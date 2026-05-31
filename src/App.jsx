@@ -4,7 +4,6 @@ import Sidebar  from './components/layout/Sidebar'
 import TopBar   from './components/layout/TopBar'
 import { Modal, Toast } from './components/ui'
 
-// Pages
 import Login      from './pages/Login'
 import Dashboard  from './pages/Dashboard'
 import Leads      from './pages/Leads'
@@ -112,8 +111,7 @@ function AuthRouter() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
-      <Route path="/
-*"     element={<RequireAuth><Shell /></RequireAuth>} />
+      <Route path="*" element={<RequireAuth><Shell /></RequireAuth>} />
     </Routes>
   )
 }
