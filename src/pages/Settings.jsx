@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../hooks/useApi'
 import { Badge, Empty, Spinner } from '../components/ui'
-import { useApp } from '../context/AppContext'
+
 
 export default function Settings() {
   const { showToast, openModal, closeModal } = useApp()
