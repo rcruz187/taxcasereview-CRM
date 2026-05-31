@@ -113,3 +113,17 @@ function AuthRouter() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
       <Route path="/
+*"     element={<RequireAuth><Shell /></RequireAuth>} />
+    </Routes>
+  )
+}
+
+export default function App() {
+  return (
+    <AppProvider>
+      <BrowserRouter basename="/taxcasereview-CRM">
+        <AuthRouter />
+      </BrowserRouter>
+    </AppProvider>
+  )
+}
