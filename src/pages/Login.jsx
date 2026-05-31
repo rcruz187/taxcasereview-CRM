@@ -1,32 +1,24 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
+import { supabase } from '../lib/supabase'
 
 export default function Login() {
   const { login, showToast } = useApp()
-  const [username, setUsername] = useState('')
+  const [email, setEmail]     = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError]       = useState('')
-  const [loading, setLoading]   = useState(false)
+  const [error, setError]     = useState('')
+  const [loading, setLoading] = useState(false)
 
   async function submit(e) {
     e.preventDefault()
-    if (!username || !password) return setError('Username and password required')
+    if (!email || !password) return setError('Email and password required')
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-firm-slug': 'taxcasereview',
-        },
-        body: JSON.stringify({ username, password }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Login failed')
-      login(data.user || data)
-      showToast(`Welcome back, ${(data.user || data).name || username}!`)
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) throw error
+      login(data.user)
+      showToast(`Welcome back!`)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -51,12 +43,13 @@ export default function Login() {
         {error && <div className="login-err">{error}</div>}
 
         <div className="field">
-          <label>Username</label>
+          <label>Email</label>
           <input
-            value={username}
-            onChange={e => setUsername(e.target.value)}
-            placeholder="rcruz187"
-            autoComplete="username"
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            autoComplete="email"
             autoFocus
           />
         </div>

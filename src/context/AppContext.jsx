@@ -1,13 +1,27 @@
-import { createContext, useContext, useState, useCallback, useRef } from 'react'
+import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
 
 const AppContext = createContext(null)
 
 export function AppProvider({ children }) {
-  const [user, setUser]         = useState(null)
-  const [toast, setToast]       = useState({ msg: '', type: 'ok', show: false })
-  const [modal, setModal]       = useState({ open: false, title: '', body: null })
-  const [searchQ, setSearchQ]   = useState('')
+  const [user, setUser]       = useState(null)
+  const [checking, setChecking] = useState(true)
+  const [toast, setToast]     = useState({ msg: '', type: 'ok', show: false })
+  const [modal, setModal]     = useState({ open: false, title: '', body: null })
+  const [searchQ, setSearchQ] = useState('')
   const toastTimer = useRef(null)
+
+  /* ── Check existing session on load ── */
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session?.user) setUser(data.session.user)
+      setChecking(false)
+    })
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+    return () => listener.subscription.unsubscribe()
+  }, [])
 
   /* ── Toast ── */
   const showToast = useCallback((msg, type = 'ok') => {
@@ -23,13 +37,13 @@ export function AppProvider({ children }) {
   /* ── Auth ── */
   const login  = useCallback((u) => setUser(u), [])
   const logout = useCallback(async () => {
-    try { await fetch('/api/auth/logout', { method: 'POST' }) } catch {}
+    await supabase.auth.signOut()
     setUser(null)
   }, [])
 
   return (
     <AppContext.Provider value={{
-      user, login, logout,
+      user, login, logout, checking,
       toast, showToast,
       modal, openModal, closeModal,
       searchQ, setSearchQ,

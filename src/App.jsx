@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AppProvider, useApp } from './context/AppContext'
 import Sidebar  from './components/layout/Sidebar'
@@ -29,19 +28,16 @@ import Employees  from './pages/Employees'
 import Reports    from './pages/Reports'
 import Settings   from './pages/Settings'
 
-/* ── Inject global animation ── */
 const style = document.createElement('style')
 style.textContent = `@keyframes spin { to { transform: rotate(360deg) } }`
 document.head.appendChild(style)
 
-/* ── Auth guard ── */
 function RequireAuth({ children }) {
   const { user } = useApp()
   if (!user) return <Navigate to="/login" replace />
   return children
 }
 
-/* ── App shell with sidebar + topbar ── */
 function Shell() {
   const { openModal } = useApp()
 
@@ -104,19 +100,8 @@ function Shell() {
   )
 }
 
-/* ── Root with auth check ── */
 function AuthRouter() {
-  const { user, login } = useApp()
-  const [checking, setChecking] = useState(true)
-
-  // Check if already logged in (session cookie)
-  useEffect(() => {
-    fetch('/api/auth/me', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data?.user || data?.id) login(data.user || data) })
-      .catch(() => {})
-      .finally(() => setChecking(false))
-  }, [])
+  const { user, checking } = useApp()
 
   if (checking) return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg)' }}>
@@ -127,17 +112,4 @@ function AuthRouter() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
-      <Route path="/*"     element={<RequireAuth><Shell /></RequireAuth>} />
-    </Routes>
-  )
-}
-
-export default function App() {
-  return (
-    <AppProvider>
-      <BrowserRouter>
-        <AuthRouter />
-      </BrowserRouter>
-    </AppProvider>
-  )
-}
+      <Route path="/
