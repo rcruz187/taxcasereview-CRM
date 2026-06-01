@@ -1,107 +1,243 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useApp } from '../context/AppContext'
 
 const BLANK = { title:'', clientName:'', caseNum:'', assignedTo:'', dueDate:'', priority:'Normal', notes:'', done:false }
+const QT_BLANK = { title:'', dueDate:'', priority:'Normal', clientName:'', assignedTo:'' }
 
 export default function Tasks() {
-  const [tasks, setTasks]       = useState([])
-  const [clients, setClients]   = useState([])
-  const [employees,setEmployees]= useState([])
-  const [modal, setModal]       = useState(false)
-  const [form, setForm]         = useState(BLANK)
-  const [qtForm, setQt]         = useState({title:'',dueDate:'',priority:'Normal',clientName:'',assignedTo:''})
-  const [suggestions, setSug]   = useState([])
-  const [qtSug, setQtSug]       = useState([])
-  const [saving, setSaving]     = useState(false)
-  const [toast, setToast]       = useState('')
+  const { user } = useApp()
+  const [tasks,     setTasks]     = useState([])
+  const [deleted,   setDeleted]   = useState([])   // soft-deleted tasks
+  const [clients,   setClients]   = useState([])
+  const [employees, setEmployees] = useState([])
+  const [modal,     setModal]     = useState(false)
+  const [form,      setForm]      = useState(BLANK)
+  const [qtForm,    setQt]        = useState(QT_BLANK)
+  const [sug,       setSug]       = useState([])
+  const [qtSug,     setQtSug]     = useState([])
+  const [saving,    setSaving]    = useState(false)
+  const [toast,     setToast]     = useState('')
+  const [view,      setView]      = useState('open') // 'open' | 'completed' | 'deleted'
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
 
   useEffect(() => { load() }, [])
+  useEffect(() => {
+    // Check if current user is Super Admin
+    if (user?.email) checkRole(user.email)
+  }, [user])
+
+  async function checkRole(email) {
+    const { data } = await supabase.from('employees').select('access').eq('email', email).maybeSingle()
+    if (data?.access === 'Super Admin') setIsSuperAdmin(true)
+    // Also check against known super admin email directly
+    if (email === 'romy@taxcasereview.org') setIsSuperAdmin(true)
+  }
 
   async function load() {
-    const [{ data: t }, { data: c }, { data: e }] = await Promise.all([
-      supabase.from('tasks').select('*').order('created_at', { ascending: false }),
+    const [{ data:t },{ data:dt },{ data:c },{ data:e }] = await Promise.all([
+      supabase.from('tasks').select('*').eq('deleted', false).order('created_at',{ascending:false}),
+      supabase.from('tasks').select('*').eq('deleted', true).order('deleted_at',{ascending:false}),
       supabase.from('clients').select('id,name'),
       supabase.from('employees').select('id,name')
     ])
+    // Handle case where 'deleted' column may not exist yet — fall back gracefully
     if (t) setTasks(t)
+    else {
+      const { data: fallback } = await supabase.from('tasks').select('*').order('created_at',{ascending:false})
+      if (fallback) setTasks(fallback)
+    }
+    if (dt) setDeleted(dt)
     if (c) setClients(c)
     if (e) setEmployees(e)
   }
 
-  function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''),3000) }
-  function fld(k,v) { setForm(f=>({...f,[k]:v})) }
+  function showToast(msg){setToast(msg);setTimeout(()=>setToast(''),3500)}
+  function fld(k,v){setForm(f=>({...f,[k]:v}))}
 
   function searchClient(val, isQt=false) {
     if (isQt) setQt(f=>({...f,clientName:val})); else fld('clientName',val)
-    if (val.length < 2) { isQt ? setQtSug([]) : setSug([]); return }
-    const res = clients.filter(c=>c.name.toLowerCase().includes(val.toLowerCase())).slice(0,6)
-    isQt ? setQtSug(res) : setSug(res)
+    if (val.length<2){isQt?setQtSug([]):setSug([]);return}
+    const res=clients.filter(c=>c.name.toLowerCase().includes(val.toLowerCase())).slice(0,6)
+    isQt?setQtSug(res):setSug(res)
   }
 
   async function save(data) {
-    if (!data.title.trim()) { showToast('Title required'); return }
+    if (!data.title.trim()){showToast('Title required');return}
     setSaving(true)
-    const { error } = await supabase.from('tasks').insert([{ ...data, created_at: new Date().toISOString() }])
+    const payload = { ...data, done:false, deleted:false, created_at:new Date().toISOString() }
+    const {error} = await supabase.from('tasks').insert([payload])
     setSaving(false)
-    if (error) { showToast('Error: ' + error.message); return }
-    showToast('Task added!')
-    setModal(false)
-    setForm(BLANK)
-    setQt({title:'',dueDate:'',priority:'Normal',clientName:'',assignedTo:''})
-    load()
+    if (error){showToast('❌ '+error.message);return}
+    showToast('✅ Task added!')
+    setModal(false); setForm(BLANK); setQt(QT_BLANK); load()
   }
 
   async function toggleDone(t) {
-    await supabase.from('tasks').update({ done: !t.done }).eq('id', t.id)
+    await supabase.from('tasks').update({done:!t.done}).eq('id',t.id)
     load()
   }
 
-  async function deleteTask(id) {
-    await supabase.from('tasks').delete().eq('id', id)
-    showToast('Deleted')
+  // Soft delete — sets deleted=true, records timestamp
+  async function softDelete(id) {
+    const {error} = await supabase.from('tasks').update({deleted:true, deleted_at:new Date().toISOString()}).eq('id',id)
+    if (error) {
+      // Column may not exist — fall back to hard delete
+      await supabase.from('tasks').delete().eq('id',id)
+      showToast('Task deleted')
+    } else {
+      showToast('Task moved to deleted')
+    }
     load()
   }
 
-  const open = tasks.filter(t => !t.done)
-  const done = tasks.filter(t => t.done)
+  // Restore a deleted task (Super Admin only)
+  async function restore(id) {
+    const {error} = await supabase.from('tasks').update({deleted:false, deleted_at:null}).eq('id',id)
+    if (error){showToast('❌ '+error.message);return}
+    showToast('✅ Task restored!')
+    load()
+  }
 
-  function TaskItem({ t }) {
-    const pc = t.priority === 'Urgent' ? 'br' : t.priority === 'High' ? 'ba' : 'bn'
+  // Permanent delete (Super Admin only)
+  async function permDelete(id) {
+    if (!confirm('Permanently delete this task? This cannot be undone.')) return
+    await supabase.from('tasks').delete().eq('id',id)
+    showToast('Permanently deleted'); load()
+  }
+
+  const reps = employees.length>0 ? employees.map(e=>e.name) : ['Romy Cruz','Dana Richard','Yesenia Gonzalez']
+  const open      = tasks.filter(t=>!t.done && !t.deleted)
+  const completed = tasks.filter(t=>t.done  && !t.deleted)
+  const pc = p => p==='Urgent'?'br':p==='High'?'ba':'bn'
+
+  function TaskItem({t, showRestore=false}) {
     return (
-      <div className="task-item">
-        <div className={`tcb${t.done?' done':''}`} onClick={()=>toggleDone(t)} style={{cursor:'pointer'}}>
-          {t.done ? '✓' : ''}
-        </div>
-        <div style={{flex:1}}>
-          <div style={{textDecoration:t.done?'line-through':'',opacity:t.done?.5:1}}>{t.title}</div>
-          <div style={{fontSize:11,color:'var(--t3)'}}>
-            {t.assignedTo||''}{t.dueDate ? ' · due '+t.dueDate : ''}{t.clientName ? ' · '+t.clientName : ''}
+      <div style={{display:'flex',gap:10,alignItems:'flex-start',padding:'9px 0',borderBottom:'1px solid var(--br)'}}>
+        {/* Checkbox */}
+        <div
+          onClick={()=>!showRestore&&toggleDone(t)}
+          style={{
+            width:20,height:20,borderRadius:5,flexShrink:0,marginTop:1,cursor:showRestore?'default':'pointer',
+            border:'1.5px solid var(--b2c)',
+            background:t.done?'var(--ok)':'var(--s2)',
+            display:'flex',alignItems:'center',justifyContent:'center',
+            color:'#fff',fontSize:12,fontWeight:700
+          }}
+        >{t.done?'✓':''}</div>
+
+        {/* Content */}
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{
+            fontSize:13,fontWeight:t.done?400:600,
+            textDecoration:t.done||showRestore?'line-through':'none',
+            opacity:t.done||showRestore?0.55:1,
+            color:'var(--tx)',
+            overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'
+          }}>{t.title}</div>
+          <div style={{fontSize:11,color:'var(--t3)',marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
+            {t.assignedTo&&<span>👤 {t.assignedTo}</span>}
+            {t.dueDate&&<span style={{color:new Date(t.dueDate)<new Date()&&!t.done?'var(--bad)':'inherit'}}>📅 {t.dueDate}</span>}
+            {t.clientName&&<span>🏢 {t.clientName}</span>}
+            {t.priority&&<span className={`bdg ${pc(t.priority)}`} style={{fontSize:9}}>{t.priority}</span>}
+            {showRestore&&t.deleted_at&&<span style={{color:'var(--bad)'}}>Deleted {t.deleted_at?.slice(0,10)}</span>}
           </div>
+          {t.notes&&<div style={{fontSize:11,color:'var(--t2)',marginTop:3,lineHeight:1.5}}>{t.notes}</div>}
         </div>
-        <span className={`bdg ${pc}`}>{t.priority||'Normal'}</span>
-        <button className="btn del" style={{marginLeft:6}} onClick={()=>deleteTask(t.id)}>Del</button>
+
+        {/* Actions */}
+        <div style={{display:'flex',gap:4,flexShrink:0}}>
+          {!showRestore ? (
+            <>
+              {!t.done&&<button className="btn sec" style={{fontSize:10,padding:'2px 7px'}} onClick={()=>toggleDone(t)}>✓ Done</button>}
+              <button className="btn del" style={{fontSize:10,padding:'2px 7px'}} onClick={()=>softDelete(t.id)}>Del</button>
+            </>
+          ) : isSuperAdmin ? (
+            <>
+              <button className="btn sec" style={{fontSize:10,padding:'2px 8px',color:'var(--ok)'}} onClick={()=>restore(t.id)}>↩ Restore</button>
+              <button className="btn del" style={{fontSize:10,padding:'2px 7px'}} onClick={()=>permDelete(t.id)}>☠ Perm</button>
+            </>
+          ) : null}
+        </div>
       </div>
     )
   }
 
+  // Stats bar
+  const totalCreated   = tasks.length + deleted.length
+  const totalCompleted = completed.length
+  const totalDeleted   = deleted.length
+
   return (
     <div>
-      {toast && <div className="toast show">{toast}</div>}
-      <div className="g2">
+      {toast&&<div className="toast show">{toast}</div>}
+
+      {/* Stats */}
+      <div className="metrics" style={{marginBottom:12}}>
+        <div className="metric"><div className="ml">Open</div><div className="mv" style={{color:'var(--b2)'}}>{open.length}</div></div>
+        <div className="metric"><div className="ml">Completed</div><div className="mv" style={{color:'var(--ok)'}}>{totalCompleted}</div></div>
+        <div className="metric"><div className="ml">Total Created</div><div className="mv">{totalCreated}</div></div>
+        {isSuperAdmin&&<div className="metric" style={{cursor:'pointer'}} onClick={()=>setView('deleted')}>
+          <div className="ml">Deleted</div>
+          <div className="mv" style={{color:totalDeleted>0?'var(--bad)':'var(--t3)'}}>{totalDeleted}</div>
+        </div>}
+      </div>
+
+      {/* View tabs */}
+      <div style={{display:'flex',gap:6,marginBottom:12}}>
+        <span className={`chip${view==='open'?' on':''}`} onClick={()=>setView('open')}>Open ({open.length})</span>
+        <span className={`chip${view==='completed'?' on':''}`} onClick={()=>setView('completed')}>Completed ({totalCompleted})</span>
+        {isSuperAdmin&&<span className={`chip${view==='deleted'?' on':''}`} onClick={()=>setView('deleted')} style={{color:totalDeleted>0?'var(--bad)':'',borderColor:totalDeleted>0?'var(--bad)':''}}>🗑 Deleted ({totalDeleted}) — Admin Only</span>}
+      </div>
+
+      <div className="g2" style={{alignItems:'start'}}>
         {/* Left: task list */}
         <div>
-          <div className="card">
-            <div className="ch">
-              <span className="ct">Open Tasks ({open.length})</span>
-              <button className="btn pri" onClick={()=>setModal(true)}>+ Add Task</button>
+          {/* Open tasks */}
+          {view==='open'&&(
+            <div className="card">
+              <div className="ch">
+                <span className="ct">Open Tasks ({open.length})</span>
+                <button className="btn pri" onClick={()=>setModal(true)}>+ Add Task</button>
+              </div>
+              {open.length===0
+                ?<div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>🎉 No open tasks!</div>
+                :open.map(t=><TaskItem key={t.id} t={t}/>)
+              }
             </div>
-            {open.length === 0 ? <div style={{color:'var(--t3)',fontSize:12,padding:'8px 0'}}>No open tasks 🎉</div>
-              : open.map(t=><TaskItem key={t.id} t={t}/>)}
-          </div>
-          {done.length > 0 && (
-            <div className="card" style={{marginTop:0}}>
-              <div className="ch"><span className="ct" style={{color:'var(--t3)'}}>Completed ({done.length})</span></div>
-              {done.map(t=><TaskItem key={t.id} t={t}/>)}
+          )}
+
+          {/* Completed */}
+          {view==='completed'&&(
+            <div className="card">
+              <div className="ch"><span className="ct">Completed Tasks ({totalCompleted})</span></div>
+              {totalCompleted===0
+                ?<div style={{color:'var(--t3)',fontSize:13,padding:'8px 0'}}>No completed tasks yet</div>
+                :completed.map(t=><TaskItem key={t.id} t={t}/>)
+              }
+            </div>
+          )}
+
+          {/* Deleted — Super Admin only */}
+          {view==='deleted'&&isSuperAdmin&&(
+            <div className="card" style={{borderColor:'var(--bad)'}}>
+              <div className="ch">
+                <span className="ct" style={{color:'var(--bad)'}}>🗑 Deleted Tasks ({totalDeleted})</span>
+                <span style={{fontSize:11,color:'var(--t3)'}}>Super Admin View</span>
+              </div>
+              {totalDeleted===0
+                ?<div style={{color:'var(--t3)',fontSize:13,padding:'8px 0'}}>No deleted tasks</div>
+                :deleted.map(t=><TaskItem key={t.id} t={t} showRestore={true}/>)
+              }
+            </div>
+          )}
+
+          {/* Blocked non-admin */}
+          {view==='deleted'&&!isSuperAdmin&&(
+            <div className="card" style={{textAlign:'center',padding:40}}>
+              <div style={{fontSize:32,marginBottom:8}}>🔒</div>
+              <div style={{fontWeight:700}}>Super Admin Only</div>
+              <div style={{fontSize:13,color:'var(--t3)',marginTop:4}}>You don't have permission to view deleted tasks.</div>
             </div>
           )}
         </div>
@@ -110,7 +246,9 @@ export default function Tasks() {
         <div className="card">
           <div className="ch"><span className="ct">Quick Add Task</span></div>
           <div className="field"><label>Title *</label>
-            <input value={qtForm.title} onChange={e=>setQt(f=>({...f,title:e.target.value}))} placeholder="Task description"/>
+            <input value={qtForm.title} onChange={e=>setQt(f=>({...f,title:e.target.value}))}
+              onKeyDown={e=>e.key==='Enter'&&save(qtForm)}
+              placeholder="Task description"/>
           </div>
           <div className="fg2">
             <div className="field"><label>Due Date</label>
@@ -126,47 +264,61 @@ export default function Tasks() {
             <div className="field" style={{position:'relative'}}>
               <label>Linked Client</label>
               <input value={qtForm.clientName} onChange={e=>searchClient(e.target.value,true)} placeholder="Search..." autoComplete="off"/>
-              {qtSug.length > 0 && (
+              {qtSug.length>0&&(
                 <div style={{position:'absolute',top:'100%',left:0,right:0,background:'var(--s3)',border:'1px solid var(--b2c)',borderRadius:7,zIndex:500}}>
-                  {qtSug.map(c=>(
-                    <div key={c.id} onClick={()=>{setQt(f=>({...f,clientName:c.name}));setQtSug([])}} style={{padding:'7px 12px',cursor:'pointer',fontSize:13}}>
-                      {c.name}
-                    </div>
-                  ))}
+                  {qtSug.map(c=><div key={c.id} onClick={()=>{setQt(f=>({...f,clientName:c.name}));setQtSug([])}} style={{padding:'7px 12px',cursor:'pointer',fontSize:13}}>{c.name}</div>)}
                 </div>
               )}
             </div>
             <div className="field"><label>Assigned To</label>
               <select value={qtForm.assignedTo} onChange={e=>setQt(f=>({...f,assignedTo:e.target.value}))}>
-                {(employees.length > 0 ? employees.map(e=>e.name) : ['Romy Cruz','Dana Richard','Yesenia Gonzalez']).map(r=>(<option key={r}>{r}</option>))}
+                <option value="">Unassigned</option>
+                {reps.map(r=><option key={r}>{r}</option>)}
               </select>
             </div>
           </div>
           <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:10}} onClick={()=>save(qtForm)} disabled={saving}>
-            {saving ? 'Adding...' : 'Add Task'}
+            {saving?'Adding…':'Add Task'}
           </button>
+
+          {/* Summary box */}
+          <div style={{marginTop:16,padding:12,background:'var(--s2)',borderRadius:8}}>
+            <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em',color:'var(--t3)',marginBottom:8}}>Summary</div>
+            <div style={{display:'flex',flexDirection:'column',gap:5}}>
+              {[
+                ['Open Tasks',      open.length,      'var(--b2)'],
+                ['Completed Today', completed.filter(t=>t.created_at?.slice(0,10)===new Date().toISOString().slice(0,10)).length, 'var(--ok)'],
+                ['Total Completed', totalCompleted,   'var(--ok)'],
+                ['Total Created',   totalCreated,     'var(--tx)'],
+              ].map(([label,val,color])=>(
+                <div key={label} style={{display:'flex',justifyContent:'space-between',fontSize:12}}>
+                  <span style={{color:'var(--t2)'}}>{label}</span>
+                  <span style={{fontWeight:700,color}}>{val}</span>
+                </div>
+              ))}
+              {isSuperAdmin&&(
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:12}}>
+                  <span style={{color:'var(--t2)'}}>Deleted</span>
+                  <span style={{fontWeight:700,color:totalDeleted>0?'var(--bad)':'var(--t3)',cursor:'pointer'}} onClick={()=>setView('deleted')}>{totalDeleted} {totalDeleted>0?'— view →':''}</span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Full modal */}
-      {modal && (
+      {/* Full add modal */}
+      {modal&&(
         <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setModal(false)}>
-          <div className="modal">
-            <div className="mh">
-              <span className="mt">Add Task</span>
-              <button className="xbtn" onClick={()=>setModal(false)}>&times;</button>
-            </div>
+          <div className="modal" style={{width:540}}>
+            <div className="mh"><span className="mt">Add Task</span><button className="xbtn" onClick={()=>setModal(false)}>&times;</button></div>
             <div className="field"><label>Title *</label><input value={form.title} onChange={e=>fld('title',e.target.value)} placeholder="Task description"/></div>
             <div className="field" style={{position:'relative'}}>
               <label>Client / Lead</label>
               <input value={form.clientName} onChange={e=>searchClient(e.target.value)} placeholder="Search clients..." autoComplete="off"/>
-              {suggestions.length > 0 && (
+              {sug.length>0&&(
                 <div style={{position:'absolute',top:'100%',left:0,right:0,background:'var(--s3)',border:'1px solid var(--b2c)',borderRadius:7,zIndex:500}}>
-                  {suggestions.map(c=>(
-                    <div key={c.id} onClick={()=>{fld('clientName',c.name);setSug([])}} style={{padding:'7px 12px',cursor:'pointer',fontSize:13}}>
-                      {c.name}
-                    </div>
-                  ))}
+                  {sug.map(c=><div key={c.id} onClick={()=>{fld('clientName',c.name);setSug([])}} style={{padding:'7px 12px',cursor:'pointer',fontSize:13}}>{c.name}</div>)}
                 </div>
               )}
             </div>
@@ -174,7 +326,8 @@ export default function Tasks() {
               <div className="field"><label>Case #</label><input value={form.caseNum} onChange={e=>fld('caseNum',e.target.value)}/></div>
               <div className="field"><label>Assigned To</label>
                 <select value={form.assignedTo} onChange={e=>fld('assignedTo',e.target.value)}>
-                  {(employees.length > 0 ? employees.map(e=>e.name) : ['Romy Cruz','Dana Richard','Yesenia Gonzalez']).map(r=>(<option key={r}>{r}</option>))}
+                  <option value="">Unassigned</option>
+                  {reps.map(r=><option key={r}>{r}</option>)}
                 </select>
               </div>
             </div>
@@ -186,9 +339,9 @@ export default function Tasks() {
                 </select>
               </div>
             </div>
-            <div className="field"><label>Notes</label><textarea value={form.notes} onChange={e=>fld('notes',e.target.value)}/></div>
+            <div className="field"><label>Notes</label><textarea value={form.notes} onChange={e=>fld('notes',e.target.value)} style={{minHeight:70}}/></div>
             <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:10}} onClick={()=>save(form)} disabled={saving}>
-              {saving ? 'Saving...' : 'Add Task'}
+              {saving?'Saving…':'Add Task'}
             </button>
           </div>
         </div>
