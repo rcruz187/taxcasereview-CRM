@@ -34,32 +34,23 @@ export default function Employees() {
     const log = []
 
     for (const member of TEAM) {
-      // 1. Try to find existing record
-      const { data: existing, error: findErr } = await supabase
-        .from('employees').select('id').eq('email', member.email).maybeSingle()
-
-      if (findErr) {
-        log.push(`❌ Find ${member.name}: ${findErr.message}`)
-        continue
+      // Delete any existing row with this email first, then insert fresh
+      const { error: delErr } = await supabase
+        .from('employees').delete().eq('email', member.email)
+      if (delErr) {
+        log.push(`⚠️ Clear ${member.name}: ${delErr.message}`)
+        // continue anyway — might not have existed
       }
 
-      if (existing) {
-        // Update
-        const { error: updErr } = await supabase
-          .from('employees').update(member).eq('id', existing.id)
-        log.push(updErr ? `❌ Update ${member.name}: ${updErr.message}` : `✅ Updated ${member.name}`)
-      } else {
-        // Insert
-        const { error: insErr } = await supabase
-          .from('employees').insert([{ ...member, created_at: new Date().toISOString() }])
-        log.push(insErr ? `❌ Insert ${member.name}: ${insErr.message}` : `✅ Inserted ${member.name}`)
-      }
+      const { error: insErr } = await supabase
+        .from('employees').insert([{ ...member, created_at: new Date().toISOString() }])
+      log.push(insErr ? `❌ Insert ${member.name}: ${insErr.message}` : `✅ ${member.name} added`)
     }
 
     setSeedLog(log)
     setSeeding(false)
     const failures = log.filter(l => l.startsWith('❌'))
-    showToast(failures.length === 0 ? '✅ Team seeded successfully!' : `⚠️ Done with ${failures.length} error(s) — see log below`)
+    showToast(failures.length === 0 ? '✅ Team seeded!' : `⚠️ ${failures.length} error(s) — see log`)
     load()
   }
 
