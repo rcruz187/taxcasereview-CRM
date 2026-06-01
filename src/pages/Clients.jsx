@@ -1,13 +1,23 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { generateServiceAgreement, generateAddendum, generateEngagementLetter, generatePOACoverLetter } from '../lib/docUtils'
 
 const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const DAYS   = Array.from({length:31},(_,i)=>String(i+1).padStart(2,'0'))
 const YDOB   = Array.from({length:80},(_,i)=>2005-i)
 
-const BLANK_DEP = { name:'', ssn:'', dob:'', relationship:'Child' }
+const PIPELINE_STAGES = [
+  { label:'Investigation', key:'investigation' },
+  { label:'Transcripts',   key:'transcripts' },
+  { label:'Analysis',      key:'analysis' },
+  { label:'Proposal',      key:'proposal' },
+  { label:'Negotiation',   key:'negotiation' },
+  { label:'Resolution',    key:'resolution' },
+  { label:'Closed',        key:'closed' },
+]
 
+const BLANK_DEP = { name:'', ssn:'', dob:'', relationship:'Child' }
 const BLANK = {
   clientType:'Individual', name:'', phone:'', phone2:'', email:'',
   street:'', city:'', state:'', zip:'', county:'',
@@ -15,31 +25,43 @@ const BLANK = {
   spouseName:'', spouseSsn:'', filingStatus:'Single',
   irsBalance:'', issueType:'OIC', irsOrState:'IRS Federal', taxYears:'',
   clientSince:'', status:'Active', notes:'', assignedTo:'',
-  dependents: []
+  pipelineStage:'investigation', dependents:[]
 }
 
 function Bdg({s,c}) { return <span className={`bdg ${c||'bn'}`}>{s}</span> }
-
-function DR({label, val}) {
+function DR({label,val}) {
   return (
-    <div style={{display:'flex',borderBottom:'1px solid var(--br)',padding:'7px 0',gap:12,alignItems:'flex-start'}}>
+    <div style={{display:'flex',borderBottom:'1px solid var(--br)',padding:'7px 0',gap:12}}>
       <div style={{minWidth:130,fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em',color:'var(--t3)',paddingTop:1}}>{label}</div>
-      <div style={{flex:1,fontSize:13,color:'var(--tx)'}}>{val || <span style={{color:'var(--t3)'}}>—</span>}</div>
+      <div style={{flex:1,fontSize:13,color:'var(--tx)'}}>{val||<span style={{color:'var(--t3)'}}>—</span>}</div>
     </div>
   )
 }
-
 function formatBalance(val) {
   if (!val) return '—'
-  if (typeof val === 'string' && (val.includes('$') || isNaN(Number(val)))) return val
-  const n = Number(val)
-  return isNaN(n) ? val : '$' + n.toLocaleString()
+  if (typeof val==='string'&&(val.includes('$')||isNaN(Number(val)))) return val
+  const n=Number(val); return isNaN(n)?val:'$'+n.toLocaleString()
 }
-
 function parseDependents(raw) {
   if (!raw) return []
   if (Array.isArray(raw)) return raw
   try { return JSON.parse(raw) } catch { return [] }
+}
+
+// ─── Action Button ────────────────────────────────────────────────────────────
+function ActionBtn({color, icon, label, sub, onClick}) {
+  return (
+    <button onClick={onClick} style={{
+      background:color, color:'#fff', border:'none', borderRadius:8,
+      padding:'10px 12px', cursor:'pointer', display:'flex', flexDirection:'column',
+      alignItems:'center', gap:3, fontSize:11, fontWeight:700, textAlign:'center',
+      flex:1, minWidth:90
+    }}>
+      <span style={{fontSize:18}}>{icon}</span>
+      <span>{label}</span>
+      {sub && <span style={{fontSize:9,opacity:.8,fontWeight:400}}>{sub}</span>}
+    </button>
+  )
 }
 
 export default function Clients() {
@@ -52,162 +74,345 @@ export default function Clients() {
   const [saving,    setSaving]    = useState(false)
   const [toast,     setToast]     = useState('')
   const [detail,    setDetail]    = useState(null)
+  // Related data for detail view
+  const [relCases,    setRelCases]    = useState([])
+  const [relTasks,    setRelTasks]    = useState([])
+  const [relInvoices, setRelInvoices] = useState([])
+  const [loadingRel,  setLoadingRel]  = useState(false)
+  // Quick add task inline
+  const [quickTask,   setQuickTask]   = useState('')
+  const [addingTask,  setAddingTask]  = useState(false)
 
   useEffect(() => { load() }, [])
 
   async function load() {
-    const [{ data: cl }, { data: em }] = await Promise.all([
-      supabase.from('clients').select('*').order('created_at', { ascending: false }),
+    const [{ data:cl },{ data:em }] = await Promise.all([
+      supabase.from('clients').select('*').order('created_at',{ascending:false}),
       supabase.from('employees').select('id,name')
     ])
     if (cl) setClients(cl)
     if (em) setEmployees(em)
   }
 
-  function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''),3500) }
-  function fld(k,v) { setForm(f=>({...f,[k]:v})) }
+  async function loadRelated(clientName) {
+    setLoadingRel(true)
+    const [{ data:cases },{ data:tasks },{ data:invoices }] = await Promise.all([
+      supabase.from('cases').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
+      supabase.from('tasks').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
+      supabase.from('invoices').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
+    ])
+    setRelCases(cases||[])
+    setRelTasks(tasks||[])
+    setRelInvoices(invoices||[])
+    setLoadingRel(false)
+  }
 
-  const filtered = filter === 'All' ? clients : clients.filter(c => c.clientType === filter)
+  function showToast(msg){setToast(msg);setTimeout(()=>setToast(''),3500)}
+  function fld(k,v){setForm(f=>({...f,[k]:v}))}
+  const filtered = filter==='All'?clients:clients.filter(c=>c.clientType===filter)
 
   function buildPayload(f) {
-    const { dobM, dobD, dobY, id, created_at, ...rest } = f
-    const dob = dobM && dobD && dobY ? `${dobM}/${dobD}/${dobY}` : f.dob || ''
-    return { ...rest, dob, dependents: JSON.stringify(f.dependents || []) }
+    const {dobM,dobD,dobY,id,created_at,...rest}=f
+    const dob=dobM&&dobD&&dobY?`${dobM}/${dobD}/${dobY}`:f.dob||''
+    return {...rest,dob,dependents:JSON.stringify(f.dependents||[])}
   }
 
   async function save() {
-    if (!form.name.trim()) { showToast('Name is required'); return }
+    if (!form.name.trim()){showToast('Name is required');return}
     setSaving(true)
-    const { error } = await supabase.from('clients').insert([{ ...buildPayload(form), created_at: new Date().toISOString() }])
+    const {error}=await supabase.from('clients').insert([{...buildPayload(form),created_at:new Date().toISOString()}])
     setSaving(false)
-    if (error) { showToast('Error: ' + error.message); return }
+    if (error){showToast('Error: '+error.message);return}
     showToast('✅ Client added!')
-    setModal(false); setForm(BLANK); load()
+    setModal(false);setForm(BLANK);load()
   }
 
   async function saveEdit() {
     setSaving(true)
-    const { error } = await supabase.from('clients').update(buildPayload(form)).eq('id', form.id)
+    const {error}=await supabase.from('clients').update(buildPayload(form)).eq('id',form.id)
     setSaving(false)
-    if (error) { showToast('Error: ' + error.message); return }
+    if (error){showToast('Error: '+error.message);return}
     showToast('✅ Saved!')
     setEditModal(false)
-    const { data } = await supabase.from('clients').select('*').eq('id', form.id).single()
-    if (data) setDetail(data)
+    const {data}=await supabase.from('clients').select('*').eq('id',form.id).single()
+    if (data){setDetail(data);loadRelated(data.name)}
     load()
   }
 
-  async function deleteClient(id) {
+  async function deleteClient(id,name) {
     if (!confirm('Delete this client?')) return
-    await supabase.from('clients').delete().eq('id', id)
-    showToast('Deleted'); setDetail(null); load()
+    await supabase.from('clients').delete().eq('id',id)
+    showToast('Deleted');setDetail(null);load()
+  }
+
+  async function toggleTask(task) {
+    const {error}=await supabase.from('tasks').update({done:!task.done}).eq('id',task.id)
+    if (!error && detail) loadRelated(detail.name)
+  }
+
+  async function addQuickTask() {
+    if (!quickTask.trim()||!detail) return
+    setAddingTask(true)
+    const {error}=await supabase.from('tasks').insert([{
+      title:quickTask.trim(), clientName:detail.name, priority:'Normal',
+      done:false, created_at:new Date().toISOString()
+    }])
+    setAddingTask(false)
+    if (error){showToast('Task error: '+error.message);return}
+    setQuickTask('')
+    loadRelated(detail.name)
+    showToast('✅ Task added!')
   }
 
   function openEdit(c) {
-    const deps = parseDependents(c.dependents)
-    // Parse dob back into parts
-    let dobM='', dobD='', dobY=''
-    if (c.dob) {
-      const parts = c.dob.split('/')
-      if (parts.length === 3) { dobM = parts[0]; dobD = parts[1]; dobY = parts[2] }
-    }
-    setForm({ ...BLANK, ...c, dobM, dobD, dobY, dependents: deps })
+    const deps=parseDependents(c.dependents)
+    let dobM='',dobD='',dobY=''
+    if (c.dob){const p=c.dob.split('/');if(p.length===3){dobM=p[0];dobD=p[1];dobY=p[2]}}
+    setForm({...BLANK,...c,dobM,dobD,dobY,dependents:deps})
     setEditModal(true)
   }
 
-  const reps = employees.length > 0
-    ? employees.map(e => e.name)
-    : ['Romy Cruz', 'Dana Richard', 'Yesenia Gonzalez']
+  function openDetail(c) {
+    setDetail(c)
+    setRelCases([]);setRelTasks([]);setRelInvoices([])
+    loadRelated(c.name)
+  }
+
+  const reps=employees.length>0?employees.map(e=>e.name):['Romy Cruz','Dana Richard','Yesenia Gonzalez']
+  const stageIdx=c=>PIPELINE_STAGES.findIndex(s=>s.key===(c.pipelineStage||'investigation'))
 
   // ── Detail View ──────────────────────────────────────────────────────────────
   if (detail) {
-    const c = detail
-    const deps = parseDependents(c.dependents)
+    const c=detail
+    const deps=parseDependents(c.dependents)
+    const si=stageIdx(c)
+
     return (
-      <div style={{maxWidth:900,margin:'0 auto'}}>
-        {toast && <div className="toast show">{toast}</div>}
-        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16}}>
+      <div style={{maxWidth:960,margin:'0 auto'}}>
+        {toast&&<div className="toast show">{toast}</div>}
+
+        {/* Back + top actions */}
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,flexWrap:'wrap'}}>
           <button className="btn" onClick={()=>setDetail(null)}>← Back to Clients</button>
           <button className="btn pri" onClick={()=>openEdit(c)} style={{marginLeft:'auto'}}>✏️ Edit</button>
-          <button className="btn del" onClick={()=>deleteClient(c.id)}>🗑 Delete</button>
+          <button className="btn del" onClick={()=>deleteClient(c.id,c.name)}>🗑 Delete</button>
         </div>
 
-        {/* Header */}
+        {/* Header card */}
         <div className="card" style={{marginBottom:12}}>
-          <div style={{display:'flex',alignItems:'center',gap:16,padding:'4px 0 8px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:16,padding:'4px 0 8px',flexWrap:'wrap'}}>
             <div style={{width:56,height:56,borderRadius:'50%',background:'var(--blue)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:22,color:'#fff',flexShrink:0}}>
               {(c.name||'?')[0].toUpperCase()}
             </div>
-            <div>
+            <div style={{flex:1}}>
               <div style={{fontSize:22,fontWeight:800}}>{c.name}</div>
               <div style={{display:'flex',gap:6,marginTop:5,flexWrap:'wrap'}}>
                 <Bdg s={c.clientType||'Individual'} c="bb"/>
                 <Bdg s={c.status||'Active'} c={c.status==='Active'?'bg':'bn'}/>
-                {c.irsOrState && <Bdg s={c.irsOrState} c="ba"/>}
-                {c.issueType  && <Bdg s={c.issueType}  c="bb"/>}
+                {c.irsOrState&&<Bdg s={c.irsOrState} c="ba"/>}
+                {c.issueType&&<Bdg s={c.issueType} c="bb"/>}
+                {c.assignedTo&&<Bdg s={'👤 '+c.assignedTo} c="bn"/>}
               </div>
+            </div>
+          </div>
+
+          {/* Pipeline */}
+          <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid var(--br)'}}>
+            <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>Case Pipeline</div>
+            <div style={{display:'flex',alignItems:'center',gap:0,overflowX:'auto',paddingBottom:4}}>
+              {PIPELINE_STAGES.map((s,i)=>(
+                <div key={s.key} style={{display:'flex',alignItems:'center'}}>
+                  <div
+                    onClick={async()=>{
+                      await supabase.from('clients').update({pipelineStage:s.key}).eq('id',c.id)
+                      const {data}=await supabase.from('clients').select('*').eq('id',c.id).single()
+                      if(data)setDetail(data)
+                    }}
+                    style={{
+                      padding:'5px 10px',borderRadius:20,fontSize:11,fontWeight:600,cursor:'pointer',
+                      whiteSpace:'nowrap',
+                      background:i<=si?'var(--blue)':'var(--s3)',
+                      color:i<=si?'#fff':'var(--t3)',
+                      border:i===si?'2px solid var(--blue)':'2px solid transparent',
+                      transform:i===si?'scale(1.05)':'scale(1)',
+                      transition:'all .15s'
+                    }}>{s.label}</div>
+                  {i<PIPELINE_STAGES.length-1&&<div style={{width:16,height:2,background:i<si?'var(--blue)':'var(--br)',flexShrink:0}}/>}
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        <div className="g2" style={{alignItems:'start',gap:12}}>
-          {/* Left column */}
+        {/* Action Buttons */}
+        <div className="card" style={{marginBottom:12}}>
+          <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Quick Actions</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            <ActionBtn color="#22863a" icon="📄" label="Service Agreement" sub="Print/Sign" onClick={()=>generateServiceAgreement(c)}/>
+            <ActionBtn color="#1A7FD4" icon="✉️" label="Engagement Letter" sub="Print" onClick={()=>generateEngagementLetter(c)}/>
+            <ActionBtn color="#d97706" icon="📋" label="Addendum" sub="Add Services" onClick={()=>generateAddendum(c)}/>
+            <ActionBtn color="#6c5ce7" icon="🔐" label="POA Cover Letter" sub="Form 2848" onClick={()=>generatePOACoverLetter(c)}/>
+            <ActionBtn color="#0891b2" icon="📁" label="New Case" sub="Open Case" onClick={()=>window.location.hash='/cases'}/>
+            <ActionBtn color="#7c3aed" icon="✅" label="Add Task" sub="Assign Work" onClick={()=>{
+              const t=prompt(`New task for ${c.name}:`)
+              if(t)supabase.from('tasks').insert([{title:t,clientName:c.name,priority:'Normal',done:false,created_at:new Date().toISOString()}]).then(()=>loadRelated(c.name))
+            }}/>
+            <ActionBtn color="#be185d" icon="🧾" label="New Invoice" sub="Bill Client" onClick={()=>window.location.hash='/invoices'}/>
+          </div>
+        </div>
+
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,alignItems:'start'}}>
+          {/* LEFT COLUMN */}
           <div style={{display:'flex',flexDirection:'column',gap:12}}>
+
+            {/* Contact Info */}
             <div className="card">
               <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>Contact Info</div>
-              <DR label="Phone"   val={c.phone} />
-              <DR label="Phone 2" val={c.phone2} />
-              <DR label="Email"   val={c.email} />
-              <DR label="Address" val={[c.street,c.city,c.state,c.zip].filter(Boolean).join(', ')} />
-              <DR label="County"  val={c.county} />
+              <DR label="Phone"   val={c.phone}/>
+              <DR label="Phone 2" val={c.phone2}/>
+              <DR label="Email"   val={c.email}/>
+              <DR label="Address" val={[c.street,c.city,c.state,c.zip].filter(Boolean).join(', ')}/>
+              <DR label="County"  val={c.county}/>
             </div>
 
+            {/* Taxpayer Info */}
             <div className="card">
               <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>🔒 Taxpayer Info</div>
-              <DR label="SSN"           val={c.ssn ? '***-**-' + c.ssn.replace(/-/g,'').slice(-4) : null} />
-              <DR label="EIN"           val={c.ein} />
-              <DR label="Date of Birth" val={c.dob} />
-              <DR label="Filing Status" val={c.filingStatus} />
-              <DR label="Spouse Name"   val={c.spouseName} />
-              <DR label="Spouse SSN"    val={c.spouseSsn ? '***-**-' + c.spouseSsn.replace(/-/g,'').slice(-4) : null} />
+              <DR label="SSN"           val={c.ssn?'***-**-'+c.ssn.replace(/-/g,'').slice(-4):null}/>
+              <DR label="EIN"           val={c.ein}/>
+              <DR label="Date of Birth" val={c.dob}/>
+              <DR label="Filing Status" val={c.filingStatus}/>
+              <DR label="Spouse Name"   val={c.spouseName}/>
+              <DR label="Spouse SSN"    val={c.spouseSsn?'***-**-'+c.spouseSsn.replace(/-/g,'').slice(-4):null}/>
             </div>
 
             {/* Dependents */}
-            {deps.length > 0 && (
+            {deps.length>0&&(
               <div className="card">
                 <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>👨‍👩‍👧 Dependents ({deps.length})</div>
-                {deps.map((d,i) => (
-                  <div key={i} style={{borderBottom:'1px solid var(--br)',padding:'8px 0',display:'flex',gap:12,alignItems:'flex-start'}}>
-                    <div style={{width:28,height:28,borderRadius:'50%',background:'var(--s3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,flexShrink:0,color:'var(--t2)'}}>
-                      {i+1}
-                    </div>
-                    <div style={{flex:1}}>
+                {deps.map((d,i)=>(
+                  <div key={i} style={{borderBottom:'1px solid var(--br)',padding:'8px 0',display:'flex',gap:10}}>
+                    <div style={{width:26,height:26,borderRadius:'50%',background:'var(--s3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'var(--t2)',flexShrink:0}}>{i+1}</div>
+                    <div>
                       <div style={{fontWeight:600,fontSize:13}}>{d.name||'Unnamed'}</div>
-                      <div style={{fontSize:11,color:'var(--t3)',marginTop:2,display:'flex',gap:12,flexWrap:'wrap'}}>
+                      <div style={{fontSize:11,color:'var(--t3)',marginTop:2,display:'flex',gap:10,flexWrap:'wrap'}}>
                         <span>{d.relationship||'—'}</span>
-                        {d.dob && <span>DOB: {d.dob}</span>}
-                        {d.ssn && <span>SSN: ***-**-{d.ssn.replace(/-/g,'').slice(-4)}</span>}
+                        {d.dob&&<span>DOB: {d.dob}</span>}
+                        {d.ssn&&<span>SSN: ***-**-{d.ssn.replace(/-/g,'').slice(-4)}</span>}
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
             )}
+
+            {/* Tasks */}
+            <div className="card">
+              <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>
+                ✅ Tasks ({relTasks.length})
+              </div>
+              {loadingRel&&<div style={{color:'var(--t3)',fontSize:12}}>Loading…</div>}
+              {!loadingRel&&relTasks.length===0&&(
+                <div style={{color:'var(--t3)',fontSize:12,marginBottom:10}}>No tasks yet for this client.</div>
+              )}
+              {relTasks.map(t=>(
+                <div key={t.id} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'6px 0',borderBottom:'1px solid var(--br)'}}>
+                  <div
+                    onClick={()=>toggleTask(t)}
+                    style={{width:18,height:18,borderRadius:4,border:'1.5px solid var(--b2c)',background:t.done?'var(--ok)':'var(--s2)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,marginTop:1,color:'#fff',fontSize:11}}
+                  >{t.done?'✓':''}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:t.done?400:600,textDecoration:t.done?'line-through':'none',color:t.done?'var(--t3)':'var(--tx)'}}>{t.title}</div>
+                    <div style={{fontSize:10,color:'var(--t3)',marginTop:2,display:'flex',gap:8}}>
+                      {t.priority&&<span className={`bdg ${t.priority==='High'?'br':t.priority==='Low'?'bn':'ba'}`} style={{fontSize:9}}>{t.priority}</span>}
+                      {t.dueDate&&<span>Due: {t.dueDate}</span>}
+                      {t.assignedTo&&<span>→ {t.assignedTo}</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {/* Quick add task */}
+              <div style={{display:'flex',gap:6,marginTop:10}}>
+                <input
+                  value={quickTask}
+                  onChange={e=>setQuickTask(e.target.value)}
+                  onKeyDown={e=>e.key==='Enter'&&addQuickTask()}
+                  placeholder="Add a task…"
+                  style={{flex:1,padding:'6px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12}}
+                />
+                <button className="btn pri" style={{fontSize:11,padding:'5px 10px'}} onClick={addQuickTask} disabled={addingTask}>
+                  {addingTask?'…':'+'}
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Right column */}
+          {/* RIGHT COLUMN */}
           <div style={{display:'flex',flexDirection:'column',gap:12}}>
+
+            {/* IRS / Case Info */}
             <div className="card">
               <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>IRS / Case Info</div>
-              <DR label="IRS Balance"  val={formatBalance(c.irsBalance)} />
-              <DR label="Issue Type"   val={c.issueType} />
-              <DR label="IRS or State" val={c.irsOrState} />
-              <DR label="Tax Years"    val={c.taxYears} />
-              <DR label="Assigned Rep" val={c.assignedTo} />
-              <DR label="Client Since" val={c.clientSince} />
+              <DR label="IRS Balance"  val={formatBalance(c.irsBalance)}/>
+              <DR label="Issue Type"   val={c.issueType}/>
+              <DR label="IRS or State" val={c.irsOrState}/>
+              <DR label="Tax Years"    val={c.taxYears}/>
+              <DR label="Assigned Rep" val={c.assignedTo}/>
+              <DR label="Client Since" val={c.clientSince}/>
             </div>
 
-            {c.notes && (
+            {/* Cases */}
+            <div className="card">
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>📁 Cases ({relCases.length})</div>
+              </div>
+              {loadingRel&&<div style={{color:'var(--t3)',fontSize:12}}>Loading…</div>}
+              {!loadingRel&&relCases.length===0&&(
+                <div style={{color:'var(--t3)',fontSize:12}}>No cases linked to this client.</div>
+              )}
+              {relCases.map(cas=>(
+                <div key={cas.id} style={{borderBottom:'1px solid var(--br)',padding:'8px 0'}}>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+                    <div>
+                      <div style={{fontWeight:600,fontSize:13}}>{cas.caseType||'Case'}</div>
+                      <div style={{fontSize:11,color:'var(--t3)',marginTop:2}}>
+                        {cas.irsBalance&&<span>Balance: {formatBalance(cas.irsBalance)} · </span>}
+                        {cas.assignedTo&&<span>Rep: {cas.assignedTo}</span>}
+                      </div>
+                    </div>
+                    <span className={`bdg ${cas.status==='Open'?'bb':cas.status==='Closed'?'bg':'bn'}`}>{cas.status||'Open'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Invoices */}
+            <div className="card">
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>🧾 Invoices ({relInvoices.length})</div>
+              </div>
+              {loadingRel&&<div style={{color:'var(--t3)',fontSize:12}}>Loading…</div>}
+              {!loadingRel&&relInvoices.length===0&&(
+                <div style={{color:'var(--t3)',fontSize:12}}>No invoices for this client.</div>
+              )}
+              {relInvoices.map(inv=>(
+                <div key={inv.id} style={{borderBottom:'1px solid var(--br)',padding:'8px 0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <div>
+                    <div style={{fontWeight:600,fontSize:13}}>{inv.caseNum?`#${inv.caseNum} · `:''}{inv.lineItems||'Invoice'}</div>
+                    <div style={{fontSize:11,color:'var(--t3)',marginTop:2}}>
+                      {inv.dueDate&&<span>Due: {inv.dueDate}</span>}
+                    </div>
+                  </div>
+                  <div style={{textAlign:'right'}}>
+                    <div style={{fontWeight:700,fontSize:13}}>{inv.total?'$'+Number(inv.total).toLocaleString():'—'}</div>
+                    <span className={`bdg ${inv.status==='Paid'?'bg':inv.status==='Overdue'?'br':'bn'}`}>{inv.status||'Unpaid'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Notes */}
+            {c.notes&&(
               <div className="card">
                 <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:8}}>Notes</div>
                 <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.7,whiteSpace:'pre-wrap'}}>{c.notes}</div>
@@ -216,12 +421,7 @@ export default function Clients() {
           </div>
         </div>
 
-        {editModal && (
-          <ClientFormModal
-            form={form} fld={fld} reps={reps} saving={saving}
-            onSave={saveEdit} onClose={()=>setEditModal(false)} title="Edit Client"
-          />
-        )}
+        {editModal&&<ClientFormModal form={form} fld={fld} reps={reps} saving={saving} onSave={saveEdit} onClose={()=>setEditModal(false)} title="Edit Client"/>}
       </div>
     )
   }
@@ -229,7 +429,7 @@ export default function Clients() {
   // ── List View ────────────────────────────────────────────────────────────────
   return (
     <div>
-      {toast && <div className="toast show">{toast}</div>}
+      {toast&&<div className="toast show">{toast}</div>}
       <div className="card">
         <div className="ch">
           <span className="ct">Client Roster ({filtered.length})</span>
@@ -237,7 +437,7 @@ export default function Clients() {
             {['All','Individual','Business'].map(f=>(
               <span key={f} className={`chip${filter===f?' on':''}`} onClick={()=>setFilter(f)}>{f}</span>
             ))}
-            <button className="btn pri" onClick={()=>{ setForm(BLANK); setModal(true) }}>+ Add Client</button>
+            <button className="btn pri" onClick={()=>{setForm(BLANK);setModal(true)}}>+ Add Client</button>
           </div>
         </div>
         <div className="ovx">
@@ -246,10 +446,10 @@ export default function Clients() {
               <tr><th>Name</th><th>Type</th><th>Phone</th><th>Email</th><th>IRS Balance</th><th>Issue</th><th>Assigned</th><th>Status</th><th>Since</th><th></th></tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {filtered.length===0?(
                 <tr><td colSpan={10} style={{textAlign:'center',color:'var(--t3)',padding:20}}>No clients yet</td></tr>
-              ) : filtered.map(c => (
-                <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>setDetail(c)}>
+              ):filtered.map(c=>(
+                <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>openDetail(c)}>
                   <td style={{fontWeight:600}}>{c.name}</td>
                   <td><span className="bdg bb">{c.clientType||'Individual'}</span></td>
                   <td>{c.phone||'—'}</td>
@@ -260,7 +460,7 @@ export default function Clients() {
                   <td><span className={`bdg ${c.status==='Active'?'bg':'bn'}`}>{c.status||'Active'}</span></td>
                   <td style={{color:'var(--t2)',fontSize:12}}>{c.clientSince||'—'}</td>
                   <td onClick={e=>e.stopPropagation()}>
-                    <button className="btn del" onClick={()=>deleteClient(c.id)}>Del</button>
+                    <button className="btn del" onClick={()=>deleteClient(c.id,c.name)}>Del</button>
                   </td>
                 </tr>
               ))}
@@ -268,32 +468,16 @@ export default function Clients() {
           </table>
         </div>
       </div>
-
-      {modal && (
-        <ClientFormModal
-          form={form} fld={fld} reps={reps} saving={saving}
-          onSave={save} onClose={()=>setModal(false)} title="Add Client"
-        />
-      )}
+      {modal&&<ClientFormModal form={form} fld={fld} reps={reps} saving={saving} onSave={save} onClose={()=>setModal(false)} title="Add Client"/>}
     </div>
   )
 }
 
-// ── Client Form Modal (Add + Edit) ────────────────────────────────────────────
-function ClientFormModal({ form, fld, reps, saving, onSave, onClose, title }) {
-  function addDependent() {
-    fld('dependents', [...(form.dependents||[]), { ...BLANK_DEP }])
-  }
-  function updateDep(i, k, v) {
-    const deps = [...(form.dependents||[])]
-    deps[i] = { ...deps[i], [k]: v }
-    fld('dependents', deps)
-  }
-  function removeDep(i) {
-    const deps = [...(form.dependents||[])]
-    deps.splice(i, 1)
-    fld('dependents', deps)
-  }
+// ── Form Modal ────────────────────────────────────────────────────────────────
+function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
+  function addDep(){fld('dependents',[...(form.dependents||[]),{...BLANK_DEP}])}
+  function updDep(i,k,v){const d=[...(form.dependents||[])];d[i]={...d[i],[k]:v};fld('dependents',d)}
+  function remDep(i){const d=[...(form.dependents||[])];d.splice(i,1);fld('dependents',d)}
 
   return (
     <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&onClose()}>
@@ -303,7 +487,6 @@ function ClientFormModal({ form, fld, reps, saving, onSave, onClose, title }) {
           <button className="xbtn" onClick={onClose}>&times;</button>
         </div>
 
-        {/* Basic Info */}
         <div className="fg2">
           <div className="field"><label>Client Type</label>
             <select value={form.clientType} onChange={e=>fld('clientType',e.target.value)}>
@@ -311,29 +494,27 @@ function ClientFormModal({ form, fld, reps, saving, onSave, onClose, title }) {
             </select>
           </div>
           <div className="field"><label>Full Name *</label>
-            <input value={form.name} onChange={e=>fld('name',e.target.value)} placeholder="First Last / Business Name"/>
+            <input value={form.name} onChange={e=>fld('name',e.target.value)} placeholder="First Last"/>
           </div>
         </div>
-
         <div className="fg3">
           <div className="field"><label>Phone 1</label><input value={form.phone||''} onChange={e=>fld('phone',e.target.value)} placeholder="(305) 555-0000"/></div>
-          <div className="field"><label>Phone 2</label><input value={form.phone2||''} onChange={e=>fld('phone2',e.target.value)} placeholder="(305) 555-0000"/></div>
+          <div className="field"><label>Phone 2</label><input value={form.phone2||''} onChange={e=>fld('phone2',e.target.value)}/></div>
           <div className="field"><label>Email</label><input value={form.email||''} onChange={e=>fld('email',e.target.value)}/></div>
         </div>
-
         <div className="field"><label>Street Address</label><input value={form.street||''} onChange={e=>fld('street',e.target.value)}/></div>
         <div className="fg3">
           <div className="field"><label>City</label><input value={form.city||''} onChange={e=>fld('city',e.target.value)}/></div>
           <div className="field"><label>State</label>
             <select value={form.state||''} onChange={e=>fld('state',e.target.value)}>
-              <option value="">Select...</option>{STATES.map(s=><option key={s}>{s}</option>)}
+              <option value="">Select…</option>{STATES.map(s=><option key={s}>{s}</option>)}
             </select>
           </div>
           <div className="field"><label>ZIP</label><input value={form.zip||''} onChange={e=>fld('zip',e.target.value)}/></div>
         </div>
         <div className="field"><label>County</label><input value={form.county||''} onChange={e=>fld('county',e.target.value)} placeholder="e.g. Palm Beach"/></div>
 
-        {/* Taxpayer Info */}
+        {/* Taxpayer */}
         <div style={{background:'var(--s3)',borderRadius:8,padding:12,marginBottom:10}}>
           <div style={{fontWeight:700,fontSize:12,marginBottom:8}}>🔒 Taxpayer Info</div>
           <div className="fg2">
@@ -355,7 +536,7 @@ function ClientFormModal({ form, fld, reps, saving, onSave, onClose, title }) {
           </div>
         </div>
 
-        {/* Spouse / Partner */}
+        {/* Spouse */}
         <div style={{background:'var(--s3)',borderRadius:8,padding:12,marginBottom:10}}>
           <div style={{fontWeight:700,fontSize:12,marginBottom:8}}>👥 Spouse / Partner</div>
           <div className="fg2">
@@ -373,48 +554,34 @@ function ClientFormModal({ form, fld, reps, saving, onSave, onClose, title }) {
         <div style={{background:'var(--s3)',borderRadius:8,padding:12,marginBottom:10}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
             <div style={{fontWeight:700,fontSize:12}}>👨‍👩‍👧 Dependents ({(form.dependents||[]).length})</div>
-            <button className="btn sec" style={{fontSize:11,padding:'3px 10px'}} onClick={addDependent}>+ Add Dependent</button>
+            <button className="btn sec" style={{fontSize:11,padding:'3px 10px'}} onClick={addDep}>+ Add</button>
           </div>
-
-          {(form.dependents||[]).length === 0 && (
-            <div style={{textAlign:'center',color:'var(--t3)',fontSize:12,padding:'10px 0'}}>
-              No dependents added — click "+ Add Dependent" to add one.
-            </div>
-          )}
-
-          {(form.dependents||[]).map((d,i) => (
-            <div key={i} style={{background:'var(--s2)',borderRadius:6,padding:10,marginBottom:8,position:'relative'}}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+          {(form.dependents||[]).length===0&&<div style={{color:'var(--t3)',fontSize:12,textAlign:'center',padding:'6px 0'}}>None added</div>}
+          {(form.dependents||[]).map((d,i)=>(
+            <div key={i} style={{background:'var(--s2)',borderRadius:6,padding:10,marginBottom:8}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
                 <span style={{fontSize:11,fontWeight:700,color:'var(--t2)',textTransform:'uppercase'}}>Dependent {i+1}</span>
-                <button onClick={()=>removeDep(i)} style={{background:'none',border:'none',color:'var(--red)',cursor:'pointer',fontSize:16,lineHeight:1}}>×</button>
+                <button onClick={()=>remDep(i)} style={{background:'none',border:'none',color:'var(--red)',cursor:'pointer',fontSize:16}}>×</button>
               </div>
               <div className="fg2">
-                <div className="field"><label>Full Name</label>
-                  <input value={d.name||''} onChange={e=>updateDep(i,'name',e.target.value)} placeholder="First Last"/>
-                </div>
+                <div className="field"><label>Full Name</label><input value={d.name||''} onChange={e=>updDep(i,'name',e.target.value)}/></div>
                 <div className="field"><label>Relationship</label>
-                  <select value={d.relationship||'Child'} onChange={e=>updateDep(i,'relationship',e.target.value)}>
+                  <select value={d.relationship||'Child'} onChange={e=>updDep(i,'relationship',e.target.value)}>
                     {['Child','Stepchild','Foster Child','Sibling','Parent','Other'].map(r=><option key={r}>{r}</option>)}
                   </select>
                 </div>
               </div>
               <div className="fg2">
-                <div className="field"><label>Date of Birth</label>
-                  <input type="date" value={d.dob||''} onChange={e=>updateDep(i,'dob',e.target.value)}/>
-                </div>
-                <div className="field"><label>SSN</label>
-                  <input value={d.ssn||''} onChange={e=>updateDep(i,'ssn',e.target.value)} placeholder="XXX-XX-XXXX" maxLength={11}/>
-                </div>
+                <div className="field"><label>Date of Birth</label><input type="date" value={d.dob||''} onChange={e=>updDep(i,'dob',e.target.value)}/></div>
+                <div className="field"><label>SSN</label><input value={d.ssn||''} onChange={e=>updDep(i,'ssn',e.target.value)} placeholder="XXX-XX-XXXX" maxLength={11}/></div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* IRS / Case Info */}
+        {/* IRS Info */}
         <div className="fg2">
-          <div className="field"><label>Est. IRS Balance ($)</label>
-            <input type="number" value={form.irsBalance||''} onChange={e=>fld('irsBalance',e.target.value)} placeholder="e.g. 45000"/>
-          </div>
+          <div className="field"><label>Est. IRS Balance ($)</label><input type="number" value={form.irsBalance||''} onChange={e=>fld('irsBalance',e.target.value)} placeholder="e.g. 45000"/></div>
           <div className="field"><label>Issue Type</label>
             <select value={form.issueType||'OIC'} onChange={e=>fld('issueType',e.target.value)}>
               {['OIC','Installment Agreement','CNC','Penalty Abatement','Payroll Tax','Unfiled Returns','Appeals','Audit','Liens/Levies','Tax Investigation','ACS','Notice Status','Other'].map(o=><option key={o}>{o}</option>)}
@@ -427,14 +594,17 @@ function ClientFormModal({ form, fld, reps, saving, onSave, onClose, title }) {
               <option>IRS Federal</option><option>State</option><option>Both IRS + State</option>
             </select>
           </div>
-          <div className="field"><label>Tax Years</label>
-            <input value={form.taxYears||''} onChange={e=>fld('taxYears',e.target.value)} placeholder="2020, 2021, 2022"/>
-          </div>
+          <div className="field"><label>Tax Years</label><input value={form.taxYears||''} onChange={e=>fld('taxYears',e.target.value)} placeholder="2020, 2021, 2022"/></div>
         </div>
-        <div className="fg3">
-          <div className="field"><label>Client Since</label>
-            <input type="date" value={form.clientSince||''} onChange={e=>fld('clientSince',e.target.value)}/>
+        <div className="fg2">
+          <div className="field"><label>Pipeline Stage</label>
+            <select value={form.pipelineStage||'investigation'} onChange={e=>fld('pipelineStage',e.target.value)}>
+              {PIPELINE_STAGES.map(s=><option key={s.key} value={s.key}>{s.label}</option>)}
+            </select>
           </div>
+          <div className="field"><label>Client Since</label><input type="date" value={form.clientSince||''} onChange={e=>fld('clientSince',e.target.value)}/></div>
+        </div>
+        <div className="fg2">
           <div className="field"><label>Status</label>
             <select value={form.status||'Active'} onChange={e=>fld('status',e.target.value)}>
               <option>Active</option><option>Inactive</option><option>Prospect</option>
@@ -442,17 +612,14 @@ function ClientFormModal({ form, fld, reps, saving, onSave, onClose, title }) {
           </div>
           <div className="field"><label>Assigned Rep</label>
             <select value={form.assignedTo||''} onChange={e=>fld('assignedTo',e.target.value)}>
-              <option value="">Unassigned</option>
-              {reps.map(r=><option key={r}>{r}</option>)}
+              <option value="">Unassigned</option>{reps.map(r=><option key={r}>{r}</option>)}
             </select>
           </div>
         </div>
-        <div className="field"><label>Notes</label>
-          <textarea value={form.notes||''} onChange={e=>fld('notes',e.target.value)} style={{minHeight:80}}/>
-        </div>
+        <div className="field"><label>Notes</label><textarea value={form.notes||''} onChange={e=>fld('notes',e.target.value)} style={{minHeight:80}}/></div>
 
         <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:10}} onClick={onSave} disabled={saving}>
-          {saving ? 'Saving...' : title}
+          {saving?'Saving…':title}
         </button>
       </div>
     </div>
