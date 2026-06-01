@@ -13,6 +13,7 @@ import Tasks      from './pages/Tasks'
 import Calendar   from './pages/Calendar'
 import Transcripts from './pages/Transcripts'
 import IrsForms   from './pages/IrsForms'
+import TaxReturns from './pages/TaxReturns'
 import Deadlines  from './pages/Deadlines'
 import Estimates  from './pages/Estimates'
 import Invoices   from './pages/Invoices'
@@ -78,6 +79,8 @@ function Shell() {
             <Route path="/calendar"    element={<Calendar />} />
             <Route path="/transcripts" element={<Transcripts />} />
             <Route path="/irsforms"    element={<IrsForms />} />
+            <Route path="/taxreturns"  element={<TaxReturns />} />
+            <Route path="/taxreturns/:id" element={<TaxReturns />} />
             <Route path="/deadlines"   element={<Deadlines />} />
             <Route path="/estimates"   element={<Estimates />} />
             <Route path="/invoices"    element={<Invoices />} />
