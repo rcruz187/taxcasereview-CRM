@@ -10,11 +10,9 @@ const BLANK = {
   clientType:'Individual', name:'', phone:'', phone2:'', email:'',
   street:'', city:'', state:'', zip:'', county:'',
   ssn:'', ein:'', dobM:'', dobD:'', dobY:'',
-  spouse:'', spouseSsn:'', sdobM:'', sdobD:'', sdobY:'',
-  filingStatus:'Single',
+  spouseName:'', spouseSsn:'', filingStatus:'Single',
   irsBalance:'', issueType:'OIC', irsOrState:'IRS Federal', taxYears:'',
-  clientSince:'', status:'Active', notes:'',
-  assist:'Personal', irsOrStateTop:'IRS Federal'
+  clientSince:'', status:'Active', notes:'', assignedTo:''
 }
 
 function SBdg({s}) {
@@ -46,7 +44,10 @@ export default function Clients() {
   async function save() {
     if (!form.name.trim()) { showToast('Name is required'); return }
     setSaving(true)
-    const { error } = await supabase.from('clients').insert([{ ...form, created_at: new Date().toISOString() }])
+    const { dobM, dobD, dobY, ...rest } = form
+    const dob = dobM && dobD && dobY ? `${dobM}/${dobD}/${dobY}` : ''
+    const payload = { ...rest, dob, created_at: new Date().toISOString() }
+    const { error } = await supabase.from('clients').insert([payload])
     setSaving(false)
     if (error) { showToast('Error: ' + error.message); return }
     showToast('Client added!')
@@ -193,7 +194,7 @@ export default function Clients() {
             <div style={{background:'var(--s3)',borderRadius:8,padding:12,marginBottom:10}}>
               <div style={{fontWeight:700,fontSize:12,marginBottom:8}}>Spouse / Partner</div>
               <div className="fg2">
-                <div className="field"><label>Spouse Full Name</label><input value={form.spouse} onChange={e=>fld('spouse',e.target.value)}/></div>
+                <div className="field"><label>Spouse Full Name</label><input value={form.spouseName} onChange={e=>fld('spouseName',e.target.value)}/></div>
                 <div className="field"><label>Spouse SSN</label><input value={form.spouseSsn} onChange={e=>fld('spouseSsn',e.target.value)} placeholder="XXX-XX-XXXX" maxLength={11}/></div>
               </div>
               <div className="field"><label>Filing Status</label>
@@ -207,7 +208,7 @@ export default function Clients() {
               <div className="field"><label>IRS Balance</label><input type="number" value={form.irsBalance} onChange={e=>fld('irsBalance',e.target.value)}/></div>
               <div className="field"><label>Issue Type</label>
                 <select value={form.issueType} onChange={e=>fld('issueType',e.target.value)}>
-                  {['OIC','Installment Agreement','CNC','Penalty Abatement','Payroll Tax','Unfiled Returns','Appeals','Audit','Liens/Levies','Tax Investigation','Other'].map(o=><option key={o}>{o}</option>)}
+                  {['OIC','Installment Agreement','CNC','Penalty Abatement','Payroll Tax','Unfiled Returns','Appeals','Audit','Liens/Levies','Tax Investigation','ACS','Notice Status','Other'].map(o=><option key={o}>{o}</option>)}
                 </select>
               </div>
             </div>
@@ -238,3 +239,4 @@ export default function Clients() {
     </div>
   )
 }
+
