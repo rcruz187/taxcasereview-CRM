@@ -27,6 +27,7 @@ import Employees  from './pages/Employees'
 import Reports    from './pages/Reports'
 import Settings   from './pages/Settings'
 import Dialer     from './pages/Dialer'
+import Chat       from './pages/Chat'
 
 const style = document.createElement('style')
 style.textContent = `@keyframes spin { to { transform: rotate(360deg) } }`
@@ -91,6 +92,7 @@ function Shell() {
             <Route path="/reports"     element={<Reports />} />
             <Route path="/settings"    element={<Settings />} />
             <Route path="/dialer"      element={<Dialer />} />
+            <Route path="/chat"        element={<Chat />} />
             <Route path="*"            element={<Navigate to="/" />} />
           </Routes>
         </div>

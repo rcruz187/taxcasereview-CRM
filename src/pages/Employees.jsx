@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
-const BLANK = { name:'', role:'Tax Resolution Specialist', email:'', phone:'', payType:'Hourly', rate:'', startDate:'', access:'Admin', notes:'' }
-
+// Try both camelCase and snake_case for DB compatibility
 const TEAM = [
-  { name:'Romy Cruz',        role:'Tax Resolution Specialist', email:'romy@taxcasereview.org',    phone:'850-459-9039', payType:'Owner Draw', access:'Super Admin', startDate:'2024-01-01', rate:'', notes:'' },
-  { name:'Dana Richard',     role:'Tax Resolution Specialist', email:'dana@taxcasereview.org',    phone:'',            payType:'Salary',     access:'Admin',       startDate:'2024-01-01', rate:'', notes:'' },
-  { name:'Yesenia Gonzalez', role:'Tax Resolution Specialist', email:'yesenia@taxcasereview.org', phone:'',            payType:'Salary',     access:'Admin',       startDate:'2024-01-01', rate:'', notes:'' },
+  { name:'Romy Cruz',        role:'Tax Resolution Specialist', email:'romy@taxcasereview.org',    phone:'850-459-9039', pay_type:'Owner Draw', payType:'Owner Draw', access:'Super Admin', start_date:'2024-01-01', startDate:'2024-01-01', rate:'', notes:'' },
+  { name:'Dana Richard',     role:'Tax Resolution Specialist', email:'dana@taxcasereview.org',    phone:'',             pay_type:'Salary',     payType:'Salary',     access:'Admin',       start_date:'2024-01-01', startDate:'2024-01-01', rate:'', notes:'' },
+  { name:'Yesenia Gonzalez', role:'Tax Resolution Specialist', email:'yesenia@taxcasereview.org', phone:'',             pay_type:'Salary',     payType:'Salary',     access:'Admin',       start_date:'2024-01-01', startDate:'2024-01-01', rate:'', notes:'' },
 ]
+
+const BLANK = { name:'', role:'Tax Resolution Specialist', email:'', phone:'', pay_type:'Hourly', payType:'Hourly', access:'Admin', start_date:'', startDate:'', rate:'', notes:'' }
 
 export default function Employees() {
   const [items,   setItems]   = useState([])
@@ -17,6 +18,7 @@ export default function Employees() {
   const [saving,  setSaving]  = useState(false)
   const [seeding, setSeeding] = useState(false)
   const [toast,   setToast]   = useState('')
+  const [seedLog, setSeedLog] = useState([])
 
   useEffect(() => { load() }, [])
 
@@ -28,39 +30,46 @@ export default function Employees() {
 
   async function seedTeam() {
     setSeeding(true)
-    showToast('Seeding team...')
-    let successCount = 0
-    let lastError = null
+    setSeedLog([])
+    const log = []
 
     for (const member of TEAM) {
-      // Try update first (if email exists), then insert
-      const { data: existing } = await supabase.from('employees').select('id').eq('email', member.email).maybeSingle()
+      // 1. Try to find existing record
+      const { data: existing, error: findErr } = await supabase
+        .from('employees').select('id').eq('email', member.email).maybeSingle()
+
+      if (findErr) {
+        log.push(`❌ Find ${member.name}: ${findErr.message}`)
+        continue
+      }
+
       if (existing) {
-        const { error } = await supabase.from('employees').update(member).eq('email', member.email)
-        if (error) { lastError = error } else { successCount++ }
+        // Update
+        const { error: updErr } = await supabase
+          .from('employees').update(member).eq('id', existing.id)
+        log.push(updErr ? `❌ Update ${member.name}: ${updErr.message}` : `✅ Updated ${member.name}`)
       } else {
-        const { error } = await supabase.from('employees').insert([{ ...member, created_at: new Date().toISOString() }])
-        if (error) { lastError = error } else { successCount++ }
+        // Insert
+        const { error: insErr } = await supabase
+          .from('employees').insert([{ ...member, created_at: new Date().toISOString() }])
+        log.push(insErr ? `❌ Insert ${member.name}: ${insErr.message}` : `✅ Inserted ${member.name}`)
       }
     }
 
+    setSeedLog(log)
     setSeeding(false)
-    if (lastError) {
-      showToast(`⚠️ Seeded ${successCount}/3 — Error: ${lastError.message}`)
-    } else {
-      showToast(`✅ Team seeded (${successCount} members)!`)
-    }
+    const failures = log.filter(l => l.startsWith('❌'))
+    showToast(failures.length === 0 ? '✅ Team seeded successfully!' : `⚠️ Done with ${failures.length} error(s) — see log below`)
     load()
   }
 
-  function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''),4000) }
-  function fld(k,v) { setForm(f=>({...f,[k]:v})) }
+  function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''),5000) }
+  function fld(k,v) { setForm(f=>({...f,[k]:v,[k==='pay_type'?'payType':'startDate']:v})) }
 
   async function save() {
     if (!form.name.trim()) { showToast('Name is required'); return }
     setSaving(true)
-    const payload = { ...form, created_at: new Date().toISOString() }
-    const { error } = await supabase.from('employees').insert([payload])
+    const { error } = await supabase.from('employees').insert([{ ...form, created_at: new Date().toISOString() }])
     setSaving(false)
     if (error) { showToast('❌ Error: ' + error.message); return }
     showToast('✅ Employee added!')
@@ -85,6 +94,8 @@ export default function Employees() {
 
   function openEdit(e) { setForm({ ...BLANK, ...e }); setEditEmp(e) }
 
+  const payType = e => e.pay_type || e.payType || '—'
+  const startDate = e => e.start_date || e.startDate || '—'
   const accessColor = a => a === 'Super Admin' ? 'br' : a === 'Admin' ? 'bb' : 'bg'
 
   return (
@@ -95,24 +106,39 @@ export default function Employees() {
           <span className="ct">Employees ({items.length})</span>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             <button className="btn sec" onClick={seedTeam} disabled={seeding}>
-              {seeding ? 'Seeding...' : '🌱 Seed Team'}
+              {seeding ? '⏳ Seeding...' : '🌱 Seed Team (Romy, Dana, Yesenia)'}
             </button>
             <button className="btn pri" onClick={()=>{ setForm(BLANK); setModal(true) }}>+ Add Employee</button>
           </div>
         </div>
 
+        {/* Seed log */}
+        {seedLog.length > 0 && (
+          <div style={{background:'var(--s3)',borderRadius:6,padding:10,margin:'0 0 12px',fontSize:12}}>
+            <div style={{fontWeight:700,marginBottom:6,color:'var(--t2)'}}>Seed results:</div>
+            {seedLog.map((l,i)=>(
+              <div key={i} style={{color: l.startsWith('❌') ? 'var(--red)' : 'var(--green)', marginBottom:2}}>{l}</div>
+            ))}
+            <div style={{marginTop:8,color:'var(--t3)',fontSize:11}}>
+              If you see column errors, run this SQL in Supabase → SQL Editor:<br/>
+              <code style={{background:'var(--s2)',padding:'2px 6px',borderRadius:3,display:'inline-block',marginTop:4}}>
+                ALTER TABLE employees ADD COLUMN IF NOT EXISTS pay_type text; ALTER TABLE employees ADD COLUMN IF NOT EXISTS start_date text;
+              </code>
+            </div>
+          </div>
+        )}
+
         {items.length === 0 ? (
           <div style={{textAlign:'center',padding:40,color:'var(--t3)'}}>
             <div style={{fontSize:32,marginBottom:8}}>👥</div>
             <div style={{fontWeight:600,marginBottom:4}}>No employees yet</div>
-            <div style={{fontSize:13,marginBottom:16}}>Click "Seed Team" to add Romy, Dana &amp; Yesenia, or add employees manually.</div>
-            <button className="btn pri" onClick={seedTeam} disabled={seeding}>{seeding ? 'Seeding...' : '🌱 Seed Team'}</button>
+            <div style={{fontSize:13,marginBottom:16}}>Click "Seed Team" to add Romy, Dana &amp; Yesenia automatically.</div>
           </div>
         ) : (
           <div className="ovx">
             <table>
               <thead>
-                <tr><th>Name</th><th>Role</th><th>Email</th><th>Phone</th><th>Pay Type</th><th>Rate</th><th>Access</th><th>Since</th><th></th></tr>
+                <tr><th>Name</th><th>Role</th><th>Email</th><th>Phone</th><th>Pay Type</th><th>Access</th><th>Since</th><th></th></tr>
               </thead>
               <tbody>
                 {items.map(e => (
@@ -128,10 +154,9 @@ export default function Employees() {
                     <td style={{color:'var(--t2)',fontSize:12}}>{e.role}</td>
                     <td style={{color:'var(--t2)',fontSize:12}}>{e.email||'—'}</td>
                     <td style={{fontSize:12}}>{e.phone||'—'}</td>
-                    <td><span className="bdg bn">{e.payType}</span></td>
-                    <td style={{fontSize:12}}>{e.rate ? '$'+e.rate : '—'}</td>
+                    <td><span className="bdg bn">{payType(e)}</span></td>
                     <td><span className={`bdg ${accessColor(e.access)}`}>{e.access}</span></td>
-                    <td style={{color:'var(--t2)',fontSize:12}}>{e.startDate||'—'}</td>
+                    <td style={{color:'var(--t2)',fontSize:12}}>{startDate(e)}</td>
                     <td style={{display:'flex',gap:4}}>
                       <button className="btn sec" style={{fontSize:11,padding:'3px 8px'}} onClick={()=>openEdit(e)}>Edit</button>
                       <button className="btn del" style={{fontSize:11,padding:'3px 8px'}} onClick={()=>deleteItem(e.id)}>Del</button>
@@ -144,10 +169,7 @@ export default function Employees() {
         )}
       </div>
 
-      {/* Add Modal */}
-      {modal && <EmpModal title="Add Employee" form={form} fld={fld} saving={saving} onSave={save} onClose={()=>setModal(false)}/>}
-
-      {/* Edit Modal */}
+      {modal   && <EmpModal title="Add Employee"  form={form} fld={fld} saving={saving} onSave={save}     onClose={()=>setModal(false)}/>}
       {editEmp && <EmpModal title="Edit Employee" form={form} fld={fld} saving={saving} onSave={saveEdit} onClose={()=>setEditEmp(null)}/>}
     </div>
   )
@@ -161,7 +183,6 @@ function EmpModal({ title, form, fld, saving, onSave, onClose }) {
           <span className="mt">{title}</span>
           <button className="xbtn" onClick={onClose}>&times;</button>
         </div>
-
         <div className="fg2">
           <div className="field"><label>Full Name *</label>
             <input value={form.name} onChange={e=>fld('name',e.target.value)} placeholder="First Last"/>
@@ -172,7 +193,6 @@ function EmpModal({ title, form, fld, saving, onSave, onClose }) {
             </select>
           </div>
         </div>
-
         <div className="fg2">
           <div className="field"><label>Email</label>
             <input value={form.email||''} onChange={e=>fld('email',e.target.value)} placeholder="email@taxcasereview.org"/>
@@ -181,7 +201,6 @@ function EmpModal({ title, form, fld, saving, onSave, onClose }) {
             <input value={form.phone||''} onChange={e=>fld('phone',e.target.value)} placeholder="(305) 555-0000"/>
           </div>
         </div>
-
         <div className="fg2">
           <div className="field"><label>Access Level</label>
             <select value={form.access} onChange={e=>fld('access',e.target.value)}>
@@ -189,25 +208,22 @@ function EmpModal({ title, form, fld, saving, onSave, onClose }) {
             </select>
           </div>
           <div className="field"><label>Pay Type</label>
-            <select value={form.payType} onChange={e=>fld('payType',e.target.value)}>
+            <select value={form.pay_type||form.payType||'Hourly'} onChange={e=>fld('pay_type',e.target.value)}>
               <option>Hourly</option><option>Salary</option><option>1099 Contractor</option><option>Owner Draw</option>
             </select>
           </div>
         </div>
-
         <div className="fg2">
           <div className="field"><label>Rate ($/hr or annual)</label>
             <input type="number" value={form.rate||''} onChange={e=>fld('rate',e.target.value)} placeholder="e.g. 25.00"/>
           </div>
           <div className="field"><label>Start Date</label>
-            <input type="date" value={form.startDate||''} onChange={e=>fld('startDate',e.target.value)}/>
+            <input type="date" value={form.start_date||form.startDate||''} onChange={e=>fld('start_date',e.target.value)}/>
           </div>
         </div>
-
         <div className="field"><label>Notes</label>
           <textarea value={form.notes||''} onChange={e=>fld('notes',e.target.value)} style={{minHeight:60}}/>
         </div>
-
         <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:10}} onClick={onSave} disabled={saving}>
           {saving ? 'Saving...' : title}
         </button>
