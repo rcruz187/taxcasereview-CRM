@@ -3,16 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { generateServiceAgreement, generateAddendum, generateEngagementLetter, generatePOACoverLetter } from '../lib/docUtils'
 
-const PIPELINE_STAGES = [
-  { label:'Contacted',    key:'contacted' },
-  { label:'Consultation', key:'consult' },
-  { label:'Agr Signed',   key:'agreement' },
-  { label:'Fee Paid',     key:'paid' },
-  { label:'Tax Inv',      key:'taxinv' },
-  { label:'Addendum',     key:'addendum' },
-  { label:'Converted',    key:'client' },
-]
-
 const STATUSES = ['New Lead','Contacted','Consultation Scheduled','Consultation Completed',
   'Tax Inv Agreement Sent','Tax Inv Agreement Signed','Tax Inv Fee Paid',
   'Tax Investigation Active','IRS Facts Received','Addendum Sent','Addendum Signed',
