@@ -7,13 +7,14 @@ const TYPE_C   = {'OIC':'bb','Installment Agreement':'bg','CNC':'bn','Penalty Ab
 
 const BLANK = {
   clientName:'', caseType:'OIC', irsBalance:'', status:'Open',
-  assignedTo:'Romy Cruz', deadline:'', taxYears:'', resolutionAmount:'', notes:''
+  assignedTo:'', deadline:'', taxYears:'', resolutionAmount:'', notes:''
 }
 
 export default function Cases() {
-  const [cases, setCases]     = useState([])
-  const [clients, setClients] = useState([])
-  const [filter, setFilter]   = useState('All')
+  const [cases, setCases]       = useState([])
+  const [clients, setClients]   = useState([])
+  const [employees,setEmployees]= useState([])
+  const [filter, setFilter]     = useState('All')
   const [modal, setModal]     = useState(false)
   const [form, setForm]       = useState(BLANK)
   const [suggestions, setSug] = useState([])
@@ -24,12 +25,14 @@ export default function Cases() {
   useEffect(() => { load() }, [])
 
   async function load() {
-    const [{ data: cs }, { data: cl }] = await Promise.all([
+    const [{ data: cs }, { data: cl }, { data: em }] = await Promise.all([
       supabase.from('cases').select('*').order('created_at', { ascending: false }),
-      supabase.from('clients').select('id,name,irsBalance')
+      supabase.from('clients').select('id,name,irsBalance'),
+      supabase.from('employees').select('id,name')
     ])
     if (cs) setCases(cs)
     if (cl) setClients(cl)
+    if (em) setEmployees(em)
     const badge = document.getElementById('badge-cases')
     if (badge && cs) badge.textContent = cs.filter(c => c.status === 'Open' || c.status === 'Pending IRS').length || 0
   }
@@ -182,7 +185,10 @@ export default function Cases() {
               </div>
               <div className="field"><label>Assigned To</label>
                 <select value={form.assignedTo} onChange={e=>fld('assignedTo',e.target.value)}>
-                  <option>Romy Cruz</option><option>Dana Richard</option><option>Yesenia Gonzalez</option>
+                  <option value="">Unassigned</option>
+                  {(employees.length > 0 ? employees.map(e=>e.name) : ['Romy Cruz','Dana Richard','Yesenia Gonzalez']).map(r=>(
+                    <option key={r}>{r}</option>
+                  ))}
                 </select>
               </div>
             </div>

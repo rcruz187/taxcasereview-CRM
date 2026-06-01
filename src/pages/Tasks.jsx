@@ -1,28 +1,31 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
-const BLANK = { title:'', clientName:'', caseNum:'', assignedTo:'Romy Cruz', dueDate:'', priority:'Normal', notes:'', done:false }
+const BLANK = { title:'', clientName:'', caseNum:'', assignedTo:'', dueDate:'', priority:'Normal', notes:'', done:false }
 
 export default function Tasks() {
-  const [tasks, setTasks]     = useState([])
-  const [clients, setClients] = useState([])
-  const [modal, setModal]     = useState(false)
-  const [form, setForm]       = useState(BLANK)
-  const [qtForm, setQt]       = useState({title:'',dueDate:'',priority:'Normal',clientName:'',assignedTo:'Romy Cruz'})
-  const [suggestions, setSug] = useState([])
-  const [qtSug, setQtSug]     = useState([])
-  const [saving, setSaving]   = useState(false)
-  const [toast, setToast]     = useState('')
+  const [tasks, setTasks]       = useState([])
+  const [clients, setClients]   = useState([])
+  const [employees,setEmployees]= useState([])
+  const [modal, setModal]       = useState(false)
+  const [form, setForm]         = useState(BLANK)
+  const [qtForm, setQt]         = useState({title:'',dueDate:'',priority:'Normal',clientName:'',assignedTo:''})
+  const [suggestions, setSug]   = useState([])
+  const [qtSug, setQtSug]       = useState([])
+  const [saving, setSaving]     = useState(false)
+  const [toast, setToast]       = useState('')
 
   useEffect(() => { load() }, [])
 
   async function load() {
-    const [{ data: t }, { data: c }] = await Promise.all([
+    const [{ data: t }, { data: c }, { data: e }] = await Promise.all([
       supabase.from('tasks').select('*').order('created_at', { ascending: false }),
-      supabase.from('clients').select('id,name')
+      supabase.from('clients').select('id,name'),
+      supabase.from('employees').select('id,name')
     ])
     if (t) setTasks(t)
     if (c) setClients(c)
+    if (e) setEmployees(e)
   }
 
   function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''),3000) }
@@ -44,7 +47,7 @@ export default function Tasks() {
     showToast('Task added!')
     setModal(false)
     setForm(BLANK)
-    setQt({title:'',dueDate:'',priority:'Normal',clientName:'',assignedTo:'Romy Cruz'})
+    setQt({title:'',dueDate:'',priority:'Normal',clientName:'',assignedTo:''})
     load()
   }
 
@@ -135,7 +138,7 @@ export default function Tasks() {
             </div>
             <div className="field"><label>Assigned To</label>
               <select value={qtForm.assignedTo} onChange={e=>setQt(f=>({...f,assignedTo:e.target.value}))}>
-                <option>Romy Cruz</option><option>Dana Richard</option><option>Yesenia Gonzalez</option>
+                {(employees.length > 0 ? employees.map(e=>e.name) : ['Romy Cruz','Dana Richard','Yesenia Gonzalez']).map(r=>(<option key={r}>{r}</option>))}
               </select>
             </div>
           </div>
@@ -171,7 +174,7 @@ export default function Tasks() {
               <div className="field"><label>Case #</label><input value={form.caseNum} onChange={e=>fld('caseNum',e.target.value)}/></div>
               <div className="field"><label>Assigned To</label>
                 <select value={form.assignedTo} onChange={e=>fld('assignedTo',e.target.value)}>
-                  <option>Romy Cruz</option><option>Dana Richard</option><option>Yesenia Gonzalez</option>
+                  {(employees.length > 0 ? employees.map(e=>e.name) : ['Romy Cruz','Dana Richard','Yesenia Gonzalez']).map(r=>(<option key={r}>{r}</option>))}
                 </select>
               </div>
             </div>
