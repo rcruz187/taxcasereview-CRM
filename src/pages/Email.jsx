@@ -1,34 +1,40 @@
-import { useState, useEffect } from 'react'
-import { api } from '../hooks/useApi'
-import { Badge, Empty, Spinner } from '../components/ui'
-import { useApp } from '../context/AppContext'
+import { useState } from 'react'
 
 export default function Email() {
-  const { showToast, openModal, closeModal } = useApp()
-  const [rows, setRows]     = useState([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => { load() }, [])
-  async function load() {
-    try {
-      const endpoint = 'Email'.toLowerCase().replace('irsforms','irsforms').replace('timeclock','timeclock')
-      const r = await api.get(`/api/data/${endpoint}`)
-      setRows(r.data || r.rows || r || [])
-    } catch { setRows([]) } finally { setLoading(false) }
-  }
+  const [to, setTo]       = useState('')
+  const [subject, setSub] = useState('')
+  const [body, setBody]   = useState('')
 
   return (
-    <div className="card">
-      <div className="card-header">
-        <span className="card-title">Email</span>
-        <button className="btn pri" onClick={() => showToast('Form coming soon!')}>+ New</button>
+    <div>
+      <div className="g2">
+        <div className="card">
+          <div className="ch"><span className="ct">Compose Email</span></div>
+          <div className="field"><label>To</label><input value={to} onChange={e=>setTo(e.target.value)} placeholder="client@email.com"/></div>
+          <div className="field"><label>Subject</label><input value={subject} onChange={e=>setSub(e.target.value)} placeholder="Re: Your Tax Case"/></div>
+          <div className="field"><label>Message</label><textarea value={body} onChange={e=>setBody(e.target.value)} style={{minHeight:140}} placeholder="Dear {name},&#10;&#10;..."/></div>
+          <div style={{display:'flex',gap:8}}>
+            <button className="btn pri" style={{flex:1,justifyContent:'center',padding:10}}>Send Email</button>
+            <button className="btn" style={{flex:1,justifyContent:'center',padding:10}}>Save Draft</button>
+          </div>
+          <div style={{marginTop:16,padding:10,background:'var(--s2)',borderRadius:7,fontSize:12,color:'var(--t3)'}}>
+            💡 Connect SendGrid or Gmail in Settings to enable sending.
+          </div>
+        </div>
+        <div className="card">
+          <div className="ch"><span className="ct">Email Templates</span></div>
+          {[
+            ['Welcome Letter','Dear {name},\n\nWelcome to Tax Case Review! We are pleased to begin working on your tax resolution case...'],
+            ['Document Request','Dear {name},\n\nTo proceed with your case, we need the following documents:\n\n1. {doc1}\n2. {doc2}\n\nPlease provide these at your earliest convenience.'],
+            ['OIC Update','Dear {name},\n\nWe have an update regarding your Offer in Compromise. The IRS has...'],
+          ].map(([title, text]) => (
+            <div key={title} style={{padding:'10px 0',borderBottom:'1px solid var(--br)'}}>
+              <div style={{fontWeight:600,fontSize:13,marginBottom:4}}>{title}</div>
+              <button className="btn sm" onClick={()=>setBody(text)}>Use Template</button>
+            </div>
+          ))}
+        </div>
       </div>
-      {loading ? <Spinner /> : rows.length === 0
-        ? <Empty icon="📂" message="No records yet" action={() => showToast('Form coming soon!')} actionLabel="Add Record" />
-        : <div className="ovx"><table><thead><tr><th>ID</th><th>Details</th><th>Status</th></tr></thead><tbody>
-          {rows.map((r,i) => <tr key={r.id||i}><td className="mono">{r.id||i+1}</td><td>{r.name||r.title||r.description||JSON.stringify(r).slice(0,60)}</td><td><Badge status={r.status||'Active'}/></td></tr>)}
-        </tbody></table></div>
-      }
     </div>
   )
 }
