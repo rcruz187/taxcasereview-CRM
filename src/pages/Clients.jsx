@@ -6,13 +6,16 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 const DAYS   = Array.from({length:31},(_,i)=>String(i+1).padStart(2,'0'))
 const YDOB   = Array.from({length:80},(_,i)=>2005-i)
 
+const BLANK_DEP = { name:'', ssn:'', dob:'', relationship:'Child' }
+
 const BLANK = {
   clientType:'Individual', name:'', phone:'', phone2:'', email:'',
   street:'', city:'', state:'', zip:'', county:'',
   ssn:'', ein:'', dobM:'', dobD:'', dobY:'',
   spouseName:'', spouseSsn:'', filingStatus:'Single',
   irsBalance:'', issueType:'OIC', irsOrState:'IRS Federal', taxYears:'',
-  clientSince:'', status:'Active', notes:'', assignedTo:''
+  clientSince:'', status:'Active', notes:'', assignedTo:'',
+  dependents: []
 }
 
 function Bdg({s,c}) { return <span className={`bdg ${c||'bn'}`}>{s}</span> }
@@ -28,22 +31,27 @@ function DR({label, val}) {
 
 function formatBalance(val) {
   if (!val) return '—'
-  // If it already contains a $ or letters, show as-is (came from lead dropdown)
   if (typeof val === 'string' && (val.includes('$') || isNaN(Number(val)))) return val
   const n = Number(val)
   return isNaN(n) ? val : '$' + n.toLocaleString()
 }
 
+function parseDependents(raw) {
+  if (!raw) return []
+  if (Array.isArray(raw)) return raw
+  try { return JSON.parse(raw) } catch { return [] }
+}
+
 export default function Clients() {
-  const [clients,  setClients]  = useState([])
-  const [employees,setEmployees]= useState([])
-  const [filter,   setFilter]   = useState('All')
-  const [modal,    setModal]    = useState(false)
-  const [editModal,setEditModal]= useState(false)
-  const [form,     setForm]     = useState(BLANK)
-  const [saving,   setSaving]   = useState(false)
-  const [toast,    setToast]    = useState('')
-  const [detail,   setDetail]   = useState(null)
+  const [clients,   setClients]   = useState([])
+  const [employees, setEmployees] = useState([])
+  const [filter,    setFilter]    = useState('All')
+  const [modal,     setModal]     = useState(false)
+  const [editModal, setEditModal] = useState(false)
+  const [form,      setForm]      = useState(BLANK)
+  const [saving,    setSaving]    = useState(false)
+  const [toast,     setToast]     = useState('')
+  const [detail,    setDetail]    = useState(null)
 
   useEffect(() => { load() }, [])
 
@@ -61,29 +69,29 @@ export default function Clients() {
 
   const filtered = filter === 'All' ? clients : clients.filter(c => c.clientType === filter)
 
+  function buildPayload(f) {
+    const { dobM, dobD, dobY, id, created_at, ...rest } = f
+    const dob = dobM && dobD && dobY ? `${dobM}/${dobD}/${dobY}` : f.dob || ''
+    return { ...rest, dob, dependents: JSON.stringify(f.dependents || []) }
+  }
+
   async function save() {
     if (!form.name.trim()) { showToast('Name is required'); return }
     setSaving(true)
-    const { dobM, dobD, dobY, ...rest } = form
-    const dob = dobM && dobD && dobY ? `${dobM}/${dobD}/${dobY}` : ''
-    const payload = { ...rest, dob, created_at: new Date().toISOString() }
-    const { error } = await supabase.from('clients').insert([payload])
+    const { error } = await supabase.from('clients').insert([{ ...buildPayload(form), created_at: new Date().toISOString() }])
     setSaving(false)
     if (error) { showToast('Error: ' + error.message); return }
-    showToast('Client added!')
+    showToast('✅ Client added!')
     setModal(false); setForm(BLANK); load()
   }
 
   async function saveEdit() {
     setSaving(true)
-    const { dobM, dobD, dobY, id, created_at, ...rest } = form
-    const dob = dobM && dobD && dobY ? `${dobM}/${dobD}/${dobY}` : form.dob || ''
-    const { error } = await supabase.from('clients').update({ ...rest, dob }).eq('id', form.id)
+    const { error } = await supabase.from('clients').update(buildPayload(form)).eq('id', form.id)
     setSaving(false)
     if (error) { showToast('Error: ' + error.message); return }
-    showToast('Saved!')
+    showToast('✅ Saved!')
     setEditModal(false)
-    // Refresh detail view
     const { data } = await supabase.from('clients').select('*').eq('id', form.id).single()
     if (data) setDetail(data)
     load()
@@ -96,7 +104,14 @@ export default function Clients() {
   }
 
   function openEdit(c) {
-    setForm({ ...BLANK, ...c })
+    const deps = parseDependents(c.dependents)
+    // Parse dob back into parts
+    let dobM='', dobD='', dobY=''
+    if (c.dob) {
+      const parts = c.dob.split('/')
+      if (parts.length === 3) { dobM = parts[0]; dobD = parts[1]; dobY = parts[2] }
+    }
+    setForm({ ...BLANK, ...c, dobM, dobD, dobY, dependents: deps })
     setEditModal(true)
   }
 
@@ -107,6 +122,7 @@ export default function Clients() {
   // ── Detail View ──────────────────────────────────────────────────────────────
   if (detail) {
     const c = detail
+    const deps = parseDependents(c.dependents)
     return (
       <div style={{maxWidth:900,margin:'0 auto'}}>
         {toast && <div className="toast show">{toast}</div>}
@@ -147,26 +163,48 @@ export default function Clients() {
             </div>
 
             <div className="card">
-              <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>Taxpayer Info</div>
-              <DR label="SSN"            val={c.ssn ? '***-**-' + c.ssn.slice(-4) : null} />
-              <DR label="EIN"            val={c.ein} />
-              <DR label="Date of Birth"  val={c.dob} />
-              <DR label="Filing Status"  val={c.filingStatus} />
-              <DR label="Spouse Name"    val={c.spouseName} />
-              <DR label="Spouse SSN"     val={c.spouseSsn ? '***-**-' + c.spouseSsn.slice(-4) : null} />
+              <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>🔒 Taxpayer Info</div>
+              <DR label="SSN"           val={c.ssn ? '***-**-' + c.ssn.replace(/-/g,'').slice(-4) : null} />
+              <DR label="EIN"           val={c.ein} />
+              <DR label="Date of Birth" val={c.dob} />
+              <DR label="Filing Status" val={c.filingStatus} />
+              <DR label="Spouse Name"   val={c.spouseName} />
+              <DR label="Spouse SSN"    val={c.spouseSsn ? '***-**-' + c.spouseSsn.replace(/-/g,'').slice(-4) : null} />
             </div>
+
+            {/* Dependents */}
+            {deps.length > 0 && (
+              <div className="card">
+                <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>👨‍👩‍👧 Dependents ({deps.length})</div>
+                {deps.map((d,i) => (
+                  <div key={i} style={{borderBottom:'1px solid var(--br)',padding:'8px 0',display:'flex',gap:12,alignItems:'flex-start'}}>
+                    <div style={{width:28,height:28,borderRadius:'50%',background:'var(--s3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,flexShrink:0,color:'var(--t2)'}}>
+                      {i+1}
+                    </div>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:600,fontSize:13}}>{d.name||'Unnamed'}</div>
+                      <div style={{fontSize:11,color:'var(--t3)',marginTop:2,display:'flex',gap:12,flexWrap:'wrap'}}>
+                        <span>{d.relationship||'—'}</span>
+                        {d.dob && <span>DOB: {d.dob}</span>}
+                        {d.ssn && <span>SSN: ***-**-{d.ssn.replace(/-/g,'').slice(-4)}</span>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Right column */}
           <div style={{display:'flex',flexDirection:'column',gap:12}}>
             <div className="card">
               <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>IRS / Case Info</div>
-              <DR label="IRS Balance"   val={formatBalance(c.irsBalance)} />
-              <DR label="Issue Type"    val={c.issueType} />
-              <DR label="IRS or State"  val={c.irsOrState} />
-              <DR label="Tax Years"     val={c.taxYears} />
-              <DR label="Assigned Rep"  val={c.assignedTo} />
-              <DR label="Client Since"  val={c.clientSince} />
+              <DR label="IRS Balance"  val={formatBalance(c.irsBalance)} />
+              <DR label="Issue Type"   val={c.issueType} />
+              <DR label="IRS or State" val={c.irsOrState} />
+              <DR label="Tax Years"    val={c.taxYears} />
+              <DR label="Assigned Rep" val={c.assignedTo} />
+              <DR label="Client Since" val={c.clientSince} />
             </div>
 
             {c.notes && (
@@ -178,8 +216,12 @@ export default function Clients() {
           </div>
         </div>
 
-        {/* Edit Modal */}
-        {editModal && <ClientFormModal form={form} fld={fld} reps={reps} saving={saving} onSave={saveEdit} onClose={()=>setEditModal(false)} title="Edit Client"/>}
+        {editModal && (
+          <ClientFormModal
+            form={form} fld={fld} reps={reps} saving={saving}
+            onSave={saveEdit} onClose={()=>setEditModal(false)} title="Edit Client"
+          />
+        )}
       </div>
     )
   }
@@ -227,20 +269,41 @@ export default function Clients() {
         </div>
       </div>
 
-      {modal && <ClientFormModal form={form} fld={fld} reps={reps} saving={saving} onSave={save} onClose={()=>setModal(false)} title="Add Client"/>}
+      {modal && (
+        <ClientFormModal
+          form={form} fld={fld} reps={reps} saving={saving}
+          onSave={save} onClose={()=>setModal(false)} title="Add Client"
+        />
+      )}
     </div>
   )
 }
 
+// ── Client Form Modal (Add + Edit) ────────────────────────────────────────────
 function ClientFormModal({ form, fld, reps, saving, onSave, onClose, title }) {
+  function addDependent() {
+    fld('dependents', [...(form.dependents||[]), { ...BLANK_DEP }])
+  }
+  function updateDep(i, k, v) {
+    const deps = [...(form.dependents||[])]
+    deps[i] = { ...deps[i], [k]: v }
+    fld('dependents', deps)
+  }
+  function removeDep(i) {
+    const deps = [...(form.dependents||[])]
+    deps.splice(i, 1)
+    fld('dependents', deps)
+  }
+
   return (
     <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{width:660,maxHeight:'90vh',overflowY:'auto'}}>
+      <div className="modal" style={{width:680,maxHeight:'92vh',overflowY:'auto'}}>
         <div className="mh">
           <span className="mt">{title}</span>
           <button className="xbtn" onClick={onClose}>&times;</button>
         </div>
 
+        {/* Basic Info */}
         <div className="fg2">
           <div className="field"><label>Client Type</label>
             <select value={form.clientType} onChange={e=>fld('clientType',e.target.value)}>
@@ -251,11 +314,13 @@ function ClientFormModal({ form, fld, reps, saving, onSave, onClose, title }) {
             <input value={form.name} onChange={e=>fld('name',e.target.value)} placeholder="First Last / Business Name"/>
           </div>
         </div>
+
         <div className="fg3">
           <div className="field"><label>Phone 1</label><input value={form.phone||''} onChange={e=>fld('phone',e.target.value)} placeholder="(305) 555-0000"/></div>
           <div className="field"><label>Phone 2</label><input value={form.phone2||''} onChange={e=>fld('phone2',e.target.value)} placeholder="(305) 555-0000"/></div>
           <div className="field"><label>Email</label><input value={form.email||''} onChange={e=>fld('email',e.target.value)}/></div>
         </div>
+
         <div className="field"><label>Street Address</label><input value={form.street||''} onChange={e=>fld('street',e.target.value)}/></div>
         <div className="fg3">
           <div className="field"><label>City</label><input value={form.city||''} onChange={e=>fld('city',e.target.value)}/></div>
@@ -266,7 +331,9 @@ function ClientFormModal({ form, fld, reps, saving, onSave, onClose, title }) {
           </div>
           <div className="field"><label>ZIP</label><input value={form.zip||''} onChange={e=>fld('zip',e.target.value)}/></div>
         </div>
+        <div className="field"><label>County</label><input value={form.county||''} onChange={e=>fld('county',e.target.value)} placeholder="e.g. Palm Beach"/></div>
 
+        {/* Taxpayer Info */}
         <div style={{background:'var(--s3)',borderRadius:8,padding:12,marginBottom:10}}>
           <div style={{fontWeight:700,fontSize:12,marginBottom:8}}>🔒 Taxpayer Info</div>
           <div className="fg2">
@@ -288,6 +355,7 @@ function ClientFormModal({ form, fld, reps, saving, onSave, onClose, title }) {
           </div>
         </div>
 
+        {/* Spouse / Partner */}
         <div style={{background:'var(--s3)',borderRadius:8,padding:12,marginBottom:10}}>
           <div style={{fontWeight:700,fontSize:12,marginBottom:8}}>👥 Spouse / Partner</div>
           <div className="fg2">
@@ -301,8 +369,52 @@ function ClientFormModal({ form, fld, reps, saving, onSave, onClose, title }) {
           </div>
         </div>
 
+        {/* Dependents */}
+        <div style={{background:'var(--s3)',borderRadius:8,padding:12,marginBottom:10}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+            <div style={{fontWeight:700,fontSize:12}}>👨‍👩‍👧 Dependents ({(form.dependents||[]).length})</div>
+            <button className="btn sec" style={{fontSize:11,padding:'3px 10px'}} onClick={addDependent}>+ Add Dependent</button>
+          </div>
+
+          {(form.dependents||[]).length === 0 && (
+            <div style={{textAlign:'center',color:'var(--t3)',fontSize:12,padding:'10px 0'}}>
+              No dependents added — click "+ Add Dependent" to add one.
+            </div>
+          )}
+
+          {(form.dependents||[]).map((d,i) => (
+            <div key={i} style={{background:'var(--s2)',borderRadius:6,padding:10,marginBottom:8,position:'relative'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                <span style={{fontSize:11,fontWeight:700,color:'var(--t2)',textTransform:'uppercase'}}>Dependent {i+1}</span>
+                <button onClick={()=>removeDep(i)} style={{background:'none',border:'none',color:'var(--red)',cursor:'pointer',fontSize:16,lineHeight:1}}>×</button>
+              </div>
+              <div className="fg2">
+                <div className="field"><label>Full Name</label>
+                  <input value={d.name||''} onChange={e=>updateDep(i,'name',e.target.value)} placeholder="First Last"/>
+                </div>
+                <div className="field"><label>Relationship</label>
+                  <select value={d.relationship||'Child'} onChange={e=>updateDep(i,'relationship',e.target.value)}>
+                    {['Child','Stepchild','Foster Child','Sibling','Parent','Other'].map(r=><option key={r}>{r}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="fg2">
+                <div className="field"><label>Date of Birth</label>
+                  <input type="date" value={d.dob||''} onChange={e=>updateDep(i,'dob',e.target.value)}/>
+                </div>
+                <div className="field"><label>SSN</label>
+                  <input value={d.ssn||''} onChange={e=>updateDep(i,'ssn',e.target.value)} placeholder="XXX-XX-XXXX" maxLength={11}/>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* IRS / Case Info */}
         <div className="fg2">
-          <div className="field"><label>Est. IRS Balance ($)</label><input type="number" value={form.irsBalance||''} onChange={e=>fld('irsBalance',e.target.value)} placeholder="e.g. 45000"/></div>
+          <div className="field"><label>Est. IRS Balance ($)</label>
+            <input type="number" value={form.irsBalance||''} onChange={e=>fld('irsBalance',e.target.value)} placeholder="e.g. 45000"/>
+          </div>
           <div className="field"><label>Issue Type</label>
             <select value={form.issueType||'OIC'} onChange={e=>fld('issueType',e.target.value)}>
               {['OIC','Installment Agreement','CNC','Penalty Abatement','Payroll Tax','Unfiled Returns','Appeals','Audit','Liens/Levies','Tax Investigation','ACS','Notice Status','Other'].map(o=><option key={o}>{o}</option>)}
@@ -315,10 +427,14 @@ function ClientFormModal({ form, fld, reps, saving, onSave, onClose, title }) {
               <option>IRS Federal</option><option>State</option><option>Both IRS + State</option>
             </select>
           </div>
-          <div className="field"><label>Tax Years</label><input value={form.taxYears||''} onChange={e=>fld('taxYears',e.target.value)} placeholder="2020, 2021, 2022"/></div>
+          <div className="field"><label>Tax Years</label>
+            <input value={form.taxYears||''} onChange={e=>fld('taxYears',e.target.value)} placeholder="2020, 2021, 2022"/>
+          </div>
         </div>
         <div className="fg3">
-          <div className="field"><label>Client Since</label><input type="date" value={form.clientSince||''} onChange={e=>fld('clientSince',e.target.value)}/></div>
+          <div className="field"><label>Client Since</label>
+            <input type="date" value={form.clientSince||''} onChange={e=>fld('clientSince',e.target.value)}/>
+          </div>
           <div className="field"><label>Status</label>
             <select value={form.status||'Active'} onChange={e=>fld('status',e.target.value)}>
               <option>Active</option><option>Inactive</option><option>Prospect</option>
@@ -331,7 +447,9 @@ function ClientFormModal({ form, fld, reps, saving, onSave, onClose, title }) {
             </select>
           </div>
         </div>
-        <div className="field"><label>Notes</label><textarea value={form.notes||''} onChange={e=>fld('notes',e.target.value)} style={{minHeight:80}}/></div>
+        <div className="field"><label>Notes</label>
+          <textarea value={form.notes||''} onChange={e=>fld('notes',e.target.value)} style={{minHeight:80}}/>
+        </div>
 
         <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:10}} onClick={onSave} disabled={saving}>
           {saving ? 'Saving...' : title}
