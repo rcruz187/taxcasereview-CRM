@@ -82,6 +82,10 @@ export default function Clients() {
   const [relDocs,     setRelDocs]     = useState([])
   const [uploadingDoc,setUploadingDoc]= useState(false)
   const [docForm,     setDocForm]     = useState({ name:'', docType:'IRS Notice', notes:'' })
+  const [relNotes,    setRelNotes]    = useState([])
+  const [notesExpanded, setNotesExpanded] = useState(false)
+  const [newNote,     setNewNote]     = useState('')
+  const [addingNote,  setAddingNote]  = useState(false)
   const [relTasks,    setRelTasks]    = useState([])
   const [relInvoices, setRelInvoices] = useState([])
   const [loadingRel,  setLoadingRel]  = useState(false)
@@ -107,11 +111,13 @@ export default function Clients() {
       supabase.from('tasks').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('invoices').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('documents').select('*').eq('client', clientName).order('created_at',{ascending:false}),
+      supabase.from('client_notes').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
     ])
     setRelCases(cases||[])
     setRelTasks(tasks||[])
     setRelInvoices(invoices||[])
     setRelDocs(docs||[])
+    setRelNotes(clientNotes||[])
     setLoadingRel(false)
   }
 
@@ -421,6 +427,60 @@ export default function Clients() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* Notes */}
+            <div className="card">
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>📝 Notes ({relNotes.length})</div>
+                {relNotes.length>3&&<button className="btn sec" style={{fontSize:11,padding:'2px 8px'}} onClick={()=>setNotesExpanded(v=>!v)}>{notesExpanded?'Show Less':'See All'}</button>}
+              </div>
+              {/* Add note input */}
+              <div style={{display:'flex',gap:6,marginBottom:10}}>
+                <textarea
+                  value={newNote}
+                  onChange={e=>setNewNote(e.target.value)}
+                  placeholder="Add a note... (emails, calls, updates)"
+                  style={{flex:1,padding:'7px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12,lineHeight:1.5,resize:'vertical',minHeight:38,fontFamily:'inherit'}}
+                  rows={2}
+                  onKeyDown={e=>{if(e.key==='Enter'&&e.ctrlKey)addClientNote()}}
+                />
+                <button className="btn pri" style={{fontSize:11,padding:'6px 10px',alignSelf:'flex-end'}} onClick={async()=>{
+                  if(!newNote.trim()||!detail)return
+                  setAddingNote(true)
+                  const {error}=await supabase.from('client_notes').insert([{
+                    clientName:detail.name, text:newNote.trim(),
+                    author: 'Rep', type:'Note',
+                    created_at:new Date().toISOString()
+                  }])
+                  setAddingNote(false)
+                  if(error){showToast('Error: '+error.message);return}
+                  setNewNote('');loadRelated(detail.name)
+                }} disabled={addingNote}>{addingNote?'…':'+'}</button>
+              </div>
+              {/* Notes list */}
+              {relNotes.length===0&&<div style={{color:'var(--t3)',fontSize:12}}>No notes yet. Add one above.</div>}
+              {(notesExpanded?relNotes:relNotes.slice(0,3)).map((n,i)=>(
+                <div key={n.id||i} style={{borderTop:'1px solid var(--br)',padding:'8px 0',display:'flex',gap:8,alignItems:'flex-start'}}>
+                  <div style={{width:28,height:28,borderRadius:'50%',background:n.type==='Email'?'var(--blue)':'var(--s3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,flexShrink:0,color:n.type==='Email'?'#fff':'var(--t2)'}}>
+                    {n.type==='Email'?'✉️':'📝'}
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:12,lineHeight:1.6,whiteSpace:'pre-wrap',color:'var(--tx)'}}>{n.text}</div>
+                    <div style={{fontSize:10,color:'var(--t3)',marginTop:3,display:'flex',gap:8}}>
+                      {n.author&&<span>{n.author}</span>}
+                      {n.type&&n.type!=='Note'&&<span className="bdg bn" style={{fontSize:9}}>{n.type}</span>}
+                      <span>{n.created_at?new Date(n.created_at).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):''}</span>
+                    </div>
+                  </div>
+                  <button onClick={async()=>{await supabase.from('client_notes').delete().eq('id',n.id);loadRelated(detail.name)}} style={{background:'none',border:'none',color:'var(--t3)',cursor:'pointer',fontSize:14,lineHeight:1,flexShrink:0}}>×</button>
+                </div>
+              ))}
+              {!notesExpanded&&relNotes.length>3&&(
+                <div style={{textAlign:'center',paddingTop:8,fontSize:12,color:'var(--t3)',cursor:'pointer'}} onClick={()=>setNotesExpanded(true)}>
+                  + {relNotes.length-3} more notes — click See All
+                </div>
+              )}
             </div>
 
             {/* Documents */}

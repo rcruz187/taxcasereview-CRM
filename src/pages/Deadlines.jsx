@@ -1,119 +1,176 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
-const BLANK = { name:'', client:'', type:'OIC', dueDate:'', status:'Tracking' }
-const TYPES = ['OIC','Installment Agreement','CDP','CSED','Penalty Abatement','Appeals','General']
+const TYPES    = ['OIC','Installment Agreement','CDP','CSED','Penalty Abatement','Appeals','Return Filing','IRS Notice','General']
 const STATUSES = ['Tracking','Action Required','Scheduled','Completed']
 
+const BLANK = { name:'', title:'', client:'', clientName:'', type:'General', dueDate:'', status:'Tracking', notes:'' }
+
 export default function Deadlines() {
-  const [items, setItems] = useState([])
-  const [modal, setModal] = useState(false)
-  const [form, setForm]   = useState(BLANK)
-  const [saving, setSaving] = useState(false)
-  const [toast, setToast]   = useState('')
+  const [items,   setItems]   = useState([])
+  const [clients, setClients] = useState([])
+  const [modal,   setModal]   = useState(false)
+  const [form,    setForm]    = useState(BLANK)
+  const [sug,     setSug]     = useState([])
+  const [saving,  setSaving]  = useState(false)
+  const [toast,   setToast]   = useState('')
+  const [filter,  setFilter]  = useState('All')
 
   useEffect(() => { load() }, [])
 
   async function load() {
-    const { data } = await supabase.from('deadlines').select('*').order('dueDate', { ascending: true })
+    const [{ data },{ data:cl }] = await Promise.all([
+      supabase.from('deadlines').select('*').order('dueDate',{ascending:true}),
+      supabase.from('clients').select('id,name')
+    ])
     if (data) setItems(data)
+    if (cl)   setClients(cl)
     const badge = document.getElementById('badge-deadlines')
     if (badge && data) {
-      const urgent = data.filter(d => {
-        const dy = Math.ceil((new Date(d.dueDate) - new Date()) / 86400000)
-        return dy <= 7 && dy >= 0 && d.status !== 'Completed'
-      }).length
-      badge.textContent = urgent || 0
+      const n = data.filter(d=>{const dy=daysLeft(d);return dy<=7&&dy>=-1&&getStatus(d)!=='Completed'}).length
+      badge.textContent = n || ''
     }
   }
 
-  function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''),3000) }
-  function fld(k,v) { setForm(f=>({...f,[k]:v})) }
+  function showToast(msg){setToast(msg);setTimeout(()=>setToast(''),4000)}
+  function fld(k,v){setForm(f=>({...f,[k]:v}))}
 
-  function daysLeft(d) { return Math.ceil((new Date(d) - new Date()) / 86400000) }
-  function urgencyColor(dy) { return dy <= 3 ? 'var(--bad)' : dy <= 7 ? 'var(--warn)' : dy <= 30 ? 'var(--tx)' : 'var(--t2)' }
-  function urgencyBdg(dy) { return dy < 0 ? 'br' : dy <= 3 ? 'br' : dy <= 7 ? 'ba' : 'bg' }
-  function daysText(dy) { return dy < 0 ? 'OVERDUE' : dy === 0 ? 'TODAY' : dy+'d' }
+  // Support both 'name' and 'title' column names
+  function getName(d) { return d.name || d.title || '—' }
+  function getClient(d) { return d.client || d.clientName || '—' }
+  function getStatus(d) { return d.status || 'Tracking' }
+
+  function daysLeft(d) {
+    const due = d.dueDate || d.due_date
+    if (!due) return 999
+    return Math.ceil((new Date(due) - new Date()) / 86400000)
+  }
+  function urgencyColor(dy) { return dy<0?'var(--bad)':dy<=3?'var(--bad)':dy<=7?'var(--warn)':'var(--t2)' }
+  function urgencyBdg(dy)   { return dy<0?'br':dy<=3?'br':dy<=7?'ba':'bg' }
+  function daysText(dy)     { return dy<0?'OVERDUE':dy===0?'TODAY':dy+'d left' }
+
+  function searchClient(val) {
+    fld('client',val); fld('clientName',val)
+    if (val.length<2){setSug([]);return}
+    setSug(clients.filter(c=>c.name.toLowerCase().includes(val.toLowerCase())).slice(0,6))
+  }
 
   async function save() {
-    if (!form.name.trim() || !form.dueDate) { showToast('Name and date required'); return }
+    if (!form.name.trim()&&!form.title.trim()) { showToast('Deadline name is required'); return }
+    if (!form.dueDate) { showToast('Due date is required'); return }
     setSaving(true)
-    const { error } = await supabase.from('deadlines').insert([{ ...form, created_at: new Date().toISOString() }])
+    // Send both name and title to handle either column
+    const payload = {
+      ...form,
+      name:  form.name||form.title,
+      title: form.name||form.title,
+      client: form.client||form.clientName,
+      clientName: form.client||form.clientName,
+      created_at: new Date().toISOString()
+    }
+    const { data, error } = await supabase.from('deadlines').insert([payload]).select()
     setSaving(false)
-    if (error) { showToast('Error: ' + error.message); return }
-    showToast('Deadline added!')
-    setModal(false)
-    setForm(BLANK)
+    if (error) { showToast('❌ Error: ' + error.message); return }
+    showToast('✅ Deadline added!')
+    setModal(false); setForm(BLANK); load()
+  }
+
+  async function markStatus(id, status) {
+    const { error } = await supabase.from('deadlines').update({status}).eq('id',id)
+    if (error) { showToast('❌ '+error.message); return }
     load()
   }
 
   async function deleteItem(id) {
-    await supabase.from('deadlines').delete().eq('id', id)
-    showToast('Deleted')
-    load()
+    await supabase.from('deadlines').delete().eq('id',id)
+    showToast('Deleted'); load()
   }
 
-  const urgent = items.filter(d => { const dy = daysLeft(d.dueDate); return dy <= 7 && dy >= -30 && d.status !== 'Completed' })
-  const rest   = items.filter(d => { const dy = daysLeft(d.dueDate); return !(dy <= 7 && dy >= -30 && d.status !== 'Completed') })
+  const filtered = filter==='All' ? items : filter==='Upcoming' ? items.filter(d=>daysLeft(d)>=0&&getStatus(d)!=='Completed') : filter==='Overdue' ? items.filter(d=>daysLeft(d)<0&&getStatus(d)!=='Completed') : items.filter(d=>getStatus(d)===filter)
+  const urgent   = items.filter(d=>{ const dy=daysLeft(d); return dy<=7&&getStatus(d)!=='Completed' })
 
-  function Row({ d }) {
-    const dy = daysLeft(d.dueDate)
+  function Row({d}) {
+    const dy = daysLeft(d)
     return (
       <tr>
-        <td style={{fontWeight:600,color: urgencyColor(dy)}}>{d.name}</td>
-        <td>{d.client||'—'}</td>
-        <td><span className="bdg bn">{d.type}</span></td>
-        <td style={{color: urgencyColor(dy)}}>{d.dueDate}</td>
+        <td style={{fontWeight:600,color:urgencyColor(dy)}}>{getName(d)}</td>
+        <td style={{fontSize:12,color:'var(--t2)'}}>{getClient(d)}</td>
+        <td><span className="bdg bn" style={{fontSize:10}}>{d.type}</span></td>
+        <td style={{color:urgencyColor(dy),fontSize:12}}>{d.dueDate||d.due_date||'—'}</td>
         <td><span className={`bdg ${urgencyBdg(dy)}`}>{daysText(dy)}</span></td>
-        <td><span className={`bdg ${d.status==='Completed'?'bg':d.status==='Action Required'?'br':'bb'}`}>{d.status}</span></td>
-        <td><button className="btn del" onClick={()=>deleteItem(d.id)}>Del</button></td>
+        <td>
+          <select
+            value={getStatus(d)}
+            onChange={e=>markStatus(d.id,e.target.value)}
+            style={{background:'var(--s2)',border:'1px solid var(--br)',borderRadius:5,color:'var(--tx)',fontSize:11,padding:'2px 6px',cursor:'pointer'}}
+          >
+            {STATUSES.map(s=><option key={s}>{s}</option>)}
+          </select>
+        </td>
+        <td><button className="btn del" style={{fontSize:10,padding:'2px 7px'}} onClick={()=>deleteItem(d.id)}>Del</button></td>
       </tr>
     )
   }
 
   return (
     <div>
-      {toast && <div className="toast show">{toast}</div>}
+      {toast&&<div className="toast show">{toast}</div>}
 
-      {urgent.length > 0 && (
-        <div className="card" style={{borderColor:'var(--bad)'}}>
-          <div className="ch"><span className="ct" style={{color:'var(--bad)'}}>⚠️ Urgent Deadlines ({urgent.length})</span></div>
+      {/* Urgent banner */}
+      {urgent.length>0&&(
+        <div className="card" style={{borderColor:'var(--bad)',marginBottom:12}}>
+          <div className="ch"><span className="ct" style={{color:'var(--bad)'}}>⚠️ Urgent — Within 7 Days ({urgent.length})</span></div>
           <div className="ovx">
             <table>
-              <thead><tr><th>Name</th><th>Client</th><th>Type</th><th>Due Date</th><th>Days Left</th><th>Status</th><th></th></tr></thead>
+              <thead><tr><th>Deadline</th><th>Client</th><th>Type</th><th>Due</th><th>Days</th><th>Status</th><th></th></tr></thead>
               <tbody>{urgent.map(d=><Row key={d.id} d={d}/>)}</tbody>
             </table>
           </div>
         </div>
       )}
 
+      {/* Filter chips */}
+      <div style={{display:'flex',flexWrap:'wrap',gap:4,marginBottom:10}}>
+        {['All','Upcoming','Overdue',...STATUSES].map(f=>(
+          <span key={f} className={`chip${filter===f?' on':''}`} onClick={()=>setFilter(f)}>{f}</span>
+        ))}
+      </div>
+
       <div className="card">
         <div className="ch">
-          <span className="ct">All Deadlines ({items.length})</span>
-          <button className="btn pri" onClick={()=>setModal(true)}>+ Add Deadline</button>
+          <span className="ct">All Deadlines ({filtered.length})</span>
+          <button className="btn pri" onClick={()=>{setForm(BLANK);setModal(true)}}>+ Add Deadline</button>
         </div>
         <div className="ovx">
           <table>
-            <thead><tr><th>Name</th><th>Client</th><th>Type</th><th>Due Date</th><th>Days Left</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Deadline</th><th>Client</th><th>Type</th><th>Due</th><th>Days</th><th>Status</th><th></th></tr></thead>
             <tbody>
-              {items.length === 0 ? (
-                <tr><td colSpan={7} style={{textAlign:'center',color:'var(--t3)',padding:20}}>No deadlines yet</td></tr>
-              ) : items.map(d=><Row key={d.id} d={d}/>)}
+              {filtered.length===0
+                ?<tr><td colSpan={7} style={{textAlign:'center',color:'var(--t3)',padding:20}}>No deadlines</td></tr>
+                :filtered.map(d=><Row key={d.id} d={d}/>)
+              }
             </tbody>
           </table>
         </div>
       </div>
 
-      {modal && (
+      {modal&&(
         <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setModal(false)}>
-          <div className="modal">
-            <div className="mh">
-              <span className="mt">Add Deadline</span>
-              <button className="xbtn" onClick={()=>setModal(false)}>&times;</button>
-            </div>
+          <div className="modal" style={{width:520}}>
+            <div className="mh"><span className="mt">Add Deadline</span><button className="xbtn" onClick={()=>setModal(false)}>&times;</button></div>
             <div className="fg2">
-              <div className="field"><label>Deadline Name *</label><input value={form.name} onChange={e=>fld('name',e.target.value)} placeholder="e.g. OIC Response Due"/></div>
-              <div className="field"><label>Client</label><input value={form.client} onChange={e=>fld('client',e.target.value)}/></div>
+              <div className="field"><label>Deadline Name *</label>
+                <input value={form.name} onChange={e=>fld('name',e.target.value)} placeholder="e.g. OIC Response Due"/>
+              </div>
+              <div className="field" style={{position:'relative'}}>
+                <label>Client</label>
+                <input value={form.client} onChange={e=>searchClient(e.target.value)} placeholder="Type client name..." autoComplete="off"/>
+                {sug.length>0&&(
+                  <div style={{position:'absolute',top:'100%',left:0,right:0,background:'var(--s3)',border:'1px solid var(--b2c)',borderRadius:7,zIndex:500}}>
+                    {sug.map(c=><div key={c.id} onClick={()=>{fld('client',c.name);fld('clientName',c.name);setSug([])}} style={{padding:'7px 12px',cursor:'pointer',fontSize:13}}>{c.name}</div>)}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="fg2">
               <div className="field"><label>Type</label>
@@ -121,15 +178,20 @@ export default function Deadlines() {
                   {TYPES.map(t=><option key={t}>{t}</option>)}
                 </select>
               </div>
-              <div className="field"><label>Due Date *</label><input type="date" value={form.dueDate} onChange={e=>fld('dueDate',e.target.value)}/></div>
+              <div className="field"><label>Due Date *</label>
+                <input type="date" value={form.dueDate} onChange={e=>fld('dueDate',e.target.value)}/>
+              </div>
             </div>
             <div className="field"><label>Status</label>
               <select value={form.status} onChange={e=>fld('status',e.target.value)}>
                 {STATUSES.map(s=><option key={s}>{s}</option>)}
               </select>
             </div>
+            <div className="field"><label>Notes</label>
+              <textarea value={form.notes} onChange={e=>fld('notes',e.target.value)} style={{minHeight:60}} placeholder="Optional details..."/>
+            </div>
             <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:10}} onClick={save} disabled={saving}>
-              {saving ? 'Saving...' : 'Add Deadline'}
+              {saving?'Saving…':'Add Deadline'}
             </button>
           </div>
         </div>
