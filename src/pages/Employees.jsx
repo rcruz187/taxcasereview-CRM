@@ -24,11 +24,12 @@ export default function Employees() {
 
   async function seedTeam(silent = false) {
     setSaving(true)
-    const { error } = await supabase.from('employees').insert([
-      { name:'Romy Cruz',        role:'Tax Resolution Specialist', email:'romy@taxcasereview.org',    phone:'850-459-9039', payType:'Owner Draw', access:'Super Admin', startDate:'2024-01-01', created_at: new Date().toISOString() },
-      { name:'Dana Richard',     role:'Tax Resolution Specialist', email:'dana@taxcasereview.org',    phone:'',            payType:'Salary',     access:'Admin',       startDate:'2024-01-01', created_at: new Date().toISOString() },
-      { name:'Yesenia Gonzalez', role:'Tax Resolution Specialist', email:'yesenia@taxcasereview.org', phone:'',            payType:'Salary',     access:'Admin',       startDate:'2024-01-01', created_at: new Date().toISOString() },
-    ])
+    // Use upsert on email to avoid duplicate key errors
+    const { error } = await supabase.from('employees').upsert([
+      { name:'Romy Cruz',        role:'Tax Resolution Specialist', email:'romy@taxcasereview.org',    phone:'850-459-9039', payType:'Owner Draw', access:'Super Admin', startDate:'2024-01-01' },
+      { name:'Dana Richard',     role:'Tax Resolution Specialist', email:'dana@taxcasereview.org',    phone:'',            payType:'Salary',     access:'Admin',       startDate:'2024-01-01' },
+      { name:'Yesenia Gonzalez', role:'Tax Resolution Specialist', email:'yesenia@taxcasereview.org', phone:'',            payType:'Salary',     access:'Admin',       startDate:'2024-01-01' },
+    ], { onConflict: 'email', ignoreDuplicates: false })
     setSaving(false)
     if (error) { showToast('Seed error: ' + error.message); return }
     if (!silent) showToast('✅ Team seeded!')
