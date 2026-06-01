@@ -4,76 +4,119 @@ const LOGO_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/pub
 
 function printHeader(title) {
   return `
-    <div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #1A7FD4;padding-bottom:16px">
-      <img src="${LOGO_URL}" style="height:48px;margin-bottom:8px" onerror="this.style.display='none'"/>
-      <div style="font-size:20px;font-weight:700;color:#1A7FD4">Tax Case Review</div>
-      <div style="font-size:11px;color:#666">238 Evergreen Dr, Lake Park, FL 33403 · info@taxcasereview.com</div>
-      <div style="font-size:16px;font-weight:700;margin-top:10px;color:#111">${title}</div>
+    <div style="text-align:center;margin-bottom:28px;padding-bottom:18px;border-bottom:3px solid #1A7FD4">
+      <img src="${LOGO_URL}" style="height:52px;margin-bottom:10px;display:block;margin-left:auto;margin-right:auto" onerror="this.style.display='none'"/>
+      <div style="font-size:22px;font-weight:800;color:#1A7FD4;letter-spacing:-.3px">Tax Case Review</div>
+      <div style="font-size:11px;color:#666;margin-top:3px">238 Evergreen Dr, Lake Park, FL 33403 &nbsp;·&nbsp; info@taxcasereview.com &nbsp;·&nbsp; (850) 459-9039</div>
+      <div style="font-size:15px;font-weight:700;margin-top:14px;color:#111;text-transform:uppercase;letter-spacing:.5px">${title}</div>
+    </div>`
+}
+
+function footer() {
+  return `
+    <div style="margin-top:48px;padding-top:16px;border-top:1px solid #ddd;text-align:center;font-size:10px;color:#999;line-height:1.8">
+      Tax Case Review &nbsp;·&nbsp; 238 Evergreen Dr, Lake Park, FL 33403 &nbsp;·&nbsp; info@taxcasereview.com &nbsp;·&nbsp; (850) 459-9039<br/>
+      <em>Tax Case Review is a tax resolution consulting firm and is not a law firm. No attorney-client relationship is created by this agreement.</em>
     </div>`
 }
 
 function sigBlock(label1 = 'Client Signature', label2 = 'Authorized Representative') {
   return `
-    <div style="display:flex;gap:40px;margin-top:32px">
-      <div style="flex:1;border-top:1px solid #333;padding-top:6px;font-size:11px;color:#555">
-        ${label1}<br/>Date: ___________________
-      </div>
-      <div style="flex:1;border-top:1px solid #333;padding-top:6px;font-size:11px;color:#555">
-        ${label2} — Tax Case Review<br/>Date: ___________________
+    <div style="margin-top:48px;padding-top:0">
+      <div style="display:flex;gap:48px;">
+        <div style="flex:1">
+          <div style="border-top:1.5px solid #333;padding-top:8px;margin-top:0">
+            <div style="font-size:12px;font-weight:700;color:#222;margin-bottom:4px">${label1}</div>
+            <div style="font-size:11px;color:#555">Print Name: ___________________________________</div>
+            <div style="font-size:11px;color:#555;margin-top:6px">Date: _______________________</div>
+          </div>
+        </div>
+        <div style="flex:1">
+          <div style="border-top:1.5px solid #333;padding-top:8px;margin-top:0">
+            <div style="font-size:12px;font-weight:700;color:#222;margin-bottom:4px">${label2} — Tax Case Review</div>
+            <div style="font-size:11px;color:#555">Name: ___________________________________</div>
+            <div style="font-size:11px;color:#555;margin-top:6px">Date: _______________________</div>
+          </div>
+        </div>
       </div>
     </div>`
 }
 
 export function printBase(title, body) {
-  const w = window.open('', '_blank', 'width=860,height=1000')
+  const w = window.open('', '_blank', 'width=880,height=1100')
   w.document.write(`<!DOCTYPE html><html><head>
-    <title>${title}</title>
+    <title>${title} — Tax Case Review</title>
     <style>
-      body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:40px 48px;max-width:800px;margin:0 auto}
-      h3{color:#1A7FD4;margin:18px 0 6px}
-      p{margin:6px 0;line-height:1.6}
-      ul{margin:6px 0;padding-left:20px;line-height:1.7}
-      .fee-box{border:2px solid #1A7FD4;border-radius:6px;padding:12px 16px;margin:16px 0;background:#f0f7ff}
-      .fee-box b{font-size:14px}
-      .client-box{border:1px solid #ddd;border-radius:6px;padding:10px 14px;margin:0 0 20px;background:#f9f9f9;font-size:11px}
-      .client-box b{font-size:13px;display:block;margin-bottom:4px}
-      @media print{body{padding:24px}}
+      *{box-sizing:border-box}
+      body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:12.5px;color:#111;padding:48px 56px;max-width:820px;margin:0 auto;line-height:1.6}
+      h3{color:#1A7FD4;margin:22px 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid #e0eef9;padding-bottom:4px}
+      p{margin:8px 0;line-height:1.7}
+      ul{margin:8px 0 14px;padding-left:22px;line-height:1.9}
+      li{margin-bottom:2px}
+      .fee-box{border:2px solid #1A7FD4;border-radius:8px;padding:16px 20px;margin:16px 0;background:#f0f7ff}
+      .fee-box .fee-main{font-size:16px;font-weight:800;color:#1A7FD4;margin-bottom:6px}
+      .fee-box .fee-sub{font-size:11px;color:#555;line-height:1.7}
+      .client-box{border:1px solid #c8daea;border-radius:8px;padding:14px 18px;margin:0 0 24px;background:#f5f9fd}
+      .client-box .cb-name{font-size:14px;font-weight:800;color:#111;margin-bottom:6px}
+      .client-box .cb-row{font-size:11.5px;color:#444;margin-top:3px}
+      .notice{background:#fffbea;border:1px solid #f0c040;border-radius:6px;padding:10px 14px;font-size:11px;color:#7a5c00;margin:14px 0}
+      @media print{
+        body{padding:24px 32px}
+        button{display:none}
+      }
     </style>
   </head><body>
     ${printHeader(title)}
     ${body}
+    ${footer()}
   </body></html>`)
   w.document.close()
-  setTimeout(() => w.print(), 400)
+  setTimeout(() => w.print(), 500)
 }
 
 // ─── Client info block ────────────────────────────────────────────────────────
-function clientBlock(lead) {
-  if (!lead) return ''
-  const name = lead.name || `${lead.first || ''} ${lead.last || ''}`.trim() || '___________________'
-  const phone = lead.phone || '___________________'
-  const email = lead.email || '___________________'
-  const address = [lead.street, lead.city, lead.state, lead.zip].filter(Boolean).join(', ') || '___________________'
-  const balance = lead.irsBalance || '___________________'
-  const fee = lead.taxFee ? `$${lead.taxFee}` : '$___________'
+function clientBlock(c) {
+  if (!c) return ''
+  const name    = c.name || `${c.first||''} ${c.last||''}`.trim() || '___________________'
+  const phone   = c.phone || '___________________'
+  const email   = c.email || '___________________'
+  const address = [c.street, c.city, c.state, c.zip].filter(Boolean).join(', ') || '___________________'
+  const balance = c.irsBalance ? (isNaN(Number(c.irsBalance)) ? c.irsBalance : '$'+Number(c.irsBalance).toLocaleString()) : '___________________'
+  const fee     = c.taxFee ? `$${Number(c.taxFee).toLocaleString()}` : (c.investigationFee ? `$${c.investigationFee}` : '$___________')
+  const years   = c.taxYears || '___________________'
+  const issue   = c.issueType || '___________________'
   return `
     <div class="client-box">
-      <b>Client: ${name}</b>
-      Phone: ${phone} &nbsp;|&nbsp; Email: ${email}<br/>
-      Address: ${address}<br/>
-      Est. IRS Balance: ${balance} &nbsp;|&nbsp; Investigation Fee: ${fee}
+      <div class="cb-name">${name}</div>
+      <div class="cb-row">📞 ${phone} &nbsp;&nbsp; ✉️ ${email}</div>
+      <div class="cb-row">📍 ${address}</div>
+      <div class="cb-row" style="margin-top:8px;padding-top:8px;border-top:1px solid #d0dde8">
+        <b>Est. IRS Balance:</b> ${balance} &nbsp;&nbsp;
+        <b>Issue:</b> ${issue} &nbsp;&nbsp;
+        <b>Tax Years:</b> ${years} &nbsp;&nbsp;
+        <b>Investigation Fee:</b> ${fee}
+      </div>
     </div>`
 }
 
 // ─── Service Agreement ────────────────────────────────────────────────────────
-export function generateServiceAgreement(lead = null) {
-  const fee = lead?.taxFee ? `$${lead.taxFee}` : '$___________'
+export function generateServiceAgreement(c = null) {
+  const fee  = c?.taxFee ? `$${Number(c.taxFee).toLocaleString()}` : (c?.investigationFee ? `$${c.investigationFee}` : '$___________')
+  const date = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})
   printBase('Tax Investigation Service Agreement', `
-    ${clientBlock(lead)}
-    <p>This Tax Investigation Service Agreement ("Agreement") is entered into between <b>Tax Case Review</b> ("Company") and the undersigned client ("Client") as of the date signed below.</p>
+    <p style="text-align:right;font-size:11px;color:#666;margin-bottom:4px">Date: ${date}</p>
+    ${clientBlock(c)}
+
+    <p>This Tax Investigation Service Agreement (<b>"Agreement"</b>) is entered into between <b>Tax Case Review</b> ("Company") and the undersigned client ("Client") as of the date signed below.</p>
 
     <h3>1. Scope of Services</h3>
-    <p>The Company agrees to perform an initial tax investigation, which includes review of tax transcripts, identification of IRS or state tax liabilities, evaluation of available resolution programs, and preparation of a written summary of findings and recommended resolution strategy.</p>
+    <p>The Company agrees to perform an initial tax investigation, which includes:</p>
+    <ul>
+      <li>Review of IRS and/or state tax transcripts</li>
+      <li>Identification of outstanding tax liabilities</li>
+      <li>Evaluation of available resolution programs</li>
+      <li>Preparation of a written summary and recommended resolution strategy</li>
+    </ul>
 
     <h3>2. Company Obligations</h3>
     <ul>
@@ -87,134 +130,186 @@ export function generateServiceAgreement(lead = null) {
     <h3>3. Client Obligations</h3>
     <ul>
       <li>Provide accurate and complete personal, financial, and tax information</li>
-      <li>Execute IRS authorization forms (2848 / 8821) promptly</li>
+      <li>Execute IRS authorization forms (Form 2848 / 8821) promptly</li>
       <li>Respond to company requests for documents within 5 business days</li>
       <li>Pay the investigation fee in full prior to commencement of services</li>
     </ul>
 
     <h3>4. Tax Investigation Fee</h3>
     <div class="fee-box">
-      <b>Investigation Fee: ${fee}</b><br/>
-      <span style="font-size:11px;color:#555">(Standard fee: $499 – $699. Manager-approved rates may vary.)</span><br/>
-      <span style="font-size:11px">This fee is non-refundable once transcript review has commenced.</span>
+      <div class="fee-main">Investigation Fee: ${fee}</div>
+      <div class="fee-sub">
+        This fee is non-refundable once transcript review has commenced.<br/>
+        Standard range: $499 – $699. Manager-approved rates may vary.
+      </div>
     </div>
 
     <h3>5. Not a Law Firm</h3>
-    <p>Tax Case Review is a tax resolution consulting firm and is <b>not a law firm</b>. No attorney-client relationship is created by this agreement. The Company does not provide legal advice. Enrolled Agents and/or licensed tax professionals perform all representation services.</p>
+    <p>Tax Case Review is a tax resolution consulting firm and is <b>not a law firm</b>. No attorney-client relationship is created by this Agreement. Enrolled Agents and/or licensed tax professionals perform all representation services.</p>
 
     <h3>6. No Guarantee of Outcome</h3>
     <p>The Company makes no guarantee as to the specific outcome of any IRS or state tax resolution matter. Acceptance into any IRS program (including Offer in Compromise) is solely at the discretion of the IRS.</p>
 
     <h3>7. Termination</h3>
-    <p>Either party may terminate this Agreement with 5 business days written notice. Investigation fees already paid are non-refundable once services have commenced. The Company may terminate immediately for non-cooperation or material misrepresentation by the Client.</p>
+    <p>Either party may terminate this Agreement with 5 business days written notice. Investigation fees already paid are non-refundable once services have commenced. The Company may terminate immediately for non-cooperation or material misrepresentation.</p>
 
-    <h3>8. Dispute Resolution / Arbitration</h3>
+    <h3>8. Dispute Resolution</h3>
     <p>Any dispute arising from this Agreement shall be resolved by binding arbitration under the rules of the American Arbitration Association in Palm Beach County, Florida. Both parties waive their right to a jury trial.</p>
 
     <h3>9. Governing Law</h3>
     <p>This Agreement is governed by the laws of the State of Florida.</p>
 
-    ${sigBlock('Client Signature', 'Authorized Representative — Tax Case Review')}
-    <p style="font-size:10px;color:#888;margin-top:20px;text-align:center">
-      Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403 · info@taxcasereview.com · Not a law firm
-    </p>
+    ${sigBlock('Client Signature', 'Authorized Representative')}
   `)
 }
 
-// ─── Addendum ────────────────────────────────────────────────────────────────
-export function generateAddendum(lead = null) {
+// ─── Addendum — called with pre-filled fee/scope from modal ──────────────────
+export function generateAddendum(c = null, opts = {}) {
+  const {
+    resolutionFee   = '',
+    paymentPlan     = '',
+    startDate       = '',
+    workScope       = [],
+    notes           = '',
+  } = opts
+
+  const feeDisplay  = resolutionFee ? `$${Number(resolutionFee).toLocaleString()}` : '$___________'
+  const planDisplay = paymentPlan   ? `$${Number(paymentPlan).toLocaleString()} /month` : '$___________ /month'
+  const startDisp   = startDate     || '___________'
+
+  const defaultScope = [
+    'Full IRS / State representation and negotiation',
+    'Preparation and submission of resolution application (OIC, IA, CNC, Abatement, or applicable program)',
+    'Power of Attorney representation before the IRS and/or state tax authorities',
+    'Filing of any delinquent returns required for resolution eligibility',
+    'Ongoing case management through resolution acceptance or closure',
+  ]
+  const scopeItems = workScope.length > 0 ? workScope : defaultScope
+
+  const date = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})
+
   printBase('Service Addendum — Additional Services Agreement', `
-    ${clientBlock(lead)}
-    <p>This Addendum ("Addendum") supplements the Tax Investigation Service Agreement previously executed between <b>Tax Case Review</b> ("Company") and the undersigned client ("Client") and is incorporated therein by reference.</p>
+    <p style="text-align:right;font-size:11px;color:#666;margin-bottom:4px">Date: ${date}</p>
+    ${clientBlock(c)}
+
+    <p>This Addendum (<b>"Addendum"</b>) supplements the Tax Investigation Service Agreement previously executed between <b>Tax Case Review</b> ("Company") and the undersigned client ("Client") and is incorporated therein by reference.</p>
 
     <h3>1. Additional Services Authorized</h3>
-    <p>Client authorizes the Company to proceed with the following additional resolution services beyond the initial tax investigation:</p>
+    <p>Client authorizes the Company to proceed with the following resolution services beyond the initial tax investigation:</p>
     <ul>
-      <li>Full IRS / State representation and negotiation</li>
-      <li>Preparation and submission of resolution application (as applicable)</li>
-      <li>Power of Attorney representation before the IRS and/or state tax authorities</li>
-      <li>Filing of any delinquent returns required for resolution eligibility</li>
-      <li>Ongoing case management through resolution acceptance or closure</li>
+      ${scopeItems.map(s=>`<li>${s}</li>`).join('\n      ')}
     </ul>
+    ${notes ? `<p><b>Additional Scope Notes:</b> ${notes}</p>` : ''}
 
-    <h3>2. Additional Service Fee</h3>
+    <h3>2. Resolution Service Fee</h3>
     <div class="fee-box">
-      <b>Additional Service Fee: $___________</b><br/>
-      <span style="font-size:11px;color:#555">Payment plan: $___________ /month · Starting: ___________</span><br/>
-      <span style="font-size:11px">Fees for additional services are separate from and in addition to the investigation fee.</span>
+      <div class="fee-main">Resolution Service Fee: ${feeDisplay}</div>
+      <div class="fee-sub">
+        Payment Plan: ${planDisplay} · Starting: ${startDisp}<br/>
+        Fees for resolution services are separate from and in addition to the investigation fee.<br/>
+        Payments are due on the agreed start date and monthly thereafter until paid in full.
+      </div>
     </div>
 
     <h3>3. Conditions</h3>
-    <p>Services under this Addendum are contingent upon: (a) Client remaining current on any required tax filings; (b) Client maintaining compliance with any IRS or state payment agreements during representation; (c) Timely payment of fees as agreed.</p>
+    <p>Services under this Addendum are contingent upon: (a) Client remaining current on any required tax filings; (b) Client maintaining compliance with any IRS or state payment agreements during representation; (c) Timely payment of fees as agreed upon above.</p>
 
-    <h3>4. Incorporation</h3>
-    <p>All terms of the original Tax Investigation Service Agreement remain in full force and effect and are incorporated herein. In the event of conflict, this Addendum controls.</p>
+    <h3>4. Incorporation &amp; Entire Agreement</h3>
+    <p>All terms of the original Tax Investigation Service Agreement remain in full force and effect and are incorporated herein. In the event of conflict between this Addendum and the original Agreement, this Addendum controls.</p>
 
-    ${sigBlock('Client Signature', 'Authorized Representative — Tax Case Review')}
-    <p style="font-size:10px;color:#888;margin-top:20px;text-align:center">
-      Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403 · info@taxcasereview.com · Not a law firm
-    </p>
+    <h3>5. Client Acknowledgment</h3>
+    <p>By signing below, Client confirms they have read, understand, and agree to the terms of this Addendum and authorize Tax Case Review to proceed with the resolution services described herein.</p>
+
+    ${sigBlock('Client Signature', 'Authorized Representative')}
   `)
 }
 
 // ─── Engagement Letter ────────────────────────────────────────────────────────
-export function generateEngagementLetter(lead = null) {
-  const name = lead ? (lead.name || `${lead.first || ''} ${lead.last || ''}`.trim()) : 'Client'
+export function generateEngagementLetter(c = null) {
+  const name    = c ? (c.name || `${c.first||''} ${c.last||''}`.trim()) : 'Valued Client'
+  const fee     = c?.taxFee ? `$${Number(c.taxFee).toLocaleString()}` : (c?.investigationFee ? `$${c.investigationFee}` : '$___________')
+  const issue   = c?.issueType || 'tax resolution matter'
+  const years   = c?.taxYears  || '___________________'
+  const rep     = c?.assignedTo || '___________________'
+  const date    = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})
+
   printBase('Engagement Letter', `
-    ${clientBlock(lead)}
-    <p>Dear ${name},</p>
-    <p>Thank you for choosing <b>Tax Case Review</b>. We are pleased to confirm our engagement to assist you with your federal and/or state tax resolution matter.</p>
+    <p style="text-align:right;font-size:11px;color:#666;margin-bottom:16px">${date}</p>
+    ${clientBlock(c)}
+
+    <p>Dear <b>${name}</b>,</p>
+    <p>Thank you for choosing <b>Tax Case Review</b>. We are pleased to confirm our engagement to assist you with your ${issue} matter${years !== '___________________' ? ` for tax year(s) ${years}` : ''}. Your dedicated case representative is <b>${rep}</b>.</p>
 
     <h3>Services to Be Performed</h3>
     <ul>
       <li>Review your tax transcripts and compliance history with the IRS and/or applicable state taxing authority</li>
       <li>Identify all outstanding liabilities and unfiled returns</li>
-      <li>Evaluate eligibility for IRS resolution programs including Installment Agreement, Currently Not Collectible status, Offer in Compromise, Penalty Abatement, and/or Innocent Spouse relief</li>
+      <li>Evaluate eligibility for IRS resolution programs including Installment Agreement, Currently Not Collectible (CNC), Offer in Compromise, Penalty Abatement, and/or Innocent Spouse relief</li>
       <li>Represent you before the IRS and/or state tax authority through resolution</li>
     </ul>
+
+    <h3>Investigation Fee</h3>
+    <div class="fee-box">
+      <div class="fee-main">Investigation Fee: ${fee}</div>
+      <div class="fee-sub">
+        This fee covers the initial tax investigation, transcript retrieval, and delivery of a written resolution strategy.<br/>
+        This fee is non-refundable once transcript review has commenced.
+      </div>
+    </div>
 
     <h3>Your Responsibilities</h3>
     <ul>
       <li>Provide complete and accurate financial and tax information</li>
-      <li>Execute all necessary authorization forms promptly</li>
+      <li>Execute all necessary authorization forms (Form 2848 / 8821) promptly</li>
       <li>Notify us immediately of any IRS or state contacts, notices, or levies received</li>
       <li>Respond to requests for information within 5 business days</li>
     </ul>
 
-    <h3>Our Commitment</h3>
-    <p>We are committed to providing professional, ethical, and effective representation. A dedicated case representative will be assigned to your file and will keep you informed of all significant developments.</p>
+    <h3>Our Commitment to You</h3>
+    <p>We are committed to providing professional, ethical, and effective representation. Your assigned representative will keep you informed of all significant developments in your case. We are available Monday through Friday to answer your questions.</p>
 
-    ${sigBlock('Client Acknowledgment', 'Authorized Representative — Tax Case Review')}
-    <p style="font-size:10px;color:#888;margin-top:20px;text-align:center">
-      Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403 · info@taxcasereview.com · Not a law firm
-    </p>
+    <div class="notice">
+      <b>Important:</b> Tax Case Review is a tax resolution consulting firm and is not a law firm. No attorney-client relationship is created by this engagement. All representation is performed by Enrolled Agents and/or licensed tax professionals.
+    </div>
+
+    ${sigBlock('Client Acknowledgment', 'Authorized Representative')}
   `)
 }
 
 // ─── POA Cover Letter ─────────────────────────────────────────────────────────
-export function generatePOACoverLetter(lead = null) {
-  const name = lead ? (lead.name || `${lead.first || ''} ${lead.last || ''}`.trim()) : '___________________'
-  printBase('Power of Attorney Cover Letter', `
-    ${clientBlock(lead)}
-    <p>Date: ___________________</p>
+export function generatePOACoverLetter(c = null) {
+  const name  = c ? (c.name || `${c.first||''} ${c.last||''}`.trim()) : '___________________'
+  const ssn   = c?.ssn ? `***-**-${c.ssn.replace(/-/g,'').slice(-4)}` : '___-__-____'
+  const years = c?.taxYears || '___________________'
+  const date  = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})
+
+  printBase('Power of Attorney Cover Letter — Form 2848', `
+    <p style="margin-bottom:24px;font-size:11px;color:#666">${date}</p>
+
     <p>Internal Revenue Service<br/>
-    [IRS Campus Address]</p>
-    <br/>
-    <p>Re: Power of Attorney — Taxpayer: <b>${name}</b><br/>
-    SSN/EIN: ___________________<br/>
-    Tax Periods: ___________________</p>
-    <br/>
-    <p>To Whom It May Concern,</p>
-    <p>Enclosed please find a completed Form 2848 (Power of Attorney and Declaration of Representative) authorizing Tax Case Review to represent the above-named taxpayer in connection with the tax matters and periods specified therein.</p>
-    <p>Please update your records to reflect this authorization and direct all future correspondence regarding the above-referenced matter to our office at the address below.</p>
+    [IRS Campus — See Form 2848 Instructions for Applicable Address]</p>
+
+    <p style="margin-top:20px"><b>Re: Power of Attorney — Form 2848</b><br/>
+    <b>Taxpayer:</b> ${name}<br/>
+    <b>SSN/EIN:</b> ${ssn}<br/>
+    <b>Tax Periods:</b> ${years}</p>
+
+    <p style="margin-top:20px">To Whom It May Concern,</p>
+
+    <p>Enclosed please find a completed Form 2848 (Power of Attorney and Declaration of Representative) authorizing <b>Tax Case Review</b> to represent the above-named taxpayer in connection with the tax matters and periods specified therein.</p>
+
+    <p>Please update your records to reflect this authorization and direct all future correspondence regarding the above-referenced matter to our office at the address below. We respectfully request that all notices, letters, and communications be sent to our office rather than directly to the taxpayer.</p>
+
     <p>If you have any questions or require additional information, please do not hesitate to contact our office.</p>
-    <br/>
-    <p>Respectfully,</p>
-    <br/>
-    <p>___________________<br/>
-    Authorized Representative<br/>
-    Tax Case Review<br/>
-    238 Evergreen Dr, Lake Park, FL 33403<br/>
-    info@taxcasereview.com</p>
+
+    <p style="margin-top:28px">Respectfully submitted,</p>
+
+    <div style="margin-top:32px;padding-top:8px;border-top:1.5px solid #333;display:inline-block;min-width:260px">
+      <div style="font-size:12px;font-weight:700">Authorized Representative</div>
+      <div style="font-size:11.5px;margin-top:4px">Tax Case Review</div>
+      <div style="font-size:11px;color:#555;margin-top:2px">238 Evergreen Dr, Lake Park, FL 33403</div>
+      <div style="font-size:11px;color:#555">info@taxcasereview.com &nbsp;·&nbsp; (850) 459-9039</div>
+      <div style="font-size:11px;color:#888;margin-top:6px">Date: _______________________</div>
+    </div>
   `)
 }

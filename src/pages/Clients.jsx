@@ -74,8 +74,14 @@ export default function Clients() {
   const [saving,    setSaving]    = useState(false)
   const [toast,     setToast]     = useState('')
   const [detail,    setDetail]    = useState(null)
+  // Addendum modal
+  const [addModal,    setAddModal]    = useState(false)
+  const [addForm,     setAddForm]     = useState({ resolutionFee:'', paymentPlan:'', startDate:'', notes:'' })
   // Related data for detail view
   const [relCases,    setRelCases]    = useState([])
+  const [relDocs,     setRelDocs]     = useState([])
+  const [uploadingDoc,setUploadingDoc]= useState(false)
+  const [docForm,     setDocForm]     = useState({ name:'', docType:'IRS Notice', notes:'' })
   const [relTasks,    setRelTasks]    = useState([])
   const [relInvoices, setRelInvoices] = useState([])
   const [loadingRel,  setLoadingRel]  = useState(false)
@@ -96,14 +102,16 @@ export default function Clients() {
 
   async function loadRelated(clientName) {
     setLoadingRel(true)
-    const [{ data:cases },{ data:tasks },{ data:invoices }] = await Promise.all([
+    const [{ data:cases },{ data:tasks },{ data:invoices },{ data:docs }] = await Promise.all([
       supabase.from('cases').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('tasks').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('invoices').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
+      supabase.from('documents').select('*').eq('client', clientName).order('created_at',{ascending:false}),
     ])
     setRelCases(cases||[])
     setRelTasks(tasks||[])
     setRelInvoices(invoices||[])
+    setRelDocs(docs||[])
     setLoadingRel(false)
   }
 
@@ -254,7 +262,7 @@ export default function Clients() {
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             <ActionBtn color="#22863a" icon="📄" label="Service Agreement" sub="Print/Sign" onClick={()=>generateServiceAgreement(c)}/>
             <ActionBtn color="#1A7FD4" icon="✉️" label="Engagement Letter" sub="Print" onClick={()=>generateEngagementLetter(c)}/>
-            <ActionBtn color="#d97706" icon="📋" label="Addendum" sub="Add Services" onClick={()=>generateAddendum(c)}/>
+            <ActionBtn color="#d97706" icon="📋" label="Addendum" sub="Add Services" onClick={()=>{setAddForm({resolutionFee:'',paymentPlan:'',startDate:'',notes:''});setAddModal(true)}}/>
             <ActionBtn color="#6c5ce7" icon="🔐" label="POA Cover Letter" sub="Form 2848" onClick={()=>generatePOACoverLetter(c)}/>
             <ActionBtn color="#0891b2" icon="📁" label="New Case" sub="Open Case" onClick={()=>window.location.hash='/cases'}/>
             <ActionBtn color="#7c3aed" icon="✅" label="Add Task" sub="Assign Work" onClick={()=>{
@@ -415,6 +423,61 @@ export default function Clients() {
               ))}
             </div>
 
+            {/* Documents */}
+            <div className="card">
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>📁 Documents ({relDocs.length})</div>
+                <button className="btn pri" style={{fontSize:11,padding:'3px 10px'}} onClick={()=>setUploadingDoc(v=>!v)}>+ Add Doc</button>
+              </div>
+              {uploadingDoc&&(
+                <div style={{background:'var(--s3)',borderRadius:6,padding:10,marginBottom:10}}>
+                  <div className="fg2">
+                    <div className="field"><label>Document Name *</label>
+                      <input value={docForm.name} onChange={e=>setDocForm(f=>({...f,name:e.target.value}))} placeholder="e.g. 2022 W2"/>
+                    </div>
+                    <div className="field"><label>Type</label>
+                      <select value={docForm.docType} onChange={e=>setDocForm(f=>({...f,docType:e.target.value}))}>
+                        {['IRS Notice','IRS Form','Transcript','Agreement','W2 / 1099','Tax Return','Financial Statement','Bank Statement','Correspondence','Engagement Letter','Other'].map(t=><option key={t}>{t}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="field"><label>Notes</label>
+                    <input value={docForm.notes} onChange={e=>setDocForm(f=>({...f,notes:e.target.value}))} placeholder="Brief description"/>
+                  </div>
+                  <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:8}} onClick={async()=>{
+                    if(!docForm.name.trim()){showToast('Name required');return}
+                    const {error}=await supabase.from('documents').insert([{...docForm,client:c.name,created_at:new Date().toISOString()}])
+                    if(error){showToast('Error: '+error.message);return}
+                    showToast('✅ Document added!')
+                    setDocForm({name:'',docType:'IRS Notice',notes:''})
+                    setUploadingDoc(false)
+                    loadRelated(c.name)
+                  }}>Save Document</button>
+                </div>
+              )}
+              {loadingRel&&<div style={{color:'var(--t3)',fontSize:12}}>Loading…</div>}
+              {!loadingRel&&relDocs.length===0&&!uploadingDoc&&(
+                <div style={{color:'var(--t3)',fontSize:12}}>No documents stored for this client.</div>
+              )}
+              {relDocs.map(d=>(
+                <div key={d.id} style={{borderBottom:'1px solid var(--br)',padding:'7px 0',display:'flex',alignItems:'center',gap:10}}>
+                  <span style={{fontSize:18}}>📄</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:600,fontSize:13}}>{d.name}</div>
+                    <div style={{fontSize:11,color:'var(--t3)',marginTop:2,display:'flex',gap:10}}>
+                      <span className="bdg bn" style={{fontSize:9}}>{d.docType}</span>
+                      {d.notes&&<span>{d.notes}</span>}
+                      <span>{d.created_at?.slice(0,10)}</span>
+                    </div>
+                  </div>
+                  <button className="btn del" style={{fontSize:10,padding:'2px 7px'}} onClick={async()=>{
+                    await supabase.from('documents').delete().eq('id',d.id)
+                    loadRelated(c.name)
+                  }}>Del</button>
+                </div>
+              ))}
+            </div>
+
             {/* Notes */}
             {c.notes&&(
               <div className="card">
@@ -426,6 +489,44 @@ export default function Clients() {
         </div>
 
         {editModal&&<ClientFormModal form={form} fld={fld} reps={reps} saving={saving} onSave={saveEdit} onClose={()=>setEditModal(false)} title="Edit Client"/>}
+
+        {addModal&&(
+          <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setAddModal(false)}>
+            <div className="modal" style={{width:560}}>
+              <div className="mh">
+                <span className="mt">📋 Generate Addendum — {c.name}</span>
+                <button className="xbtn" onClick={()=>setAddModal(false)}>&times;</button>
+              </div>
+              <div style={{fontSize:12,color:'var(--t3)',marginBottom:14}}>
+                Fill in the resolution fee and scope details before generating. These will print directly on the document for the client to sign.
+              </div>
+              <div className="fg2">
+                <div className="field"><label>Resolution Service Fee ($) *</label>
+                  <input type="number" value={addForm.resolutionFee} onChange={e=>setAddForm(f=>({...f,resolutionFee:e.target.value}))} placeholder="e.g. 3500"/>
+                </div>
+                <div className="field"><label>Monthly Payment Plan ($)</label>
+                  <input type="number" value={addForm.paymentPlan} onChange={e=>setAddForm(f=>({...f,paymentPlan:e.target.value}))} placeholder="e.g. 350"/>
+                </div>
+              </div>
+              <div className="field"><label>Payments Start Date</label>
+                <input type="date" value={addForm.startDate} onChange={e=>setAddForm(f=>({...f,startDate:e.target.value}))}/>
+              </div>
+              <div className="field"><label>Additional Scope / Work Notes</label>
+                <textarea value={addForm.notes} onChange={e=>setAddForm(f=>({...f,notes:e.target.value}))} style={{minHeight:80}} placeholder="e.g. Includes filing 3 years of unfiled returns, OIC preparation, lien subordination..."/>
+              </div>
+              <div style={{background:'var(--s3)',borderRadius:6,padding:10,fontSize:11,color:'var(--t3)',marginBottom:12}}>
+                The standard resolution services (IRS representation, POA, negotiation, case management) are always included. Use the notes field to add anything specific to this client's case.
+              </div>
+              <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:11}} onClick={()=>{
+                if(!addForm.resolutionFee){showToast('Enter the resolution fee first');return}
+                generateAddendum(c, addForm)
+                setAddModal(false)
+              }}>
+                🖨️ Generate &amp; Print Addendum
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
