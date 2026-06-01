@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { generateServiceAgreement, generateAddendum, generateEngagementLetter, generatePOACoverLetter } from '../lib/docUtils'
 
@@ -65,6 +66,8 @@ function ActionBtn({color, icon, label, sub, onClick}) {
 }
 
 export default function Clients() {
+  const navigate = useNavigate()
+  const { id: urlId } = useParams()
   const [clients,   setClients]   = useState([])
   const [employees, setEmployees] = useState([])
   const [filter,    setFilter]    = useState('All')
@@ -94,6 +97,14 @@ export default function Clients() {
   const [addingTask,  setAddingTask]  = useState(false)
 
   useEffect(() => { load() }, [])
+
+  // Auto-open client from URL param (/clients/:id)
+  useEffect(() => {
+    if (urlId && clients.length > 0 && !detail) {
+      const found = clients.find(c => String(c.id) === String(urlId))
+      if (found) openDetail(found)
+    }
+  }, [urlId, clients])
 
   async function load() {
     const [{ data:cl },{ data:em }] = await Promise.all([
@@ -193,6 +204,7 @@ export default function Clients() {
     setDetail(c)
     setRelCases([]);setRelTasks([]);setRelInvoices([])
     loadRelated(c.name)
+    navigate(`/clients/${c.id}`, { replace: true })
   }
 
   const reps=employees.length>0?employees.map(e=>e.name):['Romy Cruz','Dana Richard','Yesenia Gonzalez']
@@ -210,7 +222,7 @@ export default function Clients() {
 
         {/* Back + top actions */}
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,flexWrap:'wrap'}}>
-          <button className="btn" onClick={()=>setDetail(null)}>← Back to Clients</button>
+          <button className="btn" onClick={()=>{setDetail(null);navigate('/clients',{replace:true})}}>← Back to Clients</button>
           <button className="btn pri" onClick={()=>openEdit(c)} style={{marginLeft:'auto'}}>✏️ Edit</button>
           <button className="btn del" onClick={()=>deleteClient(c.id,c.name)}>🗑 Delete</button>
         </div>
@@ -324,44 +336,58 @@ export default function Clients() {
               </div>
             )}
 
-            {/* Tasks */}
+            {/* Notes */}
             <div className="card">
-              <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>
-                ✅ Tasks ({relTasks.length})
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>📝 Notes ({relNotes.length})</div>
+                {relNotes.length>3&&<button className="btn sec" style={{fontSize:11,padding:'2px 8px'}} onClick={()=>setNotesExpanded(v=>!v)}>{notesExpanded?'Show Less':'See All'}</button>}
               </div>
-              {loadingRel&&<div style={{color:'var(--t3)',fontSize:12}}>Loading…</div>}
-              {!loadingRel&&relTasks.length===0&&(
-                <div style={{color:'var(--t3)',fontSize:12,marginBottom:10}}>No tasks yet for this client.</div>
-              )}
-              {relTasks.map(t=>(
-                <div key={t.id} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'6px 0',borderBottom:'1px solid var(--br)'}}>
-                  <div
-                    onClick={()=>toggleTask(t)}
-                    style={{width:18,height:18,borderRadius:4,border:'1.5px solid var(--b2c)',background:t.done?'var(--ok)':'var(--s2)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,marginTop:1,color:'#fff',fontSize:11}}
-                  >{t.done?'✓':''}</div>
+              {/* Add note input */}
+              <div style={{display:'flex',gap:6,marginBottom:10}}>
+                <textarea
+                  value={newNote}
+                  onChange={e=>setNewNote(e.target.value)}
+                  placeholder="Add a note... (emails, calls, updates)"
+                  style={{flex:1,padding:'7px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12,lineHeight:1.5,resize:'vertical',minHeight:80,fontFamily:'inherit'}}
+                  rows={4}
+                  onKeyDown={e=>{if(e.key==='Enter'&&e.ctrlKey)addClientNote()}}
+                />
+                <button className="btn pri" style={{fontSize:11,padding:'6px 10px',alignSelf:'flex-end'}} onClick={async()=>{
+                  if(!newNote.trim()||!detail)return
+                  setAddingNote(true)
+                  const {error}=await supabase.from('client_notes').insert([{
+                    clientName:detail.name, text:newNote.trim(),
+                    author: 'Rep', type:'Note',
+                    created_at:new Date().toISOString()
+                  }])
+                  setAddingNote(false)
+                  if(error){showToast('Error: '+error.message);return}
+                  setNewNote('');loadRelated(detail.name)
+                }} disabled={addingNote}>{addingNote?'…':'+'}</button>
+              </div>
+              {/* Notes list */}
+              {relNotes.length===0&&<div style={{color:'var(--t3)',fontSize:12}}>No notes yet. Add one above.</div>}
+              {(notesExpanded?relNotes:relNotes.slice(0,3)).map((n,i)=>(
+                <div key={n.id||i} style={{borderTop:'1px solid var(--br)',padding:'8px 0',display:'flex',gap:8,alignItems:'flex-start'}}>
+                  <div style={{width:28,height:28,borderRadius:'50%',background:n.type==='Email'?'var(--blue)':'var(--s3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,flexShrink:0,color:n.type==='Email'?'#fff':'var(--t2)'}}>
+                    {n.type==='Email'?'✉️':'📝'}
+                  </div>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:13,fontWeight:t.done?400:600,textDecoration:t.done?'line-through':'none',color:t.done?'var(--t3)':'var(--tx)'}}>{t.title}</div>
-                    <div style={{fontSize:10,color:'var(--t3)',marginTop:2,display:'flex',gap:8}}>
-                      {t.priority&&<span className={`bdg ${t.priority==='High'?'br':t.priority==='Low'?'bn':'ba'}`} style={{fontSize:9}}>{t.priority}</span>}
-                      {t.dueDate&&<span>Due: {t.dueDate}</span>}
-                      {t.assignedTo&&<span>→ {t.assignedTo}</span>}
+                    <div style={{fontSize:12,lineHeight:1.6,whiteSpace:'pre-wrap',color:'var(--tx)'}}>{n.text}</div>
+                    <div style={{fontSize:10,color:'var(--t3)',marginTop:3,display:'flex',gap:8}}>
+                      {n.author&&<span>{n.author}</span>}
+                      {n.type&&n.type!=='Note'&&<span className="bdg bn" style={{fontSize:9}}>{n.type}</span>}
+                      <span>{n.created_at?new Date(n.created_at).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):''}</span>
                     </div>
                   </div>
+                  <button onClick={async()=>{await supabase.from('client_notes').delete().eq('id',n.id);loadRelated(detail.name)}} style={{background:'none',border:'none',color:'var(--t3)',cursor:'pointer',fontSize:14,lineHeight:1,flexShrink:0}}>×</button>
                 </div>
               ))}
-              {/* Quick add task */}
-              <div style={{display:'flex',gap:6,marginTop:10}}>
-                <input
-                  value={quickTask}
-                  onChange={e=>setQuickTask(e.target.value)}
-                  onKeyDown={e=>e.key==='Enter'&&addQuickTask()}
-                  placeholder="Add a task…"
-                  style={{flex:1,padding:'6px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12}}
-                />
-                <button className="btn pri" style={{fontSize:11,padding:'5px 10px'}} onClick={addQuickTask} disabled={addingTask}>
-                  {addingTask?'…':'+'}
-                </button>
-              </div>
+              {!notesExpanded&&relNotes.length>3&&(
+                <div style={{textAlign:'center',paddingTop:8,fontSize:12,color:'var(--t3)',cursor:'pointer'}} onClick={()=>setNotesExpanded(true)}>
+                  + {relNotes.length-3} more notes — click See All
+                </div>
+              )}
             </div>
           </div>
 
@@ -429,58 +455,44 @@ export default function Clients() {
               ))}
             </div>
 
-            {/* Notes */}
+            {/* Tasks */}
             <div className="card">
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-                <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>📝 Notes ({relNotes.length})</div>
-                {relNotes.length>3&&<button className="btn sec" style={{fontSize:11,padding:'2px 8px'}} onClick={()=>setNotesExpanded(v=>!v)}>{notesExpanded?'Show Less':'See All'}</button>}
+              <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>
+                ✅ Tasks ({relTasks.length})
               </div>
-              {/* Add note input */}
-              <div style={{display:'flex',gap:6,marginBottom:10}}>
-                <textarea
-                  value={newNote}
-                  onChange={e=>setNewNote(e.target.value)}
-                  placeholder="Add a note... (emails, calls, updates)"
-                  style={{flex:1,padding:'7px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12,lineHeight:1.5,resize:'vertical',minHeight:38,fontFamily:'inherit'}}
-                  rows={2}
-                  onKeyDown={e=>{if(e.key==='Enter'&&e.ctrlKey)addClientNote()}}
-                />
-                <button className="btn pri" style={{fontSize:11,padding:'6px 10px',alignSelf:'flex-end'}} onClick={async()=>{
-                  if(!newNote.trim()||!detail)return
-                  setAddingNote(true)
-                  const {error}=await supabase.from('client_notes').insert([{
-                    clientName:detail.name, text:newNote.trim(),
-                    author: 'Rep', type:'Note',
-                    created_at:new Date().toISOString()
-                  }])
-                  setAddingNote(false)
-                  if(error){showToast('Error: '+error.message);return}
-                  setNewNote('');loadRelated(detail.name)
-                }} disabled={addingNote}>{addingNote?'…':'+'}</button>
-              </div>
-              {/* Notes list */}
-              {relNotes.length===0&&<div style={{color:'var(--t3)',fontSize:12}}>No notes yet. Add one above.</div>}
-              {(notesExpanded?relNotes:relNotes.slice(0,3)).map((n,i)=>(
-                <div key={n.id||i} style={{borderTop:'1px solid var(--br)',padding:'8px 0',display:'flex',gap:8,alignItems:'flex-start'}}>
-                  <div style={{width:28,height:28,borderRadius:'50%',background:n.type==='Email'?'var(--blue)':'var(--s3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,flexShrink:0,color:n.type==='Email'?'#fff':'var(--t2)'}}>
-                    {n.type==='Email'?'✉️':'📝'}
-                  </div>
+              {loadingRel&&<div style={{color:'var(--t3)',fontSize:12}}>Loading…</div>}
+              {!loadingRel&&relTasks.length===0&&(
+                <div style={{color:'var(--t3)',fontSize:12,marginBottom:10}}>No tasks yet for this client.</div>
+              )}
+              {relTasks.map(t=>(
+                <div key={t.id} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'6px 0',borderBottom:'1px solid var(--br)'}}>
+                  <div
+                    onClick={()=>toggleTask(t)}
+                    style={{width:18,height:18,borderRadius:4,border:'1.5px solid var(--b2c)',background:t.done?'var(--ok)':'var(--s2)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,marginTop:1,color:'#fff',fontSize:11}}
+                  >{t.done?'✓':''}</div>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:12,lineHeight:1.6,whiteSpace:'pre-wrap',color:'var(--tx)'}}>{n.text}</div>
-                    <div style={{fontSize:10,color:'var(--t3)',marginTop:3,display:'flex',gap:8}}>
-                      {n.author&&<span>{n.author}</span>}
-                      {n.type&&n.type!=='Note'&&<span className="bdg bn" style={{fontSize:9}}>{n.type}</span>}
-                      <span>{n.created_at?new Date(n.created_at).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):''}</span>
+                    <div style={{fontSize:13,fontWeight:t.done?400:600,textDecoration:t.done?'line-through':'none',color:t.done?'var(--t3)':'var(--tx)'}}>{t.title}</div>
+                    <div style={{fontSize:10,color:'var(--t3)',marginTop:2,display:'flex',gap:8}}>
+                      {t.priority&&<span className={`bdg ${t.priority==='High'?'br':t.priority==='Low'?'bn':'ba'}`} style={{fontSize:9}}>{t.priority}</span>}
+                      {t.dueDate&&<span>Due: {t.dueDate}</span>}
+                      {t.assignedTo&&<span>→ {t.assignedTo}</span>}
                     </div>
                   </div>
-                  <button onClick={async()=>{await supabase.from('client_notes').delete().eq('id',n.id);loadRelated(detail.name)}} style={{background:'none',border:'none',color:'var(--t3)',cursor:'pointer',fontSize:14,lineHeight:1,flexShrink:0}}>×</button>
                 </div>
               ))}
-              {!notesExpanded&&relNotes.length>3&&(
-                <div style={{textAlign:'center',paddingTop:8,fontSize:12,color:'var(--t3)',cursor:'pointer'}} onClick={()=>setNotesExpanded(true)}>
-                  + {relNotes.length-3} more notes — click See All
-                </div>
-              )}
+              {/* Quick add task */}
+              <div style={{display:'flex',gap:6,marginTop:10}}>
+                <input
+                  value={quickTask}
+                  onChange={e=>setQuickTask(e.target.value)}
+                  onKeyDown={e=>e.key==='Enter'&&addQuickTask()}
+                  placeholder="Add a task…"
+                  style={{flex:1,padding:'6px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12}}
+                />
+                <button className="btn pri" style={{fontSize:11,padding:'5px 10px'}} onClick={addQuickTask} disabled={addingTask}>
+                  {addingTask?'…':'+'}
+                </button>
+              </div>
             </div>
 
             {/* Documents */}
