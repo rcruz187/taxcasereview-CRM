@@ -271,37 +271,6 @@ export default function TaxReturns() {
         </select>
       </div>
 
-      {/* DB setup notice if no returns */}
-      {setupNeeded && (
-        <div className="card" style={{ marginBottom: 12, border: '2px solid var(--warn)', background: 'var(--warn)0d' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
-            <span style={{ fontSize:24 }}>⚙️</span>
-            <div>
-              <div style={{ fontWeight:800, fontSize:14, color:'var(--tx)' }}>One-time database setup required</div>
-              <div style={{ fontSize:12, color:'var(--t2)', marginTop:2 }}>
-                The <strong>tax_returns</strong> table doesn't exist yet. Copy the SQL below and run it in your{' '}
-                <a href="https://supabase.com/dashboard/project/mpxgxfqdbquzkrvvejkh/sql" target="_blank" rel="noreferrer"
-                  style={{ color:'var(--b2c)', fontWeight:600 }}>Supabase SQL Editor ↗</a>
-              </div>
-            </div>
-          </div>
-          <pre style={{ fontSize:10, background:'var(--s2)', padding:'12px 14px', borderRadius:7, overflowX:'auto', color:'var(--tx)', lineHeight:1.7, marginBottom:10, border:'1px solid var(--br)' }}>{SQL_SETUP}</pre>
-          <div style={{ display:'flex', gap:8 }}>
-            <button className="btn pri" style={{ fontSize:11, padding:'6px 14px' }}
-              onClick={()=>{ navigator.clipboard?.writeText(SQL_SETUP); showToast('✅ SQL copied! Paste it in Supabase SQL Editor.') }}>
-              📋 Copy SQL
-            </button>
-            <a href="https://supabase.com/dashboard/project/mpxgxfqdbquzkrvvejkh/sql" target="_blank" rel="noreferrer"
-              className="btn sec" style={{ fontSize:11, padding:'6px 14px', textDecoration:'none' }}>
-              Open Supabase SQL Editor ↗
-            </a>
-            <button className="btn sec" style={{ fontSize:11, padding:'6px 14px' }} onClick={load}>
-              🔄 Retry (after running SQL)
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Returns table */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {filtered.length === 0 ? (
