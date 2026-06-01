@@ -26,12 +26,13 @@ export default function Dialer() {
   useEffect(() => { loadLeads(); loadCallLog() }, [])
 
   async function loadLeads() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('leads')
-      .select('id, firstName, lastName, phone, status, source')
+      .select('id, name, first, last, phone, status, source')
       .not('status', 'eq', 'Converted to Client')
       .not('status', 'eq', 'Dead')
       .order('created_at', { ascending: false })
+    if (error) console.error('loadLeads error:', error)
     if (data) setLeads(data)
   }
 
@@ -75,7 +76,7 @@ export default function Dialer() {
     setSaving(true)
     const record = {
       leadId: active.id,
-      clientName: `${active.firstName || ''} ${active.lastName || ''}`.trim(),
+      clientName: active.name || `${active.first || ''} ${active.last || ''}`.trim(),
       phone: active.phone,
       outcome: logForm.outcome,
       notes: logForm.notes,
@@ -114,7 +115,7 @@ export default function Dialer() {
 
   function callDialpad() {
     if (!dialpad) return
-    const fakeLead = { id: null, firstName: 'Manual', lastName: 'Dial', phone: dialpad, status: 'Manual' }
+    const fakeLead = { id: null, name: 'Manual Dial', first: 'Manual', last: 'Dial', phone: dialpad, status: 'Manual' }
     startCall(fakeLead)
   }
 
@@ -150,7 +151,7 @@ export default function Dialer() {
             }}>📞</div>
             <div>
               <div style={{ color: '#fff', fontWeight: 700, fontSize: 16 }}>
-                {active.firstName} {active.lastName}
+                {active?.name || `${active?.first || ''} ${active?.last || ''}`.trim()}
               </div>
               <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13 }}>{active.phone}</div>
               <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 }}>
@@ -254,7 +255,7 @@ export default function Dialer() {
                     ) : leads.map(lead => (
                       <tr key={lead.id} style={active?.id === lead.id ? { background: 'rgba(37,162,90,0.08)' } : {}}>
                         <td style={{ fontWeight: 600 }}>
-                          {lead.firstName} {lead.lastName}
+                          {lead.name || `${lead.first || ''} ${lead.last || ''}`.trim()}
                         </td>
                         <td style={{ fontFamily: 'monospace', color: 'var(--t2)' }}>
                           {lead.phone || '—'}
@@ -328,7 +329,7 @@ export default function Dialer() {
         <div className="modal-bg open" onClick={e => e.target === e.currentTarget && setLogModal(false)}>
           <div className="modal">
             <div className="mh">
-              <span className="mt">Log Call — {active?.firstName} {active?.lastName}</span>
+              <span className="mt">Log Call — {active?.name || `${active?.first || ''} ${active?.last || ''}`.trim()}</span>
               <button className="xbtn" onClick={() => { setLogModal(false); setActive(null) }}>&times;</button>
             </div>
 
