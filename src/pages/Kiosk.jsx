@@ -26,31 +26,6 @@ export default function Kiosk() {
     }
   }, [])
 
-  // Kiosk lockdown mode
-  useEffect(() => {
-    if (!lockdown) return
-    const pushState = () => window.history.pushState(null, '', window.location.href)
-    pushState()
-    window.addEventListener('popstate', pushState)
-    const handleKey = (e) => {
-      if (
-        e.key === 'F5' ||
-        (e.altKey && e.key === 'F4') ||
-        (e.ctrlKey && ['w','r','t','n'].includes(e.key.toLowerCase())) ||
-        (e.altKey && ['ArrowLeft','ArrowRight'].includes(e.key))
-      ) {
-        e.preventDefault(); e.stopPropagation()
-      }
-    }
-    const handleContext = (e) => { e.preventDefault() }
-    document.addEventListener('keydown', handleKey, true)
-    document.addEventListener('contextmenu', handleContext)
-    return () => {
-      window.removeEventListener('popstate', pushState)
-      document.removeEventListener('keydown', handleKey, true)
-      document.removeEventListener('contextmenu', handleContext)
-    }
-  }, [lockdown])
 
   // Clock tick
   useEffect(() => {
@@ -170,20 +145,30 @@ export default function Kiosk() {
           Scan to clock in or clock out — no app download required
         </div>
 
-        {/* Admin lockdown toggle */}
-        <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-          <span style={{ fontSize: 10, color: lockdown ? 'rgba(29,158,117,.7)' : 'rgba(248,113,113,.7)', fontWeight: 600 }}>
-            {lockdown ? '🔒 Kiosk Mode' : '🔓 Unlocked'}
-          </span>
-          <button onClick={() => setLockdown(l => !l)}
-            style={{ background: 'none', border: '1px solid rgba(255,255,255,.1)', borderRadius: 6, color: 'rgba(255,255,255,.25)', fontSize: 9, padding: '2px 8px', cursor: 'pointer', fontFamily: 'inherit' }}>
-            {lockdown ? 'Admin Unlock' : 'Re-lock'}
-          </button>
-          {!lockdown && (
-            <a href="/taxcasereview-CRM/" style={{ fontSize: 9, color: 'rgba(255,255,255,.4)', textDecoration: 'none', border: '1px solid rgba(255,255,255,.15)', borderRadius: 6, padding: '2px 8px' }}>
-              ← Back to CRM
-            </a>
-          )}
+        {/* Back to CRM button — always visible */}
+        <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+          <a href="/taxcasereview-CRM/"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              background: 'rgba(255,255,255,.12)',
+              border: '1px solid rgba(255,255,255,.25)',
+              borderRadius: 8, padding: '8px 20px',
+              color: '#fff', textDecoration: 'none',
+              fontSize: 13, fontWeight: 600,
+              cursor: 'pointer',
+            }}>
+            ← Back to CRM
+          </a>
+          {/* Tiny kiosk mode indicator */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 10, color: lockdown ? 'rgba(29,158,117,.6)' : 'rgba(248,113,113,.6)', fontWeight: 600 }}>
+              {lockdown ? '🔒 Kiosk Mode' : '🔓 Unlocked'}
+            </span>
+            <button onClick={() => setLockdown(l => !l)}
+              style={{ background: 'none', border: '1px solid rgba(255,255,255,.1)', borderRadius: 6, color: 'rgba(255,255,255,.2)', fontSize: 9, padding: '2px 7px', cursor: 'pointer', fontFamily: 'inherit' }}>
+              {lockdown ? 'Disable lockdown' : 'Re-lock'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
