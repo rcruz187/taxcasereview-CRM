@@ -153,11 +153,26 @@ export default function Settings() {
         <div className="card">
           <div className="card-header"><span className="card-title">Team Members</span></div>
           <div style={{ padding: '0 20px 20px' }}>
-            <div style={{ background: 'var(--bg2)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>Logged in as</div>
-              <div style={{ color: 'var(--t2)', fontSize: 13 }}>{user?.email}</div>
-            </div>
-            <div style={{ color: 'var(--t3)', fontSize: 13 }}>
+            {[
+              { name:'Romy Cruz',        email:'romy@taxcasereview.org',    role:'Super Admin', color:'br' },
+              { name:'Dana Richard',     email:'dana@taxcasereview.org',    role:'Admin',       color:'bb' },
+              { name:'Yesenia Gonzalez', email:'yesenia@taxcasereview.org', role:'Admin',       color:'bb' },
+            ].map(m => (
+              <div key={m.email} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 0', borderBottom:'1px solid var(--br)' }}>
+                <div style={{ width:40, height:40, borderRadius:'50%', background:'var(--blue)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:16, color:'#fff', flexShrink:0 }}>
+                  {m.name[0]}
+                </div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontWeight:700, fontSize:14 }}>
+                    {m.name}
+                    {m.email === user?.email && <span style={{ fontSize:10, color:'var(--ok)', marginLeft:8 }}>● You</span>}
+                  </div>
+                  <div style={{ color:'var(--t2)', fontSize:12 }}>{m.email}</div>
+                </div>
+                <span className={`bdg ${m.color}`} style={{ fontSize:11 }}>{m.role}</span>
+              </div>
+            ))}
+            <div style={{ color:'var(--t3)', fontSize:12, marginTop:14 }}>
               To add or remove team members, go to Supabase → Authentication → Users.
             </div>
           </div>

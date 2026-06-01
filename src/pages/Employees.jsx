@@ -14,7 +14,18 @@ export default function Employees() {
 
   async function load() {
     const { data } = await supabase.from('employees').select('*').order('created_at', { ascending: false })
-    if (data) setItems(data)
+    if (data && data.length === 0) {
+      // Seed the 3 known team members on first load
+      await supabase.from('employees').insert([
+        { name:'Romy Cruz',       role:'Tax Resolution Specialist', email:'romy@taxcasereview.org',    phone:'850-459-9039', payType:'Owner Draw',  access:'Super Admin', startDate:'2024-01-01', created_at: new Date().toISOString() },
+        { name:'Dana Richard',    role:'Tax Resolution Specialist', email:'dana@taxcasereview.org',    phone:'',            payType:'Salary',       access:'Admin',       startDate:'2024-01-01', created_at: new Date().toISOString() },
+        { name:'Yesenia Gonzalez',role:'Tax Resolution Specialist', email:'yesenia@taxcasereview.org', phone:'',            payType:'Salary',       access:'Admin',       startDate:'2024-01-01', created_at: new Date().toISOString() },
+      ])
+      const { data: seeded } = await supabase.from('employees').select('*').order('created_at', { ascending: false })
+      if (seeded) setItems(seeded)
+    } else if (data) {
+      setItems(data)
+    }
   }
 
   function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''),3000) }
