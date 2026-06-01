@@ -118,13 +118,17 @@ export default function Leads() {
   async function convertToClient(l) {
     if (!confirm(`Convert "${l.name}" to a full client?`)) return
     setConverting(true)
-    // Insert into clients table with all lead data
+    const taxYearsStr = l.taxYearsCustom || (()=>{try{return JSON.parse(l.taxYears||'[]').join(', ')}catch{return l.taxYears||''}})()
     const { error } = await supabase.from('clients').insert([{
-      name: l.name, clientType: l.clientType, phone: l.phone, email: l.email,
+      name: l.name, clientType: l.clientType || 'Individual',
+      first: l.first, mi: l.mi, last: l.last,
+      phone: l.phone, email: l.email,
       street: l.street, city: l.city, state: l.state, zip: l.zip, county: l.county,
+      source: l.source, assignedTo: l.assignedTo,
       irsBalance: l.irsBalance, issueType: l.issueType, irsOrState: l.irsOrState,
-      taxYears: l.taxYearsCustom || (()=>{try{return JSON.parse(l.taxYears||'[]').join(', ')}catch{return ''}})(),
-      notes: l.notes, status: 'Active', clientSince: new Date().toISOString().slice(0,10),
+      taxYears: taxYearsStr,
+      notes: l.notes, status: 'Active',
+      clientSince: new Date().toISOString().slice(0,10),
       created_at: new Date().toISOString()
     }])
     if (error) { showToast('Error: '+error.message); setConverting(false); return }
@@ -241,8 +245,9 @@ export default function Leads() {
               <span style={{fontSize:12,fontWeight:700}}>🔐 POA Cover Letter</span>
               <span style={{fontSize:10,opacity:.8}}>Generate & Print</span>
             </button>
-            <button className="btn ok" style={{justifyContent:'center',padding:10,fontSize:13,fontWeight:700,gridColumn:'1/-1'}} onClick={()=>convertToClient(l)} disabled={converting}>
-              ✓ Convert to Client
+            <button className="btn ok" style={{justifyContent:'center',flexDirection:'column',gap:3,padding:10,textAlign:'center'}} onClick={()=>convertToClient(l)} disabled={converting}>
+              <span style={{fontSize:12,fontWeight:700}}>✓ Convert to Client</span>
+              <span style={{fontSize:10,opacity:.8}}>{converting ? 'Converting…' : 'Move to Clients'}</span>
             </button>
           </div>
 
