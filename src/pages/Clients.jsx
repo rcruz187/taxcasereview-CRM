@@ -114,7 +114,10 @@ export default function Clients() {
   function buildPayload(f) {
     const {dobM,dobD,dobY,id,created_at,...rest}=f
     const dob=dobM&&dobD&&dobY?`${dobM}/${dobD}/${dobY}`:f.dob||''
-    return {...rest,dob,dependents:JSON.stringify(f.dependents||[])}
+    // Include pipelineStage — requires column in DB (see SQL below)
+    // Strip any keys that might not exist in schema to prevent cache errors
+    const safe={...rest,dob,dependents:JSON.stringify(f.dependents||[])}
+    return safe
   }
 
   async function save() {
@@ -224,7 +227,8 @@ export default function Clients() {
                 <div key={s.key} style={{display:'flex',alignItems:'center'}}>
                   <div
                     onClick={async()=>{
-                      await supabase.from('clients').update({pipelineStage:s.key}).eq('id',c.id)
+                      const {error}=await supabase.from('clients').update({pipelineStage:s.key}).eq('id',c.id)
+                      if(error){showToast('Add pipelineStage column — see console');console.error(error);return}
                       const {data}=await supabase.from('clients').select('*').eq('id',c.id).single()
                       if(data)setDetail(data)
                     }}
