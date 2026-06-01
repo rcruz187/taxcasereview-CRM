@@ -13,19 +13,22 @@ export default function Employees() {
   useEffect(() => { load() }, [])
 
   async function load() {
-    const { data } = await supabase.from('employees').select('*').order('created_at', { ascending: false })
-    if (data && data.length === 0) {
-      // Seed the 3 known team members on first load
-      await supabase.from('employees').insert([
-        { name:'Romy Cruz',       role:'Tax Resolution Specialist', email:'romy@taxcasereview.org',    phone:'850-459-9039', payType:'Owner Draw',  access:'Super Admin', startDate:'2024-01-01', created_at: new Date().toISOString() },
-        { name:'Dana Richard',    role:'Tax Resolution Specialist', email:'dana@taxcasereview.org',    phone:'',            payType:'Salary',       access:'Admin',       startDate:'2024-01-01', created_at: new Date().toISOString() },
-        { name:'Yesenia Gonzalez',role:'Tax Resolution Specialist', email:'yesenia@taxcasereview.org', phone:'',            payType:'Salary',       access:'Admin',       startDate:'2024-01-01', created_at: new Date().toISOString() },
-      ])
-      const { data: seeded } = await supabase.from('employees').select('*').order('created_at', { ascending: false })
-      if (seeded) setItems(seeded)
-    } else if (data) {
-      setItems(data)
-    }
+    const { data, error } = await supabase.from('employees').select('*').order('created_at', { ascending: false })
+    if (error) { showToast('Error loading: ' + error.message); return }
+    if (data) setItems(data)
+  }
+
+  async function seedTeam() {
+    setSaving(true)
+    const { error } = await supabase.from('employees').insert([
+      { name:'Romy Cruz',        role:'Tax Resolution Specialist', email:'romy@taxcasereview.org',    phone:'850-459-9039', payType:'Owner Draw', access:'Super Admin', startDate:'2024-01-01', created_at: new Date().toISOString() },
+      { name:'Dana Richard',     role:'Tax Resolution Specialist', email:'dana@taxcasereview.org',    phone:'',            payType:'Salary',     access:'Admin',       startDate:'2024-01-01', created_at: new Date().toISOString() },
+      { name:'Yesenia Gonzalez', role:'Tax Resolution Specialist', email:'yesenia@taxcasereview.org', phone:'',            payType:'Salary',     access:'Admin',       startDate:'2024-01-01', created_at: new Date().toISOString() },
+    ])
+    setSaving(false)
+    if (error) { showToast('Seed error: ' + error.message); return }
+    showToast('✅ Team seeded!')
+    load()
   }
 
   function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''),3000) }
@@ -54,7 +57,10 @@ export default function Employees() {
       <div className="card">
         <div className="ch">
           <span className="ct">Employees ({items.length})</span>
-          <button className="btn pri" onClick={()=>setModal(true)}>+ Add Employee</button>
+          <div style={{display:'flex',gap:8}}>
+            {items.length === 0 && <button className="btn sec" onClick={seedTeam} disabled={saving}>🌱 Seed Team (Romy, Dana, Yesenia)</button>}
+            <button className="btn pri" onClick={()=>setModal(true)}>+ Add Employee</button>
+          </div>
         </div>
         <div className="ovx">
           <table>
