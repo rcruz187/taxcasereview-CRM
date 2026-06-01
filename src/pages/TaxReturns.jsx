@@ -1,6 +1,25 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
+const SQL_SETUP = `create table if not exists tax_returns (
+  id uuid default gen_random_uuid() primary key,
+  returnNum text, clientName text, taxYear text,
+  returnType text, filingStatus text, status text default 'Draft',
+  assignedTo text, wages numeric, interest numeric, dividends numeric,
+  capitalGains numeric, businessIncome numeric, rentalIncome numeric,
+  retirementIncome numeric, socialSecurity numeric, otherIncome numeric,
+  studentLoanInterest numeric, iraDeduction numeric, selfEmployedHealth numeric,
+  selfEmployedTax numeric, alimonyPaid numeric, otherAdjustments numeric,
+  deductionType text default 'Standard', itemizedDeductions numeric,
+  stateLocalTax numeric, mortgageInterest numeric, charitableContrib numeric,
+  medicalExpenses numeric, childTaxCredit numeric, earnedIncomeCredit numeric,
+  childCareCredit numeric, educationCredit numeric, otherCredits numeric,
+  withholding numeric, estimatedPayments numeric, refundable numeric,
+  notes text, created_at timestamptz default now(), updated_at timestamptz
+);
+alter table tax_returns enable row level security;
+create policy "anon_all" on tax_returns for all using (true) with check (true);`
+
 const TAX_YEARS = ['2024','2023','2022','2021','2020','2019','2018']
 const FILING_STATUSES = ['Single','Married Filing Jointly','Married Filing Separately','Head of Household','Qualifying Surviving Spouse']
 const RETURN_TYPES = ['Federal 1040','State Return','1040-X Amended','1040-SR Senior','1040-NR Non-Resident','941 Payroll','940 FUTA','1065 Partnership','1120 Corp','1120S S-Corp','1041 Estate/Trust']
@@ -83,6 +102,7 @@ export default function TaxReturns() {
   const [filterYear, setFilterYear] = useState('All')
   const [filterStatus, setFilterStatus] = useState('All')
   const [tab, setTab]           = useState('income')
+  const [setupNeeded, setSetupNeeded] = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -92,7 +112,13 @@ export default function TaxReturns() {
       supabase.from('clients').select('id,name,ssn,filingStatus,assignedTo').order('name'),
       supabase.from('employees').select('name'),
     ])
-    setReturns(r.data || [])
+    // Detect missing table
+    if (r.error && (r.error.code === '42P01' || r.error.message?.includes('does not exist'))) {
+      setSetupNeeded(true)
+    } else {
+      setSetupNeeded(false)
+      setReturns(r.data || [])
+    }
     setClients(c.data || [])
     setEmployees(e.data || [])
     setLoading(false)
@@ -246,31 +272,33 @@ export default function TaxReturns() {
       </div>
 
       {/* DB setup notice if no returns */}
-      {returns.length === 0 && (
-        <div className="card" style={{ marginBottom: 12, border: '1px solid var(--warn)', background: 'var(--warn)11' }}>
-          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>⚙️ First-Time Setup</div>
-          <div style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.7 }}>
-            Run this SQL in your Supabase SQL editor to enable Tax Returns:
+      {setupNeeded && (
+        <div className="card" style={{ marginBottom: 12, border: '2px solid var(--warn)', background: 'var(--warn)0d' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+            <span style={{ fontSize:24 }}>⚙️</span>
+            <div>
+              <div style={{ fontWeight:800, fontSize:14, color:'var(--tx)' }}>One-time database setup required</div>
+              <div style={{ fontSize:12, color:'var(--t2)', marginTop:2 }}>
+                The <strong>tax_returns</strong> table doesn't exist yet. Copy the SQL below and run it in your{' '}
+                <a href="https://supabase.com/dashboard/project/mpxgxfqdbquzkrvvejkh/sql" target="_blank" rel="noreferrer"
+                  style={{ color:'var(--b2c)', fontWeight:600 }}>Supabase SQL Editor ↗</a>
+              </div>
+            </div>
           </div>
-          <pre style={{ fontSize: 10, background: 'var(--s3)', padding: '10px 12px', borderRadius: 6, marginTop: 8, overflowX: 'auto', color: 'var(--tx)', lineHeight: 1.5 }}>{`create table if not exists tax_returns (
-  id uuid default gen_random_uuid() primary key,
-  returnNum text, clientName text, taxYear text,
-  returnType text, filingStatus text, status text default 'Draft',
-  assignedTo text, wages numeric, interest numeric, dividends numeric,
-  capitalGains numeric, businessIncome numeric, rentalIncome numeric,
-  retirementIncome numeric, socialSecurity numeric, otherIncome numeric,
-  studentLoanInterest numeric, iraDeduction numeric, selfEmployedHealth numeric,
-  selfEmployedTax numeric, alimonyPaid numeric, otherAdjustments numeric,
-  deductionType text default 'Standard', itemizedDeductions numeric,
-  stateLocalTax numeric, mortgageInterest numeric, charitableContrib numeric,
-  medicalExpenses numeric, childTaxCredit numeric, earnedIncomeCredit numeric,
-  childCareCredit numeric, educationCredit numeric, otherCredits numeric,
-  withholding numeric, estimatedPayments numeric, refundable numeric,
-  notes text, created_at timestamptz default now(), updated_at timestamptz
-);
-alter table tax_returns enable row level security;
-create policy "anon_all" on tax_returns for all using (true) with check (true);`}
-            </pre>
+          <pre style={{ fontSize:10, background:'var(--s2)', padding:'12px 14px', borderRadius:7, overflowX:'auto', color:'var(--tx)', lineHeight:1.7, marginBottom:10, border:'1px solid var(--br)' }}>{SQL_SETUP}</pre>
+          <div style={{ display:'flex', gap:8 }}>
+            <button className="btn pri" style={{ fontSize:11, padding:'6px 14px' }}
+              onClick={()=>{ navigator.clipboard?.writeText(SQL_SETUP); showToast('✅ SQL copied! Paste it in Supabase SQL Editor.') }}>
+              📋 Copy SQL
+            </button>
+            <a href="https://supabase.com/dashboard/project/mpxgxfqdbquzkrvvejkh/sql" target="_blank" rel="noreferrer"
+              className="btn sec" style={{ fontSize:11, padding:'6px 14px', textDecoration:'none' }}>
+              Open Supabase SQL Editor ↗
+            </a>
+            <button className="btn sec" style={{ fontSize:11, padding:'6px 14px' }} onClick={load}>
+              🔄 Retry (after running SQL)
+            </button>
+          </div>
         </div>
       )}
 
