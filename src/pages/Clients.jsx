@@ -95,6 +95,15 @@ export default function Clients() {
   // Quick add task inline
   const [quickTask,   setQuickTask]   = useState('')
   const [addingTask,  setAddingTask]  = useState(false)
+  // Add task modal (from action button)
+  const [taskModal,   setTaskModal]   = useState(false)
+  const [taskTitle,   setTaskTitle]   = useState('')
+  const [taskPriority,setTaskPriority]= useState('Normal')
+  const [taskDueDate, setTaskDueDate] = useState('')
+  // Add payment modal
+  const [payModal,    setPayModal]    = useState(false)
+  const [payForm,     setPayForm]     = useState({ amount:'', method:'Credit Card', date:'', notes:'' })
+  const [savingPay,   setSavingPay]   = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -192,6 +201,52 @@ export default function Clients() {
     showToast('✅ Task added!')
   }
 
+  async function addClientNote() {
+    if (!newNote.trim()||!detail) return
+    setAddingNote(true)
+    const {error}=await supabase.from('client_notes').insert([{
+      clientName:detail.name, text:newNote.trim(),
+      author:'Rep', type:'Note',
+      created_at:new Date().toISOString()
+    }])
+    setAddingNote(false)
+    if(error){showToast('Error: '+error.message);return}
+    setNewNote('');loadRelated(detail.name)
+    showToast('✅ Note added!')
+  }
+
+  async function addTaskFromModal() {
+    if (!taskTitle.trim()||!detail) return
+    setAddingTask(true)
+    const {error}=await supabase.from('tasks').insert([{
+      title:taskTitle.trim(), clientName:detail.name,
+      priority:taskPriority, dueDate:taskDueDate||null,
+      done:false, created_at:new Date().toISOString()
+    }])
+    setAddingTask(false)
+    if(error){showToast('Task error: '+error.message);return}
+    setTaskTitle('');setTaskPriority('Normal');setTaskDueDate('')
+    setTaskModal(false)
+    loadRelated(detail.name)
+    showToast('✅ Task added!')
+  }
+
+  async function addPaymentForClient() {
+    if (!payForm.amount||!detail) return
+    setSavingPay(true)
+    const {error}=await supabase.from('payments').insert([{
+      clientName:detail.name, amount:payForm.amount,
+      method:payForm.method, date:payForm.date||new Date().toISOString().slice(0,10),
+      notes:payForm.notes, status:'Cleared',
+      created_at:new Date().toISOString()
+    }])
+    setSavingPay(false)
+    if(error){showToast('Payment error: '+error.message);return}
+    setPayForm({amount:'',method:'Credit Card',date:'',notes:''})
+    setPayModal(false)
+    showToast('✅ Payment recorded!')
+  }
+
   function openEdit(c) {
     const deps=parseDependents(c.dependents)
     let dobM='',dobD='',dobY=''
@@ -282,12 +337,10 @@ export default function Clients() {
             <ActionBtn color="#1A7FD4" icon="✉️" label="Engagement Letter" sub="Print" onClick={()=>generateEngagementLetter(c)}/>
             <ActionBtn color="#d97706" icon="📋" label="Addendum" sub="Add Services" onClick={()=>{setAddForm({resolutionFee:'',paymentPlan:'',startDate:'',notes:''});setAddModal(true)}}/>
             <ActionBtn color="#6c5ce7" icon="🔐" label="POA Cover Letter" sub="Form 2848" onClick={()=>generatePOACoverLetter(c)}/>
-            <ActionBtn color="#0891b2" icon="📁" label="New Case" sub="Open Case" onClick={()=>window.location.hash='/cases'}/>
-            <ActionBtn color="#7c3aed" icon="✅" label="Add Task" sub="Assign Work" onClick={()=>{
-              const t=prompt(`New task for ${c.name}:`)
-              if(t)supabase.from('tasks').insert([{title:t,clientName:c.name,priority:'Normal',done:false,created_at:new Date().toISOString()}]).then(()=>loadRelated(c.name))
-            }}/>
-            <ActionBtn color="#be185d" icon="🧾" label="New Invoice" sub="Bill Client" onClick={()=>window.location.hash='/invoices'}/>
+            <ActionBtn color="#0891b2" icon="📁" label="New Case" sub="Open Case" onClick={()=>navigate('/cases')}/>
+            <ActionBtn color="#7c3aed" icon="✅" label="Add Task" sub="Assign Work" onClick={()=>{setTaskTitle('');setTaskPriority('Normal');setTaskDueDate('');setTaskModal(true)}}/>
+            <ActionBtn color="#be185d" icon="🧾" label="New Invoice" sub="Bill Client" onClick={()=>navigate('/invoices')}/>
+            <ActionBtn color="#059669" icon="💳" label="Add Payment" sub="Record Payment" onClick={()=>{setPayForm({amount:'',method:'Credit Card',date:'',notes:''});setPayModal(true)}}/>
           </div>
         </div>
 
@@ -562,6 +615,72 @@ export default function Clients() {
 
         {editModal&&<ClientFormModal form={form} fld={fld} reps={reps} saving={saving} onSave={saveEdit} onClose={()=>setEditModal(false)} title="Edit Client"/>}
 
+        {/* ── Add Task Modal ── */}
+        {taskModal&&(
+          <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setTaskModal(false)}>
+            <div className="modal" style={{width:440}}>
+              <div className="mh">
+                <span className="mt">✅ Add Task — {detail?.name}</span>
+                <button className="xbtn" onClick={()=>setTaskModal(false)}>&times;</button>
+              </div>
+              <div className="field"><label>Task Title *</label>
+                <input value={taskTitle} onChange={e=>setTaskTitle(e.target.value)}
+                  placeholder="e.g. Request transcripts, Follow up on offer..."
+                  onKeyDown={e=>e.key==='Enter'&&addTaskFromModal()}
+                  autoFocus/>
+              </div>
+              <div className="fg2">
+                <div className="field"><label>Priority</label>
+                  <select value={taskPriority} onChange={e=>setTaskPriority(e.target.value)}>
+                    <option>Low</option><option>Normal</option><option>High</option><option>Urgent</option>
+                  </select>
+                </div>
+                <div className="field"><label>Due Date</label>
+                  <input type="date" value={taskDueDate} onChange={e=>setTaskDueDate(e.target.value)}/>
+                </div>
+              </div>
+              <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:10}} onClick={addTaskFromModal} disabled={addingTask}>
+                {addingTask?'Adding…':'✅ Add Task'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Add Payment Modal ── */}
+        {payModal&&(
+          <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setPayModal(false)}>
+            <div className="modal" style={{width:440}}>
+              <div className="mh">
+                <span className="mt">💳 Record Payment — {detail?.name}</span>
+                <button className="xbtn" onClick={()=>setPayModal(false)}>&times;</button>
+              </div>
+              <div className="field">
+                <label>Amount *</label>
+                <div style={{position:'relative'}}>
+                  <span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--t3)'}}>$</span>
+                  <input type="number" value={payForm.amount} onChange={e=>setPayForm(f=>({...f,amount:e.target.value}))} style={{paddingLeft:22}} placeholder="0.00" autoFocus/>
+                </div>
+              </div>
+              <div className="fg2">
+                <div className="field"><label>Method</label>
+                  <select value={payForm.method} onChange={e=>setPayForm(f=>({...f,method:e.target.value}))}>
+                    {['Credit Card','ACH / Bank Transfer','Check','Cash','Zelle','Venmo','Wire Transfer','Other'].map(m=><option key={m}>{m}</option>)}
+                  </select>
+                </div>
+                <div className="field"><label>Date</label>
+                  <input type="date" value={payForm.date} onChange={e=>setPayForm(f=>({...f,date:e.target.value}))}/>
+                </div>
+              </div>
+              <div className="field"><label>Notes (optional)</label>
+                <input value={payForm.notes||''} onChange={e=>setPayForm(f=>({...f,notes:e.target.value}))} placeholder="e.g. Partial payment, invoice INV-XXXXX"/>
+              </div>
+              <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:10}} onClick={addPaymentForClient} disabled={savingPay}>
+                {savingPay?'Saving…':'💳 Record Payment'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {addModal&&(
           <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setAddModal(false)}>
             <div className="modal" style={{width:560}}>
@@ -758,7 +877,7 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
 
         {/* IRS Info */}
         <div className="fg2">
-          <div className="field"><label>Est. IRS Balance ($)</label><input type="number" value={form.irsBalance||''} onChange={e=>fld('irsBalance',e.target.value)} placeholder="e.g. 45000"/></div>
+          <div className="field"><label>Est. IRS Balance</label><input type="text" value={form.irsBalance||''} onChange={e=>fld('irsBalance',e.target.value)} placeholder="e.g. 45000 or $30,000 - $50,000"/></div>
           <div className="field"><label>Issue Type</label>
             <select value={form.issueType||'OIC'} onChange={e=>fld('issueType',e.target.value)}>
               {['OIC','Installment Agreement','CNC','Penalty Abatement','Payroll Tax','Unfiled Returns','Appeals','Audit','Liens/Levies','Tax Investigation','ACS','Notice Status','Other'].map(o=><option key={o}>{o}</option>)}
