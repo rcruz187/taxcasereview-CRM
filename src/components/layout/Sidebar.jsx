@@ -32,14 +32,14 @@ const NAV = [
   { path: '/chat',      icon: ChatIcon,     label: 'Team Chat' },
   { divider: true },
   { group: 'HR & Payroll' },
+  { path: '/kiosk',     icon: KioskIcon,    label: 'Time Kiosk' },
   { path: '/timeclock', icon: ClockIcon,    label: 'Time Clock' },
   { path: '/payroll',   icon: PayrollIcon,  label: 'Payroll' },
-  { path: '/employees', icon: EmpIcon,      label: 'Employees' },
   { divider: true },
   { group: 'Firm' },
+  { path: '/employees', icon: EmpIcon,      label: 'Employees' },
   { path: '/reports',   icon: BarIcon,      label: 'Reports' },
   { path: '/settings',  icon: GearIcon,     label: 'Settings' },
-  { path: '/kiosk',     icon: KioskIcon,    label: 'Time Kiosk' },
 ]
 
 export default function Sidebar() {
