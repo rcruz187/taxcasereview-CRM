@@ -586,3 +586,19 @@ tbody tr:hover td { background: var(--s2); cursor: pointer; }
 .br { background: var(--bdt); color: #E84B5A; }
 .bn { background: rgba(255,255,255,.08); color: var(--t2); }
 .bc { background: rgba(37,162,90,.15); color: #3DCA7E; }
+
+
+/* chip.on alias */
+.chip.on { background: var(--blt); color: var(--b2); border-color: var(--blue); }
+
+/* btn.del sm fix */
+.btn.del { padding: 3px 8px; font-size: 11px; }
+
+/* modal scrollable body fix */
+.modal { max-height: 90vh; overflow-y: auto; }
+
+/* section box inside modal */
+.modal > div[style*="background:var(--s3)"],
+.modal > div[style*="background: var(--s3)"] { 
+  border-radius: 8px; 
+}
