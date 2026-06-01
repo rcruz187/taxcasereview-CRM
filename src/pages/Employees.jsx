@@ -14,11 +14,15 @@ export default function Employees() {
 
   async function load() {
     const { data, error } = await supabase.from('employees').select('*').order('created_at', { ascending: false })
-    if (error) { showToast('Error loading: ' + error.message); return }
-    if (data) setItems(data)
+    if (error) { showToast('DB Error: ' + error.message); return }
+    if (data && data.length === 0) {
+      await seedTeam(true)
+    } else if (data) {
+      setItems(data)
+    }
   }
 
-  async function seedTeam() {
+  async function seedTeam(silent = false) {
     setSaving(true)
     const { error } = await supabase.from('employees').insert([
       { name:'Romy Cruz',        role:'Tax Resolution Specialist', email:'romy@taxcasereview.org',    phone:'850-459-9039', payType:'Owner Draw', access:'Super Admin', startDate:'2024-01-01', created_at: new Date().toISOString() },
@@ -27,8 +31,9 @@ export default function Employees() {
     ])
     setSaving(false)
     if (error) { showToast('Seed error: ' + error.message); return }
-    showToast('✅ Team seeded!')
-    load()
+    if (!silent) showToast('✅ Team seeded!')
+    const { data } = await supabase.from('employees').select('*').order('created_at', { ascending: false })
+    if (data) setItems(data)
   }
 
   function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''),3000) }
@@ -58,7 +63,7 @@ export default function Employees() {
         <div className="ch">
           <span className="ct">Employees ({items.length})</span>
           <div style={{display:'flex',gap:8}}>
-            {items.length === 0 && <button className="btn sec" onClick={seedTeam} disabled={saving}>🌱 Seed Team (Romy, Dana, Yesenia)</button>}
+            {items.length === 0 && <button className="btn sec" onClick={()=>seedTeam(false)} disabled={saving}>🌱 Seed Team</button>}
             <button className="btn pri" onClick={()=>setModal(true)}>+ Add Employee</button>
           </div>
         </div>
