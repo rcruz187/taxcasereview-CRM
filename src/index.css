@@ -564,3 +564,25 @@ tbody tr:hover td { background: var(--s2); cursor: pointer; }
   .sidebar { display: none; }
   .g3c { grid-template-columns: 1fr; }
 }
+
+
+/* ── Aliases so all pages work ── */
+.modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 200; align-items: center; justify-content: center; }
+.modal-bg.open { display: flex; }
+.mh { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.mt { font-size: 15px; font-weight: 700; }
+.xbtn { background: none; border: none; color: var(--t3); font-size: 22px; cursor: pointer; line-height: 1; padding: 0 4px; }
+.xbtn:hover { color: var(--tx); }
+.ch { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 6px; }
+.ct { font-size: 13px; font-weight: 700; }
+.ml { font-size: 10px; color: var(--t3); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+.mv { font-size: 24px; font-weight: 700; }
+.ms { font-size: 11px; color: var(--t3); margin-top: 2px; }
+.tcb { width: 17px; height: 17px; border: 1.5px solid var(--b2c); border-radius: 4px; flex-shrink: 0; margin-top: 2px; cursor: pointer; background: var(--s2); display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; transition: all .1s; }
+.tcb.done { background: var(--ok); border-color: var(--ok); }
+.bb { background: var(--blt); color: var(--b2); }
+.bg { background: var(--olt); color: #3DCA7E; }
+.ba { background: var(--wlt); color: #F4AA1A; }
+.br { background: var(--bdt); color: #E84B5A; }
+.bn { background: rgba(255,255,255,.08); color: var(--t2); }
+.bc { background: rgba(37,162,90,.15); color: #3DCA7E; }
