@@ -45,12 +45,16 @@ export default function Calendar() {
   useEffect(() => {
     const el = document.querySelector('.page-content')
     if (!el) return
-    const orig = { padding: el.style.padding, overflow: el.style.overflow }
+    const origPadding = el.style.padding
+    const origOverflow = el.style.overflow
+    const origHeight = el.style.height
     el.style.padding = '0'
     el.style.overflow = 'hidden'
+    el.style.height = '100%'
     return () => {
-      el.style.padding = orig.padding
-      el.style.overflow = orig.overflow
+      el.style.padding = origPadding
+      el.style.overflow = origOverflow
+      el.style.height = origHeight
     }
   }, [])
 
@@ -149,6 +153,7 @@ export default function Calendar() {
     <div ref={containerRef} style={{
       display: 'flex', flexDirection: 'column',
       height: 'calc(100vh - 52px)',
+      maxHeight: 'calc(100vh - 52px)',
       background: 'var(--bg)', overflow: 'hidden',
     }}>
       {toast && <div className="toast show">{toast}</div>}

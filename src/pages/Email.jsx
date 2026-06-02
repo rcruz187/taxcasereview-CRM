@@ -27,8 +27,14 @@ export default function Email() {
   const [selected, setSelected] = useState(null)
   const [search, setSearch]     = useState('')
   const [gmailConnected, setGmailConnected] = useState(false)
+  const [gmailClientId, setGmailClientId] = useState('')
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); loadGmailConfig() }, [])
+
+  async function loadGmailConfig() {
+    const { data } = await supabase.from('settings').select('gmail_client_id').limit(1).maybeSingle()
+    if (data?.gmail_client_id) setGmailClientId(data.gmail_client_id)
+  }
 
   async function load() {
     const [{ data: e }, { data: c }] = await Promise.all([
@@ -106,9 +112,19 @@ export default function Email() {
           <div style={{ margin: '0 10px 10px', padding: '10px 12px', background: 'rgba(26,127,212,.12)', borderRadius: 8, border: '1px solid rgba(26,127,212,.3)' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', marginBottom: 4 }}>📧 Connect Gmail</div>
             <div style={{ fontSize: 10, color: 'var(--t3)', marginBottom: 8, lineHeight: 1.5 }}>Link your Gmail account to send & receive emails directly.</div>
-            <button onClick={() => showToast('Go to console.cloud.google.com → Create OAuth 2.0 Client ID → paste it in Settings → Firm Info')} style={{ width: '100%', padding: '5px 0', borderRadius: 6, border: 'none', background: 'var(--blue)', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
-              Setup Instructions
-            </button>
+            {gmailClientId ? (
+              <button onClick={() => {
+                const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${gmailClientId}&redirect_uri=${encodeURIComponent(window.location.origin + '/taxcasereview-CRM/auth/callback')}&response_type=code&scope=https://mail.google.com/&access_type=offline&prompt=consent`
+                window.open(url, '_blank')
+                showToast('Complete authorization in the popup window')
+              }} style={{ width: '100%', padding: '5px 0', borderRadius: 6, border: 'none', background: 'var(--blue)', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                🔗 Connect Gmail
+              </button>
+            ) : (
+              <button onClick={() => showToast('Go to Settings → Integrations to add your Gmail Client ID first')} style={{ width: '100%', padding: '5px 0', borderRadius: 6, border: 'none', background: 'var(--s2)', color: 'var(--t3)', cursor: 'pointer', fontSize: 11, border: '1px solid var(--br)' }}>
+                ⚙️ Setup in Settings
+              </button>
+            )}
           </div>
         )}
 

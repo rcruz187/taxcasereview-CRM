@@ -108,7 +108,7 @@ export default function TaxReturns() {
   useEffect(() => { load(); loadPreparer() }, [])
 
   async function loadPreparer() {
-    const { data } = await supabase.from('firm_settings').select('preparer_name,ptin,caf_number,efin').limit(1).maybeSingle()
+    const { data } = await supabase.from('settings').select('preparer_name,ptin,caf_number,efin').limit(1).maybeSingle()
     if (data) setPreparer({ name: data.preparer_name || '', ptin: data.ptin || '', caf: data.caf_number || '', efin: data.efin || '' })
   }
 
