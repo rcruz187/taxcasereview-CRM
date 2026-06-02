@@ -37,7 +37,7 @@ export default function TopBar({ onNew }) {
   useEffect(() => {
     const tick = () => {
       const d = new Date()
-      setClock(d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }))
+      setClock(d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }))
     }
     tick()
     const t = setInterval(tick, 1000)
