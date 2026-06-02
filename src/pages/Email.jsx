@@ -13,7 +13,7 @@ const TEMPLATES = [
 
 const TRIAGE = ['Inbox','Action Needed','Waiting','Sent','Archive']
 const TRIAGE_COLORS = { 'Action Needed':'var(--bad)', 'Waiting':'var(--warn)', 'Inbox':'var(--blue)', 'Sent':'var(--ok)', 'Archive':'var(--t3)' }
-const BLANK = { to:'', clientName:'', subject:'', body:'', triage:'Inbox', status:'Sent' }
+const BLANK = { recipient:'', clientName:'', subject:'', body:'', triage:'Inbox', status:'Sent' }
 
 export default function Email() {
   const [emails, setEmails]     = useState([])
@@ -54,7 +54,7 @@ export default function Email() {
     const m = clients.filter(c => c.name.toLowerCase().includes(val.toLowerCase())).slice(0, 5)
     setSug(m)
     const match = clients.find(c => c.name.toLowerCase() === val.toLowerCase())
-    if (match?.email) fld('to', match.email)
+    if (match?.email) fld('recipient', match.email)
   }
 
   function useTemplate(t) {
@@ -181,7 +181,7 @@ export default function Email() {
                     borderLeft: selected?.id === e.id ? '3px solid var(--blue)' : '3px solid transparent',
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 3 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--tx)' }}>{e.clientName || e.to || 'Unknown'}</div>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--tx)' }}>{e.clientName || erecipient:'' || 'Unknown'}</div>
                       <div style={{ fontSize: 10, color: 'var(--t3)', flexShrink: 0, marginLeft: 8 }}>
                         {e.created_at ? new Date(e.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}
                       </div>
@@ -200,7 +200,7 @@ export default function Email() {
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
                     <div>
                       <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--tx)', marginBottom: 6 }}>{selected.subject}</div>
-                      <div style={{ fontSize: 13, color: 'var(--t3)' }}>To: {selected.clientName} {selected.to ? `<${selected.to}>` : ''}</div>
+                      <div style={{ fontSize: 13, color: 'var(--t3)' }}>To: {selected.clientName} {selectedrecipient:'' ? `<${selectedrecipient:''}>` : ''}</div>
                       <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{selected.created_at ? new Date(selected.created_at).toLocaleString() : ''}</div>
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -208,7 +208,7 @@ export default function Email() {
                       {TRIAGE.filter(t => t !== (selected.triage || 'Inbox')).map(t => (
                         <button key={t} className="btn sec" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => moveTriage(selected.id, t)}>→ {t}</button>
                       ))}
-                      <button className="btn" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => { setForm({ ...BLANK, clientName: selected.clientName, to: selected.to, subject: 'Re: ' + selected.subject }); setView('compose') }}>↩ Reply</button>
+                      <button className="btn" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => { setForm({ ...BLANK, clientName: selected.clientName, to: selectedrecipient:'', subject: 'Re: ' + selected.subject }); setView('compose') }}>↩ Reply</button>
                       <button className="btn del" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => deleteEmail(selected.id)}>🗑</button>
                     </div>
                   </div>
@@ -240,12 +240,12 @@ export default function Email() {
               <input value={form.clientName} onChange={e => searchClient(e.target.value)} placeholder="Search client…" autoComplete="off" onBlur={() => setTimeout(() => setSug([]), 150)} />
               {sug.length > 0 && (
                 <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--s3)', border: '1px solid var(--br)', borderRadius: 7, zIndex: 100 }}>
-                  {sug.map(c => <div key={c.id} onClick={() => { fld('clientName', c.name); if (c.email) fld('to', c.email); setSug([]) }} style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13 }}>{c.name} {c.email ? `— ${c.email}` : ''}</div>)}
+                  {sug.map(c => <div key={c.id} onClick={() => { fld('clientName', c.name); if (c.email) fld('recipient', c.email); setSug([]) }} style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13 }}>{c.name} {c.email ? `— ${c.email}` : ''}</div>)}
                 </div>
               )}
             </div>
             <div className="field"><label>To (email address)</label>
-              <input type="email" value={form.to} onChange={e => fld('to', e.target.value)} placeholder="client@email.com" />
+              <input type="email" value={formrecipient:''} onChange={e => fld('recipient', e.target.value)} placeholder="client@email.com" />
             </div>
             <div className="field"><label>Subject *</label>
               <input value={form.subject} onChange={e => fld('subject', e.target.value)} placeholder="Email subject…" />
