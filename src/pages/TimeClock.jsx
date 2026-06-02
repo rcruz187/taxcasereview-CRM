@@ -3,6 +3,14 @@ import { supabase } from '../lib/supabase'
 
 const BLANK = { employee:'', date:'', inTime:'', outTime:'', hours:'', notes:'' }
 
+function fmt12(t) {
+  if (!t) return '—'
+  const [h, m] = t.split(':').map(Number)
+  const ampm = h >= 12 ? 'PM' : 'AM'
+  const hr = h % 12 || 12
+  return `${hr}:${String(m).padStart(2,'0')} ${ampm}`
+}
+
 export default function TimeClock() {
   const [items,     setItems]     = useState([])
   const [employees, setEmployees] = useState([])
@@ -64,7 +72,7 @@ export default function TimeClock() {
 
   async function clockIn(empName) {
     const now2 = new Date()
-    const inTime = now2.toTimeString().slice(0,5)
+    const inTime = now2.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
     const date = now2.toISOString().slice(0,10)
     const {data,error} = await supabase.from('timeentries').insert([{
       employee:empName, date, inTime, outTime:null, hours:null, notes:null,
@@ -79,7 +87,7 @@ export default function TimeClock() {
   async function clockOut(empName) {
     const entry = clocking[empName]
     if (!entry) return
-    const outTime = new Date().toTimeString().slice(0,5)
+    const outTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
     const hours = calcHours(entry.inTime, outTime)
     const {error} = await supabase.from('timeentries').update({outTime, hours: hours || 0, updated_at:new Date().toISOString()}).eq('id',entry.id)
     if (error) { showToast('Error: '+error.message); return }
@@ -225,7 +233,7 @@ export default function TimeClock() {
                   onMouseLeave={ev=>ev.currentTarget.style.background=''}>
                   <td style={{padding:'9px 12px',fontWeight:600}}>{e.employee}</td>
                   <td style={{padding:'9px 12px',color:'var(--t2)'}}>{e.date}</td>
-                  <td style={{padding:'9px 12px',color:'var(--ok)',fontWeight:600}}>{e.inTime||'—'}</td>
+                  <td style={{padding:'9px 12px',color:'var(--ok)',fontWeight:600}}>{fmt12(e.inTime)||e.inTime||'—'}</td>
                   <td style={{padding:'9px 12px',color:e.outTime?'var(--bad)':'var(--t3)'}}>
                     {e.outTime||<span className="bdg ba">Active</span>}
                   </td>
