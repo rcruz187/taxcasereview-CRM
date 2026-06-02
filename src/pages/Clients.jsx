@@ -31,10 +31,24 @@ const BLANK = {
 
 function Bdg({s,c}) { return <span className={`bdg ${c||'bn'}`}>{s}</span> }
 function DR({label,val}) {
+  const isPhone = label==='Phone'||label==='Phone 2'||label==='Phone2'
+  const renderVal = () => {
+    if (!val) return <span style={{color:'var(--t3)'}}>—</span>
+    if (isPhone) return (
+      <a href={`tel:${val.replace(/\D/g,'')}`}
+        style={{color:'var(--blue)',textDecoration:'none',fontWeight:600,display:'inline-flex',alignItems:'center',gap:5}}
+        onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
+        onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.18 1h3a2 2 0 012 1.72 12.05 12.05 0 00.7 2.81 2 2 0 01-.45 2.11L4.91 8.15a16 16 0 006.29 6.29l1.51-1.52a2 2 0 012.11-.45 12.05 12.05 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+        {val}
+      </a>
+    )
+    return val
+  }
   return (
     <div style={{display:'flex',borderBottom:'1px solid var(--br)',padding:'7px 0',gap:12}}>
       <div style={{minWidth:130,fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em',color:'var(--t3)',paddingTop:1}}>{label}</div>
-      <div style={{flex:1,fontSize:13,color:'var(--tx)'}}>{val||<span style={{color:'var(--t3)'}}>—</span>}</div>
+      <div style={{flex:1,fontSize:13,color:'var(--tx)'}}>{renderVal()}</div>
     </div>
   )
 }
@@ -817,7 +831,7 @@ export default function Clients() {
                 <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>openDetail(c)}>
                   <td style={{fontWeight:600}}>{c.name}</td>
                   <td><span className="bdg bb">{c.clientType||'Individual'}</span></td>
-                  <td>{c.phone||'—'}</td>
+                  <td>{c.phone ? <a href={`tel:${c.phone.replace(/\D/g,'')}`} onClick={e=>e.stopPropagation()} style={{color:'var(--blue)',textDecoration:'none',fontWeight:600}} onMouseEnter={e=>e.target.style.textDecoration='underline'} onMouseLeave={e=>e.target.style.textDecoration='none'}>{c.phone}</a> : '—'}</td>
                   <td style={{color:'var(--t2)',fontSize:12}}>{c.email||'—'}</td>
                   <td>{formatBalance(c.irsBalance)}</td>
                   <td>{c.issueType||'—'}</td>
@@ -990,3 +1004,4 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
     </div>
   )
 }
+
