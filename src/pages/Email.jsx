@@ -200,7 +200,7 @@ export default function Email() {
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
                     <div>
                       <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--tx)', marginBottom: 6 }}>{selected.subject}</div>
-                      <div style={{ fontSize: 13, color: 'var(--t3)' }}>To: {selected.clientName} {selectedrecipient:'' ? `<${selectedrecipient:''}>` : ''}</div>
+                      <div style={{ fontSize: 13, color: 'var(--t3)' }}>To: {selected.clientName} {selected.recipient ? `<${selected.recipient}>` : ''}</div>
                       <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{selected.created_at ? new Date(selected.created_at).toLocaleString() : ''}</div>
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -208,7 +208,7 @@ export default function Email() {
                       {TRIAGE.filter(t => t !== (selected.triage || 'Inbox')).map(t => (
                         <button key={t} className="btn sec" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => moveTriage(selected.id, t)}>→ {t}</button>
                       ))}
-                      <button className="btn" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => { setForm({ ...BLANK, clientName: selected.clientName, to: selectedrecipient:'', subject: 'Re: ' + selected.subject }); setView('compose') }}>↩ Reply</button>
+                      <button className="btn" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => { setForm({ ...BLANK, clientName: selected.clientName, recipient: selected.recipient, subject: 'Re: ' + selected.subject }); setView('compose') }}>↩ Reply</button>
                       <button className="btn del" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => deleteEmail(selected.id)}>🗑</button>
                     </div>
                   </div>
@@ -245,7 +245,7 @@ export default function Email() {
               )}
             </div>
             <div className="field"><label>To (email address)</label>
-              <input type="email" value={formrecipient:''} onChange={e => fld('recipient', e.target.value)} placeholder="client@email.com" />
+              <input type="email" value={form.recipient} onChange={e => fld('recipient', e.target.value)} placeholder="client@email.com" />
             </div>
             <div className="field"><label>Subject *</label>
               <input value={form.subject} onChange={e => fld('subject', e.target.value)} placeholder="Email subject…" />
