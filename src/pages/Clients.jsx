@@ -91,6 +91,7 @@ export default function Clients() {
   const [addingNote,  setAddingNote]  = useState(false)
   const [relTasks,    setRelTasks]    = useState([])
   const [relInvoices, setRelInvoices] = useState([])
+  const [relPayments, setRelPayments] = useState([])
   const [loadingRel,  setLoadingRel]  = useState(false)
   // Quick add task inline
   const [quickTask,   setQuickTask]   = useState('')
@@ -126,18 +127,20 @@ export default function Clients() {
 
   async function loadRelated(clientName) {
     setLoadingRel(true)
-    const [{ data:cases },{ data:tasks },{ data:invoices },{ data:docs }] = await Promise.all([
+    const [{ data:cases },{ data:tasks },{ data:invoices },{ data:docs },{ data:clientNotes },{ data:payments }] = await Promise.all([
       supabase.from('cases').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('tasks').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('invoices').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('documents').select('*').eq('client', clientName).order('created_at',{ascending:false}),
       supabase.from('client_notes').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
+      supabase.from('payments').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
     ])
     setRelCases(cases||[])
     setRelTasks(tasks||[])
     setRelInvoices(invoices||[])
     setRelDocs(docs||[])
     setRelNotes(clientNotes||[])
+    setRelPayments(payments||[])
     setLoadingRel(false)
   }
 
@@ -327,6 +330,37 @@ export default function Clients() {
               ))}
             </div>
           </div>
+
+          {/* Balance summary */}
+          {(() => {
+            const totalPaid = relPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0)
+            const rawBal = c.irsBalance
+            const irsNum = rawBal && !isNaN(Number(rawBal)) ? Number(rawBal) : null
+            const remaining = irsNum !== null ? irsNum - totalPaid : null
+            if (!irsNum && totalPaid === 0) return null
+            return (
+              <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid var(--br)',display:'flex',gap:20,flexWrap:'wrap'}}>
+                {irsNum !== null && (
+                  <div style={{display:'flex',flexDirection:'column',gap:2}}>
+                    <div style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>IRS Balance</div>
+                    <div style={{fontSize:16,fontWeight:800,color:'var(--bad)'}}>${irsNum.toLocaleString()}</div>
+                  </div>
+                )}
+                {totalPaid > 0 && (
+                  <div style={{display:'flex',flexDirection:'column',gap:2}}>
+                    <div style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>Paid to Firm</div>
+                    <div style={{fontSize:16,fontWeight:800,color:'var(--ok)'}}>${totalPaid.toLocaleString()}</div>
+                  </div>
+                )}
+                {remaining !== null && (
+                  <div style={{display:'flex',flexDirection:'column',gap:2}}>
+                    <div style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>Remaining Balance</div>
+                    <div style={{fontSize:16,fontWeight:800,color:remaining<=0?'var(--ok)':'var(--tx)'}}>${Math.max(0,remaining).toLocaleString()}</div>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
 
         {/* Action Buttons */}
@@ -341,6 +375,7 @@ export default function Clients() {
             <ActionBtn color="#7c3aed" icon="✅" label="Add Task" sub="Assign Work" onClick={()=>{setTaskTitle('');setTaskPriority('Normal');setTaskDueDate('');setTaskModal(true)}}/>
             <ActionBtn color="#be185d" icon="🧾" label="New Invoice" sub="Bill Client" onClick={()=>navigate('/invoices')}/>
             <ActionBtn color="#059669" icon="💳" label="Add Payment" sub="Record Payment" onClick={()=>{setPayForm({amount:'',method:'Credit Card',date:'',notes:''});setPayModal(true)}}/>
+            <ActionBtn color="#0f766e" icon="📊" label="P&amp;L" sub="Books &amp; Ledger" onClick={()=>navigate('/books?client='+encodeURIComponent(c.name))}/>
           </div>
         </div>
 
@@ -388,6 +423,40 @@ export default function Clients() {
                 ))}
               </div>
             )}
+
+            {/* Payments */}
+            <div className="card">
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>💳 Payments ({relPayments.length})</div>
+                <button className="btn pri" style={{fontSize:11,padding:'3px 10px'}} onClick={()=>{setPayForm({amount:'',method:'Credit Card',date:'',notes:''});setPayModal(true)}}>+ Add</button>
+              </div>
+              {loadingRel&&<div style={{color:'var(--t3)',fontSize:12}}>Loading…</div>}
+              {!loadingRel&&relPayments.length===0&&(
+                <div style={{color:'var(--t3)',fontSize:12,marginBottom:6}}>No payments recorded yet.</div>
+              )}
+              {relPayments.map(p=>(
+                <div key={p.id} style={{borderBottom:'1px solid var(--br)',padding:'8px 0',display:'flex',alignItems:'center',gap:10}}>
+                  <div style={{width:32,height:32,borderRadius:'50%',background:'var(--ok)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,flexShrink:0}}>💳</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700,fontSize:14,color:'var(--ok)'}}>+${Number(p.amount||0).toLocaleString()}</div>
+                    <div style={{fontSize:11,color:'var(--t3)',marginTop:1,display:'flex',gap:8,flexWrap:'wrap'}}>
+                      <span>{p.method||'—'}</span>
+                      {p.date&&<span>{p.date}</span>}
+                      {p.notes&&<span style={{color:'var(--t2)'}}>{p.notes}</span>}
+                    </div>
+                  </div>
+                  <span className="bdg bg" style={{fontSize:10}}>{p.status||'Cleared'}</span>
+                </div>
+              ))}
+              {relPayments.length > 0 && (
+                <div style={{paddingTop:10,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <span style={{fontSize:12,color:'var(--t3)'}}>Total received</span>
+                  <span style={{fontWeight:800,fontSize:15,color:'var(--ok)'}}>
+                    ${relPayments.reduce((s,p)=>s+(Number(p.amount)||0),0).toLocaleString()}
+                  </span>
+                </div>
+              )}
+            </div>
 
             {/* Notes */}
             <div className="card">
