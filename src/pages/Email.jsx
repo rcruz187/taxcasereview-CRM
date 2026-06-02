@@ -181,7 +181,7 @@ export default function Email() {
                     borderLeft: selected?.id === e.id ? '3px solid var(--blue)' : '3px solid transparent',
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 3 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--tx)' }}>{e.clientName || erecipient:'' || 'Unknown'}</div>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--tx)' }}>{e.clientName || e.recipient || 'Unknown'}</div>
                       <div style={{ fontSize: 10, color: 'var(--t3)', flexShrink: 0, marginLeft: 8 }}>
                         {e.created_at ? new Date(e.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}
                       </div>
