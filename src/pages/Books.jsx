@@ -37,8 +37,8 @@ export default function Books() {
 
   async function loadAll() {
     setLoading(true)
-    let q = supabase.from('bookkeeping').select('*').order('date', { ascending: false })
-    if (year) q = q.gte('date', `${year}-01-01`).lte('date', `${year}-12-31`)
+    let q = supabase.from('bookkeeping').select('*').order('created_at', { ascending: false })
+    if (year) q = q.gte('created_at', `${year}-01-01`).lte('created_at', `${year}-12-31`)
     if (clientFilter) q = q.eq('client_name', clientFilter)
     const { data, error } = await q
     if (error) showToast(error.message, 'err')
@@ -84,8 +84,8 @@ export default function Books() {
   // Monthly P&L data
   const monthlyData = Array.from({length:12}, (_,i) => {
     const m = String(i+1).padStart(2,'0')
-    const inc = entries.filter(e => e.type==='Income'  && e.date?.slice(5,7)===m).reduce((s,e)=>s+(Number(e.amount)||0),0)
-    const exp = entries.filter(e => e.type==='Expense' && e.date?.slice(5,7)===m).reduce((s,e)=>s+(Number(e.amount)||0),0)
+    const inc = entries.filter(e => e.type==='Income'  && e.created_at?.slice(5,7)===m).reduce((s,e)=>s+(Number(e.amount)||0),0)
+    const exp = entries.filter(e => e.type==='Expense' && e.created_at?.slice(5,7)===m).reduce((s,e)=>s+(Number(e.amount)||0),0)
     return { month: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][i], inc, exp, net: inc-exp }
   })
 
@@ -200,7 +200,7 @@ export default function Books() {
                           color:'#fff', fontSize:10
                         }}>{e.reconciled?'✓':''}</div>
                       </td>
-                      <td style={{ fontSize:12, color:'var(--t3)', whiteSpace:'nowrap' }}>{e.date}</td>
+                      <td style={{ fontSize:12, color:'var(--t3)', whiteSpace:'nowrap' }}>{e.created_at?.slice(0,10)}</td>
                       <td style={{ fontWeight:600 }}>{e.description}</td>
                       <td><span className="bdg bn" style={{fontSize:10}}>{e.category}</span></td>
                       <td><span className={`bdg ${e.type==='Income'?'bg':'br'}`} style={{fontSize:10}}>{e.type}</span></td>

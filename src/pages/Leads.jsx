@@ -58,6 +58,10 @@ export default function Leads() {
   const [filter, setFilter] = useState('All')
   const [modal, setModal]   = useState(false)
   const [detail, setDetail] = useState(null)
+  const [leadNotes, setLeadNotes]     = useState([])
+  const [newLeadNote, setNewLeadNote] = useState('')
+  const [addingLeadNote, setAddingLeadNote] = useState(false)
+  const [noteType, setNoteType]       = useState('Call')
   const [form, setForm]     = useState(BLANK)
   const [saving, setSaving] = useState(false)
   const [toast, setToast]   = useState('')
@@ -75,6 +79,29 @@ export default function Leads() {
       // refresh detail if open
       if (detail) setDetail(data.find(l => l.id === detail.id) || null)
     }
+  }
+
+  async function loadLeadNotes(leadId) {
+    const { data } = await supabase.from('lead_notes').select('*').eq('lead_id', leadId).order('created_at', { ascending: false })
+    setLeadNotes(data || [])
+  }
+
+  async function addLeadNote() {
+    if (!newLeadNote.trim() || !detail) return
+    setAddingLeadNote(true)
+    const { error } = await supabase.from('lead_notes').insert([{
+      lead_id: detail.id,
+      lead_name: detail.name,
+      text: newLeadNote.trim(),
+      type: noteType,
+      author: 'Rep',
+      created_at: new Date().toISOString()
+    }])
+    setAddingLeadNote(false)
+    if (error) { showToast('Error: ' + error.message); return }
+    setNewLeadNote('')
+    loadLeadNotes(detail.id)
+    showToast('Note added!')
   }
 
   function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''),3000) }
@@ -242,11 +269,71 @@ export default function Leads() {
           </div>
 
           {l.notes && (
-            <div style={{marginTop:14}}>
-              <div className="stitle">Notes</div>
-              <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.7,padding:'8px 0'}}>{l.notes}</div>
+            <div style={{marginTop:14,padding:12,background:'var(--s2)',borderRadius:8}}>
+              <div className="stitle" style={{marginBottom:6}}>Initial Notes</div>
+              <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.7}}>{l.notes}</div>
             </div>
           )}
+        </div>
+
+        {/* ── Call Log / Activity Notes ── */}
+        <div className="card" style={{marginTop:12}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+            <div style={{fontWeight:700,fontSize:13,color:'var(--tx)'}}>📞 Call Log & Activity Notes</div>
+            <span style={{fontSize:11,color:'var(--t3)'}}>{leadNotes.length} entries</span>
+          </div>
+
+          {/* Add note row */}
+          <div style={{display:'flex',gap:8,marginBottom:12,alignItems:'flex-start'}}>
+            <select value={noteType} onChange={e=>setNoteType(e.target.value)}
+              style={{padding:'7px 10px',borderRadius:6,border:'1px solid var(--br)',background:'var(--s2)',color:'var(--tx)',fontSize:12,flexShrink:0,width:110}}>
+              <option>Call</option>
+              <option>Email</option>
+              <option>SMS</option>
+              <option>Meeting</option>
+              <option>Note</option>
+              <option>Follow Up</option>
+            </select>
+            <textarea
+              value={newLeadNote}
+              onChange={e=>setNewLeadNote(e.target.value)}
+              onKeyDown={e=>{ if(e.key==='Enter'&&e.ctrlKey) addLeadNote() }}
+              placeholder="Log a call, email, or note... (Ctrl+Enter to save)"
+              rows={2}
+              style={{flex:1,padding:'7px 10px',borderRadius:6,border:'1px solid var(--br)',background:'var(--s2)',color:'var(--tx)',fontSize:13,resize:'vertical',fontFamily:'inherit',lineHeight:1.5}}
+            />
+            <button className="btn pri" onClick={addLeadNote} disabled={addingLeadNote || !newLeadNote.trim()}
+              style={{padding:'7px 14px',alignSelf:'flex-end',flexShrink:0}}>
+              {addingLeadNote ? '…' : '+ Log'}
+            </button>
+          </div>
+
+          {/* Notes list */}
+          {leadNotes.length === 0 ? (
+            <div style={{textAlign:'center',padding:'20px 0',color:'var(--t3)',fontSize:13}}>
+              No activity logged yet. Log your first call above.
+            </div>
+          ) : leadNotes.map((n,i) => {
+            const typeColors = {Call:'#3b82f6',Email:'#8b5cf6',SMS:'#06b6d4',Meeting:'#f59e0b',Note:'#64748b','Follow Up':'#ec4899'}
+            const tc = typeColors[n.type] || '#64748b'
+            return (
+              <div key={n.id||i} style={{display:'flex',gap:10,padding:'10px 0',borderTop:'1px solid var(--br)',alignItems:'flex-start'}}>
+                <div style={{width:32,height:32,borderRadius:'50%',background:tc+'22',border:'1.5px solid '+tc+'66',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,flexShrink:0,color:tc,fontWeight:700}}>
+                  {n.type==='Call'?'📞':n.type==='Email'?'✉️':n.type==='SMS'?'💬':n.type==='Meeting'?'🤝':n.type==='Follow Up'?'🔔':'📝'}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:3,flexWrap:'wrap'}}>
+                    <span style={{fontSize:11,fontWeight:700,padding:'1px 8px',borderRadius:12,background:tc+'22',color:tc,border:'1px solid '+tc+'44'}}>{n.type}</span>
+                    <span style={{fontSize:11,color:'var(--t3)'}}>{n.author}</span>
+                    <span style={{fontSize:11,color:'var(--t3)',marginLeft:'auto'}}>{n.created_at?new Date(n.created_at).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):''}</span>
+                  </div>
+                  <div style={{fontSize:13,lineHeight:1.6,color:'var(--tx)',whiteSpace:'pre-wrap'}}>{n.text}</div>
+                </div>
+                <button onClick={async()=>{ await supabase.from('lead_notes').delete().eq('id',n.id); loadLeadNotes(detail.id) }}
+                  style={{background:'none',border:'none',color:'var(--t3)',cursor:'pointer',fontSize:16,flexShrink:0,padding:'0 4px'}}>×</button>
+              </div>
+            )
+          })}
         </div>
       </div>
     )
@@ -277,7 +364,7 @@ export default function Leads() {
               {filtered.length === 0 ? (
                 <tr><td colSpan={9} style={{textAlign:'center',color:'var(--t3)',padding:20}}>No leads yet — add your first one!</td></tr>
               ) : filtered.map(l => (
-                <tr key={l.id} onClick={()=>setDetail(l)} style={{cursor:'pointer'}}>
+                <tr key={l.id} onClick={()=>{ setDetail(l); loadLeadNotes(l.id) }} style={{cursor:'pointer'}}>
                   <td style={{fontWeight:600}}>{l.name}</td>
                   <td><span className="bdg bb">{l.clientType||'Individual'}</span></td>
                   <td>{l.phone||'—'}</td>
