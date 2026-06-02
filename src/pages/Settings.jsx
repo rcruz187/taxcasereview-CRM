@@ -216,10 +216,12 @@ insert into storage.buckets (id, name, public)
 values ('documents', 'documents', true)
 on conflict (id) do nothing;
 
-create policy if not exists "Public read documents"
+drop policy if exists "Public read documents" on storage.objects;
+create policy "Public read documents"
   on storage.objects for select using (bucket_id = 'documents');
 
-create policy if not exists "Auth upload documents"
+drop policy if exists "Auth upload documents" on storage.objects;
+create policy "Auth upload documents"
   on storage.objects for insert
   with check (bucket_id = 'documents');`}</div>
               <button className="btn sec" onClick={() => {
