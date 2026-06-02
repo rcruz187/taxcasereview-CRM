@@ -49,7 +49,7 @@ html, body, #root {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--bg);
   color: var(--tx);
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
@@ -121,7 +121,7 @@ html, body, #root {
 /* ── Nav ── */
 .nav-group {
   padding: 10px 14px 2px;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--t3);
   letter-spacing: .1em;
@@ -137,7 +137,7 @@ html, body, #root {
   padding: 7px 14px;
   cursor: pointer;
   color: var(--t2);
-  font-size: 12.5px;
+  font-size: 14px;
   border-left: 2px solid transparent;
   user-select: none;
   transition: all .1s;
