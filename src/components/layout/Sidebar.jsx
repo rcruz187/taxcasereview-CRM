@@ -93,7 +93,7 @@ export default function Sidebar() {
     return null
   }
 
-  const [openKey, setOpenKey] = useState(() => activeSection() || 'clientwork')
+  const [openKey, setOpenKey] = useState('clientwork')
 
   // Auto-open the section that contains the active page on navigation
   useEffect(() => {
@@ -143,8 +143,9 @@ export default function Sidebar() {
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   paddingRight: 10,
-                  color: hasActive ? 'var(--blue)' : undefined,
+                  color: hasActive ? 'var(--blue)' : 'var(--t2)',
                   userSelect: 'none',
+                  fontSize: 12,
                 }}
               >
                 <span>{section.label}</span>

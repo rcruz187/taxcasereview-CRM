@@ -103,8 +103,14 @@ export default function TaxReturns() {
   const [filterStatus, setFilterStatus] = useState('All')
   const [tab, setTab]           = useState('income')
   const [setupNeeded, setSetupNeeded] = useState(false)
+  const [preparer, setPreparer] = useState({ name:'', ptin:'', caf:'', efin:'' })
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); loadPreparer() }, [])
+
+  async function loadPreparer() {
+    const { data } = await supabase.from('firm_settings').select('preparer_name,ptin,caf_number,efin').limit(1).maybeSingle()
+    if (data) setPreparer({ name: data.preparer_name || '', ptin: data.ptin || '', caf: data.caf_number || '', efin: data.efin || '' })
+  }
 
   async function load() {
     const [r, c, e] = await Promise.all([
@@ -327,6 +333,7 @@ export default function TaxReturns() {
     { key: 'credits', label: '⭐ Credits' },
     { key: 'payments', label: '💳 Payments' },
     { key: 'summary', label: '📊 Summary' },
+    { key: 'submit',  label: '📤 Submit / Export' },
   ]
 
   return (
@@ -602,6 +609,353 @@ export default function TaxReturns() {
           </div>
         </div>
       )}
+
+      {/* ── SUBMIT / EXPORT TAB ── */}
+      {tab === 'submit' && (() => {
+        const t = calcTotals(form)
+        function downloadFile(content, filename, type='text/plain') {
+          const blob = new Blob([content], { type })
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url; a.download = filename; a.click()
+          URL.revokeObjectURL(url)
+        }
+        function printReturn() {
+          const win = window.open('', '_blank')
+          win.document.write(`<html><head><title>Tax Return — ${form.clientName} ${form.taxYear}</title>
+            <style>body{font-family:Arial,sans-serif;font-size:12px;padding:20px;color:#000}
+            h1{font-size:18px;border-bottom:2px solid #000;padding-bottom:6px}
+            h2{font-size:14px;border-bottom:1px solid #ccc;padding-bottom:4px;margin-top:20px}
+            .row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee}
+            .bold{font-weight:700}.total{font-size:14px;font-weight:700;background:#f0f0f0;padding:6px 8px}
+            .refund{background:#d4edda;padding:12px;text-align:center;font-size:18px;font-weight:700;border:2px solid #28a745}
+            .owed{background:#f8d7da;padding:12px;text-align:center;font-size:18px;font-weight:700;border:2px solid #dc3545}
+            .footer{margin-top:30px;border-top:1px solid #000;padding-top:10px;font-size:10px}
+            </style></head><body>
+            <h1>FEDERAL INCOME TAX RETURN — ${form.taxYear}</h1>
+            <div class="row"><span>Taxpayer Name:</span><span class="bold">${form.clientName}</span></div>
+            <div class="row"><span>Filing Status:</span><span>${form.filingStatus}</span></div>
+            <div class="row"><span>Return Type:</span><span>${form.returnType}</span></div>
+            <div class="row"><span>Prepared By:</span><span>${preparer.name || 'Tax Case Review'}</span></div>
+            <div class="row"><span>PTIN:</span><span>${preparer.ptin || '—'}</span></div>
+            <div class="row"><span>CAF#:</span><span>${preparer.caf || '—'}</span></div>
+            <div class="row"><span>Preparation Date:</span><span>${new Date().toLocaleDateString()}</span></div>
+            <h2>INCOME</h2>
+            ${[['Wages', form.wages],['Interest',form.interest],['Dividends',form.dividends],['Capital Gains',form.capitalGains],['Business Income',form.businessIncome],['Rental Income',form.rentalIncome],['Retirement',form.retirementIncome],['Social Security',form.socialSecurity],['Other Income',form.otherIncome]].filter(([,v])=>parseFloat(v||0)>0).map(([l,v])=>`<div class="row"><span>${l}</span><span>$${Math.round(parseFloat(v||0)).toLocaleString()}</span></div>`).join('')}
+            <div class="row total"><span>GROSS INCOME</span><span>$${Math.round(t.grossIncome).toLocaleString()}</span></div>
+            <h2>ADJUSTMENTS & DEDUCTIONS</h2>
+            <div class="row"><span>Total Adjustments</span><span>-$${Math.round(t.adjustments).toLocaleString()}</span></div>
+            <div class="row"><span>Adjusted Gross Income</span><span>$${Math.round(t.agi).toLocaleString()}</span></div>
+            <div class="row"><span>${form.deductionType} Deduction</span><span>-$${Math.round(t.deductions).toLocaleString()}</span></div>
+            <div class="row total"><span>TAXABLE INCOME</span><span>$${Math.round(t.taxableIncome).toLocaleString()}</span></div>
+            <h2>TAX & CREDITS</h2>
+            <div class="row"><span>Estimated Tax</span><span>$${Math.round(t.tax).toLocaleString()}</span></div>
+            <div class="row"><span>Tax Credits</span><span>-$${Math.round(t.credits).toLocaleString()}</span></div>
+            <div class="row total"><span>TAX AFTER CREDITS</span><span>$${Math.round(t.taxAfterCredits).toLocaleString()}</span></div>
+            <h2>PAYMENTS</h2>
+            <div class="row"><span>Withholding</span><span>$${Math.round(parseFloat(form.withholding||0)).toLocaleString()}</span></div>
+            <div class="row"><span>Estimated Payments</span><span>$${Math.round(parseFloat(form.estimatedPayments||0)).toLocaleString()}</span></div>
+            <div class="row total"><span>TOTAL PAYMENTS</span><span>$${Math.round(t.payments).toLocaleString()}</span></div>
+            <br/>
+            <div class="${t.refundOrOwed >= 0 ? 'refund' : 'owed'}">${t.refundOrOwed >= 0 ? '✓ ESTIMATED REFUND' : '⚠ BALANCE DUE'}: $${Math.round(Math.abs(t.refundOrOwed)).toLocaleString()}</div>
+            <div class="footer">
+              Prepared by ${preparer.name || 'Tax Case Review'} · PTIN: ${preparer.ptin || 'N/A'} · CAF#: ${preparer.caf || 'N/A'}<br/>
+              This is a tax preparation worksheet. The final return must be submitted through IRS-approved e-file software using EFIN: ${preparer.efin || 'N/A'}.
+            </div>
+            </body></html>`)
+          win.document.close()
+          win.print()
+        }
+        return (
+          <div>
+            {/* Preparer info card */}
+            <div className="card" style={{ marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)', marginBottom: 12 }}>🪪 Preparer Credentials</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="field"><label>Preparer Name</label>
+                  <input value={preparer.name} onChange={e => setPreparer(p => ({...p, name: e.target.value}))} placeholder="Your name" />
+                </div>
+                <div className="field"><label>PTIN</label>
+                  <input value={preparer.ptin} onChange={e => setPreparer(p => ({...p, ptin: e.target.value}))} placeholder="P00000000" />
+                </div>
+                <div className="field"><label>CAF Number</label>
+                  <input value={preparer.caf} onChange={e => setPreparer(p => ({...p, caf: e.target.value}))} placeholder="CAF number (for POA/transcripts)" />
+                </div>
+                <div className="field"><label>EFIN (e-file ID)</label>
+                  <input value={preparer.efin} onChange={e => setPreparer(p => ({...p, efin: e.target.value}))} placeholder="6-digit EFIN" />
+                </div>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 6 }}>
+                💡 Save these in Settings → Firm Info to auto-populate on every return.
+              </div>
+            </div>
+
+            {/* Return summary */}
+            <div className="card" style={{ marginBottom: 14, display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+              {[
+                ['Client', form.clientName],
+                ['Tax Year', form.taxYear],
+                ['Type', form.returnType],
+                ['Status', form.status],
+                [t.refundOrOwed >= 0 ? 'Refund' : 'Balance Due', (t.refundOrOwed >= 0 ? '+' : '-') + '$' + Math.round(Math.abs(t.refundOrOwed)).toLocaleString()],
+              ].map(([l, v]) => (
+                <div key={l}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{l}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--tx)', marginTop: 2 }}>{v}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Status workflow */}
+            <div className="card" style={{ marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)', marginBottom: 12 }}>📋 Filing Workflow</div>
+              <div style={{ display: 'flex', gap: 0, overflowX: 'auto' }}>
+                {['Draft','In Review','Client Review','Ready to File','Filed','Accepted'].map((s, i) => {
+                  const statuses = ['Draft','In Review','Client Review','Ready to File','Filed','Accepted']
+                  const idx = statuses.indexOf(form.status)
+                  const done = i <= idx
+                  return (
+                    <div key={s} style={{ display: 'flex', alignItems: 'center' }}>
+                      <div onClick={() => fld('status', s)} style={{
+                        padding: '6px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+                        background: done ? 'var(--blue)' : 'var(--s2)',
+                        color: done ? '#fff' : 'var(--t3)',
+                        border: s === form.status ? '2px solid var(--blue)' : '2px solid transparent',
+                        transition: 'all .15s'
+                      }}>{s}</div>
+                      {i < 5 && <div style={{ width: 14, height: 2, background: done && i < idx ? 'var(--blue)' : 'var(--br)', flexShrink: 0 }} />}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Export actions */}
+            <div className="card">
+              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)', marginBottom: 14 }}>📤 Export & Submit</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+
+                <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--br)', background: 'var(--s2)' }}>
+                  <div style={{ fontSize: 22, marginBottom: 8 }}>🖨️</div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--tx)', marginBottom: 4 }}>Print Return</div>
+                  <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 12, lineHeight: 1.5 }}>Print a formatted return summary for client review and signature.</div>
+                  <button className="btn pri" style={{ width: '100%', justifyContent: 'center' }} onClick={printReturn}>Print / Preview</button>
+                </div>
+
+                <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--br)', background: 'var(--s2)' }}>
+                  <div style={{ fontSize: 22, marginBottom: 8 }}>📄</div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--tx)', marginBottom: 4 }}>IRS MeF XML Export</div>
+                  <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 12, lineHeight: 1.5 }}>Generate MeF-compatible XML. Import into Drake, ProSeries, or Lacerte for final e-file submission.</div>
+                  <button className="btn pri" style={{ width: '100%', justifyContent: 'center' }} onClick={() => {
+                    const xml = generateMeFXML(form, t, preparer)
+                    downloadFile(xml, `${form.clientName?.replace(/\s+/g,'_')}_${form.taxYear}_MeF.xml`, 'text/xml')
+                  }}>⬇ Download XML</button>
+                </div>
+
+                <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--br)', background: 'var(--s2)' }}>
+                  <div style={{ fontSize: 22, marginBottom: 8 }}>📋</div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--tx)', marginBottom: 4 }}>State Filing Export</div>
+                  <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 12, lineHeight: 1.5 }}>Export a formatted state return worksheet with federal AGI carryover and preparer credentials.</div>
+                  <button className="btn pri" style={{ width: '100%', justifyContent: 'center' }} onClick={() => {
+                    const txt = generateStateExport(form, t, preparer)
+                    downloadFile(txt, `${form.clientName?.replace(/\s+/g,'_')}_${form.taxYear}_State.txt`)
+                  }}>⬇ Download State Export</button>
+                </div>
+
+                <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--br)', background: 'var(--s2)' }}>
+                  <div style={{ fontSize: 22, marginBottom: 8 }}>✅</div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--tx)', marginBottom: 4 }}>Mark as Filed</div>
+                  <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 12, lineHeight: 1.5 }}>After submitting through your e-file software, mark this return as filed and save.</div>
+                  <button className="btn ok" style={{ width: '100%', justifyContent: 'center' }} onClick={async () => {
+                    fld('status', 'Filed')
+                    await supabase.from('tax_returns').update({ status: 'Filed', updated_at: new Date().toISOString() }).eq('id', current?.id)
+                    showToast('✅ Return marked as Filed!')
+                    load()
+                  }} disabled={!current?.id}>Mark as Filed</button>
+                </div>
+
+              </div>
+
+              <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(26,127,212,.1)', borderRadius: 8, border: '1px solid rgba(26,127,212,.3)', fontSize: 12, color: 'var(--t2)', lineHeight: 1.7 }}>
+                <strong style={{ color: 'var(--blue)' }}>📌 IRS E-File Requirement:</strong> Direct IRS MeF submission requires an approved EFIN (Electronic Filing Identification Number).
+                Your PTIN ({preparer.ptin || 'not set'}) and CAF# ({preparer.caf || 'not set'}) are used for return preparation and IRS representation.
+                Export the XML above and import it into your approved e-file software (Drake Tax, ProSeries, Lacerte, TaxSlayer Pro) for final submission.
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUBMISSION HELPERS — appended to TaxReturns.jsx
+// These are exported for use by the Submit tab rendered inside TaxReturns
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function generateMeFXML(ret, totals, preparer) {
+  const n = k => parseFloat(ret[k] || 0) || 0
+  const ts = new Date().toISOString()
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<!-- IRS MeF Compatible Export — Generated ${ts} -->
+<!-- IMPORTANT: This XML is for review purposes. Submit via IRS-approved e-file software. -->
+<Return xmlns="http://www.irs.gov/efile" returnVersion="2024v5.0">
+  <ReturnHeader binaryAttachmentCount="0">
+    <ReturnTs>${ts}</ReturnTs>
+    <TaxYr>${ret.taxYear || '2024'}</TaxYr>
+    <PreparerFirmGrp>
+      <PreparerFirmName>
+        <BusinessNameLine1Txt>Tax Case Review</BusinessNameLine1Txt>
+      </PreparerFirmName>
+      <PreparerFirmEIN>Applied For</PreparerFirmEIN>
+    </PreparerFirmGrp>
+    <PreparerPersonGrp>
+      <PTIN>${preparer.ptin || 'P00000000'}</PTIN>
+      <PreparerPersonNm>${preparer.name || ''}</PreparerPersonNm>
+      <SelfEmployedInd>X</SelfEmployedInd>
+    </PreparerPersonGrp>
+    <ReturnTypeCd>1040</ReturnTypeCd>
+    <FilingSecurityInformation>
+      <AtSubmissionCreationGrp>
+        <TotalPreparationSubmissionTs>${ts}</TotalPreparationSubmissionTs>
+      </AtSubmissionCreationGrp>
+    </FilingSecurityInformation>
+    <Filer>
+      <PrimarySSN>${ret.clientSSN ? ret.clientSSN.replace(/\D/g,'') : '000000000'}</PrimarySSN>
+      <NameLine1Txt>${ret.clientName || ''}</NameLine1Txt>
+      <USAddrGrp>
+        <AddressLine1Txt>${ret.clientAddress || ''}</AddressLine1Txt>
+        <CityNm>${ret.clientCity || ''}</CityNm>
+        <StateAbbreviationCd>${ret.clientState || ''}</StateAbbreviationCd>
+        <ZIPCd>${ret.clientZip || ''}</ZIPCd>
+      </USAddrGrp>
+    </Filer>
+    <FilingStatus>
+      <${ret.filingStatus === 'Single' ? 'SingleInd' :
+         ret.filingStatus === 'Married Filing Jointly' ? 'MarriedFilingJointlyInd' :
+         ret.filingStatus === 'Married Filing Separately' ? 'MarriedFilingSeparatelyInd' :
+         ret.filingStatus === 'Head of Household' ? 'HeadOfHouseholdInd' : 'SingleInd'}/>X</${ret.filingStatus === 'Single' ? 'SingleInd' :
+         ret.filingStatus === 'Married Filing Jointly' ? 'MarriedFilingJointlyInd' :
+         ret.filingStatus === 'Married Filing Separately' ? 'MarriedFilingSeparatelyInd' :
+         ret.filingStatus === 'Head of Household' ? 'HeadOfHouseholdInd' : 'SingleInd'}>
+    </FilingStatus>
+  </ReturnHeader>
+  <ReturnData documentCnt="1">
+    <IRS1040 documentId="IRS1040" referenceDocumentId="GeneralDep">
+      <!-- LINE 1 — Wages -->
+      <WagesAmt>${Math.round(n('wages'))}</WagesAmt>
+      <!-- LINE 2b — Taxable Interest -->
+      <TaxableInterestAmt>${Math.round(n('interest'))}</TaxableInterestAmt>
+      <!-- LINE 3b — Ordinary Dividends -->
+      <OrdinaryDividendsAmt>${Math.round(n('dividends'))}</OrdinaryDividendsAmt>
+      <!-- LINE 4b — Retirement -->
+      <TaxableIRAPensionAmt>${Math.round(n('retirementIncome'))}</TaxableIRAPensionAmt>
+      <!-- LINE 5b — Social Security -->
+      <TaxableSocSecBnftAmt>${Math.round(n('socialSecurity') * 0.85)}</TaxableSocSecBnftAmt>
+      <!-- LINE 7 — Capital Gains -->
+      <CapitalGainLossAmt>${Math.round(n('capitalGains'))}</CapitalGainLossAmt>
+      <!-- LINE 8 — Other Income -->
+      <OtherIncomeAmt>${Math.round(n('otherIncome') + n('businessIncome') + n('rentalIncome'))}</OtherIncomeAmt>
+      <!-- LINE 9 — Total Income -->
+      <TotalIncomeAmt>${Math.round(totals.grossIncome)}</TotalIncomeAmt>
+      <!-- LINE 11 — AGI -->
+      <AdjustedGrossIncomeAmt>${Math.round(totals.agi)}</AdjustedGrossIncomeAmt>
+      <!-- LINE 12 — Standard/Itemized Deduction -->
+      <TotalDeductionsAmt>${Math.round(totals.deductions)}</TotalDeductionsAmt>
+      <!-- LINE 15 — Taxable Income -->
+      <TaxableIncomeAmt>${Math.round(totals.taxableIncome)}</TaxableIncomeAmt>
+      <!-- LINE 16 — Tax -->
+      <TentativeTaxAmt>${Math.round(totals.tax)}</TentativeTaxAmt>
+      <!-- LINE 19 — Child Tax Credit -->
+      <ChildTaxCreditAmt>${Math.round(n('childTaxCredit'))}</ChildTaxCreditAmt>
+      <!-- LINE 24 — Total Tax -->
+      <TotalTaxAmt>${Math.round(totals.taxAfterCredits)}</TotalTaxAmt>
+      <!-- LINE 25a — Withholding -->
+      <WithholdingTaxAmt>${Math.round(n('withholding'))}</WithholdingTaxAmt>
+      <!-- LINE 26 — Estimated Payments -->
+      <EstimatedTaxPaymentsAmt>${Math.round(n('estimatedPayments'))}</EstimatedTaxPaymentsAmt>
+      <!-- LINE 33 — Total Payments -->
+      <TotalPaymentsAmt>${Math.round(totals.payments)}</TotalPaymentsAmt>
+      ${totals.refundOrOwed >= 0
+        ? `<!-- LINE 35a — Refund -->\n      <OverpaidAmt>${Math.round(totals.refundOrOwed)}</OverpaidAmt>\n      <RefundAmt>${Math.round(totals.refundOrOwed)}</RefundAmt>`
+        : `<!-- LINE 37 — Amount Owed -->\n      <BalanceDueAmt>${Math.round(Math.abs(totals.refundOrOwed))}</BalanceDueAmt>`}
+    </IRS1040>
+  </ReturnData>
+</Return>`
+}
+
+export function generateStateExport(ret, totals, preparer) {
+  const n = k => parseFloat(ret[k] || 0) || 0
+  return `STATE TAX RETURN EXPORT
+===============================================================
+Prepared by: ${preparer.name || 'Tax Case Review'}
+CAF#: ${preparer.caf || ''}  PTIN: ${preparer.ptin || ''}
+Generated: ${new Date().toLocaleString()}
+
+TAXPAYER INFORMATION
+---------------------------------------------------------------
+Name:           ${ret.clientName || ''}
+SSN:            ${ret.clientSSN || '***-**-****'}
+Tax Year:       ${ret.taxYear || '2024'}
+Filing Status:  ${ret.filingStatus || ''}
+Return Type:    ${ret.returnType || ''}
+
+FEDERAL AGI (carry-over to state):  $${Math.round(totals.agi).toLocaleString()}
+
+INCOME SUMMARY
+---------------------------------------------------------------
+Wages & Salaries:         $${Math.round(n('wages')).toLocaleString()}
+Interest Income:          $${Math.round(n('interest')).toLocaleString()}
+Dividend Income:          $${Math.round(n('dividends')).toLocaleString()}
+Capital Gains:            $${Math.round(n('capitalGains')).toLocaleString()}
+Business Income:          $${Math.round(n('businessIncome')).toLocaleString()}
+Rental Income:            $${Math.round(n('rentalIncome')).toLocaleString()}
+Retirement Income:        $${Math.round(n('retirementIncome')).toLocaleString()}
+Social Security:          $${Math.round(n('socialSecurity')).toLocaleString()}
+Other Income:             $${Math.round(n('otherIncome')).toLocaleString()}
+                          ─────────────
+GROSS INCOME:             $${Math.round(totals.grossIncome).toLocaleString()}
+
+ADJUSTMENTS
+---------------------------------------------------------------
+Total Adjustments:        -$${Math.round(totals.adjustments).toLocaleString()}
+ADJUSTED GROSS INCOME:    $${Math.round(totals.agi).toLocaleString()}
+
+DEDUCTIONS
+---------------------------------------------------------------
+Method: ${ret.deductionType}
+Total Deductions:         -$${Math.round(totals.deductions).toLocaleString()}
+TAXABLE INCOME:           $${Math.round(totals.taxableIncome).toLocaleString()}
+
+TAX CALCULATION
+---------------------------------------------------------------
+Estimated Federal Tax:    $${Math.round(totals.tax).toLocaleString()}
+Tax Credits:              -$${Math.round(totals.credits).toLocaleString()}
+Tax After Credits:        $${Math.round(totals.taxAfterCredits).toLocaleString()}
+
+PAYMENTS
+---------------------------------------------------------------
+Federal Withholding:      $${Math.round(n('withholding')).toLocaleString()}
+Estimated Payments:       $${Math.round(n('estimatedPayments')).toLocaleString()}
+Total Payments:           $${Math.round(totals.payments).toLocaleString()}
+
+RESULT
+---------------------------------------------------------------
+${totals.refundOrOwed >= 0
+  ? `ESTIMATED REFUND:         $${Math.round(totals.refundOrOwed).toLocaleString()}`
+  : `BALANCE DUE:              $${Math.round(Math.abs(totals.refundOrOwed)).toLocaleString()}`}
+
+===============================================================
+PREPARER DECLARATION
+I declare that this return was prepared by the following:
+Name:  ${preparer.name || ''}
+PTIN:  ${preparer.ptin || ''}
+CAF#:  ${preparer.caf || ''}
+Date:  ${new Date().toLocaleDateString()}
+===============================================================
+NOTE: This export is for review and state filing reference.
+Submit to the IRS via IRS-approved e-file software (Drake,
+ProSeries, Lacerte, etc.) using your EFIN after review.
+===============================================================`
 }

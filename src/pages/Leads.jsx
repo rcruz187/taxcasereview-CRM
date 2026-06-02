@@ -62,6 +62,7 @@ export default function Leads() {
   const [newLeadNote, setNewLeadNote] = useState('')
   const [addingLeadNote, setAddingLeadNote] = useState(false)
   const [noteType, setNoteType]       = useState('Call')
+  const [showAllNotes, setShowAllNotes] = useState(false)
   const [form, setForm]     = useState(BLANK)
   const [saving, setSaving] = useState(false)
   const [toast, setToast]   = useState('')
@@ -276,64 +277,71 @@ export default function Leads() {
           )}
         </div>
 
-        {/* ── Call Log / Activity Notes ── */}
+        {/* ── Call Log / Activity Notes ── compact ── */}
         <div className="card" style={{marginTop:12}}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
-            <div style={{fontWeight:700,fontSize:13,color:'var(--tx)'}}>📞 Call Log & Activity Notes</div>
-            <span style={{fontSize:11,color:'var(--t3)'}}>{leadNotes.length} entries</span>
+          {/* Header */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+            <div style={{fontWeight:700,fontSize:13,color:'var(--tx)'}}>📞 Activity Log</div>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              {leadNotes.length > 3 && (
+                <span onClick={()=>setShowAllNotes(s=>!s)} style={{fontSize:11,color:'var(--blue)',cursor:'pointer',fontWeight:600}}>
+                  {showAllNotes ? 'Show less' : `View all ${leadNotes.length}`}
+                </span>
+              )}
+              <span style={{fontSize:11,color:'var(--t3)'}}>{leadNotes.length} entries</span>
+            </div>
           </div>
 
-          {/* Add note row */}
-          <div style={{display:'flex',gap:8,marginBottom:12,alignItems:'flex-start'}}>
+          {/* Quick log row */}
+          <div style={{display:'flex',gap:6,marginBottom:10,alignItems:'center'}}>
             <select value={noteType} onChange={e=>setNoteType(e.target.value)}
-              style={{padding:'7px 10px',borderRadius:6,border:'1px solid var(--br)',background:'var(--s2)',color:'var(--tx)',fontSize:12,flexShrink:0,width:110}}>
-              <option>Call</option>
-              <option>Email</option>
-              <option>SMS</option>
-              <option>Meeting</option>
-              <option>Note</option>
-              <option>Follow Up</option>
+              style={{padding:'5px 8px',borderRadius:6,border:'1px solid var(--br)',background:'var(--s2)',color:'var(--tx)',fontSize:12,flexShrink:0,width:100}}>
+              <option>Call</option><option>Email</option><option>SMS</option>
+              <option>Meeting</option><option>Note</option><option>Follow Up</option>
             </select>
-            <textarea
+            <input
               value={newLeadNote}
               onChange={e=>setNewLeadNote(e.target.value)}
-              onKeyDown={e=>{ if(e.key==='Enter'&&e.ctrlKey) addLeadNote() }}
-              placeholder="Log a call, email, or note... (Ctrl+Enter to save)"
-              rows={2}
-              style={{flex:1,padding:'7px 10px',borderRadius:6,border:'1px solid var(--br)',background:'var(--s2)',color:'var(--tx)',fontSize:13,resize:'vertical',fontFamily:'inherit',lineHeight:1.5}}
+              onKeyDown={e=>{ if(e.key==='Enter') addLeadNote() }}
+              placeholder="Log activity... (Enter to save)"
+              style={{flex:1,padding:'6px 10px',borderRadius:6,border:'1px solid var(--br)',background:'var(--s2)',color:'var(--tx)',fontSize:12}}
             />
             <button className="btn pri" onClick={addLeadNote} disabled={addingLeadNote || !newLeadNote.trim()}
-              style={{padding:'7px 14px',alignSelf:'flex-end',flexShrink:0}}>
-              {addingLeadNote ? '…' : '+ Log'}
+              style={{padding:'5px 12px',flexShrink:0,fontSize:12}}>
+              {addingLeadNote ? '…' : 'Log'}
             </button>
           </div>
 
-          {/* Notes list */}
+          {/* Notes list — last 3 or all */}
           {leadNotes.length === 0 ? (
-            <div style={{textAlign:'center',padding:'20px 0',color:'var(--t3)',fontSize:13}}>
-              No activity logged yet. Log your first call above.
-            </div>
-          ) : leadNotes.map((n,i) => {
+            <div style={{color:'var(--t3)',fontSize:12,textAlign:'center',padding:'8px 0'}}>No activity yet.</div>
+          ) : (showAllNotes ? leadNotes : leadNotes.slice(0,3)).map((n,i) => {
             const typeColors = {Call:'#3b82f6',Email:'#8b5cf6',SMS:'#06b6d4',Meeting:'#f59e0b',Note:'#64748b','Follow Up':'#ec4899'}
             const tc = typeColors[n.type] || '#64748b'
             return (
-              <div key={n.id||i} style={{display:'flex',gap:10,padding:'10px 0',borderTop:'1px solid var(--br)',alignItems:'flex-start'}}>
-                <div style={{width:32,height:32,borderRadius:'50%',background:tc+'22',border:'1.5px solid '+tc+'66',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,flexShrink:0,color:tc,fontWeight:700}}>
+              <div key={n.id||i} style={{display:'flex',gap:8,padding:'6px 0',borderTop:'1px solid var(--br)',alignItems:'flex-start'}}>
+                <span style={{fontSize:14,flexShrink:0,marginTop:1}}>
                   {n.type==='Call'?'📞':n.type==='Email'?'✉️':n.type==='SMS'?'💬':n.type==='Meeting'?'🤝':n.type==='Follow Up'?'🔔':'📝'}
-                </div>
+                </span>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:3,flexWrap:'wrap'}}>
-                    <span style={{fontSize:11,fontWeight:700,padding:'1px 8px',borderRadius:12,background:tc+'22',color:tc,border:'1px solid '+tc+'44'}}>{n.type}</span>
-                    <span style={{fontSize:11,color:'var(--t3)'}}>{n.author}</span>
-                    <span style={{fontSize:11,color:'var(--t3)',marginLeft:'auto'}}>{n.created_at?new Date(n.created_at).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):''}</span>
+                  <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                    <span style={{fontSize:10,fontWeight:700,padding:'1px 6px',borderRadius:10,background:tc+'22',color:tc,border:'1px solid '+tc+'33'}}>{n.type}</span>
+                    <span style={{fontSize:11,color:'var(--tx)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{n.text}</span>
+                    <span style={{fontSize:10,color:'var(--t3)',flexShrink:0,whiteSpace:'nowrap'}}>
+                      {n.created_at?new Date(n.created_at).toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):''}
+                    </span>
+                    <button onClick={async()=>{ await supabase.from('lead_notes').delete().eq('id',n.id); loadLeadNotes(detail.id) }}
+                      style={{background:'none',border:'none',color:'var(--t3)',cursor:'pointer',fontSize:13,flexShrink:0,padding:'0 2px',lineHeight:1}}>×</button>
                   </div>
-                  <div style={{fontSize:13,lineHeight:1.6,color:'var(--tx)',whiteSpace:'pre-wrap'}}>{n.text}</div>
                 </div>
-                <button onClick={async()=>{ await supabase.from('lead_notes').delete().eq('id',n.id); loadLeadNotes(detail.id) }}
-                  style={{background:'none',border:'none',color:'var(--t3)',cursor:'pointer',fontSize:16,flexShrink:0,padding:'0 4px'}}>×</button>
               </div>
             )
           })}
+          {!showAllNotes && leadNotes.length > 3 && (
+            <div onClick={()=>setShowAllNotes(true)} style={{textAlign:'center',padding:'6px 0',fontSize:11,color:'var(--blue)',cursor:'pointer',borderTop:'1px solid var(--br)',marginTop:4}}>
+              + {leadNotes.length - 3} more entries — click to view all
+            </div>
+          )}
         </div>
       </div>
     )

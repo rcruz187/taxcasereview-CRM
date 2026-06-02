@@ -67,7 +67,7 @@ export default function TimeClock() {
     const inTime = now2.toTimeString().slice(0,5)
     const date = now2.toISOString().slice(0,10)
     const {data,error} = await supabase.from('timeentries').insert([{
-      employee:empName, date, inTime, outTime:'', hours:'', notes:'',
+      employee:empName, date, inTime, outTime:null, hours:null, notes:null,
       created_at: now2.toISOString()
     }]).select().single()
     if (error) { showToast('Error: '+error.message); return }
@@ -81,7 +81,7 @@ export default function TimeClock() {
     if (!entry) return
     const outTime = new Date().toTimeString().slice(0,5)
     const hours = calcHours(entry.inTime, outTime)
-    const {error} = await supabase.from('timeentries').update({outTime, hours, updated_at:new Date().toISOString()}).eq('id',entry.id)
+    const {error} = await supabase.from('timeentries').update({outTime, hours: hours || 0, updated_at:new Date().toISOString()}).eq('id',entry.id)
     if (error) { showToast('Error: '+error.message); return }
     setClocking(c=>{ const n={...c}; delete n[empName]; return n })
     showToast(`✅ ${empName.split(' ')[0]} clocked out — ${hours}h logged`)
@@ -91,7 +91,7 @@ export default function TimeClock() {
   async function save() {
     if (!form.employee || !form.date) { showToast('Employee and date required'); return }
     setSaving(true)
-    const hours = calcHours(form.inTime, form.outTime) || form.hours
+    const hours = calcHours(form.inTime, form.outTime) || (form.hours ? parseFloat(form.hours) : null)
     if (editId) {
       const {error} = await supabase.from('timeentries').update({...form, hours, updated_at:new Date().toISOString()}).eq('id',editId)
       if (error) { showToast('Error: '+error.message); setSaving(false); return }

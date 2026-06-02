@@ -74,7 +74,7 @@ export default function Employees() {
       name: emp.name || '',
       email: emp.email || '',
       phone: emp.phone || '',
-      title: emp.title || '',
+      title: emp.title ?? '',
       access: emp.access || 'Staff',
       perm_clients:  emp.perm_clients  ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_clients,
       perm_billing:  emp.perm_billing  ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_billing,
@@ -97,7 +97,10 @@ export default function Employees() {
   async function save() {
     if (!form.name || !form.email) return showToast('Name and email required', 'err')
     setSaving(true)
-    const payload = { ...form }
+    // Strip any fields that may not exist in DB yet
+    const payload = Object.fromEntries(
+      Object.entries(form).filter(([, v]) => v !== undefined)
+    )
     let error
     if (editing) {
       ({ error } = await supabase.from('employees').update(payload).eq('id', editing))

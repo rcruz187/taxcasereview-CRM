@@ -106,11 +106,8 @@ export default function Email() {
           <div style={{ margin: '0 10px 10px', padding: '10px 12px', background: 'rgba(26,127,212,.12)', borderRadius: 8, border: '1px solid rgba(26,127,212,.3)' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', marginBottom: 4 }}>📧 Connect Gmail</div>
             <div style={{ fontSize: 10, color: 'var(--t3)', marginBottom: 8, lineHeight: 1.5 }}>Link your Gmail account to send & receive emails directly.</div>
-            <button onClick={() => {
-              window.open('https://accounts.google.com/o/oauth2/v2/auth?client_id=YOUR_CLIENT_ID&redirect_uri=' + encodeURIComponent(window.location.origin) + '&response_type=code&scope=https://mail.google.com/&access_type=offline', '_blank')
-              showToast('Add your Google OAuth client ID in Settings to enable Gmail')
-            }} style={{ width: '100%', padding: '5px 0', borderRadius: 6, border: 'none', background: 'var(--blue)', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
-              Connect Gmail
+            <button onClick={() => showToast('Go to console.cloud.google.com → Create OAuth 2.0 Client ID → paste it in Settings → Firm Info')} style={{ width: '100%', padding: '5px 0', borderRadius: 6, border: 'none', background: 'var(--blue)', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+              Setup Instructions
             </button>
           </div>
         )}
