@@ -267,7 +267,7 @@ export default function Calendar() {
   }
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 52px)', background: '#0a0f1a', overflow: 'hidden', margin: '-16px' }}>
+    <div style={{ display: 'flex', position: 'absolute', inset: 0, background: '#0a0f1a', overflow: 'hidden' }}>
       {toast && <div style={{ position: 'fixed', bottom: 24, right: 24, background: '#16a34a', color: '#fff', padding: '12px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 999, boxShadow: '0 4px 20px rgba(0,0,0,.4)' }}>{toast}</div>}
 
       {/* ── MAIN CALENDAR AREA ── */}
@@ -570,3 +570,4 @@ export default function Calendar() {
     </div>
   )
 }
+
