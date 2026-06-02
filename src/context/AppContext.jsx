@@ -3,8 +3,69 @@ import { supabase } from '../lib/supabase'
 
 const AppContext = createContext(null)
 
+// ── Section → DB column map ──────────────────────────────────────────────
+// Each route/section maps to a perm_* column on the employees table.
+// 0 = No Access, 1 = View Only, 2 = Edit, 3 = Full Admin
+export const SECTION_COLS = {
+  leads:       'perm_clients',
+  clients:     'perm_clients',
+  cases:       'perm_clients',
+  tasks:       'perm_clients',
+  deadlines:   'perm_clients',
+  estimates:   'perm_billing',
+  invoices:    'perm_billing',
+  payments:    'perm_billing',
+  books:       'perm_billing',
+  calendar:    'perm_schedule',
+  documents:   'perm_documents',
+  esign:       'perm_documents',
+  transcripts: 'perm_irs',
+  irsforms:    'perm_irs',
+  taxreturns:  'perm_irs',
+  reports:     'perm_reports',
+  timeclock:   'perm_hr',
+  payroll:     'perm_hr',
+  employees:   'perm_hr',
+  sms:         'perm_comms',
+  email:       'perm_comms',
+  dialer:      'perm_comms',
+  chat:        'perm_comms',
+  settings:    'perm_settings',
+  dashboard:   null,   // always visible
+  kiosk:       null,
+}
+
+// Access levels (match Employees.jsx UI)
+export const ACCESS_LEVELS = {
+  'Super Admin': { label: 'Super Admin', color: '#ef4444' },
+  'Admin':       { label: 'Admin',       color: '#f59e0b' },
+  'Staff':       { label: 'Staff',       color: '#3b82f6' },
+  'View Only':   { label: 'View Only',   color: '#64748b' },
+}
+
+// Role-based defaults (used when no per-section perms exist)
+const ROLE_DEFAULTS = {
+  'Super Admin': { canView: ['*'], canEdit: ['*'] },
+  'Admin': {
+    canView: ['*'],
+    canEdit: ['leads','clients','cases','tasks','calendar','deadlines','transcripts',
+              'irsforms','taxreturns','estimates','invoices','payments','sms','email',
+              'documents','esign','timeclock','reports','dialer','chat','books','irs'],
+  },
+  'Staff': {
+    canView: ['dashboard','leads','clients','cases','tasks','calendar','deadlines','documents','chat','irsforms'],
+    canEdit: ['tasks','chat'],
+  },
+  'View Only': {
+    canView: ['dashboard','leads','clients','cases','tasks','calendar','deadlines','documents','irsforms'],
+    canEdit: [],
+  },
+}
+
 export function AppProvider({ children }) {
   const [user, setUser]         = useState(null)
+  const [role, setRole]         = useState('Admin')
+  const [perms, setPerms]       = useState(null)   // per-section perm object from DB
   const [checking, setChecking] = useState(true)
   const [toast, setToast]       = useState({ msg: '', type: 'ok', show: false })
   const [modal, setModal]       = useState({ open: false, title: '', body: null })
@@ -13,14 +74,68 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session?.user) setUser(data.session.user)
+      if (data.session?.user) {
+        setUser(data.session.user)
+        loadRole(data.session.user.email)
+      }
       setChecking(false)
     })
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
+      if (session?.user) loadRole(session.user.email)
+      else { setRole('Staff'); setPerms(null) }
     })
     return () => listener.subscription.unsubscribe()
   }, [])
+
+  async function loadRole(email) {
+    if (!email) return
+    if (email === 'romy@taxcasereview.org') {
+      setRole('Super Admin')
+      setPerms(null)
+      return
+    }
+    const { data } = await supabase
+      .from('employees')
+      .select('access, perm_clients, perm_billing, perm_schedule, perm_documents, perm_reports, perm_hr, perm_settings, perm_comms, perm_irs')
+      .eq('email', email)
+      .maybeSingle()
+
+    if (data) {
+      setRole(data.access || 'Staff')
+      // Store per-section perms if they exist
+      const hasCustomPerms = Object.keys(data).some(k => k.startsWith('perm_') && data[k] !== null)
+      setPerms(hasCustomPerms ? data : null)
+    } else {
+      setRole('Admin')
+      setPerms(null)
+    }
+  }
+
+  const can = useCallback((action, section) => {
+    // Super Admin always yes
+    if (role === 'Super Admin') return true
+
+    // Dashboard/kiosk always visible
+    if (section === 'dashboard' || section === 'kiosk') return true
+
+    // If we have per-section perms, use them
+    if (perms) {
+      const col = SECTION_COLS[section]
+      if (col && perms[col] !== null && perms[col] !== undefined) {
+        const level = perms[col] // 0=none, 1=view, 2=edit, 3=full
+        if (action === 'view') return level >= 1
+        if (action === 'edit') return level >= 2
+        return false
+      }
+    }
+
+    // Fall back to role-based defaults
+    const defaults = ROLE_DEFAULTS[role] || ROLE_DEFAULTS['Staff']
+    if (action === 'view') return defaults.canView.includes('*') || defaults.canView.includes(section)
+    if (action === 'edit') return defaults.canEdit.includes('*') || defaults.canEdit.includes(section)
+    return false
+  }, [role, perms])
 
   const showToast = useCallback((msg, type = 'ok') => {
     if (toastTimer.current) clearTimeout(toastTimer.current)
@@ -30,16 +145,18 @@ export function AppProvider({ children }) {
 
   const openModal  = useCallback((title, body) => setModal({ open: true, title, body }), [])
   const closeModal = useCallback(() => setModal({ open: false, title: '', body: null }), [])
-
   const login  = useCallback((u) => setUser(u), [])
   const logout = useCallback(async () => {
     await supabase.auth.signOut()
     setUser(null)
+    setRole('Staff')
+    setPerms(null)
   }, [])
 
   return (
     <AppContext.Provider value={{
       user, login, logout, checking,
+      role, perms, can,
       toast, showToast,
       modal, openModal, closeModal,
       searchQ, setSearchQ,
