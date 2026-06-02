@@ -1,518 +1,569 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
-const DAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
-const EVENT_TYPES = ['Consultation Call','Client Meeting','IRS Call','IRS Appointment','Court Date','Hearing','Deadline','Follow-up Call','Document Due','Payment Due','Team Meeting','Other']
-const COLORS = { bb:'#1A7FD4', br:'#C0202F', bg:'#25A25A', ba:'#D4930A', bw:'#6B7280', bv:'#7C3AED' }
-const COLOR_OPTS = [
-  { val:'bb', label:'🔵 Blue — Call/Meeting' },
-  { val:'bg', label:'🟢 Green — Completed' },
-  { val:'ba', label:'🟡 Yellow — Deadline' },
-  { val:'br', label:'🔴 Red — IRS/Urgent' },
-  { val:'bv', label:'🟣 Purple — Court/Hearing' },
-]
-const BLANK = { title:'', eventType:'Consultation Call', date:'', time:'', endTime:'', clientName:'', assignedTo:'', notes:'', color:'bb', recurring:'none' }
+const STATUS_COLORS = {
+  scheduled:   { bg: '#1e3a5f', border: '#3b82f6', text: '#93c5fd' },
+  in_progress: { bg: '#1a3a2a', border: '#16a34a', text: '#4ade80' },
+  completed:   { bg: '#1e293b', border: '#475569', text: '#94a3b8' },
+  cancelled:   { bg: '#3b1a1a', border: '#ef4444', text: '#fca5a5' },
+  reminder:    { bg: '#2a1f3d', border: '#7c3aed', text: '#c4b5fd' },
+  draft:       { bg: '#1e293b', border: '#475569', text: '#94a3b8' },
+}
 
-function fmtTime(t) {
-  if (!t) return ''
-  const [h, m] = t.split(':')
-  const hr = parseInt(h)
-  return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`
+// Map calevents color keys to status colors
+const COLOR_MAP = {
+  bb: 'scheduled', bg: 'completed', ba: 'reminder', br: 'cancelled', bv: 'reminder', bw: 'draft'
+}
+
+const DAYS  = ['SUN','MON','TUE','WED','THU','FRI','SAT']
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+
+function fmtTime(d) {
+  if (!d) return ''
+  // Handle HH:MM format
+  if (d.includes('T') || d.includes('-')) {
+    return new Date(d).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  }
+  // Handle plain time string like "09:00"
+  const [h, m] = d.split(':').map(Number)
+  const ampm = h >= 12 ? 'PM' : 'AM'
+  return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${ampm}`
+}
+
+function scOf(ev) {
+  // Use status if present, else map from color key
+  const statusKey = ev.status || COLOR_MAP[ev.color] || 'scheduled'
+  return STATUS_COLORS[statusKey] || STATUS_COLORS.scheduled
 }
 
 export default function Calendar() {
-  const today = new Date()
-  const [year, setYear]     = useState(today.getFullYear())
-  const [month, setMonth]   = useState(today.getMonth())
-  const [view, setView]     = useState('month') // month | week | list
-  const [events, setEvents] = useState([])
-  const [clients, setClients] = useState([])
-  const [employees, setEmployees] = useState([])
-  const [deadlines, setDeadlines] = useState([])
-  const [modal, setModal]   = useState(false)
-  const [editId, setEditId] = useState(null)
-  const [form, setForm]     = useState(BLANK)
-  const [saving, setSaving] = useState(false)
-  const [toast, setToast]   = useState('')
-  const [selectedDay, setSelectedDay] = useState(null)
-  const [sug, setSug]       = useState([])
-  const [showSug, setShowSug] = useState(false)
-  const [detailEv, setDetailEv] = useState(null)
-  const containerRef = useRef(null)
+  const [events,        setEvents]        = useState([])
+  const [clients,       setClients]       = useState([])
+  const [employees,     setEmployees]     = useState([])
+  const [deadlines,     setDeadlines]     = useState([])
+  const [loading,       setLoading]       = useState(true)
+  const [currentDate,   setCurrentDate]   = useState(new Date())
+  const [view,          setView]          = useState('month')
+  const [selectedEvent, setSelectedEvent] = useState(null)
+  const [showForm,      setShowForm]      = useState(false)
+  const [dayMenuPos,    setDayMenuPos]    = useState(null)
+  const [dayMenuDate,   setDayMenuDate]   = useState(null)
+  const [showUnscheduled, setShowUnscheduled] = useState(true)
+  const [toast,         setToast]         = useState('')
+  const [saving,        setSaving]        = useState(false)
 
-  // Escape .page-content padding so calendar goes full-width
+  const [form, setForm] = useState({
+    title: '', clientName: '', assignedTo: '', date: '', time: '',
+    endTime: '', eventType: 'Consultation Call', color: 'bb',
+    notes: '', recurring: 'none', status: 'scheduled'
+  })
+
+  // Escape .page-content padding
   useEffect(() => {
     const el = document.querySelector('.page-content')
     if (!el) return
-    const origPadding = el.style.padding
-    const origOverflow = el.style.overflow
-    const origHeight = el.style.height
-    el.style.padding = '0'
-    el.style.overflow = 'hidden'
-    el.style.height = '100%'
-    return () => {
-      el.style.padding = origPadding
-      el.style.overflow = origOverflow
-      el.style.height = origHeight
-    }
+    const op = el.style.padding, oo = el.style.overflow, oh = el.style.height
+    el.style.padding = '0'; el.style.overflow = 'hidden'; el.style.height = '100%'
+    return () => { el.style.padding = op; el.style.overflow = oo; el.style.height = oh }
   }, [])
 
   useEffect(() => { load() }, [])
 
   async function load() {
+    setLoading(true)
     const [{ data: ev }, { data: cl }, { data: em }, { data: dl }] = await Promise.all([
       supabase.from('calevents').select('*').order('date', { ascending: true }),
       supabase.from('clients').select('id,name'),
-      supabase.from('employees').select('name'),
+      supabase.from('employees').select('id,name').order('name'),
       supabase.from('deadlines').select('id,title,dueDate,clientName,status').neq('status', 'Completed'),
     ])
-    if (ev) setEvents(ev)
-    if (cl) setClients(cl)
-    if (em) setEmployees(em)
-    if (dl) setDeadlines(dl)
+    setEvents(ev || [])
+    setClients(cl || [])
+    setEmployees(em || [])
+    setDeadlines(dl || [])
+    setLoading(false)
   }
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3000) }
   function fld(k, v) { setForm(f => ({ ...f, [k]: v })) }
-  function prevMonth() { month === 0 ? (setMonth(11), setYear(y => y - 1)) : setMonth(m => m - 1) }
-  function nextMonth() { month === 11 ? (setMonth(0), setYear(y => y + 1)) : setMonth(m => m + 1) }
 
-  function dateStr(d) {
-    return `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-  }
-
-  function eventsOn(ds) {
-    const cal = events.filter(e => e.date === ds)
-    const dls = deadlines.filter(d => d.dueDate === ds).map(d => ({ ...d, _isDl: true, color: 'br' }))
-    return [...cal, ...dls].sort((a, b) => (a.time || '').localeCompare(b.time || ''))
-  }
-
-  function openNew(date = '') {
-    setForm({ ...BLANK, date, time: '09:00' })
-    setEditId(null); setModal(true); setDetailEv(null)
-  }
-
-  function openEdit(ev) {
-    setForm({ ...BLANK, ...ev }); setEditId(ev.id); setModal(true); setDetailEv(null)
-  }
-
-  async function save() {
+  async function saveEvent() {
     if (!form.title || !form.date) { showToast('Title and date required'); return }
     setSaving(true)
+    const payload = { ...form, updated_at: new Date().toISOString() }
     let error
-    if (editId) {
-      ;({ error } = await supabase.from('calevents').update({ ...form, updated_at: new Date().toISOString() }).eq('id', editId))
+    if (form.id) {
+      ;({ error } = await supabase.from('calevents').update(payload).eq('id', form.id))
     } else {
-      ;({ error } = await supabase.from('calevents').insert([{ ...form, created_at: new Date().toISOString() }]))
+      payload.created_at = new Date().toISOString()
+      ;({ error } = await supabase.from('calevents').insert([payload]))
     }
     setSaving(false)
     if (error) { showToast('Error: ' + error.message); return }
-    showToast('✅ Saved!'); setModal(false); setEditId(null); setForm(BLANK); load()
+    showToast('✅ Event saved!')
+    setShowForm(false); setForm({ title:'',clientName:'',assignedTo:'',date:'',time:'',endTime:'',eventType:'Consultation Call',color:'bb',notes:'',recurring:'none',status:'scheduled' })
+    load()
   }
 
-  async function del(id) {
+  async function deleteEvent(id) {
     if (!confirm('Delete this event?')) return
     await supabase.from('calevents').delete().eq('id', id)
-    showToast('Deleted'); setDetailEv(null); load()
+    setSelectedEvent(null); showToast('Deleted'); load()
   }
 
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-  const reps = employees.length > 0 ? employees.map(e => e.name) : ['Romy Cruz', 'Dana Richard', 'Yesenia Gonzalez']
+  async function quickStatus(ev, status) {
+    await supabase.from('calevents').update({ status, updated_at: new Date().toISOString() }).eq('id', ev.id)
+    setSelectedEvent({ ...ev, status }); load()
+  }
 
-  // Month grid
-  const firstDay = new Date(year, month, 1).getDay()
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const cells = []
-  for (let i = 0; i < firstDay; i++) cells.push(null)
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+  const goToday = () => setCurrentDate(new Date())
+  const goPrev  = () => {
+    const d = new Date(currentDate)
+    view === 'month' ? d.setMonth(d.getMonth()-1) : view === 'week' ? d.setDate(d.getDate()-7) : d.setDate(d.getDate()-1)
+    setCurrentDate(d)
+  }
+  const goNext  = () => {
+    const d = new Date(currentDate)
+    view === 'month' ? d.setMonth(d.getMonth()+1) : view === 'week' ? d.setDate(d.getDate()+7) : d.setDate(d.getDate()+1)
+    setCurrentDate(d)
+  }
 
-  // Week view — current week
-  const startOfWeek = new Date(today)
-  startOfWeek.setDate(today.getDate() - today.getDay())
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(startOfWeek); d.setDate(startOfWeek.getDate() + i); return d
-  })
+  const getMonthDays = () => {
+    const y = currentDate.getFullYear(), m = currentDate.getMonth()
+    const first = new Date(y, m, 1), last = new Date(y, m+1, 0)
+    const days = []
+    for (let i = 0; i < first.getDay(); i++) days.push(null)
+    for (let d = 1; d <= last.getDate(); d++) days.push(new Date(y, m, d))
+    while (days.length % 7 !== 0) days.push(null)
+    return days
+  }
 
-  // Upcoming
-  const allItems = [
-    ...events.map(e => ({ ...e, _type: 'event' })),
-    ...deadlines.map(d => ({ ...d, date: d.dueDate, color: 'br', _type: 'deadline' }))
-  ].filter(e => e.date >= todayStr).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 20)
+  const getWeekDays = () => {
+    const d = new Date(currentDate); d.setDate(d.getDate() - d.getDay())
+    return Array.from({ length: 7 }, (_, i) => { const dd = new Date(d); dd.setDate(d.getDate()+i); return dd })
+  }
 
-  const S = { // styles shorthand
-    cell: (ds, isWeekend) => ({
-      flex: 1, minHeight: 110, borderRight: '1px solid var(--br)', borderBottom: '1px solid var(--br)',
-      padding: '6px 5px 4px', cursor: 'pointer', position: 'relative',
-      background: ds === todayStr ? 'rgba(26,127,212,.1)' : isWeekend ? 'rgba(255,255,255,.01)' : 'var(--bg)',
-      transition: 'background .1s',
-    })
+  function eventsForDay(date) {
+    const ds = date.toDateString()
+    const cal = events.filter(e => e.date && new Date(e.date + 'T12:00').toDateString() === ds)
+    const dls = deadlines.filter(d => d.dueDate && new Date(d.dueDate + 'T12:00').toDateString() === ds)
+      .map(d => ({ ...d, title: d.title, clientName: d.clientName, color: 'br', status: 'cancelled', _isDl: true }))
+    return [...cal, ...dls].sort((a, b) => (a.time || '').localeCompare(b.time || ''))
+  }
+
+  const isToday = date => date.toDateString() === new Date().toDateString()
+
+  const viewTitle = () => {
+    if (view === 'month') return `${MONTHS[currentDate.getMonth()]} ${currentDate.getFullYear()}`
+    if (view === 'week') {
+      const days = getWeekDays()
+      return `${MONTHS[days[0].getMonth()]} ${days[0].getDate()} – ${days[6].getDate()}, ${days[6].getFullYear()}`
+    }
+    return currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+  }
+
+  function openDayMenu(date, e) {
+    e.stopPropagation()
+    const x = Math.min(e.clientX, window.innerWidth - 260)
+    const y = Math.min(e.clientY, window.innerHeight - 320)
+    setDayMenuDate(date); setDayMenuPos({ x, y })
+  }
+
+  function openNewForm(date, hour) {
+    const d = new Date(date); d.setHours(hour ?? 9, 0, 0, 0)
+    setForm(f => ({
+      ...f,
+      title: '', date: date.toISOString().slice(0, 10),
+      time: `${String(d.getHours()).padStart(2,'0')}:00`,
+      id: undefined
+    }))
+    setShowForm(true); setDayMenuPos(null); setDayMenuDate(null)
+  }
+
+  function openEditForm(ev) {
+    setForm({ ...ev })
+    setShowForm(true); setSelectedEvent(null)
+  }
+
+  const inp = { width: '100%', padding: '9px 11px', border: '1px solid #1e293b', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none', background: '#0f172a', color: '#f1f5f9', boxSizing: 'border-box' }
+  const lbl = { fontSize: 10, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4, display: 'block' }
+
+  const EventPill = ({ ev, onClick }) => {
+    const sc = scOf(ev)
+    return (
+      <div onClick={e => { e.stopPropagation(); onClick() }}
+        style={{ background: sc.bg, borderLeft: `3px solid ${sc.border}`, borderRadius: 4, padding: '3px 6px', marginBottom: 2, cursor: 'pointer', overflow: 'hidden' }}>
+        <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: sc.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {ev.time && <span style={{ opacity: .7 }}>{fmtTime(ev.time)} </span>}
+          {ev._isDl ? '⏰ ' : ''}{ev.clientName || ev.title}
+        </p>
+      </div>
+    )
+  }
+
+  // ── EVENT DETAIL PANEL ──
+  if (selectedEvent) {
+    const sc = scOf(selectedEvent)
+    return (
+      <div style={{ padding: '1.5rem', background: '#0a0f1a', minHeight: '100%' }}>
+        {toast && <div style={{ position: 'fixed', bottom: 24, right: 24, background: '#16a34a', color: '#fff', padding: '12px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 999 }}>{toast}</div>}
+        <button onClick={() => setSelectedEvent(null)} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 16 }}>← Back to Calendar</button>
+
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <span style={{ background: sc.bg, color: sc.text, border: `1px solid ${sc.border}`, padding: '3px 10px', borderRadius: 99, fontSize: 11, fontWeight: 700, textTransform: 'capitalize', marginBottom: 8, display: 'inline-block' }}>
+              {(selectedEvent.status || 'scheduled').replace('_', ' ')}
+            </span>
+            <h1 style={{ margin: '6px 0 4px', fontSize: 22, fontWeight: 800, color: '#f1f5f9' }}>{selectedEvent.title}</h1>
+            {selectedEvent.clientName && <p style={{ margin: 0, fontSize: 14, color: '#64748b' }}>{selectedEvent.clientName}</p>}
+          </div>
+          {!selectedEvent._isDl && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => openEditForm(selectedEvent)} style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>✏️ Edit</button>
+              <button onClick={() => deleteEvent(selectedEvent.id)} style={{ padding: '8px 16px', background: '#3b1a1a', color: '#fca5a5', border: '1px solid #ef4444', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>🗑 Delete</button>
+            </div>
+          )}
+        </div>
+
+        {!selectedEvent._isDl && (
+          <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: '14px 16px', marginBottom: 14 }}>
+            <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '.05em' }}>Quick Status</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {['scheduled','in_progress','completed','cancelled'].map(s => (
+                <button key={s} onClick={() => quickStatus(selectedEvent, s)} style={{
+                  padding: '6px 14px', borderRadius: 99, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', textTransform: 'capitalize',
+                  background: (selectedEvent.status||'scheduled') === s ? STATUS_COLORS[s].bg : 'transparent',
+                  color: (selectedEvent.status||'scheduled') === s ? STATUS_COLORS[s].text : '#64748b',
+                  border: (selectedEvent.status||'scheduled') === s ? `1px solid ${STATUS_COLORS[s].border}` : '1px solid #1e293b',
+                }}>{s.replace('_', ' ')}</button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: '14px 16px' }}>
+          <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 700, color: '#f1f5f9' }}>Details</h3>
+          {[
+            ['Date', selectedEvent.date ? new Date(selectedEvent.date + 'T12:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : '—'],
+            ['Time', selectedEvent.time ? fmtTime(selectedEvent.time) + (selectedEvent.endTime ? ' – ' + fmtTime(selectedEvent.endTime) : '') : '—'],
+            ['Type', selectedEvent.eventType || '—'],
+            ['Assigned To', selectedEvent.assignedTo || 'Unassigned'],
+            ['Recurring', selectedEvent.recurring || 'None'],
+          ].map(([label, value]) => (
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #1e293b' }}>
+              <span style={{ fontSize: 12, color: '#475569', fontWeight: 600 }}>{label}</span>
+              <span style={{ fontSize: 13, color: '#f1f5f9' }}>{value}</span>
+            </div>
+          ))}
+          {selectedEvent.notes && (
+            <div style={{ marginTop: 12 }}>
+              <p style={{ margin: '0 0 4px', fontSize: 11, color: '#475569', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em' }}>Notes</p>
+              <p style={{ margin: 0, fontSize: 13, color: '#cbd5e1', lineHeight: 1.6 }}>{selectedEvent.notes}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div ref={containerRef} style={{
-      display: 'flex', flexDirection: 'column',
-      height: 'calc(100vh - 52px)',
-      maxHeight: 'calc(100vh - 52px)',
-      background: 'var(--bg)', overflow: 'hidden',
-    }}>
-      {toast && <div className="toast show">{toast}</div>}
+    <div style={{ display: 'flex', height: 'calc(100vh - 52px)', background: '#0a0f1a', overflow: 'hidden', margin: '-16px' }}>
+      {toast && <div style={{ position: 'fixed', bottom: 24, right: 24, background: '#16a34a', color: '#fff', padding: '12px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 999, boxShadow: '0 4px 20px rgba(0,0,0,.4)' }}>{toast}</div>}
 
-      {/* ── Top bar ── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: '10px 20px', borderBottom: '1px solid var(--br)',
-        background: 'var(--sf)', flexShrink: 0, flexWrap: 'wrap'
-      }}>
-        <button className="btn sec" style={{ padding: '5px 12px', fontSize: 16, lineHeight: 1 }} onClick={prevMonth}>‹</button>
-        <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0, minWidth: 170, textAlign: 'center', color: 'var(--tx)' }}>
-          {MONTHS[month]} {year}
-        </h2>
-        <button className="btn sec" style={{ padding: '5px 12px', fontSize: 16, lineHeight: 1 }} onClick={nextMonth}>›</button>
-        <button className="btn sec" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => { setMonth(today.getMonth()); setYear(today.getFullYear()) }}>Today</button>
+      {/* ── MAIN CALENDAR AREA ── */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-        <div style={{ flex: 1 }} />
+        {/* Top bar */}
+        <div style={{ background: '#0d1526', borderBottom: '1px solid #1e293b', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button onClick={goToday} style={{ padding: '7px 16px', background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, color: '#f1f5f9', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Today</button>
+            <div style={{ display: 'flex', gap: 2 }}>
+              <button onClick={goPrev} style={{ width: 32, height: 32, background: '#0f172a', border: '1px solid #1e293b', borderRadius: 6, color: '#f1f5f9', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
+              <button onClick={goNext} style={{ width: 32, height: 32, background: '#0f172a', border: '1px solid #1e293b', borderRadius: 6, color: '#f1f5f9', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+            </div>
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9' }}>{viewTitle()}</span>
+          </div>
 
-        {/* View switcher */}
-        <div style={{ display: 'flex', background: 'var(--s2)', borderRadius: 8, padding: 2, gap: 2 }}>
-          {['month', 'week', 'list'].map(v => (
-            <button key={v} onClick={() => setView(v)} style={{
-              padding: '5px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
-              background: view === v ? 'var(--blue)' : 'transparent',
-              color: view === v ? '#fff' : 'var(--t2)',
-              fontWeight: view === v ? 700 : 400, fontSize: 12, textTransform: 'capitalize',
-              transition: 'all .15s'
-            }}>{v}</button>
-          ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, overflow: 'hidden' }}>
+              {['month','week','day'].map((v, i) => (
+                <button key={v} onClick={() => setView(v)} style={{
+                  padding: '7px 16px', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                  fontSize: 13, fontWeight: 600, textTransform: 'capitalize',
+                  background: view === v ? '#16a34a' : 'transparent',
+                  color: view === v ? '#fff' : '#64748b',
+                  borderRight: i < 2 ? '1px solid #1e293b' : 'none',
+                }}>{v.charAt(0).toUpperCase() + v.slice(1)}</button>
+              ))}
+            </div>
+            <button onClick={() => { setForm(f => ({...f, date: new Date().toISOString().slice(0,10), id: undefined})); setShowForm(true) }} style={{ padding: '8px 18px', background: '#16a34a', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              + Add Event
+            </button>
+            <button onClick={() => setShowUnscheduled(s => !s)} style={{ padding: '7px 12px', background: showUnscheduled ? 'rgba(74,222,128,.15)' : '#0f172a', border: '1px solid #1e293b', borderRadius: 8, color: showUnscheduled ? '#4ade80' : '#64748b', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+              Upcoming {deadlines.filter(d => { const dl = Math.ceil((new Date(d.dueDate)-new Date())/86400000); return dl <= 7 && dl >= 0 }).length > 0 &&
+                <span style={{ background: '#fbbf24', color: '#000', borderRadius: 99, padding: '0 6px', fontSize: 10, fontWeight: 800, marginLeft: 4 }}>
+                  {deadlines.filter(d => { const dl = Math.ceil((new Date(d.dueDate)-new Date())/86400000); return dl <= 7 && dl >= 0 }).length}
+                </span>}
+            </button>
+          </div>
         </div>
 
-        <button className="btn pri" style={{ fontSize: 13, padding: '6px 16px' }} onClick={() => openNew()}>
-          + New Event
-        </button>
-      </div>
-
-      {/* ── Body: grid + sidebar ── */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-
-        {/* Main calendar area */}
-        <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-
-          {/* MONTH VIEW */}
-          {view === 'month' && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              {/* Day-of-week headers */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', borderBottom: '1px solid var(--br)', background: 'var(--sf)', flexShrink: 0 }}>
-                {DAYS_SHORT.map((d, i) => (
-                  <div key={d} style={{ padding: '8px 0', textAlign: 'center', fontSize: 11, fontWeight: 700, color: i === 0 || i === 6 ? 'var(--bad)' : 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{d}</div>
+        {/* Calendar body */}
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {loading ? (
+            <div style={{ padding: '4rem', textAlign: 'center', color: '#475569', fontSize: 14 }}>Loading…</div>
+          ) : view === 'month' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', background: '#0d1526', borderBottom: '1px solid #1e293b', flexShrink: 0 }}>
+                {DAYS.map((d, i) => (
+                  <div key={d} style={{ padding: '10px 0', textAlign: 'center', fontSize: 11, fontWeight: 700, color: i===0||i===6 ? '#ef4444' : '#475569', letterSpacing: '.06em' }}>{d}</div>
                 ))}
               </div>
-              {/* Cells */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', flex: 1, alignContent: 'start' }}>
-                {cells.map((day, i) => {
-                  if (!day) return <div key={'e' + i} style={{ minHeight: 110, borderRight: '1px solid var(--br)', borderBottom: '1px solid var(--br)', background: 'rgba(0,0,0,.15)' }} />
-                  const ds = dateStr(day)
-                  const evs = eventsOn(ds)
-                  const isToday = ds === todayStr
-                  const isWeekend = new Date(year, month, day).getDay() % 6 === 0
-                  const isSelected = selectedDay === day
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gridAutoRows: 'minmax(110px,1fr)', flex: 1 }}>
+                {getMonthDays().map((date, i) => {
+                  const dayEvs = date ? eventsForDay(date) : []
+                  const today = date && isToday(date)
                   return (
-                    <div key={day}
-                      onClick={() => setSelectedDay(isSelected ? null : day)}
-                      onDoubleClick={() => openNew(ds)}
-                      style={{
-                        ...S.cell(ds, isWeekend),
-                        outline: isSelected ? '2px solid var(--blue)' : 'none',
-                        outlineOffset: -1,
-                      }}
-                    >
-                      {/* Day number */}
-                      <div style={{
-                        width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 13, fontWeight: isToday ? 800 : 400, marginBottom: 3,
-                        background: isToday ? 'var(--blue)' : 'transparent',
-                        color: isToday ? '#fff' : isWeekend ? 'var(--t3)' : 'var(--t2)',
-                      }}>{day}</div>
-
-                      {/* Events */}
-                      {evs.slice(0, 3).map((ev, idx) => (
-                        <div key={ev.id || idx}
-                          onClick={e => { e.stopPropagation(); setDetailEv(ev); setSelectedDay(day) }}
-                          style={{
-                            fontSize: 10, fontWeight: 600, padding: '2px 5px', borderRadius: 4, marginBottom: 2,
-                            background: COLORS[ev.color || 'bb'] + '28', color: COLORS[ev.color || 'bb'],
-                            borderLeft: `2px solid ${COLORS[ev.color || 'bb']}`,
-                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                            cursor: 'pointer',
-                          }}>
-                          {ev.time ? fmtTime(ev.time) + ' ' : ''}{ev._isDl ? '⏰ ' : ''}{ev.title}
-                        </div>
-                      ))}
-                      {evs.length > 3 && <div style={{ fontSize: 9, color: 'var(--t3)', fontWeight: 600, paddingLeft: 4 }}>+{evs.length - 3} more</div>}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* WEEK VIEW */}
-          {view === 'week' && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', borderBottom: '1px solid var(--br)', background: 'var(--sf)', flexShrink: 0 }}>
-                {weekDays.map((d, i) => {
-                  const ds = d.toISOString().slice(0, 10)
-                  const isToday = ds === todayStr
-                  return (
-                    <div key={i} onClick={() => openNew(ds)} style={{ padding: '10px 0', textAlign: 'center', cursor: 'pointer', borderRight: '1px solid var(--br)' }}>
-                      <div style={{ fontSize: 10, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{DAYS_SHORT[i]}</div>
-                      <div style={{
-                        width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        margin: '4px auto 0', fontSize: 15, fontWeight: isToday ? 800 : 500,
-                        background: isToday ? 'var(--blue)' : 'transparent',
-                        color: isToday ? '#fff' : 'var(--tx)'
-                      }}>{d.getDate()}</div>
-                    </div>
-                  )
-                })}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', flex: 1, overflow: 'auto' }}>
-                {weekDays.map((d, i) => {
-                  const ds = d.toISOString().slice(0, 10)
-                  const evs = eventsOn(ds)
-                  return (
-                    <div key={i} onDoubleClick={() => openNew(ds)} style={{
-                      borderRight: '1px solid var(--br)', padding: '8px 5px', minHeight: 200,
-                      background: ds === todayStr ? 'rgba(26,127,212,.07)' : 'var(--bg)',
-                    }}>
-                      {evs.map((ev, idx) => (
-                        <div key={ev.id || idx} onClick={() => setDetailEv(ev)} style={{
-                          fontSize: 11, fontWeight: 600, padding: '4px 7px', borderRadius: 5, marginBottom: 4,
-                          background: COLORS[ev.color || 'bb'] + '28', color: COLORS[ev.color || 'bb'],
-                          borderLeft: `3px solid ${COLORS[ev.color || 'bb']}`, cursor: 'pointer',
-                        }}>
-                          {ev.time ? <span style={{ opacity: .7, fontSize: 10 }}>{fmtTime(ev.time)}<br /></span> : null}
-                          {ev.title}
-                        </div>
-                      ))}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* LIST VIEW */}
-          {view === 'list' && (
-            <div style={{ flex: 1, overflow: 'auto' }}>
-              {allItems.length === 0 ? (
-                <div style={{ padding: 40, textAlign: 'center', color: 'var(--t3)', fontSize: 14 }}>No upcoming events or deadlines.</div>
-              ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                  <thead style={{ position: 'sticky', top: 0, background: 'var(--sf)', zIndex: 1 }}>
-                    <tr>
-                      {['Date', 'Time', 'Event', 'Client', 'Type', 'Rep', ''].map(h => (
-                        <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', borderBottom: '1px solid var(--br)' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {allItems.map((ev, i) => (
-                      <tr key={ev.id || i}
-                        onClick={() => setDetailEv(ev)}
-                        style={{ borderBottom: '1px solid var(--br)', cursor: 'pointer' }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'var(--s2)'}
-                        onMouseLeave={e => e.currentTarget.style.background = ''}
-                      >
-                        <td style={{ padding: '10px 14px', fontWeight: 600, color: ev.date === todayStr ? 'var(--blue)' : 'var(--tx)' }}>
-                          {ev.date === todayStr ? 'Today' : new Date(ev.date + 'T12:00').toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
-                        </td>
-                        <td style={{ padding: '10px 14px', color: 'var(--t2)', fontSize: 12 }}>{ev.time ? fmtTime(ev.time) : '—'}</td>
-                        <td style={{ padding: '10px 14px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ width: 10, height: 10, borderRadius: '50%', background: COLORS[ev.color || 'bb'], flexShrink: 0 }} />
-                            <span style={{ fontWeight: 600 }}>{ev.title}</span>
-                            {ev._type === 'deadline' && <span className="bdg br" style={{ fontSize: 9 }}>Deadline</span>}
+                    <div key={i} onClick={e => date && openDayMenu(date, e)} onDoubleClick={() => date && openNewForm(date)}
+                      style={{ border: '1px solid #1e293b', background: today ? 'rgba(74,222,128,.04)' : '#0a0f1a', padding: 6, cursor: date ? 'pointer' : 'default', overflow: 'hidden' }}
+                      onMouseEnter={e => { if (date) e.currentTarget.style.background = today ? 'rgba(74,222,128,.07)' : 'rgba(255,255,255,.02)' }}
+                      onMouseLeave={e => { if (date) e.currentTarget.style.background = today ? 'rgba(74,222,128,.04)' : '#0a0f1a' }}>
+                      {date && (
+                        <>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <span style={{ fontSize: 13, fontWeight: today ? 800 : 500, color: today ? '#fff' : date.getMonth() !== currentDate.getMonth() ? '#334155' : '#f1f5f9', background: today ? '#16a34a' : 'transparent', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{date.getDate()}</span>
+                            {dayEvs.length > 0 && <span style={{ fontSize: 10, color: '#64748b', fontWeight: 600 }}>{dayEvs.length}</span>}
                           </div>
-                        </td>
-                        <td style={{ padding: '10px 14px', color: 'var(--t2)' }}>{ev.clientName || '—'}</td>
-                        <td style={{ padding: '10px 14px', color: 'var(--t3)', fontSize: 11 }}>{ev.eventType || ev._type || '—'}</td>
-                        <td style={{ padding: '10px 14px', color: 'var(--t3)', fontSize: 11 }}>{ev.assignedTo || '—'}</td>
-                        <td style={{ padding: '10px 14px' }}>
-                          {!ev._isDl && ev._type !== 'deadline' && (
-                            <div style={{ display: 'flex', gap: 5 }}>
-                              <button className="btn sec" style={{ fontSize: 10, padding: '3px 8px' }} onClick={e => { e.stopPropagation(); openEdit(ev) }}>Edit</button>
-                              <button className="btn del" style={{ fontSize: 10, padding: '3px 8px' }} onClick={e => { e.stopPropagation(); del(ev.id) }}>Del</button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* ── Right sidebar ── */}
-        <div style={{ width: 260, flexShrink: 0, borderLeft: '1px solid var(--br)', background: 'var(--sf)', overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-
-          {/* Event detail panel */}
-          {detailEv ? (
-            <div style={{ padding: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)' }}>Event Details</div>
-                <button onClick={() => setDetailEv(null)} style={{ background: 'none', border: 'none', color: 'var(--t3)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
+                          {dayEvs.slice(0, 3).map((ev, j) => <EventPill key={ev.id||j} ev={ev} onClick={() => setSelectedEvent(ev)} />)}
+                          {dayEvs.length > 3 && <p style={{ margin: '2px 0 0', fontSize: 10, color: '#64748b', fontWeight: 600 }}>+{dayEvs.length-3} more</p>}
+                        </>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                <div style={{ width: 10, height: 10, borderRadius: '50%', background: COLORS[detailEv.color || 'bb'], flexShrink: 0 }} />
-                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--tx)' }}>{detailEv.title}</div>
-              </div>
-              {[
-                ['Date', detailEv.date ? new Date(detailEv.date + 'T12:00').toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }) : null],
-                ['Time', detailEv.time ? fmtTime(detailEv.time) + (detailEv.endTime ? ' – ' + fmtTime(detailEv.endTime) : '') : null],
-                ['Type', detailEv.eventType],
-                ['Client', detailEv.clientName],
-                ['Assigned', detailEv.assignedTo],
-                ['Notes', detailEv.notes],
-              ].filter(([, v]) => v).map(([label, val]) => (
-                <div key={label} style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 2 }}>{label}</div>
-                  <div style={{ fontSize: 13, color: 'var(--tx)', lineHeight: 1.5 }}>{val}</div>
-                </div>
-              ))}
-              {!detailEv._isDl && (
-                <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                  <button className="btn pri" style={{ flex: 1, justifyContent: 'center', fontSize: 12 }} onClick={() => openEdit(detailEv)}>✏️ Edit</button>
-                  <button className="btn del" style={{ flex: 1, justifyContent: 'center', fontSize: 12 }} onClick={() => del(detailEv.id)}>🗑 Delete</button>
-                </div>
-              )}
             </div>
-          ) : (
-            <>
-              {/* Legend */}
-              <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--br)' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 10 }}>Legend</div>
-                {[['bb', 'Call / Meeting'], ['bg', 'Completed'], ['ba', 'Warning / Deadline'], ['br', 'IRS / Urgent'], ['bv', 'Court / Hearing']].map(([c, l]) => (
-                  <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 12 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: COLORS[c], flexShrink: 0 }} />
-                    <span style={{ color: 'var(--t2)' }}>{l}</span>
+          ) : view === 'week' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '56px repeat(7,1fr)', background: '#0d1526', borderBottom: '1px solid #1e293b', flexShrink: 0 }}>
+                <div style={{ borderRight: '1px solid #1e293b' }} />
+                {getWeekDays().map((date, i) => (
+                  <div key={i} onClick={e => openDayMenu(date, e)} style={{ padding: '10px 8px', textAlign: 'center', borderLeft: i > 0 ? '1px solid #1e293b' : 'none', cursor: 'pointer' }}>
+                    <p style={{ margin: 0, fontSize: 10, fontWeight: 700, color: i===0||i===6 ? '#ef4444' : '#475569', letterSpacing: '.06em' }}>{DAYS[i]}</p>
+                    <span style={{ fontSize: 18, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: '50%', marginTop: 2, background: isToday(date) ? '#16a34a' : 'transparent', color: isToday(date) ? '#fff' : '#f1f5f9' }}>{date.getDate()}</span>
                   </div>
                 ))}
               </div>
+              <div style={{ flex: 1, overflowY: 'auto' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '56px repeat(7,1fr)' }}>
+                  {Array.from({ length: 15 }, (_, h) => h + 6).map(hour => (
+                    <div key={hour} style={{ display: 'contents' }}>
+                      <div style={{ padding: '0 8px', height: 60, borderRight: '1px solid #1e293b', borderBottom: '1px solid rgba(30,41,59,.5)', display: 'flex', alignItems: 'flex-start', paddingTop: 4 }}>
+                        <span style={{ fontSize: 10, color: '#334155', fontWeight: 600, whiteSpace: 'nowrap' }}>{hour === 12 ? '12 PM' : hour < 12 ? `${hour} AM` : `${hour-12} PM`}</span>
+                      </div>
+                      {getWeekDays().map((date, di) => {
+                        const slotEvs = eventsForDay(date).filter(ev => {
+                          if (!ev.time) return false
+                          const [h] = ev.time.split(':').map(Number)
+                          return h === hour
+                        })
+                        return (
+                          <div key={di} style={{ height: 60, borderLeft: '1px solid #1e293b', borderBottom: '1px solid rgba(30,41,59,.5)', padding: '2px 4px' }}
+                            onDoubleClick={() => openNewForm(date, hour)}>
+                            {slotEvs.map((ev, j) => <EventPill key={ev.id||j} ev={ev} onClick={() => setSelectedEvent(ev)} />)}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            // DAY VIEW
+            <div style={{ padding: 24 }}>
+              <h2 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 700, color: '#f1f5f9' }}>
+                {currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+              </h2>
+              {eventsForDay(currentDate).length === 0 ? (
+                <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: '3rem', textAlign: 'center' }}>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>📅</div>
+                  <p style={{ margin: 0, fontSize: 14, color: '#475569' }}>No events scheduled</p>
+                  <button onClick={() => openNewForm(currentDate)} style={{ marginTop: 16, padding: '8px 20px', background: '#16a34a', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>+ Add Event</button>
+                </div>
+              ) : eventsForDay(currentDate).map((ev, i) => {
+                const sc = scOf(ev)
+                return (
+                  <div key={i} onClick={() => setSelectedEvent(ev)} style={{ background: sc.bg, borderLeft: `4px solid ${sc.border}`, borderRadius: 10, padding: '14px 16px', marginBottom: 10, cursor: 'pointer' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div>
+                        {ev.time && <p style={{ margin: '0 0 4px', fontSize: 12, color: sc.text, opacity: .8, fontWeight: 600 }}>{fmtTime(ev.time)}</p>}
+                        <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: sc.text }}>{ev.clientName || ev.title}</p>
+                        {ev.clientName && ev.title !== ev.clientName && <p style={{ margin: '2px 0 0', fontSize: 13, color: sc.text, opacity: .8 }}>{ev.title}</p>}
+                        {ev.notes && <p style={{ margin: '6px 0 0', fontSize: 12, color: sc.text, opacity: .6 }}>{ev.notes}</p>}
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 700, background: `${sc.border}33`, color: sc.text, padding: '4px 10px', borderRadius: 99, textTransform: 'capitalize', whiteSpace: 'nowrap' }}>{(ev.status || 'scheduled').replace('_',' ')}</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
 
-              {/* Upcoming */}
-              <div style={{ padding: '14px 16px', flex: 1, overflow: 'auto' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 12 }}>Upcoming</div>
-                {allItems.length === 0 ? (
-                  <div style={{ fontSize: 12, color: 'var(--t3)' }}>No upcoming events.</div>
-                ) : allItems.slice(0, 15).map((ev, i) => {
-                  const isToday = ev.date === todayStr
-                  const isTomorrow = ev.date === new Date(today.getTime() + 86400000).toISOString().slice(0, 10)
-                  const label = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : new Date(ev.date + 'T12:00').toLocaleDateString([], { month: 'short', day: 'numeric' })
+      {/* ── UPCOMING DEADLINES SIDEBAR ── */}
+      {showUnscheduled && (
+        <div style={{ width: 270, background: '#0d1526', borderLeft: '1px solid #1e293b', display: 'flex', flexDirection: 'column', flexShrink: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid #1e293b', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#f1f5f9' }}>Upcoming Deadlines</h3>
+              <p style={{ margin: 0, fontSize: 11, color: '#475569' }}>{deadlines.length} active</p>
+            </div>
+            <button onClick={() => setShowUnscheduled(false)} style={{ background: 'none', border: 'none', color: '#475569', fontSize: 18, cursor: 'pointer' }}>×</button>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
+            {deadlines.length === 0 ? (
+              <div style={{ padding: '2rem', textAlign: 'center' }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+                <p style={{ margin: 0, fontSize: 13, color: '#475569' }}>No active deadlines</p>
+              </div>
+            ) : deadlines.map((d, i) => {
+              const dl = Math.ceil((new Date(d.dueDate) - new Date()) / 86400000)
+              const overdue = dl < 0, urgent = dl >= 0 && dl <= 7
+              return (
+                <div key={i} style={{ background: '#0f172a', border: `1px solid ${overdue ? '#ef4444' : urgent ? '#d97706' : '#1e293b'}`, borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
+                  <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 600, color: '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.title}</p>
+                  <p style={{ margin: '0 0 6px', fontSize: 11, color: '#64748b' }}>{d.clientName || ''}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 11, color: '#64748b' }}>{d.dueDate}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: overdue ? '#fca5a5' : urgent ? '#fbbf24' : '#4ade80' }}>
+                      {overdue ? 'OVERDUE' : dl === 0 ? 'TODAY' : `${dl}d left`}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── DAY CONTEXT MENU ── */}
+      {dayMenuPos && dayMenuDate && (
+        <>
+          <div onClick={() => { setDayMenuPos(null); setDayMenuDate(null) }} style={{ position: 'fixed', inset: 0, zIndex: 498 }} />
+          <div style={{ position: 'fixed', left: dayMenuPos.x, top: dayMenuPos.y, background: '#0d1526', border: '1px solid #1e293b', borderRadius: 12, padding: 8, zIndex: 499, minWidth: 240, boxShadow: '0 12px 40px rgba(0,0,0,.6)' }}>
+            <div style={{ padding: '6px 10px 10px', borderBottom: '1px solid #1e293b', marginBottom: 6 }}>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#f1f5f9' }}>
+                {dayMenuDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+              </p>
+            </div>
+            {[
+              { icon: '📅', label: 'New Event',      action: () => openNewForm(dayMenuDate, dayMenuDate.getHours() || 9) },
+              { icon: '📆', label: 'View Day',       action: () => { setCurrentDate(dayMenuDate); setView('day'); setDayMenuPos(null) } },
+              { icon: '📍', label: 'Map Route',      action: () => {
+                const addrs = eventsForDay(dayMenuDate).map(ev => {
+                  const c = clients.find(cl => cl.name === ev.clientName)
+                  return c ? c.address : null
+                }).filter(Boolean)
+                if (addrs.length) window.open(`https://www.google.com/maps/dir/${addrs.map(a => encodeURIComponent(a)).join('/')}`, '_blank')
+                else showToast('No client addresses found')
+                setDayMenuPos(null)
+              }},
+            ].map(item => (
+              <button key={item.label} onClick={item.action} style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '10px 12px', background: 'none', border: 'none', borderRadius: 8, color: '#cbd5e1', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.06)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>{item.icon}</span>
+                <span style={{ fontWeight: 500 }}>{item.label}</span>
+              </button>
+            ))}
+            {eventsForDay(dayMenuDate).length > 0 && (
+              <div style={{ borderTop: '1px solid #1e293b', marginTop: 6, paddingTop: 8, maxHeight: 180, overflowY: 'auto' }}>
+                <p style={{ margin: '0 0 6px 10px', fontSize: 10, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                  {eventsForDay(dayMenuDate).length} scheduled
+                </p>
+                {eventsForDay(dayMenuDate).map((ev, i) => {
+                  const sc = scOf(ev)
                   return (
-                    <div key={ev.id || i} onClick={() => setDetailEv(ev)} style={{ display: 'flex', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--br)', cursor: 'pointer', alignItems: 'flex-start' }}>
-                      <div style={{ width: 3, borderRadius: 3, alignSelf: 'stretch', minHeight: 32, background: COLORS[ev.color || 'bb'], flexShrink: 0 }} />
+                    <div key={i} onClick={() => { setSelectedEvent(ev); setDayMenuPos(null) }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 6, marginBottom: 2, cursor: 'pointer' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.04)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: sc.border, flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.title}</div>
-                        <div style={{ fontSize: 11, color: 'var(--t3)', display: 'flex', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
-                          <span style={{ fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--blue)' : 'var(--t3)' }}>{label}</span>
-                          {ev.time && <span>{fmtTime(ev.time)}</span>}
-                          {ev.clientName && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>· {ev.clientName}</span>}
-                        </div>
+                        <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: sc.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.clientName || ev.title}</p>
+                        {ev.time && <p style={{ margin: 0, fontSize: 10, color: '#475569' }}>{fmtTime(ev.time)}</p>}
                       </div>
                     </div>
                   )
                 })}
               </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* ── Selected day detail strip (month view) ── */}
-      {view === 'month' && selectedDay && eventsOn(dateStr(selectedDay)).length > 0 && !detailEv && (
-        <div style={{ borderTop: '1px solid var(--br)', background: 'var(--sf)', padding: '10px 20px', flexShrink: 0, maxHeight: 160, overflow: 'auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)' }}>
-              {MONTHS[month]} {selectedDay} — {eventsOn(dateStr(selectedDay)).length} event(s)
-            </span>
-            <button className="btn pri" style={{ fontSize: 11, padding: '3px 10px' }} onClick={() => openNew(dateStr(selectedDay))}>+ Add</button>
+            )}
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {eventsOn(dateStr(selectedDay)).map((ev, i) => (
-              <div key={ev.id || i} onClick={() => setDetailEv(ev)} style={{
-                padding: '5px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                background: COLORS[ev.color || 'bb'] + '22', color: COLORS[ev.color || 'bb'],
-                border: `1px solid ${COLORS[ev.color || 'bb']}44`, display: 'flex', alignItems: 'center', gap: 6
-              }}>
-                {ev.time ? fmtTime(ev.time) + ' · ' : ''}{ev.title}
-              </div>
-            ))}
-          </div>
-        </div>
+        </>
       )}
 
-      {/* ── Event Modal ── */}
-      {modal && (
-        <div className="modal-bg open" onClick={e => e.target === e.currentTarget && (setModal(false), setEditId(null))}>
-          <div className="modal" style={{ width: 540 }}>
-            <div className="mh">
-              <span className="mt">{editId ? '✏️ Edit Event' : '+ New Event'}</span>
-              <button className="xbtn" onClick={() => { setModal(false); setEditId(null) }}>&times;</button>
+      {/* ── ADD/EDIT EVENT MODAL ── */}
+      {showForm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: '#0d1526', border: '1px solid #1e293b', borderRadius: 16, padding: 28, width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#f1f5f9' }}>{form.id ? '✏️ Edit Event' : '+ New Event'}</h2>
+              <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', color: '#475569', fontSize: 22, cursor: 'pointer' }}>×</button>
             </div>
-            <div className="field"><label>Event Title *</label>
-              <input value={form.title} onChange={e => fld('title', e.target.value)} placeholder="e.g. IRS Call — John Smith" autoFocus />
-            </div>
-            <div className="fg2">
-              <div className="field"><label>Event Type</label>
-                <select value={form.eventType} onChange={e => fld('eventType', e.target.value)}>
-                  {EVENT_TYPES.map(t => <option key={t}>{t}</option>)}
-                </select>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div><label style={lbl}>Title *</label>
+                <input style={inp} value={form.title} onChange={e => fld('title', e.target.value)} autoFocus />
               </div>
-              <div className="field"><label>Color</label>
-                <select value={form.color || 'bb'} onChange={e => fld('color', e.target.value)}>
-                  {COLOR_OPTS.map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
-                </select>
+              <div><label style={lbl}>Client</label>
+                <input style={inp} value={form.clientName} onChange={e => fld('clientName', e.target.value)} list="cal-clients" placeholder="Search client..." />
+                <datalist id="cal-clients">{clients.map(c => <option key={c.id} value={c.name} />)}</datalist>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div><label style={lbl}>Date *</label>
+                  <input type="date" style={inp} value={form.date} onChange={e => fld('date', e.target.value)} />
+                </div>
+                <div><label style={lbl}>Start Time</label>
+                  <input type="time" style={inp} value={form.time} onChange={e => fld('time', e.target.value)} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div><label style={lbl}>End Time</label>
+                  <input type="time" style={inp} value={form.endTime} onChange={e => fld('endTime', e.target.value)} />
+                </div>
+                <div><label style={lbl}>Assigned To</label>
+                  <select style={inp} value={form.assignedTo} onChange={e => fld('assignedTo', e.target.value)}>
+                    <option value="">— Anyone —</option>
+                    {employees.map(em => <option key={em.id} value={em.name}>{em.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div><label style={lbl}>Event Type</label>
+                  <select style={inp} value={form.eventType} onChange={e => fld('eventType', e.target.value)}>
+                    {['Consultation Call','Client Meeting','IRS Call','IRS Appointment','Court Date','Hearing','Deadline','Follow-up Call','Document Due','Payment Due','Team Meeting','Other'].map(t => <option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div><label style={lbl}>Status</label>
+                  <select style={inp} value={form.status} onChange={e => fld('status', e.target.value)}>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+              </div>
+              <div><label style={lbl}>Notes</label>
+                <textarea style={{ ...inp, height: 70, resize: 'vertical' }} value={form.notes} onChange={e => fld('notes', e.target.value)} />
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 8, justifyContent: 'flex-end' }}>
+                <button onClick={() => setShowForm(false)} style={{ padding: '10px 20px', background: 'transparent', border: '1px solid #1e293b', borderRadius: 9, color: '#64748b', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+                <button onClick={saveEvent} disabled={saving} style={{ padding: '10px 28px', background: '#16a34a', border: 'none', borderRadius: 9, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {saving ? 'Saving…' : form.id ? 'Update Event' : 'Save Event'}
+                </button>
               </div>
             </div>
-            <div className="fg2">
-              <div className="field"><label>Date *</label><input type="date" value={form.date} onChange={e => fld('date', e.target.value)} /></div>
-              <div className="field"><label>Start Time</label><input type="time" value={form.time || ''} onChange={e => fld('time', e.target.value)} /></div>
-            </div>
-            <div className="field"><label>End Time (optional)</label>
-              <input type="time" value={form.endTime || ''} onChange={e => fld('endTime', e.target.value)} />
-            </div>
-            <div className="field" style={{ position: 'relative' }}>
-              <label>Client (optional)</label>
-              <input value={form.clientName || ''} onChange={e => {
-                fld('clientName', e.target.value)
-                const m = clients.filter(c => c.name.toLowerCase().includes(e.target.value.toLowerCase())).slice(0, 5)
-                setSug(m); setShowSug(m.length > 0 && e.target.value.length > 1)
-              }} placeholder="Search client…" autoComplete="off" onBlur={() => setTimeout(() => setShowSug(false), 150)} />
-              {showSug && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--s3)', border: '1px solid var(--br)', borderRadius: 7, zIndex: 500 }}>
-                {sug.map(c => <div key={c.id} onClick={() => { fld('clientName', c.name); setShowSug(false) }} style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13 }}>{c.name}</div>)}
-              </div>}
-            </div>
-            <div className="fg2">
-              <div className="field"><label>Assigned To</label>
-                <select value={form.assignedTo || ''} onChange={e => fld('assignedTo', e.target.value)}>
-                  <option value="">— Anyone —</option>
-                  {reps.map(r => <option key={r}>{r}</option>)}
-                </select>
-              </div>
-              <div className="field"><label>Recurring</label>
-                <select value={form.recurring || 'none'} onChange={e => fld('recurring', e.target.value)}>
-                  {['none', 'daily', 'weekly', 'biweekly', 'monthly'].map(r => <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="field"><label>Notes</label>
-              <textarea value={form.notes || ''} onChange={e => fld('notes', e.target.value)} rows={2} />
-            </div>
-            <button className="btn pri" style={{ width: '100%', justifyContent: 'center', padding: 10 }} onClick={save} disabled={saving}>
-              {saving ? 'Saving…' : editId ? '✅ Update Event' : '✅ Add Event'}
-            </button>
           </div>
         </div>
       )}
