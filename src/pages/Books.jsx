@@ -39,7 +39,7 @@ export default function Books() {
     setLoading(true)
     let q = supabase.from('bookkeeping').select('*').order('date', { ascending: false })
     if (year) q = q.gte('date', `${year}-01-01`).lte('date', `${year}-12-31`)
-    if (clientFilter) q = q.ilike('client_name', `%${clientFilter}%`)
+    if (clientFilter) q = q.eq('client_name', clientFilter)
     const { data, error } = await q
     if (error) showToast(error.message, 'err')
     setEntries(data || [])
@@ -104,9 +104,9 @@ export default function Books() {
       <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20, flexWrap:'wrap' }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           {clientParam && (
-            <button className="btn" onClick={() => navigate(-1)} style={{ display:'flex', alignItems:'center', gap:6 }}>
+            <button className="btn" onClick={() => navigate('/clients')} style={{ display:'flex', alignItems:'center', gap:6 }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-              Back to {clientParam}
+              ← Back to {clientParam}
             </button>
           )}
           <div>
