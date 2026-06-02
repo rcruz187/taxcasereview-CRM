@@ -41,6 +41,26 @@ function RequireAuth({ children }) {
   return children
 }
 
+// Blocks a route if the user doesn't have view permission for that section
+function Guard({ section, children }) {
+  const { can } = useApp()
+  if (!can('view', section)) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        height: '60vh', gap: 12, color: 'var(--t3)'
+      }}>
+        <div style={{ fontSize: 40 }}>🔒</div>
+        <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--tx)' }}>Access Restricted</div>
+        <div style={{ fontSize: 13 }}>You don't have permission to view this page.</div>
+        <div style={{ fontSize: 12 }}>Contact Romy Cruz to request access.</div>
+      </div>
+    )
+  }
+  return children
+}
+
 function Shell() {
   const { openModal } = useApp()
 
@@ -71,32 +91,32 @@ function Shell() {
         <div className="page-content">
           <Routes>
             <Route path="/"            element={<Dashboard />} />
-            <Route path="/leads"       element={<Leads />} />
-            <Route path="/clients"     element={<Clients />} />
-            <Route path="/clients/:id" element={<Clients />} />
-            <Route path="/cases"       element={<Cases />} />
-            <Route path="/cases/:id"   element={<Cases />} />
-            <Route path="/tasks"       element={<Tasks />} />
-            <Route path="/calendar"    element={<Calendar />} />
-            <Route path="/transcripts" element={<Transcripts />} />
-            <Route path="/irsforms"    element={<IrsForms />} />
-            <Route path="/taxreturns"  element={<TaxReturns />} />
-            <Route path="/taxreturns/:id" element={<TaxReturns />} />
-            <Route path="/deadlines"   element={<Deadlines />} />
-            <Route path="/estimates"   element={<Estimates />} />
-            <Route path="/invoices"    element={<Invoices />} />
-            <Route path="/payments"    element={<Payments />} />
-            <Route path="/sms"         element={<Sms />} />
-            <Route path="/email"       element={<Email />} />
-            <Route path="/documents"   element={<Documents />} />
-            <Route path="/esign"       element={<Esign />} />
-            <Route path="/timeclock"   element={<TimeClock />} />
-            <Route path="/payroll"     element={<Payroll />} />
-            <Route path="/employees"   element={<Employees />} />
-            <Route path="/reports"     element={<Reports />} />
-            <Route path="/settings"    element={<Settings />} />
-            <Route path="/dialer"      element={<Dialer />} />
-            <Route path="/chat"        element={<Chat />} />
+            <Route path="/leads"       element={<Guard section="leads"><Leads /></Guard>} />
+            <Route path="/clients"     element={<Guard section="clients"><Clients /></Guard>} />
+            <Route path="/clients/:id" element={<Guard section="clients"><Clients /></Guard>} />
+            <Route path="/cases"       element={<Guard section="cases"><Cases /></Guard>} />
+            <Route path="/cases/:id"   element={<Guard section="cases"><Cases /></Guard>} />
+            <Route path="/tasks"       element={<Guard section="tasks"><Tasks /></Guard>} />
+            <Route path="/calendar"    element={<Guard section="calendar"><Calendar /></Guard>} />
+            <Route path="/transcripts" element={<Guard section="transcripts"><Transcripts /></Guard>} />
+            <Route path="/irsforms"    element={<Guard section="irsforms"><IrsForms /></Guard>} />
+            <Route path="/taxreturns"  element={<Guard section="taxreturns"><TaxReturns /></Guard>} />
+            <Route path="/taxreturns/:id" element={<Guard section="taxreturns"><TaxReturns /></Guard>} />
+            <Route path="/deadlines"   element={<Guard section="deadlines"><Deadlines /></Guard>} />
+            <Route path="/estimates"   element={<Guard section="estimates"><Estimates /></Guard>} />
+            <Route path="/invoices"    element={<Guard section="invoices"><Invoices /></Guard>} />
+            <Route path="/payments"    element={<Guard section="payments"><Payments /></Guard>} />
+            <Route path="/sms"         element={<Guard section="sms"><Sms /></Guard>} />
+            <Route path="/email"       element={<Guard section="email"><Email /></Guard>} />
+            <Route path="/documents"   element={<Guard section="documents"><Documents /></Guard>} />
+            <Route path="/esign"       element={<Guard section="esign"><Esign /></Guard>} />
+            <Route path="/timeclock"   element={<Guard section="timeclock"><TimeClock /></Guard>} />
+            <Route path="/payroll"     element={<Guard section="payroll"><Payroll /></Guard>} />
+            <Route path="/employees"   element={<Guard section="employees"><Employees /></Guard>} />
+            <Route path="/reports"     element={<Guard section="reports"><Reports /></Guard>} />
+            <Route path="/settings"    element={<Guard section="settings"><Settings /></Guard>} />
+            <Route path="/dialer"      element={<Guard section="dialer"><Dialer /></Guard>} />
+            <Route path="/chat"        element={<Guard section="chat"><Chat /></Guard>} />
             <Route path="*"            element={<Navigate to="/" />} />
           </Routes>
         </div>
