@@ -9,7 +9,7 @@ const TEMPLATES = [
   { label:'Welcome Text',         body:'Hi {name}, welcome to Tax Case Review! Your dedicated rep will be in touch soon. Questions? Call or text us anytime.' },
 ]
 
-const BLANK = { to:'', clientName:'', body:'', status:'Sent' }
+const BLANK = { phone:'', clientName:'', body:'', status:'Sent' }
 
 export default function Sms() {
   const [sent,    setSent]    = useState([])
@@ -85,7 +85,7 @@ export default function Sms() {
               {sug.length>0&&(
                 <div style={{position:'absolute',top:'100%',left:0,right:0,background:'var(--s3)',border:'1px solid var(--b2c)',borderRadius:7,zIndex:500}}>
                   {sug.map(c=>(
-                    <div key={c.id} onClick={()=>{fld('clientName',c.name);fld('to',c.phone||'');setSug([])}} style={{padding:'7px 12px',cursor:'pointer',fontSize:13}}>
+                    <div key={c.id} onClick={()=>{fld('clientName',c.name);fld('phone',c.phone||'');setSug([])}} style={{padding:'7px 12px',cursor:'pointer',fontSize:13}}>
                       <div style={{fontWeight:600}}>{c.name}</div>
                       {c.phone&&<div style={{fontSize:11,color:'var(--t3)'}}>{c.phone}</div>}
                     </div>
@@ -93,7 +93,7 @@ export default function Sms() {
                 </div>
               )}
             </div>
-            <div className="field"><label>To (Phone #)</label><input value={form.to} onChange={e=>fld('to',e.target.value)} placeholder="(305) 555-0000"/></div>
+            <div className="field"><label>To (Phone #)</label><input value={form.phone} onChange={e=>fld('phone',e.target.value)} placeholder="(305) 555-0000"/></div>
             <div className="field">
               <label style={{display:'flex',justifyContent:'space-between'}}>
                 <span>Message *</span>
@@ -133,7 +133,7 @@ export default function Sms() {
                   :sent.map(s=>(
                     <tr key={s.id}>
                       <td style={{fontWeight:600}}>{s.clientName}</td>
-                      <td style={{fontSize:12,color:'var(--t2)'}}>{s.to||'—'}</td>
+                      <td style={{fontSize:12,color:'var(--t2)'}}>{s.phone||'—'}</td>
                       <td style={{fontSize:12,maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.body}</td>
                       <td style={{fontSize:11,color:'var(--t3)'}}>{s.created_at?.slice(0,10)}</td>
                       <td><span className="bdg bg">{s.status||'Sent'}</span></td>

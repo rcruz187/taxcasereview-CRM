@@ -19,6 +19,10 @@ export default function Cases() {
   const [saving,    setSaving]    = useState(false)
   const [toast,     setToast]     = useState('')
   const [detail,    setDetail]    = useState(null)
+  const [caseNotes, setCaseNotes] = useState([])
+  const [newNote, setNewNote]     = useState('')
+  const [addingNote, setAddingNote] = useState(false)
+  const [showAllCaseNotes, setShowAllCaseNotes] = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -33,6 +37,20 @@ export default function Cases() {
     if (em) setEmployees(em)
     const badge = document.getElementById('badge-cases')
     if (badge && cs) badge.textContent = cs.filter(c=>c.status==='Open'||c.status==='Pending IRS').length || ''
+  }
+
+  async function loadCaseNotes(caseId) {
+    const { data } = await supabase.from('case_notes').select('*').eq('case_id', caseId).order('created_at', { ascending: false })
+    setCaseNotes(data || [])
+  }
+
+  async function addCaseNote() {
+    if (!newNote.trim() || !detail) return
+    setAddingNote(true)
+    await supabase.from('case_notes').insert([{ case_id: detail.id, text: newNote.trim(), created_at: new Date().toISOString() }])
+    setAddingNote(false)
+    setNewNote('')
+    loadCaseNotes(detail.id)
   }
 
   function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''),4000) }
@@ -82,6 +100,7 @@ export default function Cases() {
     showToast('Deleted'); setDetail(null); load()
   }
 
+  function openDetail(c) { setDetail(c); loadCaseNotes(c.id) }
   function openEdit(c) { setForm({...BLANK,...c}); setEditCase(c) }
 
   // ── Detail view ──────────────────────────────────────────────────────────────
@@ -152,6 +171,39 @@ export default function Cases() {
           </div>
         </div>
 
+        {/* Case Notes */}
+        <div className="card" style={{marginTop:12}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+            <div style={{fontWeight:700,fontSize:13,color:'var(--tx)'}}>📝 Case Notes</div>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              {caseNotes.length > 3 && <span onClick={()=>setShowAllCaseNotes(s=>!s)} style={{fontSize:11,color:'var(--blue)',cursor:'pointer',fontWeight:600}}>{showAllCaseNotes?'Show less':'View all '+caseNotes.length}</span>}
+              <span style={{fontSize:11,color:'var(--t3)'}}>{caseNotes.length} notes</span>
+            </div>
+          </div>
+          <div style={{display:'flex',gap:6,marginBottom:10}}>
+            <input value={newNote} onChange={e=>setNewNote(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addCaseNote()}
+              placeholder="Add a case note... (Enter to save)"
+              style={{flex:1,padding:'6px 10px',borderRadius:6,border:'1px solid var(--br)',background:'var(--s2)',color:'var(--tx)',fontSize:12}}/>
+            <button className="btn pri" onClick={addCaseNote} disabled={addingNote||!newNote.trim()} style={{padding:'5px 12px',fontSize:12}}>
+              {addingNote?'…':'Add'}
+            </button>
+          </div>
+          {caseNotes.length===0
+            ? <div style={{color:'var(--t3)',fontSize:12,textAlign:'center',padding:'8px 0'}}>No notes yet.</div>
+            : (showAllCaseNotes?caseNotes:caseNotes.slice(0,3)).map((n,i)=>(
+              <div key={n.id||i} style={{display:'flex',gap:8,padding:'6px 0',borderTop:'1px solid var(--br)',alignItems:'flex-start'}}>
+                <span style={{fontSize:14,flexShrink:0}}>📝</span>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:12,color:'var(--tx)',lineHeight:1.5}}>{n.text}</div>
+                  <div style={{fontSize:10,color:'var(--t3)',marginTop:2}}>{n.created_at?new Date(n.created_at).toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):''}</div>
+                </div>
+                <button onClick={async()=>{await supabase.from('case_notes').delete().eq('id',n.id);loadCaseNotes(detail.id)}}
+                  style={{background:'none',border:'none',color:'var(--t3)',cursor:'pointer',fontSize:13,flexShrink:0}}>×</button>
+              </div>
+            ))
+          }
+        </div>
+
         {editCase&&<CaseModal form={form} fld={fld} reps={reps} saving={saving} onSave={saveEdit} onClose={()=>setEditCase(null)} title="Edit Case" clients={clients} sug={sug} searchClient={searchClient} pickClient={pickClient}/>}
       </div>
     )
@@ -178,7 +230,7 @@ export default function Cases() {
               {filtered.length===0
                 ?<tr><td colSpan={8} style={{textAlign:'center',color:'var(--t3)',padding:20}}>No cases yet</td></tr>
                 :filtered.map(c=>(
-                  <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>setDetail(c)}>
+                  <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>openDetail(c)}>
                     <td style={{color:'var(--t2)',fontSize:11}}>{c.caseNum}</td>
                     <td style={{fontWeight:600}}>{c.clientName}</td>
                     <td><span className="bdg bb">{c.caseType}</span></td>
