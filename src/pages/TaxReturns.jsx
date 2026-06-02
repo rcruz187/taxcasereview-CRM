@@ -337,7 +337,7 @@ export default function TaxReturns() {
   ]
 
   return (
-    <div>
+    <div style={{ maxWidth: 900 }}>
       {toast && <div className="toast show">{toast}</div>}
 
       {/* Header */}
@@ -356,31 +356,33 @@ export default function TaxReturns() {
       {/* Client + Meta */}
       <div className="card" style={{ marginBottom: 12 }}>
         <div style={{ fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--t3)', marginBottom: 10 }}>Return Info</div>
-        <div className="fg2">
-          <div className="field">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px', gap: 10, marginBottom: 10 }}>
+          <div className="field" style={{ margin: 0 }}>
             <label>Client *</label>
             <input list="client-list" value={form.clientName} onChange={e => onClientChange(e.target.value)} placeholder="Type client name…"/>
             <datalist id="client-list">{clients.map(c => <option key={c.id} value={c.name}/>)}</datalist>
           </div>
-          <div className="field">
+          <div className="field" style={{ margin: 0 }}>
             <label>Tax Year</label>
             <select value={form.taxYear} onChange={e => fld('taxYear', e.target.value)}>
               {TAX_YEARS.map(y => <option key={y}>{y}</option>)}
             </select>
           </div>
-          <div className="field">
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+          <div className="field" style={{ margin: 0 }}>
             <label>Return Type</label>
             <select value={form.returnType} onChange={e => fld('returnType', e.target.value)}>
               {RETURN_TYPES.map(t => <option key={t}>{t}</option>)}
             </select>
           </div>
-          <div className="field">
+          <div className="field" style={{ margin: 0 }}>
             <label>Filing Status</label>
             <select value={form.filingStatus} onChange={e => fld('filingStatus', e.target.value)}>
               {FILING_STATUSES.map(s => <option key={s}>{s}</option>)}
             </select>
           </div>
-          <div className="field">
+          <div className="field" style={{ margin: 0 }}>
             <label>Assigned To</label>
             <select value={form.assignedTo} onChange={e => fld('assignedTo', e.target.value)}>
               <option value="">— Unassigned —</option>
@@ -671,17 +673,17 @@ export default function TaxReturns() {
             {/* Preparer info card */}
             <div className="card" style={{ marginBottom: 14 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)', marginBottom: 12 }}>🪪 Preparer Credentials</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div className="field"><label>Preparer Name</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12, maxWidth: 600 }}>
+                <div className="field" style={{ margin: 0 }}><label>Preparer Name</label>
                   <input value={preparer.name} onChange={e => setPreparer(p => ({...p, name: e.target.value}))} placeholder="Your name" />
                 </div>
-                <div className="field"><label>PTIN</label>
+                <div className="field" style={{ margin: 0 }}><label>PTIN</label>
                   <input value={preparer.ptin} onChange={e => setPreparer(p => ({...p, ptin: e.target.value}))} placeholder="P00000000" />
                 </div>
-                <div className="field"><label>CAF Number</label>
+                <div className="field" style={{ margin: 0 }}><label>CAF Number</label>
                   <input value={preparer.caf} onChange={e => setPreparer(p => ({...p, caf: e.target.value}))} placeholder="CAF number (for POA/transcripts)" />
                 </div>
-                <div className="field"><label>EFIN (e-file ID)</label>
+                <div className="field" style={{ margin: 0 }}><label>EFIN (e-file ID)</label>
                   <input value={preparer.efin} onChange={e => setPreparer(p => ({...p, efin: e.target.value}))} placeholder="6-digit EFIN" />
                 </div>
               </div>
@@ -959,3 +961,4 @@ Submit to the IRS via IRS-approved e-file software (Drake,
 ProSeries, Lacerte, etc.) using your EFIN after review.
 ===============================================================`
 }
+
