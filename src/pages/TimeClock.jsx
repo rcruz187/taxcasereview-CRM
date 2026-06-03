@@ -93,8 +93,7 @@ export default function TimeClock() {
     const inTime = now2.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
     const date = now2.toISOString().slice(0, 10)
     const { data, error } = await supabase.from('timeentries').insert([{
-      employee: empName, date, inTime, outTime: null, hours: null, notes: null,
-      created_at: now2.toISOString()
+      employee: empName, date, inTime, outTime: null, hours: null, notes: null
     }]).select().single()
     if (error) { showToast('Error: ' + error.message); return }
     setOpenEntries(prev => ({
@@ -113,7 +112,7 @@ export default function TimeClock() {
     const outTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
     const hours = calcHours(entry.inTime, outTime) || '0'
     const { error } = await supabase.from('timeentries').update({
-      outTime, hours: parseFloat(hours), updated_at: new Date().toISOString()
+      outTime, hours: parseFloat(hours)
     }).eq('id', entry.id)
     if (error) { showToast('Error: ' + error.message); return }
     const remaining = entries.slice(0, -1)
@@ -132,7 +131,7 @@ export default function TimeClock() {
     setSaving(true)
     const hours = calcHours(form.inTime, form.outTime) || (form.hours ? parseFloat(form.hours) : null)
     if (editId) {
-      const { error } = await supabase.from('timeentries').update({ ...form, hours, updated_at: new Date().toISOString() }).eq('id', editId)
+      const { error } = await supabase.from('timeentries').update({ employee: form.employee, date: form.date, inTime: form.inTime, outTime: form.outTime, hours, notes: form.notes }).eq('id', editId)
       if (error) { showToast('Error: ' + error.message); setSaving(false); return }
       showToast('✅ Entry updated!')
     } else {
