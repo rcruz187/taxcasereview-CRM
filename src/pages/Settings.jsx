@@ -26,15 +26,46 @@ export default function Settings() {
 
   function applyBrandColor(hex) {
     if (!hex || !hex.startsWith('#')) return
-    document.documentElement.style.setProperty('--blue', hex)
-    // derive a transparent version for badges/borders
-    document.documentElement.style.setProperty('--blt', hex + '22')
-    document.documentElement.style.setProperty('--b2c', hex + '33')
-    // update meta theme-color for mobile browsers
+    const r = parseInt(hex.slice(1,3),16)
+    const g = parseInt(hex.slice(3,5),16)
+    const b = parseInt(hex.slice(5,7),16)
+    const rgb = `${r},${g},${b}`
+    const root = document.documentElement
+    // Primary accent — used everywhere var(--blue) appears
+    root.style.setProperty('--blue', hex)
+    root.style.setProperty('--b2',   hex)
+    // Transparent variants for backgrounds, badges, borders
+    root.style.setProperty('--blt',  `rgba(${rgb},.18)`)
+    root.style.setProperty('--b2c',  `rgba(${rgb},.14)`)
+    // Inject a style tag to override the hardcoded rgba in .nav-item.active
+    // (CSS variables can't override static rgba() values in existing rules)
+    let styleTag = document.getElementById('tcr-brand-override')
+    if (!styleTag) {
+      styleTag = document.createElement('style')
+      styleTag.id = 'tcr-brand-override'
+      document.head.appendChild(styleTag)
+    }
+    styleTag.textContent = `
+      .nav-item.active { background: rgba(${rgb},.18) !important; color: ${hex} !important; border-left-color: ${hex} !important; }
+      .btn.pri { background: ${hex} !important; border-color: ${hex} !important; }
+      .btn.pri:hover { background: ${hex}dd !important; }
+      .bdg.blue, .bdg.bb { background: rgba(${rgb},.18) !important; color: ${hex} !important; }
+      .chip.active, .chip:hover, .chip.on { background: rgba(${rgb},.18) !important; color: ${hex} !important; border-color: ${hex} !important; }
+      .tl-dot.blue { background: ${hex} !important; }
+      .cal-event { background: ${hex} !important; }
+      .cal-day.today { border-color: ${hex} !important; }
+      .field input:focus, .field select:focus, .field textarea:focus { border-color: ${hex} !important; }
+      .search-input:focus { border-color: ${hex} !important; }
+      .metric:hover { border-color: ${hex} !important; }
+      .tab-active, [class*="tab"].active { border-bottom-color: ${hex} !important; color: ${hex} !important; }
+      a { color: ${hex}; }
+    `
+    // Update meta theme-color for mobile browsers
     const meta = document.querySelector('meta[name="theme-color"]')
     if (meta) meta.setAttribute('content', hex)
-    // persist so it survives page refreshes before Supabase loads
+    // Persist so it survives page refreshes
     localStorage.setItem('tcr_brand_color', hex)
+    localStorage.setItem('tcr_brand_rgb', rgb)
   }
 
   async function loadFirm() {
