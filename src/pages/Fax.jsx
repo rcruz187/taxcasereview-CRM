@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
+import { useLocation } from 'react-router-dom'
 
 const BLANK = { to_number:'', from_number:'', client_name:'', subject:'', notes:'' }
 
@@ -17,7 +18,12 @@ export default function Fax() {
   const [logs,     setLogs]     = useState([])
   const [clients,  setClients]  = useState([])
   const [modal,    setModal]    = useState(false)
-  const [form,     setForm]     = useState(BLANK)
+  const location = useLocation()
+  const qp = new URLSearchParams(location.search)
+  const [form, setForm] = useState({...BLANK,
+    client_name: qp.get('client') || '',
+    to_number:   (qp.get('phone') || '').replace(/\D/g,'')
+  })
   const [file,     setFile]     = useState(null)
   const [sending,  setSending]  = useState(false)
   const [toast,    setToast]    = useState('')
