@@ -72,7 +72,39 @@ export function AppProvider({ children }) {
   const [searchQ, setSearchQ]   = useState('')
   const toastTimer = useRef(null)
 
+  function applyBrandColor(hex) {
+    if (!hex || !hex.startsWith('#')) return
+    const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16)
+    const rgb = `${r},${g},${b}`
+    const root = document.documentElement
+    root.style.setProperty('--blue', hex)
+    root.style.setProperty('--b2', hex)
+    root.style.setProperty('--blt', `rgba(${rgb},.18)`)
+    root.style.setProperty('--b2c', `rgba(${rgb},.14)`)
+    localStorage.setItem('tcr_brand_color', hex)
+    localStorage.setItem('tcr_brand_rgb', rgb)
+    let s = document.getElementById('tcr-brand-override')
+    if (!s) { s = document.createElement('style'); s.id = 'tcr-brand-override'; document.head.appendChild(s) }
+    s.textContent = `
+      .nav-item.active { background: rgba(${rgb},.18) !important; color: ${hex} !important; border-left-color: ${hex} !important; }
+      .btn.pri { background: ${hex} !important; border-color: ${hex} !important; }
+      .btn.pri:hover { filter: brightness(1.15) !important; }
+      .bdg.blue, .bdg.bb { background: rgba(${rgb},.18) !important; color: ${hex} !important; }
+      .chip.active, .chip.on { background: rgba(${rgb},.18) !important; color: ${hex} !important; border-color: ${hex} !important; }
+      .cal-event { background: ${hex} !important; }
+      .cal-day.today { border-color: ${hex} !important; }
+    `
+  }
+
+  async function loadBrandColor() {
+    try {
+      const { data } = await supabase.from('settings').select('primary_color').limit(1).maybeSingle()
+      if (data?.primary_color) applyBrandColor(data.primary_color)
+    } catch(e) {}
+  }
+
   useEffect(() => {
+    loadBrandColor()
     supabase.auth.getSession().then(({ data }) => {
       if (data.session?.user) {
         setUser(data.session.user)
@@ -82,7 +114,7 @@ export function AppProvider({ children }) {
     })
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
-      if (session?.user) loadRole(session.user.email)
+      if (session?.user) { loadRole(session.user.email); loadBrandColor() }
       else { setRole('Staff'); setPerms(null) }
     })
     return () => listener.subscription.unsubscribe()
@@ -171,3 +203,4 @@ export const useApp = () => {
   if (!ctx) throw new Error('useApp must be inside AppProvider')
   return ctx
 }
+
