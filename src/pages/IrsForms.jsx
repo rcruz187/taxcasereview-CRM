@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useFirm } from '../lib/useFirm'
 
 const BLANK = { formNumber: '2848', status: 'Not Filed', client: '', caseNum: '', filedDate: '', notes: '' }
 
@@ -23,8 +24,8 @@ function printHeader(title) {
   return `
     <div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #1A7FD4;padding-bottom:16px">
       <img src="${LOGO_URL}" style="height:48px;margin-bottom:8px" onerror="this.style.display='none'"/>
-      <div style="font-size:20px;font-weight:700;color:#1A7FD4">Tax Case Review</div>
-      <div style="font-size:11px;color:#666">238 Evergreen Dr, Lake Park, FL 33403 · info@taxcasereview.com</div>
+      <div style="font-size:20px;font-weight:700;color:#1A7FD4">${firmName}</div>
+      <div style="font-size:11px;color:#666">${address} · ${email}</div>
       <div style="font-size:16px;font-weight:700;margin-top:10px;color:#111">${title}</div>
     </div>`
 }
@@ -36,7 +37,7 @@ function sigBlock(label1 = 'Client Signature', label2 = 'Authorized Representati
         ${label1}<br/>Date: ___________________
       </div>
       <div style="flex:1;border-top:1px solid #333;padding-top:6px;font-size:11px;color:#555">
-        ${label2} — Tax Case Review<br/>Date: ___________________
+        ${label2} — ${firmName}<br/>Date: ___________________
       </div>
     </div>`
 }
@@ -65,7 +66,7 @@ function printBase(title, body) {
 // ─── Document generators ──────────────────────────────────────────────────────
 function generateServiceAgreement() {
   printBase('Tax Investigation Service Agreement', `
-    <p>This Tax Investigation Service Agreement ("Agreement") is entered into between <b>Tax Case Review</b> ("Company") and the undersigned client ("Client") as of the date signed below.</p>
+    <p>This Tax Investigation Service Agreement ("Agreement") is entered into between <b>${firmName}</b> ("Company") and the undersigned client ("Client") as of the date signed below.</p>
 
     <h3>1. Scope of Services</h3>
     <p>The Company agrees to perform an initial tax investigation, which includes review of tax transcripts, identification of IRS or state tax liabilities, evaluation of available resolution programs, and preparation of a written summary of findings and recommended resolution strategy.</p>
@@ -95,7 +96,7 @@ function generateServiceAgreement() {
     </div>
 
     <h3>5. Not a Law Firm</h3>
-    <p>Tax Case Review is a tax resolution consulting firm and is <b>not a law firm</b>. No attorney-client relationship is created by this agreement. The Company does not provide legal advice. Enrolled Agents and/or licensed tax professionals perform all representation services.</p>
+    <p>${firmName} is a tax resolution consulting firm and is <b>not a law firm</b>. No attorney-client relationship is created by this agreement. The Company does not provide legal advice. Enrolled Agents and/or licensed tax professionals perform all representation services.</p>
 
     <h3>6. No Guarantee of Outcome</h3>
     <p>The Company makes no guarantee as to the specific outcome of any IRS or state tax resolution matter. Acceptance into any IRS program (including Offer in Compromise) is solely at the discretion of the IRS.</p>
@@ -109,16 +110,16 @@ function generateServiceAgreement() {
     <h3>9. Governing Law</h3>
     <p>This Agreement is governed by the laws of the State of Florida.</p>
 
-    ${sigBlock('Client Signature', 'Authorized Representative — Tax Case Review')}
+    ${sigBlock('Client Signature', 'Authorized Representative — ${firmName}')}
     <p style="font-size:10px;color:#888;margin-top:20px;text-align:center">
-      Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403 · info@taxcasereview.com · Not a law firm
+      ${firmName} · ${address} · ${email} · Not a law firm
     </p>
   `)
 }
 
 function generateAddendum() {
   printBase('Service Addendum — Additional Services Agreement', `
-    <p>This Addendum ("Addendum") supplements the Tax Investigation Service Agreement previously executed between <b>Tax Case Review</b> ("Company") and the undersigned client ("Client") and is incorporated therein by reference.</p>
+    <p>This Addendum ("Addendum") supplements the Tax Investigation Service Agreement previously executed between <b>${firmName}</b> ("Company") and the undersigned client ("Client") and is incorporated therein by reference.</p>
 
     <h3>1. Additional Services Authorized</h3>
     <p>Client authorizes the Company to proceed with the following additional resolution services beyond the initial tax investigation:</p>
@@ -143,9 +144,9 @@ function generateAddendum() {
     <h3>4. Incorporation</h3>
     <p>All terms of the original Tax Investigation Service Agreement remain in full force and effect and are incorporated herein. In the event of conflict, this Addendum controls.</p>
 
-    ${sigBlock('Client Signature', 'Authorized Representative — Tax Case Review')}
+    ${sigBlock('Client Signature', 'Authorized Representative — ${firmName}')}
     <p style="font-size:10px;color:#888;margin-top:20px;text-align:center">
-      Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403 · info@taxcasereview.com · Not a law firm
+      ${firmName} · ${address} · ${email} · Not a law firm
     </p>
   `)
 }
@@ -153,7 +154,7 @@ function generateAddendum() {
 function generateEngagementLetter() {
   printBase('Engagement Letter', `
     <p>Dear Client,</p>
-    <p>Thank you for choosing <b>Tax Case Review</b>. We are pleased to confirm our engagement to assist you with your federal and/or state tax resolution matter. This letter outlines the terms of our engagement.</p>
+    <p>Thank you for choosing <b>${firmName}</b>. We are pleased to confirm our engagement to assist you with your federal and/or state tax resolution matter. This letter outlines the terms of our engagement.</p>
 
     <h3>Services to Be Performed</h3>
     <ul>
@@ -172,16 +173,16 @@ function generateEngagementLetter() {
     </ul>
 
     <h3>Important Disclosures</h3>
-    <p>Tax Case Review is a tax resolution firm staffed by Enrolled Agents and licensed tax professionals. We are <b>not a law firm</b> and do not provide legal advice. Results in tax resolution matters cannot be guaranteed, as final decisions rest with the IRS or applicable state agency.</p>
+    <p>${firmName} is a tax resolution firm staffed by Enrolled Agents and licensed tax professionals. We are <b>not a law firm</b> and do not provide legal advice. Results in tax resolution matters cannot be guaranteed, as final decisions rest with the IRS or applicable state agency.</p>
 
     <p>We are committed to providing you with diligent, professional representation. Please do not hesitate to contact our office with any questions.</p>
 
     <p style="margin-top:16px">Sincerely,</p>
-    <p><b>Tax Case Review</b><br/>238 Evergreen Dr, Lake Park, FL 33403<br/>info@taxcasereview.com</p>
+    <p><b>${firmName}</b><br/>${address}<br/>${email}</p>
 
-    ${sigBlock('Client Acknowledgment', 'Authorized Representative — Tax Case Review')}
+    ${sigBlock('Client Acknowledgment', 'Authorized Representative — ${firmName}')}
     <p style="font-size:10px;color:#888;margin-top:20px;text-align:center">
-      Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403 · info@taxcasereview.com · Not a law firm
+      ${firmName} · ${address} · ${email} · Not a law firm
     </p>
   `)
 }
@@ -199,17 +200,17 @@ function generatePOALetter() {
 
     <p>Dear IRS Representative,</p>
 
-    <p>Please find enclosed a completed and executed Form 2848, Power of Attorney and Declaration of Representative, authorizing <b>Tax Case Review</b> to represent the above-named taxpayer before the Internal Revenue Service.</p>
+    <p>Please find enclosed a completed and executed Form 2848, Power of Attorney and Declaration of Representative, authorizing <b>${firmName}</b> to represent the above-named taxpayer before the Internal Revenue Service.</p>
 
     <p>Effective immediately, please direct all correspondence, notices, and communications regarding the above-referenced taxpayer and tax period(s) to our office:</p>
 
     <div style="border-left:3px solid #1A7FD4;padding-left:16px;margin:16px 0">
-      <b>Tax Case Review</b><br/>
+      <b>${firmName}</b><br/>
       238 Evergreen Dr<br/>
       Lake Park, FL 33403<br/>
       Phone: (561) ___-____<br/>
       Fax: (561) ___-____<br/>
-      Email: info@taxcasereview.com
+      Email: ${email}
     </div>
 
     <p>Our authorized representative(s) are Enrolled Agents licensed to practice before the IRS. We respectfully request that all future contact regarding this matter be made through our office so that we may best serve our client's interests.</p>
@@ -219,13 +220,13 @@ function generatePOALetter() {
     <p style="margin-top:16px">Respectfully submitted,</p>
 
     <div style="margin-top:40px;border-top:1px solid #333;width:280px;padding-top:6px;font-size:11px;color:#555">
-      Authorized Representative — Tax Case Review<br/>
+      Authorized Representative — ${firmName}<br/>
       Enrolled Agent / Licensed Professional<br/>
       Date: ___________________
     </div>
 
     <p style="font-size:10px;color:#888;margin-top:24px;text-align:center">
-      Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403 · info@taxcasereview.com · Not a law firm
+      ${firmName} · ${address} · ${email} · Not a law firm
     </p>
   `)
 }
