@@ -32,6 +32,7 @@ import Dialer     from './pages/Dialer'
 import Chat       from './pages/Chat'
 import Books         from './pages/Books'
 import FormaCorp     from './pages/FormaCorp'
+import Fax          from './pages/Fax'
 
 const style = document.createElement('style')
 style.textContent = `@keyframes spin { to { transform: rotate(360deg) } }`
@@ -120,6 +121,8 @@ function Shell() {
             <Route path="/dialer"      element={<Guard section="dialer"><Dialer /></Guard>} />
             <Route path="/chat"        element={<Guard section="chat"><Chat /></Guard>} />
             <Route path="/books"       element={<Guard section="books"><Books /></Guard>} />
+            <Route path="/formacorp"   element={<Guard section="books"><FormaCorp /></Guard>} />
+            <Route path="/fax"         element={<Guard section="email"><Fax /></Guard>} />
             <Route path="*"            element={<Navigate to="/" />} />
           </Routes>
         </div>
