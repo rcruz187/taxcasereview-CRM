@@ -72,7 +72,7 @@ export default function Dashboard() {
 
   const greeting = () => {
     const h = time.getHours()
-    const name = user?.user_metadata?.name?.split(' ')[0] || 'there'
+    const name = user?.user_metadata?.name?.split(' ')[0] || user?.email?.split('@')[0]?.split('.')[0] || 'there'
     return `${h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'}, ${name} 👋`
   }
 
