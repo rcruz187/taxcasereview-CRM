@@ -61,9 +61,16 @@ export default function Chat() {
   const [input, setInput]         = useState('')
   const [sending, setSending]     = useState(false)
   const [loading, setLoading]     = useState(false)
-  const [huddle, setHuddle]       = useState(false)
+  const [huddle, setHuddle]             = useState(false)
   const [huddleMembers, setHuddleMembers] = useState([])
   const [showHuddleInvite, setShowHuddleInvite] = useState(false)
+  const [huddleId, setHuddleId]         = useState(null)  // unique room ID
+  const [micOn, setMicOn]               = useState(true)
+  const [incomingHuddle, setIncomingHuddle] = useState(null) // { from, huddleId }
+  const localStreamRef  = useRef(null)
+  const peerConnsRef    = useRef({})   // { peerName: RTCPeerConnection }
+  const audioRefs       = useRef({})   // { peerName: <audio> el }
+  const huddleSignalRef = useRef(null) // Supabase realtime channel
   const [showEmoji, setShowEmoji]   = useState(false)
   const [showAllEmoji, setShowAllEmoji] = useState(false)
   const [hoverMsg, setHoverMsg]   = useState(null)
@@ -165,19 +172,184 @@ export default function Chat() {
     setReacting(null)
   }
 
-  function startHuddle() {
+  // ── WebRTC Huddle ──────────────────────────────────────
+  const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
+
+  function huddleChannel(id) {
+    return supabase.channel(`huddle:${id}`, { config: { broadcast: { self: false } } })
+  }
+
+  async function startHuddle() {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2,7)}`
+    setHuddleId(id)
     setHuddle(true)
     setHuddleMembers([myName])
     setShowHuddleInvite(false)
+    await initLocalStream()
+    // Signal channel
+    const ch = huddleChannel(id)
+    huddleSignalRef.current = ch
+    ch.on('broadcast', { event: 'signal' }, ({ payload }) => handleSignal(payload))
+    ch.on('broadcast', { event: 'joined' }, ({ payload }) => {
+      setHuddleMembers(m => m.includes(payload.name) ? m : [...m, payload.name])
+      // Initiate offer to new joiner
+      createOffer(payload.name, id)
+    })
+    ch.on('broadcast', { event: 'left' }, ({ payload }) => {
+      setHuddleMembers(m => m.filter(n => n !== payload.name))
+      closePeer(payload.name)
+    })
+    await ch.subscribe()
+    // Broadcast invite to all team members via chat_messages
+    await supabase.from('chat_messages').insert([{
+      channel: 'general', sender: '🔔 System',
+      text: `📞 ${myName} started a Huddle! Click "Join Huddle" to join the call.`,
+      huddle_id: id, created_at: new Date().toISOString()
+    }])
   }
 
-  function inviteToHuddle(name) {
-    if (!huddleMembers.includes(name)) setHuddleMembers(m => [...m, name])
+  async function joinHuddle(id) {
+    setHuddleId(id)
+    setHuddle(true)
+    setIncomingHuddle(null)
+    await initLocalStream()
+    const ch = huddleChannel(id)
+    huddleSignalRef.current = ch
+    ch.on('broadcast', { event: 'signal' }, ({ payload }) => handleSignal(payload))
+    ch.on('broadcast', { event: 'joined' }, ({ payload }) => {
+      setHuddleMembers(m => m.includes(payload.name) ? m : [...m, payload.name])
+    })
+    ch.on('broadcast', { event: 'left' }, ({ payload }) => {
+      setHuddleMembers(m => m.filter(n => n !== payload.name))
+      closePeer(payload.name)
+    })
+    await ch.subscribe()
+    // Announce join
+    await ch.send({ type: 'broadcast', event: 'joined', payload: { name: myName } })
+    setHuddleMembers(m => m.includes(myName) ? m : [...m, myName])
   }
 
-  function leaveHuddle() {
-    setHuddle(false); setHuddleMembers([]); setShowHuddleInvite(false)
+  async function inviteToHuddle(name) {
+    if (!huddleMembers.includes(name)) {
+      setHuddleMembers(m => [...m, name])
+      // Send a system message nudge
+      await supabase.from('chat_messages').insert([{
+        channel: 'general', sender: '🔔 System',
+        text: `📞 ${myName} invited ${name} to join the Huddle!`,
+        huddle_id: huddleId, created_at: new Date().toISOString()
+      }])
+    }
   }
+
+  async function leaveHuddle() {
+    if (huddleSignalRef.current) {
+      await huddleSignalRef.current.send({ type: 'broadcast', event: 'left', payload: { name: myName } })
+      await supabase.removeChannel(huddleSignalRef.current)
+      huddleSignalRef.current = null
+    }
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(t => t.stop())
+      localStreamRef.current = null
+    }
+    Object.keys(peerConnsRef.current).forEach(closePeer)
+    setHuddle(false); setHuddleMembers([]); setHuddleId(null); setShowHuddleInvite(false)
+  }
+
+  async function initLocalStream() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      localStreamRef.current = stream
+    } catch(e) {
+      showToast('Mic access denied — check browser permissions')
+    }
+  }
+
+  function toggleMic() {
+    if (!localStreamRef.current) return
+    const track = localStreamRef.current.getAudioTracks()[0]
+    if (track) { track.enabled = !track.enabled; setMicOn(track.enabled) }
+  }
+
+  function closePeer(name) {
+    if (peerConnsRef.current[name]) { peerConnsRef.current[name].close(); delete peerConnsRef.current[name] }
+    if (audioRefs.current[name]) { audioRefs.current[name].srcObject = null; delete audioRefs.current[name] }
+  }
+
+  async function createOffer(peerName, id) {
+    const pc = createPC(peerName)
+    const offer = await pc.createOffer()
+    await pc.setLocalDescription(offer)
+    await huddleSignalRef.current?.send({
+      type: 'broadcast', event: 'signal',
+      payload: { from: myName, to: peerName, type: 'offer', sdp: offer.sdp }
+    })
+  }
+
+  function createPC(peerName) {
+    if (peerConnsRef.current[peerName]) peerConnsRef.current[peerName].close()
+    const pc = new RTCPeerConnection(ICE)
+    peerConnsRef.current[peerName] = pc
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(t => pc.addTrack(t, localStreamRef.current))
+    }
+    pc.ontrack = (e) => {
+      let audio = audioRefs.current[peerName]
+      if (!audio) {
+        audio = document.createElement('audio')
+        audio.autoplay = true
+        document.body.appendChild(audio)
+        audioRefs.current[peerName] = audio
+      }
+      audio.srcObject = e.streams[0]
+    }
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        huddleSignalRef.current?.send({
+          type: 'broadcast', event: 'signal',
+          payload: { from: myName, to: peerName, type: 'ice', candidate: e.candidate }
+        })
+      }
+    }
+    return pc
+  }
+
+  async function handleSignal({ from, to, type, sdp, candidate }) {
+    if (to !== myName) return
+    if (type === 'offer') {
+      const pc = createPC(from)
+      await pc.setRemoteDescription({ type: 'offer', sdp })
+      const answer = await pc.createAnswer()
+      await pc.setLocalDescription(answer)
+      await huddleSignalRef.current?.send({
+        type: 'broadcast', event: 'signal',
+        payload: { from: myName, to: from, type: 'answer', sdp: answer.sdp }
+      })
+    } else if (type === 'answer') {
+      const pc = peerConnsRef.current[from]
+      if (pc) await pc.setRemoteDescription({ type: 'answer', sdp })
+    } else if (type === 'ice') {
+      const pc = peerConnsRef.current[from]
+      if (pc && candidate) await pc.addIceCandidate(candidate)
+    }
+  }
+
+  // Listen for incoming huddle invites via chat messages
+  useEffect(() => {
+    const ch = supabase.channel('huddle-notify')
+    ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, ({ new: msg }) => {
+      if (msg.huddle_id && msg.sender === '🔔 System' && !huddle) {
+        setIncomingHuddle({ from: msg.text, huddleId: msg.huddle_id })
+      }
+    }).subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [huddle])
+
+  useEffect(() => {
+    return () => {
+      if (localStreamRef.current) localStreamRef.current.getTracks().forEach(t => t.stop())
+      Object.keys(peerConnsRef.current).forEach(closePeer)
+    }
+  }, [])
 
   function addChannel() {
     const name = newChanName.trim().toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
@@ -206,7 +378,25 @@ export default function Chat() {
   }
 
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', background: '#0a0f1a', overflow: 'hidden' }}>
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', background: '#0a0f1a', overflow: 'hidden', flexDirection: 'column' }}>
+
+      {/* ── Incoming Huddle Alert ── */}
+      {incomingHuddle && !huddle && (
+        <div style={{ background: 'linear-gradient(90deg,#14532d,#15803d)', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 14, fontSize: 13, color: '#dcfce7', flexShrink: 0, zIndex: 100 }}>
+          <span style={{ fontSize: 20 }}>📞</span>
+          <span style={{ fontWeight: 700, flex: 1 }}>Incoming Huddle — someone started a call. Join to talk!</span>
+          <button onClick={() => joinHuddle(incomingHuddle.huddleId)}
+            style={{ padding: '6px 18px', borderRadius: 8, border: 'none', background: '#16a34a', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+            Join Call
+          </button>
+          <button onClick={() => setIncomingHuddle(null)}
+            style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: 'rgba(255,255,255,.15)', color: '#dcfce7', cursor: 'pointer', fontSize: 13 }}>
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
       {/* ── LEFT SIDEBAR ── */}
       <div style={s.sidebar}>
@@ -241,7 +431,12 @@ export default function Chat() {
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4ade80', display: 'inline-block', animation: 'pulse 2s infinite' }}/>
                   Huddle Active
                 </div>
-                <button onClick={leaveHuddle} style={{ background: 'none', border: 'none', color: '#f87171', fontSize: 11, cursor: 'pointer', fontWeight: 700, padding: '1px 5px' }}>Leave</button>
+                <div style={{ display:'flex', gap:4 }}>
+                  <button onClick={toggleMic} style={{ background: 'none', border: 'none', color: micOn ? '#4ade80' : '#f87171', fontSize: 11, cursor: 'pointer', fontWeight: 700, padding: '1px 5px' }} title={micOn ? 'Mute mic' : 'Unmute mic'}>
+                    {micOn ? '🎤' : '🔇'}
+                  </button>
+                  <button onClick={leaveHuddle} style={{ background: 'none', border: 'none', color: '#f87171', fontSize: 11, cursor: 'pointer', fontWeight: 700, padding: '1px 5px' }}>Leave</button>
+                </div>
               </div>
               <div style={{ display: 'flex', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
                 {huddleMembers.map(name => (
@@ -349,7 +544,10 @@ export default function Chat() {
                 </div>
               </div>
             )}
-            <button onClick={leaveHuddle} style={{ marginLeft: 'auto', padding: '3px 12px', borderRadius: 5, background: 'rgba(239,68,68,.2)', border: '1px solid #ef4444', color: '#fca5a5', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>Leave Huddle</button>
+            <button onClick={toggleMic} style={{ padding: '3px 12px', borderRadius: 5, background: 'rgba(255,255,255,.15)', border: '1px solid rgba(255,255,255,.3)', color: '#dcfce7', cursor: 'pointer', fontWeight: 600, fontSize: 12 }} title={micOn ? 'Mute' : 'Unmute'}>
+              {micOn ? '🎤 Mic On' : '🔇 Muted'}
+            </button>
+            <button onClick={leaveHuddle} style={{ marginLeft: 4, padding: '3px 12px', borderRadius: 5, background: 'rgba(239,68,68,.2)', border: '1px solid #ef4444', color: '#fca5a5', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>Leave Huddle</button>
           </div>
         )}
 
@@ -556,6 +754,8 @@ export default function Chat() {
           <div style={{ fontSize: 11, color: '#475569', marginTop: 5, paddingLeft: 4 }}>Enter to send · Shift+Enter for new line · 📎 to attach</div>
         </div>
       </div>
+      </div>
     </div>
   )
 }
+
