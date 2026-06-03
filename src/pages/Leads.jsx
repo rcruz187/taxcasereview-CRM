@@ -164,118 +164,122 @@ export default function Leads() {
     const taxYearsList = (() => { try { return JSON.parse(l.taxYears||'[]').join(', ') } catch { return l.taxYearsCustom||'—' } })()
 
     return (
-      <div>
+      <div style={{maxWidth:900}}>
         {toast && <div className="toast show">{toast}</div>}
-        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
-          <button className="btn" onClick={()=>setDetail(null)}>← Back</button>
-          <span style={{color:'var(--t3)',fontSize:12}}>Leads / {l.name}</span>
+
+        {/* Top bar */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:8}}>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <button className="btn sm" onClick={()=>setDetail(null)}>← Back</button>
+            <span style={{color:'var(--t3)',fontSize:12}}>Leads / {l.name}</span>
+          </div>
+          <div style={{display:'flex',gap:6}}>
+            <button className="btn sm" onClick={()=>{setForm({...BLANK,...l,taxYears:(() => {try{return JSON.parse(l.taxYears||'[]')}catch{return []}})()});setModal('edit')}}>✏️ Edit</button>
+            <button className="btn ok sm" onClick={()=>convertToClient(l)} disabled={converting}>✓ Convert to Client</button>
+            <button className="btn del sm" onClick={()=>deleteLead(l.id)}>🗑 Delete</button>
+          </div>
         </div>
 
-        {/* Header */}
-        <div className="card">
-          <div style={{display:'flex',alignItems:'flex-start',gap:14,paddingBottom:14,borderBottom:'1px solid var(--br)',marginBottom:14,flexWrap:'wrap'}}>
-            <div style={{width:52,height:52,borderRadius:'50%',background:'var(--blt)',color:'var(--b2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,fontWeight:800,flexShrink:0}}>
+        {/* Header card — compact */}
+        <div className="card" style={{padding:'14px 16px',marginBottom:10}}>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <div style={{width:42,height:42,borderRadius:'50%',background:'var(--blt)',color:'var(--b2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,fontWeight:800,flexShrink:0}}>
               {(l.name||'?')[0].toUpperCase()}
             </div>
-            <div style={{flex:1}}>
-              <div style={{fontSize:20,fontWeight:800}}>{l.name}</div>
-              <div style={{display:'flex',gap:6,marginTop:6,flexWrap:'wrap'}}>
-                <span className="bdg bb">{l.clientType||'Individual'}</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:17,fontWeight:800,lineHeight:1.2}}>{l.name}</div>
+              <div style={{display:'flex',gap:5,marginTop:4,flexWrap:'wrap'}}>
+                <span className="bdg bb" style={{fontSize:10}}>{l.clientType||'Individual'}</span>
                 <Bdg s={l.status||'New Lead'}/>
-                {l.taxFee && <span className="bdg bg">Tax Inv Fee: ${l.taxFee}</span>}
+                {l.taxFee && <span className="bdg bg" style={{fontSize:10}}>Tax Inv Fee: ${l.taxFee}</span>}
               </div>
             </div>
-            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-              <button className="btn sm" onClick={()=>{setForm({...BLANK,...l,taxYears:(() => {try{return JSON.parse(l.taxYears||'[]')}catch{return []}})()});setModal('edit')}}>✏️ Edit</button>
-              <button className="btn ok sm" onClick={()=>convertToClient(l)} disabled={converting}>✓ Convert to Client</button>
-              <button className="btn del sm" onClick={()=>deleteLead(l.id)}>🗑 Delete</button>
-            </div>
           </div>
-
-          {/* Pipeline tracker */}
-          <div style={{background:'var(--s2)',borderRadius:8,padding:12,marginBottom:14}}>
-            <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Pipeline Progress</div>
-            <div style={{display:'flex',alignItems:'center',overflowX:'auto',gap:0}}>
-              {PIPELINE_STAGES.map((s,i) => (
-                <div key={s.key} style={{display:'flex',alignItems:'center',flex:1,minWidth:70}}>
-                  <div style={{display:'flex',flexDirection:'column',alignItems:'center',flex:1}}>
-                    <div style={{width:28,height:28,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,flexShrink:0,background:done[i]?'var(--ok)':'var(--s3)',color:done[i]?'#fff':'var(--t3)',border:`2px solid ${done[i]?'var(--ok)':'var(--br)'}`}}>
-                      {done[i] ? '✓' : i+1}
-                    </div>
-                    <div style={{fontSize:9,marginTop:4,textAlign:'center',color:done[i]?'var(--ok)':'var(--t3)',whiteSpace:'nowrap'}}>{s.label}</div>
-                  </div>
-                  {i < PIPELINE_STAGES.length-1 && <div style={{height:2,width:16,background:done[i]?'var(--ok)':'var(--br)',flexShrink:0,marginBottom:14}}/>}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Info grid */}
-          <div className="fg2">
-            <div>
-              <div className="stitle">Contact Info</div>
-              {[['Phone', l.phone],['Email', l.email],['Address', [l.street,l.city,l.state,l.zip].filter(Boolean).join(' ')],['County', l.county],['Source', l.source]].map(([label,val])=>(
-                <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">{val||'—'}</span></div>
-              ))}
-            </div>
-            <div>
-              <div className="stitle">IRS Info</div>
-              {[['Est. Balance', l.irsBalance ? <span style={{fontWeight:700,color:'var(--bad)'}}>~{l.irsBalance}</span> : '—'],
-                ['Issue Type', <TypeBdg t={l.issueType||'—'}/>],
-                ['IRS or State', l.irsOrState],
-                ['Tax Years', taxYearsList],
-                ['Assigned Rep', l.assignedTo || <span style={{color:'var(--warn)'}}>Unassigned</span>],
-                ['Tax Inv Fee', l.taxFee ? <span style={{fontWeight:700,color:'var(--ok)'}}>${l.taxFee}</span> : 'Not set'],
-              ].map(([label,val])=>(
-                <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">{val||'—'}</span></div>
-              ))}
-            </div>
-          </div>
-
-          {/* Update Status */}
-          <div style={{marginTop:14,padding:12,background:'var(--s2)',borderRadius:8}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
-              <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Update Status</div>
-              <button className="btn sec" style={{padding:'3px 10px',fontSize:11}} onClick={()=>setShowFlow(true)}>📊 View Flow</button>
-            </div>
-            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-              {STATUSES.map(s => (
-                <span key={s} className={`chip${l.status===s?' on':''}`} onClick={()=>updateStatus(l.id, s)} style={{fontSize:10}}>{s}</span>
-              ))}
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:8,marginTop:14}}>
-            <button className="btn ok" style={{justifyContent:'center',flexDirection:'column',gap:3,padding:10,textAlign:'center'}} onClick={()=>generateServiceAgreement(l)}>
-              <span style={{fontSize:12,fontWeight:700}}>📄 Service Agreement</span>
-              <span style={{fontSize:10,opacity:.8}}>Generate & Print</span>
-            </button>
-            <button className="btn" style={{background:'var(--blue)',color:'#fff',borderColor:'var(--blue)',justifyContent:'center',flexDirection:'column',gap:3,padding:10,textAlign:'center'}} onClick={()=>generateEngagementLetter(l)}>
-              <span style={{fontSize:12,fontWeight:700}}>✉️ Engagement Letter</span>
-              <span style={{fontSize:10,opacity:.8}}>Generate & Print</span>
-            </button>
-            <button className="btn" style={{background:'var(--warn)',color:'#fff',borderColor:'var(--warn)',justifyContent:'center',flexDirection:'column',gap:3,padding:10,textAlign:'center'}} onClick={()=>generateAddendum(l)}>
-              <span style={{fontSize:12,fontWeight:700}}>📋 Generate Addendum</span>
-              <span style={{fontSize:10,opacity:.8}}>After IRS facts</span>
-            </button>
-            <button className="btn" style={{background:'#6c5ce7',color:'#fff',borderColor:'#6c5ce7',justifyContent:'center',flexDirection:'column',gap:3,padding:10,textAlign:'center'}} onClick={()=>generatePOACoverLetter(l)}>
-              <span style={{fontSize:12,fontWeight:700}}>🔐 POA Cover Letter</span>
-              <span style={{fontSize:10,opacity:.8}}>Generate & Print</span>
-            </button>
-            <button className="btn ok" style={{justifyContent:'center',flexDirection:'column',gap:3,padding:10,textAlign:'center'}} onClick={()=>convertToClient(l)} disabled={converting}>
-              <span style={{fontSize:12,fontWeight:700}}>✓ Convert to Client</span>
-              <span style={{fontSize:10,opacity:.8}}>{converting ? 'Converting…' : 'Move to Clients'}</span>
-            </button>
-          </div>
-
-          {l.notes && (
-            <div style={{marginTop:14,padding:12,background:'var(--s2)',borderRadius:8}}>
-              <div className="stitle" style={{marginBottom:6}}>Initial Notes</div>
-              <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.7}}>{l.notes}</div>
-            </div>
-          )}
         </div>
+
+        {/* Pipeline tracker — slim */}
+        <div className="card" style={{padding:'10px 16px',marginBottom:10}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+            <span style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Pipeline</span>
+            <button className="btn sec" style={{padding:'2px 8px',fontSize:10}} onClick={()=>setShowFlow(true)}>📊 View Flow</button>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:0,overflowX:'auto'}}>
+            {PIPELINE_STAGES.map((s,i) => (
+              <div key={s.key} style={{display:'flex',alignItems:'center',flex:1,minWidth:60}}>
+                <div style={{display:'flex',flexDirection:'column',alignItems:'center',flex:1}}>
+                  <div style={{width:22,height:22,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700,flexShrink:0,background:done[i]?'var(--ok)':'var(--s3)',color:done[i]?'#fff':'var(--t3)',border:`2px solid ${done[i]?'var(--ok)':'var(--br)'}`}}>
+                    {done[i] ? '✓' : i+1}
+                  </div>
+                  <div style={{fontSize:9,marginTop:3,textAlign:'center',color:done[i]?'var(--ok)':'var(--t3)',whiteSpace:'nowrap'}}>{s.label}</div>
+                </div>
+                {i < PIPELINE_STAGES.length-1 && <div style={{height:2,flex:1,maxWidth:20,background:done[i]?'var(--ok)':'var(--br)',marginBottom:14}}/>}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Info + IRS side by side */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
+          <div className="card" style={{padding:'12px 16px'}}>
+            <div className="stitle" style={{marginBottom:8}}>Contact Info</div>
+            {[['Phone', l.phone],['Email', l.email],['Address', [l.street,l.city,l.state,l.zip].filter(Boolean).join(' ')],['County', l.county],['Source', l.source]].map(([label,val])=>(
+              <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">{val||'—'}</span></div>
+            ))}
+          </div>
+          <div className="card" style={{padding:'12px 16px'}}>
+            <div className="stitle" style={{marginBottom:8}}>IRS Info</div>
+            {[['Est. Balance', l.irsBalance ? <span style={{fontWeight:700,color:'var(--bad)'}}>~{l.irsBalance}</span> : '—'],
+              ['Issue Type', <TypeBdg t={l.issueType||'—'}/>],
+              ['IRS or State', l.irsOrState],
+              ['Tax Years', taxYearsList],
+              ['Assigned Rep', l.assignedTo || <span style={{color:'var(--warn)'}}>Unassigned</span>],
+              ['Tax Inv Fee', l.taxFee ? <span style={{fontWeight:700,color:'var(--ok)'}}>${l.taxFee}</span> : 'Not set'],
+            ].map(([label,val])=>(
+              <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">{val||'—'}</span></div>
+            ))}
+          </div>
+        </div>
+
+        {/* Status chips */}
+        <div className="card" style={{padding:'10px 16px',marginBottom:10}}>
+          <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>Update Status</div>
+          <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+            {STATUSES.map(s => (
+              <span key={s} className={`chip${l.status===s?' on':''}`} onClick={()=>updateStatus(l.id, s)} style={{fontSize:10}}>{s}</span>
+            ))}
+          </div>
+        </div>
+
+        {/* Action buttons — compact row */}
+        <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}>
+          <button className="btn ok sm" style={{flex:1,minWidth:120,justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generateServiceAgreement(l)}>
+            <span style={{fontSize:11,fontWeight:700}}>📄 Service Agreement</span>
+            <span style={{fontSize:10,opacity:.8}}>Generate & Print</span>
+          </button>
+          <button className="btn sm" style={{flex:1,minWidth:120,background:'var(--blue)',color:'#fff',borderColor:'var(--blue)',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generateEngagementLetter(l)}>
+            <span style={{fontSize:11,fontWeight:700}}>✉️ Engagement Letter</span>
+            <span style={{fontSize:10,opacity:.8}}>Generate & Print</span>
+          </button>
+          <button className="btn sm" style={{flex:1,minWidth:120,background:'var(--warn)',color:'#fff',borderColor:'var(--warn)',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generateAddendum(l)}>
+            <span style={{fontSize:11,fontWeight:700}}>📋 Addendum</span>
+            <span style={{fontSize:10,opacity:.8}}>After IRS facts</span>
+          </button>
+          <button className="btn sm" style={{flex:1,minWidth:120,background:'#6c5ce7',color:'#fff',borderColor:'#6c5ce7',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generatePOACoverLetter(l)}>
+            <span style={{fontSize:11,fontWeight:700}}>🔐 POA Cover Letter</span>
+            <span style={{fontSize:10,opacity:.8}}>Generate & Print</span>
+          </button>
+          <button className="btn ok sm" style={{flex:1,minWidth:120,justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>convertToClient(l)} disabled={converting}>
+            <span style={{fontSize:11,fontWeight:700}}>✓ Convert to Client</span>
+            <span style={{fontSize:10,opacity:.8}}>{converting?'Converting…':'Move to Clients'}</span>
+          </button>
+        </div>
+
+        {l.notes && (
+          <div className="card" style={{padding:'10px 16px',marginBottom:10}}>
+            <div className="stitle" style={{marginBottom:4}}>Initial Notes</div>
+            <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.6}}>{l.notes}</div>
+          </div>
+        )}
 
         {/* ── Call Log / Activity Notes ── compact ── */}
         <div className="card" style={{marginTop:12}}>
@@ -569,4 +573,5 @@ export default function Leads() {
     </div>
   )
 }
+
 
