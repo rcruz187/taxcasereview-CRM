@@ -23,7 +23,12 @@ export default function Dialer() {
   const [elapsed, setElapsed]   = useState(0)
   const timerRef = useRef(null)
 
-  useEffect(() => { loadLeads(); loadCallLog() }, [])
+  useEffect(() => {
+    loadLeads(); loadCallLog()
+    // Pick up number passed from client phone link
+    const pre = sessionStorage.getItem('dialerNumber')
+    if (pre) { setDialpad(pre); sessionStorage.removeItem('dialerNumber') }
+  }, [])
 
   async function loadLeads() {
     const { data, error } = await supabase
@@ -378,3 +383,4 @@ export default function Dialer() {
     </div>
   )
 }
+
