@@ -279,21 +279,8 @@ export default function Settings() {
               <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.6 }}>
                 Document uploads use Supabase Storage. The bucket is configured and active.
               </div>
-              <div style={{ background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 8, padding: '12px 16px', fontFamily: 'monospace', fontSize: 12, color: 'var(--ok)', marginBottom: 14, whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{`-- Run in Supabase SQL Editor:
-insert into storage.buckets (id, name, public)
-values ('documents', 'documents', true)
-on conflict (id) do nothing;
-
-drop policy if exists "Public read documents" on storage.objects;
-create policy "Public read documents"
-  on storage.objects for select using (bucket_id = 'documents');
-
-drop policy if exists "Auth upload documents" on storage.objects;
-create policy "Auth upload documents"
-  on storage.objects for insert
-  with check (bucket_id = 'documents');`}</div>
-              
-            </div>
+                            <div style={{background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.25)",borderRadius:8,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10,fontSize:12,color:"var(--ok)"}}><span>✅</span><span>Storage bucket configured and active.</span></div>
+              </div>
           </div>
         </div>
       )}
