@@ -95,21 +95,28 @@ export default function Dashboard() {
     const borderColor = CARD_COLORS[label] || 'var(--blue)'
     return (
     <div onClick={() => to && navigate(to)} style={{
-      background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: 12,
-      padding: '16px 18px', cursor: to ? 'pointer' : 'default',
-      transition: 'transform .15s, box-shadow .15s', position: 'relative', overflow: 'hidden',
-      borderTop: `3px solid ${borderColor}`,
+      background: 'var(--sf)',
+      border: '1px solid var(--br)',
+      borderTop: 'none',
+      borderRadius: '0 0 10px 10px',
+      padding: '14px 16px',
+      cursor: to ? 'pointer' : 'default',
+      transition: 'transform .15s, box-shadow .15s',
+      position: 'relative',
+      overflow: 'hidden',
     }}
-      onMouseEnter={e => { if (to) { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 8px 28px ${borderColor}30` }}}
+      onMouseEnter={e => { if (to) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 6px 24px ${borderColor}40` }}}
       onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+      {/* Thick colored top bar — Jobber style */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: borderColor, borderRadius: '0' }}/>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', paddingTop: 8 }}>
         <div>
-          <div style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 8 }}>{label}</div>
-          <div style={{ fontSize: 28, fontWeight: 900, color: color || 'var(--tx)', lineHeight: 1 }}>{val}</div>
-          {sub && <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 6 }}>{sub}</div>}
+          <div style={{ fontSize: 10, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>{label}</div>
+          <div style={{ fontSize: 26, fontWeight: 900, color: color || 'var(--tx)', lineHeight: 1 }}>{val ?? '—'}</div>
+          {sub && <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 5 }}>{sub}</div>}
         </div>
-        {icon && <div style={{ fontSize: 26, opacity: .25 }}>{icon}</div>}
+        {icon && <div style={{ fontSize: 24, opacity: .2 }}>{icon}</div>}
       </div>
     </div>
   )}
