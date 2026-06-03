@@ -26,6 +26,12 @@ const NEW_ITEMS = [
   { icon: '💰', label: 'New Payment',  sub: 'Record a payment',      path: '/payments', color: '#06b6d4' },
   { icon: '📊', label: 'New Entry',    sub: 'Books & Ledger',        path: '/books',    color: '#10b981' },
   { icon: '📅', label: 'New Event',    sub: 'Add to calendar',       path: '/calendar', color: '#8b5cf6' },
+  { icon: '📧', label: 'New Email',    sub: 'Compose email',         path: '/email',    color: '#0ea5e9' },
+  { icon: '📠', label: 'New Fax',      sub: 'Send a fax',            path: '/fax',      color: '#dc2626' },
+  { icon: '📁', label: 'New Document', sub: 'Upload document',       path: '/documents',color: '#f97316' },
+  { icon: '✍️', label: 'New E-Sign',   sub: 'Request signature',     path: '/esign',    color: '#7c3aed' },
+  { icon: '📝', label: 'New Transcript',sub: 'Add transcript',       path: '/transcripts',color:'#14b8a6'},
+  { icon: '🏢', label: 'New Corp',     sub: 'Formation case',        path: '/formacorp',color: '#6366f1' },
 ]
 
 export default function TopBar({ onNew }) {
