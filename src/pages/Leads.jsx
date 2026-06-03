@@ -273,6 +273,14 @@ export default function Leads() {
             <span style={{fontSize:11,fontWeight:700}}>✓ Convert to Client</span>
             <span style={{fontSize:10,opacity:.8}}>{converting?'Converting…':'Move to Clients'}</span>
           </button>
+          <button className="btn sm" style={{flex:1,minWidth:120,background:'#dc2626',color:'#fff',borderColor:'#dc2626',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>navigate('/fax?client='+encodeURIComponent(l.name)+'&phone='+encodeURIComponent(l.phone||''))}>
+            <span style={{fontSize:11,fontWeight:700}}>📠 Send Fax</span>
+            <span style={{fontSize:10,opacity:.8}}>Telnyx Fax</span>
+          </button>
+          <button className="btn sm" style={{flex:1,minWidth:120,background:'#7c3aed',color:'#fff',borderColor:'#7c3aed',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>navigate('/esign?client='+encodeURIComponent(l.name)+'&email='+encodeURIComponent(l.email||''))}>
+            <span style={{fontSize:11,fontWeight:700}}>✍️ E-Signature</span>
+            <span style={{fontSize:10,opacity:.8}}>Request Sign</span>
+          </button>
         </div>
 
         {l.notes && (
