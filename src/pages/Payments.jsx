@@ -109,7 +109,7 @@ export default function Payments() {
   items.filter(p=>p.status==='Cleared').forEach(p=>{ byMethod[p.method||'Other']=(byMethod[p.method||'Other']||0)+parseFloat(p.amount||0) })
 
   return (
-    <div>
+    <div style={{maxWidth:1000}}>
       {toast&&<div className="toast show">{toast}</div>}
 
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:8}}>
