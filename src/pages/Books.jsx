@@ -37,8 +37,7 @@ export default function Books() {
 
   async function loadAll() {
     setLoading(true)
-    let q = supabase.from('bookkeeping').select('*').order('created_at', { ascending: false })
-    if (year) q = q.gte('created_at', `${year}-01-01T00:00:00`).lte('created_at', `${year}-12-31T23:59:59`)
+    let q = supabase.from('bookkeeping').select('*').order('date', { ascending: false, nullsFirst: false })
     if (clientFilter) q = q.eq('client_name', clientFilter)
     const { data, error } = await q
     if (error) showToast(error.message, 'err')
@@ -74,6 +73,9 @@ export default function Books() {
   const filtered = entries.filter(e => {
     if (typeFilter !== 'All' && e.type !== typeFilter) return false
     if (search && !e.description?.toLowerCase().includes(search.toLowerCase()) && !e.category?.toLowerCase().includes(search.toLowerCase())) return false
+    // Year filter — use date field if set, fall back to created_at
+    const entryYear = e.date ? e.date.slice(0,4) : e.created_at?.slice(0,4)
+    if (year && entryYear && String(entryYear) !== String(year)) return false
     return true
   })
 
@@ -342,5 +344,6 @@ export default function Books() {
     </div>
   )
 }
+
 
 
