@@ -53,6 +53,67 @@ function TypeBdg({t}) {
   return <span className={`bdg ${m[t]||'bn'}`}>{t}</span>
 }
 
+
+function LeadInlineFax({ lead, onClose }) {
+  const [toNum,set0]=useState((lead?.phone||'').replace(/\D/g,''))
+  const [subject,set1]=useState('')
+  const [file,set2]=useState(null)
+  const [sending,set3]=useState(false)
+  async function send() {
+    set3(true)
+    const {data:s}=await supabase.from('settings').select('telnyx_api_key,firm_fax_number').limit(1).maybeSingle()
+    let fileUrl=null
+    if(file){const path='fax/'+Date.now()+'_'+file.name;await supabase.storage.from('documents').upload(path,file,{upsert:true});const{data:u}=supabase.storage.from('documents').getPublicUrl(path);fileUrl=u?.publicUrl}
+    await supabase.from('fax_logs').insert([{to_number:'+1'+toNum.slice(-10),from_number:s?.firm_fax_number||'',client_name:lead?.name,subject,file_url:fileUrl,file_name:file?.name||null,status:s?.telnyx_api_key?'Sent':'Logged',sent_at:new Date().toISOString(),created_at:new Date().toISOString()}])
+    set3(false);onClose()
+  }
+  return <div style={{padding:'0 4px 4px'}}>
+    <div className="field"><label>To Fax Number</label><input value={toNum} onChange={e=>set0(e.target.value.replace(/\D/g,''))} placeholder="10 digits"/></div>
+    <div className="field"><label>Subject</label><input value={subject} onChange={e=>set1(e.target.value)} placeholder="Document subject"/></div>
+    <div className="field"><label>Attach PDF</label><input type="file" accept=".pdf,.tiff,.jpg,.png" onChange={e=>set2(e.target.files[0])} style={{padding:'6px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',width:'100%',fontSize:12}}/></div>
+    <div style={{display:'flex',gap:8}}>
+      <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={onClose}>Cancel</button>
+      <button className="btn sm" style={{flex:1,justifyContent:'center',background:'#dc2626',color:'#fff',borderColor:'#dc2626'}} onClick={send} disabled={sending}>{sending?'Sending…':'📠 Send'}</button>
+    </div>
+  </div>
+}
+
+function LeadInlineEsign({ lead, onClose }) {
+  const [docType,set0]=useState('Engagement Letter')
+  const [message,set1]=useState('Please review and sign the attached document.')
+  const [saving,set2]=useState(false)
+  const [link,set3]=useState('')
+  async function create() {
+    set2(true)
+    const{data,error}=await supabase.from('esigns').insert([{doc_type:docType,client_name:lead?.name,client_email:lead?.email||'',message,priority:'Normal',status:'Awaiting',sent_at:new Date().toISOString(),created_at:new Date().toISOString()}]).select().single()
+    set2(false)
+    if(error){alert('Error: '+error.message);return}
+    const url=window.location.origin+'/taxcasereview-CRM/#/sign/'+data.id
+    set3(url);navigator.clipboard.writeText(url).catch(()=>{})
+  }
+  if(link) return <div style={{padding:'0 4px 4px'}}>
+    <div style={{background:'rgba(34,197,94,.08)',border:'1px solid rgba(34,197,94,.3)',borderRadius:8,padding:'12px 14px',marginBottom:14}}>
+      <div style={{fontSize:12,fontWeight:700,color:'var(--ok)',marginBottom:6}}>✅ Link copied!</div>
+      <div style={{fontSize:11,color:'var(--t3)',wordBreak:'break-all'}}>{link}</div>
+    </div>
+    <button className="btn sec" style={{width:'100%',justifyContent:'center'}} onClick={onClose}>Done</button>
+  </div>
+  return <div style={{padding:'0 4px 4px'}}>
+    <div className="field"><label>Document Type</label>
+      <select value={docType} onChange={e=>set0(e.target.value)}>
+        {['Engagement Letter','Form 2848 — Power of Attorney','Form 8821 — Tax Info Auth','Service Agreement','Fee Agreement Addendum','Custom Document'].map(t=><option key={t}>{t}</option>)}
+      </select>
+    </div>
+    <div className="field"><label>Message</label>
+      <textarea value={message} onChange={e=>set1(e.target.value)} rows={3} style={{width:'100%',resize:'none',padding:'8px 12px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:13,fontFamily:'inherit'}}/>
+    </div>
+    <div style={{display:'flex',gap:8}}>
+      <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={onClose}>Cancel</button>
+      <button className="btn sm" style={{flex:1,justifyContent:'center',background:'#7c3aed',color:'#fff',borderColor:'#7c3aed'}} onClick={create} disabled={saving}>{saving?'Creating…':'✍️ Create Link'}</button>
+    </div>
+  </div>
+}
+
 export default function Leads() {
   const navigate = useNavigate()
   const [leads, setLeads]   = useState([])
@@ -68,6 +129,10 @@ export default function Leads() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast]   = useState('')
   const [converting, setConverting] = useState(false)
+  const [inlineFaxLead, setInlineFaxLead] = useState(null)
+  const [showFaxModal, setShowFaxModal] = useState(false)
+  const [inlineEsignLead, setInlineEsignLead] = useState(null)
+  const [showEsignModal, setShowEsignModal] = useState(false)
   const [showFlow, setShowFlow]     = useState(false)
 
   useEffect(() => { load() }, [])
@@ -273,11 +338,11 @@ export default function Leads() {
             <span style={{fontSize:11,fontWeight:700}}>✓ Convert to Client</span>
             <span style={{fontSize:10,opacity:.8}}>{converting?'Converting…':'Move to Clients'}</span>
           </button>
-          <button className="btn sm" style={{flex:1,minWidth:120,background:'#dc2626',color:'#fff',borderColor:'#dc2626',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>navigate('/fax?client='+encodeURIComponent(l.name)+'&phone='+encodeURIComponent(l.phone||''))}>
+          <button className="btn sm" style={{flex:1,minWidth:120,background:'#dc2626',color:'#fff',borderColor:'#dc2626',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>{setInlineFaxLead(l);setShowFaxModal(true)}}>
             <span style={{fontSize:11,fontWeight:700}}>📠 Send Fax</span>
             <span style={{fontSize:10,opacity:.8}}>Telnyx Fax</span>
           </button>
-          <button className="btn sm" style={{flex:1,minWidth:120,background:'#7c3aed',color:'#fff',borderColor:'#7c3aed',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>navigate('/esign?client='+encodeURIComponent(l.name)+'&email='+encodeURIComponent(l.email||''))}>
+          <button className="btn sm" style={{flex:1,minWidth:120,background:'#7c3aed',color:'#fff',borderColor:'#7c3aed',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>{setInlineEsignLead(l);setShowEsignModal(true)}}>
             <span style={{fontSize:11,fontWeight:700}}>✍️ E-Signature</span>
             <span style={{fontSize:10,opacity:.8}}>Request Sign</span>
           </button>
@@ -287,6 +352,24 @@ export default function Leads() {
           <div className="card" style={{padding:'10px 16px',marginBottom:10}}>
             <div className="stitle" style={{marginBottom:4}}>Initial Notes</div>
             <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.6}}>{l.notes}</div>
+          </div>
+        )}
+
+        {showFaxModal && inlineFaxLead && (
+          <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setShowFaxModal(false)}>
+            <div className="modal" style={{width:520}}>
+              <div className="mh"><span className="mt">📠 Send Fax — {inlineFaxLead.name}</span><button className="xbtn" onClick={()=>setShowFaxModal(false)}>&times;</button></div>
+              <LeadInlineFax lead={inlineFaxLead} onClose={()=>setShowFaxModal(false)}/>
+            </div>
+          </div>
+        )}
+
+        {showEsignModal && inlineEsignLead && (
+          <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setShowEsignModal(false)}>
+            <div className="modal" style={{width:520}}>
+              <div className="mh"><span className="mt">✍️ E-Signature — {inlineEsignLead.name}</span><button className="xbtn" onClick={()=>setShowEsignModal(false)}>&times;</button></div>
+              <LeadInlineEsign lead={inlineEsignLead} onClose={()=>setShowEsignModal(false)}/>
+            </div>
           </div>
         )}
 
