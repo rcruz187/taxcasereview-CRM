@@ -35,9 +35,14 @@ function buildDocHtml(item) {
   label{display:block;font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
   input{width:100%;padding:10px 14px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;outline:none}
   input:focus{border-color:#2563eb}
+  .tabs{display:flex;gap:8px;margin-bottom:8px}
+  .tab{padding:6px 16px;border-radius:6px;border:1px solid #cbd5e1;background:#f8fafc;cursor:pointer;font-size:12px;font-weight:600;color:#64748b}
+  .tab.active{background:#0f172a;color:#fff;border-color:#0f172a}
   .sig-pad{border:2px dashed #cbd5e1;border-radius:8px;height:120px;display:flex;align-items:center;justify-content:center;cursor:text;margin-bottom:8px;position:relative;background:#fafafa}
   .sig-pad input{border:none;background:none;font-size:28px;font-family:Georgia,serif;text-align:center;color:#0f172a;width:100%;cursor:text}
   .sig-pad input:focus{outline:none}
+  canvas{border:2px dashed #cbd5e1;border-radius:8px;background:#fafafa;touch-action:none;cursor:crosshair;display:block;width:100%}
+  .clear-btn{font-size:11px;color:#94a3b8;background:none;border:none;cursor:pointer;text-decoration:underline;margin-top:4px}
   .meta{font-size:11px;color:#94a3b8;margin-bottom:24px}
   .btn-sign{width:100%;padding:14px;background:#16a34a;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer}
   .btn-sign:disabled{background:#94a3b8;cursor:default}
@@ -52,11 +57,21 @@ function buildDocHtml(item) {
   <h1>${item.doc_type}</h1>
   <div class="sub">Prepared for: <strong>${item.client_name}</strong></div>
   <div class="doc-body">${item.message || 'Please review this document and provide your electronic signature below to confirm your agreement and authorization.'}</div>
-  <div class="field"><label>Full Legal Name</label><input id="fullname" placeholder="Type your full name as it appears on the document" /></div>
+  <div class="field"><label>Full Legal Name</label><input id="fullname" placeholder="Type your full name as it appears on the document" oninput="checkReady()" /></div>
   <div class="field">
-    <label>Electronic Signature (type your name)</label>
-    <div class="sig-pad"><input id="sig" placeholder="Sign here — type your full name" /></div>
-    <div class="meta">By typing your name above, you agree this constitutes a legal electronic signature.</div>
+    <label>Electronic Signature</label>
+    <div class="tabs">
+      <button class="tab active" onclick="setMode('type',this)">Type</button>
+      <button class="tab" onclick="setMode('draw',this)">Draw</button>
+    </div>
+    <div id="type-mode">
+      <div class="sig-pad"><input id="sig" placeholder="Type your full name to sign" oninput="checkReady()" /></div>
+    </div>
+    <div id="draw-mode" style="display:none">
+      <canvas id="sigCanvas" height="120"></canvas>
+      <button class="clear-btn" onclick="clearCanvas()">Clear</button>
+    </div>
+    <div class="meta">By signing above, you agree this constitutes a legal electronic signature.</div>
   </div>
   <div id="meta-display" class="meta" style="margin-bottom:16px"></div>
   <button class="btn-sign" id="signBtn" onclick="doSign()" disabled>Sign Document</button>
@@ -68,57 +83,143 @@ function buildDocHtml(item) {
 
 <script>
   const docId = '${item.id}'
+  const clientName = '${item.client_name}'
+  const docType = '${item.doc_type}'
   const supaUrl = 'https://mpxgxfqdbquzkrvvejkh.supabase.co'
   const supaKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1weGd4ZnFkYnF1emtydnZlamtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyOTk5MzksImV4cCI6MjA5NDg3NTkzOX0.puvhU1MV5nGOykizeTkwCpRR7NKKaGsVpA8oqjVjmu4'
 
-  // Get IP
   let clientIp = 'Unknown'
-  fetch('https://api.ipify.org?format=json').then(r=>r.json()).then(d=>{ clientIp=d.ip; document.getElementById('meta-display').textContent='Your IP: '+d.ip+' · '+new Date().toLocaleString() }).catch(()=>{})
+  let sigMode = 'type'
+  let drawing = false
+  let canvasHasData = false
 
-  document.getElementById('sig').addEventListener('input', function() {
-    document.getElementById('signBtn').disabled = this.value.trim().length < 2
+  fetch('https://api.ipify.org?format=json').then(r=>r.json())
+    .then(d=>{ clientIp=d.ip; document.getElementById('meta-display').textContent='Your IP: '+d.ip+' · '+new Date().toLocaleString() })
+    .catch(()=>{})
+
+  // Canvas setup
+  window.addEventListener('load', function() {
+    const canvas = document.getElementById('sigCanvas')
+    if (!canvas) return
+    canvas.width = canvas.offsetWidth * window.devicePixelRatio || 580
+    canvas.height = 120 * window.devicePixelRatio || 120
+    canvas.style.width = '100%'
+    canvas.style.height = '120px'
+    const ctx = canvas.getContext('2d')
+    ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1)
+    ctx.strokeStyle = '#0f172a'
+    ctx.lineWidth = 2.5
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+
+    function getPos(e) {
+      const rect = canvas.getBoundingClientRect()
+      const src = e.touches ? e.touches[0] : e
+      return { x: src.clientX - rect.left, y: src.clientY - rect.top }
+    }
+    function start(e) { e.preventDefault(); drawing=true; const p=getPos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y) }
+    function move(e) { e.preventDefault(); if(!drawing) return; const p=getPos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); canvasHasData=true; checkReady() }
+    function end(e) { e.preventDefault(); drawing=false }
+    canvas.addEventListener('mousedown',start); canvas.addEventListener('mousemove',move); canvas.addEventListener('mouseup',end); canvas.addEventListener('mouseleave',end)
+    canvas.addEventListener('touchstart',start,{passive:false}); canvas.addEventListener('touchmove',move,{passive:false}); canvas.addEventListener('touchend',end)
   })
 
+  function setMode(mode, btn) {
+    sigMode = mode
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'))
+    btn.classList.add('active')
+    document.getElementById('type-mode').style.display = mode==='type' ? '' : 'none'
+    document.getElementById('draw-mode').style.display = mode==='draw' ? '' : 'none'
+    checkReady()
+  }
+
+  function clearCanvas() {
+    const canvas = document.getElementById('sigCanvas')
+    const ctx = canvas.getContext('2d')
+    ctx.clearRect(0,0,canvas.width,canvas.height)
+    canvasHasData = false
+    checkReady()
+  }
+
+  function checkReady() {
+    const name = document.getElementById('fullname').value.trim()
+    const typeSig = document.getElementById('sig') ? document.getElementById('sig').value.trim() : ''
+    const ready = name.length > 1 && (sigMode==='draw' ? canvasHasData : typeSig.length > 1)
+    document.getElementById('signBtn').disabled = !ready
+  }
+
   async function doSign() {
-    const sig = document.getElementById('sig').value.trim()
     const fullname = document.getElementById('fullname').value.trim()
+    let sig = ''
+    let sigImage = null
+
+    if (sigMode === 'type') {
+      sig = document.getElementById('sig').value.trim()
+    } else {
+      const canvas = document.getElementById('sigCanvas')
+      sig = fullname
+      sigImage = canvas.toDataURL('image/png')
+    }
+
     if (!sig || sig.length < 2) return
     document.getElementById('signBtn').disabled = true
     document.getElementById('signBtn').textContent = 'Processing…'
     const signedAt = new Date().toISOString()
+
+    // Use snake_case column names to match Supabase schema
     const payload = {
-      status: 'Signed', signedAt,
-      signedName: sig, signerFullName: fullname,
-      signerIp: clientIp,
-      signedTimestamp: signedAt,
-      signedUserAgent: navigator.userAgent.slice(0,200),
-      updated_at: signedAt
+      status: 'Signed',
+      signed_at: signedAt,
+      signed_name: sig,
+      signer_full_name: fullname,
+      signer_ip: clientIp,
+      signed_timestamp: signedAt,
+      signed_user_agent: navigator.userAgent.slice(0,200)
     }
+
     const res = await fetch(supaUrl+'/rest/v1/esigns?id=eq.'+docId, {
       method: 'PATCH',
       headers: { apikey: supaKey, Authorization: 'Bearer '+supaKey, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
       body: JSON.stringify(payload)
     })
+
+    // Also save to documents table so it appears in client file
     if (res.ok) {
+      const certText = 'SIGNATURE CERTIFICATE\nDocument: '+docType+'\nClient: '+clientName+'\nSigned By: '+sig+'\nIP Address: '+clientIp+'\nTimestamp: '+signedAt+'\nDevice: '+navigator.userAgent.slice(0,100)
+      await fetch(supaUrl+'/rest/v1/documents', {
+        method: 'POST',
+        headers: { apikey: supaKey, Authorization: 'Bearer '+supaKey, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          client: clientName,
+          name: 'SIGNED — '+docType,
+          docType: 'E-Signature',
+          notes: certText,
+          created_at: signedAt
+        })
+      }).catch(()=>{})
+
       document.getElementById('main').innerHTML = \`
         <div class="success">
           <div style="font-size:48px;margin-bottom:16px">✅</div>
           <h2>Document Signed Successfully</h2>
-          <p>Thank you, <strong>\${sig}</strong>.<br/>Your signature has been recorded on \${new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})} at \${new Date().toLocaleTimeString()}.<br/><br/>
-          A confirmation has been sent to Tax Case Review.<br/>You may close this window.</p>
-          <div style="margin-top:24px;padding:16px;background:#f0fdf4;border-radius:8px;font-size:12px;color:#166534;text-align:left">
-            <strong>Signature Certificate</strong><br/>
-            Signer: \${sig}<br/>
-            IP Address: \${clientIp}<br/>
-            Timestamp: \${new Date().toISOString()}<br/>
-            Document: ${item.doc_type}<br/>
-            Client: ${item.client_name}
+          <p>Thank you, <strong>\${sig}</strong>.<br/>
+          Signed on \${new Date(signedAt).toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})} at \${new Date(signedAt).toLocaleTimeString()}.</p>
+          <div style="margin-top:20px;padding:14px;background:#f0fdf4;border-radius:8px;font-size:12px;color:#166534;text-align:left;line-height:1.8">
+            <strong>Certificate of Completion</strong><br/>
+            Document: \${docType}<br/>
+            Client: \${clientName}<br/>
+            Signed by: \${sig}<br/>
+            IP: \${clientIp}<br/>
+            Timestamp: \${signedAt}
           </div>
+          <p style="margin-top:16px;font-size:12px;color:#94a3b8">A copy has been saved to your file. You may close this window.</p>
         </div>\`
     } else {
+      const errText = await res.text().catch(()=>'')
       document.getElementById('signBtn').disabled = false
       document.getElementById('signBtn').textContent = 'Sign Document'
-      alert('Error recording signature. Please try again or contact Tax Case Review.')
+      console.error('Sign error:', res.status, errText)
+      document.getElementById('signBtn').insertAdjacentHTML('afterend','<p style="color:#dc2626;font-size:12px;margin-top:8px;text-align:center">Error saving signature ('+res.status+'). Please try again.</p>')
     }
   }
 </script>
