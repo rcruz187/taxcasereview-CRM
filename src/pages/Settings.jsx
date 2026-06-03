@@ -15,7 +15,7 @@ export default function Settings() {
   const [firm, setFirm] = useState({
     name: '', tagline: '', phone: '', email: '',
     address: '', city: '', state: '', zip: '',
-    website: '', ein: '', primary_color: '#2563eb', notifyre_api_key: '', firm_fax_number: '',
+    website: '', ein: '', primary_color: '#2563eb', telnyx_api_key: '', firm_fax_number: '',
     preparer_name: '', ptin: '', caf_number: '', efin: '',
     gmail_client_id: '', gmail_client_secret: '', gmail_redirect_uri: ''
   })
@@ -259,19 +259,7 @@ export default function Settings() {
               <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.6 }}>
                 Document uploads use Supabase Storage. Run the SQL below in your Supabase SQL Editor to create the bucket if you haven't already.
               </div>
-              <div style={{ background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 8, padding: '12px 16px', fontFamily: 'monospace', fontSize: 12, color: 'var(--ok)', marginBottom: 14, whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{`-- Run in Supabase SQL Editor:
-insert into storage.buckets (id, name, public)
-values ('documents', 'documents', true)
-on conflict (id) do nothing;
-
-drop policy if exists "Public read documents" on storage.objects;
-create policy "Public read documents"
-  on storage.objects for select using (bucket_id = 'documents');
-
-drop policy if exists "Auth upload documents" on storage.objects;
-create policy "Auth upload documents"
-  on storage.objects for insert
-  with check (bucket_id = 'documents');`}</div>
+              <div style={{background:'rgba(34,197,94,.08)',border:'1px solid rgba(34,197,94,.25)',borderRadius:8,padding:'10px 14px',marginBottom:10,display:'flex',alignItems:'center',gap:10,fontSize:12,color:'var(--ok)'}}><span>✅</span><span>Document storage is configured and active.</span></div>
               <button className="btn sec" onClick={() => {
                 navigator.clipboard.writeText(`insert into storage.buckets (id, name, public)\nvalues ('documents', 'documents', true)\non conflict (id) do nothing;`)
                 showToast('SQL copied!')
@@ -283,20 +271,20 @@ create policy "Auth upload documents"
 
       {tab === 'fax' && (
         <div className="card">
-          <div style={{fontWeight:700,fontSize:14,marginBottom:4}}>📠 Fax Integration — Notifyre</div>
+          <div style={{fontWeight:700,fontSize:14,marginBottom:4}}>📠 Fax Integration — Telnyx</div>
           <div style={{fontSize:12,color:'var(--t3)',marginBottom:16,lineHeight:1.7}}>
-            Notifyre offers the best value fax API — <strong style={{color:'var(--tx)'}}>no monthly subscription, pay-as-you-go at ~$0.03–$0.08/page</strong>.
-            Minimum top-up $10. HIPAA compliant. REST API with webhooks.
+            Telnyx offers a reliable, developer-friendly fax API — <strong style={{color:'var(--tx)'}}>pay-as-you-go faxing, SMS, voice — all on one platform</strong>.
+            HIPAA compliant. REST API with webhooks. Dedicated fax numbers available.
           </div>
 
           <div style={{background:'var(--s2)',borderRadius:8,padding:'12px 16px',marginBottom:16,fontSize:12,lineHeight:1.8}}>
             <div style={{fontWeight:700,color:'var(--tx)',marginBottom:6}}>Setup (5 minutes):</div>
             {[
-              ['1','Go to notifyre.com → Sign Up (free, no monthly fee)'],
-              ['2','Add $10 minimum credit to your account'],
-              ['3','Go to Account Settings → API → Generate API Token'],
-              ['4','Paste your API token below and save'],
-              ['5','Enter your Notifyre fax number (assigned after signup)'],
+              ['1','Go to telnyx.com → Sign Up (free account)'],
+              ['2','Add credits to your account ($5 minimum)'],
+              ['3','Go to Auth → API Keys → Create API Key'],
+              ['4','Paste your Telnyx API Key below and save'],
+              ['5','Enter your Telnyx fax number (assigned after signup)'],
             ].map(([step,text])=>(
               <div key={step} style={{display:'flex',gap:10,marginBottom:4,alignItems:'flex-start'}}>
                 <div style={{width:20,height:20,borderRadius:'50%',background:'var(--blue)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,flexShrink:0,marginTop:1}}>{step}</div>
@@ -305,16 +293,16 @@ create policy "Auth upload documents"
             ))}
           </div>
 
-          <div className="field"><label>Notifyre API Token</label>
-            <input type="password" value={firm.notifyre_api_key||''} onChange={set('notifyre_api_key')} placeholder="nt_live_xxxxxxxxxxxx"/>
+          <div className="field"><label>Telnyx API Key</label>
+            <input type="password" value={firm.telnyx_api_key||''} onChange={set('telnyx_api_key')} placeholder="KEY0xxxxxxxxxxxxxxxxxxxxxxxx"/>
           </div>
           <div className="field"><label>Your Fax Number (from Notifyre)</label>
             <input value={firm.firm_fax_number||''} onChange={set('firm_fax_number')} placeholder="+1 (800) 555-0100"/>
           </div>
 
           <div style={{background:'rgba(26,127,212,.08)',border:'1px solid rgba(26,127,212,.2)',borderRadius:8,padding:'10px 14px',marginBottom:16,fontSize:12,color:'var(--t2)',lineHeight:1.6}}>
-            <strong style={{color:'var(--blue)'}}>Pricing reference:</strong> Domestic fax ~$0.03–$0.08/page · International from $0.15/page · No monthly fee · $10 min top-up · HIPAA compliant<br/>
-            Docs: <a href="https://support.notifyre.com/notifyre-developer-api-documentation" target="_blank" style={{color:'var(--blue)'}}>notifyre.com/api-docs</a>
+            <strong style={{color:'var(--blue)'}}>Pricing reference:</strong> Domestic fax from ~$0.005/page · International rates vary · Pay-as-you-go · HIPAA compliant<br/>
+            Docs: <a href="https://developers.telnyx.com/docs/fax" target="_blank" style={{color:'var(--blue)'}}>developers.telnyx.com/docs/fax</a>
           </div>
 
           <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving?'Saving…':'💾 Save Fax Settings'}</button>
@@ -366,8 +354,8 @@ create policy "Auth upload documents"
           <div style={{ padding: '0 20px 20px' }}>
             {[
               { name:'Romy Cruz',        email:'romy@taxcasereview.org',    role:'Super Admin', color:'br' },
-              { name:'Dana Richard',     email:'dana@taxcasereview.org',    role:'Admin',       color:'bb' },
-              { name:'Yesenia Gonzalez', email:'yesenia@taxcasereview.org', role:'Admin',       color:'bb' },
+              { name:'Dana Richard',     email:'flipnitnow@gmail.com',    role:'Admin',       color:'bb' },
+              { name:'Yesenia Gonzalez', email:'yeseniagt1@gmail.com', role:'Admin',       color:'bb' },
             ].map(m => (
               <div key={m.email} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 0', borderBottom:'1px solid var(--br)' }}>
                 <div style={{ width:40, height:40, borderRadius:'50%', background:'var(--blue)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:16, color:'#fff', flexShrink:0 }}>
