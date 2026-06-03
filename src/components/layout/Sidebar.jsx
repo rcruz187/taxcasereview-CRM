@@ -101,13 +101,22 @@ export default function Sidebar() {
     if (active) setOpenKey(active)
   }, [location.pathname])
 
+  const [firmName, setFirmName] = useState('ClearCase.Tax')
+  const [tagline,  setTagline]  = useState('Tax & Resolution Services')
+
   useEffect(() => {
-    const { data } = supabase.storage.from('firm-assets').getPublicUrl('logo')
-    if (data?.publicUrl) {
-      const img = new Image()
-      img.onload = () => setLogoUrl(data.publicUrl + '?t=' + Date.now())
-      img.src = data.publicUrl
+    async function loadBranding() {
+      const { data: s } = await supabase.from('settings').select('name,tagline').limit(1).maybeSingle()
+      if (s?.name)    setFirmName(s.name)
+      if (s?.tagline) setTagline(s.tagline)
+      const { data } = supabase.storage.from('firm-assets').getPublicUrl('logo')
+      if (data?.publicUrl) {
+        const img = new Image()
+        img.onload = () => setLogoUrl(data.publicUrl + '?t=' + Date.now())
+        img.src = data.publicUrl
+      }
     }
+    loadBranding()
   }, [])
 
   function toggle(key) {
@@ -116,11 +125,14 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <div className="brand" onClick={() => navigate('/')}>
-        <img src={logoUrl} alt="TCR" />
-        <div>
-          <div className="brand-name">Tax Resolution CRM</div>
-          <div className="brand-sub">IRS Resolution CRM</div>
+      <div className="brand" onClick={() => navigate('/')} style={{flexDirection:'column',alignItems:'center',padding:'16px 12px 12px',gap:8}}>
+        {logoUrl
+          ? <img src={logoUrl} alt={firmName} style={{width:'100%',maxWidth:140,height:56,objectFit:'contain'}}/>
+          : <div style={{fontWeight:900,fontSize:18,color:'var(--blue)',textAlign:'center',lineHeight:1.2}}>{firmName}</div>
+        }
+        <div style={{textAlign:'center'}}>
+          <div className="brand-name" style={{fontSize:13}}>{firmName}</div>
+          <div className="brand-sub" style={{fontSize:10}}>{tagline || 'Tax & Resolution Services'}</div>
         </div>
       </div>
 
