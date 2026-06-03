@@ -37,6 +37,7 @@ const SECTIONS = [
       { path: '/dialer',    icon: DialIcon,    label: 'Dialer',        section: 'dialer' },
       { path: '/documents', icon: FolderIcon,  label: 'Documents',     section: 'documents' },
       { path: '/esign',     icon: SignIcon,    label: 'E-Signatures',  section: 'esign' },
+      { path: '/fax',       icon: FaxIcon,     label: 'Fax',           section: 'fax' },
     ]
   },
   {
