@@ -12,9 +12,9 @@
   --s2:   #152840;
   --s3:   #1A3050;
 
-  /* Brand blue */
+  /* Brand blue — all derived from --blue by applyBrandColor() in Settings */
   --blue: #1A7FD4;
-  --b2:   #2490E8;
+  --b2:   #1A7FD4;
   --blt:  rgba(26,127,212,.15);
 
   /* Status */
@@ -146,8 +146,8 @@ html, body, #root {
 }
 .nav-item:hover { background: var(--s2); color: var(--tx); }
 .nav-item.active {
-  background: rgba(26,127,212,.18);
-  color: var(--b2);
+  background: var(--blt);
+  color: var(--blue);
   border-left-color: var(--blue);
 }
 .nav-item svg { width: 14px; height: 14px; flex-shrink: 0; opacity: .8; }
@@ -608,3 +608,4 @@ tbody tr:hover td { background: var(--s2); cursor: pointer; }
   border-radius: 8px; 
 }
 /* cache bust Mon Jun  1 23:39:13 UTC 2026 */
+
