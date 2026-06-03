@@ -126,7 +126,7 @@ export default function Documents() {
   })
 
   return (
-    <div>
+    <div style={{maxWidth:1000}}>
       {toast && <div className="toast show">{toast}</div>}
 
       {/* Header */}
