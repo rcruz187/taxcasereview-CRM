@@ -94,7 +94,7 @@ export default function Invoices() {
   }
 
   async function deleteItem(id) {
-    if (!confirm('Delete this invoice?')) return
+    if (!window.confirm('Delete this invoice?')) return
     await supabase.from('invoices').delete().eq('id',id)
     showToast('Deleted'); load()
   }
@@ -112,7 +112,7 @@ export default function Invoices() {
   })
 
   return (
-    <div>
+    <div style={{maxWidth:1000}}>
       {toast && <div className="toast show">{toast}</div>}
 
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:8}}>
