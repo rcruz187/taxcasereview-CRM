@@ -15,7 +15,7 @@ export default function Settings() {
   const [firm, setFirm] = useState({
     name: '', tagline: '', phone: '', email: '',
     address: '', city: '', state: '', zip: '',
-    website: '', ein: '', primary_color: '#2563eb',
+    website: '', ein: '', primary_color: '#2563eb', notifyre_api_key: '', firm_fax_number: '',
     preparer_name: '', ptin: '', caf_number: '', efin: '',
     gmail_client_id: '', gmail_client_secret: '', gmail_redirect_uri: ''
   })
@@ -119,14 +119,14 @@ export default function Settings() {
   }
 
   const set = k => e => setFirm(f => ({ ...f, [k]: e.target.value }))
-  const tabs = ['firm', 'integrations', 'branding', 'users', 'security']
+  const tabs = ['firm', 'integrations', 'fax', 'branding', 'users', 'security']
 
   return (
     <div style={{ maxWidth: 860, margin: '0 auto' }}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
         {tabs.map(t => (
           <button key={t} className={`btn${tab === t ? ' pri' : ''}`} onClick={() => setTab(t)}>
-            {t === 'firm' ? '🏢 Firm Info' : t === 'integrations' ? '🔌 Integrations' : t === 'branding' ? '🎨 Branding' : t === 'users' ? '👥 Users' : '🔒 Security'}
+            {t === 'firm' ? '🏢 Firm Info' : t === 'integrations' ? '🔌 Integrations' : t === 'fax' ? '📠 Fax' : t === 'branding' ? '🎨 Branding' : t === 'users' ? '👥 Users' : '🔒 Security'}
           </button>
         ))}
       </div>
@@ -281,6 +281,46 @@ create policy "Auth upload documents"
         </div>
       )}
 
+      {tab === 'fax' && (
+        <div className="card">
+          <div style={{fontWeight:700,fontSize:14,marginBottom:4}}>📠 Fax Integration — Notifyre</div>
+          <div style={{fontSize:12,color:'var(--t3)',marginBottom:16,lineHeight:1.7}}>
+            Notifyre offers the best value fax API — <strong style={{color:'var(--tx)'}}>no monthly subscription, pay-as-you-go at ~$0.03–$0.08/page</strong>.
+            Minimum top-up $10. HIPAA compliant. REST API with webhooks.
+          </div>
+
+          <div style={{background:'var(--s2)',borderRadius:8,padding:'12px 16px',marginBottom:16,fontSize:12,lineHeight:1.8}}>
+            <div style={{fontWeight:700,color:'var(--tx)',marginBottom:6}}>Setup (5 minutes):</div>
+            {[
+              ['1','Go to notifyre.com → Sign Up (free, no monthly fee)'],
+              ['2','Add $10 minimum credit to your account'],
+              ['3','Go to Account Settings → API → Generate API Token'],
+              ['4','Paste your API token below and save'],
+              ['5','Enter your Notifyre fax number (assigned after signup)'],
+            ].map(([step,text])=>(
+              <div key={step} style={{display:'flex',gap:10,marginBottom:4,alignItems:'flex-start'}}>
+                <div style={{width:20,height:20,borderRadius:'50%',background:'var(--blue)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,flexShrink:0,marginTop:1}}>{step}</div>
+                <div style={{color:'var(--t2)'}}>{text}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="field"><label>Notifyre API Token</label>
+            <input type="password" value={firm.notifyre_api_key||''} onChange={set('notifyre_api_key')} placeholder="nt_live_xxxxxxxxxxxx"/>
+          </div>
+          <div className="field"><label>Your Fax Number (from Notifyre)</label>
+            <input value={firm.firm_fax_number||''} onChange={set('firm_fax_number')} placeholder="+1 (800) 555-0100"/>
+          </div>
+
+          <div style={{background:'rgba(26,127,212,.08)',border:'1px solid rgba(26,127,212,.2)',borderRadius:8,padding:'10px 14px',marginBottom:16,fontSize:12,color:'var(--t2)',lineHeight:1.6}}>
+            <strong style={{color:'var(--blue)'}}>Pricing reference:</strong> Domestic fax ~$0.03–$0.08/page · International from $0.15/page · No monthly fee · $10 min top-up · HIPAA compliant<br/>
+            Docs: <a href="https://support.notifyre.com/notifyre-developer-api-documentation" target="_blank" style={{color:'var(--blue)'}}>notifyre.com/api-docs</a>
+          </div>
+
+          <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving?'Saving…':'💾 Save Fax Settings'}</button>
+        </div>
+      )}
+
       {tab === 'branding' && (
         <div className="card">
           <div className="card-header"><span className="card-title">Branding</span></div>
@@ -365,3 +405,4 @@ create policy "Auth upload documents"
     </div>
   )
 }
+
