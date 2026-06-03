@@ -167,7 +167,7 @@ export default function Reports() {
   }
 
   return (
-    <div>
+    <div style={{maxWidth:1100}}>
       {/* Header */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:8}}>
         <h2 style={{fontSize:15,fontWeight:700,margin:0}}>📊 Reports & Analytics</h2>
