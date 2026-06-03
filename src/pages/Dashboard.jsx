@@ -80,24 +80,39 @@ export default function Dashboard() {
   const fmtDate = t => t.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
   const daysLeft = d => Math.ceil((new Date(d.dueDate) - new Date()) / 86400000)
 
-  const StatCard = ({ label, val, sub, color, to, icon }) => (
+  const CARD_COLORS = {
+    'Active Cases':     '#f59e0b',
+    'Open Leads':       '#a855f7',
+    'Clients':          '#3b82f6',
+    'Revenue MTD':      '#22c55e',
+    'Unpaid Invoices':  '#ef4444',
+    'Open Tasks':       '#22c55e',
+    'Upcoming DL':      '#f59e0b',
+    'Overdue DL':       '#ef4444',
+  }
+
+  const StatCard = ({ label, val, sub, color, to, icon }) => {
+    const borderColor = CARD_COLORS[label] || 'var(--blue)'
+    return (
     <div onClick={() => to && navigate(to)} style={{
       background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: 12,
       padding: '16px 18px', cursor: to ? 'pointer' : 'default',
-      transition: 'all .15s', position: 'relative', overflow: 'hidden',
+      transition: 'transform .15s, box-shadow .15s', position: 'relative', overflow: 'hidden',
+      borderTop: `3px solid ${borderColor}`,
     }}
-      onMouseEnter={e => { if (to) e.currentTarget.style.borderColor = 'var(--blue)' }}
-      onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--br)'}
+      onMouseEnter={e => { if (to) { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 8px 28px ${borderColor}30` }}}
+      onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: 12, color: 'var(--t3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>{label}</div>
+          <div style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 8 }}>{label}</div>
           <div style={{ fontSize: 28, fontWeight: 900, color: color || 'var(--tx)', lineHeight: 1 }}>{val}</div>
           {sub && <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 6 }}>{sub}</div>}
         </div>
-        {icon && <div style={{ fontSize: 28, opacity: .3 }}>{icon}</div>}
+        {icon && <div style={{ fontSize: 26, opacity: .25 }}>{icon}</div>}
       </div>
     </div>
+  )}
   )
 
   return (
