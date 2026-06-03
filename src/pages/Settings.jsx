@@ -131,6 +131,41 @@ export default function Settings() {
         ))}
       </div>
 
+              <div style={{height:1,background:'var(--br)',margin:'18px 0'}}/>
+              <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>📬 POP / SMTP Email</div>
+              <div style={{fontSize:12,color:'var(--t3)',marginBottom:12,lineHeight:1.6}}>
+                Use any provider — Outlook, Yahoo, Zoho, custom domain. No Google account required.
+              </div>
+              <div className="fg2">
+                <div className="field"><label>SMTP Host</label>
+                  <input value={firm.smtp_host||''} onChange={set('smtp_host')} placeholder="smtp.yourprovider.com"/>
+                </div>
+                <div className="field"><label>SMTP Port</label>
+                  <input value={firm.smtp_port||''} onChange={set('smtp_port')} placeholder="587"/>
+                </div>
+              </div>
+              <div className="fg2">
+                <div className="field"><label>Email Address</label>
+                  <input type="email" value={firm.smtp_email||''} onChange={set('smtp_email')} placeholder="you@yourdomain.com"/>
+                </div>
+                <div className="field"><label>Password / App Password</label>
+                  <input type="password" value={firm.smtp_password||''} onChange={set('smtp_password')} placeholder="••••••••"/>
+                </div>
+              </div>
+              <div className="fg2">
+                <div className="field"><label>From Name</label>
+                  <input value={firm.smtp_name||''} onChange={set('smtp_name')} placeholder="ClearCase.Tax"/>
+                </div>
+                <div className="field"><label>Encryption</label>
+                  <select value={firm.smtp_encryption||'TLS'} onChange={set('smtp_encryption')}>
+                    <option>TLS</option><option>SSL</option><option>None</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{background:'var(--s2)',borderRadius:6,padding:'8px 14px',fontSize:11,color:'var(--t3)',lineHeight:1.7,marginBottom:12}}>
+                💡 Outlook: smtp.office365.com:587 · Yahoo: smtp.mail.yahoo.com:587 · Zoho: smtp.zoho.com:587
+              </div>
+
       {tab === 'firm' && (
         <div className="card">
           <div className="card-header"><span className="card-title">Firm Information</span></div>
@@ -265,6 +300,135 @@ export default function Settings() {
                 showToast('SQL copied!')
               }}>📋 Copy SQL</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'fax' && (
+        <div className="card">
+          <div style={{fontWeight:700,fontSize:14,marginBottom:4}}>📠 Fax Integration — Telnyx</div>
+          <div style={{fontSize:12,color:'var(--t3)',marginBottom:16,lineHeight:1.7}}>
+            Telnyx offers a reliable, developer-friendly fax API — <strong style={{color:'var(--tx)'}}>pay-as-you-go faxing, SMS, voice — all on one platform</strong>.
+            HIPAA compliant. REST API with webhooks. Dedicated fax numbers available.
+          </div>
+
+          <div style={{background:'var(--s2)',borderRadius:8,padding:'12px 16px',marginBottom:16,fontSize:12,lineHeight:1.8}}>
+            <div style={{fontWeight:700,color:'var(--tx)',marginBottom:6}}>Setup (5 minutes):</div>
+            {[
+              ['1','Go to telnyx.com → Sign Up (free account)'],
+              ['2','Add credits to your account ($5 minimum)'],
+              ['3','Go to Auth → API Keys → Create API Key'],
+              ['4','Paste your Telnyx API Key below and save'],
+              ['5','Enter your Telnyx fax number (assigned after signup)'],
+            ].map(([step,text])=>(
+              <div key={step} style={{display:'flex',gap:10,marginBottom:4,alignItems:'flex-start'}}>
+                <div style={{width:20,height:20,borderRadius:'50%',background:'var(--blue)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,flexShrink:0,marginTop:1}}>{step}</div>
+                <div style={{color:'var(--t2)'}}>{text}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="field"><label>Telnyx API Key</label>
+            <input type="password" value={firm.telnyx_api_key||''} onChange={set('telnyx_api_key')} placeholder="KEY0xxxxxxxxxxxxxxxxxxxxxxxx"/>
+          </div>
+          <div className="field"><label>Your Fax Number (from Notifyre)</label>
+            <input value={firm.firm_fax_number||''} onChange={set('firm_fax_number')} placeholder="+1 (800) 555-0100"/>
+          </div>
+
+          <div style={{background:'rgba(26,127,212,.08)',border:'1px solid rgba(26,127,212,.2)',borderRadius:8,padding:'10px 14px',marginBottom:16,fontSize:12,color:'var(--t2)',lineHeight:1.6}}>
+            <strong style={{color:'var(--blue)'}}>Pricing reference:</strong> Domestic fax from ~$0.005/page · International rates vary · Pay-as-you-go · HIPAA compliant<br/>
+            Docs: <a href="https://developers.telnyx.com/docs/fax" target="_blank" style={{color:'var(--blue)'}}>developers.telnyx.com/docs/fax</a>
+          </div>
+
+          <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving?'Saving…':'💾 Save Fax Settings'}</button>
+        </div>
+      )}
+
+      {tab === 'branding' && (
+        <div className="card">
+          <div className="card-header"><span className="card-title">Branding</span></div>
+          <div style={{ padding: '0 20px 20px' }}>
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>Company Logo</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+                <div style={{
+                  width: 120, height: 80, borderRadius: 10, border: '2px dashed var(--border)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  overflow: 'hidden', background: 'var(--bg2)'
+                }}>
+                  {logoUrl
+                    ? <img src={logoUrl} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                    : <span style={{ fontSize: 28 }}>🏢</span>}
+                </div>
+                <div>
+                  <button className="btn pri" onClick={() => fileRef.current.click()} disabled={uploading}>
+                    {uploading ? 'Uploading…' : '📤 Upload Logo'}
+                  </button>
+                  <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 6 }}>PNG, JPG, SVG — max 2MB</div>
+                  <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={uploadLogo} />
+                </div>
+              </div>
+            </div>
+            <div className="field" style={{ maxWidth: 260 }}>
+              <label>Primary Color</label>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <input type="color" value={firm.primary_color} onChange={e => { set('primary_color')(e); applyBrandColor(e.target.value) }} style={{ width: 48, height: 36, borderRadius: 6, border: 'none', cursor: 'pointer' }} />
+                <input value={firm.primary_color} onChange={e => { set('primary_color')(e); applyBrandColor(e.target.value) }} style={{ flex: 1 }} placeholder="#2563eb" />
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+              <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Branding'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'users' && (
+        <div className="card">
+          <div className="card-header"><span className="card-title">Team Members</span></div>
+          <div style={{ padding: '0 20px 20px' }}>
+            {[
+              { name:'Romy Cruz',        email:'romy@taxcasereview.org',    role:'Super Admin', color:'br' },
+              { name:'Dana Richard',     email:'flipnitnow@gmail.com',    role:'Admin',       color:'bb' },
+              { name:'Yesenia Gonzalez', email:'yeseniagt1@gmail.com', role:'Admin',       color:'bb' },
+            ].map(m => (
+              <div key={m.email} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 0', borderBottom:'1px solid var(--br)' }}>
+                <div style={{ width:40, height:40, borderRadius:'50%', background:'var(--blue)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:16, color:'#fff', flexShrink:0 }}>
+                  {m.name[0]}
+                </div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontWeight:700, fontSize:14 }}>
+                    {m.name}
+                    {m.email === user?.email && <span style={{ fontSize:10, color:'var(--ok)', marginLeft:8 }}>● You</span>}
+                  </div>
+                  <div style={{ color:'var(--t2)', fontSize:12 }}>{m.email}</div>
+                </div>
+                <span className={`bdg ${m.color}`} style={{ fontSize:11 }}>{m.role}</span>
+              </div>
+            ))}
+            <div style={{ color:'var(--t3)', fontSize:12, marginTop:14 }}>
+              To add or remove team members, go to Supabase → Authentication → Users.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'security' && (
+        <div className="card">
+          <div className="card-header"><span className="card-title">Change Password</span></div>
+          <div style={{ padding: '0 20px 20px', maxWidth: 400 }}>
+            <div className="field"><label>New Password</label><input type="password" value={pw.next} onChange={e => setPw(p => ({ ...p, next: e.target.value }))} /></div>
+            <div className="field"><label>Confirm Password</label><input type="password" value={pw.confirm} onChange={e => setPw(p => ({ ...p, confirm: e.target.value }))} /></div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+              <button className="btn pri" onClick={changePassword} disabled={saving}>{saving ? 'Saving…' : 'Update Password'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+<div style={{background:'rgba(34,197,94,.08)',border:'1px solid rgba(34,197,94,.25)',borderRadius:8,padding:'10px 14px',marginBottom:10,display:'flex',alignItems:'center',gap:10,fontSize:12,color:'var(--ok)'}}><span>✅</span><span>Document storage bucket configured and active. File uploads are working.</span></div>
           </div>
         </div>
       )}
