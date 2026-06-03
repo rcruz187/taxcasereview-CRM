@@ -406,6 +406,8 @@ export default function Clients() {
             <ActionBtn color="#be185d" icon="🧾" label="New Invoice" sub="Bill Client" onClick={()=>navigate('/invoices')}/>
             <ActionBtn color="#059669" icon="💳" label="Add Payment" sub="Record Payment" onClick={()=>{setPayForm({amount:'',method:'Credit Card',date:'',notes:''});setPayModal(true)}}/>
             <ActionBtn color="#0f766e" icon="📊" label="P&amp;L" sub="Books &amp; Ledger" onClick={()=>navigate('/books?client='+encodeURIComponent(c.name))}/>
+            <ActionBtn color="#dc2626" icon="📠" label="Send Fax" sub="Telnyx Fax" onClick={()=>navigate('/fax?client='+encodeURIComponent(c.name)+'&phone='+encodeURIComponent(c.phone||''))}/>
+            <ActionBtn color="#7c3aed" icon="✍️" label="E-Signature" sub="Request Sign" onClick={()=>navigate('/esign?client='+encodeURIComponent(c.name)+'&email='+encodeURIComponent(c.email||''))}/>
           </div>
         </div>
 
