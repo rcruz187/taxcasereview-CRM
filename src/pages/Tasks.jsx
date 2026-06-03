@@ -17,6 +17,7 @@ export default function Tasks() {
   const [sug,       setSug]       = useState([])
   const [qtSug,     setQtSug]     = useState([])
   const [saving,    setSaving]    = useState(false)
+  const [confirmDelId, setConfirmDelId] = useState(null)
   const [toast,     setToast]     = useState('')
   const [view,      setView]      = useState('open') // 'open' | 'completed' | 'deleted'
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
@@ -101,7 +102,8 @@ export default function Tasks() {
 
   // Permanent delete (Super Admin only)
   async function permDelete(id) {
-    if (!confirm('Permanently delete this task? This cannot be undone.')) return
+    if (!window._confirmDel) { setConfirmDelId(id); return }
+    window._confirmDel = false
     await supabase.from('tasks').delete().eq('id',id)
     showToast('Permanently deleted'); load()
   }
@@ -169,7 +171,7 @@ export default function Tasks() {
   const totalDeleted   = deleted.length
 
   return (
-    <div>
+    <div style={{maxWidth:1000}}>
       {toast&&<div className="toast show">{toast}</div>}
 
       {/* Stats */}
@@ -343,6 +345,19 @@ export default function Tasks() {
             <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:10}} onClick={()=>save(form)} disabled={saving}>
               {saving?'Saving…':'Add Task'}
             </button>
+          </div>
+        </div>
+      )}
+      {confirmDelId&&(
+        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setConfirmDelId(null)}>
+          <div className="modal" style={{maxWidth:380,textAlign:'center'}}>
+            <div style={{fontSize:36,marginBottom:12}}>🗑</div>
+            <div style={{fontWeight:700,fontSize:15,marginBottom:8}}>Delete this task?</div>
+            <div style={{fontSize:13,color:'var(--t3)',marginBottom:20}}>This cannot be undone.</div>
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={()=>setConfirmDelId(null)}>Cancel</button>
+              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>{window._confirmDel=true;permanentDelete(confirmDelId);setConfirmDelId(null)}}>Delete</button>
+            </div>
           </div>
         </div>
       )}
