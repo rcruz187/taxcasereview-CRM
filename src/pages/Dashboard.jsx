@@ -120,7 +120,6 @@ export default function Dashboard() {
       </div>
     </div>
   )}
-  )
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
