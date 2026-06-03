@@ -30,7 +30,8 @@ import Reports    from './pages/Reports'
 import Settings   from './pages/Settings'
 import Dialer     from './pages/Dialer'
 import Chat       from './pages/Chat'
-import Books      from './pages/Books'
+import Books         from './pages/Books'
+import FormaCorp     from './pages/FormaCorp'
 
 const style = document.createElement('style')
 style.textContent = `@keyframes spin { to { transform: rotate(360deg) } }`
