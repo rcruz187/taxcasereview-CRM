@@ -90,6 +90,136 @@ function ActionBtn({color, icon, label, sub, onClick}) {
   )
 }
 
+
+// ── Inline Fax Form ─────────────────────────────────────────────────────────
+function InlineFaxForm({ client, onClose, showToast }) {
+  const [toNum,   setToNum]   = useState((client?.phone||'').replace(/\D/g,''))
+  const [subject, setSubject] = useState('')
+  const [notes,   setNotes]   = useState('')
+  const [file,    setFile]    = useState(null)
+  const [sending, setSending] = useState(false)
+
+  async function send() {
+    if (!toNum) { showToast('Fax number required','err'); return }
+    setSending(true)
+    const { data:s } = await supabase.from('settings').select('telnyx_api_key,firm_fax_number').limit(1).maybeSingle()
+    let fileUrl = null
+    if (file) {
+      const path = 'fax/'+Date.now()+'_'+file.name
+      await supabase.storage.from('documents').upload(path, file, {upsert:true})
+      const { data:u } = supabase.storage.from('documents').getPublicUrl(path)
+      fileUrl = u?.publicUrl
+    }
+    const toFull = '+1'+toNum.slice(-10)
+    const fromNum = s?.firm_fax_number || ''
+    if (s?.telnyx_api_key) {
+      await fetch('https://api.telnyx.com/v2/faxes', {
+        method:'POST',
+        headers:{'Authorization':'Bearer '+s.telnyx_api_key,'Content-Type':'application/json'},
+        body: JSON.stringify({to:toFull,from:fromNum,...(fileUrl?{media_url:fileUrl}:{})})
+      }).catch(()=>{})
+    }
+    await supabase.from('fax_logs').insert([{
+      to_number:toFull, from_number:fromNum, client_name:client?.name,
+      subject, notes, file_name:file?.name||null, file_url:fileUrl,
+      status: s?.telnyx_api_key ? 'Sent' : 'Logged',
+      sent_by:'CRM', sent_at:new Date().toISOString(), created_at:new Date().toISOString()
+    }])
+    setSending(false)
+    showToast('📠 Fax '+(s?.telnyx_api_key?'sent':'logged')+'!')
+    onClose()
+  }
+
+  return (
+    <div style={{padding:'0 4px 4px'}}>
+      <div className="field"><label>To Fax Number</label>
+        <input value={toNum} onChange={e=>setToNum(e.target.value.replace(/\D/g,''))} placeholder="10 digits"/>
+      </div>
+      <div className="field"><label>Subject</label>
+        <input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="e.g. Form 2848"/>
+      </div>
+      <div className="field"><label>Attach PDF</label>
+        <input type="file" accept=".pdf,.tiff,.jpg,.png" onChange={e=>setFile(e.target.files[0])}
+          style={{padding:'6px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',width:'100%',fontSize:12}}/>
+      </div>
+      <div className="field"><label>Notes</label>
+        <input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Internal notes"/>
+      </div>
+      <div style={{display:'flex',gap:8}}>
+        <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={onClose}>Cancel</button>
+        <button className="btn pri" style={{flex:1,justifyContent:'center',background:'#dc2626',borderColor:'#dc2626'}} onClick={send} disabled={sending}>
+          {sending?'Sending…':'📠 Send Fax'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Inline E-Sign Form ───────────────────────────────────────────────────────
+const DOC_TYPES_INLINE = ['Engagement Letter','Form 2848 — Power of Attorney','Form 8821 — Tax Info Auth',
+  'Service Agreement','Fee Agreement Addendum','9465 Installment Agreement','OIC Application (656)','Custom Document']
+
+function InlineEsignForm({ client, onClose, showToast }) {
+  const [docType,  setDocType]  = useState('Engagement Letter')
+  const [message,  setMessage]  = useState('Please review and sign the attached document at your earliest convenience.')
+  const [priority, setPriority] = useState('Normal')
+  const [saving,   setSaving]   = useState(false)
+  const [link,     setLink]     = useState('')
+
+  async function create() {
+    setSaving(true)
+    const { data, error } = await supabase.from('esigns').insert([{
+      doc_type: docType, client_name: client?.name, client_email: client?.email||'',
+      message, priority, status:'Awaiting', sent_at: new Date().toISOString(), created_at: new Date().toISOString()
+    }]).select().single()
+    setSaving(false)
+    if (error) { showToast('Error: '+error.message,'err'); return }
+    const url = window.location.origin+'/taxcasereview-CRM/#/sign/'+data.id
+    setLink(url)
+    navigator.clipboard.writeText(url).catch(()=>{})
+    showToast('✅ Signing link copied!')
+  }
+
+  if (link) return (
+    <div style={{padding:'0 4px 4px'}}>
+      <div style={{background:'rgba(34,197,94,.08)',border:'1px solid rgba(34,197,94,.3)',borderRadius:8,padding:'12px 14px',marginBottom:14}}>
+        <div style={{fontSize:12,fontWeight:700,color:'var(--ok)',marginBottom:6}}>✅ Signing link created & copied!</div>
+        <div style={{fontSize:11,color:'var(--t3)',wordBreak:'break-all',marginBottom:8}}>{link}</div>
+        <div style={{fontSize:11,color:'var(--t2)'}}>Send this link to <strong>{client?.name}</strong> via email or SMS. When they sign, their IP address and timestamp are automatically recorded and a copy is saved to their documents.</div>
+      </div>
+      <button className="btn sec" style={{width:'100%',justifyContent:'center'}} onClick={onClose}>Done</button>
+    </div>
+  )
+
+  return (
+    <div style={{padding:'0 4px 4px'}}>
+      <div className="field"><label>Document Type</label>
+        <select value={docType} onChange={e=>setDocType(e.target.value)}>
+          {DOC_TYPES_INLINE.map(t=><option key={t}>{t}</option>)}
+        </select>
+      </div>
+      <div className="field"><label>Message to Client</label>
+        <textarea value={message} onChange={e=>setMessage(e.target.value)} rows={3}
+          style={{width:'100%',resize:'vertical',padding:'8px 12px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:13,fontFamily:'inherit'}}/>
+      </div>
+      <div className="field"><label>Priority</label>
+        <select value={priority} onChange={e=>setPriority(e.target.value)}>
+          <option>Normal</option><option>High</option><option>Urgent</option>
+        </select>
+      </div>
+      <div style={{background:'var(--s2)',borderRadius:6,padding:'8px 12px',fontSize:11,color:'var(--t3)',marginBottom:14,lineHeight:1.6}}>
+        💡 A unique signing link will be generated. Send to client via email or SMS. Their signature, IP, and timestamp are all recorded automatically.
+      </div>
+      <div style={{display:'flex',gap:8}}>
+        <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={onClose}>Cancel</button>
+        <button className="btn pri" style={{flex:1,justifyContent:'center',background:'#7c3aed',borderColor:'#7c3aed'}} onClick={create} disabled={saving}>
+          {saving?'Creating…':'✍️ Create & Copy Link'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function Clients() {
   const navigate = useNavigate()
   const { id: urlId } = useParams()
@@ -406,8 +536,8 @@ export default function Clients() {
             <ActionBtn color="#be185d" icon="🧾" label="New Invoice" sub="Bill Client" onClick={()=>navigate('/invoices')}/>
             <ActionBtn color="#059669" icon="💳" label="Add Payment" sub="Record Payment" onClick={()=>{setPayForm({amount:'',method:'Credit Card',date:'',notes:''});setPayModal(true)}}/>
             <ActionBtn color="#0f766e" icon="📊" label="P&amp;L" sub="Books &amp; Ledger" onClick={()=>navigate('/books?client='+encodeURIComponent(c.name))}/>
-            <ActionBtn color="#dc2626" icon="📠" label="Send Fax" sub="Telnyx Fax" onClick={()=>navigate('/fax?client='+encodeURIComponent(c.name)+'&phone='+encodeURIComponent(c.phone||''))}/>
-            <ActionBtn color="#7c3aed" icon="✍️" label="E-Signature" sub="Request Sign" onClick={()=>navigate('/esign?client='+encodeURIComponent(c.name)+'&email='+encodeURIComponent(c.email||''))}/>
+            <ActionBtn color="#dc2626" icon="📠" label="Send Fax" sub="Telnyx Fax" onClick={()=>{setFaxClient(c);setFaxModal(true)}}/>
+            <ActionBtn color="#7c3aed" icon="✍️" label="E-Signature" sub="Request Sign" onClick={()=>{setEsignClient(c);setEsignModal(true)}}/>
           </div>
         </div>
 
