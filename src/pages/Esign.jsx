@@ -135,6 +135,7 @@ export default function Esign() {
     clientName: qp2.get('client') || '',
     clientEmail: qp2.get('email') || ''
   })
+  useEffect(() => { if (qp2.get('client')) setModal(true) }, [])
   const [saving,   setSaving]   = useState(false)
   const [toast,    setToast]    = useState('')
   const [search,   setSearch]   = useState('')
