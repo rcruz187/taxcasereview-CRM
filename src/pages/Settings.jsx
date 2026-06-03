@@ -24,9 +24,25 @@ export default function Settings() {
 
   useEffect(() => { loadFirm(); loadLogo() }, [])
 
+  function applyBrandColor(hex) {
+    if (!hex || !hex.startsWith('#')) return
+    document.documentElement.style.setProperty('--blue', hex)
+    // derive a transparent version for badges/borders
+    document.documentElement.style.setProperty('--blt', hex + '22')
+    document.documentElement.style.setProperty('--b2c', hex + '33')
+    // update meta theme-color for mobile browsers
+    const meta = document.querySelector('meta[name="theme-color"]')
+    if (meta) meta.setAttribute('content', hex)
+    // persist so it survives page refreshes before Supabase loads
+    localStorage.setItem('tcr_brand_color', hex)
+  }
+
   async function loadFirm() {
     const { data } = await supabase.from('settings').select('*').limit(1).maybeSingle()
-    if (data) setFirm(f => ({ ...f, ...data }))
+    if (data) {
+      setFirm(f => ({ ...f, ...data }))
+      if (data.primary_color) applyBrandColor(data.primary_color)
+    }
   }
 
   async function loadLogo() {
@@ -43,7 +59,8 @@ export default function Settings() {
       } else {
         await supabase.from('settings').insert(firm)
       }
-      showToast('Settings saved!')
+      if (firm.primary_color) applyBrandColor(firm.primary_color)
+      showToast('✅ Saved! Brand color applied across the CRM.')
     } catch (e) { showToast(e.message, 'err') } finally { setSaving(false) }
   }
 
@@ -261,8 +278,8 @@ create policy "Auth upload documents"
             <div className="field" style={{ maxWidth: 260 }}>
               <label>Primary Color</label>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                <input type="color" value={firm.primary_color} onChange={set('primary_color')} style={{ width: 48, height: 36, borderRadius: 6, border: 'none', cursor: 'pointer' }} />
-                <input value={firm.primary_color} onChange={set('primary_color')} style={{ flex: 1 }} placeholder="#2563eb" />
+                <input type="color" value={firm.primary_color} onChange={e => { set('primary_color')(e); applyBrandColor(e.target.value) }} style={{ width: 48, height: 36, borderRadius: 6, border: 'none', cursor: 'pointer' }} />
+                <input value={firm.primary_color} onChange={e => { set('primary_color')(e); applyBrandColor(e.target.value) }} style={{ flex: 1 }} placeholder="#2563eb" />
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
