@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useLocation } from 'react-router-dom'
 
 const DOC_TYPES = ['Engagement Letter','Form 2848 — Power of Attorney','Form 8821 — Tax Info Auth',
   '9465 Installment Agreement Consent','OIC Application (656)','Form 433-A Collection Info',
@@ -21,7 +22,7 @@ function signingUrl(id) {
 function buildDocHtml(item) {
   return `
 <!DOCTYPE html><html><head><meta charset="utf-8"/>
-<title>Sign: ${item.docType}</title>
+<title>Sign: ${item.doc_type}</title>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
@@ -48,8 +49,8 @@ function buildDocHtml(item) {
 </style></head><body>
 <div class="logo">TAX CASE REVIEW — Document Signing Portal</div>
 <div class="card" id="main">
-  <h1>${item.docType}</h1>
-  <div class="sub">Prepared for: <strong>${item.clientName}</strong></div>
+  <h1>${item.doc_type}</h1>
+  <div class="sub">Prepared for: <strong>${item.client_name}</strong></div>
   <div class="doc-body">${item.message || 'Please review this document and provide your electronic signature below to confirm your agreement and authorization.'}</div>
   <div class="field"><label>Full Legal Name</label><input id="fullname" placeholder="Type your full name as it appears on the document" /></div>
   <div class="field">
@@ -110,8 +111,8 @@ function buildDocHtml(item) {
             Signer: \${sig}<br/>
             IP Address: \${clientIp}<br/>
             Timestamp: \${new Date().toISOString()}<br/>
-            Document: ${item.docType}<br/>
-            Client: ${item.clientName}
+            Document: ${item.doc_type}<br/>
+            Client: ${item.client_name}
           </div>
         </div>\`
     } else {
@@ -127,8 +128,13 @@ function buildDocHtml(item) {
 export default function Esign() {
   const [items,    setItems]    = useState([])
   const [clients,  setClients]  = useState([])
-  const [modal,    setModal]    = useState(false)
-  const [form,     setForm]     = useState(BLANK)
+  const location = useLocation()
+  const [modal, setModal] = useState(false)
+  const qp2 = new URLSearchParams(location.search)
+  const [form, setForm] = useState({...BLANK,
+    clientName: qp2.get('client') || '',
+    clientEmail: qp2.get('email') || ''
+  })
   const [saving,   setSaving]   = useState(false)
   const [toast,    setToast]    = useState('')
   const [search,   setSearch]   = useState('')
@@ -169,7 +175,15 @@ export default function Esign() {
     if (!form.clientName) { showToast('Client required'); return }
     setSaving(true)
     const { data, error } = await supabase.from('esigns').insert([{
-      ...form, sentAt:new Date().toISOString(), created_at:new Date().toISOString()
+      doc_type: form.docType,
+      client_name: form.clientName,
+      client_email: form.clientEmail,
+      message: form.message,
+      priority: form.priority,
+      due_date: form.dueDate,
+      status: 'Awaiting',
+      sent_at: new Date().toISOString(),
+      created_at: new Date().toISOString()
     }]).select().single()
     setSaving(false)
     if (error) { showToast('Error: '+error.message); return }
@@ -191,7 +205,7 @@ export default function Esign() {
   async function resend(item) {
     const url = signingUrl(item.id)
     await navigator.clipboard.writeText(url).catch(()=>{})
-    await supabase.from('esigns').update({status:'Awaiting', sentAt:new Date().toISOString(), updated_at:new Date().toISOString()}).eq('id',item.id)
+    await supabase.from('esigns').update({status:'Awaiting', sent_at:new Date().toISOString()}).eq('id',item.id)
     showToast('✅ Signing link copied to clipboard! Send to client via email or SMS.')
     load()
   }
@@ -210,7 +224,7 @@ export default function Esign() {
 
   const filtered = items.filter(i=>{
     const q = search.toLowerCase()
-    const ms = !q || i.clientName?.toLowerCase().includes(q) || i.docType?.toLowerCase().includes(q)
+    const ms = !q || i.client_name?.toLowerCase().includes(q) || i.doc_type?.toLowerCase().includes(q)
     const mst = filterStatus==='All' || i.status===filterStatus
     return ms && mst
   })
@@ -268,30 +282,30 @@ export default function Esign() {
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:10}}>
           {filtered.map(item=>{
             const isOverdue = item.dueDate && new Date(item.dueDate)<new Date() && item.status==='Awaiting'
-            const daysSince = item.sentAt ? Math.floor((new Date()-new Date(item.sentAt))/(1000*60*60*24)) : 0
+            const daysSince = item.sent_at ? Math.floor((new Date()-new Date(item.sent_at))/(1000*60*60*24)) : 0
             const isSigned  = item.status==='Signed'
             return (
               <div key={item.id} className="card" style={{border:isOverdue?'1px solid var(--bad)':isSigned?'1px solid var(--ok)33':'1px solid var(--br)',padding:'14px 16px'}}>
                 <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:8}}>
                   <div>
-                    <div style={{fontSize:13,fontWeight:700,marginBottom:2}}>✍️ {item.docType}</div>
-                    <div style={{fontSize:12,color:'var(--b2)',fontWeight:600}}>{item.clientName}</div>
-                    {item.clientEmail&&<div style={{fontSize:10,color:'var(--t3)',marginTop:1}}>{item.clientEmail}</div>}
+                    <div style={{fontSize:13,fontWeight:700,marginBottom:2}}>✍️ {item.doc_type}</div>
+                    <div style={{fontSize:12,color:'var(--b2)',fontWeight:600}}>{item.client_name}</div>
+                    {item.client_email&&<div style={{fontSize:10,color:'var(--t3)',marginTop:1}}>{item.client_email}</div>}
                   </div>
                   <span className={`bdg ${isSigned?'bg':item.status==='Declined'?'br':item.status==='Expired'?'bw':'ba'}`}>{item.status}</span>
                 </div>
 
                 <div style={{display:'flex',gap:10,fontSize:10,color:'var(--t3)',marginBottom:10,flexWrap:'wrap'}}>
-                  {item.sentAt&&<span>Sent {new Date(item.sentAt).toLocaleDateString()}</span>}
+                  {item.sent_at&&<span>Sent {new Date(item.sent_at).toLocaleDateString()}</span>}
                   {item.status==='Awaiting'&&daysSince>0&&<span style={{color:daysSince>7?'var(--bad)':'var(--warn)'}}>⏱ {daysSince}d pending</span>}
-                  {item.signedAt&&<span style={{color:'var(--ok)'}}>✓ Signed {new Date(item.signedAt).toLocaleDateString()}</span>}
-                  {item.signerIp&&<span>IP: {item.signerIp}</span>}
+                  {item.signed_at&&<span style={{color:'var(--ok)'}}>✓ Signed {new Date(item.signed_at).toLocaleDateString()}</span>}
+                  {item.signer_ip&&<span>IP: {item.signer_ip}</span>}
                 </div>
 
-                {isSigned && item.signedName && (
+                {isSigned && item.signed_name && (
                   <div style={{background:'var(--ok)11',border:'1px solid var(--ok)33',borderRadius:6,padding:'6px 10px',marginBottom:8,fontSize:11}}>
                     <span style={{color:'var(--t3)'}}>Signed by: </span>
-                    <span style={{fontFamily:'Georgia,serif',fontSize:15,color:'var(--ok)',fontWeight:600}}>{item.signedName}</span>
+                    <span style={{fontFamily:'Georgia,serif',fontSize:15,color:'var(--ok)',fontWeight:600}}>{item.signed_name}</span>
                   </div>
                 )}
 
@@ -332,15 +346,15 @@ export default function Esign() {
                 <div style={{fontWeight:700,fontSize:15}}>Legally Signed Document</div>
               </div>
               {[
-                ['Document',viewCert.docType],
-                ['Client',viewCert.clientName],
-                ['Email',viewCert.clientEmail||'—'],
-                ['Signed Name',<span style={{fontFamily:'Georgia,serif',fontSize:16,color:'var(--ok)'}}>{viewCert.signedName||'—'}</span>],
-                ['Signer Full Name',viewCert.signerFullName||'—'],
-                ['IP Address',viewCert.signerIp||'Not captured'],
-                ['Signed At',viewCert.signedAt?new Date(viewCert.signedAt).toLocaleString():'—'],
-                ['Sent At',viewCert.sentAt?new Date(viewCert.sentAt).toLocaleString():'—'],
-                ['Device',viewCert.signedUserAgent?viewCert.signedUserAgent.slice(0,60)+'…':'—'],
+                ['Document',viewCert.doc_type],
+                ['Client',viewCert.client_name],
+                ['Email',viewCert.client_email||'—'],
+                ['Signed Name',<span style={{fontFamily:'Georgia,serif',fontSize:16,color:'var(--ok)'}}>{viewCert.signed_name||'—'}</span>],
+                ['Signer Full Name',viewCert.signer_full_name||'—'],
+                ['IP Address',viewCert.signer_ip||'Not captured'],
+                ['Signed At',viewCert.signed_at?new Date(viewCert.signed_at).toLocaleString():'—'],
+                ['Sent At',viewCert.sent_at?new Date(viewCert.sent_at).toLocaleString():'—'],
+                ['Device',viewCert.signed_user_agent?viewCert.signed_user_agent.slice(0,60)+'…':'—'],
               ].map(([l,v])=>(
                 <div key={l} style={{display:'flex',borderBottom:'1px solid var(--br)',padding:'5px 0',gap:12}}>
                   <span style={{color:'var(--t3)',fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'.04em',minWidth:120,paddingTop:2}}>{l}</span>
@@ -352,7 +366,7 @@ export default function Esign() {
               Legally binding under ESIGN Act & UETA. IP address + timestamp constitute proof of signing.
             </div>
             <button className="btn sec" style={{width:'100%',marginTop:12,justifyContent:'center'}} onClick={()=>{
-              const text = `SIGNATURE CERTIFICATE\n\nDocument: ${viewCert.docType}\nClient: ${viewCert.clientName}\nSigned Name: ${viewCert.signedName}\nIP Address: ${viewCert.signerIp}\nSigned At: ${new Date(viewCert.signedAt).toLocaleString()}\nDevice: ${viewCert.signedUserAgent}`
+              const text = `SIGNATURE CERTIFICATE\n\nDocument: ${viewCert.doc_type}\nClient: ${viewCert.client_name}\nSigned Name: ${viewCert.signed_name}\nIP Address: ${viewCert.signer_ip}\nSigned At: ${new Date(viewCert.signed_at).toLocaleString()}\nDevice: ${viewCert.signed_user_agent}`
               navigator.clipboard.writeText(text)
               showToast('Certificate copied to clipboard')
             }}>📋 Copy Certificate</button>
