@@ -23,7 +23,7 @@ export function useFirm() {
         supabase.storage.from(BUCKET).getPublicUrl('logo'),
       ])
       const firmData = s || {}
-      const logo = logoData?.publicUrl || ''
+      const logo = logoData?.publicUrl || '/taxcasereview-CRM/logo.png'
       _cache = { firm: firmData, logoUrl: logo }
       setFirm(firmData)
       setLogo(logo)
@@ -42,7 +42,7 @@ export function useFirm() {
         supabase.storage.from(BUCKET).getPublicUrl('logo'),
       ])
       const firmData = s || {}
-      const logo = logoData?.publicUrl || ''
+      const logo = logoData?.publicUrl || '/taxcasereview-CRM/logo.png'
       _cache = { firm: firmData, logoUrl: logo }
       setFirm(firmData)
       setLogo(logo)
