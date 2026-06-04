@@ -330,8 +330,8 @@ export default function Leads() {
         {/* Action buttons — compact row */}
         <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}>
           <button className="btn ok sm" style={{flex:1,minWidth:130,justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generateClientPackage(l)}>
-            <span style={{fontSize:11,fontWeight:700}}>📄 Client Package</span>
-            <span style={{fontSize:10,opacity:.8}}>Agreement + Letter</span>
+            <span style={{fontSize:11,fontWeight:700}}>📄 Tax Engagement</span>
+            <span style={{fontSize:10,opacity:.8}}>Service Agreement</span>
           </button>
           <button className="btn sm" style={{flex:1,minWidth:130,background:'#0369a1',color:'#fff',borderColor:'#0369a1',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generateForm8821(l)}>
             <span style={{fontSize:11,fontWeight:700}}>📋 Form 8821</span>
@@ -370,7 +370,75 @@ export default function Leads() {
           </div>
         )}
 
-        {showFaxModal && inlineFaxLead && (
+        {/* ── Status Flow Modal ──────────────────────────────────────────────── */}
+      {showFlow && (
+        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setShowFlow(false)}>
+          <div className="modal" style={{maxWidth:820,width:'95vw'}}>
+            <div className="mh">
+              <span className="mt">📊 Lead Status Flow</span>
+              <button className="xbtn" onClick={()=>setShowFlow(false)}>&times;</button>
+            </div>
+            <div style={{overflowX:'auto',padding:'8px 0'}}>
+              <div style={{display:'flex',alignItems:'center',gap:0,minWidth:700,flexWrap:'wrap',rowGap:16}}>
+                {[
+                  {s:'New Lead',       c:'#3b82f6', doc:null},
+                  {s:'Contacted',      c:'#6366f1', doc:null},
+                  {s:'Consultation Scheduled', c:'#8b5cf6', doc:null},
+                  {s:'Consultation Completed', c:'#a855f7', doc:null},
+                  {s:'Tax Inv Agreement Sent', c:'#f59e0b', doc:'📄 Service Agreement'},
+                  {s:'Tax Inv Agreement Signed', c:'#f97316', doc:'✍️ Client Signs'},
+                  {s:'Tax Inv Fee Paid', c:'#10b981', doc:'💰 Fee Collected'},
+                  {s:'Tax Investigation Active', c:'#059669', doc:'🔍 Transcripts'},
+                  {s:'IRS Facts Received', c:'#0ea5e9', doc:'📋 Facts In'},
+                  {s:'Addendum Sent', c:'#f59e0b', doc:'📄 Addendum'},
+                  {s:'Addendum Signed', c:'#f97316', doc:'✍️ Client Signs'},
+                  {s:'Resolution Fee Paid', c:'#10b981', doc:'💰 Fee Collected'},
+                  {s:'Converted to Client', c:'#25A25A', doc:'🎉 Client!'},
+                ].map((item, i, arr) => (
+                  <div key={item.s} style={{display:'flex',alignItems:'center',gap:0}}>
+                    <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+                      <div style={{
+                        background: item.c, color:'#fff', borderRadius:8,
+                        padding:'6px 10px', fontSize:11, fontWeight:700,
+                        textAlign:'center', whiteSpace:'nowrap', maxWidth:110,
+                        lineHeight:1.3
+                      }}>{item.s}</div>
+                      {item.doc && <div style={{fontSize:9,color:'var(--t3)',textAlign:'center',maxWidth:110}}>{item.doc}</div>}
+                    </div>
+                    {i < arr.length - 1 && (
+                      <div style={{color:'var(--t3)',fontSize:16,margin:'0 4px',flexShrink:0}}>→</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Off-track statuses */}
+              <div style={{marginTop:16,paddingTop:12,borderTop:'1px solid var(--br)'}}>
+                <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>Off-Track</div>
+                <div style={{display:'flex',gap:8}}>
+                  {[{s:'Dead',c:'#ef4444'},{s:'Do Not Contact',c:'#6b7280'}].map(item=>(
+                    <div key={item.s} style={{background:item.c,color:'#fff',borderRadius:8,padding:'6px 12px',fontSize:11,fontWeight:700}}>
+                      {item.s}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Quick legend */}
+              <div style={{marginTop:12,padding:10,background:'var(--bg)',borderRadius:8,fontSize:11,color:'var(--t2)',lineHeight:1.8}}>
+                <b style={{color:'var(--tx)'}}>Key Actions per Stage:</b><br/>
+                🔵 <b>New → Consultation Completed</b> — Phone outreach & consult scheduling<br/>
+                🟡 <b>Agreement Sent → Fee Paid</b> — Generate Service Agreement → collect $499–$699 investigation fee<br/>
+                🟢 <b>Tax Investigation Active → IRS Facts</b> — File Form 2848/8821, pull transcripts<br/>
+                🟠 <b>Addendum Sent → Resolution Fee Paid</b> — Present resolution plan, collect full service fee<br/>
+                ✅ <b>Convert to Client</b> — Opens full client file & case management
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showFaxModal && inlineFaxLead && (
           <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setShowFaxModal(false)}>
             <div className="modal" style={{width:520}}>
               <div className="mh"><span className="mt">📠 Send Fax — {inlineFaxLead.name}</span><button className="xbtn" onClick={()=>setShowFaxModal(false)}>&times;</button></div>
@@ -610,73 +678,6 @@ export default function Leads() {
         </div>
       )}
 
-      {/* ── Status Flow Modal ──────────────────────────────────────────────── */}
-      {showFlow && (
-        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setShowFlow(false)}>
-          <div className="modal" style={{maxWidth:820,width:'95vw'}}>
-            <div className="mh">
-              <span className="mt">📊 Lead Status Flow</span>
-              <button className="xbtn" onClick={()=>setShowFlow(false)}>&times;</button>
-            </div>
-            <div style={{overflowX:'auto',padding:'8px 0'}}>
-              <div style={{display:'flex',alignItems:'center',gap:0,minWidth:700,flexWrap:'wrap',rowGap:16}}>
-                {[
-                  {s:'New Lead',       c:'#3b82f6', doc:null},
-                  {s:'Contacted',      c:'#6366f1', doc:null},
-                  {s:'Consultation Scheduled', c:'#8b5cf6', doc:null},
-                  {s:'Consultation Completed', c:'#a855f7', doc:null},
-                  {s:'Tax Inv Agreement Sent', c:'#f59e0b', doc:'📄 Service Agreement'},
-                  {s:'Tax Inv Agreement Signed', c:'#f97316', doc:'✍️ Client Signs'},
-                  {s:'Tax Inv Fee Paid', c:'#10b981', doc:'💰 Fee Collected'},
-                  {s:'Tax Investigation Active', c:'#059669', doc:'🔍 Transcripts'},
-                  {s:'IRS Facts Received', c:'#0ea5e9', doc:'📋 Facts In'},
-                  {s:'Addendum Sent', c:'#f59e0b', doc:'📄 Addendum'},
-                  {s:'Addendum Signed', c:'#f97316', doc:'✍️ Client Signs'},
-                  {s:'Resolution Fee Paid', c:'#10b981', doc:'💰 Fee Collected'},
-                  {s:'Converted to Client', c:'#25A25A', doc:'🎉 Client!'},
-                ].map((item, i, arr) => (
-                  <div key={item.s} style={{display:'flex',alignItems:'center',gap:0}}>
-                    <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
-                      <div style={{
-                        background: item.c, color:'#fff', borderRadius:8,
-                        padding:'6px 10px', fontSize:11, fontWeight:700,
-                        textAlign:'center', whiteSpace:'nowrap', maxWidth:110,
-                        lineHeight:1.3
-                      }}>{item.s}</div>
-                      {item.doc && <div style={{fontSize:9,color:'var(--t3)',textAlign:'center',maxWidth:110}}>{item.doc}</div>}
-                    </div>
-                    {i < arr.length - 1 && (
-                      <div style={{color:'var(--t3)',fontSize:16,margin:'0 4px',flexShrink:0}}>→</div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Off-track statuses */}
-              <div style={{marginTop:16,paddingTop:12,borderTop:'1px solid var(--br)'}}>
-                <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>Off-Track</div>
-                <div style={{display:'flex',gap:8}}>
-                  {[{s:'Dead',c:'#ef4444'},{s:'Do Not Contact',c:'#6b7280'}].map(item=>(
-                    <div key={item.s} style={{background:item.c,color:'#fff',borderRadius:8,padding:'6px 12px',fontSize:11,fontWeight:700}}>
-                      {item.s}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Quick legend */}
-              <div style={{marginTop:12,padding:10,background:'var(--bg)',borderRadius:8,fontSize:11,color:'var(--t2)',lineHeight:1.8}}>
-                <b style={{color:'var(--tx)'}}>Key Actions per Stage:</b><br/>
-                🔵 <b>New → Consultation Completed</b> — Phone outreach & consult scheduling<br/>
-                🟡 <b>Agreement Sent → Fee Paid</b> — Generate Service Agreement → collect $499–$699 investigation fee<br/>
-                🟢 <b>Tax Investigation Active → IRS Facts</b> — File Form 2848/8821, pull transcripts<br/>
-                🟠 <b>Addendum Sent → Resolution Fee Paid</b> — Present resolution plan, collect full service fee<br/>
-                ✅ <b>Convert to Client</b> — Opens full client file & case management
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
