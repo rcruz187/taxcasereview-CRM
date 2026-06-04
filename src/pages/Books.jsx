@@ -326,8 +326,11 @@ export default function Books() {
               </div>
               <div className="field" style={{gridColumn:'1/-1'}}>
                 <label>Client (optional)</label>
-                <input value={form.client_name||''} onChange={e=>setForm(f=>({...f,client_name:e.target.value}))}
-                  placeholder="Link to a client name" defaultValue={clientFilter}/>
+                <input list="books-clients-list" value={form.client_name||''} onChange={e=>setForm(f=>({...f,client_name:e.target.value}))}
+                  placeholder="Type to search clients…"/>
+                <datalist id="books-clients-list">
+                  {clients.map(c=><option key={c.id} value={c.name}/>)}
+                </datalist>
               </div>
               <div className="field" style={{gridColumn:'1/-1'}}>
                 <label>Notes</label>
