@@ -313,3 +313,333 @@ export function generatePOACoverLetter(c = null) {
     </div>
   `)
 }
+
+// ─── Combined Client Package (Service Agreement + Engagement Letter) ──────────
+export function generateClientPackage(c = null) {
+  const fee  = c?.taxFee ? `$${Number(c.taxFee).toLocaleString()}` : (c?.investigationFee ? `$${c.investigationFee}` : '$___________')
+  const name = c ? (c.name || `${c.first||''} ${c.last||''}`.trim()) : 'Valued Client'
+  const issue = c?.issueType || 'tax resolution matter'
+  const years = c?.taxYears || '___________________'
+  const rep   = c?.assignedTo || '___________________'
+  const date  = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})
+
+  printBase('Tax Investigation Service Agreement & Engagement Letter', `
+    <p style="text-align:right;font-size:11px;color:#666;margin-bottom:4px">Date: ${date}</p>
+    ${clientBlock(c)}
+
+    <p>Dear <b>${name}</b>,</p>
+    <p>Thank you for choosing <b>Tax Case Review</b>. This document serves as both your <b>Tax Investigation Service Agreement</b> and <b>Engagement Letter</b> confirming our engagement to assist you with your ${issue} matter${years !== '___________________' ? ` for tax year(s) ${years}` : ''}.</p>
+
+    <h3>1. Scope of Services</h3>
+    <p>Tax Case Review agrees to perform an initial tax investigation, including:</p>
+    <ul>
+      <li>Review of IRS and/or state tax transcripts</li>
+      <li>Identification of outstanding tax liabilities and unfiled returns</li>
+      <li>Evaluation of eligibility for IRS resolution programs (OIC, CNC, IA, Penalty Abatement, etc.)</li>
+      <li>Preparation and delivery of a written resolution strategy within 21 business days of full access being granted</li>
+      <li>Full IRS/state representation through a dedicated case representative: <b>${rep}</b></li>
+    </ul>
+
+    <h3>2. Authorization</h3>
+    <p>Client authorizes Tax Case Review to obtain IRS transcripts via Form 2848 (Power of Attorney) or Form 8821 (Tax Information Authorization) and to represent the Client before the IRS and/or applicable state tax authority throughout the resolution process.</p>
+
+    <h3>3. Investigation Fee</h3>
+    <div class="fee-box">
+      <div class="fee-main">Investigation Fee: ${fee}</div>
+      <div class="fee-sub">
+        Non-refundable once transcript review has commenced. Standard range: $499–$699.<br/>
+        Full payment due prior to commencement of services.
+      </div>
+    </div>
+
+    <h3>4. Client Responsibilities</h3>
+    <ul>
+      <li>Provide accurate and complete financial and tax information</li>
+      <li>Execute IRS authorization forms (Form 2848 / 8821) promptly</li>
+      <li>Respond to requests for documents within 5 business days</li>
+      <li>Notify us immediately of any IRS notices, levies, or contacts received</li>
+    </ul>
+
+    <h3>5. Our Commitment</h3>
+    <p>We are committed to professional, ethical, and effective representation. Your representative will keep you informed of all significant developments. We are available Monday through Friday.</p>
+
+    <h3>6. No Guarantee of Outcome</h3>
+    <p>Tax Case Review makes no guarantee as to any specific outcome. Acceptance into any IRS program is solely at the discretion of the IRS.</p>
+
+    <h3>7. Not a Law Firm</h3>
+    <p>Tax Case Review is a tax resolution consulting firm and is <b>not a law firm</b>. No attorney-client relationship is created. All representation is performed by Enrolled Agents and/or licensed tax professionals.</p>
+
+    <h3>8. Termination</h3>
+    <p>Either party may terminate with 5 business days written notice. Investigation fees already paid are non-refundable once services have commenced.</p>
+
+    <h3>9. Governing Law</h3>
+    <p>This Agreement is governed by the laws of the State of Florida. Disputes shall be resolved by binding arbitration in Palm Beach County, Florida.</p>
+
+    ${sigBlock('Client Signature & Acknowledgment', 'Authorized Representative — Tax Case Review')}
+  `)
+}
+
+// ─── Form 8821 — Tax Information Authorization ────────────────────────────────
+export function generateForm8821(c = null) {
+  const name    = c ? (c.name || `${c.first||''} ${c.last||''}`.trim()) : '___________________'
+  const address = c ? ([c.street, c.city, c.state, c.zip].filter(Boolean).join(', ') || '___________________') : '___________________'
+  const ssn     = c?.ssn ? `XXX-XX-${c.ssn.replace(/-/g,'').slice(-4)}` : '___-__-____'
+  const phone   = c?.phone || '___________________'
+  const years   = c?.taxYears || '___________________'
+  const date    = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})
+
+  printBase('Form 8821 — Tax Information Authorization', `
+    <div class="notice" style="margin-bottom:20px">
+      <b>Note:</b> This is a pre-filled draft for review. The taxpayer must sign the official IRS Form 8821.
+      Download the official form at <a href="https://www.irs.gov/pub/irs-pdf/f8821.pdf" target="_blank">irs.gov/pub/irs-pdf/f8821.pdf</a>
+    </div>
+
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px">
+      <tr><td colspan="2" style="background:#1A7FD4;color:#fff;font-weight:700;padding:8px 12px;font-size:13px">Section 1 — Taxpayer Information</td></tr>
+      <tr>
+        <td style="border:1px solid #ccc;padding:10px 12px;width:50%">
+          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Taxpayer Name</div>
+          <div style="font-size:14px;font-weight:700">${name}</div>
+        </td>
+        <td style="border:1px solid #ccc;padding:10px 12px">
+          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">SSN / EIN</div>
+          <div style="font-size:14px;font-weight:700">${ssn}</div>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2" style="border:1px solid #ccc;padding:10px 12px">
+          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Address</div>
+          <div style="font-size:13px">${address}</div>
+        </td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #ccc;padding:10px 12px">
+          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Phone Number</div>
+          <div style="font-size:13px">${phone}</div>
+        </td>
+        <td style="border:1px solid #ccc;padding:10px 12px">
+          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Date</div>
+          <div style="font-size:13px">${date}</div>
+        </td>
+      </tr>
+    </table>
+
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px">
+      <tr><td colspan="2" style="background:#1A7FD4;color:#fff;font-weight:700;padding:8px 12px;font-size:13px">Section 2 — Appointee (Tax Case Review)</td></tr>
+      <tr>
+        <td style="border:1px solid #ccc;padding:10px 12px;width:50%">
+          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Name</div>
+          <div style="font-size:13px">Tax Case Review</div>
+        </td>
+        <td style="border:1px solid #ccc;padding:10px 12px">
+          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">CAF Number</div>
+          <div style="font-size:13px">___________________</div>
+        </td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #ccc;padding:10px 12px">
+          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Address</div>
+          <div style="font-size:13px">238 Evergreen Dr, Lake Park, FL 33403</div>
+        </td>
+        <td style="border:1px solid #ccc;padding:10px 12px">
+          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Phone</div>
+          <div style="font-size:13px">(850) 459-9039</div>
+        </td>
+      </tr>
+    </table>
+
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px">
+      <tr><td style="background:#1A7FD4;color:#fff;font-weight:700;padding:8px 12px;font-size:13px">Section 3 — Tax Matters</td></tr>
+      <tr><td style="border:1px solid #ccc;padding:10px 12px">
+        <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:8px">Type of Tax / Tax Form Number / Tax Years or Periods</div>
+        <table style="width:100%;border-collapse:collapse;font-size:11px">
+          <tr style="background:#f5f5f5">
+            <th style="border:1px solid #ddd;padding:6px 10px;text-align:left">Type of Tax</th>
+            <th style="border:1px solid #ddd;padding:6px 10px;text-align:left">Form Number</th>
+            <th style="border:1px solid #ddd;padding:6px 10px;text-align:left">Tax Year(s) / Period(s)</th>
+          </tr>
+          <tr>
+            <td style="border:1px solid #ddd;padding:8px 10px">Income</td>
+            <td style="border:1px solid #ddd;padding:8px 10px">1040</td>
+            <td style="border:1px solid #ddd;padding:8px 10px">${years}</td>
+          </tr>
+          <tr>
+            <td style="border:1px solid #ddd;padding:8px 10px">Penalty</td>
+            <td style="border:1px solid #ddd;padding:8px 10px">All</td>
+            <td style="border:1px solid #ddd;padding:8px 10px">${years}</td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px">
+      <tr><td style="background:#1A7FD4;color:#fff;font-weight:700;padding:8px 12px;font-size:13px">Section 6 — Taxpayer Signature</td></tr>
+      <tr><td style="border:1px solid #ccc;padding:16px 12px">
+        <div style="display:flex;gap:48px">
+          <div style="flex:2">
+            <div style="border-top:1.5px solid #333;padding-top:8px;margin-top:24px">
+              <div style="font-size:11px;font-weight:700">Taxpayer Signature</div>
+              <div style="font-size:11px;color:#555;margin-top:4px">Print Name: ${name}</div>
+            </div>
+          </div>
+          <div style="flex:1">
+            <div style="border-top:1.5px solid #333;padding-top:8px;margin-top:24px">
+              <div style="font-size:11px;font-weight:700">Date</div>
+              <div style="font-size:11px;color:#555;margin-top:4px">${date}</div>
+            </div>
+          </div>
+        </div>
+      </td></tr>
+    </table>
+  `)
+}
+
+// ─── Form 2848 — Power of Attorney ───────────────────────────────────────────
+export function generateForm2848(c = null) {
+  const name    = c ? (c.name || `${c.first||''} ${c.last||''}`.trim()) : '___________________'
+  const address = c ? ([c.street, c.city, c.state, c.zip].filter(Boolean).join(', ') || '___________________') : '___________________'
+  const ssn     = c?.ssn ? `XXX-XX-${c.ssn.replace(/-/g,'').slice(-4)}` : '___-__-____'
+  const phone   = c?.phone || '___________________'
+  const years   = c?.taxYears || '___________________'
+  const date    = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})
+
+  printBase('Form 2848 — Power of Attorney and Declaration of Representative', `
+    <div class="notice" style="margin-bottom:20px">
+      <b>Note:</b> This is a pre-filled draft for review. The taxpayer must sign the official IRS Form 2848.
+      Download at <a href="https://www.irs.gov/pub/irs-pdf/f2848.pdf" target="_blank">irs.gov/pub/irs-pdf/f2848.pdf</a>
+    </div>
+
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px">
+      <tr><td colspan="2" style="background:#1A7FD4;color:#fff;font-weight:700;padding:8px 12px;font-size:13px">Part I — Power of Attorney</td></tr>
+      <tr><td colspan="2" style="background:#eaf2fb;padding:6px 12px;font-size:11px;color:#1A7FD4;font-weight:600">Section 1 — Taxpayer Information</td></tr>
+      <tr>
+        <td style="border:1px solid #ccc;padding:10px 12px;width:50%">
+          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Taxpayer Name</div>
+          <div style="font-size:14px;font-weight:700">${name}</div>
+        </td>
+        <td style="border:1px solid #ccc;padding:10px 12px">
+          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">SSN / EIN</div>
+          <div style="font-size:14px;font-weight:700">${ssn}</div>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2" style="border:1px solid #ccc;padding:10px 12px">
+          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Address</div>
+          <div style="font-size:13px">${address}</div>
+        </td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #ccc;padding:10px 12px">
+          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Phone</div>
+          <div style="font-size:13px">${phone}</div>
+        </td>
+        <td style="border:1px solid #ccc;padding:10px 12px">
+          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Date</div>
+          <div style="font-size:13px">${date}</div>
+        </td>
+      </tr>
+    </table>
+
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px">
+      <tr><td colspan="2" style="background:#eaf2fb;padding:6px 12px;font-size:11px;color:#1A7FD4;font-weight:600">Section 2 — Representative (Appointee)</td></tr>
+      <tr>
+        <td style="border:1px solid #ccc;padding:10px 12px;width:50%">
+          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Name</div>
+          <div style="font-size:13px">Tax Case Review</div>
+        </td>
+        <td style="border:1px solid #ccc;padding:10px 12px">
+          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">CAF Number</div>
+          <div style="font-size:13px">___________________</div>
+        </td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #ccc;padding:10px 12px">
+          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Address</div>
+          <div style="font-size:13px">238 Evergreen Dr, Lake Park, FL 33403</div>
+        </td>
+        <td style="border:1px solid #ccc;padding:10px 12px">
+          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Designation (ea/cpa/etc)</div>
+          <div style="font-size:13px">Enrolled Agent</div>
+        </td>
+      </tr>
+    </table>
+
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px">
+      <tr><td style="background:#eaf2fb;padding:6px 12px;font-size:11px;color:#1A7FD4;font-weight:600">Section 3 — Tax Matters</td></tr>
+      <tr><td style="border:1px solid #ccc;padding:10px 12px">
+        <table style="width:100%;border-collapse:collapse;font-size:11px">
+          <tr style="background:#f5f5f5">
+            <th style="border:1px solid #ddd;padding:6px 10px;text-align:left">Type of Tax</th>
+            <th style="border:1px solid #ddd;padding:6px 10px;text-align:left">Form Number</th>
+            <th style="border:1px solid #ddd;padding:6px 10px;text-align:left">Tax Year(s)</th>
+            <th style="border:1px solid #ddd;padding:6px 10px;text-align:left">Specific Tax Matters</th>
+          </tr>
+          <tr>
+            <td style="border:1px solid #ddd;padding:8px 10px">Income</td>
+            <td style="border:1px solid #ddd;padding:8px 10px">1040</td>
+            <td style="border:1px solid #ddd;padding:8px 10px">${years}</td>
+            <td style="border:1px solid #ddd;padding:8px 10px">All matters</td>
+          </tr>
+          <tr>
+            <td style="border:1px solid #ddd;padding:8px 10px">Penalty</td>
+            <td style="border:1px solid #ddd;padding:8px 10px">All</td>
+            <td style="border:1px solid #ddd;padding:8px 10px">${years}</td>
+            <td style="border:1px solid #ddd;padding:8px 10px">Abatement / Waiver</td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px">
+      <tr><td style="background:#eaf2fb;padding:6px 12px;font-size:11px;color:#1A7FD4;font-weight:600">Section 5 — Acts Authorized</td></tr>
+      <tr><td style="border:1px solid #ccc;padding:10px 12px;font-size:11px;line-height:1.8">
+        The representative is authorized to receive and inspect confidential tax information and to perform any and all acts that the taxpayer can perform with respect to the tax matters described in Section 3, including:
+        receiving notices and communications, executing waivers, executing closing agreements, representing the taxpayer before IRS Appeals, and any other tax matter listed above.
+      </td></tr>
+    </table>
+
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px">
+      <tr><td colspan="2" style="background:#eaf2fb;padding:6px 12px;font-size:11px;color:#1A7FD4;font-weight:600">Section 9 — Taxpayer Signature</td></tr>
+      <tr><td colspan="2" style="border:1px solid #ccc;padding:16px 12px">
+        <p style="font-size:11px;color:#555;margin-bottom:16px">
+          Under penalties of perjury, I declare that I am the taxpayer referenced above and that the information on this document is true, correct, and complete.
+        </p>
+        <div style="display:flex;gap:48px">
+          <div style="flex:2">
+            <div style="border-top:1.5px solid #333;padding-top:8px;margin-top:24px">
+              <div style="font-size:11px;font-weight:700">Taxpayer Signature</div>
+              <div style="font-size:11px;color:#555;margin-top:4px">Print Name: ${name}</div>
+            </div>
+          </div>
+          <div style="flex:1">
+            <div style="border-top:1.5px solid #333;padding-top:8px;margin-top:24px">
+              <div style="font-size:11px;font-weight:700">Date</div>
+              <div style="font-size:11px;color:#555;margin-top:4px">${date}</div>
+            </div>
+          </div>
+        </div>
+      </td></tr>
+    </table>
+
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <tr><td colspan="2" style="background:#1A7FD4;color:#fff;font-weight:700;padding:8px 12px;font-size:13px">Part II — Declaration of Representative</td></tr>
+      <tr><td colspan="2" style="border:1px solid #ccc;padding:10px 12px;font-size:11px;line-height:1.8">
+        Under penalties of perjury, I declare that I am not currently under suspension or disbarment from practice before the IRS; that I am aware of the regulations in Circular 230; and that I am authorized to represent the taxpayer identified in Part I.
+      </td></tr>
+      <tr>
+        <td style="border:1px solid #ccc;padding:10px 12px">
+          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Representative Signature</div>
+          <div style="border-top:1.5px solid #333;padding-top:8px;margin-top:24px">
+            <div style="font-size:11px;color:#555">Tax Case Review — Authorized Representative</div>
+          </div>
+        </td>
+        <td style="border:1px solid #ccc;padding:10px 12px">
+          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Date</div>
+          <div style="border-top:1.5px solid #333;padding-top:8px;margin-top:24px">
+            <div style="font-size:11px;color:#555">${date}</div>
+          </div>
+        </td>
+      </tr>
+    </table>
+  `)
+}
