@@ -434,9 +434,9 @@ export default function Clients() {
 
         {/* Back + top actions */}
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,flexWrap:'wrap'}}>
-          <button className="btn" onClick={()=>{setDetail(null);navigate('/clients',{replace:true})}}>← Back to Clients</button>
-          <button className="btn pri" onClick={()=>openEdit(c)} style={{marginLeft:'auto'}}>✏️ Edit</button>
-          <button className="btn del" onClick={()=>deleteClient(c.id,c.name)}>🗑 Delete</button>
+          <button className="btn" style={{padding:'8px 16px',fontSize:13,fontWeight:600}} onClick={()=>{setDetail(null);navigate('/clients',{replace:true})}}>← Back to Clients</button>
+          <button className="btn pri" style={{marginLeft:'auto',padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>openEdit(c)}>✏️ Edit</button>
+          <button className="btn del" style={{padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>deleteClient(c.id,c.name)}>🗑 Delete</button>
         </div>
 
         {/* Header card */}
@@ -1142,6 +1142,15 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
               <option value="">Unassigned</option>{reps.map(r=><option key={r}>{r}</option>)}
             </select>
           </div>
+        </div>
+        <div className="field">
+          <label style={{display:'flex',alignItems:'center',gap:6}}>
+            <span>📌 Internal Note</span>
+            <span style={{fontSize:10,color:'var(--warn)',fontWeight:400}}>(staff only — shows as sticky alert on file)</span>
+          </label>
+          <input value={form.internal_note||''} onChange={e=>fld('internal_note',e.target.value)}
+            placeholder="e.g. Call husband John for updates, not the wife — (850) 555-0100"
+            style={{width:'100%'}}/>
         </div>
         <div className="field"><label>Notes</label><textarea value={form.notes||''} onChange={e=>fld('notes',e.target.value)} style={{minHeight:80}}/></div>
 
