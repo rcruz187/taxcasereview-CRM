@@ -18,20 +18,20 @@ const PAGE_TITLES = {
 }
 
 const NEW_ITEMS = [
-  { icon: '👤', label: 'New Lead',     sub: 'Add a prospect',        path: '/leads',    color: '#22c55e' },
-  { icon: '🏢', label: 'New Client',   sub: 'Add a client file',     path: '/clients',  color: '#4f8ef7' },
-  { icon: '📁', label: 'New Case',     sub: 'Open a case',           path: '/cases',    color: '#f59e0b' },
-  { icon: '✅', label: 'New Task',     sub: 'Assign work',           path: '/tasks',    color: '#a855f7' },
-  { icon: '🧾', label: 'New Invoice',  sub: 'Bill a client',         path: '/invoices', color: '#ec4899' },
-  { icon: '💰', label: 'New Payment',  sub: 'Record a payment',      path: '/payments', color: '#06b6d4' },
-  { icon: '📊', label: 'New Entry',    sub: 'Books & Ledger',        path: '/books',    color: '#10b981' },
-  { icon: '📅', label: 'New Event',    sub: 'Add to calendar',       path: '/calendar', color: '#8b5cf6' },
-  { icon: '📧', label: 'New Email',    sub: 'Compose email',         path: '/email',    color: '#0ea5e9' },
-  { icon: '📠', label: 'New Fax',      sub: 'Send a fax',            path: '/fax',      color: '#dc2626' },
-  { icon: '📁', label: 'New Document', sub: 'Upload document',       path: '/documents',color: '#f97316' },
-  { icon: '✍️', label: 'New E-Sign',   sub: 'Request signature',     path: '/esign',    color: '#7c3aed' },
-  { icon: '📝', label: 'New Transcript',sub: 'Add transcript',       path: '/transcripts',color:'#14b8a6'},
-  { icon: '🏢', label: 'New Corp',     sub: 'Formation case',        path: '/formacorp',color: '#6366f1' },
+  { icon: '📅', label: 'New Event',      sub: 'Add to calendar',       path: '/calendar',    color: '#8b5cf6' },
+  { icon: '📧', label: 'New Email',      sub: 'Compose email',         path: '/email',       color: '#0ea5e9' },
+  { icon: '✍️', label: 'New E-Sign',     sub: 'Request signature',     path: '/esign',       color: '#7c3aed' },
+  { icon: '📊', label: 'New Entry',      sub: 'Books & Ledger',        path: '/books',       color: '#10b981' },
+  { icon: '📠', label: 'New Fax',        sub: 'Send a fax',            path: '/fax',         color: '#dc2626' },
+  { icon: '🏢', label: 'New Corp',       sub: 'Formation case',        path: '/formacorp',   color: '#6366f1' },
+  { icon: '📋', label: 'New Case',       sub: 'Open a case',           path: '/cases',       color: '#f59e0b' },
+  { icon: '👤', label: 'New Client',     sub: 'Add a client file',     path: '/clients',     color: '#3b82f6' },
+  { icon: '📁', label: 'New Document',   sub: 'Upload document',       path: '/documents',   color: '#f97316' },
+  { icon: '🧾', label: 'New Invoice',    sub: 'Bill a client',         path: '/invoices',    color: '#ef4444' },
+  { icon: '👥', label: 'New Lead',       sub: 'Add a prospect',        path: '/leads',       color: '#a855f7' },
+  { icon: '💳', label: 'New Payment',    sub: 'Record a payment',      path: '/payments',    color: '#22c55e' },
+  { icon: '✅', label: 'New Task',       sub: 'Assign work',           path: '/tasks',       color: '#06b6d4' },
+  { icon: '📝', label: 'New Transcript', sub: 'Add transcript',        path: '/transcripts', color: '#14b8a6' },
 ]
 
 export default function TopBar({ onNew }) {
