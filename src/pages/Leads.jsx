@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useFirm } from '../lib/useFirm'
-import { generateServiceAgreement, generateAddendum, generateEngagementLetter, generatePOACoverLetter } from '../lib/docUtils'
+import { generateClientPackage, generateAddendum, generatePOACoverLetter, generateForm8821, generateForm2848 } from '../lib/docUtils'
 
 const STATUSES = ['New Lead','Contacted','Consultation Scheduled','Consultation Completed',
   'Tax Inv Agreement Sent','Tax Inv Agreement Signed','Tax Inv Fee Paid',
@@ -180,12 +180,23 @@ export default function Leads() {
   async function save() {
     if (!form.name.trim()) { showToast('Name is required'); return }
     setSaving(true)
-    const payload = { ...form, taxYears: JSON.stringify(form.taxYears), created_at: new Date().toISOString() }
-    const { error } = await supabase.from('leads').insert([payload])
+    const payload = { ...form, taxYears: JSON.stringify(form.taxYears) }
+    let error
+    if (modal === 'edit') {
+      const { id, created_at, ...rest } = payload
+      ;({ error } = await supabase.from('leads').update(rest).eq('id', form.id))
+    } else {
+      payload.created_at = new Date().toISOString()
+      ;({ error } = await supabase.from('leads').insert([payload]))
+    }
     setSaving(false)
     if (error) { showToast('Error: '+error.message); return }
-    showToast('Lead added!')
+    showToast(modal==='edit' ? '✅ Lead updated!' : '✅ Lead added!')
     setModal(false); setForm(BLANK); load()
+    if (modal==='edit' && detail) {
+      const { data } = await supabase.from('leads').select('*').eq('id', form.id).single()
+      if (data) setDetail(data)
+    }
   }
 
   async function deleteLead(id) {
@@ -318,21 +329,25 @@ export default function Leads() {
 
         {/* Action buttons — compact row */}
         <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}>
-          <button className="btn ok sm" style={{flex:1,minWidth:120,justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generateServiceAgreement(l)}>
-            <span style={{fontSize:11,fontWeight:700}}>📄 Service Agreement</span>
-            <span style={{fontSize:10,opacity:.8}}>Generate & Print</span>
+          <button className="btn ok sm" style={{flex:1,minWidth:130,justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generateClientPackage(l)}>
+            <span style={{fontSize:11,fontWeight:700}}>📄 Client Package</span>
+            <span style={{fontSize:10,opacity:.8}}>Agreement + Letter</span>
           </button>
-          <button className="btn sm" style={{flex:1,minWidth:120,background:'var(--blue)',color:'#fff',borderColor:'var(--blue)',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generateEngagementLetter(l)}>
-            <span style={{fontSize:11,fontWeight:700}}>✉️ Engagement Letter</span>
-            <span style={{fontSize:10,opacity:.8}}>Generate & Print</span>
+          <button className="btn sm" style={{flex:1,minWidth:130,background:'#0369a1',color:'#fff',borderColor:'#0369a1',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generateForm8821(l)}>
+            <span style={{fontSize:11,fontWeight:700}}>📋 Form 8821</span>
+            <span style={{fontSize:10,opacity:.8}}>Tax Info Auth</span>
           </button>
-          <button className="btn sm" style={{flex:1,minWidth:120,background:'var(--warn)',color:'#fff',borderColor:'var(--warn)',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generateAddendum(l)}>
-            <span style={{fontSize:11,fontWeight:700}}>📋 Addendum</span>
+          <button className="btn sm" style={{flex:1,minWidth:130,background:'#7c3aed',color:'#fff',borderColor:'#7c3aed',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generateForm2848(l)}>
+            <span style={{fontSize:11,fontWeight:700}}>🔏 Form 2848</span>
+            <span style={{fontSize:10,opacity:.8}}>Power of Attorney</span>
+          </button>
+          <button className="btn sm" style={{flex:1,minWidth:130,background:'var(--warn)',color:'#fff',borderColor:'var(--warn)',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generateAddendum(l)}>
+            <span style={{fontSize:11,fontWeight:700}}>📝 Addendum</span>
             <span style={{fontSize:10,opacity:.8}}>After IRS facts</span>
           </button>
-          <button className="btn sm" style={{flex:1,minWidth:120,background:'#6c5ce7',color:'#fff',borderColor:'#6c5ce7',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generatePOACoverLetter(l)}>
-            <span style={{fontSize:11,fontWeight:700}}>🔐 POA Cover Letter</span>
-            <span style={{fontSize:10,opacity:.8}}>Generate & Print</span>
+          <button className="btn sm" style={{flex:1,minWidth:130,background:'#6c5ce7',color:'#fff',borderColor:'#6c5ce7',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generatePOACoverLetter(l)}>
+            <span style={{fontSize:11,fontWeight:700}}>🔐 POA Letter</span>
+            <span style={{fontSize:10,opacity:.8}}>Cover Letter</span>
           </button>
           <button className="btn ok sm" style={{flex:1,minWidth:120,justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>convertToClient(l)} disabled={converting}>
             <span style={{fontSize:11,fontWeight:700}}>✓ Convert to Client</span>
