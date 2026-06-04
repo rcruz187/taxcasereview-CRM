@@ -218,6 +218,27 @@ export default function Cases() {
           <span key={s} className={`chip${filter===s?' on':''}`} onClick={()=>setFilter(s)}>{s}</span>
         ))}
       </div>
+      {/* Cases by Rep breakdown */}
+      {(() => {
+        const reps = {}
+        cases.forEach(c => { const r = c.assignedTo || 'Unassigned'; reps[r] = (reps[r]||0)+1 })
+        const repList = Object.entries(reps).sort((a,b) => b[1]-a[1])
+        if (!repList.length) return null
+        return (
+          <div className="card" style={{padding:'10px 16px',marginBottom:10}}>
+            <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>Cases by Rep</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+              {repList.map(([rep,count]) => (
+                <div key={rep} style={{display:'flex',alignItems:'center',gap:6,background:'var(--s2)',borderRadius:6,padding:'4px 12px',fontSize:12}}>
+                  <span style={{fontWeight:700}}>{rep}</span>
+                  <span style={{background:'var(--blue)',color:'#fff',borderRadius:20,padding:'1px 8px',fontSize:11,fontWeight:800}}>{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
       <div className="card">
         <div className="ch">
           <span className="ct">All Cases ({filtered.length})</span>
