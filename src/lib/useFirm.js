@@ -52,8 +52,8 @@ export function useFirm() {
   }
 
   // Derived helpers used in doc headers
-  const name      = firm?.name     || 'ClearCase.Tax'
-  const tagline   = firm?.tagline  || 'Tax & Resolution Services'
+  const name      = firm?.name     || 'Tax Case Review'
+  const tagline   = firm?.tagline  || 'IRS Resolution Services'
   const address   = [firm?.address, firm?.city, firm?.state, firm?.zip].filter(Boolean).join(', ')
   const phone     = firm?.phone    || ''
   const email     = firm?.email    || ''
