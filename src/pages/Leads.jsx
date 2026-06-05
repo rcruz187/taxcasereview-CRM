@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useFirm } from '../lib/useFirm'
-import { generateClientPackage, generateAddendum, generatePOACoverLetter, generateForm8821, generateForm2848 } from '../lib/docUtils'
+import { generateClientPackage, generateAddendum, generatePOACoverLetter, generateForm8821Personal, generateForm8821Business, generateForm2848Personal, generateForm2848Business } from '../lib/docUtils'
 
 const STATUSES = ['New Lead','Contacted','Consultation Scheduled','Consultation Completed',
   'Tax Inv Agreement Sent','Tax Inv Agreement Signed','Tax Inv Fee Paid',
@@ -333,14 +333,32 @@ export default function Leads() {
             <span style={{fontSize:11,fontWeight:700}}>📄 Tax Engagement</span>
             <span style={{fontSize:10,opacity:.8}}>Service Agreement</span>
           </button>
-          <button className="btn sm" style={{flex:1,minWidth:130,background:'#0369a1',color:'#fff',borderColor:'#0369a1',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generateForm8821(l)}>
-            <span style={{fontSize:11,fontWeight:700}}>📋 Form 8821</span>
-            <span style={{fontSize:10,opacity:.8}}>Tax Info Auth</span>
-          </button>
-          <button className="btn sm" style={{flex:1,minWidth:130,background:'#7c3aed',color:'#fff',borderColor:'#7c3aed',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generateForm2848(l)}>
-            <span style={{fontSize:11,fontWeight:700}}>🔏 Form 2848</span>
-            <span style={{fontSize:10,opacity:.8}}>Power of Attorney</span>
-          </button>
+          {/* 8821 — show personal, business, or both based on clientType */}
+          {(l.clientType !== 'Business') && (
+            <button className="btn sm" style={{flex:1,minWidth:130,background:'#0369a1',color:'#fff',borderColor:'#0369a1',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generateForm8821Personal(l)}>
+              <span style={{fontSize:11,fontWeight:700}}>📋 8821 Personal</span>
+              <span style={{fontSize:10,opacity:.8}}>Tax Info Auth</span>
+            </button>
+          )}
+          {(l.clientType === 'Business' || l.clientType === 'Both') && (
+            <button className="btn sm" style={{flex:1,minWidth:130,background:'#0369a1',color:'#fff',borderColor:'#0369a1',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generateForm8821Business(l)}>
+              <span style={{fontSize:11,fontWeight:700}}>📋 8821 Business</span>
+              <span style={{fontSize:10,opacity:.8}}>Tax Info Auth</span>
+            </button>
+          )}
+          {/* 2848 — same logic */}
+          {(l.clientType !== 'Business') && (
+            <button className="btn sm" style={{flex:1,minWidth:130,background:'#7c3aed',color:'#fff',borderColor:'#7c3aed',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generateForm2848Personal(l)}>
+              <span style={{fontSize:11,fontWeight:700}}>🔏 2848 Personal</span>
+              <span style={{fontSize:10,opacity:.8}}>Power of Attorney</span>
+            </button>
+          )}
+          {(l.clientType === 'Business' || l.clientType === 'Both') && (
+            <button className="btn sm" style={{flex:1,minWidth:130,background:'#7c3aed',color:'#fff',borderColor:'#7c3aed',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generateForm2848Business(l)}>
+              <span style={{fontSize:11,fontWeight:700}}>🔏 2848 Business</span>
+              <span style={{fontSize:10,opacity:.8}}>Power of Attorney</span>
+            </button>
+          )}
           <button className="btn sm" style={{flex:1,minWidth:130,background:'var(--warn)',color:'#fff',borderColor:'var(--warn)',justifyContent:'center',flexDirection:'column',gap:2,padding:'8px 10px',textAlign:'center'}} onClick={()=>generateAddendum(l)}>
             <span style={{fontSize:11,fontWeight:700}}>📝 Addendum</span>
             <span style={{fontSize:10,opacity:.8}}>After IRS facts</span>
