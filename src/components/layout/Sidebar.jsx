@@ -102,8 +102,8 @@ export default function Sidebar() {
     if (active) setOpenKey(active)
   }, [location.pathname])
 
-  const [firmName, setFirmName] = useState('ClearCase.Tax')
-  const [tagline,  setTagline]  = useState('Tax & Resolution Services')
+  const [firmName, setFirmName] = useState('Tax Case Review')
+  const [tagline,  setTagline]  = useState('IRS Resolution Services')
 
   useEffect(() => {
     async function loadBranding() {
@@ -133,7 +133,7 @@ export default function Sidebar() {
         }
         <div style={{textAlign:'center'}}>
           <div className="brand-name" style={{fontSize:13}}>{firmName}</div>
-          <div className="brand-sub" style={{fontSize:10}}>{tagline || 'Tax & Resolution Services'}</div>
+          <div className="brand-sub" style={{fontSize:10}}>{tagline || 'IRS Resolution Services'}</div>
         </div>
       </div>
 
