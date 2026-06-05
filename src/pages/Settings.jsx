@@ -84,15 +84,41 @@ export default function Settings() {
   async function saveFirm() {
     setSaving(true)
     try {
-      const { data: existing } = await supabase.from('settings').select('id').limit(1).maybeSingle()
-      if (existing?.id) {
-        await supabase.from('settings').update(firm).eq('id', existing.id)
-      } else {
-        await supabase.from('settings').insert(firm)
+      // Only save known DB columns - exclude any React state extras
+      const payload = {
+        name: firm.name, tagline: firm.tagline, phone: firm.phone,
+        email: firm.email, address: firm.address, city: firm.city,
+        state: firm.state, zip: firm.zip, website: firm.website,
+        ein: firm.ein, primary_color: firm.primary_color,
+        preparer_name: firm.preparer_name, ptin: firm.ptin,
+        caf_number: firm.caf_number, efin: firm.efin,
+        gmail_client_id: firm.gmail_client_id,
+        gmail_client_secret: firm.gmail_client_secret,
+        gmail_redirect_uri: firm.gmail_redirect_uri,
+        telnyx_api_key: firm.telnyx_api_key,
+        firm_fax_number: firm.firm_fax_number,
+        smtp_host: firm.smtp_host, smtp_port: firm.smtp_port,
+        smtp_email: firm.smtp_email, smtp_password: firm.smtp_password,
+        smtp_name: firm.smtp_name, smtp_encryption: firm.smtp_encryption,
+        twilio_sid: firm.twilio_sid, twilio_token: firm.twilio_token,
+        twilio_phone: firm.twilio_phone,
       }
+      const { data: existing, error: fetchErr } = await supabase.from('settings').select('id').limit(1).maybeSingle()
+      if (fetchErr) throw fetchErr
+      let saveErr
+      if (existing?.id) {
+        const { error } = await supabase.from('settings').update(payload).eq('id', existing.id)
+        saveErr = error
+      } else {
+        const { error } = await supabase.from('settings').insert([payload])
+        saveErr = error
+      }
+      if (saveErr) throw saveErr
       if (firm.primary_color) applyBrandColor(firm.primary_color)
-      showToast('✅ Saved! Brand color applied across the CRM.')
-    } catch (e) { showToast(e.message, 'err') } finally { setSaving(false) }
+      // Refresh the Sidebar firm name
+      window.dispatchEvent(new Event('firm-updated'))
+      showToast('✅ Settings saved!')
+    } catch (e) { showToast('Error: ' + e.message, 'err') } finally { setSaving(false) }
   }
 
   async function uploadLogo(e) {
@@ -136,7 +162,7 @@ export default function Settings() {
           <div className="card-header"><span className="card-title">Firm Information</span></div>
           <div style={{ padding: '0 20px 20px' }}>
             <div className="fg2">
-              <div className="field"><label>Firm Name</label><input value={firm.name} onChange={set('name')} placeholder="Acme Tax Resolution" /></div>
+              <div className="field"><label>Firm Name</label><input value={firm.name} onChange={set('name')} placeholder="Tax Case Review" /></div>
               <div style={{height:1,background:'var(--br)',margin:'18px 0'}}/>
               <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>📬 POP / SMTP Email</div>
               <div style={{fontSize:12,color:'var(--t3)',marginBottom:12,lineHeight:1.6}}>Use any provider — Outlook, Yahoo, Zoho, custom domain. No Google required.</div>
