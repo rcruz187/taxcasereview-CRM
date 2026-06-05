@@ -258,6 +258,10 @@ export default function Clients() {
   const [taskDueDate, setTaskDueDate] = useState('')
   // Add payment modal
   const [payModal,    setPayModal]    = useState(false)
+  const [faxModal,    setFaxModal]    = useState(false)
+  const [faxClient,   setFaxClient]   = useState(null)
+  const [esignModal,  setEsignModal]  = useState(false)
+  const [esignClient, setEsignClient] = useState(null)
   const [payForm,     setPayForm]     = useState({ amount:'', method:'Credit Card', date:'', notes:'' })
   const [savingPay,   setSavingPay]   = useState(false)
 
@@ -996,6 +1000,24 @@ export default function Clients() {
         </div>
       </div>
       {modal&&<ClientFormModal form={form} fld={fld} reps={reps} saving={saving} onSave={save} onClose={()=>setModal(false)} title="Add Client"/>}
+
+      {faxModal && faxClient && (
+        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setFaxModal(false)}>
+          <div className="modal" style={{width:500}}>
+            <div className="mh"><span className="mt">📠 Send Fax — {faxClient.name}</span><button className="xbtn" onClick={()=>setFaxModal(false)}>&times;</button></div>
+            <InlineFaxForm client={faxClient} onClose={()=>setFaxModal(false)} showToast={showToast}/>
+          </div>
+        </div>
+      )}
+
+      {esignModal && esignClient && (
+        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setEsignModal(false)}>
+          <div className="modal" style={{width:500}}>
+            <div className="mh"><span className="mt">✍️ E-Signature — {esignClient.name}</span><button className="xbtn" onClick={()=>setEsignModal(false)}>&times;</button></div>
+            <InlineEsignForm client={esignClient} onClose={()=>setEsignModal(false)} showToast={showToast}/>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
