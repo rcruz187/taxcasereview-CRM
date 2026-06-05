@@ -314,332 +314,540 @@ export function generatePOACoverLetter(c = null) {
   `)
 }
 
-// ─── Combined Client Package (Service Agreement + Engagement Letter) ──────────
-export function generateClientPackage(c = null) {
-  const fee  = c?.taxFee ? `$${Number(c.taxFee).toLocaleString()}` : (c?.investigationFee ? `$${c.investigationFee}` : '$___________')
-  const name = c ? (c.name || `${c.first||''} ${c.last||''}`.trim()) : 'Valued Client'
-  const issue = c?.issueType || 'tax resolution matter'
-  const years = c?.taxYears || '___________________'
-  const rep   = c?.assignedTo || '___________________'
-  const date  = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})
 
-  printBase('Tax Investigation Service Agreement & Engagement Letter', `
-    <p style="text-align:right;font-size:11px;color:#666;margin-bottom:4px">Date: ${date}</p>
-    ${clientBlock(c)}
+// ─── REPRESENTATIVE CONSTANTS ─────────────────────────────────────────────────
+const REP1 = {
+  name: 'Rommel Cruz Rivera',
+  address: '631 US Highway One, North Palm Beach FL 33408',
+  caf: '0312-27862R',
+  ptin: 'P01982875',
+  phone: '561-206-2551',
+  fax: '561-328-0029',
+}
+const REP2 = {
+  name: 'Anthony Michael Tropeano',
+  address: '2006 Tigris Dr, West Palm Beach FL 33411',
+  caf: '0309-50688R',
+  ptin: 'P01065275',
+  phone: '561-596-2724',
+  fax: '561-328-0029',
+}
 
-    <p>Dear <b>${name}</b>,</p>
-    <p>Thank you for choosing <b>Tax Case Review</b>. This document serves as both your <b>Tax Investigation Service Agreement</b> and <b>Engagement Letter</b> confirming our engagement to assist you with your ${issue} matter${years !== '___________________' ? ` for tax year(s) ${years}` : ''}.</p>
+function irsFormBase(title, body) {
+  const w = window.open('','_blank','width=900,height=1100')
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
+  <title>${title}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:11px;color:#000;background:#fff;padding:24px;max-width:780px;margin:auto}
+    h1{font-size:13px;font-weight:bold;text-align:center;margin-bottom:2px}
+    h2{font-size:11px;font-weight:bold;text-align:center;margin-bottom:12px;color:#333}
+    table{width:100%;border-collapse:collapse;margin-bottom:8px}
+    td,th{border:1px solid #000;padding:4px 6px;vertical-align:top;font-size:10px}
+    .no-border td{border:none;padding:2px 0}
+    .header-box{border:1px solid #000;padding:6px;margin-bottom:8px}
+    .section-label{font-weight:bold;font-size:10px;margin:8px 0 4px}
+    .irs-box{border:1px solid #000;padding:6px;font-size:10px;float:right;width:160px;margin-left:12px;margin-bottom:8px}
+    .field-label{font-size:8px;color:#555;margin-bottom:2px}
+    .field-value{font-size:11px;font-weight:bold;border-bottom:1px solid #000;min-height:16px;padding-bottom:1px}
+    .sig-line{border-bottom:1px solid #000;min-height:32px;margin-top:8px}
+    .clearfix::after{content:'';display:table;clear:both}
+    .warn{font-style:italic;font-size:9px;color:#444}
+    @media print{body{padding:12px}}
+  </style>
+  </head><body onload="window.print()">${body}</body></html>`)
+  w.document.close()
+}
 
-    <h3>1. Scope of Services</h3>
-    <p>Tax Case Review agrees to perform an initial tax investigation, including:</p>
-    <ul>
-      <li>Review of IRS and/or state tax transcripts</li>
-      <li>Identification of outstanding tax liabilities and unfiled returns</li>
-      <li>Evaluation of eligibility for IRS resolution programs (OIC, CNC, IA, Penalty Abatement, etc.)</li>
-      <li>Preparation and delivery of a written resolution strategy within 21 business days of full access being granted</li>
-      <li>Full IRS/state representation through a dedicated case representative: <b>${rep}</b></li>
-    </ul>
+// ─── Form 8821 Personal ───────────────────────────────────────────────────────
+export function generateForm8821Personal(c = null) {
+  const name    = c?.name || '___________________________________'
+  const address = [c?.street, c?.city, c?.state, c?.zip].filter(Boolean).join(', ') || '___________________________________'
+  const ssn     = c?.ssn  || '___-__-____'
+  const phone   = c?.phone || '_________________'
+  const years   = (() => { try { return JSON.parse(c?.taxYears||'[]').join(', ') } catch { return c?.taxYears || '____' } })()
+  const date    = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'})
 
-    <h3>2. Authorization</h3>
-    <p>Client authorizes Tax Case Review to obtain IRS transcripts via Form 2848 (Power of Attorney) or Form 8821 (Tax Information Authorization) and to represent the Client before the IRS and/or applicable state tax authority throughout the resolution process.</p>
-
-    <h3>3. Investigation Fee</h3>
-    <div class="fee-box">
-      <div class="fee-main">Investigation Fee: ${fee}</div>
-      <div class="fee-sub">
-        Non-refundable once transcript review has commenced. Standard range: $499–$699.<br/>
-        Full payment due prior to commencement of services.
+  irsFormBase('Form 8821 — Personal', `
+    <div class="clearfix">
+      <div class="irs-box">
+        <b>For IRS Use Only</b><br/>
+        Received by: ___________<br/>
+        Name: ___________<br/>
+        Telephone: ___________<br/>
+        Function: ___________<br/>
+        Date: ___________
+      </div>
+      <div style="margin-right:170px">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
+          <div style="font-size:36px;font-weight:900;border:3px solid #000;padding:2px 8px">8821</div>
+          <div>
+            <div style="font-size:13px;font-weight:bold">Tax Information Authorization</div>
+            <div style="font-size:9px">Department of the Treasury — Internal Revenue Service</div>
+            <div style="font-size:9px">OMB No. 1545-1165</div>
+          </div>
+        </div>
+        <div class="warn">▶ Don't sign this form unless all applicable lines have been completed.<br/>
+        ▶ Don't use Form 8821 to request copies of your tax returns or to authorize someone to represent you.</div>
       </div>
     </div>
 
+    <div class="section-label">1 Taxpayer information. Taxpayer must sign and date this form on line 6.</div>
+    <table>
+      <tr>
+        <td style="width:60%">
+          <div class="field-label">Taxpayer name and address</div>
+          <div class="field-value">${name}</div>
+          <div class="field-value" style="margin-top:4px">${address}</div>
+        </td>
+        <td>
+          <div class="field-label">Taxpayer identification number(s)</div>
+          <div class="field-value">${ssn}</div>
+          <div class="field-label" style="margin-top:6px">Daytime telephone number</div>
+          <div class="field-value">${phone}</div>
+        </td>
+      </tr>
+    </table>
+
+    <div class="section-label">2 Designee(s).</div>
+    <table>
+      <tr>
+        <td style="width:55%">
+          <div class="field-label">Name and address</div>
+          <div class="field-value">${REP1.name}</div>
+          <div class="field-value" style="margin-top:2px">${REP1.address}</div>
+          <div style="margin-top:4px"><input type="checkbox" checked/> Check if to be sent copies of notices and communications</div>
+        </td>
+        <td>
+          <div class="field-label">CAF No.</div><div class="field-value">${REP1.caf}</div>
+          <div class="field-label">PTIN</div><div class="field-value">${REP1.ptin}</div>
+          <div class="field-label">Telephone No.</div><div class="field-value">${REP1.phone}</div>
+          <div class="field-label">Fax No.</div><div class="field-value">${REP1.fax}</div>
+        </td>
+      </tr>
+    </table>
+
+    <div class="section-label">3 Tax information.</div>
+    <table>
+      <tr style="background:#eee"><th>(a) Type of Tax Information</th><th>(b) Tax Form Number</th><th>(c) Year(s) or Period(s)</th><th>(d) Specific Tax Matters</th></tr>
+      <tr><td>Income</td><td>1040</td><td>${years}</td><td>N/A</td></tr>
+      <tr><td>Penalty</td><td>500</td><td>${years}</td><td>N/A</td></tr>
+    </table>
+
+    <div class="section-label">6 Taxpayer signature.</div>
+    <div class="warn">▶ IF NOT COMPLETED, SIGNED, AND DATED, THIS TAX INFORMATION AUTHORIZATION WILL BE RETURNED.<br/>
+    ▶ DON'T SIGN THIS FORM IF IT IS BLANK OR INCOMPLETE.</div>
+    <table style="margin-top:8px">
+      <tr>
+        <td style="width:55%">
+          <div class="field-label">Signature</div>
+          <div class="sig-line"></div>
+          <div class="field-label" style="margin-top:4px">Print Name: <span style="font-weight:bold">${name}</span></div>
+        </td>
+        <td>
+          <div class="field-label">Date</div>
+          <div class="field-value">${date}</div>
+          <div class="field-label" style="margin-top:4px">Title (if applicable)</div>
+          <div class="field-value"></div>
+        </td>
+      </tr>
+    </table>
+    <div style="font-size:9px;margin-top:8px;border-top:1px solid #000;padding-top:4px">
+      For Privacy Act and Paperwork Reduction Act Notice, see the instructions. &nbsp;&nbsp; Cat. No. 11596P &nbsp;&nbsp; Form <b>8821</b> (Rev. 01-2021)
+    </div>
+  `)
+}
+
+// ─── Form 8821 Business ───────────────────────────────────────────────────────
+export function generateForm8821Business(c = null) {
+  const name    = c?.entityName || c?.name || '___________________________________'
+  const address = [c?.street, c?.city, c?.state, c?.zip].filter(Boolean).join(', ') || '___________________________________'
+  const ein     = c?.ein || c?.ssn || '__-_______'
+  const phone   = c?.phone || '_________________'
+  const years   = (() => { try { return JSON.parse(c?.taxYears||'[]').join(', ') } catch { return c?.taxYears || '____' } })()
+  const date    = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'})
+
+  irsFormBase('Form 8821 — Business', `
+    <div class="clearfix">
+      <div class="irs-box">
+        <b>For IRS Use Only</b><br/>
+        Received by: ___________<br/>
+        Name: ___________<br/>
+        Telephone: ___________<br/>
+        Function: ___________<br/>
+        Date: ___________
+      </div>
+      <div style="margin-right:170px">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
+          <div style="font-size:36px;font-weight:900;border:3px solid #000;padding:2px 8px">8821</div>
+          <div>
+            <div style="font-size:13px;font-weight:bold">Tax Information Authorization — Business</div>
+            <div style="font-size:9px">Department of the Treasury — Internal Revenue Service</div>
+            <div style="font-size:9px">OMB No. 1545-1165</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-label">1 Taxpayer information.</div>
+    <table>
+      <tr>
+        <td style="width:60%">
+          <div class="field-label">Business name and address</div>
+          <div class="field-value">${name}</div>
+          <div class="field-value" style="margin-top:4px">${address}</div>
+        </td>
+        <td>
+          <div class="field-label">EIN</div>
+          <div class="field-value">${ein}</div>
+          <div class="field-label" style="margin-top:6px">Daytime telephone number</div>
+          <div class="field-value">${phone}</div>
+        </td>
+      </tr>
+    </table>
+
+    <div class="section-label">2 Designee(s).</div>
+    <table>
+      <tr>
+        <td style="width:55%">
+          <div class="field-label">Name and address</div>
+          <div class="field-value">${REP1.name}</div>
+          <div class="field-value" style="margin-top:2px">${REP1.address}</div>
+          <div style="margin-top:4px"><input type="checkbox" checked/> Check if to be sent copies of notices and communications</div>
+        </td>
+        <td>
+          <div class="field-label">CAF No.</div><div class="field-value">${REP1.caf}</div>
+          <div class="field-label">PTIN</div><div class="field-value">${REP1.ptin}</div>
+          <div class="field-label">Telephone No.</div><div class="field-value">${REP1.phone}</div>
+          <div class="field-label">Fax No.</div><div class="field-value">${REP1.fax}</div>
+        </td>
+      </tr>
+    </table>
+
+    <div style="margin-top:4px"><input type="checkbox" checked/> By checking here, I authorize access to my IRS records via an Intermediate Service Provider.</div>
+
+    <div class="section-label">3 Tax information.</div>
+    <table>
+      <tr style="background:#eee"><th>(a) Type of Tax Information</th><th>(b) Tax Form Number</th><th>(c) Year(s) or Period(s)</th><th>(d) Specific Tax Matters</th></tr>
+      <tr><td>Corporate/Partnership</td><td>1120/1120s/1065</td><td>${years}</td><td>N/A</td></tr>
+      <tr><td>Employment/Payroll</td><td>940/941 All Quarters</td><td>${years}</td><td>N/A</td></tr>
+      <tr><td>Civil Penalty</td><td>500</td><td>${years}</td><td>N/A</td></tr>
+    </table>
+
+    <div class="section-label">6 Taxpayer signature.</div>
+    <div class="warn">▶ IF NOT COMPLETED, SIGNED, AND DATED, THIS TAX INFORMATION AUTHORIZATION WILL BE RETURNED.</div>
+    <table style="margin-top:8px">
+      <tr>
+        <td style="width:55%">
+          <div class="field-label">Signature</div>
+          <div class="sig-line"></div>
+          <div class="field-label" style="margin-top:4px">Print Name: <span style="font-weight:bold">${name}</span></div>
+        </td>
+        <td>
+          <div class="field-label">Date</div>
+          <div class="field-value">${date}</div>
+          <div class="field-label" style="margin-top:4px">Title (if applicable)</div>
+          <div class="field-value"></div>
+        </td>
+      </tr>
+    </table>
+    <div style="font-size:9px;margin-top:8px;border-top:1px solid #000;padding-top:4px">
+      For Privacy Act and Paperwork Reduction Act Notice, see the instructions. &nbsp;&nbsp; Cat. No. 11596P &nbsp;&nbsp; Form <b>8821</b> (Rev. 01-2021)
+    </div>
+  `)
+}
+
+// ─── Form 2848 Personal ───────────────────────────────────────────────────────
+export function generateForm2848Personal(c = null) {
+  const name    = c?.name || '___________________________________'
+  const address = [c?.street, c?.city, c?.state, c?.zip].filter(Boolean).join(', ') || '___________________________________'
+  const ssn     = c?.ssn  || '___-__-____'
+  const phone   = c?.phone || '_________________'
+  const years   = (() => { try { return JSON.parse(c?.taxYears||'[]').join(', ') } catch { return c?.taxYears || '____' } })()
+  const date    = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'})
+
+  irsFormBase('Form 2848 — Personal POA', `
+    <div class="clearfix">
+      <div class="irs-box">
+        <b>For IRS Use Only</b><br/>
+        Received by: ___________<br/>
+        Name: ___________<br/>
+        Telephone: ___________<br/>
+        Function: ___________<br/>
+        Date: ___________
+      </div>
+      <div style="margin-right:170px">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
+          <div style="font-size:36px;font-weight:900;border:3px solid #000;padding:2px 8px">2848</div>
+          <div>
+            <div style="font-size:13px;font-weight:bold">Power of Attorney and Declaration of Representative</div>
+            <div style="font-size:9px">Department of the Treasury — Internal Revenue Service</div>
+            <div style="font-size:9px">OMB No. 1545-0150</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="font-weight:bold;font-size:11px;margin-bottom:6px;border-top:2px solid #000;padding-top:4px">Part I &nbsp;&nbsp; Power of Attorney</div>
+    <div class="warn" style="margin-bottom:6px">Caution: A separate Form 2848 must be completed for each taxpayer.</div>
+
+    <div class="section-label">1 Taxpayer information. Taxpayer must sign and date this form on page 2, line 7.</div>
+    <table>
+      <tr>
+        <td style="width:60%">
+          <div class="field-label">Taxpayer name and address</div>
+          <div class="field-value">${name}</div>
+          <div class="field-value" style="margin-top:4px">${address}</div>
+        </td>
+        <td>
+          <div class="field-label">Taxpayer identification number(s)</div>
+          <div class="field-value">${ssn}</div>
+          <div class="field-label" style="margin-top:6px">Daytime telephone number</div>
+          <div class="field-value">${phone}</div>
+        </td>
+      </tr>
+    </table>
+    <div style="font-size:10px;margin:4px 0">hereby appoints the following representative(s) as attorney(s)-in-fact:</div>
+
+    <div class="section-label">2 Representative(s) must sign and date this form on page 2, Part II.</div>
+    <table>
+      <tr>
+        <td style="width:55%">
+          <div class="field-label">Name and address</div>
+          <div class="field-value">${REP2.name}</div>
+          <div class="field-value" style="margin-top:2px">${REP2.address}</div>
+        </td>
+        <td>
+          <div class="field-label">CAF No.</div><div class="field-value">${REP2.caf}</div>
+          <div class="field-label">PTIN</div><div class="field-value">${REP2.ptin}</div>
+          <div class="field-label">Telephone No.</div><div class="field-value">${REP2.phone}</div>
+          <div class="field-label">Fax No.</div><div class="field-value">${REP2.fax}</div>
+        </td>
+      </tr>
+      <tr>
+        <td style="width:55%">
+          <div class="field-label">Name and address</div>
+          <div class="field-value">${REP1.name}</div>
+          <div class="field-value" style="margin-top:2px">${REP1.address}</div>
+          <div style="margin-top:4px"><input type="checkbox" checked/> Check if to be sent copies of notices and communications</div>
+        </td>
+        <td>
+          <div class="field-label">CAF No.</div><div class="field-value">${REP1.caf}</div>
+          <div class="field-label">PTIN</div><div class="field-value">${REP1.ptin}</div>
+          <div class="field-label">Telephone No.</div><div class="field-value">${REP1.phone}</div>
+          <div class="field-label">Fax No.</div><div class="field-value">${REP1.fax}</div>
+        </td>
+      </tr>
+    </table>
+
+    <div class="section-label">3 Acts authorized.</div>
+    <table>
+      <tr style="background:#eee"><th>Description of Matter</th><th>Tax Form Number</th><th>Year(s) or Period(s)</th></tr>
+      <tr><td>Income</td><td>1040</td><td>${years}</td></tr>
+      <tr><td>Health Insurance</td><td>6672/6702</td><td>${years}</td></tr>
+      <tr><td>Civil Penalty</td><td>500</td><td>${years}</td></tr>
+    </table>
+
+    <div class="section-label" style="page-break-before:always;margin-top:16px">7 Taxpayer declaration and signature. (Page 2)</div>
+    <div class="warn">▶ IF NOT COMPLETED, SIGNED, AND DATED, THE IRS WILL RETURN THIS POWER OF ATTORNEY TO THE TAXPAYER.</div>
+    <table style="margin-top:8px">
+      <tr>
+        <td style="width:50%">
+          <div class="field-label">Signature</div>
+          <div class="sig-line"></div>
+          <div class="field-label" style="margin-top:6px">Print name: <span style="font-weight:bold">${name}</span></div>
+        </td>
+        <td style="width:25%">
+          <div class="field-label">Date</div>
+          <div class="field-value">${date}</div>
+        </td>
+        <td>
+          <div class="field-label">Title (if applicable)</div>
+          <div class="field-value"></div>
+        </td>
+      </tr>
+    </table>
+
+    <div style="font-weight:bold;font-size:11px;margin:12px 0 6px;border-top:2px solid #000;padding-top:4px">Part II &nbsp;&nbsp; Declaration of Representative</div>
+    <div style="font-size:9px;margin-bottom:6px;line-height:1.5">Under penalties of perjury, by my signature below I declare that I am not currently suspended or disbarred from practice before the IRS; I am subject to regulations in Circular 230; I am authorized to represent the taxpayer identified in Part I.</div>
+    <table>
+      <tr style="background:#eee">
+        <th>Designation (a–r)</th>
+        <th>Licensing jurisdiction</th>
+        <th>Bar/license/enrollment number</th>
+        <th>Signature</th>
+        <th>Date</th>
+      </tr>
+      <tr>
+        <td style="text-align:center">D</td>
+        <td>RS</td>
+        <td>${REP1.caf}</td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr><td></td><td></td><td></td><td></td><td></td></tr>
+    </table>
+    <div style="font-size:9px;margin-top:8px;border-top:1px solid #000;padding-top:4px">
+      Cat. No. 11980J &nbsp;&nbsp; Form <b>2848</b> (Rev. 1-2021)
+    </div>
+  `)
+}
+
+// ─── Form 2848 Business ───────────────────────────────────────────────────────
+export function generateForm2848Business(c = null) {
+  const name    = c?.entityName || c?.name || '___________________________________'
+  const address = [c?.street, c?.city, c?.state, c?.zip].filter(Boolean).join(', ') || '___________________________________'
+  const ein     = c?.ein || c?.ssn || '__-_______'
+  const phone   = c?.phone || '_________________'
+  const years   = (() => { try { return JSON.parse(c?.taxYears||'[]').join(', ') } catch { return c?.taxYears || '____' } })()
+  const date    = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'})
+
+  irsFormBase('Form 2848 — Business POA', `
+    <div class="clearfix">
+      <div class="irs-box">
+        <b>For IRS Use Only</b><br/>
+        Received by: ___________<br/>
+        Name: ___________<br/>
+        Telephone: ___________<br/>
+        Function: ___________<br/>
+        Date: ___________
+      </div>
+      <div style="margin-right:170px">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
+          <div style="font-size:36px;font-weight:900;border:3px solid #000;padding:2px 8px">2848</div>
+          <div>
+            <div style="font-size:13px;font-weight:bold">Power of Attorney — Business Entity</div>
+            <div style="font-size:9px">Department of the Treasury — Internal Revenue Service</div>
+            <div style="font-size:9px">OMB No. 1545-0150</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="font-weight:bold;font-size:11px;margin-bottom:6px;border-top:2px solid #000;padding-top:4px">Part I &nbsp;&nbsp; Power of Attorney</div>
+
+    <div class="section-label">1 Taxpayer information.</div>
+    <table>
+      <tr>
+        <td style="width:60%">
+          <div class="field-label">Business name and address</div>
+          <div class="field-value">${name}</div>
+          <div class="field-value" style="margin-top:4px">${address}</div>
+        </td>
+        <td>
+          <div class="field-label">EIN</div>
+          <div class="field-value">${ein}</div>
+          <div class="field-label" style="margin-top:6px">Daytime telephone number</div>
+          <div class="field-value">${phone}</div>
+        </td>
+      </tr>
+    </table>
+
+    <div class="section-label">2 Representative(s).</div>
+    <table>
+      <tr>
+        <td style="width:55%">
+          <div class="field-label">Name and address</div>
+          <div class="field-value">${REP1.name}</div>
+          <div class="field-value" style="margin-top:2px">${REP1.address}</div>
+          <div style="margin-top:4px"><input type="checkbox" checked/> Check if to be sent copies of notices and communications</div>
+        </td>
+        <td>
+          <div class="field-label">CAF No.</div><div class="field-value">${REP1.caf}</div>
+          <div class="field-label">PTIN</div><div class="field-value">${REP1.ptin}</div>
+          <div class="field-label">Telephone No.</div><div class="field-value">${REP1.phone}</div>
+          <div class="field-label">Fax No.</div><div class="field-value">${REP1.fax}</div>
+        </td>
+      </tr>
+    </table>
+
+    <div class="section-label">3 Acts authorized.</div>
+    <table>
+      <tr style="background:#eee"><th>Description of Matter</th><th>Tax Form Number</th><th>Year(s) or Period(s)</th></tr>
+      <tr><td>Income/Corporate</td><td>1120/1120s/1065</td><td>${years}</td></tr>
+      <tr><td>Employment/Payroll</td><td>940/941</td><td>${years}</td></tr>
+      <tr><td>Civil Penalty</td><td>500</td><td>${years}</td></tr>
+    </table>
+
+    <div class="section-label" style="margin-top:16px">7 Authorized Officer/Partner Signature (Page 2)</div>
+    <div class="warn">▶ IF NOT COMPLETED, SIGNED, AND DATED, THE IRS WILL RETURN THIS POWER OF ATTORNEY TO THE TAXPAYER.</div>
+    <table style="margin-top:8px">
+      <tr>
+        <td style="width:50%">
+          <div class="field-label">Signature of authorized officer/partner</div>
+          <div class="sig-line"></div>
+          <div class="field-label" style="margin-top:6px">Print name: <span style="font-weight:bold">${name}</span></div>
+        </td>
+        <td style="width:25%">
+          <div class="field-label">Date</div>
+          <div class="field-value">${date}</div>
+        </td>
+        <td>
+          <div class="field-label">Title</div>
+          <div class="field-value"></div>
+        </td>
+      </tr>
+    </table>
+
+    <div style="font-weight:bold;font-size:11px;margin:12px 0 6px;border-top:2px solid #000;padding-top:4px">Part II &nbsp;&nbsp; Declaration of Representative</div>
+    <table>
+      <tr style="background:#eee">
+        <th>Designation</th><th>Licensing jurisdiction</th><th>Enrollment number</th><th>Signature</th><th>Date</th>
+      </tr>
+      <tr>
+        <td style="text-align:center">D</td>
+        <td>RS</td>
+        <td>${REP1.caf}</td>
+        <td></td>
+        <td></td>
+      </tr>
+    </table>
+    <div style="font-size:9px;margin-top:8px;border-top:1px solid #000;padding-top:4px">
+      Cat. No. 11980J &nbsp;&nbsp; Form <b>2848</b> (Rev. 1-2021)
+    </div>
+  `)
+}
+
+// ─── Combined Client Package (Tax Engagement Service Agreement) ───────────────
+export function generateClientPackage(c = null) {
+  const fee  = c?.taxFee ? `$${Number(c.taxFee).toLocaleString()}` : (c?.investigationFee ? `$${c.investigationFee}` : '$___________')
+  const name = c ? (c.name || '') : 'Valued Client'
+  const date = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})
+  const rep  = c?.assignedTo || '___________________'
+  const years= (() => { try { return JSON.parse(c?.taxYears||'[]').join(', ') } catch { return c?.taxYears || '___________________' } })()
+  const issue= c?.issueType || 'tax resolution matter'
+
+  printBase('Tax Engagement Service Agreement', `
+    ${clientBlock(c)}
+    <p style="text-align:right;font-size:11px;color:#666">Date: ${date}</p>
+    <p>Dear <b>${name}</b>,</p>
+    <p>Thank you for choosing <b>Tax Case Review</b>. This document serves as your <b>Tax Investigation Service Agreement</b> and <b>Engagement Letter</b> confirming our engagement to assist you with your ${issue} matter${years !== '___________________' ? ` for tax year(s) ${years}` : ''}.</p>
+    <h3>1. Scope of Services</h3>
+    <ul>
+      <li>Review of IRS and/or state tax transcripts</li>
+      <li>Identification of outstanding tax liabilities and unfiled returns</li>
+      <li>Evaluation of eligibility for IRS resolution programs (OIC, CNC, IA, Penalty Abatement)</li>
+      <li>Preparation of a written resolution strategy within 21 business days</li>
+      <li>Full IRS/state representation — Case Rep: <b>${rep}</b></li>
+    </ul>
+    <h3>2. Authorization</h3>
+    <p>Client authorizes Tax Case Review to obtain IRS transcripts via Form 2848/8821 and represent the Client before the IRS and/or applicable state tax authority.</p>
+    <h3>3. Investigation Fee</h3>
+    <div class="fee-box">
+      <div class="fee-main">Investigation Fee: ${fee}</div>
+      <div class="fee-sub">Non-refundable once transcript review has commenced. Full payment due prior to commencement.</div>
+    </div>
     <h3>4. Client Responsibilities</h3>
     <ul>
       <li>Provide accurate and complete financial and tax information</li>
       <li>Execute IRS authorization forms (Form 2848 / 8821) promptly</li>
-      <li>Respond to requests for documents within 5 business days</li>
-      <li>Notify us immediately of any IRS notices, levies, or contacts received</li>
+      <li>Respond to document requests within 5 business days</li>
+      <li>Notify us immediately of any IRS notices, levies, or contacts</li>
     </ul>
-
-    <h3>5. Our Commitment</h3>
-    <p>We are committed to professional, ethical, and effective representation. Your representative will keep you informed of all significant developments. We are available Monday through Friday.</p>
-
-    <h3>6. No Guarantee of Outcome</h3>
+    <h3>5. No Guarantee of Outcome</h3>
     <p>Tax Case Review makes no guarantee as to any specific outcome. Acceptance into any IRS program is solely at the discretion of the IRS.</p>
-
-    <h3>7. Not a Law Firm</h3>
-    <p>Tax Case Review is a tax resolution consulting firm and is <b>not a law firm</b>. No attorney-client relationship is created. All representation is performed by Enrolled Agents and/or licensed tax professionals.</p>
-
-    <h3>8. Termination</h3>
-    <p>Either party may terminate with 5 business days written notice. Investigation fees already paid are non-refundable once services have commenced.</p>
-
-    <h3>9. Governing Law</h3>
-    <p>This Agreement is governed by the laws of the State of Florida. Disputes shall be resolved by binding arbitration in Palm Beach County, Florida.</p>
-
-    ${sigBlock('Client Signature & Acknowledgment', 'Authorized Representative — Tax Case Review')}
-  `)
-}
-
-// ─── Form 8821 — Tax Information Authorization ────────────────────────────────
-export function generateForm8821(c = null) {
-  const name    = c ? (c.name || `${c.first||''} ${c.last||''}`.trim()) : '___________________'
-  const address = c ? ([c.street, c.city, c.state, c.zip].filter(Boolean).join(', ') || '___________________') : '___________________'
-  const ssn     = c?.ssn ? c.ssn : '___-__-____'
-  const phone   = c?.phone || '___________________'
-  const years   = c?.taxYears || '___________________'
-  const date    = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})
-
-  printBase('Form 8821 — Tax Information Authorization', `
-    <div class="notice" style="margin-bottom:20px">
-      <b>Note:</b> This is a pre-filled draft for review. The taxpayer must sign the official IRS Form 8821.
-      Download the official form at <a href="https://www.irs.gov/pub/irs-pdf/f8821.pdf" target="_blank">irs.gov/pub/irs-pdf/f8821.pdf</a>
-    </div>
-
-    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px">
-      <tr><td colspan="2" style="background:#1A7FD4;color:#fff;font-weight:700;padding:8px 12px;font-size:13px">Section 1 — Taxpayer Information</td></tr>
-      <tr>
-        <td style="border:1px solid #ccc;padding:10px 12px;width:50%">
-          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Taxpayer Name</div>
-          <div style="font-size:14px;font-weight:700">${name}</div>
-        </td>
-        <td style="border:1px solid #ccc;padding:10px 12px">
-          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">SSN / EIN</div>
-          <div style="font-size:14px;font-weight:700">${ssn}</div>
-        </td>
-      </tr>
-      <tr>
-        <td colspan="2" style="border:1px solid #ccc;padding:10px 12px">
-          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Address</div>
-          <div style="font-size:13px">${address}</div>
-        </td>
-      </tr>
-      <tr>
-        <td style="border:1px solid #ccc;padding:10px 12px">
-          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Phone Number</div>
-          <div style="font-size:13px">${phone}</div>
-        </td>
-        <td style="border:1px solid #ccc;padding:10px 12px">
-          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Date</div>
-          <div style="font-size:13px">${date}</div>
-        </td>
-      </tr>
-    </table>
-
-    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px">
-      <tr><td colspan="2" style="background:#1A7FD4;color:#fff;font-weight:700;padding:8px 12px;font-size:13px">Section 2 — Appointee (Tax Case Review)</td></tr>
-      <tr>
-        <td style="border:1px solid #ccc;padding:10px 12px;width:50%">
-          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Name</div>
-          <div style="font-size:13px">Tax Case Review</div>
-        </td>
-        <td style="border:1px solid #ccc;padding:10px 12px">
-          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">CAF Number</div>
-          <div style="font-size:13px">___________________</div>
-        </td>
-      </tr>
-      <tr>
-        <td style="border:1px solid #ccc;padding:10px 12px">
-          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Address</div>
-          <div style="font-size:13px">238 Evergreen Dr, Lake Park, FL 33403</div>
-        </td>
-        <td style="border:1px solid #ccc;padding:10px 12px">
-          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Phone</div>
-          <div style="font-size:13px">(850) 459-9039</div>
-        </td>
-      </tr>
-    </table>
-
-    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px">
-      <tr><td style="background:#1A7FD4;color:#fff;font-weight:700;padding:8px 12px;font-size:13px">Section 3 — Tax Matters</td></tr>
-      <tr><td style="border:1px solid #ccc;padding:10px 12px">
-        <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:8px">Type of Tax / Tax Form Number / Tax Years or Periods</div>
-        <table style="width:100%;border-collapse:collapse;font-size:11px">
-          <tr style="background:#f5f5f5">
-            <th style="border:1px solid #ddd;padding:6px 10px;text-align:left">Type of Tax</th>
-            <th style="border:1px solid #ddd;padding:6px 10px;text-align:left">Form Number</th>
-            <th style="border:1px solid #ddd;padding:6px 10px;text-align:left">Tax Year(s) / Period(s)</th>
-          </tr>
-          <tr>
-            <td style="border:1px solid #ddd;padding:8px 10px">Income</td>
-            <td style="border:1px solid #ddd;padding:8px 10px">1040</td>
-            <td style="border:1px solid #ddd;padding:8px 10px">${years}</td>
-          </tr>
-          <tr>
-            <td style="border:1px solid #ddd;padding:8px 10px">Penalty</td>
-            <td style="border:1px solid #ddd;padding:8px 10px">All</td>
-            <td style="border:1px solid #ddd;padding:8px 10px">${years}</td>
-          </tr>
-        </table>
-      </td></tr>
-    </table>
-
-    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px">
-      <tr><td style="background:#1A7FD4;color:#fff;font-weight:700;padding:8px 12px;font-size:13px">Section 6 — Taxpayer Signature</td></tr>
-      <tr><td style="border:1px solid #ccc;padding:16px 12px">
-        <div style="display:flex;gap:48px">
-          <div style="flex:2">
-            <div style="border-top:1.5px solid #333;padding-top:8px;margin-top:24px">
-              <div style="font-size:11px;font-weight:700">Taxpayer Signature</div>
-              <div style="font-size:11px;color:#555;margin-top:4px">Print Name: ${name}</div>
-            </div>
-          </div>
-          <div style="flex:1">
-            <div style="border-top:1.5px solid #333;padding-top:8px;margin-top:24px">
-              <div style="font-size:11px;font-weight:700">Date</div>
-              <div style="font-size:11px;color:#555;margin-top:4px">${date}</div>
-            </div>
-          </div>
-        </div>
-      </td></tr>
-    </table>
-  `)
-}
-
-// ─── Form 2848 — Power of Attorney ───────────────────────────────────────────
-export function generateForm2848(c = null) {
-  const name    = c ? (c.name || `${c.first||''} ${c.last||''}`.trim()) : '___________________'
-  const address = c ? ([c.street, c.city, c.state, c.zip].filter(Boolean).join(', ') || '___________________') : '___________________'
-  const ssn     = c?.ssn ? c.ssn : '___-__-____'
-  const phone   = c?.phone || '___________________'
-  const years   = c?.taxYears || '___________________'
-  const date    = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})
-
-  printBase('Form 2848 — Power of Attorney and Declaration of Representative', `
-    <div class="notice" style="margin-bottom:20px">
-      <b>Note:</b> This is a pre-filled draft for review. The taxpayer must sign the official IRS Form 2848.
-      Download at <a href="https://www.irs.gov/pub/irs-pdf/f2848.pdf" target="_blank">irs.gov/pub/irs-pdf/f2848.pdf</a>
-    </div>
-
-    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px">
-      <tr><td colspan="2" style="background:#1A7FD4;color:#fff;font-weight:700;padding:8px 12px;font-size:13px">Part I — Power of Attorney</td></tr>
-      <tr><td colspan="2" style="background:#eaf2fb;padding:6px 12px;font-size:11px;color:#1A7FD4;font-weight:600">Section 1 — Taxpayer Information</td></tr>
-      <tr>
-        <td style="border:1px solid #ccc;padding:10px 12px;width:50%">
-          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Taxpayer Name</div>
-          <div style="font-size:14px;font-weight:700">${name}</div>
-        </td>
-        <td style="border:1px solid #ccc;padding:10px 12px">
-          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">SSN / EIN</div>
-          <div style="font-size:14px;font-weight:700">${ssn}</div>
-        </td>
-      </tr>
-      <tr>
-        <td colspan="2" style="border:1px solid #ccc;padding:10px 12px">
-          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Address</div>
-          <div style="font-size:13px">${address}</div>
-        </td>
-      </tr>
-      <tr>
-        <td style="border:1px solid #ccc;padding:10px 12px">
-          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Phone</div>
-          <div style="font-size:13px">${phone}</div>
-        </td>
-        <td style="border:1px solid #ccc;padding:10px 12px">
-          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Date</div>
-          <div style="font-size:13px">${date}</div>
-        </td>
-      </tr>
-    </table>
-
-    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px">
-      <tr><td colspan="2" style="background:#eaf2fb;padding:6px 12px;font-size:11px;color:#1A7FD4;font-weight:600">Section 2 — Representative (Appointee)</td></tr>
-      <tr>
-        <td style="border:1px solid #ccc;padding:10px 12px;width:50%">
-          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Name</div>
-          <div style="font-size:13px">Tax Case Review</div>
-        </td>
-        <td style="border:1px solid #ccc;padding:10px 12px">
-          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">CAF Number</div>
-          <div style="font-size:13px">___________________</div>
-        </td>
-      </tr>
-      <tr>
-        <td style="border:1px solid #ccc;padding:10px 12px">
-          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Address</div>
-          <div style="font-size:13px">238 Evergreen Dr, Lake Park, FL 33403</div>
-        </td>
-        <td style="border:1px solid #ccc;padding:10px 12px">
-          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Designation (ea/cpa/etc)</div>
-          <div style="font-size:13px">Enrolled Agent</div>
-        </td>
-      </tr>
-    </table>
-
-    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px">
-      <tr><td style="background:#eaf2fb;padding:6px 12px;font-size:11px;color:#1A7FD4;font-weight:600">Section 3 — Tax Matters</td></tr>
-      <tr><td style="border:1px solid #ccc;padding:10px 12px">
-        <table style="width:100%;border-collapse:collapse;font-size:11px">
-          <tr style="background:#f5f5f5">
-            <th style="border:1px solid #ddd;padding:6px 10px;text-align:left">Type of Tax</th>
-            <th style="border:1px solid #ddd;padding:6px 10px;text-align:left">Form Number</th>
-            <th style="border:1px solid #ddd;padding:6px 10px;text-align:left">Tax Year(s)</th>
-            <th style="border:1px solid #ddd;padding:6px 10px;text-align:left">Specific Tax Matters</th>
-          </tr>
-          <tr>
-            <td style="border:1px solid #ddd;padding:8px 10px">Income</td>
-            <td style="border:1px solid #ddd;padding:8px 10px">1040</td>
-            <td style="border:1px solid #ddd;padding:8px 10px">${years}</td>
-            <td style="border:1px solid #ddd;padding:8px 10px">All matters</td>
-          </tr>
-          <tr>
-            <td style="border:1px solid #ddd;padding:8px 10px">Penalty</td>
-            <td style="border:1px solid #ddd;padding:8px 10px">All</td>
-            <td style="border:1px solid #ddd;padding:8px 10px">${years}</td>
-            <td style="border:1px solid #ddd;padding:8px 10px">Abatement / Waiver</td>
-          </tr>
-        </table>
-      </td></tr>
-    </table>
-
-    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px">
-      <tr><td style="background:#eaf2fb;padding:6px 12px;font-size:11px;color:#1A7FD4;font-weight:600">Section 5 — Acts Authorized</td></tr>
-      <tr><td style="border:1px solid #ccc;padding:10px 12px;font-size:11px;line-height:1.8">
-        The representative is authorized to receive and inspect confidential tax information and to perform any and all acts that the taxpayer can perform with respect to the tax matters described in Section 3, including:
-        receiving notices and communications, executing waivers, executing closing agreements, representing the taxpayer before IRS Appeals, and any other tax matter listed above.
-      </td></tr>
-    </table>
-
-    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px">
-      <tr><td colspan="2" style="background:#eaf2fb;padding:6px 12px;font-size:11px;color:#1A7FD4;font-weight:600">Section 9 — Taxpayer Signature</td></tr>
-      <tr><td colspan="2" style="border:1px solid #ccc;padding:16px 12px">
-        <p style="font-size:11px;color:#555;margin-bottom:16px">
-          Under penalties of perjury, I declare that I am the taxpayer referenced above and that the information on this document is true, correct, and complete.
-        </p>
-        <div style="display:flex;gap:48px">
-          <div style="flex:2">
-            <div style="border-top:1.5px solid #333;padding-top:8px;margin-top:24px">
-              <div style="font-size:11px;font-weight:700">Taxpayer Signature</div>
-              <div style="font-size:11px;color:#555;margin-top:4px">Print Name: ${name}</div>
-            </div>
-          </div>
-          <div style="flex:1">
-            <div style="border-top:1.5px solid #333;padding-top:8px;margin-top:24px">
-              <div style="font-size:11px;font-weight:700">Date</div>
-              <div style="font-size:11px;color:#555;margin-top:4px">${date}</div>
-            </div>
-          </div>
-        </div>
-      </td></tr>
-    </table>
-
-    <table style="width:100%;border-collapse:collapse;font-size:12px">
-      <tr><td colspan="2" style="background:#1A7FD4;color:#fff;font-weight:700;padding:8px 12px;font-size:13px">Part II — Declaration of Representative</td></tr>
-      <tr><td colspan="2" style="border:1px solid #ccc;padding:10px 12px;font-size:11px;line-height:1.8">
-        Under penalties of perjury, I declare that I am not currently under suspension or disbarment from practice before the IRS; that I am aware of the regulations in Circular 230; and that I am authorized to represent the taxpayer identified in Part I.
-      </td></tr>
-      <tr>
-        <td style="border:1px solid #ccc;padding:10px 12px">
-          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Representative Signature</div>
-          <div style="border-top:1.5px solid #333;padding-top:8px;margin-top:24px">
-            <div style="font-size:11px;color:#555">Tax Case Review — Authorized Representative</div>
-          </div>
-        </td>
-        <td style="border:1px solid #ccc;padding:10px 12px">
-          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;margin-bottom:4px">Date</div>
-          <div style="border-top:1.5px solid #333;padding-top:8px;margin-top:24px">
-            <div style="font-size:11px;color:#555">${date}</div>
-          </div>
-        </td>
-      </tr>
-    </table>
+    <h3>6. Not a Law Firm</h3>
+    <p>Tax Case Review is a tax resolution consulting firm and is <b>not a law firm</b>. All representation is performed by Enrolled Agents and/or licensed tax professionals.</p>
+    ${sigBlock('Client Signature', 'Authorized Representative — Tax Case Review')}
   `)
 }
