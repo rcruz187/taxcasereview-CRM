@@ -9,6 +9,7 @@ const BLANK = { clientName:'', caseType:'OIC', irsBalance:'', status:'Open', ass
 
 export default function Cases() {
   const [cases,     setCases]     = useState([])
+  const [confirmDel, setConfirmDel] = useState(null)
   const [clients,   setClients]   = useState([])
   const [employees, setEmployees] = useState([])
   const [filter,    setFilter]    = useState('All')
@@ -95,7 +96,8 @@ export default function Cases() {
   }
 
   async function deleteCase(id) {
-    if (!confirm('Delete this case?')) return
+    if (!confirmDel) { setConfirmDel('pending'); return }
+    setConfirmDel(null)
     await supabase.from('cases').delete().eq('id',id)
     showToast('Deleted'); setDetail(null); load()
   }
@@ -320,6 +322,20 @@ function CaseModal({form,fld,reps,saving,onSave,onClose,title,sug,searchClient,p
           {saving?'Saving…':title}
         </button>
       </div>
+
+      {confirmDel && (
+        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setConfirmDel(null)}>
+          <div className="modal" style={{maxWidth:360,textAlign:'center'}}>
+            <div style={{fontSize:36,marginBottom:12}}>🗑</div>
+            <div style={{fontWeight:700,fontSize:15,marginBottom:8}}>Delete this case?</div>
+            <div style={{fontSize:13,color:'var(--t3)',marginBottom:20}}>This cannot be undone.</div>
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={()=>setConfirmDel(null)}>Cancel</button>
+              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>{ deleteCase(confirmDel); setConfirmDel(null) }}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
