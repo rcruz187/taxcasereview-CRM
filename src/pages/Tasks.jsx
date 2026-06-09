@@ -22,7 +22,30 @@ export default function Tasks() {
   const [view,      setView]      = useState('open') // 'open' | 'completed' | 'deleted'
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    // Request notification permission for reminders
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+  }, [])
+
+  // Check for due tasks and show browser notifications
+  useEffect(() => {
+    if (!tasks.length) return
+    const today = new Date().toISOString().slice(0,10)
+    const dueSoon = tasks.filter(t => !t.done && t.dueDate && t.dueDate <= today)
+    if (dueSoon.length > 0 && Notification.permission === 'granted') {
+      dueSoon.forEach(t => {
+        const overdue = t.dueDate < today
+        new Notification(`${overdue?'⚠️ OVERDUE':'📅 Due Today'}: ${t.title}`, {
+          body: `${t.clientName ? 'Client: '+t.clientName+'\n' : ''}Priority: ${t.priority||'Normal'}`,
+          icon: '/taxcasereview-CRM/favicon.ico',
+          tag: 'task-'+t.id,
+        })
+      })
+    }
+  }, [tasks])
   useEffect(() => {
     // Check if current user is Super Admin
     if (user?.email) checkRole(user.email)
