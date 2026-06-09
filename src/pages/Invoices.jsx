@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useApp } from '../context/AppContext'
 
 const BLANK = { clientName:'', caseNum:'', lineItems:'', total:'', paid:'0', dueDate:'', taxRate:'0', status:'Unpaid', notes:'' }
 const SERVICE_TEMPLATES = [
@@ -27,6 +28,7 @@ export default function Invoices() {
   const [editId,   setEditId]   = useState(null)
   const [form,     setForm]     = useState(BLANK)
   const [saving,   setSaving]   = useState(false)
+  const [confirmDel, setConfirmDel] = useState(null)
   const [toast,    setToast]    = useState('')
   const [search,   setSearch]   = useState('')
   const [filterStatus, setFilterStatus] = useState('All')
@@ -94,7 +96,8 @@ export default function Invoices() {
   }
 
   async function deleteItem(id) {
-    if (!window.confirm('Delete this invoice?')) return
+    if (!confirmDel) { setConfirmDel(id); return }
+    setConfirmDel(null)
     await supabase.from('invoices').delete().eq('id',id)
     showToast('Deleted'); load()
   }
@@ -110,6 +113,86 @@ export default function Invoices() {
     const matchStatus = filterStatus==='All' || i.status===filterStatus
     return matchSearch && matchStatus
   })
+
+
+  function printInvoice(inv) {
+    const w = window.open('','_blank','width=800,height=900')
+    const date = inv.date ? new Date(inv.date).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}) : new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})
+    const dueDate = inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}) : 'Upon Receipt'
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Invoice ${inv.invoiceNum||inv.id?.slice(-6)||''}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
+  body{padding:40px;color:#111;font-size:13px;line-height:1.5;max-width:720px;margin:auto}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:3px solid #1A7FD4}
+  .firm-name{font-size:22px;font-weight:900;color:#1A7FD4}
+  .firm-sub{font-size:11px;color:#64748b;margin-top:2px}
+  .inv-title{font-size:28px;font-weight:900;color:#111;text-align:right}
+  .inv-num{font-size:13px;color:#64748b;text-align:right;margin-top:4px}
+  .status-badge{display:inline-block;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700;margin-top:6px;
+    background:${inv.status==='Paid'?'#dcfce7':inv.status==='Overdue'?'#fee2e2':'#fef9c3'};
+    color:${inv.status==='Paid'?'#166534':inv.status==='Overdue'?'#991b1b':'#854d0e'}}
+  .section{display:flex;gap:40px;margin-bottom:28px}
+  .section-block{flex:1}
+  .section-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;margin-bottom:6px}
+  .section-value{font-size:13px;font-weight:600;color:#111}
+  .section-sub{font-size:12px;color:#64748b;margin-top:2px}
+  table{width:100%;border-collapse:collapse;margin-bottom:24px}
+  thead tr{background:#f1f5f9}
+  th{padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;border-bottom:1px solid #e2e8f0}
+  td{padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:13px}
+  .total-row td{font-weight:700;font-size:14px;border-top:2px solid #1A7FD4;border-bottom:none;padding-top:14px}
+  .notes{background:#f8fafc;border-radius:8px;padding:14px 16px;margin-bottom:24px;font-size:12px;color:#64748b;line-height:1.7}
+  .footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:32px;padding-top:16px;border-top:1px solid #e2e8f0}
+  @media print{body{padding:20px}.no-print{display:none}}
+</style></head><body onload="window.print()">
+  <div class="no-print" style="text-align:center;margin-bottom:20px">
+    <button onclick="window.print()" style="padding:8px 24px;background:#1A7FD4;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">🖨️ Print / Save PDF</button>
+  </div>
+  <div class="header">
+    <div>
+      <div class="firm-name">Tax Case Review</div>
+      <div class="firm-sub">IRS Resolution Services</div>
+      <div class="firm-sub">238 Evergreen Dr, Lake Park, FL 33403</div>
+    </div>
+    <div style="text-align:right">
+      <div class="inv-title">INVOICE</div>
+      <div class="inv-num">#${inv.invoiceNum||inv.id?.slice(-6)||'INV-001'}</div>
+      <div><span class="status-badge">${inv.status||'Pending'}</span></div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-block">
+      <div class="section-label">Bill To</div>
+      <div class="section-value">${inv.clientName||'Client'}</div>
+    </div>
+    <div class="section-block">
+      <div class="section-label">Invoice Date</div>
+      <div class="section-value">${date}</div>
+    </div>
+    <div class="section-block">
+      <div class="section-label">Due Date</div>
+      <div class="section-value">${dueDate}</div>
+    </div>
+    <div class="section-block">
+      <div class="section-label">Amount Due</div>
+      <div class="section-value" style="color:#1A7FD4;font-size:18px">$${Number(inv.amount||0).toLocaleString('en-US',{minimumFractionDigits:2})}</div>
+    </div>
+  </div>
+  <table>
+    <thead><tr><th>Description</th><th style="text-align:right">Amount</th></tr></thead>
+    <tbody>
+      <tr><td>${inv.description||inv.service||'Professional Tax Resolution Services'}</td><td style="text-align:right">$${Number(inv.amount||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td></tr>
+    </tbody>
+    <tfoot><tr class="total-row"><td>Total Due</td><td style="text-align:right;color:#1A7FD4">$${Number(inv.amount||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td></tr></tfoot>
+  </table>
+  ${inv.notes?`<div class="notes"><strong>Notes:</strong> ${inv.notes}</div>`:''}
+  <div class="footer">
+    Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403 · Not a Law Firm<br/>
+    Thank you for your business.
+  </div>
+</body></html>`)
+    w.document.close()
+  }
 
   return (
     <div style={{maxWidth:1000}}>
@@ -182,6 +265,7 @@ export default function Invoices() {
                       <div style={{display:'flex',gap:5}}>
                         <button className="btn sec" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>openEdit(inv)}>Edit</button>
                         {inv.status!=='Paid'&&<button className="btn" style={{fontSize:10,padding:'3px 8px',background:'var(--ok)',color:'#fff',border:'none',borderRadius:5,cursor:'pointer'}} onClick={()=>markPaid(inv)}>Paid ✓</button>}
+                        <button className="btn sec" style={{fontSize:10,padding:'3px 8px',marginRight:2}} onClick={()=>printInvoice(inv)}>🖨️</button>
                         <button className="btn del" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>deleteItem(inv.id)}>Del</button>
                       </div>
                     </td>
@@ -285,6 +369,20 @@ export default function Invoices() {
             <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:10}} onClick={save} disabled={saving}>
               {saving?'Saving…':editId?'Update Invoice':'Create Invoice'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {confirmDel && (
+        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setConfirmDel(null)}>
+          <div className="modal" style={{maxWidth:360,textAlign:'center'}}>
+            <div style={{fontSize:36,marginBottom:12}}>🗑</div>
+            <div style={{fontWeight:700,fontSize:15,marginBottom:8}}>Delete this invoice?</div>
+            <div style={{fontSize:13,color:'var(--t3)',marginBottom:20}}>This cannot be undone.</div>
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={()=>setConfirmDel(null)}>Cancel</button>
+              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>{deleteItem(confirmDel);setConfirmDel(null)}}>Delete</button>
+            </div>
           </div>
         </div>
       )}
