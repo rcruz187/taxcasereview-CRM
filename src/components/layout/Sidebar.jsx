@@ -12,7 +12,7 @@ const SECTIONS = [
     label: 'Overview',
     always: true,
     items: [
-      { path: '/',          icon: GridIcon,    label: 'Dashboard',     section: null },
+      { path: '/',          icon: GridIcon,    label: 'Home',     section: null },
       { path: '/email',     icon: EmailIcon,   label: 'Email',         section: 'email' },
       { path: '/chat',      icon: ChatIcon,    label: 'Team Chat',     section: 'chat' },
       { path: '/calendar',  icon: CalIcon,     label: 'Calendar',      section: 'calendar' },
