@@ -133,6 +133,7 @@ function LeadInlineEsign({ lead, onClose }) {
 }
 
 export default function Leads() {
+  const { user } = useApp()
   const navigate = useNavigate()
   const [leads, setLeads]   = useState([])
   const [filter, setFilter] = useState('All')
@@ -264,8 +265,12 @@ export default function Leads() {
 
         {/* Top bar — matches clients page */}
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,flexWrap:'wrap'}}>
-          <button className="btn" style={{padding:'8px 16px',fontSize:13,fontWeight:600}} onClick={()=>setDetail(null)}>← Back</button>
-          <button className="btn pri" style={{marginLeft:'auto',padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>{setForm({...BLANK,...l,taxYears:(() => {try{return JSON.parse(l.taxYears||'[]')}catch{return []}})()});setModal('edit')}}>✏️ Edit</button>
+          <button className="btn" style={{padding:'8px 16px',fontSize:13,fontWeight:600}} onClick={()=>{setDetail(null);window.scrollTo(0,0)}}>← Back</button>
+          {(l.status !== 'Converted to Client' || user?.role === 'Admin' || user?.role === 'Manager') ? (
+            <button className="btn pri" style={{marginLeft:'auto',padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>{setForm({...BLANK,...l,taxYears:(() => {try{return JSON.parse(l.taxYears||'[]')}catch{return []}})()});setModal('edit')}}>✏️ Edit</button>
+          ) : (
+            <span style={{marginLeft:'auto',fontSize:11,color:'var(--t3)',padding:'8px 12px',background:'var(--s2)',borderRadius:6}}>🔒 Admin Only</span>
+          )}
           <button className="btn ok" style={{padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>convertToClient(l)} disabled={converting}>{converting?'Converting…':'✓ Convert to Client'}</button>
           <button className="btn del" style={{padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>deleteLead(l.id)}>🗑 Delete</button>
         </div>
@@ -318,13 +323,14 @@ export default function Leads() {
         <div className="card" style={{marginBottom:12}}>
           <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Quick Actions</div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            <ActionBtn color="#16a34a" icon="📦" label="Full Package" sub="All Docs at Once" onClick={()=>{generateClientPackage(l);setTimeout(()=>generateForm8821Personal(l),300);setTimeout(()=>generateForm2848Personal(l),600)}}/>
             <ActionBtn color="#22863a" icon="📄" label="Tax Engagement" sub="Service Agreement" onClick={()=>generateClientPackage(l)}/>
             {l.clientType !== 'Business' && <ActionBtn color="#0369a1" icon="📋" label="8821 Personal" sub="Tax Info Auth" onClick={()=>generateForm8821Personal(l)}/>}
             {(l.clientType === 'Business'||l.clientType === 'Both') && <ActionBtn color="#0369a1" icon="📋" label="8821 Business" sub="Tax Info Auth" onClick={()=>generateForm8821Business(l)}/>}
             {l.clientType !== 'Business' && <ActionBtn color="#7c3aed" icon="🔏" label="2848 Personal" sub="Power of Attorney" onClick={()=>generateForm2848Personal(l)}/>}
             {(l.clientType === 'Business'||l.clientType === 'Both') && <ActionBtn color="#7c3aed" icon="🔏" label="2848 Business" sub="Power of Attorney" onClick={()=>generateForm2848Business(l)}/>}
             <ActionBtn color="#d97706" icon="📝" label="Addendum" sub="After IRS facts" onClick={()=>generateAddendum(l)}/>
-            <ActionBtn color="#6c5ce7" icon="🔐" label="POA Letter" sub="Cover Letter" onClick={()=>generatePOACoverLetter(l)}/>
+
             <ActionBtn color="#dc2626" icon="📠" label="Send Fax" sub="Telnyx Fax" onClick={()=>{setInlineFaxLead(l);setShowFaxModal(true)}}/>
             <ActionBtn color="#7c3aed" icon="✍️" label="E-Signature" sub="Request Sign" onClick={()=>{setInlineEsignLead(l);setShowEsignModal(true)}}/>
           </div>
