@@ -108,6 +108,50 @@ export default function Payments() {
   const byMethod = {}
   items.filter(p=>p.status==='Cleared').forEach(p=>{ byMethod[p.method||'Other']=(byMethod[p.method||'Other']||0)+parseFloat(p.amount||0) })
 
+
+  function printReceipt(pay) {
+    const w = window.open('','_blank','width=600,height=700')
+    const date = pay.date ? new Date(pay.date).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}) : new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Payment Receipt</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
+  body{padding:40px;max-width:500px;margin:auto;color:#111}
+  .center{text-align:center}
+  .firm{font-size:18px;font-weight:900;color:#1A7FD4;margin-bottom:4px}
+  .sub{font-size:11px;color:#64748b;margin-bottom:24px}
+  .receipt-title{font-size:22px;font-weight:700;margin:20px 0 4px}
+  .check{font-size:48px;margin:16px 0}
+  .amount{font-size:32px;font-weight:900;color:#16a34a;margin:12px 0}
+  .row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f1f5f9;font-size:13px}
+  .row:last-child{border-bottom:none}
+  .label{color:#64748b}
+  .value{font-weight:600}
+  .box{background:#f8fafc;border-radius:10px;padding:16px 20px;margin:20px 0}
+  .footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0}
+  @media print{.no-print{display:none}}
+</style></head><body onload="window.print()">
+  <div class="no-print" style="text-align:center;margin-bottom:20px">
+    <button onclick="window.print()" style="padding:8px 24px;background:#16a34a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">🖨️ Print Receipt</button>
+  </div>
+  <div class="center">
+    <div class="firm">Tax Case Review</div>
+    <div class="sub">IRS Resolution Services</div>
+    <div class="check">✅</div>
+    <div class="receipt-title">Payment Receipt</div>
+    <div class="amount">$${Number(pay.amount||0).toLocaleString('en-US',{minimumFractionDigits:2})}</div>
+  </div>
+  <div class="box">
+    <div class="row"><span class="label">Client</span><span class="value">${pay.clientName||'—'}</span></div>
+    <div class="row"><span class="label">Date</span><span class="value">${date}</span></div>
+    <div class="row"><span class="label">Method</span><span class="value">${pay.method||'—'}</span></div>
+    <div class="row"><span class="label">Status</span><span class="value">${pay.status||'Cleared'}</span></div>
+    ${pay.notes?`<div class="row"><span class="label">Notes</span><span class="value">${pay.notes}</span></div>`:''}
+  </div>
+  <div class="footer">Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403 · Not a Law Firm</div>
+</body></html>`)
+    w.document.close()
+  }
+
   return (
     <div style={{maxWidth:1000}}>
       {toast&&<div className="toast show">{toast}</div>}
@@ -194,7 +238,8 @@ export default function Payments() {
                   <td style={{padding:'9px 12px'}}>
                     <div style={{display:'flex',gap:5}}>
                       <button className="btn sec" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>openEdit(p)}>Edit</button>
-                      <button className="btn del" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>deleteItem(p.id)}>Del</button>
+                      <button className="btn sec" style={{fontSize:10,padding:'3px 8px',marginRight:2}} onClick={()=>printReceipt(pay)}>🖨️</button>
+                    <button className="btn del" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>deleteItem(p.id)}>Del</button>
                     </div>
                   </td>
                 </tr>
