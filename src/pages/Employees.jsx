@@ -41,6 +41,7 @@ const blankEmp = {
 export default function Employees() {
   const { showToast, can } = useApp()
   const [employees, setEmployees] = useState([])
+  const [confirmDel, setConfirmDel] = useState(null)
   const [loading, setLoading]     = useState(true)
   const [showForm, setShowForm]   = useState(false)
   const [editing, setEditing]     = useState(null)
@@ -115,7 +116,8 @@ export default function Employees() {
   }
 
   async function remove(id) {
-    if (!confirm('Delete this employee?')) return
+    if (!confirmDel) { setConfirmDel('pending'); return }
+    setConfirmDel(null)
     await supabase.from('employees').delete().eq('id', id)
     showToast('Employee removed')
     load()
@@ -448,6 +450,20 @@ export default function Employees() {
               <button className="btn pri" onClick={sendReset} disabled={resetSending || !resetEmail}>
                 {resetSending ? 'Sending…' : 'Send Reset Link'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDel && (
+        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setConfirmDel(null)}>
+          <div className="modal" style={{maxWidth:360,textAlign:'center'}}>
+            <div style={{fontSize:36,marginBottom:12}}>🗑</div>
+            <div style={{fontWeight:700,fontSize:15,marginBottom:8}}>Delete this employee?</div>
+            <div style={{fontSize:13,color:'var(--t3)',marginBottom:20}}>This cannot be undone.</div>
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={()=>setConfirmDel(null)}>Cancel</button>
+              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>{ deleteEmployee(confirmDel); setConfirmDel(null) }}>Delete</button>
             </div>
           </div>
         </div>
