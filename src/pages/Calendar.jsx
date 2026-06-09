@@ -26,6 +26,7 @@ function fmtTime(d) {
   }
   // Handle plain time string like "09:00"
   const [h, m] = d.split(':').map(Number)
+  const [confirmDel, setConfirmDel] = useState(null)
   const ampm = h >= 12 ? 'PM' : 'AM'
   return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${ampm}`
 }
@@ -106,7 +107,8 @@ export default function Calendar() {
   }
 
   async function deleteEvent(id) {
-    if (!confirm('Delete this event?')) return
+    if (!confirmDel) { setConfirmDel('pending'); return }
+    setConfirmDel(null)
     await supabase.from('calevents').delete().eq('id', id)
     setSelectedEvent(null); showToast('Deleted'); load()
   }
@@ -563,6 +565,20 @@ export default function Calendar() {
                   {saving ? 'Saving…' : form.id ? 'Update Event' : 'Save Event'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDel && (
+        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setConfirmDel(null)}>
+          <div className="modal" style={{maxWidth:360,textAlign:'center'}}>
+            <div style={{fontSize:36,marginBottom:12}}>🗑</div>
+            <div style={{fontWeight:700,fontSize:15,marginBottom:8}}>Delete this event?</div>
+            <div style={{fontSize:13,color:'var(--t3)',marginBottom:20}}>This cannot be undone.</div>
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={()=>setConfirmDel(null)}>Cancel</button>
+              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>{ deleteEvent(confirmDel); setConfirmDel(null) }}>Delete</button>
             </div>
           </div>
         </div>
