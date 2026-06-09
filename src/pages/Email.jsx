@@ -17,6 +17,7 @@ const BLANK = { recipient:'', clientName:'', subject:'', body:'', triage:'Inbox'
 
 export default function Email() {
   const [emails, setEmails]     = useState([])
+  const [confirmDel, setConfirmDel] = useState(null)
   const [clients, setClients]   = useState([])
   const [form, setForm]         = useState(BLANK)
   const [sug, setSug]           = useState([])
@@ -80,7 +81,8 @@ export default function Email() {
   }
 
   async function deleteEmail(id) {
-    if (!confirm('Delete this email?')) return
+    if (!confirmDel) { setConfirmDel('pending'); return }
+    setConfirmDel(null)
     await supabase.from('emails').delete().eq('id', id)
     setSelected(null); load()
   }
@@ -300,6 +302,20 @@ export default function Email() {
           </div>
         )}
       </div>
+
+      {confirmDel && (
+        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setConfirmDel(null)}>
+          <div className="modal" style={{maxWidth:360,textAlign:'center'}}>
+            <div style={{fontSize:36,marginBottom:12}}>🗑</div>
+            <div style={{fontWeight:700,fontSize:15,marginBottom:8}}>Delete this email?</div>
+            <div style={{fontSize:13,color:'var(--t3)',marginBottom:20}}>This cannot be undone.</div>
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={()=>setConfirmDel(null)}>Cancel</button>
+              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>{ deleteEmail(confirmDel); setConfirmDel(null) }}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
