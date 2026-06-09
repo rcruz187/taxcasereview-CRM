@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useApp } from '../context/AppContext'
 import { useFirm } from '../lib/useFirm'
 import { generateClientPackage, generateAddendum, generatePOACoverLetter, generateForm8821Personal, generateForm8821Business, generateForm2848Personal, generateForm2848Business } from '../lib/docUtils'
 
@@ -219,7 +220,8 @@ export default function Leads() {
   }
 
   async function deleteLead(id) {
-    if (!confirm('Delete this lead?')) return
+    if (!confirmDel) { setConfirmDel(l.id); return }
+    setConfirmDel(null)
     await supabase.from('leads').delete().eq('id', id)
     showToast('Deleted'); setDetail(null); load()
   }
