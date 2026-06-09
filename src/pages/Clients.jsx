@@ -338,7 +338,8 @@ export default function Clients() {
   }
 
   async function deleteClient(id,name) {
-    if (!confirm('Delete this client?')) return
+    if (!confirmDel) { setConfirmDel(id); return }
+    setConfirmDel(null)
     await supabase.from('clients').delete().eq('id',id)
     showToast('Deleted');setDetail(null);load()
   }
