@@ -16,6 +16,7 @@ export default function Books() {
   const clientParam = params.get('client') || ''
 
   const [tab, setTab]           = useState('ledger')
+  const [confirmDel, setConfirmDel] = useState(null)
   const [entries, setEntries]   = useState([])
   const [loading, setLoading]   = useState(true)
   const [search, setSearch]     = useState('')
@@ -64,7 +65,8 @@ export default function Books() {
   }
 
   async function deleteEntry(id) {
-    if (!confirm('Delete this entry?')) return
+    if (!confirmDel) { setConfirmDel('pending'); return }
+    setConfirmDel(null)
     await supabase.from('bookkeeping').delete().eq('id', id)
     showToast('Deleted')
     loadAll()
@@ -340,6 +342,20 @@ export default function Books() {
             <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:20 }}>
               <button className="btn" onClick={()=>setShowForm(false)}>Cancel</button>
               <button className="btn pri" onClick={save} disabled={saving}>{saving?'Saving…':'Add Entry'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDel && (
+        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setConfirmDel(null)}>
+          <div className="modal" style={{maxWidth:360,textAlign:'center'}}>
+            <div style={{fontSize:36,marginBottom:12}}>🗑</div>
+            <div style={{fontWeight:700,fontSize:15,marginBottom:8}}>Delete this entry?</div>
+            <div style={{fontSize:13,color:'var(--t3)',marginBottom:20}}>This cannot be undone.</div>
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={()=>setConfirmDel(null)}>Cancel</button>
+              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>{ deleteEntry(confirmDel); setConfirmDel(null) }}>Delete</button>
             </div>
           </div>
         </div>
