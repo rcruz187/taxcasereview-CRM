@@ -459,6 +459,12 @@ export default function Clients() {
                 {c.assignedTo&&<Bdg s={'👤 '+c.assignedTo} c="bn"/>}
               </div>
             </div>
+            {c.internal_note && (
+              <div style={{maxWidth:280,background:'rgba(245,158,11,.12)',border:'1.5px solid #f59e0b',borderRadius:8,padding:'8px 12px',fontSize:11,lineHeight:1.5}}>
+                <div style={{fontWeight:700,color:'#f59e0b',marginBottom:3,display:'flex',alignItems:'center',gap:4}}>📌 Staff Note</div>
+                <div style={{color:'var(--tx)'}}>{c.internal_note}</div>
+              </div>
+            )}
           </div>
 
           {/* Pipeline */}
@@ -953,6 +959,24 @@ export default function Clients() {
             </div>
           </div>
         )}
+
+      {faxModal && faxClient && (
+        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setFaxModal(false)}>
+          <div className="modal" style={{width:500}}>
+            <div className="mh"><span className="mt">📠 Send Fax — {faxClient.name}</span><button className="xbtn" onClick={()=>setFaxModal(false)}>&times;</button></div>
+            <InlineFaxForm client={faxClient} onClose={()=>setFaxModal(false)} showToast={showToast}/>
+          </div>
+        </div>
+      )}
+
+      {esignModal && esignClient && (
+        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setEsignModal(false)}>
+          <div className="modal" style={{width:500}}>
+            <div className="mh"><span className="mt">✍️ E-Signature — {esignClient.name}</span><button className="xbtn" onClick={()=>setEsignModal(false)}>&times;</button></div>
+            <InlineEsignForm client={esignClient} onClose={()=>setEsignModal(false)} showToast={showToast}/>
+          </div>
+        </div>
+      )}
       </div>
     )
   }
