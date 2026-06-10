@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { generateServiceAgreement, generateAddendum, generateEngagementLetter, generatePOACoverLetter } from '../lib/docUtils'
@@ -215,6 +215,185 @@ function InlineEsignForm({ client, onClose, showToast }) {
         <button className="btn pri" style={{flex:1,justifyContent:'center',background:'#7c3aed',borderColor:'#7c3aed'}} onClick={create} disabled={saving}>
           {saving?'Creating…':'✍️ Create & Copy Link'}
         </button>
+      </div>
+    </div>
+  )
+}
+
+
+// ── Canopy-style Document Manager for a specific client ──────────────────────
+const DOC_FOLDERS = ['IRS Docs','Tax Returns','Agreements','POA & Forms','Transcripts','Correspondence','Financial Statements','E-Signatures','Other']
+const FILE_EXT_ICON = n => { const e=(n||'').split('.').pop().toLowerCase(); return {pdf:'📄',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',jpg:'🖼️',jpeg:'🖼️',png:'🖼️',tiff:'🖼️'}[e]||'📎' }
+const fmt = b => b<1024?b+'B':b<1048576?(b/1024).toFixed(1)+'KB':(b/1048576).toFixed(1)+'MB'
+
+function ClientDocs({ clientName, supabase, showToast }) {
+  const [docs,       setDocs]       = useState([])
+  const [folder,     setFolder]     = useState('All')
+  const [uploading,  setUploading]  = useState(false)
+  const [form,       setForm]       = useState({ name:'', docType:'IRS Docs', notes:'' })
+  const [file,       setFile]       = useState(null)
+  const [saving,     setSaving]     = useState(false)
+  const [preview,    setPreview]    = useState(null)
+  const fileRef = useRef(null)
+
+  useEffect(() => { loadDocs() }, [clientName])
+
+  async function loadDocs() {
+    const { data } = await supabase.from('documents').select('*')
+      .eq('client', clientName).order('created_at', { ascending: false })
+    setDocs(data || [])
+  }
+
+  async function upload() {
+    if (!form.name.trim()) { showToast('Document name required'); return }
+    setSaving(true)
+    let fileUrl = null, fileName = null, fileSize = null
+    if (file) {
+      const path = `docs/${clientName.replace(/\s+/g,'-')}/${Date.now()}_${file.name}`
+      const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
+      if (upErr) { showToast('Upload error: '+upErr.message); setSaving(false); return }
+      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+      fileUrl = urlData.publicUrl; fileName = file.name; fileSize = file.size
+    }
+    const { error } = await supabase.from('documents').insert([{
+      name: form.name, client: clientName, docType: form.docType,
+      notes: form.notes, file_url: fileUrl, file_name: fileName,
+      file_size: fileSize, created_at: new Date().toISOString()
+    }])
+    setSaving(false)
+    if (error) { showToast('Error: '+error.message); return }
+    showToast('✅ Document saved!')
+    setForm({ name:'', docType:'IRS Docs', notes:'' }); setFile(null); setUploading(false); loadDocs()
+  }
+
+  async function delDoc(doc) {
+    if (doc.file_name) {
+      const path = doc.file_url?.split('/documents/')[1]
+      if (path) await supabase.storage.from('documents').remove([path]).catch(()=>{})
+    }
+    await supabase.from('documents').delete().eq('id', doc.id)
+    showToast('Deleted'); loadDocs()
+  }
+
+  // Group by folder
+  const byFolder = {}
+  DOC_FOLDERS.forEach(f => { byFolder[f] = [] })
+  docs.forEach(d => {
+    const f = d.docType || 'Other'
+    if (!byFolder[f]) byFolder[f] = []
+    byFolder[f].push(d)
+  })
+
+  const visible = folder === 'All' ? docs : (byFolder[folder] || [])
+
+  return (
+    <div className="card" style={{padding:0,overflow:'hidden'}}>
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',borderBottom:'1px solid var(--br)'}}>
+        <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>
+          📁 Documents ({docs.length})
+        </div>
+        <button className="btn pri" style={{fontSize:11,padding:'3px 10px'}} onClick={()=>setUploading(v=>!v)}>
+          {uploading ? '✕ Cancel' : '+ Add Doc'}
+        </button>
+      </div>
+
+      {/* Upload form */}
+      {uploading && (
+        <div style={{padding:'10px 14px',background:'var(--s2)',borderBottom:'1px solid var(--br)'}}>
+          <div className="fg2">
+            <div className="field"><label>Name *</label>
+              <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="e.g. 2023 Tax Return"/>
+            </div>
+            <div className="field"><label>Folder</label>
+              <select value={form.docType} onChange={e=>setForm(f=>({...f,docType:e.target.value}))}>
+                {DOC_FOLDERS.map(f=><option key={f}>{f}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{border:'2px dashed var(--br)',borderRadius:7,padding:'10px',textAlign:'center',cursor:'pointer',background:file?'rgba(34,197,94,.05)':'transparent',marginBottom:8}}
+            onClick={()=>fileRef.current?.click()}
+            onDragOver={e=>{e.preventDefault();e.currentTarget.style.borderColor='var(--blue)'}}
+            onDragLeave={e=>e.currentTarget.style.borderColor='var(--br)'}
+            onDrop={e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f)setFile(f);e.currentTarget.style.borderColor='var(--br)'}}>
+            {file
+              ? <span style={{fontSize:12,color:'var(--ok)',fontWeight:600}}>{FILE_EXT_ICON(file.name)} {file.name} ({fmt(file.size)})</span>
+              : <span style={{fontSize:11,color:'var(--t3)'}}>📎 Drop file here or click to browse</span>
+            }
+            <input ref={fileRef} type="file" style={{display:'none'}} onChange={e=>setFile(e.target.files[0])}/>
+          </div>
+          <input value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="Notes (optional)"
+            style={{width:'100%',padding:'6px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12,marginBottom:8}}/>
+          <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:7}} onClick={upload} disabled={saving}>
+            {saving?'Saving…':'💾 Save Document'}
+          </button>
+        </div>
+      )}
+
+      {/* 2-pane layout */}
+      <div style={{display:'flex',minHeight:docs.length>0?200:80}}>
+        {/* Left: folder tree */}
+        <div style={{width:150,flexShrink:0,borderRight:'1px solid var(--br)',padding:'6px 0',background:'var(--s2)'}}>
+          <div onClick={()=>setFolder('All')}
+            style={{padding:'5px 12px',cursor:'pointer',fontSize:12,fontWeight:folder==='All'?700:400,
+              background:folder==='All'?'var(--blt)':'transparent',color:folder==='All'?'var(--b2)':'var(--tx)',
+              display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <span>🗂️ All</span>
+            <span style={{fontSize:10,background:'var(--s3)',borderRadius:10,padding:'0 5px'}}>{docs.length}</span>
+          </div>
+          {DOC_FOLDERS.filter(f=>byFolder[f]?.length>0).map(f=>(
+            <div key={f} onClick={()=>setFolder(f)}
+              style={{padding:'5px 12px',cursor:'pointer',fontSize:12,fontWeight:folder===f?700:400,
+                background:folder===f?'var(--blt)':'transparent',color:folder===f?'var(--b2)':'var(--tx)',
+                display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>📂 {f}</span>
+              <span style={{fontSize:10,background:'var(--s3)',borderRadius:10,padding:'0 5px',flexShrink:0}}>{byFolder[f].length}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Right: file grid */}
+        <div style={{flex:1,padding:10,overflowY:'auto',maxHeight:400}}>
+          {visible.length===0 ? (
+            <div style={{color:'var(--t3)',fontSize:12,padding:'20px',textAlign:'center'}}>
+              <div style={{fontSize:28,marginBottom:6}}>📁</div>
+              No documents in {folder==='All'?'this client file':folder} yet.
+            </div>
+          ) : (
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:8}}>
+              {visible.map(d=>(
+                <div key={d.id}
+                  style={{border:'1px solid var(--br)',borderRadius:8,padding:'8px 8px',background:'var(--sf)',
+                    cursor:'pointer',transition:'all .12s',position:'relative'}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--blue)';e.currentTarget.style.transform='translateY(-1px)'}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--br)';e.currentTarget.style.transform=''}}>
+                  <div style={{fontSize:28,textAlign:'center',marginBottom:5}}>{FILE_EXT_ICON(d.file_name||d.name)}</div>
+                  <div style={{fontSize:11,fontWeight:600,lineHeight:1.2,marginBottom:4,overflow:'hidden',textOverflow:'ellipsis',
+                    display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>
+                    {d.name}
+                  </div>
+                  <div style={{fontSize:9,color:'var(--t3)',marginBottom:6}}>
+                    {d.created_at?.slice(0,10)}{d.file_size?` · ${fmt(d.file_size)}`:''}
+                  </div>
+                  <div style={{display:'flex',gap:4}}>
+                    {d.file_url && (
+                      <a href={d.file_url} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}
+                        style={{flex:1,padding:'3px 0',background:'var(--blue)',color:'#fff',borderRadius:5,
+                          fontSize:9,fontWeight:700,textAlign:'center',textDecoration:'none'}}>
+                        View
+                      </a>
+                    )}
+                    <button onClick={e=>{e.stopPropagation();delDoc(d)}}
+                      style={{padding:'3px 6px',background:'var(--bad)',color:'#fff',border:'none',
+                        borderRadius:5,cursor:'pointer',fontSize:9,fontWeight:700}}>
+                      Del
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -790,60 +969,8 @@ export default function Clients() {
               </div>
             </div>
 
-            {/* Documents */}
-            <div className="card">
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-                <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>📁 Documents ({relDocs.length})</div>
-                <button className="btn pri" style={{fontSize:11,padding:'3px 10px'}} onClick={()=>setUploadingDoc(v=>!v)}>+ Add Doc</button>
-              </div>
-              {uploadingDoc&&(
-                <div style={{background:'var(--s3)',borderRadius:6,padding:10,marginBottom:10}}>
-                  <div className="fg2">
-                    <div className="field"><label>Document Name *</label>
-                      <input value={docForm.name} onChange={e=>setDocForm(f=>({...f,name:e.target.value}))} placeholder="e.g. 2022 W2"/>
-                    </div>
-                    <div className="field"><label>Type</label>
-                      <select value={docForm.docType} onChange={e=>setDocForm(f=>({...f,docType:e.target.value}))}>
-                        {['IRS Notice','IRS Form','Transcript','Agreement','W2 / 1099','Tax Return','Financial Statement','Bank Statement','Correspondence','Engagement Letter','Other'].map(t=><option key={t}>{t}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="field"><label>Notes</label>
-                    <input value={docForm.notes} onChange={e=>setDocForm(f=>({...f,notes:e.target.value}))} placeholder="Brief description"/>
-                  </div>
-                  <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:8}} onClick={async()=>{
-                    if(!docForm.name.trim()){showToast('Name required');return}
-                    const {error}=await supabase.from('documents').insert([{...docForm,client:c.name,created_at:new Date().toISOString()}])
-                    if(error){showToast('Error: '+error.message);return}
-                    showToast('✅ Document added!')
-                    setDocForm({name:'',docType:'IRS Notice',notes:''})
-                    setUploadingDoc(false)
-                    loadRelated(c.name)
-                  }}>Save Document</button>
-                </div>
-              )}
-              {loadingRel&&<div style={{color:'var(--t3)',fontSize:12}}>Loading…</div>}
-              {!loadingRel&&relDocs.length===0&&!uploadingDoc&&(
-                <div style={{color:'var(--t3)',fontSize:12}}>No documents stored for this client.</div>
-              )}
-              {relDocs.map(d=>(
-                <div key={d.id} style={{borderBottom:'1px solid var(--br)',padding:'7px 0',display:'flex',alignItems:'center',gap:10}}>
-                  <span style={{fontSize:18}}>📄</span>
-                  <div style={{flex:1}}>
-                    <div style={{fontWeight:600,fontSize:13}}>{d.name}</div>
-                    <div style={{fontSize:11,color:'var(--t3)',marginTop:2,display:'flex',gap:10}}>
-                      <span className="bdg bn" style={{fontSize:9}}>{d.docType}</span>
-                      {d.notes&&<span>{d.notes}</span>}
-                      <span>{d.created_at?.slice(0,10)}</span>
-                    </div>
-                  </div>
-                  <button className="btn del" style={{fontSize:10,padding:'2px 7px'}} onClick={async()=>{
-                    await supabase.from('documents').delete().eq('id',d.id)
-                    loadRelated(c.name)
-                  }}>Del</button>
-                </div>
-              ))}
-            </div>
+            {/* Documents — Canopy-style folder tree + file grid */}
+            <ClientDocs clientName={c.name} supabase={supabase} showToast={showToast}/>
 
             {/* Notes */}
             {c.notes&&(
