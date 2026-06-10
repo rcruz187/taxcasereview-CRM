@@ -135,6 +135,7 @@ function LeadInlineEsign({ lead, onClose }) {
 
 export default function Leads() {
   const { user } = useApp()
+  const { id: urlLeadId } = useParams()
   const navigate = useNavigate()
   const [leads, setLeads]   = useState([])
   const [filter, setFilter] = useState('All')
@@ -156,6 +157,12 @@ export default function Leads() {
   const [showFlow, setShowFlow]     = useState(false)
 
   useEffect(() => { load() }, [])
+  useEffect(() => {
+    if (urlLeadId && leads.length > 0 && !detail) {
+      const found = leads.find(l => String(l.id) === String(urlLeadId))
+      if (found) setDetail(found)
+    }
+  }, [urlLeadId, leads])
 
   async function load() {
     const { data } = await supabase.from('leads').select('*').order('created_at', { ascending: false })
@@ -267,7 +274,7 @@ export default function Leads() {
 
         {/* Top bar — matches clients page */}
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,flexWrap:'wrap'}}>
-          <button className="btn" style={{padding:'8px 16px',fontSize:13,fontWeight:600}} onClick={()=>{setDetail(null);window.scrollTo(0,0)}}>← Back</button>
+          <button className="btn" style={{padding:'8px 16px',fontSize:13,fontWeight:600}} onClick={()=>{ setDetail(null); navigate('/leads',{replace:true}); window.scrollTo(0,0) }}>← Back</button>
           {(l.status !== 'Converted to Client' || user?.role === 'Admin' || user?.role === 'Manager') ? (
             <button className="btn pri" style={{marginLeft:'auto',padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>{setForm({...BLANK,...l,taxYears:(() => {try{return JSON.parse(l.taxYears||'[]')}catch{return []}})()});setModal('edit')}}>✏️ Edit</button>
           ) : (
