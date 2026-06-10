@@ -7,6 +7,38 @@ const STAGE_LABELS = { investigation:'Investigation', transcripts:'Transcripts',
 
 export default function Reports() {
   const [tab, setTab] = useState('overview')
+  const today = new Date().toISOString().slice(0,10)
+  const firstDay = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10)
+  const [dateFrom, setDateFrom] = useState(firstDay)
+  const [dateTo,   setDateTo]   = useState(today)
+
+  function exportCSV() {
+    const rows = [
+      ['Report','Tax Case Review — ' + new Date().toLocaleDateString()],
+      ['Date Range', dateFrom + ' to ' + dateTo],
+      [''],
+      ['REVENUE'],
+      ['Total Invoiced', '$' + (invoices.reduce((s,i)=>s+Number(i.amount||0),0)).toLocaleString()],
+      ['Total Paid',     '$' + (payments.reduce((s,p)=>s+Number(p.amount||0),0)).toLocaleString()],
+      [''],
+      ['PIPELINE'],
+      ['Total Leads', leads.length],
+      ['Total Clients', clients.length],
+      ['Total Cases', cases.length],
+      [''],
+      ['CASES BY STATUS'],
+      ...Object.entries(cases.reduce((a,c)=>{a[c.status||'Open']=(a[c.status||'Open']||0)+1;return a},{})).map(([k,v])=>[k,v]),
+      [''],
+      ['RECENT INVOICES'],
+      ['Client','Amount','Status','Date'],
+      ...invoices.slice(0,50).map(i=>[i.clientName,i.amount,i.status,i.date]),
+    ]
+    const csv = rows.map(r=>r.map(v=>'"'+String(v||"").replace(/"/g,'""')+'"').join(",")).join("\n")
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}))
+    a.download = `TCR_Report_${dateFrom}_${dateTo}.csv`
+    a.click()
+  }
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState({
     clients: [], leads: [], cases: [], tasks: [], invoices: [],
