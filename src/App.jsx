@@ -95,6 +95,7 @@ function Shell() {
         <div className="page-content">
           <Routes>
             <Route path="/"            element={<Dashboard />} />
+            <Route path="/leads/:id"    element={<Guard section="leads"><Leads /></Guard>} />
             <Route path="/leads"       element={<Guard section="leads"><Leads /></Guard>} />
             <Route path="/clients"     element={<Guard section="clients"><Clients /></Guard>} />
             <Route path="/clients/:id" element={<Guard section="clients"><Clients /></Guard>} />
