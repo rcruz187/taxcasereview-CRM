@@ -292,7 +292,23 @@ export default function Esign() {
     // Open the signing link immediately so firm can copy it
     const url = signingUrl(data.id)
     await navigator.clipboard.writeText(url).catch(()=>{})
-    showToast('✅ Created! Signing link copied to clipboard.')
+    // Auto-send via SMS if backend configured and client phone known
+    const {data:cfg} = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
+    const {data:cl}  = await supabase.from('clients').select('phone').eq('name', form.clientName).maybeSingle()
+    const phone = cl?.phone || leads?.find?.(l=>l.name===form.clientName)?.phone
+    let smsSent = false
+    if (cfg?.signalwire_backend && phone) {
+      try {
+        const msg = `Hi ${form.clientName}, Tax Case Review sent you a document to sign: ${url}`
+        const res = await fetch(cfg.signalwire_backend+'/sms/send',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({to:phone,body:msg})
+        })
+        const d = await res.json()
+        if (d.success) smsSent = true
+      } catch(e){ console.error('SMS error:',e) }
+    }
+    showToast(smsSent ? '✅ Created & signing link sent via SMS!' : '✅ Signing link copied — send to client via email or SMS.')
     setModal(false); setForm(BLANK); load()
   }
 
