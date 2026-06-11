@@ -620,29 +620,27 @@ export default function Leads() {
                    text:'"Thank you for calling Tax Case Review, this is [Your Name]. How can I help you today?"',
                    tip:'Warm, confident tone. Let them speak first.'},
                   {step:'2',title:'Identify the Problem',
-                   text:'"I understand — can you tell me a little about your tax situation? How many years are we talking about?"',
-                   tip:'Listen. Don't interrupt. Jot down years + IRS/State.'},
+                   text:'"I understand — can you tell me about your tax situation? How many years are we talking about?"',
+                   tip:"Listen. Don't interrupt. Jot down years + IRS/State."},
                   {step:'3',title:'Qualify the Balance',
                    text:'"Do you have a rough idea of how much you owe? Have you received any IRS notices or letters?"',
-                   tip:'Under $10K → may not qualify. $10K+ → strong candidate.'},
+                   tip:"Under $10K → may not qualify. $10K+ → strong candidate."},
                   {step:'4',title:'Build Urgency',
                    text:'"The IRS has strict timelines. The longer this goes unresolved, the more interest and penalties accrue — and they can file a lien or levy at any time."',
-                   tip:'Don't scare — inform. Real urgency = real action.'},
+                   tip:"Don't scare — inform. Real urgency = real action."},
                   {step:'5',title:'Introduce the Tax Investigation',
-                   text:'"The first step is a Tax Investigation. We pull your IRS transcripts, review everything, and give you a full picture of your options. It's a one-time fee of $599."',
+                   text:'"The first step is a Tax Investigation. We pull your IRS transcripts, review everything, and give you a full picture of your options. It is a one-time fee of $599."',
                    tip:'Present it as the logical next step, not a pitch.'},
                   {step:'6',title:'Handle Objections',
-                   text:'COST: "$599 is a fraction of what the IRS can take — and it's the only way to know your real options."
-NEED TO THINK: "I totally understand. What specific questions can I answer right now?"
-ALREADY HAVE SOMEONE: "That's great — just make sure they're pulling your IRS transcripts. That's the key."',
+                   text:"COST: \"$599 is a fraction of what the IRS can take — the only way to know your real options.\"\nNEED TO THINK: \"I totally understand. What specific questions can I answer right now?\"\nHAVE SOMEONE: \"Great — make sure they are pulling your IRS transcripts. That is the key.\"",
                    tip:'Acknowledge → reframe → close.'},
                   {step:'7',title:'Collect Info & Schedule',
-                   text:'"Let me get your information so we can get started. What's your full name and best callback number?"',
+                   text:'"Let me get your information so we can get started. What is your full name and best callback number?"',
                    tip:'Fill the form as you talk. Name, phone, email, years, balance.'},
                   {step:'8',title:'Close & Confirm',
-                   text:'"Perfect. I'll get this over to our team and someone will follow up within 24 hours. We're going to get this handled for you."',
+                   text:'"Perfect. We will get this over to our team and follow up within 24 hours. We are going to get this handled for you."',
                    tip:'Confidence closes. End on a commitment.'},
-                ].map(s=>(
+                ]                ].map(s=>(
                   <div key={s.step} style={{background:'#0f2744',border:'1px solid #1e3a5f',borderRadius:8,padding:'10px 12px'}}>
                     <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
                       <div style={{width:22,height:22,borderRadius:'50%',background:'#1d4ed8',color:'#fff',
