@@ -102,6 +102,12 @@ export default function Settings() {
         smtp_name: firm.smtp_name, smtp_encryption: firm.smtp_encryption,
         twilio_sid: firm.twilio_sid, twilio_token: firm.twilio_token,
         twilio_phone: firm.twilio_phone,
+        sw_space_url: firm.sw_space_url,
+        sw_project_id: firm.sw_project_id,
+        sw_api_token: firm.sw_api_token,
+        sw_sip_username: firm.sw_sip_username,
+        sw_sip_password: firm.sw_sip_password,
+        sw_inbound_did: firm.sw_inbound_did,
       }
       const { data: existing, error: fetchErr } = await supabase.from('settings').select('id').limit(1).maybeSingle()
       if (fetchErr) throw fetchErr
@@ -294,6 +300,43 @@ export default function Settings() {
                 {!firm.gmail_client_id && (
                   <span style={{ fontSize: 12, color: 'var(--t3)' }}>Enter your Client ID first to enable authorization</span>
                 )}
+              </div>
+            </div>
+          </div>
+
+          {/* SignalWire Dialer */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">📞 SignalWire Dialer</span></div>
+            <div style={{ padding: '0 20px 20px' }}>
+              <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.6 }}>
+                Powers the built-in dialer, SMS, and fax. Get credentials at <strong>signalwire.com</strong>.
+              </div>
+              <div className="fg2">
+                <div className="field"><label>Space URL</label>
+                  <input value={firm.sw_space_url || ''} onChange={set('sw_space_url')} placeholder="yourspace.signalwire.com" />
+                </div>
+                <div className="field"><label>Project ID</label>
+                  <input value={firm.sw_project_id || ''} onChange={set('sw_project_id')} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+                </div>
+              </div>
+              <div className="fg2">
+                <div className="field"><label>API Token</label>
+                  <input type="password" value={firm.sw_api_token || ''} onChange={set('sw_api_token')} placeholder="PT..." />
+                </div>
+                <div className="field"><label>Inbound DID (Phone Number)</label>
+                  <input value={firm.sw_inbound_did || ''} onChange={set('sw_inbound_did')} placeholder="+15615551234" />
+                </div>
+              </div>
+              <div className="fg2">
+                <div className="field"><label>SIP Username</label>
+                  <input value={firm.sw_sip_username || ''} onChange={set('sw_sip_username')} placeholder="SIP endpoint username" />
+                </div>
+                <div className="field"><label>SIP Password</label>
+                  <input type="password" value={firm.sw_sip_password || ''} onChange={set('sw_sip_password')} placeholder="SIP endpoint password" />
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save SignalWire'}</button>
               </div>
             </div>
           </div>
