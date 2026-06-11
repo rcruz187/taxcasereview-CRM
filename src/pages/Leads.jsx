@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import { useFirm } from '../lib/useFirm'
@@ -136,10 +136,21 @@ function LeadInlineEsign({ lead, onClose }) {
 export default function Leads() {
   const { user } = useApp()
   const { id: urlLeadId } = useParams()
+  const [searchParams] = useSearchParams()
+
+  // Auto-open Add Lead modal when navigated here with ?new=1
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setForm(BLANK)
+      setModal(true)
+      setShowScript(true)
+    }
+  }, [searchParams])
   const navigate = useNavigate()
   const [leads, setLeads]   = useState([])
   const [filter, setFilter] = useState('All')
   const [modal, setModal]   = useState(false)
+  const [showScript, setShowScript] = useState(false)
   const [detail, setDetail] = useState(null)
   const [leadNotes, setLeadNotes]     = useState([])
   const [newLeadNote, setNewLeadNote] = useState('')
@@ -484,10 +495,20 @@ export default function Leads() {
       {/* Add/Edit Modal */}
       {modal && (
         <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setModal(false)}>
-          <div className="modal" style={{width:640}}>
-            <div className="mh">
+          <div className="modal" style={{width:showScript&&modal!=='edit'?1080:640,maxWidth:'98vw',display:'flex',flexDirection:'row',gap:0,padding:0,overflow:'hidden'}}>
+            <div style={{flex:1,minWidth:0,padding:'0',display:'flex',flexDirection:'column'}}>
+            <div className="mh" style={{display:'flex',alignItems:'center',gap:8}}>
               <span className="mt">{modal==='edit'?'Edit Lead':'Add Lead'}</span>
-              <button className="xbtn" onClick={()=>setModal(false)}>&times;</button>
+              {modal!=='edit'&&(
+                <button
+                  onClick={()=>setShowScript(s=>!s)}
+                  style={{marginLeft:'auto',marginRight:8,padding:'4px 10px',fontSize:11,fontWeight:700,
+                    background:showScript?'#1e3a5f':'var(--s3)',color:showScript?'#60a5fa':'var(--t2)',
+                    border:'1px solid '+(showScript?'#3b82f6':'var(--br)'),borderRadius:6,cursor:'pointer'}}>
+                  📞 {showScript?'Hide Script':'Call Script'}
+                </button>
+              )}
+              <button className="xbtn" onClick={()=>{setModal(false);setShowScript(false)}}>&times;</button>
             </div>
 
             <div className="fg2">
@@ -585,7 +606,58 @@ export default function Leads() {
             <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:10}} onClick={save} disabled={saving}>
               {saving ? 'Saving...' : modal==='edit' ? 'Save Changes' : 'Add Lead'}
             </button>
-          </div>
+            </div>{/* end form column */}
+
+            {/* ── Inbound Call Script Panel ───────────────────── */}
+            {showScript&&modal!=='edit'&&(
+              <div style={{width:380,flexShrink:0,background:'#0d1b2e',borderLeft:'1px solid #1e3a5f',
+                overflowY:'auto',padding:'16px 18px',display:'flex',flexDirection:'column',gap:12}}>
+                <div style={{fontSize:13,fontWeight:800,color:'#60a5fa',letterSpacing:'.04em',borderBottom:'1px solid #1e3a5f',paddingBottom:8,marginBottom:4}}>
+                  📞 INBOUND CALL SCRIPT
+                </div>
+                {[
+                  {step:'1',title:'Answer & Greeting',
+                   text:'"Thank you for calling Tax Case Review, this is [Your Name]. How can I help you today?"',
+                   tip:'Warm, confident tone. Let them speak first.'},
+                  {step:'2',title:'Identify the Problem',
+                   text:'"I understand — can you tell me a little about your tax situation? How many years are we talking about?"',
+                   tip:'Listen. Don't interrupt. Jot down years + IRS/State.'},
+                  {step:'3',title:'Qualify the Balance',
+                   text:'"Do you have a rough idea of how much you owe? Have you received any IRS notices or letters?"',
+                   tip:'Under $10K → may not qualify. $10K+ → strong candidate.'},
+                  {step:'4',title:'Build Urgency',
+                   text:'"The IRS has strict timelines. The longer this goes unresolved, the more interest and penalties accrue — and they can file a lien or levy at any time."',
+                   tip:'Don't scare — inform. Real urgency = real action.'},
+                  {step:'5',title:'Introduce the Tax Investigation',
+                   text:'"The first step is a Tax Investigation. We pull your IRS transcripts, review everything, and give you a full picture of your options. It's a one-time fee of $599."',
+                   tip:'Present it as the logical next step, not a pitch.'},
+                  {step:'6',title:'Handle Objections',
+                   text:'COST: "$599 is a fraction of what the IRS can take — and it's the only way to know your real options."
+NEED TO THINK: "I totally understand. What specific questions can I answer right now?"
+ALREADY HAVE SOMEONE: "That's great — just make sure they're pulling your IRS transcripts. That's the key."',
+                   tip:'Acknowledge → reframe → close.'},
+                  {step:'7',title:'Collect Info & Schedule',
+                   text:'"Let me get your information so we can get started. What's your full name and best callback number?"',
+                   tip:'Fill the form as you talk. Name, phone, email, years, balance.'},
+                  {step:'8',title:'Close & Confirm',
+                   text:'"Perfect. I'll get this over to our team and someone will follow up within 24 hours. We're going to get this handled for you."',
+                   tip:'Confidence closes. End on a commitment.'},
+                ].map(s=>(
+                  <div key={s.step} style={{background:'#0f2744',border:'1px solid #1e3a5f',borderRadius:8,padding:'10px 12px'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+                      <div style={{width:22,height:22,borderRadius:'50%',background:'#1d4ed8',color:'#fff',
+                        display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,flexShrink:0}}>
+                        {s.step}
+                      </div>
+                      <div style={{fontSize:12,fontWeight:700,color:'#93c5fd'}}>{s.title}</div>
+                    </div>
+                    <div style={{fontSize:11.5,color:'#e2e8f0',lineHeight:1.6,whiteSpace:'pre-wrap',marginBottom:6}}>{s.text}</div>
+                    <div style={{fontSize:10.5,color:'#64748b',fontStyle:'italic'}}>💡 {s.tip}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>{/* end modal flex row */}
         </div>
       )}
 
