@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabase';
 import { PDFDocument } from 'pdf-lib';
 
 // ─── Field maps per form type ────────────────────────────────────────────────
@@ -72,11 +72,18 @@ function buildNameAddress(client) {
 }
 
 async function fetchTemplate(filename) {
-  // Fetch from your gh-pages public folder via raw GitHub
-  const url = `https://raw.githubusercontent.com/taxresolutioncrm/taxcasereview-CRM/gh-pages/templates/${filename}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Template not found: ${filename}`);
-  return res.arrayBuffer();
+  // Try relative path first (works when deployed), then raw GitHub fallback
+  const paths = [
+    `/taxcasereview-CRM/templates/${filename}`,
+    `https://raw.githubusercontent.com/taxresolutioncrm/taxcasereview-CRM/gh-pages/templates/${filename}`,
+  ];
+  for (const url of paths) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) return res.arrayBuffer();
+    } catch (_) {}
+  }
+  throw new Error(`Template not found: ${filename}`);
 }
 
 async function fillForm(formType, client, useEin = false) {
