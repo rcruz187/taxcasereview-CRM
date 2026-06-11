@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useFirm } from '../lib/useFirm'
+import IRSFormFiller from '../components/IRSFormFiller'
 
 const BLANK = { formNumber: '2848', status: 'Not Filed', client: '', caseNum: '', filedDate: '', notes: '' }
 
@@ -238,12 +239,20 @@ export default function IrsForms() {
   const [form, setForm]     = useState(BLANK)
   const [saving, setSaving] = useState(false)
   const [toast, setToast]   = useState('')
+  const [clients, setClients]       = useState([])
+  const [fillerClient, setFillerClient] = useState(null)
+  const [selectedClientId, setSelectedClientId] = useState('')
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); loadClients() }, [])
 
   async function load() {
     const { data } = await supabase.from('irsforms').select('*').order('created_at', { ascending: false })
     if (data) setItems(data)
+  }
+
+  async function loadClients() {
+    const { data } = await supabase.from('clients').select('id, name, business_name, address, city, state, zip, phone, ssn, ein, tin').order('name')
+    if (data) setClients(data)
   }
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3000) }
@@ -312,6 +321,39 @@ export default function IrsForms() {
               </button>
             </a>
           ))}
+        </div>
+      </div>
+
+      {/* ── Pre-fill Section ────────────────────────────────────────────── */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="ch">
+          <span className="ct">✏️ Pre-fill IRS Forms</span>
+          <span style={{ fontSize: 12, color: 'var(--t2)' }}>Fills your exact templates with client taxpayer info only</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0' }}>
+          <select
+            value={selectedClientId}
+            onChange={e => setSelectedClientId(e.target.value)}
+            style={{ flex: 1, maxWidth: 320, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--bd)', fontSize: 13 }}
+          >
+            <option value="">— Select a client —</option>
+            {clients.map(c => (
+              <option key={c.id} value={c.id}>
+                {c.business_name || c.name}
+              </option>
+            ))}
+          </select>
+          <button
+            className="btn pri"
+            disabled={!selectedClientId}
+            onClick={() => {
+              const c = clients.find(x => x.id === selectedClientId)
+              if (c) setFillerClient(c)
+            }}
+            style={{ padding: '8px 18px', opacity: selectedClientId ? 1 : 0.45 }}
+          >
+            ✏️ Pre-fill PDF
+          </button>
         </div>
       </div>
 
