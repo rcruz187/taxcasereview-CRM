@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { generateServiceAgreement, generateAddendum, generateEngagementLetter, generatePOACoverLetter } from '../lib/docUtils'
 
@@ -402,6 +402,14 @@ function ClientDocs({ clientName, supabase, showToast }) {
 export default function Clients() {
   const navigate = useNavigate()
   const { id: urlId } = useParams()
+  const [searchParams] = useSearchParams()
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setForm(BLANK)
+      setModal(true)
+    }
+  }, [searchParams])
   const [clients,   setClients]   = useState([])
   const [employees, setEmployees] = useState([])
   const [filter,    setFilter]    = useState('All')
