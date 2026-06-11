@@ -640,7 +640,7 @@ export default function Leads() {
                   {step:'8',title:'Close & Confirm',
                    text:'"Perfect. We will get this over to our team and follow up within 24 hours. We are going to get this handled for you."',
                    tip:'Confidence closes. End on a commitment.'},
-                ]                ].map(s=>(
+                ].map(s=>(
                   <div key={s.step} style={{background:'#0f2744',border:'1px solid #1e3a5f',borderRadius:8,padding:'10px 12px'}}>
                     <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
                       <div style={{width:22,height:22,borderRadius:'50%',background:'#1d4ed8',color:'#fff',
