@@ -610,47 +610,71 @@ export default function Leads() {
 
             {/* ── Inbound Call Script Panel ───────────────────── */}
             {showScript&&modal!=='edit'&&(
-              <div style={{width:380,flexShrink:0,background:'#0d1b2e',borderLeft:'1px solid #1e3a5f',
-                overflowY:'auto',padding:'16px 18px',display:'flex',flexDirection:'column',gap:12}}>
-                <div style={{fontSize:13,fontWeight:800,color:'#60a5fa',letterSpacing:'.04em',borderBottom:'1px solid #1e3a5f',paddingBottom:8,marginBottom:4}}>
+              <div style={{width:440,flexShrink:0,background:'#071120',borderLeft:'2px solid #1e40af',
+                overflowY:'auto',padding:'20px',display:'flex',flexDirection:'column',gap:14}}>
+                <div style={{fontSize:17,fontWeight:900,color:'#60a5fa',letterSpacing:'.05em',
+                  borderBottom:'1px solid #1e3a5f',paddingBottom:10,marginBottom:2}}>
                   📞 INBOUND CALL SCRIPT
                 </div>
                 {[
-                  {step:'1',title:'Answer & Greeting',
-                   text:'"Thank you for calling Tax Case Review, this is [Your Name]. How can I help you today?"',
-                   tip:'Warm, confident tone. Let them speak first.'},
-                  {step:'2',title:'Identify the Problem',
-                   text:'"I understand — can you tell me about your tax situation? How many years are we talking about?"',
-                   tip:"Listen. Don't interrupt. Jot down years + IRS/State."},
-                  {step:'3',title:'Qualify the Balance',
-                   text:'"Do you have a rough idea of how much you owe? Have you received any IRS notices or letters?"',
-                   tip:"Under $10K → may not qualify. $10K+ → strong candidate."},
-                  {step:'4',title:'Build Urgency',
-                   text:'"The IRS has strict timelines. The longer this goes unresolved, the more interest and penalties accrue — and they can file a lien or levy at any time."',
-                   tip:"Don't scare — inform. Real urgency = real action."},
-                  {step:'5',title:'Introduce the Tax Investigation',
-                   text:'"The first step is a Tax Investigation. We pull your IRS transcripts, review everything, and give you a full picture of your options. It is a one-time fee of $599."',
-                   tip:'Present it as the logical next step, not a pitch.'},
-                  {step:'6',title:'Handle Objections',
-                   text:"COST: \"$599 is a fraction of what the IRS can take — the only way to know your real options.\"\nNEED TO THINK: \"I totally understand. What specific questions can I answer right now?\"\nHAVE SOMEONE: \"Great — make sure they are pulling your IRS transcripts. That is the key.\"",
-                   tip:'Acknowledge → reframe → close.'},
-                  {step:'7',title:'Collect Info & Schedule',
-                   text:'"Let me get your information so we can get started. What is your full name and best callback number?"',
-                   tip:'Fill the form as you talk. Name, phone, email, years, balance.'},
-                  {step:'8',title:'Close & Confirm',
-                   text:'"Perfect. We will get this over to our team and follow up within 24 hours. We are going to get this handled for you."',
-                   tip:'Confidence closes. End on a commitment.'},
+                  {step:'1',color:'#3b82f6',title:'Greeting',lines:[
+                    '"Thank you for calling Tax Case Review, this is [Name] — how can I help you today?"',
+                    'Be warm and confident. Let them speak first. Do not rush.',
+                  ]},
+                  {step:'2',color:'#8b5cf6',title:'Get the Story',lines:[
+                    '"Can you tell me a little about your situation? How many tax years are we looking at?"',
+                    '"Have you received any IRS letters or notices?"',
+                    'Listen fully — do not interrupt. Write down years, IRS vs State.',
+                  ]},
+                  {step:'3',color:'#f59e0b',title:'Qualify the Balance',lines:[
+                    '"Do you have a rough idea of what you owe?"',
+                    'Under $10K → may not qualify for major programs.',
+                    '$10K–$50K → strong candidate. $50K+ → high priority.',
+                  ]},
+                  {step:'4',color:'#ef4444',title:'Create Urgency',lines:[
+                    '"The IRS does not wait. Every day this goes unresolved, interest and penalties are stacking up."',
+                    '"They can file a lien, levy your bank, or garnish your wages — often with very little warning."',
+                    'State facts calmly. Real urgency, not scare tactics.',
+                  ]},
+                  {step:'5',color:'#10b981',title:'Introduce Tax Investigation',lines:[
+                    '"The first thing we do is a Tax Investigation — we pull your IRS transcripts and give you the full picture: what you owe, what years, and exactly what your options are."',
+                    '"It is a one-time fee of $599. That gets you a complete analysis and a clear resolution plan."',
+                    'Frame it as the only logical next step — not a sales pitch.',
+                  ]},
+                  {step:'6',color:'#f97316',title:'Handle Objections',lines:[
+                    'PRICE: "I understand — $599 is a fraction of what the IRS can take. Without knowing your real position, you are flying blind."',
+                    'NEED TO THINK: "Totally fair. What specific questions can I answer for you right now?"',
+                    'HAVE SOMEONE: "Great — are they pulling your IRS transcripts? That is the only way to truly know what you are dealing with."',
+                    'DOING IT MYSELF: "You can — but the IRS has deadlines and rules most people do not know about. One missed step can permanently close your options."',
+                  ]},
+                  {step:'7',color:'#6366f1',title:'Collect Their Info',lines:[
+                    '"Let me get your information so we can get this started right away."',
+                    'Full name · phone · email · address · years owed · IRS or State · rough balance.',
+                    'Fill the form on the LEFT as you talk — do not wait until the end.',
+                  ]},
+                  {step:'8',color:'#22c55e',title:'Close & Confirm',lines:[
+                    '"Perfect — I have everything I need. Our team will review this and reach out within 24 hours."',
+                    '"We are going to get this taken care of for you."',
+                    'End with confidence and a clear commitment. No vague language.',
+                  ]},
                 ].map(s=>(
-                  <div key={s.step} style={{background:'#0f2744',border:'1px solid #1e3a5f',borderRadius:8,padding:'10px 12px'}}>
-                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
-                      <div style={{width:22,height:22,borderRadius:'50%',background:'#1d4ed8',color:'#fff',
-                        display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,flexShrink:0}}>
+                  <div key={s.step} style={{background:'#0c1e35',border:`1px solid ${s.color}55`,
+                    borderLeft:`4px solid ${s.color}`,borderRadius:8,padding:'14px 16px'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+                      <div style={{width:28,height:28,borderRadius:'50%',background:s.color,color:'#fff',
+                        display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:900,flexShrink:0}}>
                         {s.step}
                       </div>
-                      <div style={{fontSize:12,fontWeight:700,color:'#93c5fd'}}>{s.title}</div>
+                      <div style={{fontSize:15,fontWeight:800,color:s.color}}>{s.title}</div>
                     </div>
-                    <div style={{fontSize:11.5,color:'#e2e8f0',lineHeight:1.6,whiteSpace:'pre-wrap',marginBottom:6}}>{s.text}</div>
-                    <div style={{fontSize:10.5,color:'#64748b',fontStyle:'italic'}}>💡 {s.tip}</div>
+                    {s.lines.map((line,i)=>(
+                      <div key={i} style={{
+                        fontSize:13.5,lineHeight:1.7,
+                        marginBottom: i<s.lines.length-1 ? 6 : 0,
+                        color: line.startsWith('"') ? '#e2e8f0' : '#7dd3fc',
+                        fontStyle: line.startsWith('"') ? 'normal' : 'italic',
+                      }}>{line}</div>
+                    ))}
                   </div>
                 ))}
               </div>
