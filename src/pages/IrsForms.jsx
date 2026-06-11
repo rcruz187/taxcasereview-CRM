@@ -516,6 +516,13 @@ export default function IrsForms() {
           </div>
         </div>
       )}
+      {/* ── IRS Form Filler Modal ─────────────────────────────────────── */}
+      {fillerClient && (
+        <IRSFormFiller
+          client={fillerClient}
+          onClose={() => setFillerClient(null)}
+        />
+      )}
     </div>
   )
 }
