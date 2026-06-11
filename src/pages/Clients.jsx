@@ -427,6 +427,7 @@ export default function Clients() {
   const [relInvoices, setRelInvoices] = useState([])
   const [relPayments, setRelPayments] = useState([])
   const [loadingRel,  setLoadingRel]  = useState(false)
+  const [detailTab,   setDetailTab]   = useState('overview')
   // Quick add task inline
   const [quickTask,   setQuickTask]   = useState('')
   const [addingTask,  setAddingTask]  = useState(false)
@@ -597,6 +598,7 @@ export default function Clients() {
   }
 
   function openDetail(c) {
+    setDetailTab('overview')
     setDetail(c)
     setRelCases([]);setRelTasks([]);setRelInvoices([])
     loadRelated(c.name)
@@ -969,16 +971,122 @@ export default function Clients() {
               </div>
             </div>
 
-            {/* Documents — Canopy-style folder tree + file grid */}
-            <ClientDocs clientName={c.name} supabase={supabase} showToast={showToast}/>
-
-            {/* Notes */}
-            {c.notes&&(
-              <div className="card">
-                <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:8}}>Notes</div>
-                <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.7,whiteSpace:'pre-wrap'}}>{c.notes}</div>
+            {/* ── Tabbed Detail Section ─────────────────────────── */}
+            <div className="card" style={{padding:0,overflow:'hidden'}}>
+              {/* Tab Bar */}
+              <div style={{display:'flex',borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
+                {[
+                  {key:'overview', label:'📋 Overview'},
+                  {key:'docs',     label:'📁 Docs'},
+                  {key:'notes',    label:'📝 Notes'},
+                  {key:'payments', label:'💳 Payments'},
+                ].map(t=>(
+                  <button key={t.key} onClick={()=>setDetailTab(t.key)}
+                    style={{padding:'10px 16px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
+                      background:'none',cursor:'pointer',fontSize:12,fontWeight:detailTab===t.key?700:500,
+                      color:detailTab===t.key?'var(--blue)':'var(--t2)',whiteSpace:'nowrap',transition:'all .15s'}}>
+                    {t.label}
+                  </button>
+                ))}
               </div>
-            )}
+
+              {/* Overview Tab */}
+              {detailTab==='overview'&&(
+                <div style={{padding:16}}>
+                  {c.notes&&(
+                    <div style={{marginBottom:12}}>
+                      <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:6}}>Case Notes</div>
+                      <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.7,whiteSpace:'pre-wrap'}}>{c.notes}</div>
+                    </div>
+                  )}
+                  <div style={{display:'flex',gap:24,flexWrap:'wrap'}}>
+                    <div>
+                      <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Documents</div>
+                      <div style={{fontSize:22,fontWeight:800,color:'var(--blue)'}}>{relDocs.length}</div>
+                    </div>
+                    <div>
+                      <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Notes</div>
+                      <div style={{fontSize:22,fontWeight:800,color:'var(--blue)'}}>{relNotes.length}</div>
+                    </div>
+                    <div>
+                      <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Payments</div>
+                      <div style={{fontSize:22,fontWeight:800,color:'var(--ok)'}}>{relPayments.length}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Docs Tab */}
+              {detailTab==='docs'&&(
+                <div style={{padding:0}}>
+                  <ClientDocs clientName={c.name} supabase={supabase} showToast={showToast}/>
+                </div>
+              )}
+
+              {/* Notes Tab */}
+              {detailTab==='notes'&&(
+                <div style={{padding:16}}>
+                  {/* Add note */}
+                  <div style={{display:'flex',gap:8,marginBottom:14}}>
+                    <textarea
+                      value={newNote} onChange={e=>setNewNote(e.target.value)}
+                      placeholder="Add a note…"
+                      style={{flex:1,padding:'8px 10px',borderRadius:8,border:'1px solid var(--br)',resize:'vertical',minHeight:60,fontSize:13,fontFamily:'inherit',background:'var(--s2)',color:'var(--tx)'}}
+                    />
+                    <button className="btn pri" style={{alignSelf:'flex-start',padding:'8px 14px',fontSize:12}}
+                      disabled={!newNote.trim()||addingNote}
+                      onClick={async()=>{
+                        setAddingNote(true)
+                        const {error}=await supabase.from('client_notes').insert({client_name:c.name,content:newNote.trim(),created_by:user?.email||'Staff'})
+                        if(!error){setNewNote('');const{data}=await supabase.from('client_notes').select('*').eq('client_name',c.name).order('created_at',{ascending:false});if(data)setRelNotes(data)}
+                        setAddingNote(false)
+                      }}>
+                      {addingNote?'…':'+ Add'}
+                    </button>
+                  </div>
+                  {relNotes.length===0&&<div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No notes yet.</div>}
+                  {relNotes.map((n,i)=>(
+                    <div key={n.id||i} style={{padding:'10px 0',borderBottom:'1px solid var(--br)'}}>
+                      <div style={{fontSize:13,lineHeight:1.6,color:'var(--tx)',whiteSpace:'pre-wrap'}}>{n.content}</div>
+                      <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>{n.created_by||'Staff'} · {n.created_at?new Date(n.created_at).toLocaleDateString():''}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Payments Tab */}
+              {detailTab==='payments'&&(
+                <div style={{padding:16}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+                    <div style={{fontSize:12,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>
+                      💳 Payments ({relPayments.length})
+                    </div>
+                    <button className="btn pri" style={{fontSize:11,padding:'5px 12px'}} onClick={()=>setPayModal(true)}>+ Add Payment</button>
+                  </div>
+                  {loadingRel&&<div style={{color:'var(--t3)',fontSize:12}}>Loading…</div>}
+                  {!loadingRel&&relPayments.length===0&&(
+                    <div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No payments recorded yet.</div>
+                  )}
+                  {relPayments.map(p=>(
+                    <div key={p.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--br)'}}>
+                      <div>
+                        <div style={{fontSize:14,fontWeight:700,color:'var(--ok)'}}>+${Number(p.amount||0).toLocaleString()}</div>
+                        <div style={{fontSize:11,color:'var(--t3)'}}>{p.method||'Payment'} · {p.date||''}</div>
+                        {p.notes&&<div style={{fontSize:11,color:'var(--t2)',marginTop:2}}>{p.notes}</div>}
+                      </div>
+                    </div>
+                  ))}
+                  {relPayments.length>0&&(
+                    <div style={{marginTop:12,paddingTop:12,borderTop:'2px solid var(--br)',display:'flex',justifyContent:'space-between'}}>
+                      <div style={{fontSize:12,fontWeight:700,color:'var(--t3)'}}>Total Collected</div>
+                      <div style={{fontSize:16,fontWeight:800,color:'var(--ok)'}}>
+                        ${relPayments.reduce((s,p)=>s+Number(p.amount||0),0).toLocaleString()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
