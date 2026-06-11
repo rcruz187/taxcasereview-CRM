@@ -68,9 +68,10 @@ export default function TopBar({ onNew }) {
   // Close on route change
   useEffect(() => { setOpen(false) }, [location.pathname])
 
+  const MODAL_PATHS = new Set(['/leads','/clients','/cases','/tasks','/invoices','/payments','/documents','/calendar','/email','/esign','/fax'])
   function go(path) {
     setOpen(false)
-    navigate(path)
+    navigate(MODAL_PATHS.has(path) ? path + '?new=1' : path)
   }
 
   return (
