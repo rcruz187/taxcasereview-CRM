@@ -26,7 +26,6 @@ function fmtTime(d) {
   }
   // Handle plain time string like "09:00"
   const [h, m] = d.split(':').map(Number)
-  const [confirmDel, setConfirmDel] = useState(null)
   const ampm = h >= 12 ? 'PM' : 'AM'
   return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${ampm}`
 }
@@ -52,6 +51,7 @@ export default function Calendar() {
   const [showUnscheduled, setShowUnscheduled] = useState(true)
   const [toast,         setToast]         = useState('')
   const [saving,        setSaving]        = useState(false)
+  const [confirmDel,    setConfirmDel]    = useState(null)
 
   const [form, setForm] = useState({
     title: '', clientName: '', assignedTo: '', date: '', time: '',
