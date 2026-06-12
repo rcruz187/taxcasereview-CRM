@@ -447,6 +447,13 @@ export default function Leads() {
             </div>
           </div>
         )}
+
+        {bookingLead && (
+          <BookingWidget contact={{name:bookingLead.name, email:bookingLead.email, phone:bookingLead.phone}} onClose={()=>setBookingLead(null)}/>
+        )}
+        {fillerLead && (
+          <IRSFormFiller client={fillerLead} onClose={()=>setFillerLead(null)}/>
+        )}
       </div>
     )
   }
@@ -685,12 +692,6 @@ export default function Leads() {
         </div>
       )}
 
-      {bookingLead && (
-        <BookingWidget contact={{name:bookingLead.name, email:bookingLead.email, phone:bookingLead.phone}} onClose={()=>setBookingLead(null)}/>
-      )}
-      {fillerLead && (
-        <IRSFormFiller client={fillerLead} onClose={()=>setFillerLead(null)}/>
-      )}
     </div>
   )
 }
