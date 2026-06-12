@@ -479,7 +479,7 @@ export default function Leads() {
               {filtered.length === 0 ? (
                 <tr><td colSpan={9} style={{textAlign:'center',color:'var(--t3)',padding:20}}>No leads yet — add your first one!</td></tr>
               ) : filtered.map(l => (
-                <tr key={l.id} onClick={()=>{ setDetail(l); loadLeadNotes(l.id) }} style={{cursor:'pointer'}}>
+                <tr key={l.id} onClick={()=>{ setDetail(l); loadLeadNotes(l.id); navigate('/leads/'+l.id, {replace:true}) }} style={{cursor:'pointer'}}>
                   <td style={{fontWeight:600}}>{l.name}</td>
                   <td><span className="bdg bb">{l.clientType||'Individual'}</span></td>
                   <td>{l.phone||'—'}</td>
