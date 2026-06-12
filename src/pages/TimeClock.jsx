@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import PayrollStatCards from '../components/PayrollStatCards'
 
 const BLANK = { employee:'', date:'', inTime:'', outTime:'', hours:'', notes:'' }
 
@@ -61,6 +62,7 @@ export default function TimeClock() {
   // openEntries: { empName: [ {id, inTime, date}, ... ] } — multiple open punches per person
   const [openEntries, setOpenEntries] = useState({})
   const [now,        setNow]        = useState(new Date())
+  const [activeTab,  setActiveTab]  = useState('today')
   const timerRef = useRef(null)
 
   useEffect(() => {
@@ -72,7 +74,7 @@ export default function TimeClock() {
   async function load() {
     const [{ data:t }, { data:e }] = await Promise.all([
       supabase.from('timeentries').select('*').order('created_at', { ascending: false }),
-      supabase.from('employees').select('name,payType,hourlyRate'),
+      supabase.from('employees').select('*').order('name'),
     ])
     if (t) {
       setItems(t)
@@ -179,6 +181,23 @@ export default function TimeClock() {
 
   const totalHours = filtered.reduce((s, e) => s + parseFloat(e.hours || 0), 0)
 
+  // Today's entries (for Today's Log tab)
+  const todayEntries = items.filter(e => e.date === today)
+  const clockedInCount  = Object.keys(openEntries).filter(emp => (openEntries[emp]||[]).length>0).length
+  const clockedOutToday = todayEntries.filter(e => e.outTime).length
+  const totalPunchesToday = todayEntries.length
+
+  function exportTodayCSV() {
+    const rows = [['Employee','Date','Clock In','Clock Out','Hours','Notes']]
+    todayEntries.forEach(e => rows.push([e.employee, e.date, fmt12(e.inTime)||'', e.outTime?fmt12(e.outTime):'', e.hours||'', e.notes||'']))
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type:'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `timeclock-${today}.csv`; a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div>
       {toast && <div className="toast show">{toast}</div>}
@@ -193,6 +212,21 @@ export default function TimeClock() {
         </div>
       </div>
 
+      <PayrollStatCards employees={employees} timeEntries={items} />
+
+      {/* Tab Bar */}
+      <div style={{ display:'flex', gap:4, marginBottom:16, borderBottom:'1px solid var(--br)' }}>
+        {[['today',"Today's Log"],['history','Punch History']].map(([k,l]) => (
+          <button key={k} onClick={()=>setActiveTab(k)}
+            style={{ padding:'10px 18px', border:'none', borderBottom: activeTab===k?'2px solid var(--blue)':'2px solid transparent',
+              background:'none', cursor:'pointer', fontSize:13, fontWeight:activeTab===k?700:500,
+              color:activeTab===k?'var(--blue)':'var(--t2)' }}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {activeTab==='today' && (<>
       {/* Clock In/Out Cards */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))', gap:10, marginBottom:16 }}>
         {empNames.map(emp => {
@@ -251,6 +285,59 @@ export default function TimeClock() {
         })}
       </div>
 
+      {/* Today's Log mini-stats */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:10, marginBottom:16 }}>
+        {[
+          ['CURRENTLY CLOCKED IN', clockedInCount, '#22c55e'],
+          ['CLOCKED OUT TODAY', clockedOutToday, 'var(--t2)'],
+          ['TOTAL PUNCHES TODAY', totalPunchesToday, '#3b82f6'],
+          ['ACTIVE EMPLOYEES', empNames.length, '#8b5cf6'],
+        ].map(([l,v,c]) => (
+          <div key={l} className="card" style={{ padding:'12px 14px', borderTop:`3px solid ${c}` }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:6 }}>{l}</div>
+            <div style={{ fontSize:20, fontWeight:800, color:c }}>{v || '—'}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Today's clock events */}
+      <div className="card" style={{ padding:0, overflow:'hidden', marginBottom:16 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 14px', borderBottom:'1px solid var(--br)' }}>
+          <div style={{ fontWeight:700, fontSize:13 }}>Clock events — {now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</div>
+          <button className="btn sec" style={{ fontSize:11, padding:'4px 10px' }} onClick={exportTodayCSV}>📥 Export CSV</button>
+        </div>
+        {todayEntries.length === 0 ? (
+          <div style={{ padding:'36px 20px', textAlign:'center', color:'var(--t3)', fontSize:13 }}>
+            <div style={{ fontSize:28, marginBottom:6 }}>⏰</div>
+            No clock events today yet.
+          </div>
+        ) : (
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+            <thead>
+              <tr style={{ borderBottom:'1px solid var(--br)', background:'var(--s2)' }}>
+                {['Employee','Clock In','Clock Out','Hours','Notes','Status'].map(h=>(
+                  <th key={h} style={{ padding:'9px 12px', textAlign:'left', fontSize:10, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {todayEntries.map(e=>(
+                <tr key={e.id} style={{ borderBottom:'1px solid var(--br)' }}>
+                  <td style={{ padding:'9px 12px', fontWeight:600 }}>{e.employee}</td>
+                  <td style={{ padding:'9px 12px', color:'var(--ok)', fontWeight:600 }}>{fmt12(e.inTime)||'—'}</td>
+                  <td style={{ padding:'9px 12px', color:e.outTime?'var(--bad)':'var(--t3)' }}>{e.outTime?fmt12(e.outTime):'—'}</td>
+                  <td style={{ padding:'9px 12px', fontWeight:700, color:'var(--b2c)' }}>{e.hours?e.hours+'h':'—'}</td>
+                  <td style={{ padding:'9px 12px', color:'var(--t2)', fontSize:11 }}>{e.notes||'—'}</td>
+                  <td style={{ padding:'9px 12px' }}>{e.outTime ? <span className="bdg bg">Clocked Out</span> : <span className="bdg ba">Active</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      </>)}
+
+      {activeTab==='history' && (<>
       {/* Stats */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))', gap:8, marginBottom:12 }}>
         {[
@@ -321,6 +408,7 @@ export default function TimeClock() {
           </table>
         )}
       </div>
+      </>)}
 
       {/* Modal */}
       {modal && (
