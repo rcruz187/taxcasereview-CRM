@@ -279,238 +279,7 @@ export default function Leads() {
   }
 
   // ── Detail View ──
-  if (detail) {
-    const l = detail
-    const done = stagesDone(l.status)
-    const taxYearsList = (() => { try { return JSON.parse(l.taxYears||'[]').join(', ') } catch { return l.taxYearsCustom||'—' } })()
-
-    return (
-      <div style={{maxWidth:960,margin:'0 auto'}}>
-        {toast && <div className="toast show">{toast}</div>}
-
-        {/* Top bar — matches clients page */}
-        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,flexWrap:'wrap'}}>
-          <button className="btn" style={{padding:'8px 16px',fontSize:13,fontWeight:600}} onClick={()=>{ setDetail(null); navigate('/leads',{replace:true}); window.scrollTo(0,0) }}>← Back</button>
-          {(l.status !== 'Converted to Client' || user?.role === 'Admin' || user?.role === 'Manager') ? (
-            <button className="btn pri" style={{marginLeft:'auto',padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>{setForm({...BLANK,...l,taxYears:(() => {try{return JSON.parse(l.taxYears||'[]')}catch{return []}})()});setModal('edit')}}>✏️ Edit</button>
-          ) : (
-            <span style={{marginLeft:'auto',fontSize:11,color:'var(--t3)',padding:'8px 12px',background:'var(--s2)',borderRadius:6}}>🔒 Admin Only</span>
-          )}
-          <button className="btn ok" style={{padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>convertToClient(l)} disabled={converting}>{converting?'Converting…':'✓ Convert to Client'}</button>
-          <button className="btn del" style={{padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>deleteLead(l.id)}>🗑 Delete</button>
-        </div>
-
-        {/* Header card — matches clients */}
-        <div className="card" style={{marginBottom:12}}>
-          <div style={{display:'flex',alignItems:'center',gap:16,padding:'4px 0 8px',flexWrap:'wrap'}}>
-            <div style={{width:56,height:56,borderRadius:'50%',background:'var(--blue)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:22,color:'#fff',flexShrink:0}}>
-              {(l.name||'?')[0].toUpperCase()}
-            </div>
-            <div style={{flex:1}}>
-              <div style={{fontSize:22,fontWeight:800}}>{l.name}</div>
-              <div style={{display:'flex',gap:6,marginTop:5,flexWrap:'wrap'}}>
-                <span className="bdg bb">{l.clientType||'Individual'}</span>
-                <Bdg s={l.status||'New Lead'}/>
-                {l.irsOrState && <span className="bdg ba">{l.irsOrState}</span>}
-                {l.issueType  && <TypeBdg t={l.issueType}/>}
-                {l.taxFee     && <span className="bdg bg">Tax Inv Fee: ${l.taxFee}</span>}
-              </div>
-            </div>
-          </div>
-
-          {/* Pipeline — clickable chips like clients */}
-          <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid var(--br)'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
-              <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Pipeline</div>
-              <button className="btn sec" style={{padding:'2px 8px',fontSize:10}} onClick={()=>setShowFlow(true)}>📊 View Flow</button>
-            </div>
-            <div style={{display:'flex',alignItems:'center',gap:0,overflowX:'auto',paddingBottom:4}}>
-              {PIPELINE_STAGES.map((stage,i) => (
-                <div key={stage.key} style={{display:'flex',alignItems:'center'}}>
-                  <div style={{
-                    padding:'5px 10px',borderRadius:20,fontSize:11,fontWeight:600,cursor:'pointer',
-                    whiteSpace:'nowrap',
-                    background:done[i]?'var(--ok)':'var(--s3)',
-                    color:done[i]?'#fff':'var(--t3)',
-                    border:done[i]&&i===done.lastIndexOf(true)?'2px solid var(--ok)':'2px solid transparent',
-                    transition:'all .15s'
-                  }} onClick={()=>updateStatus(l.id, stage.statusMap || stage.label)}>
-                    {stage.label}
-                  </div>
-                  {i < PIPELINE_STAGES.length-1 && <div style={{width:16,height:2,background:done[i]?'var(--ok)':'var(--br)',flexShrink:0}}/>}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions — matches clients ActionBtn style */}
-        <div className="card" style={{marginBottom:12}}>
-          <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Quick Actions</div>
-          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-            <ActionBtn color="#16a34a" icon="📦" label="Full Package" sub="All Docs at Once" onClick={()=>generateClientPackage(l)}/>
-            <ActionBtn color="#22863a" icon="📄" label="Tax Engagement" sub="Service Agreement" onClick={()=>generateClientPackage(l)}/>
-            <ActionBtn color="#0369a1" icon="🖋️" label="Pre-Fill 8821/2848" sub="IRS PDF Forms" onClick={()=>{
-              try {
-                if (!l) { showToast('Error: no lead data found'); return }
-                setFillerLead({...l, address:l.street, business_name:l.entityName})
-              } catch (err) { showToast('Error opening form: ' + err.message) }
-            }}/>
-            <ActionBtn color="#0891b2" icon="📅" label="Schedule" sub="Book Appointment" onClick={()=>setBookingLead(l)}/>
-            <ActionBtn color="#d97706" icon="📝" label="Addendum" sub="After IRS facts" onClick={()=>generateAddendum(l)}/>
-
-            <ActionBtn color="#dc2626" icon="📠" label="Send Fax" sub="Telnyx Fax" onClick={()=>{setInlineFaxLead(l);setShowFaxModal(true)}}/>
-            <ActionBtn color="#7c3aed" icon="✍️" label="E-Signature" sub="Request Sign" onClick={()=>{setInlineEsignLead(l);setShowEsignModal(true)}}/>
-          </div>
-        </div>
-
-        {/* Update Status */}
-        <div className="card" style={{marginBottom:12}}>
-          <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Update Status</div>
-          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-            {STATUSES.map(st => (
-              <span key={st} className={`chip${l.status===st?' on':''}`} onClick={()=>updateStatus(l.id, st)} style={{fontSize:11}}>{st}</span>
-            ))}
-          </div>
-        </div>
-
-        {/* Info grid — side by side like clients */}
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
-          <div className="card">
-            <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>Contact Info</div>
-            {[['Phone',l.phone],['Email',l.email],['Address',[l.street,l.city,l.state,l.zip].filter(Boolean).join(', ')],['County',l.county],['Source',l.source]].map(([label,val])=>(
-              <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">{val||'—'}</span></div>
-            ))}
-          </div>
-          <div className="card">
-            <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>IRS / Case Info</div>
-            {[
-              ['Est. Balance', l.irsBalance ? <span style={{fontWeight:700,color:'var(--bad)'}}>~{l.irsBalance}</span> : '—'],
-              ['Issue Type',   <TypeBdg t={l.issueType||'—'}/>],
-              ['IRS or State', l.irsOrState],
-              ['Tax Years',    taxYearsList],
-              ['Assigned Rep', l.assignedTo||<span style={{color:'var(--warn)'}}>Unassigned</span>],
-              ['Tax Inv Fee',  l.taxFee?<span style={{fontWeight:700,color:'var(--ok)'}}>${l.taxFee}</span>:'Not set'],
-            ].map(([label,val])=>(
-              <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">{val||'—'}</span></div>
-            ))}
-          </div>
-        </div>
-
-        {/* Initial Notes */}
-        {l.notes && (
-          <div className="card" style={{marginBottom:12}}>
-            <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>Initial Notes</div>
-            <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.7,whiteSpace:'pre-wrap'}}>{l.notes}</div>
-          </div>
-        )}
-        {/* Status Flow Modal */}
-        {showFlow && (
-          <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setShowFlow(false)}>
-            <div className="modal" style={{maxWidth:820,width:'95vw'}}>
-              <div className="mh">
-                <span className="mt">📊 Lead Status Flow</span>
-                <button className="xbtn" onClick={()=>setShowFlow(false)}>&times;</button>
-              </div>
-              <div style={{overflowX:'auto',padding:'8px 0'}}>
-                <div style={{display:'flex',alignItems:'center',gap:0,minWidth:700,flexWrap:'wrap',rowGap:16}}>
-                  {[
-                    {s:'New Lead',c:'#3b82f6'},{s:'Contacted',c:'#6366f1'},
-                    {s:'Consultation Scheduled',c:'#8b5cf6'},{s:'Consultation Completed',c:'#a855f7'},
-                    {s:'Tax Inv Agreement Sent',c:'#f59e0b'},{s:'Tax Inv Agreement Signed',c:'#f97316'},
-                    {s:'Tax Inv Fee Paid',c:'#10b981'},{s:'Tax Investigation Active',c:'#059669'},
-                    {s:'IRS Facts Received',c:'#0ea5e9'},{s:'Addendum Sent',c:'#f59e0b'},
-                    {s:'Addendum Signed',c:'#f97316'},{s:'Resolution Fee Paid',c:'#10b981'},
-                    {s:'Converted to Client',c:'#25A25A'},
-                  ].map((item,i,arr) => (
-                    <div key={item.s} style={{display:'flex',alignItems:'center',gap:0}}>
-                      <div style={{background:item.c,color:'#fff',borderRadius:8,padding:'6px 10px',fontSize:11,fontWeight:700,textAlign:'center',whiteSpace:'nowrap',maxWidth:110,lineHeight:1.3}}>{item.s}</div>
-                      {i < arr.length-1 && <div style={{color:'var(--t3)',fontSize:16,margin:'0 4px'}}>→</div>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Inline Fax Modal */}
-        {showFaxModal && inlineFaxLead && (
-          <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setShowFaxModal(false)}>
-            <div className="modal" style={{width:520}}>
-              <div className="mh"><span className="mt">📠 Send Fax — {inlineFaxLead.name}</span><button className="xbtn" onClick={()=>setShowFaxModal(false)}>&times;</button></div>
-              <LeadInlineFax lead={inlineFaxLead} onClose={()=>setShowFaxModal(false)}/>
-            </div>
-          </div>
-        )}
-
-        {/* Inline E-Sign Modal */}
-        {showEsignModal && inlineEsignLead && (
-          <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setShowEsignModal(false)}>
-            <div className="modal" style={{width:520}}>
-              <div className="mh"><span className="mt">✍️ E-Signature — {inlineEsignLead.name}</span><button className="xbtn" onClick={()=>setShowEsignModal(false)}>&times;</button></div>
-              <LeadInlineEsign lead={inlineEsignLead} onClose={()=>setShowEsignModal(false)}/>
-            </div>
-          </div>
-        )}
-
-        {bookingLead && (
-          <BookingWidget contact={{name:bookingLead.name, email:bookingLead.email, phone:bookingLead.phone}} onClose={()=>setBookingLead(null)} mode="lead"/>
-        )}
-        {fillerLead && (
-          <ErrorBoundary onClose={()=>setFillerLead(null)}>
-            <IRSFormFiller client={fillerLead} onClose={()=>setFillerLead(null)}/>
-          </ErrorBoundary>
-        )}
-      </div>
-    )
-  }
-
-  return (
-    <div>
-      {toast && <div className="toast show">{toast}</div>}
-
-      <div style={{marginBottom:10,display:'flex',flexWrap:'wrap',gap:4}}>
-        {['All',...STATUSES.slice(0,8)].map(s => (
-          <span key={s} className={`chip${filter===s?' on':''}`} onClick={()=>setFilter(s)}>{s}</span>
-        ))}
-      </div>
-
-      <div className="card">
-        <div className="ch">
-          <span className="ct">All Leads ({filtered.length})</span>
-          <button className="btn pri" onClick={()=>{ setForm(BLANK); setModal(true) }}>+ Add Lead</button>
-        </div>
-        <div className="ovx">
-          <table>
-            <thead>
-              <tr><th>Name</th><th>Type</th><th>Phone</th><th>Issue</th><th>Balance</th><th>Source</th><th>Status</th><th>Assigned</th><th></th></tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr><td colSpan={9} style={{textAlign:'center',color:'var(--t3)',padding:20}}>No leads yet — add your first one!</td></tr>
-              ) : filtered.map(l => (
-                <tr key={l.id} onClick={()=>{ setDetail(l); loadLeadNotes(l.id); navigate('/leads/'+l.id, {replace:true}) }} style={{cursor:'pointer'}}>
-                  <td style={{fontWeight:600}}>{l.name}</td>
-                  <td><span className="bdg bb">{l.clientType||'Individual'}</span></td>
-                  <td>{l.phone||'—'}</td>
-                  <td><TypeBdg t={l.issueType||'—'}/></td>
-                  <td style={{color:'var(--t2)'}}>{l.irsBalance||'—'}</td>
-                  <td style={{color:'var(--t2)'}}>{l.source||'—'}</td>
-                  <td><Bdg s={l.status||'New Lead'}/></td>
-                  <td style={{color:'var(--t2)',fontSize:12}}>{l.assignedTo||<span style={{color:'var(--warn)'}}>Unassigned</span>}</td>
-                  <td onClick={e=>e.stopPropagation()}>
-                    <button className="btn del" onClick={()=>deleteLead(l.id)}>Del</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Add/Edit Modal */}
-      {modal && (
+  const editLeadModal = modal && (
         <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setModal(false)}>
           <div className="modal" style={{width:showScript&&modal!=='edit'?1080:640,maxWidth:'98vw',maxHeight:'90vh',display:'flex',flexDirection:'row',gap:0,padding:0,overflow:'hidden'}}>
             <div style={{flex:1,minWidth:0,padding:20,display:'flex',flexDirection:'column',overflowY:'auto',maxHeight:'90vh'}}>
@@ -698,7 +467,242 @@ export default function Leads() {
             )}
           </div>{/* end modal flex row */}
         </div>
-      )}
+      )
+
+  if (detail) {
+    const l = detail
+    const done = stagesDone(l.status)
+    const taxYearsList = (() => { try { return JSON.parse(l.taxYears||'[]').join(', ') } catch { return l.taxYearsCustom||'—' } })()
+
+    return (
+      <div style={{maxWidth:960,margin:'0 auto'}}>
+        {toast && <div className="toast show">{toast}</div>}
+
+        {/* Top bar — matches clients page */}
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,flexWrap:'wrap'}}>
+          <button className="btn" style={{padding:'8px 16px',fontSize:13,fontWeight:600}} onClick={()=>{ setDetail(null); navigate('/leads',{replace:true}); window.scrollTo(0,0) }}>← Back</button>
+          {(l.status !== 'Converted to Client' || user?.role === 'Admin' || user?.role === 'Manager') ? (
+            <button className="btn pri" style={{marginLeft:'auto',padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>{setForm({...BLANK,...l,taxYears:(() => {try{return JSON.parse(l.taxYears||'[]')}catch{return []}})()});setModal('edit')}}>✏️ Edit</button>
+          ) : (
+            <span style={{marginLeft:'auto',fontSize:11,color:'var(--t3)',padding:'8px 12px',background:'var(--s2)',borderRadius:6}}>🔒 Admin Only</span>
+          )}
+          <button className="btn ok" style={{padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>convertToClient(l)} disabled={converting}>{converting?'Converting…':'✓ Convert to Client'}</button>
+          <button className="btn del" style={{padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>deleteLead(l.id)}>🗑 Delete</button>
+        </div>
+
+        {/* Header card — matches clients */}
+        <div className="card" style={{marginBottom:12}}>
+          <div style={{display:'flex',alignItems:'center',gap:16,padding:'4px 0 8px',flexWrap:'wrap'}}>
+            <div style={{width:56,height:56,borderRadius:'50%',background:'var(--blue)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:22,color:'#fff',flexShrink:0}}>
+              {(l.name||'?')[0].toUpperCase()}
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:22,fontWeight:800}}>{l.name}</div>
+              <div style={{display:'flex',gap:6,marginTop:5,flexWrap:'wrap'}}>
+                <span className="bdg bb">{l.clientType||'Individual'}</span>
+                <Bdg s={l.status||'New Lead'}/>
+                {l.irsOrState && <span className="bdg ba">{l.irsOrState}</span>}
+                {l.issueType  && <TypeBdg t={l.issueType}/>}
+                {l.taxFee     && <span className="bdg bg">Tax Inv Fee: ${l.taxFee}</span>}
+              </div>
+            </div>
+          </div>
+
+          {/* Pipeline — clickable chips like clients */}
+          <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid var(--br)'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+              <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Pipeline</div>
+              <button className="btn sec" style={{padding:'2px 8px',fontSize:10}} onClick={()=>setShowFlow(true)}>📊 View Flow</button>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:0,overflowX:'auto',paddingBottom:4}}>
+              {PIPELINE_STAGES.map((stage,i) => (
+                <div key={stage.key} style={{display:'flex',alignItems:'center'}}>
+                  <div style={{
+                    padding:'5px 10px',borderRadius:20,fontSize:11,fontWeight:600,cursor:'pointer',
+                    whiteSpace:'nowrap',
+                    background:done[i]?'var(--ok)':'var(--s3)',
+                    color:done[i]?'#fff':'var(--t3)',
+                    border:done[i]&&i===done.lastIndexOf(true)?'2px solid var(--ok)':'2px solid transparent',
+                    transition:'all .15s'
+                  }} onClick={()=>updateStatus(l.id, stage.statusMap || stage.label)}>
+                    {stage.label}
+                  </div>
+                  {i < PIPELINE_STAGES.length-1 && <div style={{width:16,height:2,background:done[i]?'var(--ok)':'var(--br)',flexShrink:0}}/>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Actions — matches clients ActionBtn style */}
+        <div className="card" style={{marginBottom:12}}>
+          <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Quick Actions</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            <ActionBtn color="#16a34a" icon="📦" label="Full Package" sub="All Docs at Once" onClick={()=>generateClientPackage(l)}/>
+            <ActionBtn color="#22863a" icon="📄" label="Tax Engagement" sub="Service Agreement" onClick={()=>generateClientPackage(l)}/>
+            <ActionBtn color="#0369a1" icon="🖋️" label="Pre-Fill 8821/2848" sub="IRS PDF Forms" onClick={()=>{
+              try {
+                if (!l) { showToast('Error: no lead data found'); return }
+                setFillerLead({...l, address:l.street, business_name:l.entityName})
+              } catch (err) { showToast('Error opening form: ' + err.message) }
+            }}/>
+            <ActionBtn color="#0891b2" icon="📅" label="Schedule" sub="Book Appointment" onClick={()=>setBookingLead(l)}/>
+            <ActionBtn color="#d97706" icon="📝" label="Addendum" sub="After IRS facts" onClick={()=>generateAddendum(l)}/>
+
+            <ActionBtn color="#dc2626" icon="📠" label="Send Fax" sub="Telnyx Fax" onClick={()=>{setInlineFaxLead(l);setShowFaxModal(true)}}/>
+            <ActionBtn color="#7c3aed" icon="✍️" label="E-Signature" sub="Request Sign" onClick={()=>{setInlineEsignLead(l);setShowEsignModal(true)}}/>
+          </div>
+        </div>
+
+        {/* Update Status */}
+        <div className="card" style={{marginBottom:12}}>
+          <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Update Status</div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            {STATUSES.map(st => (
+              <span key={st} className={`chip${l.status===st?' on':''}`} onClick={()=>updateStatus(l.id, st)} style={{fontSize:11}}>{st}</span>
+            ))}
+          </div>
+        </div>
+
+        {/* Info grid — side by side like clients */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+          <div className="card">
+            <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>Contact Info</div>
+            {[['Phone',l.phone],['Email',l.email],['Address',[l.street,l.city,l.state,l.zip].filter(Boolean).join(', ')],['County',l.county],['Source',l.source]].map(([label,val])=>(
+              <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">{val||'—'}</span></div>
+            ))}
+          </div>
+          <div className="card">
+            <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>IRS / Case Info</div>
+            {[
+              ['Est. Balance', l.irsBalance ? <span style={{fontWeight:700,color:'var(--bad)'}}>~{l.irsBalance}</span> : '—'],
+              ['Issue Type',   <TypeBdg t={l.issueType||'—'}/>],
+              ['IRS or State', l.irsOrState],
+              ['Tax Years',    taxYearsList],
+              ['Assigned Rep', l.assignedTo||<span style={{color:'var(--warn)'}}>Unassigned</span>],
+              ['Tax Inv Fee',  l.taxFee?<span style={{fontWeight:700,color:'var(--ok)'}}>${l.taxFee}</span>:'Not set'],
+            ].map(([label,val])=>(
+              <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">{val||'—'}</span></div>
+            ))}
+          </div>
+        </div>
+
+        {/* Initial Notes */}
+        {l.notes && (
+          <div className="card" style={{marginBottom:12}}>
+            <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>Initial Notes</div>
+            <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.7,whiteSpace:'pre-wrap'}}>{l.notes}</div>
+          </div>
+        )}
+        {/* Status Flow Modal */}
+        {showFlow && (
+          <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setShowFlow(false)}>
+            <div className="modal" style={{maxWidth:820,width:'95vw'}}>
+              <div className="mh">
+                <span className="mt">📊 Lead Status Flow</span>
+                <button className="xbtn" onClick={()=>setShowFlow(false)}>&times;</button>
+              </div>
+              <div style={{overflowX:'auto',padding:'8px 0'}}>
+                <div style={{display:'flex',alignItems:'center',gap:0,minWidth:700,flexWrap:'wrap',rowGap:16}}>
+                  {[
+                    {s:'New Lead',c:'#3b82f6'},{s:'Contacted',c:'#6366f1'},
+                    {s:'Consultation Scheduled',c:'#8b5cf6'},{s:'Consultation Completed',c:'#a855f7'},
+                    {s:'Tax Inv Agreement Sent',c:'#f59e0b'},{s:'Tax Inv Agreement Signed',c:'#f97316'},
+                    {s:'Tax Inv Fee Paid',c:'#10b981'},{s:'Tax Investigation Active',c:'#059669'},
+                    {s:'IRS Facts Received',c:'#0ea5e9'},{s:'Addendum Sent',c:'#f59e0b'},
+                    {s:'Addendum Signed',c:'#f97316'},{s:'Resolution Fee Paid',c:'#10b981'},
+                    {s:'Converted to Client',c:'#25A25A'},
+                  ].map((item,i,arr) => (
+                    <div key={item.s} style={{display:'flex',alignItems:'center',gap:0}}>
+                      <div style={{background:item.c,color:'#fff',borderRadius:8,padding:'6px 10px',fontSize:11,fontWeight:700,textAlign:'center',whiteSpace:'nowrap',maxWidth:110,lineHeight:1.3}}>{item.s}</div>
+                      {i < arr.length-1 && <div style={{color:'var(--t3)',fontSize:16,margin:'0 4px'}}>→</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Inline Fax Modal */}
+        {showFaxModal && inlineFaxLead && (
+          <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setShowFaxModal(false)}>
+            <div className="modal" style={{width:520}}>
+              <div className="mh"><span className="mt">📠 Send Fax — {inlineFaxLead.name}</span><button className="xbtn" onClick={()=>setShowFaxModal(false)}>&times;</button></div>
+              <LeadInlineFax lead={inlineFaxLead} onClose={()=>setShowFaxModal(false)}/>
+            </div>
+          </div>
+        )}
+
+        {/* Inline E-Sign Modal */}
+        {showEsignModal && inlineEsignLead && (
+          <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setShowEsignModal(false)}>
+            <div className="modal" style={{width:520}}>
+              <div className="mh"><span className="mt">✍️ E-Signature — {inlineEsignLead.name}</span><button className="xbtn" onClick={()=>setShowEsignModal(false)}>&times;</button></div>
+              <LeadInlineEsign lead={inlineEsignLead} onClose={()=>setShowEsignModal(false)}/>
+            </div>
+          </div>
+        )}
+
+        {editLeadModal}
+
+        {bookingLead && (
+          <BookingWidget contact={{name:bookingLead.name, email:bookingLead.email, phone:bookingLead.phone}} onClose={()=>setBookingLead(null)} mode="lead"/>
+        )}
+        {fillerLead && (
+          <ErrorBoundary onClose={()=>setFillerLead(null)}>
+            <IRSFormFiller client={fillerLead} onClose={()=>setFillerLead(null)}/>
+          </ErrorBoundary>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {toast && <div className="toast show">{toast}</div>}
+
+      <div style={{marginBottom:10,display:'flex',flexWrap:'wrap',gap:4}}>
+        {['All',...STATUSES.slice(0,8)].map(s => (
+          <span key={s} className={`chip${filter===s?' on':''}`} onClick={()=>setFilter(s)}>{s}</span>
+        ))}
+      </div>
+
+      <div className="card">
+        <div className="ch">
+          <span className="ct">All Leads ({filtered.length})</span>
+          <button className="btn pri" onClick={()=>{ setForm(BLANK); setModal(true) }}>+ Add Lead</button>
+        </div>
+        <div className="ovx">
+          <table>
+            <thead>
+              <tr><th>Name</th><th>Type</th><th>Phone</th><th>Issue</th><th>Balance</th><th>Source</th><th>Status</th><th>Assigned</th><th></th></tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr><td colSpan={9} style={{textAlign:'center',color:'var(--t3)',padding:20}}>No leads yet — add your first one!</td></tr>
+              ) : filtered.map(l => (
+                <tr key={l.id} onClick={()=>{ setDetail(l); loadLeadNotes(l.id); navigate('/leads/'+l.id, {replace:true}) }} style={{cursor:'pointer'}}>
+                  <td style={{fontWeight:600}}>{l.name}</td>
+                  <td><span className="bdg bb">{l.clientType||'Individual'}</span></td>
+                  <td>{l.phone||'—'}</td>
+                  <td><TypeBdg t={l.issueType||'—'}/></td>
+                  <td style={{color:'var(--t2)'}}>{l.irsBalance||'—'}</td>
+                  <td style={{color:'var(--t2)'}}>{l.source||'—'}</td>
+                  <td><Bdg s={l.status||'New Lead'}/></td>
+                  <td style={{color:'var(--t2)',fontSize:12}}>{l.assignedTo||<span style={{color:'var(--warn)'}}>Unassigned</span>}</td>
+                  <td onClick={e=>e.stopPropagation()}>
+                    <button className="btn del" onClick={()=>deleteLead(l.id)}>Del</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Add/Edit Modal */}
+      {editLeadModal}
 
     </div>
   )
