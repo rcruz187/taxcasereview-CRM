@@ -70,6 +70,36 @@ export default function Calendar() {
 
   useEffect(() => { load() }, [])
 
+  // Realtime sync: when a new appointment is booked via the external Tax Case Review
+  // booking widget (cfoservicesnow), it gets inserted into calevents with source='booking_widget'.
+  // Pick it up live, show a toast + browser notification, and post to team chat.
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+    const ch = supabase.channel('calevents-booking-sync')
+    ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'calevents' }, ({ new: row }) => {
+      setEvents(prev => prev.some(e => e.id === row.id) ? prev : [...prev, row])
+      if (row.source === 'booking_widget') {
+        const who = row.clientName || row.title || 'New appointment'
+        showToast(`📅 New appointment booked: ${who} — ${row.date} ${row.time || ''}`)
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('📅 New Appointment Booked', {
+            body: `${who} — ${row.date} ${fmtTime(row.time||'')}`,
+            icon: '/taxcasereview-CRM/icon-192.png'
+          })
+        }
+        supabase.from('chat_messages').insert([{
+          channel: 'general', sender: '🔔 System',
+          text: `📅 New appointment booked online: **${who}** on ${row.date}${row.time?` at ${fmtTime(row.time)}`:''}${row.eventType?` (${row.eventType})`:''}.`,
+          created_at: new Date().toISOString()
+        }]).then(()=>{})
+      }
+    })
+    ch.subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [])
+
   async function load() {
     setLoading(true)
     const [{ data: ev }, { data: cl }, { data: em }, { data: dl }] = await Promise.all([
