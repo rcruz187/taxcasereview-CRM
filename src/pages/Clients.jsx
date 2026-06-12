@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import IRSFormFiller from '../components/IRSFormFiller'
 import { supabase } from '../lib/supabase'
 import { generateServiceAgreement, generateAddendum, generateEngagementLetter, generatePOACoverLetter } from '../lib/docUtils'
 
@@ -438,6 +439,7 @@ export default function Clients() {
   const [relPayments, setRelPayments] = useState([])
   const [loadingRel,  setLoadingRel]  = useState(false)
   const [detailTab,   setDetailTab]   = useState('overview')
+  const [fillerClient, setFillerClient] = useState(null)
   // Quick add task inline
   const [quickTask,   setQuickTask]   = useState('')
   const [addingTask,  setAddingTask]  = useState(false)
@@ -733,6 +735,7 @@ export default function Clients() {
             <ActionBtn color="#1A7FD4" icon="✉️" label="Engagement Letter" sub="Print" onClick={()=>generateEngagementLetter(c)}/>
             <ActionBtn color="#d97706" icon="📋" label="Addendum" sub="Add Services" onClick={()=>{setAddForm({resolutionFee:'',paymentPlan:'',startDate:'',notes:''});setAddModal(true)}}/>
             <ActionBtn color="#6c5ce7" icon="🔐" label="POA Cover Letter" sub="Form 2848" onClick={()=>generatePOACoverLetter(c)}/>
+            <ActionBtn color="#0369a1" icon="📋" label="Pre-Fill 8821/2848" sub="IRS PDF Forms" onClick={()=>setFillerClient({...c, address:c.street, business_name:c.entityName})}/>
             <ActionBtn color="#0891b2" icon="📁" label="New Case" sub="Open Case" onClick={()=>navigate('/cases')}/>
             <ActionBtn color="#7c3aed" icon="✅" label="Add Task" sub="Assign Work" onClick={()=>{setTaskTitle('');setTaskPriority('Normal');setTaskDueDate('');setTaskModal(true)}}/>
             <ActionBtn color="#be185d" icon="🧾" label="New Invoice" sub="Bill Client" onClick={()=>navigate('/invoices')}/>
@@ -1018,6 +1021,10 @@ export default function Clients() {
         </div>
 
         {editModal&&<ClientFormModal form={form} fld={fld} reps={reps} saving={saving} onSave={saveEdit} onClose={()=>setEditModal(false)} title="Edit Client"/>}
+
+        {fillerClient && (
+          <IRSFormFiller client={fillerClient} onClose={()=>setFillerClient(null)}/>
+        )}
 
         {/* ── Add Task Modal ── */}
         {taskModal&&(
