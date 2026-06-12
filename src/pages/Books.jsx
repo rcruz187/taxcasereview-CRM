@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext'
 
 const CATEGORIES = ['Revenue','Retainer','Payment Plan','Consultation','Other Income','Rent','Payroll','Software','Marketing','Office','Taxes','Utilities','Legal','Other Expense']
 const TYPES = ['Income','Expense']
+const ACCOUNTS = ['Checking','Savings','Credit Card','Cash','Other']
 
 export default function Books() {
   const navigate = useNavigate()
@@ -24,7 +25,7 @@ export default function Books() {
   const [year, setYear]         = useState(new Date().getFullYear())
   const [clientFilter, setClientFilter] = useState(clientParam)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm]         = useState({ date: new Date().toISOString().slice(0,10), description:'', amount:'', type:'Income', category:'Revenue', client_id:'', notes:'', reconciled: false })
+  const [form, setForm]         = useState({ date: new Date().toISOString().slice(0,10), description:'', amount:'', type:'Income', category:'Revenue', client_id:'', notes:'', reconciled: false, payee:'', account:'Checking' })
   const [saving, setSaving]     = useState(false)
   const [clients, setClients]   = useState([])
 
@@ -55,7 +56,7 @@ export default function Books() {
     if (error) return showToast(error.message, 'err')
     showToast('Entry added!')
     setShowForm(false)
-    setForm({ date: new Date().toISOString().slice(0,10), description:'', amount:'', type:'Income', category:'Revenue', client_name:'', notes:'', reconciled: false })
+    setForm({ date: new Date().toISOString().slice(0,10), description:'', amount:'', type:'Income', category:'Revenue', client_name:'', notes:'', reconciled: false, payee:'', account:'Checking' })
     loadAll()
   }
 
@@ -100,6 +101,33 @@ export default function Books() {
   })
   const maxCat = Math.max(...Object.values(catBreakdown), 1)
 
+  async function exportQuickBooksCSV() {
+    // QuickBooks Online "3-column" bank transaction import format:
+    // Date, Description, Amount — Amount positive = money in, negative = money out
+    const rows = [['Date','Description','Amount']]
+    filtered.forEach(e => {
+      const d = e.date || e.created_at?.slice(0,10) || ''
+      const [yyyy,mm,dd] = d.split('-')
+      const dateStr = (yyyy && mm && dd) ? `${mm}/${dd}/${yyyy}` : d
+      const amt = Number(e.amount || 0)
+      const signedAmt = e.type === 'Income' ? amt : -amt
+      const desc = [e.description, e.payee ? `(${e.payee})` : ''].filter(Boolean).join(' ')
+      rows.push([dateStr, desc, signedAmt.toFixed(2)])
+    })
+    const csv = rows.map(r => r.map(v => {
+      const s = String(v ?? '')
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s
+    }).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `quickbooks-import-${clientFilter ? clientFilter.replace(/\s+/g,'-')+'-' : ''}${year}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    showToast('✅ CSV exported — ready to import into QuickBooks Online')
+  }
+
   const TABS = ['ledger','pnl','categories']
 
   return (
@@ -131,6 +159,9 @@ export default function Books() {
             style={{ padding:'7px 12px', borderRadius:8, border:'1px solid var(--br)', background:'var(--s2)', color:'var(--tx)', fontSize:13 }}>
             {[2026,2025,2024,2023,2022].map(y=><option key={y}>{y}</option>)}
           </select>
+          <button className="btn" onClick={exportQuickBooksCSV} style={{ display:'flex', alignItems:'center', gap:6 }}>
+            ⬇️ Export to QuickBooks
+          </button>
           <button className="btn pri" onClick={()=>setShowForm(true)} style={{ display:'flex', alignItems:'center', gap:6 }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Add Entry
@@ -189,7 +220,7 @@ export default function Books() {
               <table>
                 <thead>
                   <tr>
-                    <th>✓</th><th>Date</th><th>Description</th><th>Category</th><th>Type</th><th style={{textAlign:'right'}}>Amount</th><th>Notes</th><th></th>
+                    <th>✓</th><th>Date</th><th>Description</th><th>Payee</th><th>Category</th><th>Type</th><th style={{textAlign:'right'}}>Amount</th><th>Notes</th><th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -206,6 +237,7 @@ export default function Books() {
                       </td>
                       <td style={{ fontSize:12, color:'var(--t3)', whiteSpace:'nowrap' }}>{e.date || e.created_at?.slice(0,10)}</td>
                       <td style={{ fontWeight:600 }}>{e.description}</td>
+                      <td style={{ fontSize:12, color:'var(--t3)' }}>{e.payee||'—'}</td>
                       <td><span className="bdg bn" style={{fontSize:10}}>{e.category}</span></td>
                       <td><span className={`bdg ${e.type==='Income'?'bg':'br'}`} style={{fontSize:10}}>{e.type}</span></td>
                       <td style={{ textAlign:'right', fontWeight:700, color: e.type==='Income'?'var(--ok)':'var(--bad)', whiteSpace:'nowrap' }}>
@@ -325,6 +357,16 @@ export default function Books() {
               <div className="field">
                 <label>Date</label>
                 <input type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/>
+              </div>
+              <div className="field">
+                <label>Payee / Vendor</label>
+                <input value={form.payee||''} onChange={e=>setForm(f=>({...f,payee:e.target.value}))} placeholder="Who was paid / who paid you"/>
+              </div>
+              <div className="field">
+                <label>Account</label>
+                <select value={form.account||'Checking'} onChange={e=>setForm(f=>({...f,account:e.target.value}))}>
+                  {ACCOUNTS.map(a=><option key={a}>{a}</option>)}
+                </select>
               </div>
               <div className="field" style={{gridColumn:'1/-1'}}>
                 <label>Client (optional)</label>

@@ -341,7 +341,58 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* Supabase Storage */}
+          {/* QuickBooks Online */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">📊 QuickBooks Online</span></div>
+            <div style={{ padding: '0 20px 20px' }}>
+              <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.7 }}>
+                Connect QuickBooks Online to sync invoices and payments automatically. Until this is connected, use the
+                <strong> "Export to QuickBooks" </strong> button on the Books & Ledger page to download a CSV you can
+                import manually under QuickBooks → Banking → Upload from file.
+              </div>
+
+              {/* Step by step */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                {[
+                  ['1', 'Go to developer.intuit.com and sign in with your QuickBooks account'],
+                  ['2', 'Create a new app → choose "QuickBooks Online and Payments"'],
+                  ['3', 'In the app\'s Keys & OAuth section, grab your Client ID and Client Secret (use the Production keys, not Sandbox)'],
+                  ['4', `Add Redirect URI: ${window.location.origin}/taxcasereview-CRM/auth/quickbooks-callback`],
+                  ['5', 'Copy your Client ID and Client Secret below, then save'],
+                ].map(([step, text]) => (
+                  <div key={step} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#2CA01C', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, flexShrink: 0 }}>{step}</div>
+                    <div style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, paddingTop: 2 }}>{text}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="fg2">
+                <div className="field"><label>QuickBooks Client ID</label>
+                  <input value={firm.qb_client_id || ''} onChange={set('qb_client_id')} placeholder="ABxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+                </div>
+                <div className="field"><label>QuickBooks Client Secret</label>
+                  <input type="password" value={firm.qb_client_secret || ''} onChange={set('qb_client_secret')} placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+                </div>
+              </div>
+              <div className="field"><label>Redirect URI (copy this exactly into the Intuit Developer app)</label>
+                <input readOnly value={window.location.origin + '/taxcasereview-CRM/auth/quickbooks-callback'} style={{ color: 'var(--t3)', cursor: 'text' }} onClick={e => { e.target.select(); document.execCommand('copy'); }} />
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 14 }}>Click the Redirect URI field to copy it.</div>
+
+              <div style={{ background: 'rgba(212,147,10,.1)', border: '1px solid rgba(212,147,10,.3)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--t2)', marginBottom: 14, lineHeight: 1.7 }}>
+                <strong style={{ color: 'var(--warn)' }}>⚠️ Note:</strong> Saving credentials here stores them for when the sync feature is fully wired up.
+                The "Connect to QuickBooks" button below isn't live yet — it needs a small server-side piece to securely exchange the authorization code, which is in progress.
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save QuickBooks Config'}</button>
+                <button className="btn sec" disabled style={{ opacity: .5, cursor: 'not-allowed' }} title="Coming soon">🔗 Connect to QuickBooks (coming soon)</button>
+              </div>
+            </div>
+          </div>
+
+
           <div className="card">
             <div className="card-header"><span className="card-title">📁 Document Storage</span></div>
             <div style={{ padding: '0 20px 20px' }}>
