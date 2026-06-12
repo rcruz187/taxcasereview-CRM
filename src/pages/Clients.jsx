@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import IRSFormFiller from '../components/IRSFormFiller'
+import ErrorBoundary from '../components/ErrorBoundary'
 import BookingWidget from '../components/BookingWidget'
 import { supabase } from '../lib/supabase'
 import { generateServiceAgreement, generateAddendum, generateEngagementLetter, generatePOACoverLetter } from '../lib/docUtils'
@@ -737,7 +738,12 @@ export default function Clients() {
             <ActionBtn color="#1A7FD4" icon="✉️" label="Engagement Letter" sub="Print" onClick={()=>generateEngagementLetter(c)}/>
             <ActionBtn color="#d97706" icon="📋" label="Addendum" sub="Add Services" onClick={()=>{setAddForm({resolutionFee:'',paymentPlan:'',startDate:'',notes:''});setAddModal(true)}}/>
             <ActionBtn color="#6c5ce7" icon="🔐" label="POA Cover Letter" sub="Form 2848" onClick={()=>generatePOACoverLetter(c)}/>
-            <ActionBtn color="#0369a1" icon="📋" label="Pre-Fill 8821/2848" sub="IRS PDF Forms" onClick={()=>setFillerClient({...c, address:c.street, business_name:c.entityName})}/>
+            <ActionBtn color="#0369a1" icon="📋" label="Pre-Fill 8821/2848" sub="IRS PDF Forms" onClick={()=>{
+              try {
+                if (!c) { showToast('Error: no client data found'); return }
+                setFillerClient({...c, address:c.street, business_name:c.entityName})
+              } catch (err) { showToast('Error opening form: ' + err.message) }
+            }}/>
             <ActionBtn color="#0891b2" icon="📅" label="Schedule" sub="Book Appointment" onClick={()=>setBookingClient(c)}/>
             <ActionBtn color="#0891b2" icon="📁" label="New Case" sub="Open Case" onClick={()=>navigate('/cases')}/>
             <ActionBtn color="#7c3aed" icon="✅" label="Add Task" sub="Assign Work" onClick={()=>{setTaskTitle('');setTaskPriority('Normal');setTaskDueDate('');setTaskModal(true)}}/>
@@ -1026,7 +1032,9 @@ export default function Clients() {
         {editModal&&<ClientFormModal form={form} fld={fld} reps={reps} saving={saving} onSave={saveEdit} onClose={()=>setEditModal(false)} title="Edit Client"/>}
 
         {fillerClient && (
-          <IRSFormFiller client={fillerClient} onClose={()=>setFillerClient(null)}/>
+          <ErrorBoundary onClose={()=>setFillerClient(null)}>
+            <IRSFormFiller client={fillerClient} onClose={()=>setFillerClient(null)}/>
+          </ErrorBoundary>
         )}
 
         {bookingClient && (
