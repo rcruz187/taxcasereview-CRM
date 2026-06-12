@@ -108,6 +108,8 @@ export default function Settings() {
         sw_sip_username: firm.sw_sip_username,
         sw_sip_password: firm.sw_sip_password,
         sw_inbound_did: firm.sw_inbound_did,
+        qb_client_id: firm.qb_client_id,
+        qb_client_secret: firm.qb_client_secret,
       }
       const { data: existing, error: fetchErr } = await supabase.from('settings').select('id').limit(1).maybeSingle()
       if (fetchErr) throw fetchErr

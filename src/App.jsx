@@ -34,6 +34,7 @@ import Books         from './pages/Books'
 import FormaCorp     from './pages/FormaCorp'
 import Fax          from './pages/Fax'
 import SignPage     from './pages/SignPage'
+import AuthCallback from './pages/AuthCallback'
 
 const style = document.createElement('style')
 style.textContent = `@keyframes spin { to { transform: rotate(360deg) } }`
@@ -148,6 +149,7 @@ function AuthRouter() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/kiosk" element={<Kiosk />} />
       <Route path="*" element={<RequireAuth><Shell /></RequireAuth>} />
     </Routes>

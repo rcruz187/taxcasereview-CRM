@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { sendGmailEmail } from '../lib/gmailUtils'
 
 const TEMPLATES = [
   { label:'Welcome Letter',       subject:'Welcome to Tax Case Review', body:'Dear {name},\n\nWelcome to Tax Case Review! We are pleased to begin working on your tax resolution case. Your dedicated case representative will be in touch shortly.\n\nBest regards,\nTax Case Review' },
@@ -30,11 +31,17 @@ export default function Email() {
   const [gmailConnected, setGmailConnected] = useState(false)
   const [gmailClientId, setGmailClientId] = useState('')
 
-  useEffect(() => { load(); loadGmailConfig() }, [])
+  useEffect(() => {
+    load(); loadGmailConfig()
+    const onFocus = () => loadGmailConfig()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [])
 
   async function loadGmailConfig() {
-    const { data } = await supabase.from('settings').select('gmail_client_id').limit(1).maybeSingle()
+    const { data } = await supabase.from('settings').select('gmail_client_id,gmail_refresh_token').limit(1).maybeSingle()
     if (data?.gmail_client_id) setGmailClientId(data.gmail_client_id)
+    if (data?.gmail_refresh_token) setGmailConnected(true)
   }
 
   async function load() {
@@ -67,10 +74,24 @@ export default function Email() {
   async function send() {
     if (!form.clientName || !form.subject || !form.body) { showToast('Client, subject and body required'); return }
     setSaving(true)
-    const { error } = await supabase.from('emails').insert([{ ...form, created_at: new Date().toISOString() }])
+    let status = 'Logged'
+    if (gmailConnected) {
+      if (!form.recipient) {
+        setSaving(false); showToast('Recipient email address required to send'); return
+      }
+      try {
+        await sendGmailEmail(supabase, { to: form.recipient, subject: form.subject, body: form.body })
+        status = 'Sent'
+      } catch (e) {
+        setSaving(false)
+        showToast('Gmail send failed: ' + e.message)
+        return
+      }
+    }
+    const { error } = await supabase.from('emails').insert([{ ...form, status, created_at: new Date().toISOString() }])
     setSaving(false)
     if (error) { showToast('Error: ' + error.message); return }
-    showToast('✅ Email logged!')
+    showToast(status === 'Sent' ? '✅ Email sent via Gmail!' : '✅ Email logged!')
     setForm(BLANK); setView('inbox'); load()
   }
 
@@ -110,7 +131,11 @@ export default function Email() {
         </div>
 
         {/* Gmail connect banner */}
-        {!gmailConnected && (
+        {gmailConnected ? (
+          <div style={{ margin: '0 10px 10px', padding: '8px 12px', background: 'rgba(34,197,94,.12)', borderRadius: 8, border: '1px solid rgba(34,197,94,.3)', fontSize: 11, fontWeight: 700, color: 'var(--ok)' }}>
+            ✅ Gmail Connected
+          </div>
+        ) : !gmailConnected && (
           <div style={{ margin: '0 10px 10px', padding: '10px 12px', background: 'rgba(26,127,212,.12)', borderRadius: 8, border: '1px solid rgba(26,127,212,.3)' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', marginBottom: 4 }}>📧 Connect Gmail</div>
             <div style={{ fontSize: 10, color: 'var(--t3)', marginBottom: 8, lineHeight: 1.5 }}>Link your Gmail account to send & receive emails directly.</div>
