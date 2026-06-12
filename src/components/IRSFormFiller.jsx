@@ -172,6 +172,8 @@ export default function IRSFormFiller({ client, onClose }) {
   const hasEin = !!(client.ein);
   const hasSsn = !!(client.ssn || client.tin);
   const isBiz  = hasEin || !!client.business_name || client.clientType === 'Business' || client.clientType === 'Individual & Biz';
+  const hasAddress = !!(client.address || client.street || client.city);
+  const hasPhone = !!client.phone;
   // Always allow generating Personal forms even if SSN isn't on file yet (e.g. for leads) —
   // the field will just be left blank for the client to fill in by hand.
 
@@ -226,6 +228,16 @@ export default function IRSFormFiller({ client, onClose }) {
           <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-xs text-blue-700">
             Fills taxpayer name, address, tax ID, phone, and today's date only.
             All rep info and tax matters stay exactly as pre-set on your templates.
+          </div>
+
+          {/* Data preview — shows exactly what will be written into the PDF */}
+          <div className="border border-gray-200 rounded-lg px-4 py-3 text-xs space-y-1.5">
+            <div className="font-semibold text-gray-700 mb-1">Data that will be filled in:</div>
+            <div className="flex justify-between"><span className="text-gray-500">Name</span><span className={client.name ? 'text-gray-900 font-medium' : 'text-red-500'}>{client.name || 'Missing!'}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Address</span><span className={hasAddress ? 'text-gray-900 font-medium' : 'text-amber-600'}>{hasAddress ? [client.address || client.street, client.city, client.state, client.zip].filter(Boolean).join(', ') : 'Blank — not on file'}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">SSN</span><span className={hasSsn ? 'text-gray-900 font-medium' : 'text-amber-600'}>{hasSsn ? (client.ssn || client.tin) : 'Blank — not on file'}</span></div>
+            {isBiz && <div className="flex justify-between"><span className="text-gray-500">EIN</span><span className={hasEin ? 'text-gray-900 font-medium' : 'text-amber-600'}>{hasEin ? client.ein : 'Blank — not on file'}</span></div>}
+            <div className="flex justify-between"><span className="text-gray-500">Phone</span><span className={hasPhone ? 'text-gray-900 font-medium' : 'text-amber-600'}>{hasPhone ? client.phone : 'Blank — not on file'}</span></div>
           </div>
 
           {/* Form 2848 */}
