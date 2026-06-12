@@ -1,67 +1,18 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import PayrollStatCards from '../components/PayrollStatCards'
+import { hoursFromEntry, buildLineItems, currentPeriod } from '../lib/payrollUtils'
 
 const PAY_METHODS = ['Direct Deposit','Check','Cash']
 
-// Parse "4:29 PM" or "16:29" → decimal hours from midnight
-function parseTimeToMins(t) {
-  if (!t) return null
-  t = t.trim()
-  const ampm = t.match(/(\d+):(\d+)\s*(AM|PM)/i)
-  if (ampm) {
-    let h = parseInt(ampm[1]), m = parseInt(ampm[2])
-    const p = ampm[3].toUpperCase()
-    if (p==='PM' && h!==12) h += 12
-    if (p==='AM' && h===12) h = 0
-    return h*60+m
-  }
-  const plain = t.match(/^(\d+):(\d+)$/)
-  if (plain) return parseInt(plain[1])*60+parseInt(plain[2])
-  return null
-}
-function hoursFromEntry(e) {
-  if (e.hours && parseFloat(e.hours) > 0) return parseFloat(e.hours)
-  const inM = parseTimeToMins(e.inTime), outM = parseTimeToMins(e.outTime)
-  if (inM===null || outM===null) return 0
-  let diffMins = outM - inM
-  if (diffMins <= 0) diffMins += 24 * 60  // overnight shift: clock-out is next day
-  return diffMins / 60
-}
-
-function buildLineItems(employees, timeEntries, periodStart, periodEnd) {
-  return employees.map(emp => {
-    // Filter time entries for this employee within the date range
-    const empEntries = timeEntries.filter(t => {
-      if ((t.employee||'').trim().toLowerCase() !== (emp.name||'').trim().toLowerCase()) return false
-      if (!t.date) return false
-      if (periodStart && t.date < periodStart) return false
-      if (periodEnd   && t.date > periodEnd)   return false
-      return true
-    })
-    const hrs = empEntries.reduce((s,t) => s + hoursFromEntry(t), 0)
-
-    const isHourly = emp.payType === 'Hourly'
-    const rate = parseFloat(emp.hourlyRate||0)
-    const salary = parseFloat(emp.salary||0)
-    const gross = isHourly ? rate * hrs : (salary / 24) || 0
-
-    const fedTax    = gross * 0.22
-    const stateTax  = gross * 0.06
-    const ss        = gross * 0.062
-    const medicare  = gross * 0.0145
-    const totalTaxes = fedTax + stateTax + ss + medicare
-    const net = Math.max(0, gross - totalTaxes)
-
-    return {
-      name: emp.name, payType: emp.payType||'Salary', rate,
-      hours: hrs.toFixed(2),
-      gross: gross.toFixed(2), fedTax: fedTax.toFixed(2),
-      stateTax: stateTax.toFixed(2), ss: ss.toFixed(2),
-      medicare: medicare.toFixed(2), totalTaxes: totalTaxes.toFixed(2),
-      net: net.toFixed(2), payMethod: emp.paymentMethod||'Direct Deposit',
-      entryCount: empEntries.length
-    }
-  })
+// Small stat block used in Pay Stubs cards
+function Stat({ label, value, color, bold, big }) {
+  return (
+    <div style={{ textAlign:'right', minWidth:60 }}>
+      <div style={{ fontSize:9, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:2 }}>{label}</div>
+      <div style={{ fontSize: big?15:12, fontWeight: bold?800:600, color: color||'var(--tx)' }}>{value}</div>
+    </div>
+  )
 }
 
 export default function Payroll() {
@@ -82,6 +33,7 @@ export default function Payroll() {
   const [payDate,     setPayDate]     = useState('')
   const [notes,       setNotes]       = useState('')
   const [lineItems,   setLineItems]   = useState([])
+  const [activeTab,   setActiveTab]   = useState('payroll')
 
   useEffect(() => {
     load()
@@ -113,20 +65,13 @@ export default function Payroll() {
   function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''),3000) }
 
   function openNewRun() {
-    // Default: current semi-monthly period
-    const d = today
-    const isFirstHalf = d.getDate() <= 15
-    const start = new Date(d.getFullYear(), d.getMonth(), isFirstHalf ? 1 : 16)
-    const end   = new Date(d.getFullYear(), d.getMonth(), isFirstHalf ? 15 : new Date(d.getFullYear(), d.getMonth()+1,0).getDate())
-    const fmtD  = dt => dt.toISOString().slice(0,10)
-    const label = `${start.toLocaleString('default',{month:'long'})} ${start.getDate()}–${end.getDate()}, ${d.getFullYear()}`
-
+    const { start, end, label } = currentPeriod(today)
     setPeriodLabel(label)
-    setPeriodStart(fmtD(start))
-    setPeriodEnd(fmtD(end))
-    setPayDate(fmtD(new Date(end.getTime() + 2*24*60*60*1000)))
+    setPeriodStart(start)
+    setPeriodEnd(end)
+    setPayDate(new Date(new Date(end).getTime() + 2*24*60*60*1000).toISOString().slice(0,10))
     setNotes('')
-    setLineItems(buildLineItems(employees, timeEntries, fmtD(start), fmtD(end)))
+    setLineItems(buildLineItems(employees, timeEntries, start, end))
     setModal(true)
   }
 
@@ -206,6 +151,44 @@ export default function Payroll() {
 
   const empNames = employees.length>0 ? employees.map(e=>e.name) : ['Romy Cruz','Dana Richard','Yesenia Gonzalez']
 
+  // Pay Stubs tab: current-period breakdown per employee
+  const { start: curStart, end: curEnd, label: curLabel } = currentPeriod(today)
+  const stubLines = buildLineItems(employees, timeEntries, curStart, curEnd)
+
+  function printStub(l) {
+    const w = window.open('', '_blank')
+    w.document.write(`
+      <html><head><title>Pay Stub — ${l.name}</title>
+      <style>
+        body{font-family:Arial,sans-serif;padding:30px;color:#1a1a1a}
+        h1{font-size:18px;margin:0 0 4px}
+        .sub{color:#666;font-size:12px;margin-bottom:20px}
+        table{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px}
+        td,th{padding:8px 10px;border-bottom:1px solid #ddd;text-align:left}
+        th{color:#666;font-weight:600;font-size:11px;text-transform:uppercase}
+        .net{font-weight:800;font-size:16px;color:#16a34a}
+        .bad{color:#dc2626}
+      </style></head><body>
+        <h1>Tax Case Review — Pay Stub</h1>
+        <div class="sub">${l.name} · ${l.payType} · Period: ${curLabel}</div>
+        <table>
+          <tr><th>Item</th><th>Hours</th><th>Amount</th></tr>
+          <tr><td>Regular Pay</td><td>${l.regularHours}h</td><td>$${(l.payType==='Hourly' ? (parseFloat(l.regularHours)*l.rate) : (parseFloat(l.gross)-parseFloat(l.otHours)*l.rate*1.5)).toFixed(2)}</td></tr>
+          <tr><td>Overtime Pay (1.5x)</td><td>${l.otHours}h</td><td>$${(parseFloat(l.otHours)*l.rate*1.5).toFixed(2)}</td></tr>
+          <tr><td><strong>Gross Pay</strong></td><td>${l.hours}h</td><td><strong>$${parseFloat(l.gross).toLocaleString()}</strong></td></tr>
+          <tr><td>Federal Tax</td><td></td><td class="bad">-$${l.fedTax}</td></tr>
+          <tr><td>State Tax</td><td></td><td class="bad">-$${l.stateTax}</td></tr>
+          <tr><td>Social Security</td><td></td><td class="bad">-$${l.ss}</td></tr>
+          <tr><td>Medicare</td><td></td><td class="bad">-$${l.medicare}</td></tr>
+          <tr><td colspan="2" class="net">Net Pay</td><td class="net">$${parseFloat(l.net).toLocaleString()}</td></tr>
+        </table>
+        <p style="margin-top:30px;font-size:11px;color:#999">Payment Method: ${l.payMethod}</p>
+      </body></html>
+    `)
+    w.document.close()
+    w.print()
+  }
+
   return (
     <div>
       {toast && <div className="toast show">{toast}</div>}
@@ -228,7 +211,23 @@ export default function Payroll() {
         </button>
       </div>
 
-      {/* Stats */}
+      <PayrollStatCards employees={employees} timeEntries={timeEntries} />
+
+      {/* Tab Bar */}
+      <div style={{ display:'flex', gap:4, marginBottom:16, borderBottom:'1px solid var(--br)' }}>
+        {[['payroll','Payroll'],['stubs','Pay Stubs']].map(([k,l]) => (
+          <button key={k} onClick={()=>setActiveTab(k)}
+            style={{ padding:'10px 18px', border:'none', borderBottom: activeTab===k?'2px solid var(--blue)':'2px solid transparent',
+              background:'none', cursor:'pointer', fontSize:13, fontWeight:activeTab===k?700:500,
+              color:activeTab===k?'var(--blue)':'var(--t2)' }}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {activeTab==='payroll' && (<>
+
+      {/* Run totals at a glance */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:8, marginBottom:14 }}>
         {[
           ['Total Net Paid', '$'+Math.round(totalNet).toLocaleString(), 'var(--ok)'],
@@ -343,6 +342,47 @@ export default function Payroll() {
           </table>
         )}
       </div>
+      </>)}
+
+      {/* ── Pay Stubs Tab ─────────────────────────────────────── */}
+      {activeTab==='stubs' && (<>
+        <div style={{ fontSize:12, color:'var(--t3)', marginBottom:12 }}>
+          Showing current pay period: <strong style={{color:'var(--tx)'}}>{currentPeriod().label}</strong>
+        </div>
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          {stubLines.map(l => {
+            const initials = l.name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase()
+            return (
+              <div key={l.name} className="card" style={{ padding:'14px 16px', display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' }}>
+                <div style={{ width:38, height:38, borderRadius:'50%', background:'var(--ok)', color:'#fff',
+                  display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:13, flexShrink:0 }}>
+                  {initials}
+                </div>
+                <div style={{ minWidth:160 }}>
+                  <div style={{ fontWeight:700, fontSize:14 }}>{l.name}</div>
+                  <div style={{ display:'flex', gap:6, alignItems:'center', marginTop:3 }}>
+                    <span className="bdg bn" style={{ fontSize:9 }}>{l.payType}</span>
+                    <span style={{ fontSize:11, color:'var(--t3)' }}>{l.payType==='Hourly' ? `$${l.rate}/hr` : 'Salary'}</span>
+                  </div>
+                </div>
+                <div style={{ display:'flex', gap:22, flex:1, flexWrap:'wrap', justifyContent:'flex-end', alignItems:'center' }}>
+                  <Stat label="Regular" value={l.regularHours+'h'} />
+                  <Stat label="Overtime" value={l.otHours+'h'} color={parseFloat(l.otHours)>0?'var(--warn)':'var(--t3)'} />
+                  <Stat label="Gross Pay" value={'$'+parseFloat(l.gross).toLocaleString()} color="#8b5cf6" bold />
+                  <Stat label="Fed Tax" value={'-$'+l.fedTax} color="var(--bad)" />
+                  <Stat label="SS" value={'-$'+l.ss} color="var(--bad)" />
+                  <Stat label="Medicare" value={'-$'+l.medicare} color="var(--bad)" />
+                  <Stat label="Net Pay" value={'$'+parseFloat(l.net).toLocaleString()} color="var(--ok)" bold big />
+                  <button className="btn sec" style={{ fontSize:11, padding:'6px 14px' }} onClick={()=>printStub(l)}>🖨️ Stub</button>
+                </div>
+              </div>
+            )
+          })}
+          {stubLines.length===0 && (
+            <div className="card" style={{ padding:24, textAlign:'center', color:'var(--t3)', fontSize:13 }}>No employees yet.</div>
+          )}
+        </div>
+      </>)}
 
       {/* New Run Modal */}
       {modal && (
