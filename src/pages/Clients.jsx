@@ -766,6 +766,9 @@ export default function Clients() {
               {key:'docs',     label:'📁 Docs'},
               {key:'notes',    label:'📝 Notes'},
               {key:'payments', label:'💳 Payments'},
+              {key:'tasks',    label:'✅ Tasks'},
+              {key:'cases',    label:'📁 Cases'},
+              {key:'invoices', label:'🧾 Invoices'},
             ].map(t=>(
               <button key={t.key} onClick={()=>setDetailTab(t.key)}
                 style={{padding:'10px 16px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
@@ -872,6 +875,104 @@ export default function Clients() {
               )}
             </div>
           )}
+
+          {/* Tasks Tab */}
+          {detailTab==='tasks'&&(
+            <div style={{padding:16}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                <div style={{fontSize:12,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>
+                  ✅ Tasks ({relTasks.length})
+                </div>
+              </div>
+              {loadingRel&&<div style={{color:'var(--t3)',fontSize:12}}>Loading…</div>}
+              {!loadingRel&&relTasks.length===0&&(
+                <div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No tasks yet for this client.</div>
+              )}
+              {relTasks.map(t=>(
+                <div key={t.id} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'8px 0',borderBottom:'1px solid var(--br)'}}>
+                  <div
+                    onClick={()=>toggleTask(t)}
+                    style={{width:18,height:18,borderRadius:4,border:'1.5px solid var(--b2c)',background:t.done?'var(--ok)':'var(--s2)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,marginTop:1,color:'#fff',fontSize:11}}
+                  >{t.done?'✓':''}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:t.done?400:600,textDecoration:t.done?'line-through':'none',color:t.done?'var(--t3)':'var(--tx)'}}>{t.title}</div>
+                    <div style={{fontSize:10,color:'var(--t3)',marginTop:2,display:'flex',gap:8}}>
+                      {t.priority&&<span className={`bdg ${t.priority==='High'?'br':t.priority==='Low'?'bn':'ba'}`} style={{fontSize:9}}>{t.priority}</span>}
+                      {t.dueDate&&<span>Due: {t.dueDate}</span>}
+                      {t.assignedTo&&<span>→ {t.assignedTo}</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {/* Quick add task */}
+              <div style={{display:'flex',gap:6,marginTop:12}}>
+                <input
+                  value={quickTask}
+                  onChange={e=>setQuickTask(e.target.value)}
+                  onKeyDown={e=>e.key==='Enter'&&addQuickTask()}
+                  placeholder="Add a task…"
+                  style={{flex:1,padding:'8px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12}}
+                />
+                <button className="btn pri" style={{fontSize:11,padding:'7px 14px'}} onClick={addQuickTask} disabled={addingTask}>
+                  {addingTask?'…':'+ Add'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Cases Tab */}
+          {detailTab==='cases'&&(
+            <div style={{padding:16}}>
+              <div style={{fontSize:12,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:12}}>
+                📁 Cases ({relCases.length})
+              </div>
+              {loadingRel&&<div style={{color:'var(--t3)',fontSize:12}}>Loading…</div>}
+              {!loadingRel&&relCases.length===0&&(
+                <div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No cases linked to this client.</div>
+              )}
+              {relCases.map(cas=>(
+                <div key={cas.id} style={{borderBottom:'1px solid var(--br)',padding:'10px 0'}}>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+                    <div>
+                      <div style={{fontWeight:600,fontSize:13}}>{cas.caseType||'Case'}</div>
+                      <div style={{fontSize:11,color:'var(--t3)',marginTop:2}}>
+                        {cas.irsBalance&&<span>Balance: {formatBalance(cas.irsBalance)} · </span>}
+                        {cas.assignedTo&&<span>Rep: {cas.assignedTo}</span>}
+                      </div>
+                    </div>
+                    <span className={`bdg ${cas.status==='Open'?'bb':cas.status==='Closed'?'bg':'bn'}`}>{cas.status||'Open'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Invoices Tab */}
+          {detailTab==='invoices'&&(
+            <div style={{padding:16}}>
+              <div style={{fontSize:12,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:12}}>
+                🧾 Invoices ({relInvoices.length})
+              </div>
+              {loadingRel&&<div style={{color:'var(--t3)',fontSize:12}}>Loading…</div>}
+              {!loadingRel&&relInvoices.length===0&&(
+                <div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No invoices for this client.</div>
+              )}
+              {relInvoices.map(inv=>(
+                <div key={inv.id} style={{borderBottom:'1px solid var(--br)',padding:'10px 0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <div>
+                    <div style={{fontWeight:600,fontSize:13}}>{inv.caseNum?`#${inv.caseNum} · `:''}{inv.lineItems||'Invoice'}</div>
+                    <div style={{fontSize:11,color:'var(--t3)',marginTop:2}}>
+                      {inv.dueDate&&<span>Due: {inv.dueDate}</span>}
+                    </div>
+                  </div>
+                  <div style={{textAlign:'right'}}>
+                    <div style={{fontWeight:700,fontSize:13}}>{inv.total?'$'+Number(inv.total).toLocaleString():'—'}</div>
+                    <span className={`bdg ${inv.status==='Paid'?'bg':inv.status==='Overdue'?'br':'bn'}`}>{inv.status||'Unpaid'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,alignItems:'start'}}>
@@ -934,96 +1035,6 @@ export default function Clients() {
               <DR label="Tax Years"    val={c.taxYears}/>
               <DR label="Assigned Rep" val={c.assignedTo}/>
               <DR label="Client Since" val={c.clientSince}/>
-            </div>
-
-            {/* Cases */}
-            <div className="card">
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-                <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>📁 Cases ({relCases.length})</div>
-              </div>
-              {loadingRel&&<div style={{color:'var(--t3)',fontSize:12}}>Loading…</div>}
-              {!loadingRel&&relCases.length===0&&(
-                <div style={{color:'var(--t3)',fontSize:12}}>No cases linked to this client.</div>
-              )}
-              {relCases.map(cas=>(
-                <div key={cas.id} style={{borderBottom:'1px solid var(--br)',padding:'8px 0'}}>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
-                    <div>
-                      <div style={{fontWeight:600,fontSize:13}}>{cas.caseType||'Case'}</div>
-                      <div style={{fontSize:11,color:'var(--t3)',marginTop:2}}>
-                        {cas.irsBalance&&<span>Balance: {formatBalance(cas.irsBalance)} · </span>}
-                        {cas.assignedTo&&<span>Rep: {cas.assignedTo}</span>}
-                      </div>
-                    </div>
-                    <span className={`bdg ${cas.status==='Open'?'bb':cas.status==='Closed'?'bg':'bn'}`}>{cas.status||'Open'}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Invoices */}
-            <div className="card">
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-                <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>🧾 Invoices ({relInvoices.length})</div>
-              </div>
-              {loadingRel&&<div style={{color:'var(--t3)',fontSize:12}}>Loading…</div>}
-              {!loadingRel&&relInvoices.length===0&&(
-                <div style={{color:'var(--t3)',fontSize:12}}>No invoices for this client.</div>
-              )}
-              {relInvoices.map(inv=>(
-                <div key={inv.id} style={{borderBottom:'1px solid var(--br)',padding:'8px 0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                  <div>
-                    <div style={{fontWeight:600,fontSize:13}}>{inv.caseNum?`#${inv.caseNum} · `:''}{inv.lineItems||'Invoice'}</div>
-                    <div style={{fontSize:11,color:'var(--t3)',marginTop:2}}>
-                      {inv.dueDate&&<span>Due: {inv.dueDate}</span>}
-                    </div>
-                  </div>
-                  <div style={{textAlign:'right'}}>
-                    <div style={{fontWeight:700,fontSize:13}}>{inv.total?'$'+Number(inv.total).toLocaleString():'—'}</div>
-                    <span className={`bdg ${inv.status==='Paid'?'bg':inv.status==='Overdue'?'br':'bn'}`}>{inv.status||'Unpaid'}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Tasks */}
-            <div className="card">
-              <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>
-                ✅ Tasks ({relTasks.length})
-              </div>
-              {loadingRel&&<div style={{color:'var(--t3)',fontSize:12}}>Loading…</div>}
-              {!loadingRel&&relTasks.length===0&&(
-                <div style={{color:'var(--t3)',fontSize:12,marginBottom:10}}>No tasks yet for this client.</div>
-              )}
-              {relTasks.map(t=>(
-                <div key={t.id} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'6px 0',borderBottom:'1px solid var(--br)'}}>
-                  <div
-                    onClick={()=>toggleTask(t)}
-                    style={{width:18,height:18,borderRadius:4,border:'1.5px solid var(--b2c)',background:t.done?'var(--ok)':'var(--s2)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,marginTop:1,color:'#fff',fontSize:11}}
-                  >{t.done?'✓':''}</div>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:13,fontWeight:t.done?400:600,textDecoration:t.done?'line-through':'none',color:t.done?'var(--t3)':'var(--tx)'}}>{t.title}</div>
-                    <div style={{fontSize:10,color:'var(--t3)',marginTop:2,display:'flex',gap:8}}>
-                      {t.priority&&<span className={`bdg ${t.priority==='High'?'br':t.priority==='Low'?'bn':'ba'}`} style={{fontSize:9}}>{t.priority}</span>}
-                      {t.dueDate&&<span>Due: {t.dueDate}</span>}
-                      {t.assignedTo&&<span>→ {t.assignedTo}</span>}
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {/* Quick add task */}
-              <div style={{display:'flex',gap:6,marginTop:10}}>
-                <input
-                  value={quickTask}
-                  onChange={e=>setQuickTask(e.target.value)}
-                  onKeyDown={e=>e.key==='Enter'&&addQuickTask()}
-                  placeholder="Add a task…"
-                  style={{flex:1,padding:'6px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12}}
-                />
-                <button className="btn pri" style={{fontSize:11,padding:'5px 10px'}} onClick={addQuickTask} disabled={addingTask}>
-                  {addingTask?'…':'+'}
-                </button>
-              </div>
             </div>
 
           </div>

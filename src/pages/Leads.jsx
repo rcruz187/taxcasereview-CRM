@@ -45,6 +45,7 @@ const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL'
 
 const BLANK = {
   clientType:'Individual', name:'', first:'', mi:'', last:'', phone:'', email:'',
+  ssn:'', dob:'',
   street:'', city:'', state:'', zip:'', county:'', source:'Referral',
   irsBalance:'', issueType:'OIC', irsOrState:'IRS Federal', taxYears:[],
   taxYearsCustom:'', notes:'', assignedTo:'', status:'New Lead', taxFee:'', taxFeeOverride:''
@@ -262,6 +263,7 @@ export default function Leads() {
       name: l.name, clientType: l.clientType || 'Individual',
       first: l.first, mi: l.mi, last: l.last,
       phone: l.phone, email: l.email,
+      ssn: l.ssn, dob: l.dob,
       street: l.street, city: l.city, state: l.state, zip: l.zip, county: l.county,
       source: l.source, assignedTo: l.assignedTo,
       irsBalance: l.irsBalance, issueType: l.issueType, irsOrState: l.irsOrState,
@@ -315,6 +317,10 @@ export default function Leads() {
             <div className="fg2">
               <div className="field"><label>Phone</label><input value={form.phone} onChange={e=>fld('phone',e.target.value)} placeholder="(305) 555-0000"/></div>
               <div className="field"><label>Email</label><input value={form.email} onChange={e=>fld('email',e.target.value)}/></div>
+            </div>
+            <div className="fg2">
+              <div className="field"><label>SSN</label><input value={form.ssn} onChange={e=>fld('ssn',e.target.value)} placeholder="XXX-XX-XXXX" maxLength={11}/></div>
+              <div className="field"><label>Date of Birth</label><input type="date" value={form.dob} onChange={e=>fld('dob',e.target.value)}/></div>
             </div>
             <div className="field"><label>Street Address</label><input value={form.street} onChange={e=>fld('street',e.target.value)}/></div>
             <div className="fg3">
@@ -568,7 +574,7 @@ export default function Leads() {
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
           <div className="card">
             <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>Contact Info</div>
-            {[['Phone',l.phone],['Email',l.email],['Address',[l.street,l.city,l.state,l.zip].filter(Boolean).join(', ')],['County',l.county],['Source',l.source]].map(([label,val])=>(
+            {[['Phone',l.phone],['Email',l.email],['SSN',l.ssn?'***-**-'+l.ssn.replace(/-/g,'').slice(-4):null],['Date of Birth',l.dob],['Address',[l.street,l.city,l.state,l.zip].filter(Boolean).join(', ')],['County',l.county],['Source',l.source]].map(([label,val])=>(
               <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">{val||'—'}</span></div>
             ))}
           </div>
