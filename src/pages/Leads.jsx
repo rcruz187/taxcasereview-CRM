@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import { useFirm } from '../lib/useFirm'
-import { generateClientPackage, generateAddendum, generatePOACoverLetter } from '../lib/docUtils'
+import { generateClientPackage, generateAddendum, generatePOACoverLetter, sendFullPackage } from '../lib/docUtils'
 import BookingWidget from '../components/BookingWidget'
 import IRSFormFiller from '../components/IRSFormFiller'
 import ErrorBoundary from '../components/ErrorBoundary'
@@ -167,6 +167,7 @@ export default function Leads() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast]   = useState('')
   const [converting, setConverting] = useState(false)
+  const [pkgSending, setPkgSending] = useState(false)
   const [inlineFaxLead, setInlineFaxLead] = useState(null)
   const [showFaxModal, setShowFaxModal] = useState(false)
   const [inlineEsignLead, setInlineEsignLead] = useState(null)
@@ -253,6 +254,15 @@ export default function Leads() {
   async function updateStatus(id, status) {
     await supabase.from('leads').update({ status }).eq('id', id)
     showToast('Status updated!'); load()
+  }
+
+  async function handleSendFullPackage(l) {
+    setPkgSending(true)
+    const res = await sendFullPackage({...l, address:l.street, business_name:l.entityName}, supabase)
+    setPkgSending(false)
+    if (res.error) { showToast('Error: '+res.error); return }
+    await navigator.clipboard.writeText(res.url).catch(()=>{})
+    showToast('✅ Full package created — signing link copied to clipboard!')
   }
 
   async function convertToClient(l) {
@@ -544,7 +554,7 @@ export default function Leads() {
         <div className="card" style={{marginBottom:12}}>
           <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Quick Actions</div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-            <ActionBtn color="#16a34a" icon="📦" label="Full Package" sub="All Docs at Once" onClick={()=>generateClientPackage(l)}/>
+            <ActionBtn color="#16a34a" icon="📦" label={pkgSending?'Building…':'Full Package'} sub="2848/8821 + Agreement" onClick={()=>!pkgSending&&handleSendFullPackage(l)}/>
             <ActionBtn color="#22863a" icon="📄" label="Tax Engagement" sub="Service Agreement" onClick={()=>generateClientPackage(l)}/>
             <ActionBtn color="#0369a1" icon="🖋️" label="Pre-Fill 8821/2848" sub="IRS PDF Forms" onClick={()=>{
               try {

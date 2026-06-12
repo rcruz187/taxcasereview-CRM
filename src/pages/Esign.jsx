@@ -418,6 +418,7 @@ export default function Esign() {
                   {item.status==='Awaiting'&&daysSince>0&&<span style={{color:daysSince>7?'var(--bad)':'var(--warn)'}}>⏱ {daysSince}d pending</span>}
                   {item.signed_at&&<span style={{color:'var(--ok)'}}>✓ Signed {new Date(item.signed_at).toLocaleDateString()}</span>}
                   {item.signer_ip&&<span>IP: {item.signer_ip}</span>}
+                  {Array.isArray(item.pdf_attachments)&&item.pdf_attachments.length>0&&<span>📎 {item.pdf_attachments.length} IRS form{item.pdf_attachments.length>1?'s':''}</span>}
                 </div>
 
                 {isSigned && item.signed_name && (

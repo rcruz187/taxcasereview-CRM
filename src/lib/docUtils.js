@@ -1,4 +1,5 @@
 // ─── Shared document utilities — Tax Case Review CRM ─────────────────────────
+import { getPackageFormTypes, FORM_LABELS, FORM_USES_EIN, fillForm } from './irsFormUtils'
 
 const LOGO_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo'
 
@@ -851,3 +852,92 @@ export function generateClientPackage(c = null) {
     ${sigBlock('Client Signature', 'Authorized Representative — Tax Case Review')}
   `)
 }
+
+// ─── Full Package — Investigation Agreement + IRS Authorization Forms ────────
+// Builds a plain-text version of the engagement agreement (for the e-sign
+// "message" field), pre-fills the appropriate 2848/8821 PDFs based on the
+// client's clientType, uploads them to storage, and creates a single e-sign
+// package record the client can review and sign in one place.
+
+export function getAgreementMessageText(c = null) {
+  const fee  = c?.taxFee ? `$${Number(c.taxFee).toLocaleString()}` : (c?.investigationFee ? `$${c.investigationFee}` : '$___________')
+  const name = c ? (c.name || '') : 'Valued Client'
+  const rep  = c?.assignedTo || 'Tax Case Review'
+  const years= (() => { try { return JSON.parse(c?.taxYears||'[]').join(', ') } catch { return c?.taxYears || '' } })()
+  const issue= c?.issueType || 'tax resolution matter'
+
+  return `TAX INVESTIGATION SERVICE AGREEMENT & ENGAGEMENT LETTER
+
+Dear ${name},
+
+Thank you for choosing Tax Case Review. This document serves as your Tax Investigation Service Agreement and Engagement Letter confirming our engagement to assist you with your ${issue} matter${years ? ` for tax year(s) ${years}` : ''}.
+
+1. SCOPE OF SERVICES
+- Review of IRS and/or state tax transcripts
+- Identification of outstanding tax liabilities and unfiled returns
+- Evaluation of eligibility for IRS resolution programs (OIC, CNC, IA, Penalty Abatement)
+- Preparation of a written resolution strategy within 21 business days
+- Full IRS/state representation — Case Rep: ${rep}
+
+2. AUTHORIZATION
+By signing below, you authorize Tax Case Review to obtain IRS transcripts via Form 2848/8821 and represent you before the IRS and/or applicable state tax authority. The Form 2848 (Power of Attorney) and Form 8821 (Tax Information Authorization) included with this package are part of this authorization — please review and sign each.
+
+3. INVESTIGATION FEE
+Investigation Fee: ${fee}
+Non-refundable once transcript review has commenced. Full payment due prior to commencement.
+
+4. CLIENT RESPONSIBILITIES
+- Provide accurate and complete financial and tax information
+- Respond to document requests within 5 business days
+- Notify us immediately of any IRS notices, levies, or contacts
+
+5. NO GUARANTEE OF OUTCOME
+Tax Case Review makes no guarantee as to any specific outcome. Acceptance into any IRS program is solely at the discretion of the IRS.
+
+6. NOT A LAW FIRM
+Tax Case Review is a tax resolution consulting firm and is not a law firm. All representation is performed by Enrolled Agents and/or licensed tax professionals.
+
+By typing/drawing your signature below, you electronically sign this Service Agreement AND each IRS authorization form included in this package.`
+}
+
+// Builds the pre-filled 2848/8821 PDFs for a client (based on clientType),
+// uploads them to Supabase storage, and creates a single "Full Package"
+// e-sign record. Returns { id, url, error }.
+export async function sendFullPackage(client, supabase) {
+  const clientType = client?.clientType || 'Individual'
+  const formTypes = getPackageFormTypes(clientType)
+  const safeName = (client?.name || 'client').replace(/[^a-zA-Z0-9]+/g, '-')
+
+  const pdfAttachments = []
+  for (const formType of formTypes) {
+    try {
+      const bytes = await fillForm(formType, client, FORM_USES_EIN[formType])
+      const path = `docs/${safeName}/package/${formType}.pdf`
+      const { error: upErr } = await supabase.storage.from('documents')
+        .upload(path, new Blob([bytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
+      if (upErr) throw upErr
+      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+      pdfAttachments.push({ formType, label: FORM_LABELS[formType], url: urlData.publicUrl })
+    } catch (e) {
+      return { error: `Failed to build ${FORM_LABELS[formType] || formType}: ${e.message}` }
+    }
+  }
+
+  const { data, error } = await supabase.from('esigns').insert([{
+    doc_type: 'Full Investigation Package',
+    client_name: client?.name || '',
+    client_email: client?.email || '',
+    message: getAgreementMessageText(client),
+    pdf_attachments: pdfAttachments,
+    priority: 'Normal',
+    status: 'Awaiting',
+    sent_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+  }]).select().single()
+
+  if (error) return { error: error.message }
+
+  const url = `${window.location.origin}/taxcasereview-CRM/#/sign/${data.id}`
+  return { id: data.id, url, pdfAttachments }
+}
+

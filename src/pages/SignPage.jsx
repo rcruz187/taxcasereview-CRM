@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { PDFDocument, StandardFonts } from 'pdf-lib'
+import { SIGNATURE_POSITIONS } from '../lib/irsFormUtils'
 
 export default function SignPage() {
   const { id } = useParams()
@@ -112,6 +114,56 @@ export default function SignPage() {
       created_at: signedAt,
     }]).catch(() => {})
 
+    // Stamp signature onto each pre-filled IRS PDF attached to this package
+    const pdfAttachments = Array.isArray(doc.pdf_attachments) ? doc.pdf_attachments : []
+    const signatureText = (mode === 'type' ? typedSig.trim() : fullname.trim())
+    const safeName = (doc.client_name || 'client').replace(/[^a-zA-Z0-9]+/g, '-')
+    const signedAttachments = []
+
+    for (const att of pdfAttachments) {
+      try {
+        const bytes = await fetch(att.url).then(r => r.arrayBuffer())
+        const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true })
+        const pos = SIGNATURE_POSITIONS[att.formType]
+        if (pos) {
+          const pages = pdfDoc.getPages()
+          const page = pages[pos.page] || pages[0]
+          if (mode === 'draw' && sigImage) {
+            const pngImage = await pdfDoc.embedPng(sigImage)
+            const h = 26
+            const w = (pngImage.width / pngImage.height) * h
+            page.drawImage(pngImage, { x: pos.sigX, y: pos.sigY - 4, width: w, height: h })
+          } else {
+            const sigFont = await pdfDoc.embedFont(StandardFonts.HelveticaOblique)
+            page.drawText(signatureText, { x: pos.sigX, y: pos.sigY, size: pos.size, font: sigFont })
+          }
+          const dateFont = await pdfDoc.embedFont(StandardFonts.Helvetica)
+          page.drawText(signedDate, { x: pos.dateX, y: pos.dateY, size: (pos.size || 12) - 2, font: dateFont })
+        }
+        const signedBytes = await pdfDoc.save()
+        const path = `docs/${safeName}/signed/${att.formType}_signed.pdf`
+        await supabase.storage.from('documents')
+          .upload(path, new Blob([signedBytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
+        const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+        signedAttachments.push({ formType: att.formType, label: att.label, url: urlData.publicUrl })
+        await supabase.from('documents').insert([{
+          client:     doc.client_name,
+          name:       'SIGNED — ' + att.label,
+          docType:    'E-Signature',
+          file_url:   urlData.publicUrl,
+          file_name:  `${att.formType}_signed.pdf`,
+          notes:      `Signed by: ${fullname}\nIP: ${ip}\nDate: ${signedAt}`,
+          created_at: signedAt,
+        }]).catch(() => {})
+      } catch (e) {
+        console.error('Failed to stamp', att.formType, e)
+      }
+    }
+
+    if (signedAttachments.length) {
+      await supabase.from('esigns').update({ signed_attachments: signedAttachments }).eq('id', id).catch(() => {})
+    }
+
     setDone(true); setSigning(false)
   }
 
@@ -152,6 +204,16 @@ export default function SignPage() {
             Client: {doc?.client_name}<br/>
             Signed: {doc?.signed_at ? new Date(doc.signed_at).toLocaleString() : new Date().toLocaleString()}
           </div>
+          {Array.isArray(doc?.signed_attachments) && doc.signed_attachments.length > 0 && (
+            <div style={{ marginTop:16, textAlign:'left' }}>
+              <div style={{ fontSize:12, fontWeight:700, color:'#0f172a', marginBottom:8 }}>Signed Forms</div>
+              {doc.signed_attachments.map(att => (
+                <div key={att.formType} style={{ marginBottom:6 }}>
+                  <a href={att.url} target="_blank" rel="noreferrer" style={{ fontSize:13, color:'#2563eb', textDecoration:'underline' }}>{att.label} (PDF)</a>
+                </div>
+              ))}
+            </div>
+          )}
           <div style={{ marginTop:16, fontSize:11, color:'#94a3b8' }}>You may close this window.</div>
         </div>
       </div>
@@ -171,6 +233,22 @@ export default function SignPage() {
 
         {/* Document message */}
         <div style={styles.docBody}>{doc.message || 'Please review and sign this document.'}</div>
+
+        {/* Attached IRS forms (pre-filled, signature pending) */}
+        {Array.isArray(doc.pdf_attachments) && doc.pdf_attachments.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={styles.label}>Included IRS Forms</div>
+            <div style={{ fontSize:12, color:'#64748b', marginBottom:10, lineHeight:1.6 }}>
+              Please review the form(s) below. Your signature and today's date will be added to each one in the signature line when you sign below.
+            </div>
+            {doc.pdf_attachments.map(att => (
+              <div key={att.formType} style={{ marginBottom: 14 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'#0f172a', marginBottom:6 }}>{att.label}</div>
+                <iframe src={att.url} title={att.label} style={{ width:'100%', height:380, border:'1px solid #e2e8f0', borderRadius:8 }}/>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Full legal name */}
         <div style={styles.field}>

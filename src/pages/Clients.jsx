@@ -4,7 +4,7 @@ import IRSFormFiller from '../components/IRSFormFiller'
 import ErrorBoundary from '../components/ErrorBoundary'
 import BookingWidget from '../components/BookingWidget'
 import { supabase } from '../lib/supabase'
-import { generateServiceAgreement, generateAddendum, generateEngagementLetter, generatePOACoverLetter } from '../lib/docUtils'
+import { generateServiceAgreement, generateAddendum, generateEngagementLetter, generatePOACoverLetter, sendFullPackage } from '../lib/docUtils'
 
 const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -442,6 +442,7 @@ export default function Clients() {
   const [loadingRel,  setLoadingRel]  = useState(false)
   const [detailTab,   setDetailTab]   = useState('overview')
   const [fillerClient, setFillerClient] = useState(null)
+  const [pkgSending, setPkgSending] = useState(false)
   const [bookingClient, setBookingClient] = useState(null)
   // Quick add task inline
   const [quickTask,   setQuickTask]   = useState('')
@@ -537,6 +538,15 @@ export default function Clients() {
     setConfirmDel(null)
     await supabase.from('clients').delete().eq('id',id)
     showToast('Deleted');setDetail(null);load()
+  }
+
+  async function handleSendFullPackage(c) {
+    setPkgSending(true)
+    const res = await sendFullPackage({...c, address:c.street, business_name:c.entityName}, supabase)
+    setPkgSending(false)
+    if (res.error) { showToast('Error: '+res.error); return }
+    await navigator.clipboard.writeText(res.url).catch(()=>{})
+    showToast('✅ Full package created — signing link copied to clipboard!')
   }
 
   async function toggleTask(task) {
@@ -734,6 +744,7 @@ export default function Clients() {
         <div className="card" style={{marginBottom:12}}>
           <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Quick Actions</div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            <ActionBtn color="#16a34a" icon="📦" label={pkgSending?'Building…':'Full Package'} sub="2848/8821 + Agreement" onClick={()=>!pkgSending&&handleSendFullPackage(c)}/>
             <ActionBtn color="#22863a" icon="📄" label="Service Agreement" sub="Print/Sign" onClick={()=>generateServiceAgreement(c)}/>
             <ActionBtn color="#1A7FD4" icon="✉️" label="Engagement Letter" sub="Print" onClick={()=>generateEngagementLetter(c)}/>
             <ActionBtn color="#d97706" icon="📋" label="Addendum" sub="Add Services" onClick={()=>{setAddForm({resolutionFee:'',paymentPlan:'',startDate:'',notes:''});setAddModal(true)}}/>
