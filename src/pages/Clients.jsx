@@ -1030,7 +1030,7 @@ export default function Clients() {
         )}
 
         {bookingClient && (
-          <BookingWidget contact={{name:bookingClient.name, email:bookingClient.email, phone:bookingClient.phone}} onClose={()=>setBookingClient(null)}/>
+          <BookingWidget contact={{name:bookingClient.name, email:bookingClient.email, phone:bookingClient.phone}} onClose={()=>setBookingClient(null)} mode="client"/>
         )}
 
         {/* ── Add Task Modal ── */}
