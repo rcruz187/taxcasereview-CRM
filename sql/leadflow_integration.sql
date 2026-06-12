@@ -155,7 +155,7 @@ BEGIN
     title, "clientName", "assignedTo", date, time, "endTime", "eventType",
     color, notes, recurring, status, created_at
   ) VALUES (
-    'Tax Investigation Consultation — ' || p_client_name,
+    'Tax Investigation Consultation - ' || p_client_name,
     p_client_name, p_assigned_to, p_date, p_time, p_end_time, p_event_type,
     'bb', p_notes, 'none', 'scheduled', now()
   ) RETURNING id INTO v_id;

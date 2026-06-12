@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
+import { isSoundEnabled, setSoundEnabled, playSound } from '../../lib/notifySound'
 
 const PAGE_TITLES = {
   '/':            'Dashboard',  '/calendar':    'Calendar',
@@ -40,6 +41,7 @@ export default function TopBar({ onNew }) {
   const { searchQ, setSearchQ } = useApp()
   const [clock, setClock] = useState('')
   const [open, setOpen] = useState(false)
+  const [soundOn, setSoundOnState] = useState(isSoundEnabled())
   const panelRef = useRef(null)
   const btnRef   = useRef(null)
 
@@ -83,6 +85,18 @@ export default function TopBar({ onNew }) {
         value={searchQ}
         onChange={e => setSearchQ(e.target.value)}
       />
+      <button
+        onClick={() => {
+          const next = !soundOn
+          setSoundOnState(next)
+          setSoundEnabled(next)
+          if (next) playSound('message')
+        }}
+        title={soundOn ? 'Notification sounds on (click to mute)' : 'Notification sounds muted (click to unmute)'}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: soundOn ? 'var(--t2)' : 'var(--t3)', padding: '0 4px', lineHeight: 1 }}
+      >
+        {soundOn ? '🔔' : '🔇'}
+      </button>
       <span className="topbar-clock">{clock}</span>
 
       {/* Jobber-style + New button */}

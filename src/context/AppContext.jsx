@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { playSound } from '../lib/notifySound'
 
 const AppContext = createContext(null)
 
@@ -119,6 +120,40 @@ export function AppProvider({ children }) {
     })
     return () => listener.subscription.unsubscribe()
   }, [])
+
+  // Global notification sounds — chat messages, leads/appointments via API,
+  // new emails, huddle invites, and incoming calls. Active whenever logged in.
+  useEffect(() => {
+    if (!user) return
+    const myName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'You'
+
+    const chCh = supabase.channel('global-chat-notify')
+    chCh.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, ({ new: msg }) => {
+      if (msg.huddle_id && msg.sender === '🔔 System') {
+        playSound('huddle')
+      } else if (msg.sender === '🔔 System') {
+        playSound('lead') // new lead / appointment / payment notifications from LeadFlow etc.
+      } else if (msg.sender !== myName) {
+        playSound('message')
+      }
+    }).subscribe()
+
+    const emailCh = supabase.channel('global-email-notify')
+    emailCh.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'emails' }, ({ new: row }) => {
+      if ((row.triage || 'Inbox') === 'Inbox' && row.status !== 'Sent') playSound('email')
+    }).subscribe()
+
+    const callCh = supabase.channel('global-call-notify')
+    callCh.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'calllog' }, ({ new: row }) => {
+      if (row.direction === 'Inbound' || row.direction === 'inbound') playSound('call')
+    }).subscribe()
+
+    return () => {
+      supabase.removeChannel(chCh)
+      supabase.removeChannel(emailCh)
+      supabase.removeChannel(callCh)
+    }
+  }, [user])
 
   async function loadRole(email) {
     if (!email) return
