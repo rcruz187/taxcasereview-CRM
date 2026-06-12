@@ -495,8 +495,8 @@ export default function Leads() {
       {/* Add/Edit Modal */}
       {modal && (
         <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setModal(false)}>
-          <div className="modal" style={{width:showScript&&modal!=='edit'?1080:640,maxWidth:'98vw',display:'flex',flexDirection:'row',gap:0,padding:0,overflow:'hidden'}}>
-            <div style={{flex:1,minWidth:0,padding:'0',display:'flex',flexDirection:'column'}}>
+          <div className="modal" style={{width:showScript&&modal!=='edit'?1080:640,maxWidth:'98vw',maxHeight:'90vh',display:'flex',flexDirection:'row',gap:0,padding:0,overflow:'hidden'}}>
+            <div style={{flex:1,minWidth:0,padding:20,display:'flex',flexDirection:'column',overflowY:'auto',maxHeight:'90vh'}}>
             <div className="mh" style={{display:'flex',alignItems:'center',gap:8}}>
               <span className="mt">{modal==='edit'?'Edit Lead':'Add Lead'}</span>
               {modal!=='edit'&&(
