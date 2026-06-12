@@ -22,8 +22,10 @@ function parseTimeToMins(t) {
 function hoursFromEntry(e) {
   if (e.hours && parseFloat(e.hours) > 0) return parseFloat(e.hours)
   const inM = parseTimeToMins(e.inTime), outM = parseTimeToMins(e.outTime)
-  if (inM!==null && outM!==null && outM>inM) return (outM-inM)/60
-  return 0
+  if (inM===null || outM===null) return 0
+  let diffMins = outM - inM
+  if (diffMins <= 0) diffMins += 24 * 60  // overnight shift: clock-out is next day
+  return diffMins / 60
 }
 
 function buildLineItems(employees, timeEntries, periodStart, periodEnd) {
