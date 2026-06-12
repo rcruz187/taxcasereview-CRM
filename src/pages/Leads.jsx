@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext'
 import { useFirm } from '../lib/useFirm'
 import { generateClientPackage, generateAddendum, generatePOACoverLetter, generateForm8821Personal, generateForm8821Business, generateForm2848Personal, generateForm2848Business } from '../lib/docUtils'
 import BookingWidget from '../components/BookingWidget'
+import IRSFormFiller from '../components/IRSFormFiller'
 
 const STATUSES = ['New Lead','Contacted','Consultation Scheduled','Consultation Completed',
   'Tax Inv Agreement Sent','Tax Inv Agreement Signed','Tax Inv Fee Paid',
@@ -153,6 +154,7 @@ export default function Leads() {
   const [modal, setModal]   = useState(false)
   const [showScript, setShowScript] = useState(false)
   const [bookingLead, setBookingLead] = useState(null)
+  const [fillerLead, setFillerLead] = useState(null)
   const [detail, setDetail] = useState(null)
   const [leadNotes, setLeadNotes]     = useState([])
   const [newLeadNote, setNewLeadNote] = useState('')
@@ -351,6 +353,7 @@ export default function Leads() {
             {(l.clientType === 'Business'||l.clientType === 'Both') && <ActionBtn color="#0369a1" icon="📋" label="8821 Business" sub="Tax Info Auth" onClick={()=>generateForm8821Business(l)}/>}
             {l.clientType !== 'Business' && <ActionBtn color="#7c3aed" icon="🔏" label="2848 Personal" sub="Power of Attorney" onClick={()=>generateForm2848Personal(l)}/>}
             {(l.clientType === 'Business'||l.clientType === 'Both') && <ActionBtn color="#7c3aed" icon="🔏" label="2848 Business" sub="Power of Attorney" onClick={()=>generateForm2848Business(l)}/>}
+            <ActionBtn color="#0369a1" icon="🖋️" label="Pre-Fill 8821/2848" sub="IRS PDF Forms" onClick={()=>setFillerLead({...l, address:l.street, business_name:l.entityName})}/>
             <ActionBtn color="#0891b2" icon="📅" label="Schedule" sub="Book Appointment" onClick={()=>setBookingLead(l)}/>
             <ActionBtn color="#d97706" icon="📝" label="Addendum" sub="After IRS facts" onClick={()=>generateAddendum(l)}/>
 
@@ -688,6 +691,9 @@ export default function Leads() {
 
       {bookingLead && (
         <BookingWidget contact={{name:bookingLead.name, email:bookingLead.email, phone:bookingLead.phone}} onClose={()=>setBookingLead(null)}/>
+      )}
+      {fillerLead && (
+        <IRSFormFiller client={fillerLead} onClose={()=>setFillerLead(null)}/>
       )}
     </div>
   )
