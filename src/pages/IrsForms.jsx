@@ -251,7 +251,8 @@ export default function IrsForms() {
   }
 
   async function loadClients() {
-    const { data } = await supabase.from('clients').select('id, name, business_name, address, city, state, zip, phone, ssn, ein, tin').order('name')
+    const { data, error } = await supabase.from('clients').select('id, name, entityName, street, city, state, zip, phone, ssn, ein').order('name')
+    if (error) { console.error('loadClients error:', error.message); return }
     if (data) setClients(data)
   }
 
@@ -339,7 +340,7 @@ export default function IrsForms() {
             <option value="">— Select a client —</option>
             {clients.map(c => (
               <option key={c.id} value={c.id}>
-                {c.business_name || c.name}
+                {c.entityName || c.name}
               </option>
             ))}
           </select>
@@ -348,7 +349,7 @@ export default function IrsForms() {
             disabled={!selectedClientId}
             onClick={() => {
               const c = clients.find(x => x.id === selectedClientId)
-              if (c) setFillerClient(c)
+              if (c) setFillerClient({...c, address:c.street, business_name:c.entityName})
             }}
             style={{ padding: '8px 18px', opacity: selectedClientId ? 1 : 0.45 }}
           >
