@@ -1,23 +1,26 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-// cfoservicesnow.com booking widget — embedded in our own Tax Case Review modal chrome.
+// cfoservicesnow.com booking widget — used for NEW LEAD intake only.
 const BOOKING_URL = 'https://link.cfoservicesnow.com/widget/booking/EKuBby9X6CzBZpDVN6Mu'
 
-export default function BookingWidget({ contact, onClose }) {
+const EVENT_TYPES = ['Consultation Call','Tax Investigation Review','Case Discussion','Document Signing','Follow-Up Call','In-Person Meeting','Other']
+
+// mode: 'client' = internal-only scheduler (no external widget, no irrelevant questions)
+//       'lead'   = external cfoservicesnow intake widget + manual confirm fallback
+export default function BookingWidget({ contact, onClose, mode = 'lead' }) {
   const [copied, setCopied] = useState(false)
   const [saving, setSaving] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
-
-  // Confirmation form (shown after clicking "Booked — Add to Calendar")
   const [confirmOpen, setConfirmOpen] = useState(false)
+
   const today = new Date().toISOString().slice(0,10)
   const [form, setForm] = useState({
-    date: today, time: '', eventType: 'Consultation Call', notes: '',
+    date: today, time: '', eventType: mode === 'client' ? 'Case Discussion' : 'Consultation Call', notes: '',
   })
   function fld(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
-  // Pre-fill the booking widget with the lead/client's info via query params
+  // For lead mode: pre-fill the external widget with the lead's info via query params
   const params = new URLSearchParams()
   if (contact?.name)  params.set('name', contact.name)
   if (contact?.email) params.set('email', contact.email)
@@ -34,32 +37,80 @@ export default function BookingWidget({ contact, onClose }) {
     if (!form.date || !form.time) return
     setSaving(true)
     const title = `${contact?.name || 'Appointment'} - ${form.eventType}`
-    const { data, error } = await supabase.from('calevents').insert([{
+    const { error } = await supabase.from('calevents').insert([{
       title, clientName: contact?.name || '', date: form.date, time: form.time,
       eventType: form.eventType, color: 'bb', status: 'scheduled',
-      notes: form.notes, source: 'booking_widget',
+      notes: form.notes, source: mode === 'client' ? 'internal' : 'booking_widget',
       created_at: new Date().toISOString(),
-    }]).select().single()
+    }])
     setSaving(false)
     if (error) { alert('Error saving: ' + error.message); return }
 
     // Team notification
     await supabase.from('chat_messages').insert([{
       channel: 'general', sender: '🔔 System',
-      text: `📅 New appointment booked online: **${contact?.name || 'Client'}** on ${form.date} at ${form.time}${form.eventType ? ` (${form.eventType})` : ''}.`,
+      text: `📅 New appointment scheduled: **${contact?.name || 'Client'}** on ${form.date} at ${form.time}${form.eventType ? ` (${form.eventType})` : ''}.`,
       created_at: new Date().toISOString()
     }])
 
     setConfirmed(true)
-    setTimeout(() => { setConfirmed(false); setConfirmOpen(false) }, 2000)
+    setTimeout(() => { setConfirmed(false); onClose() }, 1500)
   }
 
+  // ── Internal scheduler (clients) — no external widget, no irrelevant questions ──
+  if (mode === 'client') {
+    return (
+      <div className="modal-bg open" onClick={e => e.target === e.currentTarget && onClose()}>
+        <div className="modal" style={{ width: 480 }}>
+          <div className="mh">
+            <span className="mt">📅 Schedule Appointment — Tax Case Review</span>
+            <button className="xbtn" onClick={onClose}>&times;</button>
+          </div>
+          {contact?.name && (
+            <div style={{ fontSize: 13, color: 'var(--t2)', marginBottom: 14 }}>for <strong>{contact.name}</strong></div>
+          )}
+          {confirmed ? (
+            <div style={{ textAlign: 'center', color: 'var(--ok)', fontWeight: 700, fontSize: 14, padding: '20px 0' }}>
+              ✅ Appointment scheduled & team notified!
+            </div>
+          ) : (
+            <>
+              <div className="fg2">
+                <div className="field"><label>Date</label>
+                  <input type="date" value={form.date} onChange={e => fld('date', e.target.value)} />
+                </div>
+                <div className="field"><label>Time</label>
+                  <input type="time" value={form.time} onChange={e => fld('time', e.target.value)} />
+                </div>
+              </div>
+              <div className="field" style={{ marginBottom: 12 }}>
+                <label>Appointment Type</label>
+                <select value={form.eventType} onChange={e => fld('eventType', e.target.value)}>
+                  {EVENT_TYPES.map(o => <option key={o}>{o}</option>)}
+                </select>
+              </div>
+              <div className="field" style={{ marginBottom: 14 }}>
+                <label>Notes (optional)</label>
+                <textarea rows={3} value={form.notes} onChange={e => fld('notes', e.target.value)} placeholder="What will be discussed on this call..." />
+              </div>
+              <button className="btn pri" style={{ width: '100%', justifyContent: 'center', padding: 10 }}
+                onClick={confirmBooking} disabled={saving || !form.date || !form.time}>
+                {saving ? 'Saving…' : '✅ Schedule & Notify Team'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // ── External widget (leads) — new prospect intake via cfoservicesnow ──
   return (
     <div className="modal-bg open" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal" style={{ width: 720, maxWidth: '96vw', height: '85vh', maxHeight: '85vh', padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <div className="mh" style={{ padding: '14px 18px', borderBottom: '1px solid var(--br)' }}>
           <div>
-            <span className="mt">📅 Schedule Appointment — Tax Case Review</span>
+            <span className="mt">📅 Schedule Appointment</span>
             {contact?.name && (
               <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>for {contact.name}</div>
             )}
@@ -73,7 +124,7 @@ export default function BookingWidget({ contact, onClose }) {
         </div>
         <iframe
           src={src}
-          title="Tax Case Review — Schedule Appointment"
+          title="Schedule Appointment"
           style={{ flex: 1, width: '100%', border: 'none', background: '#fff' }}
         />
 
@@ -109,7 +160,7 @@ export default function BookingWidget({ contact, onClose }) {
                   <div className="field" style={{ margin: 0 }}>
                     <label>Type</label>
                     <select value={form.eventType} onChange={e => fld('eventType', e.target.value)}>
-                      {['Consultation Call','Tax Investigation Review','Document Signing','Follow-Up Call','In-Person Meeting','Other'].map(o => <option key={o}>{o}</option>)}
+                      {EVENT_TYPES.map(o => <option key={o}>{o}</option>)}
                     </select>
                   </div>
                 </div>
