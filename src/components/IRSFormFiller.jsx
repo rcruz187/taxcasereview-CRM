@@ -192,128 +192,76 @@ export default function IRSFormFiller({ client, onClose }) {
     }
   };
 
-  const btnClass = (key) =>
-    `flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all border ${
-      loading === key
-        ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-        : 'bg-white text-gray-700 border-gray-300 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700'
-    }`;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+    <div className="modal-bg open" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ width: 460, maxHeight: '90vh', padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="mh" style={{ padding: '14px 18px', borderBottom: '1px solid var(--br)', flexShrink: 0 }}>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">IRS Form Pre-Fill</h2>
-            <p className="text-sm text-gray-500 mt-0.5">{clientName}</p>
+            <span className="mt">IRS Form Pre-Fill</span>
+            <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{clientName}</div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-xl font-light w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100"
-          >
-            ×
-          </button>
+          <button className="xbtn" onClick={onClose}>&times;</button>
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5 space-y-5">
+        <div style={{ padding: '16px 18px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
+            <div style={{ background: 'rgba(192,32,47,.12)', border: '1px solid var(--bad)', color: 'var(--bad)', fontSize: 12, borderRadius: 8, padding: '10px 12px' }}>
               {error}
             </div>
           )}
 
           {/* Info pill */}
-          <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-xs text-blue-700">
+          <div style={{ background: 'var(--blt)', border: '1px solid var(--blue)', color: 'var(--b2)', fontSize: 12, borderRadius: 8, padding: '10px 12px', lineHeight: 1.5 }}>
             Fills taxpayer name, address, tax ID, phone, and today's date only.
             All rep info and tax matters stay exactly as pre-set on your templates.
           </div>
 
           {/* Data preview — shows exactly what will be written into the PDF */}
-          <div className="border border-gray-200 rounded-lg px-4 py-3 text-xs space-y-1.5">
-            <div className="font-semibold text-gray-700 mb-1">Data that will be filled in:</div>
-            <div className="flex justify-between"><span className="text-gray-500">Name</span><span className={client.name ? 'text-gray-900 font-medium' : 'text-red-500'}>{client.name || 'Missing!'}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Address</span><span className={hasAddress ? 'text-gray-900 font-medium' : 'text-amber-600'}>{hasAddress ? [client.address || client.street, client.city, client.state, client.zip].filter(Boolean).join(', ') : 'Blank — not on file'}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">SSN</span><span className={hasSsn ? 'text-gray-900 font-medium' : 'text-amber-600'}>{hasSsn ? (client.ssn || client.tin) : 'Blank — not on file'}</span></div>
-            {isBiz && <div className="flex justify-between"><span className="text-gray-500">EIN</span><span className={hasEin ? 'text-gray-900 font-medium' : 'text-amber-600'}>{hasEin ? client.ein : 'Blank — not on file'}</span></div>}
-            <div className="flex justify-between"><span className="text-gray-500">Phone</span><span className={hasPhone ? 'text-gray-900 font-medium' : 'text-amber-600'}>{hasPhone ? client.phone : 'Blank — not on file'}</span></div>
+          <div style={{ border: '1px solid var(--br)', borderRadius: 8, padding: '10px 12px', fontSize: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ fontWeight: 700, color: 'var(--t2)', marginBottom: 2 }}>Data that will be filled in:</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--t3)' }}>Name</span><span style={{ color: client.name ? 'var(--tx)' : 'var(--bad)', fontWeight: 600, textAlign: 'right' }}>{client.name || 'Missing!'}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--t3)' }}>Address</span><span style={{ color: hasAddress ? 'var(--tx)' : 'var(--warn)', fontWeight: 600, textAlign: 'right' }}>{hasAddress ? [client.address || client.street, client.city, client.state, client.zip].filter(Boolean).join(', ') : 'Blank — not on file'}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--t3)' }}>SSN</span><span style={{ color: hasSsn ? 'var(--tx)' : 'var(--warn)', fontWeight: 600, textAlign: 'right' }}>{hasSsn ? (client.ssn || client.tin) : 'Blank — not on file'}</span></div>
+            {isBiz && <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--t3)' }}>EIN</span><span style={{ color: hasEin ? 'var(--tx)' : 'var(--warn)', fontWeight: 600, textAlign: 'right' }}>{hasEin ? client.ein : 'Blank — not on file'}</span></div>}
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--t3)' }}>Phone</span><span style={{ color: hasPhone ? 'var(--tx)' : 'var(--warn)', fontWeight: 600, textAlign: 'right' }}>{hasPhone ? client.phone : 'Blank — not on file'}</span></div>
           </div>
 
           {/* Form 2848 */}
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>
               Form 2848 — Power of Attorney
-            </p>
-            <div className="space-y-2">
-              {(
-                <button
-                  className={btnClass('2848_personal')}
-                  disabled={!!loading}
-                  onClick={() => handleFill('2848_personal', false)}
-                >
-                  {loading === '2848_personal' ? (
-                    <span className="animate-spin">⏳</span>
-                  ) : (
-                    <span>📄</span>
-                  )}
-                  Personal (SSN) — 2848
-                </button>
-              )}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button className="btn sec" disabled={!!loading} onClick={() => handleFill('2848_personal', false)} style={{ justifyContent: 'flex-start', padding: '10px 14px' }}>
+                {loading === '2848_personal' ? '⏳' : '📄'}&nbsp; Personal (SSN) — 2848
+              </button>
               {isBiz && (
-                <button
-                  className={btnClass('2848_business_ein')}
-                  disabled={!!loading}
-                  onClick={() => handleFill('2848_business', true)}
-                >
-                  {loading === '2848_business_ein' ? (
-                    <span className="animate-spin">⏳</span>
-                  ) : (
-                    <span>🏢</span>
-                  )}
-                  Business (EIN) — 2848
+                <button className="btn sec" disabled={!!loading} onClick={() => handleFill('2848_business', true)} style={{ justifyContent: 'flex-start', padding: '10px 14px' }}>
+                  {loading === '2848_business_ein' ? '⏳' : '🏢'}&nbsp; Business (EIN) — 2848
                 </button>
               )}
               {!hasSsn && (
-                <p className="text-xs text-amber-600 bg-amber-50 rounded px-3 py-2">
+                <div style={{ fontSize: 11, color: 'var(--warn)', background: 'rgba(212,147,10,.15)', borderRadius: 6, padding: '8px 10px' }}>
                   No SSN on file yet — the SSN field will be left blank for the client to fill in.
-                </p>
+                </div>
               )}
             </div>
           </div>
 
           {/* Form 8821 */}
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>
               Form 8821 — Tax Information Authorization
-            </p>
-            <div className="space-y-2">
-              {(
-                <button
-                  className={btnClass('8821_personal')}
-                  disabled={!!loading}
-                  onClick={() => handleFill('8821_personal', false)}
-                >
-                  {loading === '8821_personal' ? (
-                    <span className="animate-spin">⏳</span>
-                  ) : (
-                    <span>📄</span>
-                  )}
-                  Personal (SSN) — 8821
-                </button>
-              )}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button className="btn sec" disabled={!!loading} onClick={() => handleFill('8821_personal', false)} style={{ justifyContent: 'flex-start', padding: '10px 14px' }}>
+                {loading === '8821_personal' ? '⏳' : '📄'}&nbsp; Personal (SSN) — 8821
+              </button>
               {isBiz && (
-                <button
-                  className={btnClass('8821_business_ein')}
-                  disabled={!!loading}
-                  onClick={() => handleFill('8821_business', true)}
-                >
-                  {loading === '8821_business_ein' ? (
-                    <span className="animate-spin">⏳</span>
-                  ) : (
-                    <span>🏢</span>
-                  )}
-                  Business (EIN) — 8821
+                <button className="btn sec" disabled={!!loading} onClick={() => handleFill('8821_business', true)} style={{ justifyContent: 'flex-start', padding: '10px 14px' }}>
+                  {loading === '8821_business_ein' ? '⏳' : '🏢'}&nbsp; Business (EIN) — 8821
                 </button>
               )}
             </div>
@@ -321,13 +269,8 @@ export default function IRSFormFiller({ client, onClose }) {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 font-medium"
-          >
-            Close
-          </button>
+        <div style={{ padding: '12px 18px', borderTop: '1px solid var(--br)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+          <button className="btn" onClick={onClose}>Close</button>
         </div>
       </div>
     </div>
