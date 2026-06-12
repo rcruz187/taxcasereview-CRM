@@ -171,6 +171,9 @@ export default function IRSFormFiller({ client, onClose }) {
   const clientName = client.business_name || client.name || 'Client';
   const hasEin = !!(client.ein);
   const hasSsn = !!(client.ssn || client.tin);
+  const isBiz  = hasEin || !!client.business_name || client.clientType === 'Business' || client.clientType === 'Individual & Biz';
+  // Always allow generating Personal forms even if SSN isn't on file yet (e.g. for leads) —
+  // the field will just be left blank for the client to fill in by hand.
 
   const handleFill = async (formType, useEin = false) => {
     setLoading(formType + (useEin ? '_ein' : ''));
@@ -231,7 +234,7 @@ export default function IRSFormFiller({ client, onClose }) {
               Form 2848 — Power of Attorney
             </p>
             <div className="space-y-2">
-              {hasSsn && (
+              {(
                 <button
                   className={btnClass('2848_personal')}
                   disabled={!!loading}
@@ -245,7 +248,7 @@ export default function IRSFormFiller({ client, onClose }) {
                   Personal (SSN) — 2848
                 </button>
               )}
-              {(hasEin || client.business_name) && (
+              {isBiz && (
                 <button
                   className={btnClass('2848_business_ein')}
                   disabled={!!loading}
@@ -259,9 +262,9 @@ export default function IRSFormFiller({ client, onClose }) {
                   Business (EIN) — 2848
                 </button>
               )}
-              {!hasSsn && !hasEin && (
+              {!hasSsn && (
                 <p className="text-xs text-amber-600 bg-amber-50 rounded px-3 py-2">
-                  No SSN or EIN on record — add tax ID to client profile first.
+                  No SSN on file yet — the SSN field will be left blank for the client to fill in.
                 </p>
               )}
             </div>
@@ -273,7 +276,7 @@ export default function IRSFormFiller({ client, onClose }) {
               Form 8821 — Tax Information Authorization
             </p>
             <div className="space-y-2">
-              {hasSsn && (
+              {(
                 <button
                   className={btnClass('8821_personal')}
                   disabled={!!loading}
@@ -287,7 +290,7 @@ export default function IRSFormFiller({ client, onClose }) {
                   Personal (SSN) — 8821
                 </button>
               )}
-              {(hasEin || client.business_name) && (
+              {isBiz && (
                 <button
                   className={btnClass('8821_business_ein')}
                   disabled={!!loading}
