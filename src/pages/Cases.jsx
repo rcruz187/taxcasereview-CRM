@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 
 const STATUSES = ['Open','Pending IRS','Active Plan','Docs Needed','POA Sent','Under Review','Resolved','Completed','Closed']
 const STATUS_C = {'Open':'bb','Pending IRS':'ba','Active Plan':'bg','Docs Needed':'ba','POA Sent':'bb','Under Review':'bn','Resolved':'bg','Completed':'bg','Closed':'bn'}
-const CASE_TYPES = ['OIC','Installment Agreement','CNC','Penalty Abatement','Appeals','Payroll Tax','Audit','Liens/Levies','Unfiled Returns','Tax Investigation','Other']
+const CASE_TYPES = ['OIC','Installment Agreement','CNC','Penalty Abatement','Lien Withdrawal','TFRP','Appeals','Payroll Tax','Audit','Liens/Levies','Unfiled Returns','Tax Investigation','Other']
 
 const BLANK = { clientName:'', caseType:'OIC', irsBalance:'', status:'Open', assignedTo:'', deadline:'', taxYears:'', resolutionAmount:'', notes:'' }
 
@@ -294,7 +294,7 @@ function CaseModal({form,fld,reps,saving,onSave,onClose,title,sug,searchClient,p
         <div className="fg2">
           <div className="field"><label>Case Type</label>
             <select value={form.caseType} onChange={e=>fld('caseType',e.target.value)}>
-              {['OIC','Installment Agreement','CNC','Penalty Abatement','Appeals','Payroll Tax','Audit','Liens/Levies','Unfiled Returns','Tax Investigation','Other'].map(o=><option key={o}>{o}</option>)}
+              {['OIC','Installment Agreement','CNC','Penalty Abatement','Lien Withdrawal','TFRP','Appeals','Payroll Tax','Audit','Liens/Levies','Unfiled Returns','Tax Investigation','Other'].map(o=><option key={o}>{o}</option>)}
             </select>
           </div>
           <div className="field"><label>Status</label>

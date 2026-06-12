@@ -1364,7 +1364,7 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
           <div className="field"><label>Est. IRS Balance</label><input type="text" value={form.irsBalance||''} onChange={e=>fld('irsBalance',e.target.value)} placeholder="e.g. 45000 or $30,000 - $50,000"/></div>
           <div className="field"><label>Issue Type</label>
             <select value={form.issueType||'OIC'} onChange={e=>fld('issueType',e.target.value)}>
-              {['OIC','Installment Agreement','CNC','Penalty Abatement','Payroll Tax','Unfiled Returns','Appeals','Audit','Liens/Levies','Tax Investigation','ACS','Notice Status','Other'].map(o=><option key={o}>{o}</option>)}
+              {['OIC','Installment Agreement','CNC','Penalty Abatement','Lien Withdrawal','TFRP','Payroll Tax','Unfiled Returns','Appeals','Audit','Liens/Levies','Tax Investigation','ACS','Notice Status','Other'].map(o=><option key={o}>{o}</option>)}
             </select>
           </div>
         </div>
