@@ -23,7 +23,9 @@ function parseTimeToMins(t) {
 function calcHours(inT, outT) {
   const inM = parseTimeToMins(inT), outM = parseTimeToMins(outT)
   if (inM === null || outM === null) return ''
-  const diff = (outM - inM) / 60
+  let diffMins = outM - inM
+  if (diffMins <= 0) diffMins += 24 * 60  // overnight shift: clock-out is next day
+  const diff = diffMins / 60
   return diff > 0 ? diff.toFixed(2) : ''
 }
 
@@ -123,6 +125,15 @@ export default function TimeClock() {
       return n
     })
     showToast(`✅ ${empName.split(' ')[0]} clocked out — ${hours}h logged`)
+    load()
+  }
+
+  async function recalcHours(entry) {
+    const hrs = calcHours(entry.inTime, entry.outTime)
+    if (!hrs) { showToast('Cannot calculate — missing in/out time'); return }
+    const { error } = await supabase.from('timeentries').update({ hours: parseFloat(hrs) }).eq('id', entry.id)
+    if (error) { showToast('Error: ' + error.message); return }
+    showToast(`✅ Recalculated: ${hrs}h`)
     load()
   }
 
@@ -297,6 +308,9 @@ export default function TimeClock() {
                   <td style={{ padding:'9px 12px', color:'var(--t2)', fontSize:11, maxWidth:140, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.notes||'—'}</td>
                   <td style={{ padding:'9px 12px' }}>
                     <div style={{ display:'flex', gap:5 }}>
+                      {e.inTime && e.outTime && !e.hours && (
+                        <button className="btn sec" style={{ fontSize:10, padding:'3px 8px', color:'var(--warn)' }} onClick={() => recalcHours(e)} title="Recalculate hours (handles overnight shifts)">↻ Recalc</button>
+                      )}
                       <button className="btn sec" style={{ fontSize:10, padding:'3px 8px' }} onClick={() => { setForm({...BLANK,...e}); setEditId(e.id); setModal(true) }}>Edit</button>
                       <button className="btn del" style={{ fontSize:10, padding:'3px 8px' }} onClick={() => del(e.id)}>Del</button>
                     </div>
