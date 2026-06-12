@@ -30,7 +30,7 @@ function buildLineItems(employees, timeEntries, periodStart, periodEnd) {
   return employees.map(emp => {
     // Filter time entries for this employee within the date range
     const empEntries = timeEntries.filter(t => {
-      if (t.employee !== emp.name) return false
+      if ((t.employee||'').trim().toLowerCase() !== (emp.name||'').trim().toLowerCase()) return false
       if (!t.date) return false
       if (periodStart && t.date < periodStart) return false
       if (periodEnd   && t.date > periodEnd)   return false
@@ -89,7 +89,12 @@ export default function Payroll() {
         if (data) setTimeEntries(data)
       })
     }, 30000)
-    return () => clearInterval(interval)
+    const empInterval = setInterval(() => {
+      supabase.from('employees').select('*').order('name').then(({ data }) => {
+        if (data) setEmployees(data)
+      })
+    }, 30000)
+    return () => { clearInterval(interval); clearInterval(empInterval) }
   }, [])
 
   async function load() {
@@ -127,6 +132,13 @@ export default function Payroll() {
   function onRangeChange(start, end) {
     if (start && end) setLineItems(buildLineItems(employees, timeEntries, start, end))
   }
+
+  // Keep the open "Process Payroll" modal in sync with live TimeClock + employee data
+  useEffect(() => {
+    if (modal && periodStart && periodEnd) {
+      setLineItems(buildLineItems(employees, timeEntries, periodStart, periodEnd))
+    }
+  }, [timeEntries, employees])
 
   function updateLine(i, k, v) {
     setLineItems(lines => lines.map((l,idx) => {
@@ -200,8 +212,13 @@ export default function Payroll() {
         <div style={{display:'flex',alignItems:'center',gap:10}}>
           <h2 style={{ fontSize:15, fontWeight:700, margin:0 }}>💼 Payroll</h2>
           <button className="btn sec" style={{fontSize:11,padding:'4px 10px'}} onClick={async()=>{
-            const{data}=await supabase.from('timeentries').select('*')
-            if(data){setTimeEntries(data);showToast('✅ Synced with Time Clock')}
+            const [{data:t},{data:e}] = await Promise.all([
+              supabase.from('timeentries').select('*'),
+              supabase.from('employees').select('*').order('name'),
+            ])
+            if(t) setTimeEntries(t)
+            if(e) setEmployees(e)
+            showToast('✅ Synced with Time Clock')
           }}>⟳ Sync Time Clock</button>
         </div>
         <button className="btn pri" onClick={openNewRun} disabled={employees.length===0}>
