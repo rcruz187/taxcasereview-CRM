@@ -6,6 +6,7 @@ import { useFirm } from '../lib/useFirm'
 import { generateClientPackage, generateAddendum, generatePOACoverLetter } from '../lib/docUtils'
 import BookingWidget from '../components/BookingWidget'
 import IRSFormFiller from '../components/IRSFormFiller'
+import ErrorBoundary from '../components/ErrorBoundary'
 
 const STATUSES = ['New Lead','Contacted','Consultation Scheduled','Consultation Completed',
   'Tax Inv Agreement Sent','Tax Inv Agreement Signed','Tax Inv Fee Paid',
@@ -349,7 +350,12 @@ export default function Leads() {
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             <ActionBtn color="#16a34a" icon="📦" label="Full Package" sub="All Docs at Once" onClick={()=>generateClientPackage(l)}/>
             <ActionBtn color="#22863a" icon="📄" label="Tax Engagement" sub="Service Agreement" onClick={()=>generateClientPackage(l)}/>
-            <ActionBtn color="#0369a1" icon="🖋️" label="Pre-Fill 8821/2848" sub="IRS PDF Forms" onClick={()=>setFillerLead({...l, address:l.street, business_name:l.entityName})}/>
+            <ActionBtn color="#0369a1" icon="🖋️" label="Pre-Fill 8821/2848" sub="IRS PDF Forms" onClick={()=>{
+              try {
+                if (!l) { showToast('Error: no lead data found'); return }
+                setFillerLead({...l, address:l.street, business_name:l.entityName})
+              } catch (err) { showToast('Error opening form: ' + err.message) }
+            }}/>
             <ActionBtn color="#0891b2" icon="📅" label="Schedule" sub="Book Appointment" onClick={()=>setBookingLead(l)}/>
             <ActionBtn color="#d97706" icon="📝" label="Addendum" sub="After IRS facts" onClick={()=>generateAddendum(l)}/>
 
@@ -452,7 +458,9 @@ export default function Leads() {
           <BookingWidget contact={{name:bookingLead.name, email:bookingLead.email, phone:bookingLead.phone}} onClose={()=>setBookingLead(null)} mode="lead"/>
         )}
         {fillerLead && (
-          <IRSFormFiller client={fillerLead} onClose={()=>setFillerLead(null)}/>
+          <ErrorBoundary onClose={()=>setFillerLead(null)}>
+            <IRSFormFiller client={fillerLead} onClose={()=>setFillerLead(null)}/>
+          </ErrorBoundary>
         )}
       </div>
     )
