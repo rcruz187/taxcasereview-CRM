@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import { useFirm } from '../lib/useFirm'
-import { generateClientPackage, generateAddendum, generatePOACoverLetter, generateForm8821Personal, generateForm8821Business, generateForm2848Personal, generateForm2848Business } from '../lib/docUtils'
+import { generateClientPackage, generateAddendum, generatePOACoverLetter } from '../lib/docUtils'
 import BookingWidget from '../components/BookingWidget'
 import IRSFormFiller from '../components/IRSFormFiller'
 
@@ -347,12 +347,8 @@ export default function Leads() {
         <div className="card" style={{marginBottom:12}}>
           <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Quick Actions</div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-            <ActionBtn color="#16a34a" icon="📦" label="Full Package" sub="All Docs at Once" onClick={()=>{generateClientPackage(l);setTimeout(()=>generateForm8821Personal(l),300);setTimeout(()=>generateForm2848Personal(l),600)}}/>
+            <ActionBtn color="#16a34a" icon="📦" label="Full Package" sub="All Docs at Once" onClick={()=>generateClientPackage(l)}/>
             <ActionBtn color="#22863a" icon="📄" label="Tax Engagement" sub="Service Agreement" onClick={()=>generateClientPackage(l)}/>
-            {l.clientType !== 'Business' && <ActionBtn color="#0369a1" icon="📋" label="8821 Personal" sub="Tax Info Auth" onClick={()=>generateForm8821Personal(l)}/>}
-            {(l.clientType === 'Business'||l.clientType === 'Both') && <ActionBtn color="#0369a1" icon="📋" label="8821 Business" sub="Tax Info Auth" onClick={()=>generateForm8821Business(l)}/>}
-            {l.clientType !== 'Business' && <ActionBtn color="#7c3aed" icon="🔏" label="2848 Personal" sub="Power of Attorney" onClick={()=>generateForm2848Personal(l)}/>}
-            {(l.clientType === 'Business'||l.clientType === 'Both') && <ActionBtn color="#7c3aed" icon="🔏" label="2848 Business" sub="Power of Attorney" onClick={()=>generateForm2848Business(l)}/>}
             <ActionBtn color="#0369a1" icon="🖋️" label="Pre-Fill 8821/2848" sub="IRS PDF Forms" onClick={()=>setFillerLead({...l, address:l.street, business_name:l.entityName})}/>
             <ActionBtn color="#0891b2" icon="📅" label="Schedule" sub="Book Appointment" onClick={()=>setBookingLead(l)}/>
             <ActionBtn color="#d97706" icon="📝" label="Addendum" sub="After IRS facts" onClick={()=>generateAddendum(l)}/>
