@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import IRSFormFiller from '../components/IRSFormFiller'
+import BookingWidget from '../components/BookingWidget'
 import { supabase } from '../lib/supabase'
 import { generateServiceAgreement, generateAddendum, generateEngagementLetter, generatePOACoverLetter } from '../lib/docUtils'
 
@@ -440,6 +441,7 @@ export default function Clients() {
   const [loadingRel,  setLoadingRel]  = useState(false)
   const [detailTab,   setDetailTab]   = useState('overview')
   const [fillerClient, setFillerClient] = useState(null)
+  const [bookingClient, setBookingClient] = useState(null)
   // Quick add task inline
   const [quickTask,   setQuickTask]   = useState('')
   const [addingTask,  setAddingTask]  = useState(false)
@@ -736,6 +738,7 @@ export default function Clients() {
             <ActionBtn color="#d97706" icon="📋" label="Addendum" sub="Add Services" onClick={()=>{setAddForm({resolutionFee:'',paymentPlan:'',startDate:'',notes:''});setAddModal(true)}}/>
             <ActionBtn color="#6c5ce7" icon="🔐" label="POA Cover Letter" sub="Form 2848" onClick={()=>generatePOACoverLetter(c)}/>
             <ActionBtn color="#0369a1" icon="📋" label="Pre-Fill 8821/2848" sub="IRS PDF Forms" onClick={()=>setFillerClient({...c, address:c.street, business_name:c.entityName})}/>
+            <ActionBtn color="#0891b2" icon="📅" label="Schedule" sub="Book Appointment" onClick={()=>setBookingClient(c)}/>
             <ActionBtn color="#0891b2" icon="📁" label="New Case" sub="Open Case" onClick={()=>navigate('/cases')}/>
             <ActionBtn color="#7c3aed" icon="✅" label="Add Task" sub="Assign Work" onClick={()=>{setTaskTitle('');setTaskPriority('Normal');setTaskDueDate('');setTaskModal(true)}}/>
             <ActionBtn color="#be185d" icon="🧾" label="New Invoice" sub="Bill Client" onClick={()=>navigate('/invoices')}/>
@@ -1024,6 +1027,10 @@ export default function Clients() {
 
         {fillerClient && (
           <IRSFormFiller client={fillerClient} onClose={()=>setFillerClient(null)}/>
+        )}
+
+        {bookingClient && (
+          <BookingWidget contact={{name:bookingClient.name, email:bookingClient.email, phone:bookingClient.phone}} onClose={()=>setBookingClient(null)}/>
         )}
 
         {/* ── Add Task Modal ── */}
