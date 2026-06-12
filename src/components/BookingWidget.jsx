@@ -6,6 +6,16 @@ const BOOKING_URL = 'https://link.cfoservicesnow.com/widget/booking/EKuBby9X6CzB
 
 const EVENT_TYPES = ['Consultation Call','Tax Investigation Review','Case Discussion','Document Signing','Follow-Up Call','In-Person Meeting','Other']
 
+// Icon-paired types for the client scheduler's quick-select chips
+const CLIENT_EVENT_TYPES = [
+  { type: 'Case Discussion',          icon: '💬' },
+  { type: 'Tax Investigation Review', icon: '🔍' },
+  { type: 'Document Signing',         icon: '✍️' },
+  { type: 'Follow-Up Call',           icon: '📞' },
+  { type: 'In-Person Meeting',        icon: '🤝' },
+  { type: 'Other',                    icon: '📌' },
+]
+
 // mode: 'client' = internal-only scheduler (no external widget, no irrelevant questions)
 //       'lead'   = external cfoservicesnow intake widget + manual confirm fallback
 export default function BookingWidget({ contact, onClose, mode = 'lead' }) {
@@ -59,46 +69,89 @@ export default function BookingWidget({ contact, onClose, mode = 'lead' }) {
 
   // ── Internal scheduler (clients) — no external widget, no irrelevant questions ──
   if (mode === 'client') {
+    const initials = (contact?.name || '?').split(' ').filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase()
+    const dateLabel = form.date ? new Date(form.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) : null
+
     return (
       <div className="modal-bg open" onClick={e => e.target === e.currentTarget && onClose()}>
-        <div className="modal" style={{ width: 480 }}>
-          <div className="mh">
-            <span className="mt">📅 Schedule Appointment — Tax Case Review</span>
-            <button className="xbtn" onClick={onClose}>&times;</button>
-          </div>
-          {contact?.name && (
-            <div style={{ fontSize: 13, color: 'var(--t2)', marginBottom: 14 }}>for <strong>{contact.name}</strong></div>
-          )}
-          {confirmed ? (
-            <div style={{ textAlign: 'center', color: 'var(--ok)', fontWeight: 700, fontSize: 14, padding: '20px 0' }}>
-              ✅ Appointment scheduled & team notified!
+        <div className="modal" style={{ width: 460, padding: 0, overflow: 'hidden' }}>
+
+          {/* Header band */}
+          <div style={{ padding: '18px 20px', background: 'linear-gradient(135deg, var(--blue), var(--b2))', position: 'relative' }}>
+            <button className="xbtn" onClick={onClose} style={{ position: 'absolute', top: 12, right: 14, color: '#fff' }}>&times;</button>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.75)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10 }}>
+              Schedule Appointment
             </div>
-          ) : (
-            <>
-              <div className="fg2">
-                <div className="field"><label>Date</label>
-                  <input type="date" value={form.date} onChange={e => fld('date', e.target.value)} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'rgba(255,255,255,.18)', border: '1px solid rgba(255,255,255,.35)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 15, color: '#fff', flexShrink: 0 }}>
+                {initials}
+              </div>
+              <div>
+                <div style={{ fontSize: 17, fontWeight: 800, color: '#fff' }}>{contact?.name || 'Client'}</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,.8)' }}>Tax Case Review</div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ padding: '18px 20px' }}>
+            {confirmed ? (
+              <div style={{ textAlign: 'center', color: 'var(--ok)', fontWeight: 700, fontSize: 14, padding: '24px 0' }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+                Appointment scheduled & team notified!
+              </div>
+            ) : (
+              <>
+                {/* Appointment type chips */}
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>
+                  What's this about?
                 </div>
-                <div className="field"><label>Time</label>
-                  <input type="time" value={form.time} onChange={e => fld('time', e.target.value)} />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 18 }}>
+                  {CLIENT_EVENT_TYPES.map(({type, icon}) => (
+                    <button key={type} onClick={() => fld('eventType', type)}
+                      style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                        padding: '10px 4px', borderRadius: 10, cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                        border: form.eventType === type ? '1.5px solid var(--blue)' : '1px solid var(--br)',
+                        background: form.eventType === type ? 'var(--blt)' : 'var(--s2)',
+                        color: form.eventType === type ? 'var(--b2)' : 'var(--t2)',
+                        transition: 'all .12s',
+                      }}>
+                      <span style={{ fontSize: 18 }}>{icon}</span>
+                      <span style={{ textAlign: 'center', lineHeight: 1.2 }}>{type}</span>
+                    </button>
+                  ))}
                 </div>
-              </div>
-              <div className="field" style={{ marginBottom: 12 }}>
-                <label>Appointment Type</label>
-                <select value={form.eventType} onChange={e => fld('eventType', e.target.value)}>
-                  {EVENT_TYPES.map(o => <option key={o}>{o}</option>)}
-                </select>
-              </div>
-              <div className="field" style={{ marginBottom: 14 }}>
-                <label>Notes (optional)</label>
-                <textarea rows={3} value={form.notes} onChange={e => fld('notes', e.target.value)} placeholder="What will be discussed on this call..." />
-              </div>
-              <button className="btn pri" style={{ width: '100%', justifyContent: 'center', padding: 10 }}
-                onClick={confirmBooking} disabled={saving || !form.date || !form.time}>
-                {saving ? 'Saving…' : '✅ Schedule & Notify Team'}
-              </button>
-            </>
-          )}
+
+                {/* Date & Time */}
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>
+                  When?
+                </div>
+                <div className="fg2" style={{ marginBottom: 14 }}>
+                  <div className="field" style={{ margin: 0 }}>
+                    <label>📅 Date</label>
+                    <input type="date" value={form.date} onChange={e => fld('date', e.target.value)} />
+                    {dateLabel && <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 4 }}>{dateLabel}</div>}
+                  </div>
+                  <div className="field" style={{ margin: 0 }}>
+                    <label>🕐 Time</label>
+                    <input type="time" value={form.time} onChange={e => fld('time', e.target.value)} />
+                  </div>
+                </div>
+
+                {/* Notes */}
+                <div className="field" style={{ marginBottom: 18 }}>
+                  <label>📝 Notes <span style={{ fontWeight: 400, color: 'var(--t3)', textTransform: 'none' }}>(optional)</span></label>
+                  <textarea rows={3} value={form.notes} onChange={e => fld('notes', e.target.value)} placeholder="What will be discussed on this call..." />
+                </div>
+
+                <button className="btn pri" style={{ width: '100%', justifyContent: 'center', padding: 11, fontSize: 14, fontWeight: 700, gap: 8 }}
+                  onClick={confirmBooking} disabled={saving || !form.date || !form.time}>
+                  {saving ? 'Saving…' : <>✅ Schedule & Notify Team</>}
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     )
