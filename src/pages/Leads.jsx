@@ -449,7 +449,7 @@ export default function Leads() {
         )}
 
         {bookingLead && (
-          <BookingWidget contact={{name:bookingLead.name, email:bookingLead.email, phone:bookingLead.phone}} onClose={()=>setBookingLead(null)}/>
+          <BookingWidget contact={{name:bookingLead.name, email:bookingLead.email, phone:bookingLead.phone}} onClose={()=>setBookingLead(null)} mode="lead"/>
         )}
         {fillerLead && (
           <IRSFormFiller client={fillerLead} onClose={()=>setFillerLead(null)}/>
