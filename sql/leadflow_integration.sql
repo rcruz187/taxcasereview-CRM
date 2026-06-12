@@ -39,7 +39,7 @@ RETURNS text
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$
+AS $func$
 DECLARE
   v_id text;
 BEGIN
@@ -87,7 +87,7 @@ BEGIN
 
   RETURN v_id;
 END;
-$$;
+$func$;
 
 GRANT EXECUTE ON FUNCTION leadflow_upsert_lead(
   text, text, text, text, text, text, text, text, text, text, numeric, text
@@ -109,7 +109,7 @@ RETURNS text
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$
+AS $func$
 DECLARE
   v_id text;
 BEGIN
@@ -123,7 +123,7 @@ BEGIN
 
   RETURN v_id;
 END;
-$$;
+$func$;
 
 GRANT EXECUTE ON FUNCTION leadflow_create_case(
   text, text, text, text, text, text, text
@@ -147,7 +147,7 @@ RETURNS text
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$
+AS $func$
 DECLARE
   v_id text;
 BEGIN
@@ -172,7 +172,7 @@ BEGIN
 
   RETURN v_id;
 END;
-$$;
+$func$;
 
 GRANT EXECUTE ON FUNCTION leadflow_book_appointment(
   text, text, text, text, text, text, text
