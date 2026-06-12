@@ -72,6 +72,19 @@ BEGIN
     ) RETURNING id INTO v_id;
   END IF;
 
+  -- Notify the team in Chat — fires every time a client pays via the website
+  INSERT INTO chat_messages (channel, sender, text, created_at)
+  VALUES (
+    'general', '🔔 System',
+    '💰 New paid lead from the website: **' || p_name || '** (' || p_email || ')' ||
+      CASE WHEN p_investigation_fee_amount IS NOT NULL
+        THEN ' — paid $' || p_investigation_fee_amount
+        ELSE '' END ||
+      CASE WHEN p_issue_type IS NOT NULL THEN '. Issue: ' || p_issue_type ELSE '' END ||
+      CASE WHEN p_irs_balance IS NOT NULL THEN '. IRS balance: ' || p_irs_balance ELSE '' END || '.',
+    now()
+  );
+
   RETURN v_id;
 END;
 $$;
