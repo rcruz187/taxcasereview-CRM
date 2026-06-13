@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { sendGmailEmail } from '../lib/gmailUtils'
 
 const BLANK = { clientName:'', service:'', description:'', amount:'', depositAmount:'', validUntil:'', status:'Draft', assignedTo:'', notes:'' }
 const SERVICES = ['OIC — Offer in Compromise','Installment Agreement (IA)','Currently Not Collectible (CNC)','Penalty Abatement','Audit Representation','Lien Release / Discharge','Wage Garnishment Release','IRS Appeals Representation','Tax Return Preparation','Transcript Analysis Package','CDP Hearing','Trust Fund Recovery Defense','Innocent Spouse Relief','Business Tax Resolution','Payroll Tax Representation']
@@ -62,6 +63,21 @@ export default function Estimates() {
       showToast('✅ Estimate created!')
     }
     setSaving(false); setModal(false); setForm(BLANK); setEditId(null); load()
+  }
+
+  async function sendEstimate(est) {
+    const { data: client } = await supabase.from('clients').select('email').eq('name', est.clientName).maybeSingle()
+    const { data: lead }   = await supabase.from('leads').select('email').eq('name', est.clientName).maybeSingle()
+    const to = client?.email || lead?.email
+    if (!to) { showToast('No email on file for this client'); return }
+    const subject = `Estimate #${est.estNum||''} — Tax Case Review`
+    const body = `Dear ${est.clientName},\n\nPlease review the following estimate from Tax Case Review.\n\nEstimate #: ${est.estNum||''}\nAmount: $${parseFloat(est.amount||0).toLocaleString()}\nValid Until: ${est.validUntil||'30 days'}\n\nServices:\n${est.description||''}\n\nTo accept this estimate, please reply to this email or call our office.\n\nBest regards,\nTax Case Review`
+    try {
+      await sendGmailEmail(supabase, { to, subject, body })
+      await supabase.from('estimates').update({ status: 'Sent', updated_at: new Date().toISOString() }).eq('id', est.id)
+      showToast(`✅ Estimate sent to ${to}`)
+      load()
+    } catch (e) { showToast('Email error: ' + e.message) }
   }
 
   async function convertToInvoice(est) {
@@ -167,9 +183,10 @@ export default function Estimates() {
                     </td>
                     <td style={{padding:'9px 12px'}}>
                       <div style={{display:'flex',gap:5}}>
-                        <button className="btn sec" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>{setForm({...BLANK,...est});setEditId(est.id);setModal(true)}}>Edit</button>
-                        {est.status==='Accepted'&&<button className="btn" style={{fontSize:10,padding:'3px 8px',background:'var(--ok)',color:'#fff',border:'none',borderRadius:5,cursor:'pointer'}} onClick={()=>convertToInvoice(est)}>→ Invoice</button>}
-                        <button className="btn del" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>del(est.id)}>Del</button>
+                        <button className="btn sec" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>{setForm({...BLANK,...est});setEditId(est.id);setModal(true)}}>✏️</button>
+                        <button className="btn sec" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>sendEstimate(est)}>📧 Send</button>
+                        {est.status!=='Rejected'&&<button className="btn" style={{fontSize:10,padding:'3px 8px',background:'var(--ok)',color:'#fff',border:'none',borderRadius:5,cursor:'pointer'}} onClick={()=>convertToInvoice(est)}>→ Invoice</button>}
+                        <button className="btn del" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>del(est.id)}>🗑</button>
                       </div>
                     </td>
                   </tr>

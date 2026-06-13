@@ -35,6 +35,8 @@ const ROLE_PERM_DEFAULTS = {
 
 const blankEmp = {
   name: '', email: '', phone: '', title: '', access: 'Staff',
+  hourlyRate: '', payType: 'Hourly', paymentMethod: 'Direct Deposit',
+  hireDate: '', emergencyContact: '', emergencyPhone: '',
   ...ROLE_PERM_DEFAULTS['Staff']
 }
 
@@ -47,6 +49,7 @@ export default function Employees() {
   const [editing, setEditing]     = useState(null)
   const [form, setForm]           = useState(blankEmp)
   const [tab, setTab]             = useState('info')
+  const TABS = ['info', 'pay', 'permissions']
   const [saving, setSaving]       = useState(false)
   const [resetEmail, setResetEmail] = useState('')
   const [showReset, setShowReset]   = useState(false)
@@ -266,7 +269,7 @@ export default function Employees() {
 
             {/* Tabs */}
             <div style={{ display: 'flex', gap: 4, padding: '12px 24px 0', borderBottom: '1px solid var(--br)' }}>
-              {['info', 'permissions'].map(t => (
+              {['info', 'pay', 'permissions'].map(t => (
                 <button key={t} onClick={() => setTab(t)} style={{
                   padding: '8px 18px', borderRadius: '8px 8px 0 0',
                   border: '1px solid var(--br)', borderBottom: tab === t ? '1px solid var(--sf)' : '1px solid var(--br)',
@@ -275,12 +278,59 @@ export default function Employees() {
                   fontWeight: tab === t ? 700 : 400,
                   cursor: 'pointer', fontSize: 13, marginBottom: -1
                 }}>
-                  {t === 'info' ? '👤 Info' : '🔐 Permissions'}
+                  {t === 'info' ? '👤 Info' : t === 'pay' ? '💵 Pay & HR' : '🔐 Permissions'}
                 </button>
               ))}
             </div>
 
             <div style={{ padding: 24 }}>
+              {/* Pay & HR tab */}
+              {tab === 'pay' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                    <div className="field">
+                      <label>Pay Type</label>
+                      <select value={form.payType||'Hourly'} onChange={e => setForm(f => ({ ...f, payType: e.target.value }))}>
+                        <option>Hourly</option>
+                        <option>Salary</option>
+                        <option>1099 Contractor</option>
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label>{form.payType === 'Salary' ? 'Annual Salary ($)' : 'Hourly Rate ($/hr)'}</label>
+                      <input type="number" step="0.01" value={form.hourlyRate||''} onChange={e => setForm(f => ({ ...f, hourlyRate: e.target.value }))} placeholder={form.payType==='Salary'?'52000':'25.00'}/>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                    <div className="field">
+                      <label>Payment Method</label>
+                      <select value={form.paymentMethod||'Direct Deposit'} onChange={e => setForm(f => ({ ...f, paymentMethod: e.target.value }))}>
+                        <option>Direct Deposit</option>
+                        <option>Check</option>
+                        <option>Cash</option>
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label>Hire Date</label>
+                      <input type="date" value={form.hireDate||''} onChange={e => setForm(f => ({ ...f, hireDate: e.target.value }))}/>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                    <div className="field">
+                      <label>Emergency Contact Name</label>
+                      <input value={form.emergencyContact||''} onChange={e => setForm(f => ({ ...f, emergencyContact: e.target.value }))} placeholder="Jane Doe"/>
+                    </div>
+                    <div className="field">
+                      <label>Emergency Contact Phone</label>
+                      <input value={form.emergencyPhone||''} onChange={e => setForm(f => ({ ...f, emergencyPhone: e.target.value }))} placeholder="(305) 555-0000"/>
+                    </div>
+                  </div>
+                  <div style={{ background:'var(--s2)', border:'1px solid var(--br)', borderRadius:8, padding:'10px 14px', fontSize:12, color:'var(--t3)', lineHeight:1.6 }}>
+                    <strong style={{color:'var(--t2)'}}>ℹ️ Payroll note:</strong> Hourly Rate feeds directly into the Payroll page calculations. Overtime (1.5x) is applied automatically after 40 hours/week. 1099 contractors are exempt from federal/SS/Medicare withholding.
+                  </div>
+                </div>
+              )}
+
               {/* Info tab */}
               {tab === 'info' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { sendGmailEmail } from '../lib/gmailUtils'
 
 const TYPES    = ['OIC','Installment Agreement','CDP','CSED','Penalty Abatement','Appeals','Return Filing','IRS Notice','General']
 const STATUSES = ['Tracking','Action Required','Scheduled','Completed']
@@ -86,6 +87,38 @@ export default function Deadlines() {
     showToast('Deleted'); load()
   }
 
+  // CSED = Collection Statute Expiration Date — 10 years from assessment date by default
+  function calcCSED() {
+    const assessDate = prompt('Enter the IRS assessment date (YYYY-MM-DD):')
+    if (!assessDate) return
+    const extraDays = prompt('Any tolling days to add (bankruptcy, OIC pending, CDP appeal, etc.)? Enter 0 if none:', '0')
+    const d = new Date(assessDate + 'T00:00:00')
+    if (isNaN(d.getTime())) { showToast('Invalid date'); return }
+    d.setFullYear(d.getFullYear() + 10)
+    d.setDate(d.getDate() + (parseInt(extraDays)||0))
+    const csedDate = d.toISOString().slice(0,10)
+    fld('name', 'CSED'); fld('title', 'CSED')
+    fld('type', 'CSED')
+    fld('dueDate', csedDate)
+    fld('notes', `CSED calculated from assessment date ${assessDate}${extraDays&&extraDays!=='0' ? ` + ${extraDays} tolling days` : ''}.`)
+    showToast(`✅ CSED calculated: ${csedDate}`)
+  }
+
+  async function sendDeadlineReminder(d) {
+    const clientName = getClient(d)
+    const { data: client } = await supabase.from('clients').select('email').eq('name', clientName).maybeSingle()
+    const { data: lead }   = await supabase.from('leads').select('email').eq('name', clientName).maybeSingle()
+    const to = client?.email || lead?.email
+    if (!to) { showToast('No email on file for ' + clientName); return }
+    const dy = daysLeft(d)
+    const subject = `Reminder: ${getName(d)} — ${d.dueDate||d.due_date}`
+    const body = `Dear ${clientName},\n\nThis is a reminder regarding an upcoming deadline on your case:\n\n${getName(d)} (${d.type})\nDue: ${d.dueDate||d.due_date} (${daysText(dy)})\n\n${d.notes||''}\n\nPlease contact our office if you have any questions.\n\nBest regards,\nTax Case Review`
+    try {
+      await sendGmailEmail(supabase, { to, subject, body })
+      showToast(`✅ Reminder sent to ${to}`)
+    } catch (e) { showToast('Email error: ' + e.message) }
+  }
+
   const filtered = filter==='All' ? items : filter==='Upcoming' ? items.filter(d=>daysLeft(d)>=0&&getStatus(d)!=='Completed') : filter==='Overdue' ? items.filter(d=>daysLeft(d)<0&&getStatus(d)!=='Completed') : items.filter(d=>getStatus(d)===filter)
   const urgent   = items.filter(d=>{ const dy=daysLeft(d); return dy<=7&&getStatus(d)!=='Completed' })
 
@@ -107,7 +140,12 @@ export default function Deadlines() {
             {STATUSES.map(s=><option key={s}>{s}</option>)}
           </select>
         </td>
-        <td><button className="btn del" style={{fontSize:10,padding:'2px 7px'}} onClick={()=>deleteItem(d.id)}>Del</button></td>
+        <td>
+          <div style={{display:'flex',gap:4}}>
+            {getClient(d)!=='—'&&<button className="btn sec" style={{fontSize:10,padding:'2px 7px'}} onClick={()=>sendDeadlineReminder(d)} title="Email reminder to client">📧</button>}
+            <button className="btn del" style={{fontSize:10,padding:'2px 7px'}} onClick={()=>deleteItem(d.id)}>🗑</button>
+          </div>
+        </td>
       </tr>
     )
   }
@@ -174,9 +212,12 @@ export default function Deadlines() {
             </div>
             <div className="fg2">
               <div className="field"><label>Type</label>
-                <select value={form.type} onChange={e=>fld('type',e.target.value)}>
-                  {TYPES.map(t=><option key={t}>{t}</option>)}
-                </select>
+                <div style={{display:'flex',gap:6}}>
+                  <select value={form.type} onChange={e=>fld('type',e.target.value)} style={{flex:1}}>
+                    {TYPES.map(t=><option key={t}>{t}</option>)}
+                  </select>
+                  {form.type==='CSED'&&<button type="button" className="btn sec" style={{fontSize:11,padding:'6px 10px',whiteSpace:'nowrap'}} onClick={calcCSED}>📅 Calc</button>}
+                </div>
               </div>
               <div className="field"><label>Due Date *</label>
                 <input type="date" value={form.dueDate} onChange={e=>fld('dueDate',e.target.value)}/>

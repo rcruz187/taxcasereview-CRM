@@ -21,6 +21,9 @@ export default function Tasks() {
   const [toast,     setToast]     = useState('')
   const [view,      setView]      = useState('open') // 'open' | 'completed' | 'deleted'
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [filterPri, setFilterPri] = useState('All')
+  const [filterAssign, setFilterAssign] = useState('All')
+  const [sortBy, setSortBy] = useState('dueDate') // 'dueDate' | 'priority' | 'created'
 
   useEffect(() => {
     load()
@@ -132,8 +135,23 @@ export default function Tasks() {
   }
 
   const reps = employees.length>0 ? employees.map(e=>e.name) : ['Romy Cruz','Dana Richard','Yesenia Gonzalez']
-  const open      = tasks.filter(t=>!t.done && !t.deleted)
+  const today2 = new Date().toISOString().slice(0,10)
+  const PRIORITY_ORDER = { 'High':0, 'Normal':1, 'Low':2, '':3 }
+  const allOpen = tasks.filter(t=>!t.done && !t.deleted)
+  const open = allOpen
+    .filter(t => filterPri === 'All' || (t.priority||'Normal') === filterPri)
+    .filter(t => filterAssign === 'All' || t.assignedTo === filterAssign)
+    .sort((a,b) => {
+      if (sortBy === 'priority') return (PRIORITY_ORDER[a.priority||'']||1) - (PRIORITY_ORDER[b.priority||'']||1)
+      if (sortBy === 'dueDate') {
+        if (!a.dueDate && !b.dueDate) return 0
+        if (!a.dueDate) return 1; if (!b.dueDate) return -1
+        return a.dueDate.localeCompare(b.dueDate)
+      }
+      return (b.created_at||'').localeCompare(a.created_at||'')
+    })
   const completed = tasks.filter(t=>t.done  && !t.deleted)
+  const assignees = [...new Set(tasks.filter(t=>t.assignedTo).map(t=>t.assignedTo))].sort()
   const pc = p => p==='Urgent'?'br':p==='High'?'ba':'bn'
 
   function TaskItem({t, showRestore=false}) {
@@ -222,8 +240,32 @@ export default function Tasks() {
           {view==='open'&&(
             <div className="card">
               <div className="ch">
-                <span className="ct">Open Tasks ({open.length})</span>
+                <span className="ct">Open Tasks ({open.length}{allOpen.length !== open.length ? ` / ${allOpen.length}` : ''})</span>
                 <button className="btn pri" onClick={()=>setModal(true)}>+ Add Task</button>
+              </div>
+              {/* Filter + Sort bar */}
+              <div style={{ display:'flex', gap:6, padding:'0 16px 12px', flexWrap:'wrap', alignItems:'center' }}>
+                <select value={filterPri} onChange={e=>setFilterPri(e.target.value)}
+                  style={{ fontSize:11, padding:'4px 8px', background:'var(--s2)', border:'1px solid var(--br)', borderRadius:6, color:'var(--tx)' }}>
+                  <option value="All">All Priorities</option>
+                  {['High','Normal','Low'].map(p=><option key={p}>{p}</option>)}
+                </select>
+                {assignees.length > 0 && (
+                  <select value={filterAssign} onChange={e=>setFilterAssign(e.target.value)}
+                    style={{ fontSize:11, padding:'4px 8px', background:'var(--s2)', border:'1px solid var(--br)', borderRadius:6, color:'var(--tx)' }}>
+                    <option value="All">All Assignees</option>
+                    {assignees.map(a=><option key={a}>{a}</option>)}
+                  </select>
+                )}
+                <select value={sortBy} onChange={e=>setSortBy(e.target.value)}
+                  style={{ fontSize:11, padding:'4px 8px', background:'var(--s2)', border:'1px solid var(--br)', borderRadius:6, color:'var(--tx)' }}>
+                  <option value="dueDate">Sort: Due Date</option>
+                  <option value="priority">Sort: Priority</option>
+                  <option value="created">Sort: Newest</option>
+                </select>
+                {(filterPri!=='All'||filterAssign!=='All') && (
+                  <button className="btn sec" style={{ fontSize:10, padding:'4px 8px' }} onClick={()=>{setFilterPri('All');setFilterAssign('All')}}>✕ Clear</button>
+                )}
               </div>
               {open.length===0
                 ?<div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>🎉 No open tasks!</div>

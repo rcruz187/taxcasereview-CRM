@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { sendGmailEmail } from '../lib/gmailUtils'
 import { useApp } from '../context/AppContext'
 
 const BLANK = { clientName:'', caseNum:'', lineItems:'', total:'', paid:'0', dueDate:'', taxRate:'0', status:'Unpaid', notes:'' }
@@ -89,8 +90,47 @@ export default function Invoices() {
     setModal(true)
   }
 
-  async function markPaid(inv) {
-    const total = parseFloat(inv.total||0)
+  async function sendInvoiceEmail(inv, isReminder = false) {
+    // Look up client email
+    const { data: client } = await supabase.from('clients').select('email').eq('name', inv.clientName).maybeSingle()
+    const { data: lead }   = await supabase.from('leads').select('email').eq('name', inv.clientName).maybeSingle()
+    const to = client?.email || lead?.email
+    if (!to) { showToast('No email on file for this client'); return }
+
+    const invNum = inv.invoiceNum || inv.id?.slice(-6) || ''
+    const subject = isReminder
+      ? `Payment Reminder — Invoice #${invNum} — Tax Case Review`
+      : `Invoice #${invNum} — Tax Case Review`
+    const body = isReminder
+      ? `Dear ${inv.clientName},\n\nThis is a friendly reminder that Invoice #${invNum} for $${parseFloat(inv.total||0).toLocaleString()} is due on ${inv.dueDate||'soon'} and remains unpaid.\n\nPlease contact our office if you have any questions.\n\nBest regards,\nTax Case Review\n(305) 555-0000`
+      : `Dear ${inv.clientName},\n\nPlease find your invoice attached.\n\nInvoice #: ${invNum}\nAmount Due: $${parseFloat(inv.total||0).toLocaleString()}\nDue Date: ${inv.dueDate||'Upon receipt'}\n\n${inv.lineItems||''}\n\nPlease contact our office with any questions.\n\nBest regards,\nTax Case Review`
+
+    try {
+      await sendGmailEmail(supabase, { to, subject, body })
+      await supabase.from('invoices').update({ status: isReminder ? inv.status : 'Sent', updated_at: new Date().toISOString() }).eq('id', inv.id)
+      showToast(`✅ ${isReminder ? 'Reminder' : 'Invoice'} sent to ${to}`)
+      load()
+    } catch (e) {
+      showToast('Email error: ' + e.message)
+    }
+  }
+
+  async function recordPayment(inv) {
+    const amount = prompt(`Record payment for Invoice #${inv.invoiceNum||inv.id?.slice(-6)||''}.\nEnter amount received:`, inv.total)
+    if (!amount) return
+    const paid = parseFloat(amount)
+    const total = parseFloat(inv.total || 0)
+    const status = paid >= total ? 'Paid' : 'Partial'
+    const { error } = await supabase.from('invoices').update({ paid: String(paid), status, updated_at: new Date().toISOString() }).eq('id', inv.id)
+    if (!error) {
+      // Also create a payment record
+      await supabase.from('payments').insert([{ clientName: inv.clientName, amount: paid, method: 'Manual', invoiceId: inv.id, notes: `Payment for Invoice #${inv.invoiceNum||''}`, created_at: new Date().toISOString() }])
+      showToast(`✅ Payment of $${paid.toLocaleString()} recorded`)
+      load()
+    }
+  }
+
+  async function markPaid(inv) {    const total = parseFloat(inv.total||0)
     const {error} = await supabase.from('invoices').update({paid:String(total), status:'Paid', updated_at:new Date().toISOString()}).eq('id',inv.id)
     if (!error) { showToast('✅ Marked as Paid!'); load() }
   }
@@ -261,12 +301,15 @@ export default function Invoices() {
                     <td style={{padding:'9px 12px',fontWeight:bal>0?700:400,color:bal>0?'var(--warn)':'var(--t2)'}}>${bal.toLocaleString()}</td>
                     <td style={{padding:'9px 12px',color:isOverdue?'var(--bad)':'var(--t2)',fontWeight:isOverdue?700:400}}>{inv.dueDate||'—'}</td>
                     <td style={{padding:'9px 12px'}}><SBdg s={isOverdue&&inv.status!=='Paid'?'Overdue':inv.status||'Unpaid'}/></td>
-                    <td style={{padding:'9px 12px'}}>
-                      <div style={{display:'flex',gap:5}}>
-                        <button className="btn sec" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>openEdit(inv)}>Edit</button>
-                        {inv.status!=='Paid'&&<button className="btn" style={{fontSize:10,padding:'3px 8px',background:'var(--ok)',color:'#fff',border:'none',borderRadius:5,cursor:'pointer'}} onClick={()=>markPaid(inv)}>Paid ✓</button>}
-                        <button className="btn sec" style={{fontSize:10,padding:'3px 8px',marginRight:2}} onClick={()=>printInvoice(inv)}>🖨️</button>
-                        <button className="btn del" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>deleteItem(inv.id)}>Del</button>
+                    <td style={{padding:'9px 8px'}}>
+                      <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                        <button className="btn sec" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>openEdit(inv)}>✏️</button>
+                        {inv.status!=='Paid'&&<button className="btn" style={{fontSize:10,padding:'3px 8px',background:'var(--ok)',color:'#fff',border:'none',borderRadius:5,cursor:'pointer'}} onClick={()=>markPaid(inv)}>✓ Paid</button>}
+                        {inv.status!=='Paid'&&<button className="btn sec" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>recordPayment(inv)}>💳</button>}
+                        <button className="btn sec" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>sendInvoiceEmail(inv)}>📧</button>
+                        {isOverdue&&<button className="btn sec" style={{fontSize:10,padding:'3px 6px',color:'var(--warn)'}} onClick={()=>sendInvoiceEmail(inv,true)}>⚠️ Remind</button>}
+                        <button className="btn sec" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>printInvoice(inv)}>🖨️</button>
+                        <button className="btn del" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>deleteItem(inv.id)}>🗑</button>
                       </div>
                     </td>
                   </tr>
