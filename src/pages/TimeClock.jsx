@@ -315,7 +315,7 @@ export default function TimeClock() {
           <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
             <thead>
               <tr style={{ borderBottom:'1px solid var(--br)', background:'var(--s2)' }}>
-                {['Employee','Clock In','Clock Out','Hours','Notes','Status'].map(h=>(
+                {['Employee','Clock In','Clock Out','Hours','Notes','Status',''].map(h=>(
                   <th key={h} style={{ padding:'9px 12px', textAlign:'left', fontSize:10, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em' }}>{h}</th>
                 ))}
               </tr>
@@ -329,6 +329,15 @@ export default function TimeClock() {
                   <td style={{ padding:'9px 12px', fontWeight:700, color:'var(--b2c)' }}>{e.hours?e.hours+'h':'—'}</td>
                   <td style={{ padding:'9px 12px', color:'var(--t2)', fontSize:11 }}>{e.notes||'—'}</td>
                   <td style={{ padding:'9px 12px' }}>{e.outTime ? <span className="bdg bg">Clocked Out</span> : <span className="bdg ba">Active</span>}</td>
+                  <td style={{ padding:'9px 8px' }}>
+                    <div style={{ display:'flex', gap:5 }}>
+                      {e.inTime && e.outTime && !e.hours && (
+                        <button className="btn sec" style={{ fontSize:10, padding:'3px 8px', color:'var(--warn)' }} onClick={() => recalcHours(e)}>↻ Recalc</button>
+                      )}
+                      <button className="btn sec" style={{ fontSize:10, padding:'3px 8px' }} onClick={() => { setForm({...BLANK,...e}); setEditId(e.id); setModal(true) }}>✏️ Edit</button>
+                      <button className="btn del" style={{ fontSize:10, padding:'3px 8px' }} onClick={() => del(e.id)}>🗑</button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

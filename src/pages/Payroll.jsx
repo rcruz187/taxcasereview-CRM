@@ -35,6 +35,14 @@ export default function Payroll() {
   const [lineItems,   setLineItems]   = useState([])
   const [activeTab,   setActiveTab]   = useState('payroll')
 
+  // Edit punch modal state (so you can fix time entries right from Payroll)
+  const [editPunch,       setEditPunch]       = useState(null)
+  const [editPunchForm,   setEditPunchForm]   = useState({ employee:'', date:'', inTime:'', outTime:'', hours:'', notes:'' })
+  const [editPunchSaving, setEditPunchSaving] = useState(false)
+  const [deletePunchId,   setDeletePunchId]   = useState(null)
+  const [teSearch,        setTeSearch]        = useState('')
+  const [teFilterEmp,     setTeFilterEmp]     = useState('All')
+
   useEffect(() => {
     load()
     // Auto-sync with TimeClock every 30 seconds
@@ -63,6 +71,47 @@ export default function Payroll() {
   }
 
   function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''),3000) }
+
+  // TimeClock helpers (same logic as TimeClock.jsx)
+  function parseTimeToMinsLocal(t) {
+    if (!t) return null; t = t.trim()
+    const ampm = t.match(/(\d+):(\d+)\s*(AM|PM)/i)
+    if (ampm) { let h=parseInt(ampm[1]),m=parseInt(ampm[2]); if(ampm[3].toUpperCase()==='PM'&&h!==12)h+=12; if(ampm[3].toUpperCase()==='AM'&&h===12)h=0; return h*60+m }
+    const plain = t.match(/^(\d+):(\d+)$/); if(plain) return parseInt(plain[1])*60+parseInt(plain[2]); return null
+  }
+  function calcHoursLocal(inT, outT) {
+    const inM=parseTimeToMinsLocal(inT),outM=parseTimeToMinsLocal(outT)
+    if(inM===null||outM===null) return ''
+    let d=outM-inM; if(d<=0)d+=24*60; return (d/60).toFixed(2)
+  }
+  function fmt12Local(t) {
+    if(!t) return '—'; if(t.match(/AM|PM/i)) return t
+    const [h,m]=t.split(':').map(Number); const ap=h>=12?'PM':'AM'; const hr=h%12||12
+    return `${hr}:${String(m).padStart(2,'0')} ${ap}`
+  }
+
+  function openEditPunch(e) {
+    setEditPunch(e)
+    setEditPunchForm({ employee:e.employee||'', date:e.date||'', inTime:e.inTime||'', outTime:e.outTime||'', hours:e.hours||'', notes:e.notes||'' })
+  }
+  async function saveEditPunch() {
+    if (!editPunch) return
+    setEditPunchSaving(true)
+    const hours = calcHoursLocal(editPunchForm.inTime, editPunchForm.outTime) || (editPunchForm.hours ? parseFloat(editPunchForm.hours) : null)
+    const { error } = await supabase.from('timeentries').update({
+      employee: editPunchForm.employee, date: editPunchForm.date,
+      inTime: editPunchForm.inTime, outTime: editPunchForm.outTime,
+      hours: hours ? parseFloat(hours) : null, notes: editPunchForm.notes,
+    }).eq('id', editPunch.id)
+    setEditPunchSaving(false)
+    if (error) { showToast('Error: '+error.message); return }
+    showToast('✅ Punch updated!')
+    setEditPunch(null); load()
+  }
+  async function deleteEditPunch(id) {
+    await supabase.from('timeentries').delete().eq('id', id)
+    setDeletePunchId(null); showToast('Deleted'); load()
+  }
 
   function openNewRun() {
     const { start, end, label } = currentPeriod(today)
@@ -215,7 +264,7 @@ export default function Payroll() {
 
       {/* Tab Bar */}
       <div style={{ display:'flex', gap:4, marginBottom:16, borderBottom:'1px solid var(--br)' }}>
-        {[['payroll','Payroll'],['stubs','Pay Stubs']].map(([k,l]) => (
+        {[['payroll','Payroll'],['stubs','Pay Stubs'],['timeentries','⏱ Time Entries']].map(([k,l]) => (
           <button key={k} onClick={()=>setActiveTab(k)}
             style={{ padding:'10px 18px', border:'none', borderBottom: activeTab===k?'2px solid var(--blue)':'2px solid transparent',
               background:'none', cursor:'pointer', fontSize:13, fontWeight:activeTab===k?700:500,
@@ -348,8 +397,7 @@ export default function Payroll() {
       {activeTab==='stubs' && (<>
         <div style={{ fontSize:12, color:'var(--t3)', marginBottom:12 }}>
           Showing current pay period: <strong style={{color:'var(--tx)'}}>{currentPeriod().label}</strong>
-        </div>
-        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+        </div>        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
           {stubLines.map(l => {
             const initials = l.name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase()
             return (
@@ -383,6 +431,134 @@ export default function Payroll() {
           )}
         </div>
       </>)}
+
+      {/* ── Time Entries Tab ─────────────────────────────────────── */}
+      {activeTab==='timeentries' && (<>
+        <div style={{ display:'flex', gap:8, marginBottom:12, flexWrap:'wrap', alignItems:'center' }}>
+          <input value={teSearch} onChange={e=>setTeSearch(e.target.value)} placeholder="Search…"
+            style={{ flex:1, minWidth:140, padding:'7px 12px', background:'var(--s2)', border:'1px solid var(--br)', borderRadius:6, color:'var(--tx)', fontSize:12 }}/>
+          <select value={teFilterEmp} onChange={e=>setTeFilterEmp(e.target.value)}
+            style={{ padding:'7px 10px', background:'var(--s2)', border:'1px solid var(--br)', borderRadius:6, color:'var(--tx)', fontSize:12 }}>
+            <option value="All">All Staff</option>
+            {[...new Set(timeEntries.map(t=>t.employee).filter(Boolean))].sort().map(e=><option key={e}>{e}</option>)}
+          </select>
+          <button className="btn pri" style={{fontSize:11,padding:'6px 14px'}} onClick={()=>{ showToast('Use the Time Clock page to add new entries'); }}>+ Add Entry via Time Clock</button>
+        </div>
+        <div className="card" style={{ padding:0, overflow:'hidden' }}>
+          {timeEntries.filter(e=>{
+            const ms = teFilterEmp==='All'||e.employee===teFilterEmp
+            const ss = !teSearch || e.employee?.toLowerCase().includes(teSearch.toLowerCase()) || e.notes?.toLowerCase().includes(teSearch.toLowerCase())
+            return ms && ss
+          }).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).length === 0 ? (
+            <div style={{ padding:24, textAlign:'center', color:'var(--t3)', fontSize:13 }}>No time entries.</div>
+          ) : (
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+              <thead>
+                <tr style={{ borderBottom:'1px solid var(--br)', background:'var(--s2)' }}>
+                  {['Employee','Date','Clock In','Clock Out','Hours','Notes',''].map(h=>(
+                    <th key={h} style={{ padding:'9px 12px', textAlign:'left', fontSize:10, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {timeEntries.filter(e=>{
+                  const ms = teFilterEmp==='All'||e.employee===teFilterEmp
+                  const ss = !teSearch || e.employee?.toLowerCase().includes(teSearch.toLowerCase()) || e.notes?.toLowerCase().includes(teSearch.toLowerCase())
+                  return ms && ss
+                }).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(e=>(
+                  <tr key={e.id} style={{ borderBottom:'1px solid var(--br)' }}
+                    onMouseEnter={ev=>ev.currentTarget.style.background='var(--s2)'}
+                    onMouseLeave={ev=>ev.currentTarget.style.background=''}>
+                    <td style={{ padding:'9px 12px', fontWeight:600 }}>{e.employee}</td>
+                    <td style={{ padding:'9px 12px', color:'var(--t2)' }}>{e.date}</td>
+                    <td style={{ padding:'9px 12px', color:'var(--ok)', fontWeight:600 }}>{fmt12Local(e.inTime)}</td>
+                    <td style={{ padding:'9px 12px', color:e.outTime?'var(--bad)':'var(--t3)' }}>{e.outTime?fmt12Local(e.outTime):<span className="bdg ba">Active</span>}</td>
+                    <td style={{ padding:'9px 12px', fontWeight:700, color:'var(--b2c)' }}>{e.hours?e.hours+'h':'—'}</td>
+                    <td style={{ padding:'9px 12px', color:'var(--t2)', fontSize:11, maxWidth:140, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.notes||'—'}</td>
+                    <td style={{ padding:'9px 8px' }}>
+                      <div style={{ display:'flex', gap:5 }}>
+                        {e.inTime && e.outTime && !e.hours && (
+                          <button className="btn sec" style={{ fontSize:10, padding:'3px 8px', color:'var(--warn)' }}
+                            onClick={async()=>{ const h=calcHoursLocal(e.inTime,e.outTime); if(h){await supabase.from('timeentries').update({hours:parseFloat(h)}).eq('id',e.id);showToast('✅ Recalculated: '+h+'h');load()} }}>
+                            ↻ Recalc
+                          </button>
+                        )}
+                        <button className="btn sec" style={{ fontSize:10, padding:'3px 8px' }} onClick={()=>openEditPunch(e)}>✏️ Edit</button>
+                        <button className="btn del" style={{ fontSize:10, padding:'3px 8px' }} onClick={()=>setDeletePunchId(e.id)}>🗑</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </>)}
+
+      {/* Edit Punch Modal */}
+      {editPunch && (
+        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setEditPunch(null)}>
+          <div className="modal" style={{ maxWidth:480 }}>
+            <div className="mh">
+              <span className="mt">✏️ Edit Time Entry</span>
+              <button className="xbtn" onClick={()=>setEditPunch(null)}>&times;</button>
+            </div>
+            <div className="fg2">
+              <div className="field"><label>Employee</label>
+                <select value={editPunchForm.employee} onChange={e=>setEditPunchForm(f=>({...f,employee:e.target.value}))}>
+                  {[...new Set(timeEntries.map(t=>t.employee).filter(Boolean))].sort().map(emp=><option key={emp}>{emp}</option>)}
+                </select>
+              </div>
+              <div className="field"><label>Date</label>
+                <input type="date" value={editPunchForm.date} onChange={e=>setEditPunchForm(f=>({...f,date:e.target.value}))}/>
+              </div>
+            </div>
+            <div className="fg2">
+              <div className="field"><label>Time In</label>
+                <input type="time" value={editPunchForm.inTime} onChange={e=>setEditPunchForm(f=>({...f,inTime:e.target.value,hours:calcHoursLocal(e.target.value,f.outTime)}))}/>
+              </div>
+              <div className="field"><label>Time Out</label>
+                <input type="time" value={editPunchForm.outTime} onChange={e=>setEditPunchForm(f=>({...f,outTime:e.target.value,hours:calcHoursLocal(f.inTime,e.target.value)}))}/>
+              </div>
+            </div>
+            <div className="fg2">
+              <div className="field"><label>Hours (auto-calc or override)</label>
+                <input type="number" step="0.25" value={editPunchForm.hours||''} onChange={e=>setEditPunchForm(f=>({...f,hours:e.target.value}))} placeholder="Auto-calculated"/>
+              </div>
+              <div className="field"><label>Notes</label>
+                <input value={editPunchForm.notes||''} onChange={e=>setEditPunchForm(f=>({...f,notes:e.target.value}))}/>
+              </div>
+            </div>
+            {editPunchForm.inTime && editPunchForm.outTime && (
+              <div style={{ background:'var(--s3)', borderRadius:6, padding:'8px 12px', marginBottom:10, fontSize:12, display:'flex', justifyContent:'space-between' }}>
+                <span style={{ color:'var(--t2)' }}>Calculated Hours</span>
+                <span style={{ fontWeight:700, color:'var(--ok)' }}>{calcHoursLocal(editPunchForm.inTime,editPunchForm.outTime)||'—'}h {parseTimeToMinsLocal(editPunchForm.outTime)<parseTimeToMinsLocal(editPunchForm.inTime)?'(overnight ✓)':''}</span>
+              </div>
+            )}
+            <div style={{ display:'flex', gap:8 }}>
+              <button className="btn del" style={{ flex:1 }} onClick={()=>{setDeletePunchId(editPunch.id);setEditPunch(null)}}>🗑 Delete</button>
+              <button className="btn pri" style={{ flex:2, justifyContent:'center' }} onClick={saveEditPunch} disabled={editPunchSaving}>
+                {editPunchSaving?'Saving…':'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletePunchId && (
+        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setDeletePunchId(null)}>
+          <div className="modal" style={{ maxWidth:360, textAlign:'center' }}>
+            <div style={{ fontSize:32, marginBottom:8 }}>🗑️</div>
+            <div style={{ fontWeight:700, fontSize:15, marginBottom:6 }}>Delete this time entry?</div>
+            <div style={{ fontSize:12, color:'var(--t3)', marginBottom:18 }}>This cannot be undone and will affect payroll calculations.</div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button className="btn sec" style={{ flex:1 }} onClick={()=>setDeletePunchId(null)}>Cancel</button>
+              <button className="btn del" style={{ flex:1 }} onClick={()=>deleteEditPunch(deletePunchId)}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* New Run Modal */}
       {modal && (
