@@ -67,16 +67,74 @@ export default function FinancialProfile({ clientName, client }) {
 
   useEffect(() => { load() }, [clientName])
 
+  // Convert "MM/DD/YYYY" (Clients tab format) to "YYYY-MM-DD" (HTML date input format)
+  function toIsoDate(d) {
+    if (!d) return ''
+    const parts = String(d).split('/')
+    if (parts.length === 3) {
+      const [m, day, y] = parts
+      if (y && m && day) return `${y.padStart(4,'0')}-${m.padStart(2,'0')}-${day.padStart(2,'0')}`
+    }
+    return d // already ISO or unrecognized — leave as-is
+  }
+
+  // Fill in any blank Financial Profile fields using data already on the
+  // client's record (Clients tab), without overwriting anything the user
+  // has already entered in the Financial Profile.
+  function seedFromClient(p) {
+    if (!client) return p
+    const next = { ...p }
+
+    if (!next.dob) next.dob = toIsoDate(client.dob)
+    if (!next.county) next.county = client.county || ''
+    if (!next.filing_status) next.filing_status = client.filingStatus || ''
+
+    // Household size: taxpayer (+spouse if MFJ) + dependents, split by age 65
+    if (!next.household_under_65 && !next.household_over_65) {
+      const deps = client.dependents
+        ? (typeof client.dependents === 'string' ? JSON.parse(client.dependents || '[]') : client.dependents)
+        : []
+      const isOver65 = (dobStr) => {
+        if (!dobStr) return false
+        const dob = new Date(toIsoDate(dobStr))
+        if (isNaN(dob.getTime())) return false
+        const age = (Date.now() - dob.getTime()) / (1000*60*60*24*365.25)
+        return age >= 65
+      }
+      let under65 = 0, over65 = 0
+      // Taxpayer
+      if (isOver65(client.dob)) over65++; else under65++
+      // Spouse (if MFJ/MFS and spouse name present)
+      if (client.spouseName && (client.filingStatus||'').toLowerCase().includes('married')) {
+        under65++ // no spouse DOB field on Clients — assume under 65
+      }
+      deps.forEach(d => { if (isOver65(d.dob)) over65++; else under65++ })
+      if (under65 || over65) {
+        next.household_under_65 = under65
+        next.household_over_65 = over65
+      }
+    }
+
+    // Business name from Clients (entityName / business_name)
+    const bizName = client.entityName || client.business_name
+    if (bizName && !next.business_1?.name) {
+      next.business_1 = { ...(next.business_1||{}), name: bizName }
+    }
+
+    return next
+  }
+
   async function load() {
     setLoading(true)
     const { data } = await supabase.from('client_financial_profiles').select('*').eq('client_name', clientName).maybeSingle()
     if (data) {
-      setProfile({ ...BLANK_PROFILE, ...data,
+      const merged = { ...BLANK_PROFILE, ...data,
         real_estate: data.real_estate?.length ? data.real_estate : BLANK_PROFILE.real_estate,
         vehicles: data.vehicles?.length ? data.vehicles : BLANK_PROFILE.vehicles,
-      })
+      }
+      setProfile(seedFromClient(merged))
     } else {
-      setProfile(BLANK_PROFILE)
+      setProfile(seedFromClient(BLANK_PROFILE))
     }
     setLoading(false)
     setDirty(false)
