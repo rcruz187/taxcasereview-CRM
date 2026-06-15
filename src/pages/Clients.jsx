@@ -710,7 +710,8 @@ export default function Clients() {
     setDetail(c)
     setRelCases([]);setRelTasks([]);setRelInvoices([])
     loadRelated(c.name)
-    navigate(`/clients/${c.id}${opts.preserveTab && searchParams.get('tab') ? `?tab=${searchParams.get('tab')}` : ''}`, { replace: true })
+    const qs = opts.preserveTab ? searchParams.toString() : ''
+    navigate(`/clients/${c.id}${qs ? `?${qs}` : ''}`, { replace: true })
   }
 
   const reps=employees.length>0?employees.map(e=>e.name):['Romy Cruz','Dana Richard','Yesenia Gonzalez']
