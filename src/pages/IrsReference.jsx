@@ -16,11 +16,14 @@ const STATE_NAMES = {
 
 const blankEntry = { category: 'IRS Phone Numbers', title: '', content: '', notes: '', state: '', sort_order: 0 }
 
+const GENERAL_CATEGORIES = CATEGORIES.filter(c => c !== 'State Info')
+
 export default function IrsReference() {
   const { showToast, user } = useApp()
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch]   = useState('')
+  const [tab, setTab]         = useState('general') // 'general' | 'state'
   const [stateFilter, setStateFilter] = useState('')
   const [modal, setModal]     = useState(false)
   const [editing, setEditing] = useState(null)
@@ -88,7 +91,12 @@ export default function IrsReference() {
 
   const q = search.trim().toLowerCase()
   const filtered = entries.filter(e => {
-    if (stateFilter && e.state !== stateFilter) return false
+    if (tab === 'state') {
+      if (e.category !== 'State Info') return false
+      if (stateFilter && e.state !== stateFilter) return false
+    } else {
+      if (e.category === 'State Info') return false
+    }
     return !q ||
       e.title?.toLowerCase().includes(q) ||
       e.content?.toLowerCase().includes(q) ||
@@ -99,16 +107,16 @@ export default function IrsReference() {
   })
 
   // All distinct states present, for the filter dropdown
-  const statesPresent = [...new Set(entries.filter(e => e.state).map(e => e.state))]
+  const statesPresent = [...new Set(entries.filter(e => e.category === 'State Info' && e.state).map(e => e.state))]
     .sort((a, b) => (STATE_NAMES[a] || a).localeCompare(STATE_NAMES[b] || b))
 
-  // Group by category, preserving category order
+  // Group by category, preserving category order (general tab only)
   const grouped = {}
   for (const e of filtered) {
     if (!grouped[e.category]) grouped[e.category] = []
     grouped[e.category].push(e)
   }
-  const categoryOrder = [...CATEGORIES.filter(c => grouped[c]), ...Object.keys(grouped).filter(c => !CATEGORIES.includes(c))]
+  const categoryOrder = [...GENERAL_CATEGORIES.filter(c => grouped[c]), ...Object.keys(grouped).filter(c => !GENERAL_CATEGORIES.includes(c))]
 
   // For 'State Info', further group by state
   function groupByState(list) {
@@ -124,13 +132,13 @@ export default function IrsReference() {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: 20, color: 'var(--tx)' }}>IRS Reference</div>
           <div style={{ fontSize: 13, color: 'var(--t3)' }}>Phone numbers, addresses, and tips — shared by the whole team</div>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {statesPresent.length > 0 && (
+          {tab === 'state' && statesPresent.length > 0 && (
             <select
               value={stateFilter} onChange={e => setStateFilter(e.target.value)}
               style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--tx)', fontSize: 13 }}
@@ -151,13 +159,49 @@ export default function IrsReference() {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--br)' }}>
+        {[
+          { key: 'general', label: 'General' },
+          { key: 'state', label: 'By State' },
+        ].map(t => (
+          <button key={t.key} onClick={() => { setTab(t.key); setStateFilter('') }} style={{
+            padding: '8px 18px', borderRadius: '8px 8px 0 0',
+            border: '1px solid var(--br)', borderBottom: tab === t.key ? '1px solid var(--sf)' : '1px solid var(--br)',
+            background: tab === t.key ? 'var(--sf)' : 'var(--s2)',
+            color: tab === t.key ? 'var(--tx)' : 'var(--t3)',
+            fontWeight: tab === t.key ? 700 : 400,
+            cursor: 'pointer', fontSize: 13, marginBottom: -1
+          }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <div style={{ textAlign: 'center', padding: 40, color: 'var(--t3)' }}>Loading…</div>
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 60, color: 'var(--t3)' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🏛️</div>
           <div style={{ fontWeight: 600, fontSize: 16, color: 'var(--tx)' }}>{q ? 'No matching entries' : 'No entries yet'}</div>
-          <div style={{ fontSize: 13, marginTop: 4 }}>{q ? 'Try a different search' : 'Add IRS phone numbers, addresses, and tips for the team'}</div>
+          <div style={{ fontSize: 13, marginTop: 4 }}>{q ? 'Try a different search' : tab === 'state' ? 'Add state-specific phone numbers, addresses, and tips' : 'Add IRS phone numbers, addresses, and tips for the team'}</div>
+        </div>
+      ) : tab === 'state' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {groupByState(filtered).map(([st, list]) => (
+            <div key={st}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--tx)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 12,
+                  background: 'var(--blt)', color: 'var(--b2)', border: '1px solid var(--blue)'
+                }}>{st}</span>
+                {STATE_NAMES[st] || st}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
+                {list.map(entry => <EntryCard key={entry.id} entry={entry} showState={false} onCopy={copyToClipboard} onEdit={openEdit} onDelete={setConfirmDel} />)}
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -166,28 +210,9 @@ export default function IrsReference() {
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>
                 {cat}
               </div>
-              {cat === 'State Info' ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {groupByState(grouped[cat]).map(([st, list]) => (
-                    <div key={st}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--tx)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{
-                          fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 12,
-                          background: 'var(--blt)', color: 'var(--b2)', border: '1px solid var(--blue)'
-                        }}>{st}</span>
-                        {STATE_NAMES[st] || st}
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
-                        {list.map(entry => <EntryCard key={entry.id} entry={entry} showState={false} onCopy={copyToClipboard} onEdit={openEdit} onDelete={setConfirmDel} />)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
-                  {grouped[cat].map(entry => <EntryCard key={entry.id} entry={entry} showState onCopy={copyToClipboard} onEdit={openEdit} onDelete={setConfirmDel} />)}
-                </div>
-              )}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
+                {grouped[cat].map(entry => <EntryCard key={entry.id} entry={entry} showState onCopy={copyToClipboard} onEdit={openEdit} onDelete={setConfirmDel} />)}
+              </div>
             </div>
           ))}
         </div>
