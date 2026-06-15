@@ -459,7 +459,7 @@ function ClientDocs({ clientName, supabase, showToast }) {
 export default function Clients() {
   const navigate = useNavigate()
   const { id: urlId } = useParams()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useApp()
 
   useEffect(() => {
@@ -493,7 +493,15 @@ export default function Clients() {
   const [relInvoices, setRelInvoices] = useState([])
   const [relPayments, setRelPayments] = useState([])
   const [loadingRel,  setLoadingRel]  = useState(false)
-  const [detailTab,   setDetailTab]   = useState('overview')
+  const [detailTab,   setDetailTabRaw] = useState(() => searchParams.get('tab') || 'overview')
+  function setDetailTab(tab) {
+    setDetailTabRaw(tab)
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.set('tab', tab)
+      return next
+    }, { replace: true })
+  }
   const [fillerClient, setFillerClient] = useState(null)
   const [pkgSending, setPkgSending] = useState(false)
   const [bookingClient, setBookingClient] = useState(null)
@@ -516,11 +524,33 @@ export default function Clients() {
 
   useEffect(() => { load() }, [])
 
-  // Auto-open client from URL param (/clients/:id)
+  // Save scroll position before refresh/navigation away, restore after detail (+ related data) loads
+  useEffect(() => {
+    if (!detail) return
+    const key = `clientScroll_${detail.id}`
+    const saveScroll = () => sessionStorage.setItem(key, String(window.scrollY))
+    window.addEventListener('beforeunload', saveScroll)
+    window.addEventListener('pagehide', saveScroll)
+    return () => {
+      saveScroll()
+      window.removeEventListener('beforeunload', saveScroll)
+      window.removeEventListener('pagehide', saveScroll)
+    }
+  }, [detail?.id])
+
+  // Restore scroll position once related data has finished loading (page height stable)
+  useEffect(() => {
+    if (!detail || loadingRel) return
+    const key = `clientScroll_${detail.id}`
+    const saved = sessionStorage.getItem(key)
+    if (saved) {
+      requestAnimationFrame(() => window.scrollTo(0, parseInt(saved, 10) || 0))
+    }
+  }, [detail?.id, loadingRel])
   useEffect(() => {
     if (urlId && clients.length > 0 && !detail) {
       const found = clients.find(c => String(c.id) === String(urlId))
-      if (found) openDetail(found)
+      if (found) openDetail(found, { preserveTab: true })
     }
   }, [urlId, clients])
 
@@ -675,12 +705,12 @@ export default function Clients() {
     setEditModal(true)
   }
 
-  function openDetail(c) {
-    setDetailTab('overview')
+  function openDetail(c, opts = {}) {
+    if (!opts.preserveTab) setDetailTab('overview')
     setDetail(c)
     setRelCases([]);setRelTasks([]);setRelInvoices([])
     loadRelated(c.name)
-    navigate(`/clients/${c.id}`, { replace: true })
+    navigate(`/clients/${c.id}${opts.preserveTab && searchParams.get('tab') ? `?tab=${searchParams.get('tab')}` : ''}`, { replace: true })
   }
 
   const reps=employees.length>0?employees.map(e=>e.name):['Romy Cruz','Dana Richard','Yesenia Gonzalez']

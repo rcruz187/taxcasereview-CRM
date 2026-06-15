@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { PDFDocument, StandardFonts, PDFName, PDFString } from 'pdf-lib';
 
 // ─── Field maps per form type ────────────────────────────────────────────────
 // Only the taxpayer section fields are filled — rep info, tax matters, etc.
@@ -284,6 +284,7 @@ export async function fillForm433F(client, profile) {
     if (!fieldName) return;
     try {
       const field = form.getTextField(fieldName);
+      try { field.acroField.dict.set(PDFName.of('DA'), PDFString.of('/Helv 9 Tf 0 g')); } catch (_) {}
       field.setText(value != null ? String(value) : '');
     } catch (_) { /* field not present — skip */ }
   };
@@ -358,7 +359,7 @@ export async function fillForm433F(client, profile) {
     setText('TOInfo.ACCOUNT_NAME_BALANCE_OF_MORTGAGE_ADDITIONAL_PROPERTY', money(re1.mortgage_balance));
     const equity1 = n(re1.zillow_value) - n(re1.mortgage_balance);
     setText('TOInfo.ACCOUNT_NAME_EQUITY_IN_PROPERTY2', equity1 ? money(equity1) : '');
-    setCheck('Other', true);
+    setCheck('Other_2', true);
   }
 
   // ── Vehicles ──
@@ -484,6 +485,7 @@ export async function fillForm433A(client, profile) {
     if (!fieldName) return;
     try {
       const field = form.getTextField(fieldName);
+      try { field.acroField.dict.set(PDFName.of('DA'), PDFString.of('/Helv 9 Tf 0 g')); } catch (_) {}
       field.setText(value != null ? String(value) : '');
     } catch (_) { /* skip */ }
   };
@@ -577,7 +579,11 @@ export async function fillForm433D(client, profile) {
 
   const setText = (fieldName, value) => {
     if (!fieldName) return;
-    try { form.getTextField(fieldName).setText(value != null ? String(value) : ''); } catch (_) {}
+    try {
+      const field = form.getTextField(fieldName);
+      try { field.acroField.dict.set(PDFName.of('DA'), PDFString.of('/Helv 9 Tf 0 g')); } catch (_) {}
+      field.setText(value != null ? String(value) : '');
+    } catch (_) {}
   };
 
   const base = 'form1[0].Page1_Part1[0]';
@@ -612,7 +618,11 @@ export async function fillForm433H(client, profile) {
 
   const setText = (fieldName, value) => {
     if (!fieldName) return;
-    try { form.getTextField(fieldName).setText(value != null ? String(value) : ''); } catch (_) {}
+    try {
+      const field = form.getTextField(fieldName);
+      try { field.acroField.dict.set(PDFName.of('DA'), PDFString.of('/Helv 9 Tf 0 g')); } catch (_) {}
+      field.setText(value != null ? String(value) : '');
+    } catch (_) {}
   };
   const setCheck = (fieldName, on) => {
     if (!fieldName) return;
@@ -713,7 +723,11 @@ export async function fillForm433B(client, profile) {
 
   const setText = (fieldName, value) => {
     if (!fieldName) return;
-    try { form.getTextField(fieldName).setText(value != null ? String(value) : ''); } catch (_) {}
+    try {
+      const field = form.getTextField(fieldName);
+      try { field.acroField.dict.set(PDFName.of('DA'), PDFString.of('/Helv 9 Tf 0 g')); } catch (_) {}
+      field.setText(value != null ? String(value) : '');
+    } catch (_) {}
   };
   const setCheck = (fieldName, value) => {
     if (!fieldName) return;
@@ -772,7 +786,11 @@ export async function fillForm433AOIC(client, profile) {
 
   const setText = (fieldName, value) => {
     if (!fieldName) return;
-    try { form.getTextField(fieldName).setText(value != null ? String(value) : ''); } catch (_) {}
+    try {
+      const field = form.getTextField(fieldName);
+      try { field.acroField.dict.set(PDFName.of('DA'), PDFString.of('/Helv 9 Tf 0 g')); } catch (_) {}
+      field.setText(value != null ? String(value) : '');
+    } catch (_) {}
   };
   const setCheck = (fieldName, on) => {
     if (!fieldName) return;

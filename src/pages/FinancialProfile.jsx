@@ -214,7 +214,7 @@ export default function FinancialProfile({ clientName, client }) {
       {/* Sub-tabs */}
       <div style={{display:'flex',gap:4,marginBottom:16,borderBottom:'1px solid var(--br)',flexWrap:'wrap'}}>
         {[
-          {key:'intake', label:'📋 Intake'},
+          {key:'intake', label:'📋 TO Intake'},
           {key:'ie',     label:'💰 I&E'},
           {key:'assets', label:'🏦 Assets & Equity'},
           {key:'oic',    label:'🧮 OIC Calculator'},
