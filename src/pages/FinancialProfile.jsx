@@ -54,7 +54,7 @@ function Field({ label, value, onChange, type='text', placeholder='', wide }) {
 }
 
 function SectionHeader({ children }) {
-  return <div style={{fontSize:12,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',margin:'18px 0 8px',paddingTop:14,borderTop:'1px solid var(--br)'}}>{children}</div>
+  return <div style={{fontSize:13,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',margin:'18px 0 8px',paddingTop:14,borderTop:'1px solid var(--br)'}}>{children}</div>
 }
 
 export default function FinancialProfile({ clientName, client }) {
@@ -348,7 +348,7 @@ function IntakeTab({ profile, set, setArr, addArrRow, removeArrRow, totalHouseho
 function EmploymentBlock({ label, data, onChange }) {
   return (
     <div style={{border:'1px solid var(--br)',borderRadius:8,padding:'12px 14px',marginBottom:12,background:'var(--s2)'}}>
-      <div style={{fontWeight:700,fontSize:12,marginBottom:8,color:'var(--t2)'}}>{label}</div>
+      <div style={{fontWeight:700,fontSize:13,marginBottom:8,color:'var(--t2)'}}>{label}</div>
       <div className="fg2">
         <Field label="Employer Name" value={data.employer} onChange={v=>onChange('employer',v)}/>
         <Field label="Length of Time at Employer" value={data.length} onChange={v=>onChange('length',v)}/>
@@ -404,7 +404,7 @@ function BusinessBlock({ data, onChange }) {
 function RealEstateBlock({ idx, row, onChange }) {
   return (
     <div style={{border:'1px solid var(--br)',borderRadius:8,padding:'12px 14px',marginBottom:12,background:'var(--s2)'}}>
-      <div style={{fontWeight:700,fontSize:12,marginBottom:8,color:'var(--t2)'}}>
+      <div style={{fontWeight:700,fontSize:13,marginBottom:8,color:'var(--t2)'}}>
         Property {idx+1} {idx===0 && '(Primary Residence)'}
       </div>
       <Field label="Address" value={row.address} onChange={v=>onChange('address',v)} wide/>
@@ -441,7 +441,7 @@ function RealEstateBlock({ idx, row, onChange }) {
 function VehicleBlock({ idx, row, onChange }) {
   return (
     <div style={{border:'1px solid var(--br)',borderRadius:8,padding:'12px 14px',marginBottom:12,background:'var(--s2)'}}>
-      <div style={{fontWeight:700,fontSize:12,marginBottom:8,color:'var(--t2)'}}>Vehicle {idx+1}</div>
+      <div style={{fontWeight:700,fontSize:13,marginBottom:8,color:'var(--t2)'}}>Vehicle {idx+1}</div>
       <div className="fg2">
         <Field label="Make / Model / Style" value={row.make_model} onChange={v=>onChange('make_model',v)}/>
         <Field label="Year" value={row.year} onChange={v=>onChange('year',v)}/>
@@ -662,11 +662,11 @@ function calcAssets(profile) {
 // ════════════════════════════════════════════════════════════════════════
 function ExpField({ label, k, expenses, set, std }) {
   return (
-    <div style={{display:'grid',gridTemplateColumns: std!==undefined ? '1fr 130px 110px' : '1fr 130px', gap:10, alignItems:'center', padding:'4px 0'}}>
-      <div style={{fontSize:12,color:'var(--t2)'}}>{label}</div>
+    <div style={{display:'grid',gridTemplateColumns: std!==undefined ? '1fr 140px 120px' : '1fr 140px', gap:10, alignItems:'center', padding:'6px 0'}}>
+      <div style={{fontSize:13.5,color:'var(--t2)'}}>{label}</div>
       <input type="number" value={expenses[k] ?? ''} onChange={e=>set('expenses.'+k, e.target.value)} placeholder="0.00"
-        style={{padding:'5px 10px',fontSize:12,background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)'}}/>
-      {std!==undefined && <div style={{fontSize:11,color:'var(--t3)',textAlign:'right'}}>Std: {fmt(std)}</div>}
+        style={{padding:'7px 10px',fontSize:13.5,background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)'}}/>
+      {std!==undefined && <div style={{fontSize:13,color:'var(--t3)',textAlign:'right'}}>Std: {fmt(std)}</div>}
     </div>
   )
 }
@@ -707,12 +707,12 @@ function IETab({ profile, set, totalHousehold }) {
 
       <SectionHeader>Monthly Living Expenses</SectionHeader>
 
-      <div style={{fontWeight:700,fontSize:12,marginTop:10,marginBottom:4,color:'var(--t2)'}}>Food, Clothing & Misc.</div>
-      <div style={{fontSize:11,color:'var(--t3)',marginBottom:6}}>National Standard for household of {totalHousehold}: {fmt(exp.foodClothingStd)}</div>
+      <div style={{fontWeight:700,fontSize:13,marginTop:10,marginBottom:4,color:'var(--t2)'}}>Food, Clothing & Misc.</div>
+      <div style={{fontSize:12.5,color:'var(--t3)',marginBottom:6}}>National Standard for household of {totalHousehold}: {fmt(exp.foodClothingStd)}</div>
       <ExpField label="Food, Clothing and Misc. (Actual — leave blank to use standard)" k="food_clothing" expenses={e} set={set} std={exp.foodClothingStd}/>
 
-      <div style={{fontWeight:700,fontSize:12,marginTop:14,marginBottom:4,color:'var(--t2)'}}>Housing & Utilities</div>
-      <div style={{fontSize:11,color:'var(--t3)',marginBottom:6}}>1st/2nd mortgage pulled from Real Estate (Property 1): {fmt(n(re0.mortgage_1)+n(re0.mortgage_2))}</div>
+      <div style={{fontWeight:700,fontSize:13,marginTop:14,marginBottom:4,color:'var(--t2)'}}>Housing & Utilities</div>
+      <div style={{fontSize:12.5,color:'var(--t3)',marginBottom:6}}>1st/2nd mortgage pulled from Real Estate (Property 1): {fmt(n(re0.mortgage_1)+n(re0.mortgage_2))}</div>
       <ExpField label="Homeowner's Insurance" k="homeowners_insurance" expenses={e} set={set}/>
       <ExpField label="Property Taxes" k="property_taxes" expenses={e} set={set}/>
       <ExpField label="HOA Dues" k="hoa_dues" expenses={e} set={set}/>
@@ -729,16 +729,16 @@ function IETab({ profile, set, totalHousehold }) {
       <ExpField label="Local Housing & Utilities Standard (for over-standard calc)" k="housing_standard" expenses={e} set={set}/>
       <SubtotalRow label="Housing & Utilities Subtotal" value={exp.housing}/>
 
-      <div style={{fontWeight:700,fontSize:12,marginTop:14,marginBottom:4,color:'var(--t2)'}}>Vehicle</div>
-      <div style={{fontSize:11,color:'var(--t3)',marginBottom:6}}>
+      <div style={{fontWeight:700,fontSize:13,marginTop:14,marginBottom:4,color:'var(--t2)'}}>Vehicle</div>
+      <div style={{fontSize:12.5,color:'var(--t3)',marginBottom:6}}>
         Vehicle 1/2 payments pulled from Vehicles: {fmt(exp.vehicle1Payment)} / {fmt(exp.vehicle2Payment)} (Std $588 each)
       </div>
       <ExpField label="Public Transportation (Std $217)" k="public_transportation" expenses={e} set={set}/>
       <ExpField label="Car Misc (Operating Expenses)" k="car_misc" expenses={e} set={set}/>
       <SubtotalRow label="Vehicle Subtotal" value={exp.vehicleTotal}/>
 
-      <div style={{fontWeight:700,fontSize:12,marginTop:14,marginBottom:4,color:'var(--t2)'}}>Health Care</div>
-      <div style={{fontSize:11,color:'var(--t3)',marginBottom:6}}>
+      <div style={{fontWeight:700,fontSize:13,marginTop:14,marginBottom:4,color:'var(--t2)'}}>Health Care</div>
+      <div style={{fontSize:12.5,color:'var(--t3)',marginBottom:6}}>
         Out-of-pocket standard: {n(profile.household_under_65)} × $68 (under 65) + {n(profile.household_over_65)} × $142 (65+) = {fmt(exp.oopHealthStd)}
       </div>
       <ExpField label="Major Medical Insurance" k="health_major_medical" expenses={e} set={set}/>
@@ -748,28 +748,28 @@ function IETab({ profile, set, totalHousehold }) {
       <ExpField label="Out of Pocket Expenses (Actual — leave blank to use standard)" k="health_oop" expenses={e} set={set} std={exp.oopHealthStd}/>
       <SubtotalRow label="Health Care Subtotal" value={exp.healthTotal}/>
 
-      <div style={{fontWeight:700,fontSize:12,marginTop:14,marginBottom:4,color:'var(--t2)'}}>Credit Cards / Other Unallowed Expenses</div>
+      <div style={{fontWeight:700,fontSize:13,marginTop:14,marginBottom:4,color:'var(--t2)'}}>Credit Cards / Other Unallowed Expenses</div>
       <ExpField label="Credit Card Minimum Monthly Payments" k="credit_card_min" expenses={e} set={set}/>
       <SubtotalRow label="Credit Subtotal" value={exp.creditTotal}/>
 
-      <div style={{fontWeight:700,fontSize:12,marginTop:14,marginBottom:4,color:'var(--t2)'}}>Court Ordered</div>
+      <div style={{fontWeight:700,fontSize:13,marginTop:14,marginBottom:4,color:'var(--t2)'}}>Court Ordered</div>
       <ExpField label="Child Support" k="child_support" expenses={e} set={set}/>
       <ExpField label="Court Ordered Judgment" k="court_judgment" expenses={e} set={set}/>
       <SubtotalRow label="Court Ordered Subtotal" value={exp.courtTotal}/>
 
-      <div style={{fontWeight:700,fontSize:12,marginTop:14,marginBottom:4,color:'var(--t2)'}}>Child/Dependent Care</div>
+      <div style={{fontWeight:700,fontSize:13,marginTop:14,marginBottom:4,color:'var(--t2)'}}>Child/Dependent Care</div>
       <ExpField label="Child/Dependent Care (Day Care)" k="child_care" expenses={e} set={set}/>
 
-      <div style={{fontWeight:700,fontSize:12,marginTop:14,marginBottom:4,color:'var(--t2)'}}>Other Secured Debt</div>
-      <div style={{fontSize:11,color:'var(--t3)',marginBottom:6}}>Pulled from Intake: {fmt(exp.otherSecured)}</div>
+      <div style={{fontWeight:700,fontSize:13,marginTop:14,marginBottom:4,color:'var(--t2)'}}>Other Secured Debt</div>
+      <div style={{fontSize:12.5,color:'var(--t3)',marginBottom:6}}>Pulled from Intake: {fmt(exp.otherSecured)}</div>
 
-      <div style={{fontWeight:700,fontSize:12,marginTop:14,marginBottom:4,color:'var(--t2)'}}>Life Insurance</div>
+      <div style={{fontWeight:700,fontSize:13,marginTop:14,marginBottom:4,color:'var(--t2)'}}>Life Insurance</div>
       <ExpField label="Term Life Insurance" k="life_term" expenses={e} set={set}/>
       <ExpField label="Whole Life Insurance" k="life_whole" expenses={e} set={set}/>
       <SubtotalRow label="Life Insurance Subtotal" value={exp.lifeTotal}/>
 
-      <div style={{fontWeight:700,fontSize:12,marginTop:14,marginBottom:4,color:'var(--t2)'}}>Taxes</div>
-      <div style={{fontSize:11,color:'var(--t3)',marginBottom:6}}>Income taxes withheld (from Income Summary): {fmt(income.taxesTotal)}</div>
+      <div style={{fontWeight:700,fontSize:13,marginTop:14,marginBottom:4,color:'var(--t2)'}}>Taxes</div>
+      <div style={{fontSize:12.5,color:'var(--t3)',marginBottom:6}}>Income taxes withheld (from Income Summary): {fmt(income.taxesTotal)}</div>
       <ExpField label="IRS Installment Agreement" k="irs_installment" expenses={e} set={set}/>
       <ExpField label="State Installment Agreement" k="state_installment" expenses={e} set={set}/>
       <SubtotalRow label="Taxes Subtotal" value={exp.taxesSubtotal}/>
@@ -810,7 +810,7 @@ function AssetRow({ asset, idx, onChange, onRemove }) {
       <Field label="Description" value={asset.description} onChange={v=>onChange(idx,'description',v)}/>
       <Field label="Value" value={asset.value} onChange={v=>onChange(idx,'value',v)} type="number"/>
       <Field label="Loan Against" value={asset.loan_against} onChange={v=>onChange(idx,'loan_against',v)} type="number"/>
-      <div style={{fontSize:11,color:'var(--t3)',marginBottom:14}}>
+      <div style={{fontSize:12.5,color:'var(--t3)',marginBottom:14}}>
         OIC value: {fmt(oicValue)}{oicAmount!==null && <> · Equity: {fmt(oicAmount)}</>}
       </div>
       <div></div>

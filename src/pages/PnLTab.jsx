@@ -52,7 +52,7 @@ function SubtotalRow({ label, value, monthly }) {
   return (
     <div style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:'1px solid var(--br)',marginTop:6,fontWeight:700,fontSize:13}}>
       <span>{label}</span>
-      <span>{fmt(value)}{monthly!==undefined && <span style={{fontSize:11,fontWeight:400,color:'var(--t3)'}}> ({fmt(monthly)}/mo)</span>}</span>
+      <span>{fmt(value)}{monthly!==undefined && <span style={{fontSize:12.5,fontWeight:400,color:'var(--t3)'}}> ({fmt(monthly)}/mo)</span>}</span>
     </div>
   )
 }
@@ -172,7 +172,7 @@ export default function PnLTab({ profile, set }) {
 
       <div className="card" style={{padding:'14px 16px',background:'var(--blt)',marginTop:16,border:'1px solid var(--blue)'}}>
         <div className="dr"><span className="dl" style={{fontWeight:800,fontSize:14}}>Net Profit (Base Year)</span>
-          <span className="dv" style={{fontWeight:800,fontSize:14,color: calc.netProfit>=0 ? 'var(--b2)' : 'var(--bad)'}}>{fmt(calc.netProfit)} <span style={{fontSize:11,fontWeight:400,color:'var(--t3)'}}>({fmt(calc.netProfit/12)}/mo)</span></span>
+          <span className="dv" style={{fontWeight:800,fontSize:14,color: calc.netProfit>=0 ? 'var(--b2)' : 'var(--bad)'}}>{fmt(calc.netProfit)} <span style={{fontSize:12.5,fontWeight:400,color:'var(--t3)'}}>({fmt(calc.netProfit/12)}/mo)</span></span>
         </div>
       </div>
 

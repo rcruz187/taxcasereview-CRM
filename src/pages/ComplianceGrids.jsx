@@ -6,7 +6,7 @@ function n(v) { const x = parseFloat(v); return isNaN(x) ? 0 : x }
 function fmt(v) { return '$' + n(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
 // Default tax-year ranges per form, matching the original TO Worksheet tabs
-const CURRENT_YEAR = new Date().getFullYear()
+const CURRENT_YEAR = new Date().getFullYear() + 1 // include next tax year
 const YEAR_RANGES = {
   '1040':  range(2007, CURRENT_YEAR),
   'STATE': range(2009, CURRENT_YEAR),
@@ -55,18 +55,18 @@ function GridRow({ rec, onChange, showQuarter, csedYears }) {
 
   return (
     <tr>
-      <td style={{padding:'4px 6px',fontWeight:600,whiteSpace:'nowrap'}}>{rec.tax_year}{showQuarter ? ` Q${rec.quarter}` : ''}</td>
-      <td style={{padding:'4px 6px'}}>
+      <td style={{padding:'8px 8px',fontWeight:600,whiteSpace:'nowrap'}}>{rec.tax_year}{showQuarter ? ` Q${rec.quarter}` : ''}</td>
+      <td style={{padding:'8px 8px'}}>
         <select value={rec.filed_status||''} onChange={e=>handle('filed_status', e.target.value)} style={selStyle}>
           {FILED_STATUS_OPTIONS.map(o=><option key={o} value={o}>{o||'—'}</option>)}
         </select>
       </td>
-      <td style={{padding:'4px 6px'}}><input type="number" value={rec.amount ?? ''} onChange={e=>handle('amount', e.target.value)} placeholder="0.00" style={inpStyle}/></td>
-      <td style={{padding:'4px 6px'}}><input type="number" value={rec.credits ?? ''} onChange={e=>handle('credits', e.target.value)} placeholder="0.00" style={inpStyle}/></td>
-      {showQuarter && <td style={{padding:'4px 6px'}}><input type="number" value={rec.deposit ?? ''} onChange={e=>handle('deposit', e.target.value)} placeholder="0.00" style={inpStyle}/></td>}
-      <td style={{padding:'4px 6px'}}><input value={rec.lien||''} onChange={e=>handle('lien', e.target.value)} placeholder="Lien?" style={{...inpStyle,width:90}}/></td>
-      <td style={{padding:'4px 6px'}}><input type="date" value={rec.assessment_date||''} onChange={e=>handle('assessment_date', e.target.value)} style={{...inpStyle,width:130}}/></td>
-      <td style={{padding:'4px 6px'}}>
+      <td style={{padding:'8px 8px'}}><input type="number" value={rec.amount ?? ''} onChange={e=>handle('amount', e.target.value)} placeholder="0.00" style={inpStyle}/></td>
+      <td style={{padding:'8px 8px'}}><input type="number" value={rec.credits ?? ''} onChange={e=>handle('credits', e.target.value)} placeholder="0.00" style={inpStyle}/></td>
+      {showQuarter && <td style={{padding:'8px 8px'}}><input type="number" value={rec.deposit ?? ''} onChange={e=>handle('deposit', e.target.value)} placeholder="0.00" style={inpStyle}/></td>}
+      <td style={{padding:'8px 8px'}}><input value={rec.lien||''} onChange={e=>handle('lien', e.target.value)} placeholder="Lien?" style={{...inpStyle,width:90}}/></td>
+      <td style={{padding:'8px 8px'}}><input type="date" value={rec.assessment_date||''} onChange={e=>handle('assessment_date', e.target.value)} style={{...inpStyle,width:130}}/></td>
+      <td style={{padding:'8px 8px'}}>
         <input type="date" value={rec.csed||''} onChange={e=>handle('csed', e.target.value)} style={{...inpStyle,width:130,
           ...(rec.csed && new Date(rec.csed) < new Date() ? {color:'var(--bad)',fontWeight:700} : {})}}/>
       </td>
@@ -74,8 +74,8 @@ function GridRow({ rec, onChange, showQuarter, csedYears }) {
   )
 }
 
-const inpStyle = { width:100, padding:'5px 8px', fontSize:12, background:'var(--s2)', border:'1px solid var(--br)', borderRadius:6, color:'var(--tx)' }
-const selStyle = { ...inpStyle, width:160 }
+const inpStyle = { width:110, padding:'7px 9px', fontSize:13.5, background:'var(--s2)', border:'1px solid var(--br)', borderRadius:6, color:'var(--tx)' }
+const selStyle = { ...inpStyle, width:175 }
 
 function FormGrid({ clientName, formType, records, onSaveRow }) {
   const meta = FORM_META[formType]
@@ -105,24 +105,24 @@ function FormGrid({ clientName, formType, records, onSaveRow }) {
     <div style={{marginBottom:24}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6,flexWrap:'wrap',gap:8}}>
         <div style={{fontWeight:700,fontSize:13,color:'var(--t2)'}}>{meta.label}</div>
-        <div style={{fontSize:11,color:'var(--t3)'}}>
+        <div style={{fontSize:12.5,color:'var(--t3)'}}>
           Total Amount: <strong style={{color:'var(--tx)'}}>{fmt(totalAmount)}</strong>
           {' · '}Total Credits: <strong style={{color:'var(--tx)'}}>{fmt(totalCredits)}</strong>
           {overdueCount > 0 && <span style={{color:'var(--bad)',fontWeight:700}}> · {overdueCount} CSED(s) expired</span>}
         </div>
       </div>
       <div style={{overflowX:'auto'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:13.5}}>
           <thead>
             <tr style={{borderBottom:'1px solid var(--br)',color:'var(--t3)',textAlign:'left'}}>
-              <th style={{padding:'4px 6px'}}>{isQuarterly ? 'Year / Qtr' : 'Tax Year'}</th>
-              <th style={{padding:'4px 6px'}}>Filed Status</th>
-              <th style={{padding:'4px 6px'}}>Amount</th>
-              <th style={{padding:'4px 6px'}}>Credits/Payments</th>
-              {isQuarterly && <th style={{padding:'4px 6px'}}>Deposits</th>}
-              <th style={{padding:'4px 6px'}}>Lien</th>
-              <th style={{padding:'4px 6px'}}>Assessment Date</th>
-              <th style={{padding:'4px 6px'}}>CSED</th>
+              <th style={{padding:'8px 8px'}}>{isQuarterly ? 'Year / Qtr' : 'Tax Year'}</th>
+              <th style={{padding:'8px 8px'}}>Filed Status</th>
+              <th style={{padding:'8px 8px'}}>Amount</th>
+              <th style={{padding:'8px 8px'}}>Credits/Payments</th>
+              {isQuarterly && <th style={{padding:'8px 8px'}}>Deposits</th>}
+              <th style={{padding:'8px 8px'}}>Lien</th>
+              <th style={{padding:'8px 8px'}}>Assessment Date</th>
+              <th style={{padding:'8px 8px'}}>CSED</th>
             </tr>
           </thead>
           <tbody>
