@@ -37,11 +37,12 @@ const blankEmp = {
   name: '', email: '', phone: '', title: '', access: 'Staff',
   hourlyRate: '', payType: 'Hourly', paymentMethod: 'Direct Deposit',
   hireDate: '', emergencyContact: '', emergencyPhone: '',
+  caf: '', ptin: '', sorShortId: '', sorUsername: '',
   ...ROLE_PERM_DEFAULTS['Staff']
 }
 
 export default function Employees() {
-  const { showToast, can } = useApp()
+  const { showToast, can, user } = useApp()
   const [employees, setEmployees] = useState([])
   const [confirmDel, setConfirmDel] = useState(null)
   const [loading, setLoading]     = useState(true)
@@ -89,6 +90,16 @@ export default function Employees() {
       perm_reports:  emp.perm_reports  ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_reports,
       perm_hr:       emp.perm_hr       ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_hr,
       perm_settings: emp.perm_settings ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_settings,
+      hourlyRate: emp.hourlyRate ?? '',
+      payType: emp.payType || 'Hourly',
+      paymentMethod: emp.paymentMethod || 'Direct Deposit',
+      hireDate: emp.hireDate ?? '',
+      emergencyContact: emp.emergencyContact ?? '',
+      emergencyPhone: emp.emergencyPhone ?? '',
+      caf: emp.caf ?? '',
+      ptin: emp.ptin ?? '',
+      sorShortId: emp.sorShortId ?? '',
+      sorUsername: emp.sorUsername ?? '',
     })
     setTab('info')
     setShowForm(true)
@@ -269,7 +280,7 @@ export default function Employees() {
 
             {/* Tabs */}
             <div style={{ display: 'flex', gap: 4, padding: '12px 24px 0', borderBottom: '1px solid var(--br)' }}>
-              {['info', 'pay', 'permissions'].map(t => (
+              {['info', 'pay', ...(can('edit','employees') || form.email === user?.email ? ['irs'] : []), 'permissions'].map(t => (
                 <button key={t} onClick={() => setTab(t)} style={{
                   padding: '8px 18px', borderRadius: '8px 8px 0 0',
                   border: '1px solid var(--br)', borderBottom: tab === t ? '1px solid var(--sf)' : '1px solid var(--br)',
@@ -278,7 +289,7 @@ export default function Employees() {
                   fontWeight: tab === t ? 700 : 400,
                   cursor: 'pointer', fontSize: 13, marginBottom: -1
                 }}>
-                  {t === 'info' ? '👤 Info' : t === 'pay' ? '💵 Pay & HR' : '🔐 Permissions'}
+                  {t === 'info' ? '👤 Info' : t === 'pay' ? '💵 Pay & HR' : t === 'irs' ? '🏛️ IRS Info' : '🔐 Permissions'}
                 </button>
               ))}
             </div>
@@ -331,7 +342,37 @@ export default function Employees() {
                 </div>
               )}
 
-              {/* Info tab */}
+              {/* IRS Info tab */}
+              {tab === 'irs' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div style={{ background:'var(--s2)', border:'1px solid var(--br)', borderRadius:8, padding:'10px 14px', fontSize:12, color:'var(--t3)', lineHeight:1.6, display:'flex', gap:8, alignItems:'flex-start' }}>
+                    <span>🔒</span>
+                    <span>This information is only visible to admins and this employee. Used when calling the IRS or logging into the IRS e-Services portal (SOR).</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                    <div className="field">
+                      <label>CAF Number</label>
+                      <input value={form.caf||''} onChange={e => setForm(f => ({ ...f, caf: e.target.value }))} placeholder="0312-27862R"/>
+                    </div>
+                    <div className="field">
+                      <label>PTIN</label>
+                      <input value={form.ptin||''} onChange={e => setForm(f => ({ ...f, ptin: e.target.value }))} placeholder="P01982875"/>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                    <div className="field">
+                      <label>SOR Short ID</label>
+                      <input value={form.sorShortId||''} onChange={e => setForm(f => ({ ...f, sorShortId: e.target.value }))} placeholder="JBF1CGA29O"/>
+                    </div>
+                    <div className="field">
+                      <label>SOR Username</label>
+                      <input value={form.sorUsername||''} onChange={e => setForm(f => ({ ...f, sorUsername: e.target.value }))} placeholder="rcruz187"/>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+
               {tab === 'info' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>

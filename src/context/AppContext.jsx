@@ -22,6 +22,7 @@ export const SECTION_COLS = {
   esign:       'perm_documents',
   transcripts: 'perm_irs',
   irsforms:    'perm_irs',
+  irsreference:'perm_irs',
   taxreturns:  'perm_irs',
   reports:     'perm_reports',
   timeclock:   'perm_hr',
@@ -50,15 +51,15 @@ const ROLE_DEFAULTS = {
   'Admin': {
     canView: ['*'],
     canEdit: ['leads','clients','cases','tasks','calendar','deadlines','transcripts',
-              'irsforms','taxreturns','estimates','invoices','payments','sms','email',
+              'irsforms','irsreference','taxreturns','estimates','invoices','payments','sms','email',
               'documents','esign','timeclock','reports','dialer','chat','books','irs'],
   },
   'Staff': {
-    canView: ['dashboard','leads','clients','cases','tasks','calendar','deadlines','documents','chat','irsforms'],
+    canView: ['dashboard','leads','clients','cases','tasks','calendar','deadlines','documents','chat','irsforms','irsreference'],
     canEdit: ['tasks','chat'],
   },
   'View Only': {
-    canView: ['dashboard','leads','clients','cases','tasks','calendar','deadlines','documents','irsforms'],
+    canView: ['dashboard','leads','clients','cases','tasks','calendar','deadlines','documents','irsforms','irsreference'],
     canEdit: [],
   },
 }
