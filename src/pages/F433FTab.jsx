@@ -32,9 +32,23 @@ export default function F433FTab({ profile, set, client, totalHousehold, income,
   const vehicles = (profile.vehicles||[]).filter(v=>v.make_model)
   const ccTotal = (profile.credit_cards||[]).reduce((s,c)=>s+n(c.min_payment),0)
 
+  function handlePrint() {
+    document.body.classList.add('printing-fp')
+    setTimeout(() => {
+      window.print()
+      document.body.classList.remove('printing-fp')
+    }, 50)
+  }
+
   return (
-    <div>
-      <div style={{fontSize:12,color:'var(--t3)',marginBottom:14,lineHeight:1.6}}>
+    <div className="print-target">
+      <div className="no-print" style={{display:'flex',justifyContent:'flex-end',marginBottom:10}}>
+        <button className="btn sec" onClick={handlePrint}>🖨️ Print / Save as PDF</button>
+      </div>
+      <div className="print-title">Form 433-F — Collection Information Statement Summary<br/>
+        <span style={{fontSize:13,fontWeight:400}}>{client?.name||''} — {new Date().toLocaleDateString()}</span>
+      </div>
+      <div className="no-print" style={{fontSize:12,color:'var(--t3)',marginBottom:14,lineHeight:1.6}}>
         Form 433-F (Collection Information Statement) summary, compiled from the Intake, I&E, and
         Assets &amp; Equity tabs plus a few additional fields below. Use this as the source of truth
         when preparing the official 433-F for submission.

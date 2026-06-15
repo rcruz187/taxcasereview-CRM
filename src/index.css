@@ -609,3 +609,43 @@ tbody tr:hover td { background: var(--s2); cursor: pointer; }
 }
 /* cache bust Mon Jun  1 23:39:13 UTC 2026 */
 
+/* ── Printable view (433-F and other Financial Profile tabs) ───────────── */
+@media print {
+  body.printing-fp .app-shell,
+  body.printing-fp .app-shell * {
+    visibility: hidden;
+  }
+  body.printing-fp .print-target,
+  body.printing-fp .print-target * {
+    visibility: visible;
+  }
+  body.printing-fp .print-target {
+    position: absolute;
+    left: 0; top: 0; width: 100%;
+    color: #000 !important;
+    background: #fff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  body.printing-fp .print-target * {
+    color: #000 !important;
+    background: transparent !important;
+    border-color: #ccc !important;
+  }
+  body.printing-fp .print-target input,
+  body.printing-fp .print-target select,
+  body.printing-fp .print-target textarea {
+    border: none !important;
+    border-bottom: 1px solid #999 !important;
+    border-radius: 0 !important;
+    padding: 2px 4px !important;
+  }
+  body.printing-fp .print-target .no-print { display: none !important; visibility: hidden !important; }
+  body.printing-fp .dr { border-bottom: 1px solid #ddd !important; page-break-inside: avoid; }
+  body.printing-fp .print-title {
+    display: block !important;
+    font-size: 18px; font-weight: 800; margin-bottom: 12px;
+  }
+}
+.print-title { display: none; }
+
