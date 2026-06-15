@@ -130,13 +130,15 @@ export default function IrsReference() {
           <div style={{ fontSize: 13, color: 'var(--t3)' }}>Phone numbers, addresses, and tips — shared by the whole team</div>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <select
-            value={stateFilter} onChange={e => setStateFilter(e.target.value)}
-            style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--tx)', fontSize: 13 }}
-          >
-            <option value="">All States</option>
-            {statesPresent.map(s => <option key={s} value={s}>{STATE_NAMES[s] || s}</option>)}
-          </select>
+          {statesPresent.length > 0 && (
+            <select
+              value={stateFilter} onChange={e => setStateFilter(e.target.value)}
+              style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--tx)', fontSize: 13 }}
+            >
+              <option value="">All States</option>
+              {statesPresent.map(s => <option key={s} value={s}>{STATE_NAMES[s] || s}</option>)}
+            </select>
+          )}
           <input
             value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search…"
