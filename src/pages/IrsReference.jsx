@@ -258,14 +258,14 @@ export default function IrsReference() {
 
 function EntryCard({ entry, showState, onCopy, onEdit, onDelete }) {
   return (
-    <div className="card" style={{ padding: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--tx)' }}>
-            {entry.title}
+    <div className="card" style={{ padding: '14px 16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--tx)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span>{entry.title}</span>
             {showState && entry.state && (
               <span style={{
-                marginLeft: 8, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 12,
+                fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 12,
                 background: 'var(--blt)', color: 'var(--b2)', border: '1px solid var(--blue)'
               }}>{entry.state}</span>
             )}
@@ -283,10 +283,16 @@ function EntryCard({ entry, showState, onCopy, onEdit, onDelete }) {
         </div>
         <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
           {entry.content && (
-            <button className="btn sm" onClick={() => onCopy(entry.content)} title="Copy">📋</button>
+            <button className="btn sm" onClick={() => onCopy(entry.content)} title="Copy" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
           )}
-          <button className="btn sm" onClick={() => onEdit(entry)} title="Edit">Edit</button>
-          <button className="btn sm" onClick={() => onDelete(entry.id)} title="Delete" style={{ color: 'var(--bad)' }}>✕</button>
+          <button className="btn sm" onClick={() => onEdit(entry)} title="Edit" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button className="btn sm" onClick={() => onDelete(entry.id)} title="Delete" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--bad)' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
         </div>
       </div>
     </div>
