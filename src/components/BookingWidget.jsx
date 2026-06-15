@@ -27,7 +27,6 @@ const HELP_OPTIONS = [
 export default function BookingWidget({ contact, onClose, mode = 'lead' }) {
   const [saving, setSaving] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
-  const [step, setStep] = useState(mode === 'lead' ? 'qualify' : 'schedule')
 
   const today = new Date().toISOString().slice(0,10)
   const [form, setForm] = useState({
@@ -122,80 +121,74 @@ export default function BookingWidget({ contact, onClose, mode = 'lead' }) {
               <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
               Appointment scheduled & team notified!
             </div>
-          ) : step === 'qualify' ? (
-            <>
-              <div style={{ fontSize: 13, color: 'var(--t2)', marginBottom: 16 }}>
-                A few quick questions before we schedule — this helps our team prep for the call.
-              </div>
-
-              {/* Q1 */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>
-                  Are you the key decision maker?
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {['Yes','No'].map(opt => (
-                    <button key={opt} onClick={() => fld('decisionMaker', opt)}
-                      style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                        border: form.decisionMaker===opt ? '1.5px solid var(--blue)' : '1px solid var(--br)',
-                        background: form.decisionMaker===opt ? 'var(--blt)' : 'var(--s2)',
-                        color: form.decisionMaker===opt ? 'var(--b2)' : 'var(--t2)' }}>
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Q2 */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>
-                  Are you happy with your current tax & accounting support?
-                </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {['Yes','No','They could be better'].map(opt => (
-                    <button key={opt} onClick={() => fld('happyWithSupport', opt)}
-                      style={{ flex: '1 1 auto', padding: '8px 10px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
-                        border: form.happyWithSupport===opt ? '1.5px solid var(--blue)' : '1px solid var(--br)',
-                        background: form.happyWithSupport===opt ? 'var(--blt)' : 'var(--s2)',
-                        color: form.happyWithSupport===opt ? 'var(--b2)' : 'var(--t2)' }}>
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Q3 */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>
-                  What do you need the most help with? <span style={{ fontWeight: 400, textTransform: 'none' }}>(check all that apply)</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {HELP_OPTIONS.map(opt => (
-                    <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', color: 'var(--t2)' }}>
-                      <input type="checkbox" checked={form.helpNeeded.includes(opt)} onChange={() => toggleHelp(opt)} />
-                      {opt}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Q4 */}
-              <div className="field" style={{ marginBottom: 18 }}>
-                <label>Anything else you'd like to share before the call? <span style={{ fontWeight: 400, color: 'var(--t3)', textTransform: 'none' }}>(optional)</span></label>
-                <textarea rows={3} value={form.extraInfo} onChange={e => fld('extraInfo', e.target.value)} placeholder="Tell us a bit more..." />
-              </div>
-
-              <button className="btn pri" style={{ width: '100%', justifyContent: 'center', padding: 11, fontSize: 14, fontWeight: 700 }}
-                onClick={() => setStep('schedule')}>
-                Continue to Scheduling →
-              </button>
-            </>
           ) : (
             <>
+              {/* Lead qualification questions (lead mode only) */}
               {mode === 'lead' && (
-                <button onClick={() => setStep('qualify')} style={{ background: 'none', border: 'none', color: 'var(--t3)', fontSize: 12, cursor: 'pointer', padding: 0, marginBottom: 14 }}>
-                  ← Back to questions
-                </button>
+                <>
+                  <div style={{ fontSize: 13, color: 'var(--t2)', marginBottom: 16 }}>
+                    A few quick questions before we schedule — this helps our team prep for the call.
+                  </div>
+
+                  {/* Q1 */}
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>
+                      Are you the key decision maker?
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {['Yes','No'].map(opt => (
+                        <button key={opt} onClick={() => fld('decisionMaker', opt)}
+                          style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                            border: form.decisionMaker===opt ? '1.5px solid var(--blue)' : '1px solid var(--br)',
+                            background: form.decisionMaker===opt ? 'var(--blt)' : 'var(--s2)',
+                            color: form.decisionMaker===opt ? 'var(--b2)' : 'var(--t2)' }}>
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Q2 */}
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>
+                      Are you happy with your current tax & accounting support?
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {['Yes','No','They could be better'].map(opt => (
+                        <button key={opt} onClick={() => fld('happyWithSupport', opt)}
+                          style={{ flex: '1 1 auto', padding: '8px 10px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+                            border: form.happyWithSupport===opt ? '1.5px solid var(--blue)' : '1px solid var(--br)',
+                            background: form.happyWithSupport===opt ? 'var(--blt)' : 'var(--s2)',
+                            color: form.happyWithSupport===opt ? 'var(--b2)' : 'var(--t2)' }}>
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Q3 */}
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>
+                      What do you need the most help with? <span style={{ fontWeight: 400, textTransform: 'none' }}>(check all that apply)</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {HELP_OPTIONS.map(opt => (
+                        <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', color: 'var(--t2)' }}>
+                          <input type="checkbox" checked={form.helpNeeded.includes(opt)} onChange={() => toggleHelp(opt)} />
+                          {opt}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Q4 */}
+                  <div className="field" style={{ marginBottom: 18 }}>
+                    <label>Anything else you'd like to share before the call? <span style={{ fontWeight: 400, color: 'var(--t3)', textTransform: 'none' }}>(optional)</span></label>
+                    <textarea rows={3} value={form.extraInfo} onChange={e => fld('extraInfo', e.target.value)} placeholder="Tell us a bit more..." />
+                  </div>
+
+                  <div style={{ borderTop: '1px solid var(--br)', margin: '4px 0 18px' }} />
+                </>
               )}
 
               {/* Appointment type chips */}
