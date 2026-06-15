@@ -23,11 +23,20 @@ export default function Dialer() {
   const [elapsed, setElapsed]   = useState(0)
   const timerRef = useRef(null)
 
+  const [clientQueue, setClientQueue] = useState([])
+
   useEffect(() => {
     loadLeads(); loadCallLog()
     // Pick up number passed from client phone link
     const pre = sessionStorage.getItem('dialerNumber')
-    if (pre) { setDialpad(pre); sessionStorage.removeItem('dialerNumber') }
+    if (pre) {
+      setDialpad(pre)
+      sessionStorage.removeItem('dialerNumber')
+      sessionStorage.removeItem('dialerName')
+    }
+    // Load client call queue (from "Add to Call Queue" on Clients page)
+    const q = JSON.parse(sessionStorage.getItem('dialerQueue')||'[]')
+    setClientQueue(q)
   }, [])
 
   async function loadLeads() {
@@ -102,6 +111,13 @@ export default function Dialer() {
 
     showToast('Call logged!')
     setLogModal(false)
+    if (active.status === 'Client Queue') {
+      setClientQueue(q => {
+        const next = q.filter(e => e.phone !== active.phone)
+        sessionStorage.setItem('dialerQueue', JSON.stringify(next))
+        return next
+      })
+    }
     setActive(null)
     setElapsed(0)
     loadCallLog()
@@ -122,6 +138,24 @@ export default function Dialer() {
     if (!dialpad) return
     const fakeLead = { id: null, name: 'Manual Dial', first: 'Manual', last: 'Dial', phone: dialpad, status: 'Manual' }
     startCall(fakeLead)
+  }
+
+  function callQueueEntry(entry) {
+    const fakeLead = { id: null, name: entry.name || 'Client', first: entry.name||'', last: '', phone: entry.phone, status: 'Client Queue' }
+    startCall(fakeLead)
+  }
+
+  function removeFromQueue(idx) {
+    setClientQueue(q => {
+      const next = q.filter((_,i)=>i!==idx)
+      sessionStorage.setItem('dialerQueue', JSON.stringify(next))
+      return next
+    })
+  }
+
+  function clearQueue() {
+    setClientQueue([])
+    sessionStorage.removeItem('dialerQueue')
   }
 
   const DIALPAD_KEYS = [
@@ -227,6 +261,48 @@ export default function Dialer() {
 
         {/* ── Right: Queue + Log ─────────────────────────────────────── */}
         <div style={{ flex: 1 }}>
+
+          {/* Client Call Queue (added via Clients page "Add to Call Queue") */}
+          {clientQueue.length > 0 && (
+            <div className="card" style={{ marginBottom: 12 }}>
+              <div className="ch">
+                <span className="ct">📇 Client Call Queue ({clientQueue.length})</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn pri" style={{ padding: '5px 12px', fontSize: 12 }}
+                    onClick={() => callQueueEntry(clientQueue[0])} disabled={calling}>
+                    📞 Call Next
+                  </button>
+                  <button className="btn sec" style={{ padding: '5px 12px', fontSize: 12 }} onClick={clearQueue}>
+                    Clear Queue
+                  </button>
+                </div>
+              </div>
+              <div className="ovx">
+                <table>
+                  <thead><tr><th>Name</th><th>Phone</th><th></th></tr></thead>
+                  <tbody>
+                    {clientQueue.map((entry, i) => (
+                      <tr key={i}>
+                        <td style={{ fontWeight: 600 }}>{entry.name || 'Unknown'}</td>
+                        <td style={{ fontFamily: 'monospace', color: 'var(--t2)' }}>{entry.phone}</td>
+                        <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <button className="btn pri" style={{ padding: '5px 12px', fontSize: 12 }}
+                            onClick={() => callQueueEntry(entry)} disabled={calling}>
+                            📞 Call
+                          </button>
+                          <button className="btn sec" style={{ padding: '5px 8px', fontSize: 12 }}
+                            onClick={() => removeFromQueue(i)}>
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* Tabs */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
             {[['queue', `📋 Call Queue (${leads.length})`], ['log', `📞 Call History (${callLog.length})`]].map(([key, label]) => (

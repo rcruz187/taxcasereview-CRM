@@ -5,6 +5,7 @@ import ErrorBoundary from '../components/ErrorBoundary'
 import BookingWidget from '../components/BookingWidget'
 import FinancialProfile from './FinancialProfile'
 import { supabase } from '../lib/supabase'
+import { useApp } from '../context/AppContext'
 import { generateServiceAgreement, generateAddendum, generateEngagementLetter, generatePOACoverLetter, sendFullPackage } from '../lib/docUtils'
 
 const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']
@@ -34,29 +35,74 @@ const BLANK = {
 }
 
 function Bdg({s,c}) { return <span className={`bdg ${c||'bn'}`}>{s}</span> }
-function PhoneLink({val}) {
+function PhoneLink({val, name}) {
   const nav = useNavigate()
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [open])
+
   if (!val) return <span style={{color:'var(--t3)'}}>—</span>
+  const digits = val.replace(/\D/g,'')
+
+  function callNow() {
+    sessionStorage.setItem('dialerNumber', digits)
+    sessionStorage.setItem('dialerName', name||'')
+    nav('/dialer')
+    setOpen(false)
+  }
+
+  function addToQueue() {
+    const queue = JSON.parse(sessionStorage.getItem('dialerQueue')||'[]')
+    queue.push({ name: name||'', phone: digits })
+    sessionStorage.setItem('dialerQueue', JSON.stringify(queue))
+    setOpen(false)
+  }
+
+  function copyNumber() {
+    navigator.clipboard?.writeText(val)
+    setOpen(false)
+  }
+
   return (
-    <span
-      onClick={() => {
-        sessionStorage.setItem('dialerNumber', val.replace(/\D/g,''))
-        nav('/dialer')
-      }}
-      style={{color:'var(--blue)',textDecoration:'none',fontWeight:600,display:'inline-flex',alignItems:'center',gap:5,cursor:'pointer'}}
-      onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
-      onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.18 1h3a2 2 0 012 1.72 12.05 12.05 0 00.7 2.81 2 2 0 01-.45 2.11L4.91 8.15a16 16 0 006.29 6.29l1.51-1.52a2 2 0 012.11-.45 12.05 12.05 0 002.81.7A2 2 0 0122 16.92z"/></svg>
-      {val}
-    </span>
+    <div ref={ref} style={{position:'relative',display:'inline-block'}}>
+      <span
+        onClick={() => setOpen(o=>!o)}
+        style={{color:'var(--blue)',textDecoration:'none',fontWeight:600,display:'inline-flex',alignItems:'center',gap:5,cursor:'pointer'}}
+        onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
+        onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.18 1h3a2 2 0 012 1.72 12.05 12.05 0 00.7 2.81 2 2 0 01-.45 2.11L4.91 8.15a16 16 0 006.29 6.29l1.51-1.52a2 2 0 012.11-.45 12.05 12.05 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+        {val}
+      </span>
+      {open && (
+        <div style={{
+          position:'absolute', top:'calc(100% + 4px)', left:0, zIndex:50,
+          background:'var(--s2)', border:'1px solid var(--br)', borderRadius:8,
+          boxShadow:'0 6px 20px rgba(0,0,0,.35)', minWidth:180, overflow:'hidden'
+        }}>
+          <button onClick={callNow} style={menuBtnStyle}>📞 Call via Dialer</button>
+          <button onClick={addToQueue} style={menuBtnStyle}>➕ Add to Call Queue</button>
+          <button onClick={copyNumber} style={menuBtnStyle}>📋 Copy Number</button>
+        </div>
+      )}
+    </div>
   )
 }
-function DR({label,val}) {
+const menuBtnStyle = {
+  display:'block', width:'100%', textAlign:'left', padding:'9px 14px', fontSize:12.5,
+  background:'none', border:'none', color:'var(--tx)', cursor:'pointer'
+}
+function DR({label,val,name}) {
   const isPhone = label==='Phone'||label==='Phone 2'||label==='Phone2'
   const renderVal = () => {
     if (!val) return <span style={{color:'var(--t3)'}}>—</span>
     if (isPhone) return (
-      <PhoneLink val={val}/>
+      <PhoneLink val={val} name={name}/>
     )
     return val
   }
@@ -414,6 +460,7 @@ export default function Clients() {
   const navigate = useNavigate()
   const { id: urlId } = useParams()
   const [searchParams] = useSearchParams()
+  const { user } = useApp()
 
   useEffect(() => {
     if (searchParams.get('new') === '1') {
@@ -688,6 +735,8 @@ export default function Clients() {
                 <div key={s.key} style={{display:'flex',alignItems:'center'}}>
                   <div
                     onClick={async()=>{
+                      if (s.key === c.pipelineStage) return // no-op if clicking current stage
+                      const prevStage = PIPELINE_STAGES.find(p=>p.key===(c.pipelineStage||'investigation'))
                       // Try to update pipelineStage (run SQL: alter table clients add column if not exists "pipelineStage" text default 'investigation')
                       const {error}=await supabase.from('clients').update({pipelineStage:s.key}).eq('id',c.id)
                       if(error){
@@ -698,6 +747,14 @@ export default function Clients() {
                       }
                       const {data}=await supabase.from('clients').select('*').eq('id',c.id).single()
                       if(data)setDetail(data)
+                      // Log the stage change as a note
+                      const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+                      const noteContent = `📊 Pipeline stage changed: ${prevStage?.label||'—'} → ${s.label}`
+                      const {error:noteErr} = await supabase.from('client_notes').insert({client_name:c.name,content:noteContent,created_by:actor})
+                      if(!noteErr && detail?.id===c.id){
+                        const{data:notesData}=await supabase.from('client_notes').select('*').eq('client_name',c.name).order('created_at',{ascending:false})
+                        if(notesData)setRelNotes(notesData)
+                      }
                     }}
                     style={{
                       padding:'5px 10px',borderRadius:20,fontSize:11,fontWeight:600,cursor:'pointer',
@@ -1009,8 +1066,8 @@ export default function Clients() {
             {/* Contact Info */}
             <div className="card">
               <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>Contact Info</div>
-              <DR label="Phone"   val={c.phone}/>
-              <DR label="Phone 2" val={c.phone2}/>
+              <DR label="Phone"   val={c.phone} name={c.name}/>
+              <DR label="Phone 2" val={c.phone2} name={c.name}/>
               <DR label="Email"   val={c.email}/>
               <DR label="Address" val={[c.street,c.city,c.state,c.zip].filter(Boolean).join(', ')}/>
               <DR label="County"  val={c.county}/>
@@ -1230,7 +1287,7 @@ export default function Clients() {
                 <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>openDetail(c)}>
                   <td style={{fontWeight:600}}>{c.name}</td>
                   <td><span className="bdg bb">{c.clientType||'Individual'}</span></td>
-                  <td><PhoneLink val={c.phone}/></td>
+                  <td onClick={e=>e.stopPropagation()}><PhoneLink val={c.phone} name={c.name}/></td>
                   <td style={{color:'var(--t2)',fontSize:12}}>{c.email||'—'}</td>
                   <td>{formatBalance(c.irsBalance)}</td>
                   <td>{c.issueType||'—'}</td>
