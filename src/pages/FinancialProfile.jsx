@@ -28,18 +28,19 @@ const BLANK_PROFILE = {
   f433_extra:{}
 }
 
-// 2026 IRS Collection Financial Standards
+// 2025 IRS Collection Financial Standards (effective April 21, 2025, in effect through June 2026)
 const NATIONAL_STANDARD_FOOD_CLOTHING = (hh) => {
   if (hh <= 0) return 0
-  if (hh === 1) return 836
-  if (hh === 2) return 1478
-  if (hh === 3) return 1694
-  if (hh === 4) return 2054
-  return 2054 + (hh - 4) * 389
+  if (hh === 1) return 839
+  if (hh === 2) return 1481
+  if (hh === 3) return 1753
+  if (hh === 4) return 2129
+  return 2129 + (hh - 4) * 394
 }
-const OOP_HEALTH_UNDER65 = 68
-const OOP_HEALTH_65PLUS = 142
-const VEHICLE_OWNERSHIP_STD = { 0: 0, 1: 617, 2: 1234 }
+const OOP_HEALTH_UNDER65 = 84
+const OOP_HEALTH_65PLUS = 149
+const VEHICLE_OWNERSHIP_STD = { 0: 0, 1: 662, 2: 1324 }
+const PUBLIC_TRANSPORTATION_STD = 244
 
 function n(v) { const x = parseFloat(v); return isNaN(x) ? 0 : x }
 function fmt(v) { return '$' + n(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
@@ -529,7 +530,7 @@ function calcExpenses(profile, totalHousehold) {
   const vehicle1Payment = n(vehicles[0]?.monthly_payment)
   const vehicle2Payment = n(vehicles[1]?.monthly_payment)
   const vehicleTotal = n(e.public_transportation) + vehicle1Payment + vehicle2Payment + n(e.car_misc)
-  const vehicleStd = (e.public_transportation ? 217 : 0) + (VEHICLE_OWNERSHIP_STD[Math.min(vehiclesWithPayment,2)] || 0)
+  const vehicleStd = (e.public_transportation ? PUBLIC_TRANSPORTATION_STD : 0) + (VEHICLE_OWNERSHIP_STD[Math.min(vehiclesWithPayment,2)] || 0)
 
   // Health Care
   const oopHealthStd = n(profile.household_under_65)*OOP_HEALTH_UNDER65 + n(profile.household_over_65)*OOP_HEALTH_65PLUS
@@ -662,10 +663,10 @@ function calcAssets(profile) {
 // ════════════════════════════════════════════════════════════════════════
 function ExpField({ label, k, expenses, set, std }) {
   return (
-    <div style={{display:'grid',gridTemplateColumns: std!==undefined ? '1fr 140px 120px' : '1fr 140px', gap:10, alignItems:'center', padding:'6px 0'}}>
-      <div style={{fontSize:13.5,color:'var(--t2)'}}>{label}</div>
+    <div style={{display:'grid',gridTemplateColumns: std!==undefined ? '1fr 140px 120px' : '1fr 140px', gap:10, alignItems:'center', padding:'7px 0'}}>
+      <div style={{fontSize:14,fontWeight:500,color:'var(--tx)'}}>{label}</div>
       <input type="number" value={expenses[k] ?? ''} onChange={e=>set('expenses.'+k, e.target.value)} placeholder="0.00"
-        style={{padding:'7px 10px',fontSize:13.5,background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)'}}/>
+        style={{padding:'8px 10px',fontSize:14,background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)'}}/>
       {std!==undefined && <div style={{fontSize:13,color:'var(--t3)',textAlign:'right'}}>Std: {fmt(std)}</div>}
     </div>
   )
@@ -708,11 +709,11 @@ function IETab({ profile, set, totalHousehold }) {
       <SectionHeader>Monthly Living Expenses</SectionHeader>
 
       <div style={{fontWeight:700,fontSize:13,marginTop:10,marginBottom:4,color:'var(--t2)'}}>Food, Clothing & Misc.</div>
-      <div style={{fontSize:12.5,color:'var(--t3)',marginBottom:6}}>National Standard for household of {totalHousehold}: {fmt(exp.foodClothingStd)}</div>
+      <div style={{fontSize:13,color:'var(--t2)',marginBottom:6}}>National Standard for household of {totalHousehold}: {fmt(exp.foodClothingStd)}</div>
       <ExpField label="Food, Clothing and Misc. (Actual — leave blank to use standard)" k="food_clothing" expenses={e} set={set} std={exp.foodClothingStd}/>
 
       <div style={{fontWeight:700,fontSize:13,marginTop:14,marginBottom:4,color:'var(--t2)'}}>Housing & Utilities</div>
-      <div style={{fontSize:12.5,color:'var(--t3)',marginBottom:6}}>1st/2nd mortgage pulled from Real Estate (Property 1): {fmt(n(re0.mortgage_1)+n(re0.mortgage_2))}</div>
+      <div style={{fontSize:13,color:'var(--t2)',marginBottom:6}}>1st/2nd mortgage pulled from Real Estate (Property 1): {fmt(n(re0.mortgage_1)+n(re0.mortgage_2))}</div>
       <ExpField label="Homeowner's Insurance" k="homeowners_insurance" expenses={e} set={set}/>
       <ExpField label="Property Taxes" k="property_taxes" expenses={e} set={set}/>
       <ExpField label="HOA Dues" k="hoa_dues" expenses={e} set={set}/>
@@ -733,7 +734,7 @@ function IETab({ profile, set, totalHousehold }) {
       <div style={{fontSize:12.5,color:'var(--t3)',marginBottom:6}}>
         Vehicle 1/2 payments pulled from Vehicles: {fmt(exp.vehicle1Payment)} / {fmt(exp.vehicle2Payment)} (Std $588 each)
       </div>
-      <ExpField label="Public Transportation (Std $217)" k="public_transportation" expenses={e} set={set}/>
+      <ExpField label="Public Transportation (Std $244)" k="public_transportation" expenses={e} set={set}/>
       <ExpField label="Car Misc (Operating Expenses)" k="car_misc" expenses={e} set={set}/>
       <SubtotalRow label="Vehicle Subtotal" value={exp.vehicleTotal}/>
 

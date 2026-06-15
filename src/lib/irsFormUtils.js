@@ -644,7 +644,7 @@ export async function fillForm433H(client, profile) {
 
   // ── Page 3: Section E (Employment) / F (Non-wage income) / G (Expenses) ──
   const p3 = 'form1[0].page_3[0]';
-  setText(`${p3}.CountyResidence[0]`, p.county || '');
+  // (page-3 "CountyResidence" field is actually the Notes box — leave blank)
   setText(`${p3}.sectionE[0].column_1[0].fieldXmlnshttpwwwxfa[0]`, et1.employer || '');
   setText(`${p3}.sectionE[0].column_2[0].FillText65[0]`, es1.employer || '');
   setText(`${p3}.sectionE[0].column_1[0].GrossPerPayPeriod[0]`, money(et1.gross_monthly_salary));
@@ -740,8 +740,11 @@ export async function fillForm433B(client, profile) {
   const base = 'topmostSubform[0].Page1[0]';
   const bizName = b1.name || client?.business_name || client?.name || '';
   setText(`${base}.Line1a-f[0].p1_1_1a[0]`, bizName);
-  const bizAddr = b1.address || [client?.street, [client?.city, client?.state, client?.zip].filter(Boolean).join(', ')].filter(Boolean).join(', ');
-  setText(`${base}.Line1a-f[0].p1_3_1b[0]`, bizAddr);
+  const bizStreet = b1.address ? b1.address.split(',')[0] : (client?.street || '');
+  setText(`${base}.Line1a-f[0].p1_3_1b[0]`, bizStreet);
+  setText(`${base}.Line1a-f[0].p1_5_1bCity[0]`, client?.city || '');
+  setText(`${base}.Line1a-f[0].p1_6_1bstate[0]`, client?.state || '');
+  setText(`${base}.Line1a-f[0].p1_7_1bZIP[0]`, client?.zip || '');
   setText(`${base}.Line1a-f[0].p1_8_1c[0]`, p.county || '');
   const [pArea, pNum] = splitPhone(client?.phone);
   setText(`${base}.Line1a-f[0].p1_9_1d_3digits[0]`, pArea);
@@ -813,11 +816,11 @@ export async function fillForm433AOIC(client, profile) {
     setText(`${s1}.SSN_4[0]`, ssnDigits.slice(5));
   }
 
-  // Marital status
+  // Marital status: CB_01[0]=Unmarried, CB_02[0]=Married
   if (p.filing_status) {
     const fs = p.filing_status.toLowerCase();
-    if (fs.includes('married')) setCheck(`${s1}.MaritalStatus[0].CB_01[0]`, true);
-    else setCheck(`${s1}.MaritalStatus[0].CB_02[0]`, true);
+    if (fs.includes('married')) setCheck(`${s1}.MaritalStatus[0].CB_02[0]`, true);
+    else setCheck(`${s1}.MaritalStatus[0].CB_01[0]`, true);
   }
 
   setText(`${s1}.Home_Address[0]`, [client?.street, [client?.city, client?.state, client?.zip].filter(Boolean).join(', ')].filter(Boolean).join(', '));
@@ -841,6 +844,13 @@ export async function fillForm433AOIC(client, profile) {
     const spFirst = spParts.length > 1 ? spParts.slice(0, -1).join(' ') : '';
     setText(`${s1}.Spouse_Last_Name[0]`, spLast);
     setText(`${s1}.Spouse_First_Name[0]`, spFirst);
+  }
+  // Spouse SSN (3-2-4 split, second widget set [1])
+  const spouseSsnDigits = (client?.spouseSsn || '').replace(/\D/g, '');
+  if (spouseSsnDigits.length === 9) {
+    setText(`${s1}.SSN_3[1]`, spouseSsnDigits.slice(0, 3));
+    setText(`${s1}.SSN_2[1]`, spouseSsnDigits.slice(3, 5));
+    setText(`${s1}.SSN_4[1]`, spouseSsnDigits.slice(5));
   }
 
   // Dependents
