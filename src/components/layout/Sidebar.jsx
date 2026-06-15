@@ -56,8 +56,8 @@ const SECTIONS = [
     items: [
       { path: '/transcripts', icon: DocIcon,   label: 'Transcripts',   section: 'transcripts' },
       { path: '/irsforms',    icon: FormIcon,  label: 'IRS Forms',     section: 'irsforms' },
-      { path: '/taxreturns',  icon: ReturnIcon,label: 'Tax Returns',   section: 'taxreturns' },
       { path: '/irsreference', icon: PhoneBookIcon, label: 'IRS Reference', section: 'irsreference' },
+      { path: '/taxreturns',  icon: ReturnIcon,label: 'Tax Returns',   section: 'taxreturns' },
     ]
   },
   {
