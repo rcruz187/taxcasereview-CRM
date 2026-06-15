@@ -1059,6 +1059,7 @@ export default function Clients() {
           )}
         </div>
 
+        {detailTab==='overview' && (
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,alignItems:'start'}}>
           {/* LEFT COLUMN */}
           <div style={{display:'flex',flexDirection:'column',gap:12}}>
@@ -1123,6 +1124,7 @@ export default function Clients() {
 
           </div>
         </div>
+        )}
 
         {editModal&&<ClientFormModal form={form} fld={fld} reps={reps} saving={saving} onSave={saveEdit} onClose={()=>setEditModal(false)} title="Edit Client"/>}
 
