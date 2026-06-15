@@ -4,6 +4,16 @@ import { useApp } from '../context/AppContext'
 
 const CATEGORIES = ['IRS Phone Numbers', 'Mailing Addresses', 'State Info', 'Rep Info', 'Tips & Procedures', 'Other']
 
+const STATE_NAMES = {
+  AL:'Alabama', AZ:'Arizona', AR:'Arkansas', CA:'California', CO:'Colorado', CT:'Connecticut',
+  DE:'Delaware', FL:'Florida', GA:'Georgia', HI:'Hawaii', ID:'Idaho', IL:'Illinois', IN:'Indiana',
+  IA:'Iowa', KS:'Kansas', KY:'Kentucky', LA:'Louisiana', ME:'Maine', MD:'Maryland', MA:'Massachusetts',
+  MI:'Michigan', MN:'Minnesota', MS:'Mississippi', MO:'Missouri', MT:'Montana', NE:'Nebraska',
+  NJ:'New Jersey', NM:'New Mexico', NY:'New York', NC:'North Carolina', ND:'North Dakota', OH:'Ohio',
+  OK:'Oklahoma', OR:'Oregon', PA:'Pennsylvania', RI:'Rhode Island', SC:'South Carolina', TN:'Tennessee',
+  TX:'Texas', UT:'Utah', VA:'Virginia', DC:'Washington D.C.', WV:'West Virginia', WI:'Wisconsin', WY:'Wyoming',
+}
+
 const blankEntry = { category: 'IRS Phone Numbers', title: '', content: '', notes: '', state: '', sort_order: 0 }
 
 export default function IrsReference() {
@@ -11,6 +21,7 @@ export default function IrsReference() {
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch]   = useState('')
+  const [stateFilter, setStateFilter] = useState('')
   const [modal, setModal]     = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm]       = useState(blankEntry)
@@ -76,14 +87,20 @@ export default function IrsReference() {
   }
 
   const q = search.trim().toLowerCase()
-  const filtered = entries.filter(e =>
-    !q ||
-    e.title?.toLowerCase().includes(q) ||
-    e.content?.toLowerCase().includes(q) ||
-    e.notes?.toLowerCase().includes(q) ||
-    e.category?.toLowerCase().includes(q) ||
-    e.state?.toLowerCase().includes(q)
-  )
+  const filtered = entries.filter(e => {
+    if (stateFilter && e.state !== stateFilter) return false
+    return !q ||
+      e.title?.toLowerCase().includes(q) ||
+      e.content?.toLowerCase().includes(q) ||
+      e.notes?.toLowerCase().includes(q) ||
+      e.category?.toLowerCase().includes(q) ||
+      e.state?.toLowerCase().includes(q) ||
+      (e.state && STATE_NAMES[e.state]?.toLowerCase().includes(q))
+  })
+
+  // All distinct states present, for the filter dropdown
+  const statesPresent = [...new Set(entries.filter(e => e.state).map(e => e.state))]
+    .sort((a, b) => (STATE_NAMES[a] || a).localeCompare(STATE_NAMES[b] || b))
 
   // Group by category, preserving category order
   const grouped = {}
@@ -92,6 +109,17 @@ export default function IrsReference() {
     grouped[e.category].push(e)
   }
   const categoryOrder = [...CATEGORIES.filter(c => grouped[c]), ...Object.keys(grouped).filter(c => !CATEGORIES.includes(c))]
+
+  // For 'State Info', further group by state
+  function groupByState(list) {
+    const byState = {}
+    for (const e of list) {
+      const key = e.state || '—'
+      if (!byState[key]) byState[key] = []
+      byState[key].push(e)
+    }
+    return Object.entries(byState).sort(([a], [b]) => (STATE_NAMES[a] || a).localeCompare(STATE_NAMES[b] || b))
+  }
 
   return (
     <div>
@@ -102,6 +130,13 @@ export default function IrsReference() {
           <div style={{ fontSize: 13, color: 'var(--t3)' }}>Phone numbers, addresses, and tips — shared by the whole team</div>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <select
+            value={stateFilter} onChange={e => setStateFilter(e.target.value)}
+            style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--tx)', fontSize: 13 }}
+          >
+            <option value="">All States</option>
+            {statesPresent.map(s => <option key={s} value={s}>{STATE_NAMES[s] || s}</option>)}
+          </select>
           <input
             value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search…"
@@ -129,42 +164,28 @@ export default function IrsReference() {
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>
                 {cat}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
-                {grouped[cat].map(entry => (
-                  <div key={entry.id} className="card" style={{ padding: 16 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--tx)' }}>
-                          {entry.title}
-                          {entry.state && (
-                            <span style={{
-                              marginLeft: 8, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 12,
-                              background: 'var(--blt)', color: 'var(--b2)', border: '1px solid var(--blue)'
-                            }}>{entry.state}</span>
-                          )}
-                        </div>
-                        {entry.content && (
-                          <div style={{ fontSize: 14, color: 'var(--t2)', marginTop: 6, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-                            {entry.content}
-                          </div>
-                        )}
-                        {entry.notes && (
-                          <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 6, lineHeight: 1.5 }}>
-                            {entry.notes}
-                          </div>
-                        )}
+              {cat === 'State Info' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {groupByState(grouped[cat]).map(([st, list]) => (
+                    <div key={st}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--tx)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 12,
+                          background: 'var(--blt)', color: 'var(--b2)', border: '1px solid var(--blue)'
+                        }}>{st}</span>
+                        {STATE_NAMES[st] || st}
                       </div>
-                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                        {entry.content && (
-                          <button className="btn sm" onClick={() => copyToClipboard(entry.content)} title="Copy">📋</button>
-                        )}
-                        <button className="btn sm" onClick={() => openEdit(entry)} title="Edit">Edit</button>
-                        <button className="btn sm" onClick={() => setConfirmDel(entry.id)} title="Delete" style={{ color: 'var(--bad)' }}>✕</button>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
+                        {list.map(entry => <EntryCard key={entry.id} entry={entry} showState={false} onCopy={copyToClipboard} onEdit={openEdit} onDelete={setConfirmDel} />)}
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
+                  {grouped[cat].map(entry => <EntryCard key={entry.id} entry={entry} showState onCopy={copyToClipboard} onEdit={openEdit} onDelete={setConfirmDel} />)}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -199,7 +220,10 @@ export default function IrsReference() {
               </div>
               <div className="field">
                 <label>State <span style={{ fontWeight: 400, color: 'var(--t3)', textTransform: 'none' }}>(optional — for state-specific entries)</span></label>
-                <input value={form.state} onChange={e => setForm(f => ({ ...f, state: e.target.value.toUpperCase().slice(0,2) }))} placeholder="e.g. FL"/>
+                <select value={form.state} onChange={e => setForm(f => ({ ...f, state: e.target.value }))}>
+                  <option value="">— None (federal/general) —</option>
+                  {Object.entries(STATE_NAMES).map(([code, name]) => <option key={code} value={code}>{name} ({code})</option>)}
+                </select>
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--br)' }}>
@@ -226,6 +250,43 @@ export default function IrsReference() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function EntryCard({ entry, showState, onCopy, onEdit, onDelete }) {
+  return (
+    <div className="card" style={{ padding: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--tx)' }}>
+            {entry.title}
+            {showState && entry.state && (
+              <span style={{
+                marginLeft: 8, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 12,
+                background: 'var(--blt)', color: 'var(--b2)', border: '1px solid var(--blue)'
+              }}>{entry.state}</span>
+            )}
+          </div>
+          {entry.content && (
+            <div style={{ fontSize: 14, color: 'var(--t2)', marginTop: 6, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+              {entry.content}
+            </div>
+          )}
+          {entry.notes && (
+            <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 6, lineHeight: 1.5 }}>
+              {entry.notes}
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+          {entry.content && (
+            <button className="btn sm" onClick={() => onCopy(entry.content)} title="Copy">📋</button>
+          )}
+          <button className="btn sm" onClick={() => onEdit(entry)} title="Edit">Edit</button>
+          <button className="btn sm" onClick={() => onDelete(entry.id)} title="Delete" style={{ color: 'var(--bad)' }}>✕</button>
+        </div>
+      </div>
     </div>
   )
 }
