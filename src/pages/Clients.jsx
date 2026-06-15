@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import IRSFormFiller from '../components/IRSFormFiller'
 import ErrorBoundary from '../components/ErrorBoundary'
 import BookingWidget from '../components/BookingWidget'
+import FinancialProfile from './FinancialProfile'
 import { supabase } from '../lib/supabase'
 import { generateServiceAgreement, generateAddendum, generateEngagementLetter, generatePOACoverLetter, sendFullPackage } from '../lib/docUtils'
 
@@ -779,6 +780,7 @@ export default function Clients() {
           <div style={{display:'flex',borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
             {[
               {key:'overview', label:'📋 Overview'},
+              {key:'finprofile', label:'🧮 Financial Profile'},
               {key:'docs',     label:'📁 Docs'},
               {key:'notes',    label:'📝 Notes'},
               {key:'payments', label:'💳 Payments'},
@@ -818,6 +820,15 @@ export default function Clients() {
                   <div style={{fontSize:22,fontWeight:800,color:'var(--ok)'}}>{relPayments.length}</div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Financial Profile Tab */}
+          {detailTab==='finprofile'&&(
+            <div style={{padding:16}}>
+              <ErrorBoundary>
+                <FinancialProfile clientName={c.name}/>
+              </ErrorBoundary>
             </div>
           )}
 
