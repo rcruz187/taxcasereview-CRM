@@ -63,6 +63,7 @@ export default function FinancialProfile({ clientName, client }) {
   const [profile, setProfile] = useState(BLANK_PROFILE)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [dirty, setDirty] = useState(false)
 
   useEffect(() => { load() }, [clientName])
@@ -188,6 +189,22 @@ export default function FinancialProfile({ clientName, client }) {
     setDirty(false)
   }
 
+  async function exportExcel() {
+    setExporting(true)
+    try {
+      const { data: recs, error } = await supabase.from('client_compliance_records')
+        .select('*').eq('client_name', clientName)
+      if (error) { showToast('Error loading compliance data: '+error.message, 'err'); return }
+      const { exportFinancialProfileToExcel } = await import('../lib/financialProfileExport')
+      exportFinancialProfileToExcel(profile, client, recs || [])
+      showToast('📥 Exported Financial Profile to Excel')
+    } catch (err) {
+      showToast('Export error: '+err.message, 'err')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   if (loading) return <div style={{padding:24,textAlign:'center',color:'var(--t3)'}}>Loading…</div>
 
   const totalHousehold = n(profile.household_under_65) + n(profile.household_over_65)
@@ -216,6 +233,7 @@ export default function FinancialProfile({ clientName, client }) {
         ))}
         <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:10}}>
           {dirty && <span style={{fontSize:11,color:'var(--warn)'}}>Unsaved changes</span>}
+          <button className="btn sec" style={{marginBottom:6}} onClick={exportExcel} disabled={exporting}>{exporting?'Exporting…':'📥 Export to Excel'}</button>
           <button className="btn pri" style={{marginBottom:6}} onClick={save} disabled={saving}>{saving?'Saving…':'💾 Save Profile'}</button>
         </div>
       </div>
