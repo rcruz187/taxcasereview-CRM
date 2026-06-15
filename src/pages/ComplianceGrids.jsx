@@ -68,7 +68,7 @@ function GridRow({ rec, onChange, showQuarter, csedYears }) {
       <td style={{padding:'4px 6px'}}><input type="date" value={rec.assessment_date||''} onChange={e=>handle('assessment_date', e.target.value)} style={{...inpStyle,width:130}}/></td>
       <td style={{padding:'4px 6px'}}>
         <input type="date" value={rec.csed||''} onChange={e=>handle('csed', e.target.value)} style={{...inpStyle,width:130,
-          ...(rec.csed && new Date(rec.csed) < new Date() ? {color:'var(--err)',fontWeight:700} : {})}}/>
+          ...(rec.csed && new Date(rec.csed) < new Date() ? {color:'var(--bad)',fontWeight:700} : {})}}/>
       </td>
     </tr>
   )
@@ -108,7 +108,7 @@ function FormGrid({ clientName, formType, records, onSaveRow }) {
         <div style={{fontSize:11,color:'var(--t3)'}}>
           Total Amount: <strong style={{color:'var(--tx)'}}>{fmt(totalAmount)}</strong>
           {' · '}Total Credits: <strong style={{color:'var(--tx)'}}>{fmt(totalCredits)}</strong>
-          {overdueCount > 0 && <span style={{color:'var(--err)',fontWeight:700}}> · {overdueCount} CSED(s) expired</span>}
+          {overdueCount > 0 && <span style={{color:'var(--bad)',fontWeight:700}}> · {overdueCount} CSED(s) expired</span>}
         </div>
       </div>
       <div style={{overflowX:'auto'}}>
@@ -208,7 +208,7 @@ export default function ComplianceGrids({ clientName }) {
         <div className="card" style={{padding:'12px 16px',marginBottom:16,background:'var(--s2)'}}>
           <div style={{fontWeight:700,fontSize:12,marginBottom:6}}>CSED Summary</div>
           {expiredCsed.length > 0 && (
-            <div style={{fontSize:12,color:'var(--err)',marginBottom:4}}>
+            <div style={{fontSize:12,color:'var(--bad)',marginBottom:4}}>
               ⚠️ {expiredCsed.length} CSED(s) already expired: {expiredCsed.map(r=>`${FORM_META[r.form_type]?.label||r.form_type} ${r.tax_year}${r.quarter?` Q${r.quarter}`:''} (${r.csed})`).join(', ')}
             </div>
           )}

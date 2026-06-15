@@ -1,5 +1,3 @@
-import { useState } from 'react'
-
 function n(v) { const x = parseFloat(v); return isNaN(x) ? 0 : x }
 function fmt(v) { return '$' + n(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
@@ -110,7 +108,7 @@ function MissingYearCard({ row, idx, base, calc, onChange, onRemove }) {
       <div style={{fontSize:12,color:'var(--t3)',marginTop:4}}>
         Ratio to Base Year: {(result.ratio*100).toFixed(1)}% &nbsp;·&nbsp;
         Allocated Total Expenses: {fmt(result.totalExpenses)} &nbsp;·&nbsp;
-        Allocated Net Profit: <strong style={{color: result.netProfit>=0 ? 'var(--ok)' : 'var(--err)'}}>{fmt(result.netProfit)}</strong>
+        Allocated Net Profit: <strong style={{color: result.netProfit>=0 ? 'var(--ok)' : 'var(--bad)'}}>{fmt(result.netProfit)}</strong>
       </div>
     </div>
   )
@@ -174,7 +172,7 @@ export default function PnLTab({ profile, set }) {
 
       <div className="card" style={{padding:'14px 16px',background:'var(--blt)',marginTop:16,border:'1px solid var(--blue)'}}>
         <div className="dr"><span className="dl" style={{fontWeight:800,fontSize:14}}>Net Profit (Base Year)</span>
-          <span className="dv" style={{fontWeight:800,fontSize:14,color: calc.netProfit>=0 ? 'var(--b2)' : 'var(--err)'}}>{fmt(calc.netProfit)} <span style={{fontSize:11,fontWeight:400,color:'var(--t3)'}}>({fmt(calc.netProfit/12)}/mo)</span></span>
+          <span className="dv" style={{fontWeight:800,fontSize:14,color: calc.netProfit>=0 ? 'var(--b2)' : 'var(--bad)'}}>{fmt(calc.netProfit)} <span style={{fontSize:11,fontWeight:400,color:'var(--t3)'}}>({fmt(calc.netProfit/12)}/mo)</span></span>
         </div>
       </div>
 

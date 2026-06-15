@@ -148,7 +148,7 @@ export default function Email() {
                 🔗 Connect Gmail
               </button>
             ) : (
-              <button onClick={() => showToast('Go to Settings → Integrations to add your Gmail Client ID first')} style={{ width: '100%', padding: '5px 0', borderRadius: 6, border: 'none', background: 'var(--s2)', color: 'var(--t3)', cursor: 'pointer', fontSize: 11, border: '1px solid var(--br)' }}>
+              <button onClick={() => showToast('Go to Settings → Integrations to add your Gmail Client ID first')} style={{ width: '100%', padding: '5px 0', borderRadius: 6, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--t3)', cursor: 'pointer', fontSize: 11 }}>
                 ⚙️ Setup in Settings
               </button>
             )}

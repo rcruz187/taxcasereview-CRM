@@ -218,7 +218,7 @@ export default function Reports() {
           <button key={t.key} onClick={()=>setTab(t.key)}
             style={{padding:'7px 14px',fontSize:12,fontWeight:tab===t.key?700:400,
               borderBottom:tab===t.key?'2px solid var(--b2c)':'2px solid transparent',
-              background:'none',border:'none',borderBottom:tab===t.key?'2px solid var(--b2c)':'2px solid transparent',
+              background:'none',border:'none',
               color:tab===t.key?'var(--b2c)':'var(--t2)',cursor:'pointer',whiteSpace:'nowrap',
               paddingBottom:8}}>
             {t.label}
