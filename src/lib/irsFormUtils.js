@@ -202,7 +202,22 @@ export async function stampSignature(pdfBytes, formType, signatureText, dateText
   if (signatureText) {
     page.drawText(signatureText, { x: pos.sigX, y: pos.sigY, size: pos.size, font: sigFont });
   }
-  if (dateText) {
+
+  // 8821_business has a real AcroForm "Text3" field with an opaque white
+  // appearance sitting right on top of the date line — drawing text under
+  // it gets covered. Fill the field itself instead, then flatten.
+  if (dateText && formType === '8821_business') {
+    try {
+      const form = pdfDoc.getForm();
+      const dateField = form.getTextField('Text3');
+      dateField.setText(dateText);
+      dateField.setFontSize((pos.size || 12) - 1);
+      form.flatten();
+    } catch (_) {
+      // fallback to drawing if the field isn't where we expect
+      page.drawText(dateText, { x: pos.dateX, y: pos.dateY, size: (pos.size || 12) - 2, font: dateFont });
+    }
+  } else if (dateText) {
     page.drawText(dateText, { x: pos.dateX, y: pos.dateY, size: (pos.size || 12) - 2, font: dateFont });
   }
 
