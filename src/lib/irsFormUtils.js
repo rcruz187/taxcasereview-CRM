@@ -554,3 +554,302 @@ export async function fillForm433A(client, profile) {
   const filledBytes = await pdfDoc.save();
   return filledBytes;
 }
+
+// ─── 433-D, 433-H, 433-B, 433-A OIC ──────────────────────────────────────────
+
+F433_TEMPLATE_PATHS['433d'] = '433D_Blank.pdf';
+F433_TEMPLATE_PATHS['433h'] = '433H_Blank.pdf';
+F433_TEMPLATE_PATHS['433b'] = '433B_Blank.pdf';
+F433_TEMPLATE_PATHS['433a_oic'] = '433A_OIC_Blank.pdf';
+
+F433_LABELS['433d'] = 'Form 433-D — Installment Agreement';
+F433_LABELS['433h'] = 'Form 433-H — Installment Agreement Request & CIS';
+F433_LABELS['433b'] = 'Form 433-B — Collection Information Statement for Businesses';
+F433_LABELS['433a_oic'] = 'Form 433-A (OIC) — Collection Information Statement (Offer in Compromise)';
+
+// Fills Form 433-D (Installment Agreement). Mostly identifying info — the
+// payment terms (lines on Part 1) are left blank for the rep to fill in
+// once an agreement amount is negotiated with the IRS.
+export async function fillForm433D(client, profile) {
+  const templateBytes = await fetchTemplate(F433_TEMPLATE_PATHS['433d']);
+  const pdfDoc = await PDFDocument.load(templateBytes, { ignoreEncryption: true });
+  const form = pdfDoc.getForm();
+
+  const setText = (fieldName, value) => {
+    if (!fieldName) return;
+    try { form.getTextField(fieldName).setText(value != null ? String(value) : ''); } catch (_) {}
+  };
+
+  const base = 'form1[0].Page1_Part1[0]';
+  const nameAddr = [client?.name, client?.street, [client?.city, client?.state, client?.zip].filter(Boolean).join(', ')]
+    .filter(Boolean).join('\r');
+  setText(`${base}.NameAddressTaxpayer[0].NameAndAddress[0]`, nameAddr);
+  setText(`${base}.SSN_EIN[0].Taxpayer[0]`, client?.ssn || client?.ein || '');
+  setText(`${base}.SSN_EIN[0].Spouse[0]`, client?.spouseSsn || '');
+  const [hArea, hNum] = splitPhone(client?.phone);
+  setText(`${base}.SSN_EIN[0].Home[0]`, client?.phone ? `(${hArea}) ${hNum}` : '');
+  setText(`${base}.SSN_EIN[0].WorkCellBusiness[0]`, '');
+  setText(`${base}.SSN_EIN[0].OrWrite[0]`, [client?.city, client?.state, client?.zip].filter(Boolean).join(', '));
+
+  const filledBytes = await pdfDoc.save();
+  return filledBytes;
+}
+
+// Fills Form 433-H (Installment Agreement Request & Collection Information
+// Statement). Personal info, income, and expenses come from the client
+// record + Financial Profile. Part 1 payment terms left blank.
+export async function fillForm433H(client, profile) {
+  const templateBytes = await fetchTemplate(F433_TEMPLATE_PATHS['433h']);
+  const pdfDoc = await PDFDocument.load(templateBytes, { ignoreEncryption: true });
+  const form = pdfDoc.getForm();
+  const p = profile || {};
+  const et1 = p.employment_taxpayer_1 || {};
+  const es1 = p.employment_spouse_1 || {};
+  const b1 = p.business_1 || {};
+  const exp = p.expenses || {};
+  const re0 = (p.real_estate || [])[0] || {};
+  const extra = p.f433_extra || {};
+
+  const setText = (fieldName, value) => {
+    if (!fieldName) return;
+    try { form.getTextField(fieldName).setText(value != null ? String(value) : ''); } catch (_) {}
+  };
+  const setCheck = (fieldName, on) => {
+    if (!fieldName) return;
+    try { const f = form.getCheckBox(fieldName); if (on) f.check(); else f.uncheck(); } catch (_) {}
+  };
+
+  // ── Page 1: Header / Identifying info ──
+  const p1 = 'form1[0].page_1[0]';
+  const nameAddr = [client?.name, client?.street, [client?.city, client?.state, client?.zip].filter(Boolean).join(', ')]
+    .filter(Boolean).join('\r');
+  setText(`${p1}.address[0].NamesAddress[0]`, nameAddr);
+  setText(`${p1}.address[0].CountyResidence[0]`, p.county || '');
+  setText(`${p1}.ssn[0].YourSocialSecurityNu[0]`, client?.ssn || '');
+  setText(`${p1}.ssn[0].YourSpousesSocialSec[0]`, client?.spouseSsn || '');
+  const [hArea, hNum] = splitPhone(client?.phone);
+  setText(`${p1}.your_telephone[0].Home11[0]`, client?.phone ? `(${hArea}) ${hNum}` : '');
+  setText(`${p1}.Under65[0]`, p.household_under_65 ?? '');
+  setText(`${p1}._65Over[0]`, p.household_over_65 ?? '');
+
+  // ── Page 3: Section E (Employment) / F (Non-wage income) / G (Expenses) ──
+  const p3 = 'form1[0].page_3[0]';
+  setText(`${p3}.CountyResidence[0]`, p.county || '');
+  setText(`${p3}.sectionE[0].column_1[0].fieldXmlnshttpwwwxfa[0]`, et1.employer || '');
+  setText(`${p3}.sectionE[0].column_2[0].FillText65[0]`, es1.employer || '');
+  setText(`${p3}.sectionE[0].column_1[0].GrossPerPayPeriod[0]`, money(et1.gross_monthly_salary));
+  setText(`${p3}.sectionE[0].column_2[0].Gross1[0]`, money(es1.gross_monthly_salary));
+  setText(`${p3}.sectionE[0].column_1[0].TaxesPerPayPeriodFed[0]`, money(et1.fed_withheld));
+  setText(`${p3}.sectionE[0].column_1[0].State[0]`, money(et1.state_withheld));
+  setText(`${p3}.sectionE[0].column_1[0].Local[0]`, money(et1.ss_med_withheld));
+  setText(`${p3}.sectionE[0].column_2[0].Fed1[0]`, money(es1.fed_withheld));
+  setText(`${p3}.sectionE[0].column_2[0].State1[0]`, money(es1.state_withheld));
+  setText(`${p3}.sectionE[0].column_2[0].Local1[0]`, money(es1.ss_med_withheld));
+  setText(`${p3}.sectionE[0].column_1[0].HowLongAtCurrentEmpl[0]`, et1.length || '');
+  setText(`${p3}.sectionE[0].column_2[0].How_long_at_current_employer[0]`, es1.length || '');
+
+  const freqMapH = { 'Weekly': 'weekly', 'Bi-weekly': 'biweekly', 'Biweekly': 'biweekly', 'Semi-monthly': 'semi', 'Semimonthly': 'semi', 'Monthly': 'monthly' };
+  if (freqMapH[et1.pay_frequency]) setCheck(`${p3}.sectionE[0].column_1[0].${freqMapH[et1.pay_frequency]}[0]`, true);
+  if (freqMapH[es1.pay_frequency]) setCheck(`${p3}.sectionE[0].column_2[0].${freqMapH[es1.pay_frequency]}[0]`, true);
+
+  // Section F — non-wage income
+  setText(`${p3}.nsei[0]`, money(b1.net_income));
+
+  // Section G — expenses
+  setText(`${p3}.column_1[0].column_1[0].food_personal_care[0].food_personal_care[0].Row1[0].food_monthly[0]`, money(exp.food));
+  setText(`${p3}.column_1[0].column_1[0].food_personal_care[0].food_personal_care[0].Row2[0].housekeeping_monthly[0]`, money(exp.housekeeping_supplies));
+  setText(`${p3}.column_1[0].column_1[0].food_personal_care[0].food_personal_care[0].Row3[0].clothing_monthly[0]`, money(exp.clothing));
+  setText(`${p3}.column_1[0].column_1[0].food_personal_care[0].food_personal_care[0].Row4[0].personal_care_monthly[0]`, money(exp.personal_care));
+  setText(`${p3}.column_1[0].column_1[0].food_personal_care[0].food_personal_care[0].Row5[0].miscellaneous_monthly[0]`, money(exp.misc));
+  setText(`${p3}.column_1[0].column_1[0].food_personal_care[0].food_personal_care[0].Row6[0].total_monthly[0]`, money(exp.food_clothing));
+
+  setText(`${p3}.column_1[0].column_1[0].transportation[0].Row1[0].gas_monthly[0]`, money(exp.car_misc));
+  setText(`${p3}.column_1[0].column_1[0].transportation[0].Row2[0].transportation_monthly[0]`, money(exp.public_transportation));
+
+  setText(`${p3}.column_1[0].column_1[0].housing_utilities[0].Row1[0].rent_monthly[0]`, money(exp.rent));
+  setText(`${p3}.column_1[0].column_1[0].housing_utilities[0].Row2[0].electric_monthly[0]`,
+    money(n(exp.electricity) + n(exp.heating_gas) + n(exp.heating_propane) + n(exp.water_sewer_trash) + n(exp.waste_sewer) + n(exp.trash)));
+  setText(`${p3}.column_1[0].column_1[0].housing_utilities[0].Row3[0].telephone_monthly[0]`,
+    money(n(exp.cell_phone) + n(exp.internet) + n(exp.cable)));
+  setText(`${p3}.column_1[0].column_1[0].housing_utilities[0].Row4[0].real_estate_monthly[0]`,
+    money(n(exp.homeowners_insurance) + n(exp.property_taxes) + n(exp.hoa_dues) + n(exp.renters_insurance)));
+  setText(`${p3}.column_1[0].column_1[0].housing_utilities[0].Row5[0].maintenance_monthly[0]`,
+    money(n(exp.maintenance) + n(exp.pest_control) + n(exp.lawn)));
+  setText(`${p3}.column_1[0].column_1[0].housing_utilities[0].Row6[0].total_monthly[0]`,
+    money(n(re0.mortgage_1) + n(re0.mortgage_2) + n(exp.rent) + n(exp.electricity) + n(exp.heating_gas) + n(exp.heating_propane) +
+      n(exp.water_sewer_trash) + n(exp.waste_sewer) + n(exp.trash) + n(exp.cell_phone) + n(exp.internet) + n(exp.cable) +
+      n(exp.homeowners_insurance) + n(exp.property_taxes) + n(exp.hoa_dues) + n(exp.renters_insurance) +
+      n(exp.maintenance) + n(exp.pest_control) + n(exp.lawn)));
+
+  setText(`${p3}.column_2[0].column_2[0].medical[0].Row1[0].health_monthly[0]`,
+    money(n(exp.health_major_medical) + n(exp.health_supplemental) + n(exp.health_dental) + n(exp.health_vision)));
+  setText(`${p3}.column_2[0].column_2[0].medical[0].Row2[0].out_of_monthly[0]`, money(exp.health_oop));
+
+  setText(`${p3}.column_2[0].column_2[0].other[0].Row1[0].child_monthly[0]`, money(exp.child_care));
+  setText(`${p3}.column_2[0].column_2[0].other[0].Row2[0].tax_payments_monthly[0]`, money(exp.estimated_tax_payments));
+  setText(`${p3}.column_2[0].column_2[0].other[0].Row4[0].required_retirement_monthly[0]`, money(exp.retirement_employer));
+  setText(`${p3}.column_2[0].column_2[0].other[0].Row5[0].voluntary_retirement_monthly[0]`, money(exp.retirement_voluntary));
+  setText(`${p3}.column_2[0].column_2[0].other[0].Row6[0].union_monthly[0]`, money(extra.union_dues));
+  setText(`${p3}.column_2[0].column_2[0].other[0].Row7[0].delinquent_monthly[0]`, money(exp.delinquent_state_local));
+  setText(`${p3}.column_2[0].column_2[0].other[0].Row8[0].student_loans_monthly[0]`, money(p.other_secured_debt?.monthly_payment));
+  setText(`${p3}.column_2[0].column_2[0].other[0].Row9[0].support_monthly[0]`, money(exp.court_ordered_child_support));
+  setText(`${p3}.column_2[0].column_2[0].other[0].Row10[0].alimony_monthly[0]`, money(extra.court_ordered_alimony));
+  setText(`${p3}.column_2[0].column_2[0].other[0].Row11[0].court_ordered_monthly[0]`, money(exp.other_court_ordered));
+
+  const filledBytes = await pdfDoc.save();
+  return filledBytes;
+}
+
+// Fills Form 433-B (Collection Information Statement for Businesses).
+// Section 1 (Business Info) and Section 6 (Officers, from business_1) are
+// auto-filled; asset/liability sections (3-5) left blank for manual entry.
+export async function fillForm433B(client, profile) {
+  const templateBytes = await fetchTemplate(F433_TEMPLATE_PATHS['433b']);
+  const pdfDoc = await PDFDocument.load(templateBytes, { ignoreEncryption: true });
+  const form = pdfDoc.getForm();
+  const p = profile || {};
+  const b1 = p.business_1 || {};
+  const exp = p.expenses || {};
+
+  const setText = (fieldName, value) => {
+    if (!fieldName) return;
+    try { form.getTextField(fieldName).setText(value != null ? String(value) : ''); } catch (_) {}
+  };
+  const setCheck = (fieldName, value) => {
+    if (!fieldName) return;
+    try {
+      const f = form.getCheckBox(fieldName);
+      if (value) f.check(); else f.uncheck();
+    } catch (_) {}
+  };
+
+  const base = 'topmostSubform[0].Page1[0]';
+  const bizName = b1.name || client?.business_name || client?.name || '';
+  setText(`${base}.Line1a-f[0].p1_1_1a[0]`, bizName);
+  const bizAddr = b1.address || [client?.street, [client?.city, client?.state, client?.zip].filter(Boolean).join(', ')].filter(Boolean).join(', ');
+  setText(`${base}.Line1a-f[0].p1_3_1b[0]`, bizAddr);
+  setText(`${base}.Line1a-f[0].p1_8_1c[0]`, p.county || '');
+  const [pArea, pNum] = splitPhone(client?.phone);
+  setText(`${base}.Line1a-f[0].p1_9_1d_3digits[0]`, pArea);
+  setText(`${base}.Line1a-f[0].p1_10_1d_7digits[0]`, pNum);
+  setText(`${base}.Line1a-f[0].p1_11_1e[0]`, p.f433_extra?.business_type || '');
+
+  setText(`${base}.p1_13_2a[0]`, b1.ein || client?.ein || '');
+  // 2b Entity type checkboxes
+  const structure = (b1.structure || '').toLowerCase();
+  if (structure.includes('partner')) setCheck(`${base}.c1_0_2b[0]`, true);
+  else if (structure.includes('corp') && !structure.includes('llc')) setCheck(`${base}.c1_0_2b[1]`, true);
+  else if (structure.includes('llc')) setCheck(`${base}.c1_0_2b[3]`, true);
+  else if (structure) setCheck(`${base}.c1_0_2b[2]`, true);
+
+  setText(`${base}.p1_16_2c[0]`, b1.date_opened || '');
+  setText(`${base}.p1_17_3a[0]`, b1.num_employees ?? '');
+  setText(`${base}.p1_18_3b[0]`, money(exp?.gross_payroll));
+
+  // Section 2 — Officers/Partners (limited to taxpayer as 7a)
+  setText(`${base}.Line7a_Col1[0].p1_33_7aFullNm[0]`, client?.name || '');
+  setText(`${base}.Line7a_Col1[0].p1_36_7aCity[0]`, client?.city || '');
+  setText(`${base}.Line7a_Col1[0].p1_37_7aSt[0]`, client?.state || '');
+  setText(`${base}.Line7a_Col1[0].p1_38_7aZIP[0]`, client?.zip || '');
+  setText(`${base}.p1_39_SSN_7a[0]`, client?.ssn || '');
+  setText(`${base}.p1_42_7aowner[0]`, b1.pct_ownership ? `${b1.pct_ownership}%` : '');
+
+  const filledBytes = await pdfDoc.save();
+  return filledBytes;
+}
+
+// Fills Form 433-A (OIC) — Section 1 (Personal Info) and Section 2
+// (Employment) from the client row + Financial Profile. Sections 3-9
+// (asset equity tables, OIC offer calculation) left blank for manual entry.
+export async function fillForm433AOIC(client, profile) {
+  const templateBytes = await fetchTemplate(F433_TEMPLATE_PATHS['433a_oic']);
+  const pdfDoc = await PDFDocument.load(templateBytes, { ignoreEncryption: true });
+  const form = pdfDoc.getForm();
+  const p = profile || {};
+  const et1 = p.employment_taxpayer_1 || {};
+  const es1 = p.employment_spouse_1 || {};
+  const b1 = p.business_1 || {};
+
+  const setText = (fieldName, value) => {
+    if (!fieldName) return;
+    try { form.getTextField(fieldName).setText(value != null ? String(value) : ''); } catch (_) {}
+  };
+  const setCheck = (fieldName, on) => {
+    if (!fieldName) return;
+    try { const f = form.getCheckBox(fieldName); if (on) f.check(); else f.uncheck(); } catch (_) {}
+  };
+
+  const s1 = 'topmostSubform[0].F433-A-OIC_Page1[0].Section1[0]';
+  // Split full name -> first/last (best-effort)
+  const nameParts = (client?.name || '').trim().split(/\s+/);
+  const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : (client?.name || '');
+  const firstName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : '';
+  setText(`${s1}.Last_Name[0]`, lastName);
+  setText(`${s1}.First_Name[0]`, firstName);
+  setText(`${s1}.Date_Birth[0]`, p.dob || '');
+  // SSN split into 3-2-4
+  const ssnDigits = (client?.ssn || '').replace(/\D/g, '');
+  if (ssnDigits.length === 9) {
+    setText(`${s1}.SSN_3[0]`, ssnDigits.slice(0, 3));
+    setText(`${s1}.SSN_2[0]`, ssnDigits.slice(3, 5));
+    setText(`${s1}.SSN_4[0]`, ssnDigits.slice(5));
+  }
+
+  // Marital status
+  if (p.filing_status) {
+    const fs = p.filing_status.toLowerCase();
+    if (fs.includes('married')) setCheck(`${s1}.MaritalStatus[0].CB_01[0]`, true);
+    else setCheck(`${s1}.MaritalStatus[0].CB_02[0]`, true);
+  }
+
+  setText(`${s1}.Home_Address[0]`, [client?.street, [client?.city, client?.state, client?.zip].filter(Boolean).join(', ')].filter(Boolean).join(', '));
+  setText(`${s1}.Col1[0].County_Residence[0]`, p.county || '');
+
+  const [pArea, pNum1] = splitPhone(client?.phone);
+  setText(`${s1}.Col1[0].primary[0].Primary_Area_Code[0]`, pArea);
+  if (pNum1.includes('-')) {
+    const [a, b] = pNum1.split('-');
+    setText(`${s1}.Col1[0].primary[0].Primary_Phone1[0]`, a);
+    setText(`${s1}.Col1[0].primary[0].Primary_Phone2[0]`, b);
+  } else {
+    setText(`${s1}.Col1[0].primary[0].Primary_Phone1[0]`, pNum1.slice(0, 3));
+    setText(`${s1}.Col1[0].primary[0].Primary_Phone2[0]`, pNum1.slice(3));
+  }
+
+  // Spouse
+  if (client?.spouseName) {
+    const spParts = client.spouseName.trim().split(/\s+/);
+    const spLast = spParts.length > 1 ? spParts[spParts.length - 1] : client.spouseName;
+    const spFirst = spParts.length > 1 ? spParts.slice(0, -1).join(' ') : '';
+    setText(`${s1}.Spouse_Last_Name[0]`, spLast);
+    setText(`${s1}.Spouse_First_Name[0]`, spFirst);
+  }
+
+  // Dependents
+  let deps = [];
+  try {
+    deps = client?.dependents
+      ? (typeof client.dependents === 'string' ? JSON.parse(client.dependents || '[]') : client.dependents)
+      : [];
+  } catch (_) { deps = []; }
+  deps.slice(0, 4).forEach((d, i) => {
+    const row = i + 1;
+    setText(`${s1}.Table1[0].Row${row}[0].Name_0${row}[0]`, d.name || '');
+    setText(`${s1}.Table1[0].Row${row}[0].Age_0${row}[0]`, d.age || '');
+    setText(`${s1}.Table1[0].Row${row}[0].Relationship_0${row}[0]`, d.relationship || '');
+  });
+
+  // Section 2 — Employment Information
+  const s2 = 'topmostSubform[0].F433-A-OIC_Page1[0].Section2[0]';
+  const freqMapOIC = { 'Weekly': 'weekly', 'Bi-weekly': 'biweekly', 'Biweekly': 'biweekly', 'Monthly': 'monthly' };
+  if (et1.employer) {
+    if (freqMapOIC[et1.pay_frequency]) setCheck(`${s2}.You[0].pay_period[0].${freqMapOIC[et1.pay_frequency]}[0]`, true);
+    if (b1.name) setCheck(`${s2}.You[0].BusinessInterest[0].CB_22[0]`, true);
+  }
+  if (es1.employer) {
+    if (freqMapOIC[es1.pay_frequency]) setCheck(`${s2}.Spouse[0].pay_period[0].${freqMapOIC[es1.pay_frequency]}[0]`, true);
+  }
+
+  const filledBytes = await pdfDoc.save();
+  return filledBytes;
+}

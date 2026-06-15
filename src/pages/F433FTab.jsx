@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { fillForm433F, fillForm433A } from '../lib/irsFormUtils'
+import { fillForm433F, fillForm433A, fillForm433D, fillForm433H, fillForm433B, fillForm433AOIC } from '../lib/irsFormUtils'
 
 function n(v) { const x = parseFloat(v); return isNaN(x) ? 0 : x }
 function fmt(v) { return '$' + n(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
@@ -55,13 +55,20 @@ export default function F433FTab({ profile, set, client, totalHousehold, income,
     }, 50)
   }
 
+  const FILLERS = {
+    '433a': fillForm433A,
+    '433f': fillForm433F,
+    '433d': fillForm433D,
+    '433h': fillForm433H,
+    '433b': fillForm433B,
+    '433a_oic': fillForm433AOIC,
+  }
+
   async function handleFillPdf(formType) {
     setFilling(formType)
     setFillError('')
     try {
-      const bytes = formType === '433f'
-        ? await fillForm433F(client, profile)
-        : await fillForm433A(client, profile)
+      const bytes = await FILLERS[formType](client, profile)
       const name = (client?.name || 'Client').replace(/\s+/g, '_')
       downloadPdf(bytes, `${formType.toUpperCase()}_${name}.pdf`)
     } catch (e) {
@@ -76,10 +83,22 @@ export default function F433FTab({ profile, set, client, totalHousehold, income,
       <div className="no-print" style={{display:'flex',justifyContent:'flex-end',gap:8,marginBottom:10,flexWrap:'wrap'}}>
         {fillError && <div style={{fontSize:11,color:'var(--bad)',alignSelf:'center'}}>{fillError}</div>}
         <button className="btn sec" disabled={!!filling} onClick={()=>handleFillPdf('433a')}>
-          {filling==='433a'?'⏳':'📄'}&nbsp; Fill 433-A PDF
+          {filling==='433a'?'⏳':'📄'}&nbsp; 433-A
+        </button>
+        <button className="btn sec" disabled={!!filling} onClick={()=>handleFillPdf('433a_oic')}>
+          {filling==='433a_oic'?'⏳':'📄'}&nbsp; 433-A (OIC)
         </button>
         <button className="btn sec" disabled={!!filling} onClick={()=>handleFillPdf('433f')}>
-          {filling==='433f'?'⏳':'📄'}&nbsp; Fill 433-F PDF
+          {filling==='433f'?'⏳':'📄'}&nbsp; 433-F
+        </button>
+        <button className="btn sec" disabled={!!filling} onClick={()=>handleFillPdf('433b')}>
+          {filling==='433b'?'⏳':'📄'}&nbsp; 433-B
+        </button>
+        <button className="btn sec" disabled={!!filling} onClick={()=>handleFillPdf('433h')}>
+          {filling==='433h'?'⏳':'📄'}&nbsp; 433-H
+        </button>
+        <button className="btn sec" disabled={!!filling} onClick={()=>handleFillPdf('433d')}>
+          {filling==='433d'?'⏳':'📄'}&nbsp; 433-D
         </button>
         <button className="btn sec" onClick={handlePrint}>🖨️ Print / Save as PDF</button>
       </div>
