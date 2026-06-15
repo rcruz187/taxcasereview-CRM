@@ -105,7 +105,7 @@ function InlineFaxForm({ client, onClose, showToast }) {
   async function send() {
     if (!toNum) { showToast('Fax number required','err'); return }
     setSending(true)
-    const { data:s } = await supabase.from('settings').select('telnyx_api_key,firm_fax_number').limit(1).maybeSingle()
+    const { data:s } = await supabase.from('settings').select('signalwire_backend,sw_inbound_did').limit(1).maybeSingle()
     let fileUrl = null
     if (file) {
       const path = 'fax/'+Date.now()+'_'+file.name
@@ -114,22 +114,27 @@ function InlineFaxForm({ client, onClose, showToast }) {
       fileUrl = u?.publicUrl
     }
     const toFull = '+1'+toNum.slice(-10)
-    const fromNum = s?.firm_fax_number || ''
-    if (s?.telnyx_api_key) {
-      await fetch('https://api.telnyx.com/v2/faxes', {
-        method:'POST',
-        headers:{'Authorization':'Bearer '+s.telnyx_api_key,'Content-Type':'application/json'},
-        body: JSON.stringify({to:toFull,from:fromNum,...(fileUrl?{media_url:fileUrl}:{})})
-      }).catch(()=>{})
+    const fromNum = s?.sw_inbound_did || ''
+    let sent = false
+    if (s?.signalwire_backend) {
+      try {
+        const res = await fetch(s.signalwire_backend+'/fax/send', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({to:toFull,from:fromNum,...(fileUrl?{media_url:fileUrl}:{})})
+        })
+        const d = await res.json()
+        sent = res.ok && d?.success
+      } catch(e) {}
     }
     await supabase.from('fax_logs').insert([{
       to_number:toFull, from_number:fromNum, client_name:client?.name,
       subject, notes, file_name:file?.name||null, file_url:fileUrl,
-      status: s?.telnyx_api_key ? 'Sent' : 'Logged',
+      status: sent ? 'Sent' : (s?.signalwire_backend ? 'Failed' : 'Logged'),
       sent_by:'CRM', sent_at:new Date().toISOString(), created_at:new Date().toISOString()
     }])
     setSending(false)
-    showToast('📠 Fax '+(s?.telnyx_api_key?'sent':'logged')+'!')
+    showToast('📠 Fax '+(sent?'sent':'logged')+'!')
     onClose()
   }
 
@@ -761,7 +766,7 @@ export default function Clients() {
             <ActionBtn color="#be185d" icon="🧾" label="New Invoice" sub="Bill Client" onClick={()=>navigate('/invoices')}/>
             <ActionBtn color="#059669" icon="💳" label="Add Payment" sub="Record Payment" onClick={()=>{setPayForm({amount:'',method:'Credit Card',date:'',notes:''});setPayModal(true)}}/>
             <ActionBtn color="#0f766e" icon="📊" label="P&amp;L" sub="Books &amp; Ledger" onClick={()=>navigate('/books?client='+encodeURIComponent(c.name))}/>
-            <ActionBtn color="#dc2626" icon="📠" label="Send Fax" sub="Telnyx Fax" onClick={()=>{setFaxClient(c);setFaxModal(true)}}/>
+            <ActionBtn color="#dc2626" icon="📠" label="Send Fax" sub="SignalWire Fax" onClick={()=>{setFaxClient(c);setFaxModal(true)}}/>
             <ActionBtn color="#7c3aed" icon="✍️" label="E-Signature" sub="Request Sign" onClick={()=>{setEsignClient(c);setEsignModal(true)}}/>
           </div>
         </div>

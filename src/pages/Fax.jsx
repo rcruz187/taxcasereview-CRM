@@ -40,7 +40,7 @@ export default function Fax() {
     const [{ data:f },{ data:c },{ data:s }] = await Promise.all([
       supabase.from('fax_logs').select('*').order('created_at',{ascending:false}),
       supabase.from('clients').select('id,name,phone'),
-      supabase.from('settings').select('telnyx_api_key,firm_fax_number').limit(1).maybeSingle(),
+      supabase.from('settings').select('signalwire_backend,sw_inbound_did').limit(1).maybeSingle(),
     ])
     if (f) setLogs(f)
     if (c) setClients(c)
@@ -66,7 +66,7 @@ export default function Fax() {
   async function sendFax() {
     if (!form.to_number) { showToast('Recipient fax number required','err'); return }
     if (!file && !form.notes) { showToast('Attach a PDF or enter a message','err'); return }
-    if (!settings?.telnyx_api_key) { showToast('Add your Telnyx API Key in Settings → Fax','err'); return }
+    if (!settings?.signalwire_backend) { showToast('Add your SignalWire backend URL in Settings → SignalWire','err'); return }
     setSending(true)
 
     try {
@@ -81,54 +81,45 @@ export default function Fax() {
         mediaUrl = urlData.publicUrl
       }
 
-      // Format numbers for Telnyx (E.164)
+      // Format numbers E.164
       const toNum   = '+1' + form.to_number.replace(/\D/g,'').slice(-10)
       const fromNum = form.from_number
         ? '+1' + form.from_number.replace(/\D/g,'').slice(-10)
-        : (settings.firm_fax_number || '')
+        : (settings.sw_inbound_did || '')
 
-      // Call Telnyx Fax API
-      const telnyxPayload = {
-        connection_id: '', // populated from Telnyx portal
-        to: toNum,
-        from: fromNum,
-        ...(mediaUrl ? { media_url: mediaUrl } : {}),
-        ...(form.notes ? { t38_enabled: false } : {}),
-      }
-
-      const res = await fetch('https://api.telnyx.com/v2/faxes', {
+      // Call SignalWire backend /fax/send
+      const res = await fetch(settings.signalwire_backend + '/fax/send', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${settings.telnyx_api_key}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(telnyxPayload)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: toNum,
+          from: fromNum,
+          ...(mediaUrl ? { media_url: mediaUrl } : {}),
+        })
       })
 
       const resData = await res.json()
-      const telnyx_id = resData?.data?.id || null
-      const status = res.ok ? 'Sent' : 'Failed'
+      const sw_id = resData?.sid || null
+      const status = res.ok && resData?.success ? 'Sent' : 'Failed'
 
-      // Log to Supabase regardless of Telnyx result
+      // Log to Supabase regardless of SignalWire result
       const { error: logErr } = await supabase.from('fax_logs').insert([{
         to_number: toNum, from_number: fromNum,
         client_name: form.client_name, subject: form.subject,
         notes: form.notes, file_name: file?.name || null,
-        file_url: mediaUrl, telnyx_fax_id: telnyx_id,
+        file_url: mediaUrl, signalwire_fax_id: sw_id,
         status, sent_by: user?.email || 'Unknown',
         sent_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
-        error_msg: res.ok ? null : JSON.stringify(resData?.errors?.[0]?.detail || resData).slice(0,200),
+        error_msg: status === 'Failed' ? JSON.stringify(resData?.error || resData).slice(0,200) : null,
       }])
 
       if (logErr) console.error('Log error:', logErr)
-      if (res.ok) {
+      if (status === 'Sent') {
         showToast('✅ Fax sent successfully!')
         setModal(false); setForm(BLANK); setFile(null); load()
       } else {
-        // Still log it but show error
-        showToast('Telnyx error: ' + (resData?.errors?.[0]?.detail || 'Check API key and fax number'), 'err')
+        showToast('SignalWire error: ' + (resData?.error || 'Check backend URL and SignalWire credentials'), 'err')
         load()
       }
     } catch(e) {
@@ -157,10 +148,10 @@ export default function Fax() {
     <div style={{maxWidth:1000}}>
       {toast && <div className={`toast show ${toast.type==='err'?'terr':''}`}>{toast.msg||toast}</div>}
 
-      {!settings?.telnyx_api_key && (
+      {!settings?.signalwire_backend && (
         <div style={{background:'rgba(245,158,11,.08)',border:'1px solid rgba(245,158,11,.3)',borderRadius:8,padding:'10px 16px',marginBottom:14,fontSize:12,color:'var(--warn)',display:'flex',alignItems:'center',gap:10}}>
           <span>⚠️</span>
-          <span>Telnyx API Key not configured. <strong>Settings → 📠 Fax</strong> to set up. You can still log faxes manually.</span>
+          <span>SignalWire backend not configured. <strong>Settings → 📞 SignalWire</strong> to set up. You can still log faxes manually.</span>
         </div>
       )}
 
@@ -288,7 +279,7 @@ export default function Fax() {
                 <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>10 digits, no dashes</div>
               </div>
               <div className="field"><label>From Number (override)</label>
-                <input value={form.from_number} onChange={e=>fld('from_number',e.target.value.replace(/\D/g,''))} placeholder={settings.firm_fax_number||'Uses firm fax number'}/>
+                <input value={form.from_number} onChange={e=>fld('from_number',e.target.value.replace(/\D/g,''))} placeholder={settings.sw_inbound_did||'Uses SignalWire DID'}/>
               </div>
             </div>
 

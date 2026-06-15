@@ -108,6 +108,7 @@ export default function Settings() {
         sw_sip_username: firm.sw_sip_username,
         sw_sip_password: firm.sw_sip_password,
         sw_inbound_did: firm.sw_inbound_did,
+        signalwire_backend: firm.signalwire_backend,
         qb_client_id: firm.qb_client_id,
         qb_client_secret: firm.qb_client_secret,
       }
@@ -337,6 +338,10 @@ export default function Settings() {
                   <input type="password" value={firm.sw_sip_password || ''} onChange={set('sw_sip_password')} placeholder="SIP endpoint password" />
                 </div>
               </div>
+              <div className="field"><label>Backend Server URL</label>
+                <input value={firm.signalwire_backend || ''} onChange={set('signalwire_backend')} placeholder="https://your-backend.onrender.com" />
+                <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>URL where signalwire-backend (server.js) is deployed. Powers SMS, fax, and dialer.</div>
+              </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
                 <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save SignalWire'}</button>
               </div>
@@ -409,30 +414,24 @@ export default function Settings() {
 
       {tab === 'fax' && (
         <div className="card">
-          <div style={{fontWeight:700,fontSize:14,marginBottom:4}}>📠 Fax Integration — Telnyx</div>
+          <div style={{fontWeight:700,fontSize:14,marginBottom:4}}>📠 Fax Integration — SignalWire</div>
           <div style={{fontSize:12,color:'var(--t3)',marginBottom:16,lineHeight:1.7}}>
-            Telnyx offers reliable pay-as-you-go faxing with a REST API. HIPAA compliant. Dedicated fax numbers available.
+            Fax is sent via your SignalWire backend's <code>/fax/send</code> endpoint, using the same SignalWire project as your dialer and SMS.
           </div>
           <div style={{background:'var(--s2)',borderRadius:8,padding:'12px 16px',marginBottom:16,fontSize:12,lineHeight:1.8}}>
-            <div style={{fontWeight:700,color:'var(--tx)',marginBottom:6}}>Setup (5 minutes):</div>
-            {[['1','Go to telnyx.com → Sign Up'],['2','Add credits to your account ($5 minimum)'],['3','Go to Auth → API Keys → Create API Key'],['4','Paste your Telnyx API Key below and save'],['5','Enter your Telnyx fax number (assigned after signup)']].map(([step,text])=>(
+            <div style={{fontWeight:700,color:'var(--tx)',marginBottom:6}}>Setup:</div>
+            {[['1','Set up SignalWire credentials in 📞 Integrations → SignalWire Dialer'],['2','Deploy signalwire-backend (server.js) to a host like Render or Railway'],['3','Enter the deployed Backend Server URL in the SignalWire card'],['4','Your SignalWire phone number (Inbound DID) is used as the fax From number']].map(([step,text])=>(
               <div key={step} style={{display:'flex',gap:10,marginBottom:4,alignItems:'flex-start'}}>
                 <div style={{width:20,height:20,borderRadius:'50%',background:'var(--blue)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,flexShrink:0,marginTop:1}}>{step}</div>
                 <div style={{color:'var(--t2)'}}>{text}</div>
               </div>
             ))}
           </div>
-          <div className="field"><label>Telnyx API Key</label>
-            <input type="password" value={firm.telnyx_api_key||''} onChange={set('telnyx_api_key')} placeholder="KEY0xxxxxxxxxxxxxxxxxxxxxxxx"/>
-          </div>
-          <div className="field"><label>Your Fax Number (from Telnyx)</label>
-            <input value={firm.firm_fax_number||''} onChange={set('firm_fax_number')} placeholder="+18005551234"/>
-          </div>
           <div style={{background:'rgba(26,127,212,.08)',border:'1px solid rgba(26,127,212,.2)',borderRadius:8,padding:'10px 14px',marginBottom:16,fontSize:12,color:'var(--t2)',lineHeight:1.6}}>
-            Domestic fax from ~$0.005/page · Pay-as-you-go · HIPAA compliant<br/>
-            Docs: <a href="https://developers.telnyx.com/docs/fax" target="_blank" style={{color:'var(--blue)'}}>developers.telnyx.com/docs/fax</a>
+            Backend URL: <strong>{firm.signalwire_backend || 'Not configured'}</strong><br/>
+            Fax From Number: <strong>{firm.sw_inbound_did || 'Not configured'}</strong><br/>
+            Configure both in 🔌 Integrations → SignalWire Dialer.
           </div>
-          <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving?'Saving…':'💾 Save Fax Settings'}</button>
         </div>
       )}
 

@@ -84,10 +84,20 @@ function LeadInlineFax({ lead, onClose }) {
   const [sending,set3]=useState(false)
   async function send() {
     set3(true)
-    const {data:s}=await supabase.from('settings').select('telnyx_api_key,firm_fax_number').limit(1).maybeSingle()
+    const {data:s}=await supabase.from('settings').select('signalwire_backend,sw_inbound_did').limit(1).maybeSingle()
     let fileUrl=null
     if(file){const path='fax/'+Date.now()+'_'+file.name;await supabase.storage.from('documents').upload(path,file,{upsert:true});const{data:u}=supabase.storage.from('documents').getPublicUrl(path);fileUrl=u?.publicUrl}
-    await supabase.from('fax_logs').insert([{to_number:'+1'+toNum.slice(-10),from_number:s?.firm_fax_number||'',client_name:lead?.name,subject,file_url:fileUrl,file_name:file?.name||null,status:s?.telnyx_api_key?'Sent':'Logged',sent_at:new Date().toISOString(),created_at:new Date().toISOString()}])
+    const toFull='+1'+toNum.slice(-10)
+    const fromNum=s?.sw_inbound_did||''
+    let sent=false
+    if(s?.signalwire_backend){
+      try{
+        const res=await fetch(s.signalwire_backend+'/fax/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:toFull,from:fromNum,...(fileUrl?{media_url:fileUrl}:{})})})
+        const d=await res.json()
+        sent=res.ok&&d?.success
+      }catch(e){}
+    }
+    await supabase.from('fax_logs').insert([{to_number:toFull,from_number:fromNum,client_name:lead?.name,subject,file_url:fileUrl,file_name:file?.name||null,status:sent?'Sent':(s?.signalwire_backend?'Failed':'Logged'),sent_at:new Date().toISOString(),created_at:new Date().toISOString()}])
     set3(false);onClose()
   }
   return <div style={{padding:'0 4px 4px'}}>
@@ -565,7 +575,7 @@ export default function Leads() {
             <ActionBtn color="#0891b2" icon="📅" label="Schedule" sub="Book Appointment" onClick={()=>setBookingLead(l)}/>
             <ActionBtn color="#d97706" icon="📝" label="Addendum" sub="After IRS facts" onClick={()=>generateAddendum(l)}/>
 
-            <ActionBtn color="#dc2626" icon="📠" label="Send Fax" sub="Telnyx Fax" onClick={()=>{setInlineFaxLead(l);setShowFaxModal(true)}}/>
+            <ActionBtn color="#dc2626" icon="📠" label="Send Fax" sub="SignalWire Fax" onClick={()=>{setInlineFaxLead(l);setShowFaxModal(true)}}/>
             <ActionBtn color="#7c3aed" icon="✍️" label="E-Signature" sub="Request Sign" onClick={()=>{setInlineEsignLead(l);setShowEsignModal(true)}}/>
           </div>
         </div>
