@@ -10,12 +10,7 @@ const CLIENT_EVENT_TYPES = [
   { type: 'Other',                    icon: '📌' },
 ]
 
-const LEAD_EVENT_TYPES = [
-  { type: 'Initial Consultation', icon: '🗣️' },
-  { type: 'Case Review Call',     icon: '🔍' },
-  { type: 'Follow-Up Call',       icon: '📞' },
-  { type: 'In-Person Meeting',    icon: '🤝' },
-]
+const LEAD_EVENT_TYPES = CLIENT_EVENT_TYPES
 
 const HELP_OPTIONS = [
   'Tax Resolution / IRS Debt',
@@ -37,7 +32,7 @@ export default function BookingWidget({ contact, onClose, mode = 'lead' }) {
   const today = new Date().toISOString().slice(0,10)
   const [form, setForm] = useState({
     date: today, time: '',
-    eventType: mode === 'client' ? 'Case Discussion' : 'Initial Consultation',
+    eventType: 'Case Discussion',
     notes: '',
     // Lead qualification fields
     decisionMaker: '', happyWithSupport: '', helpNeeded: [], extraInfo: '',
