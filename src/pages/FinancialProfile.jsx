@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import ComplianceGrids from './ComplianceGrids'
@@ -60,7 +61,16 @@ function SectionHeader({ children }) {
 
 export default function FinancialProfile({ clientName, client }) {
   const { showToast } = useApp()
-  const [tab, setTab] = useState('intake')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [tab, setTabRaw] = useState(() => searchParams.get('fptab') || 'intake')
+  function setTab(t) {
+    setTabRaw(t)
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.set('fptab', t)
+      return next
+    }, { replace: true })
+  }
   const [profile, setProfile] = useState(BLANK_PROFILE)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -178,17 +188,36 @@ export default function FinancialProfile({ clientName, client }) {
     setDirty(true)
   }
 
-  async function save() {
-    setSaving(true)
-    const payload = { ...profile, client_name: clientName, updated_at: new Date().toISOString() }
+  async function persist(profileToSave) {
+    const payload = { ...profileToSave, client_name: clientName, updated_at: new Date().toISOString() }
     delete payload.id
     const { error } = await supabase.from('client_financial_profiles')
       .upsert(payload, { onConflict: 'client_name' })
+    return error
+  }
+
+  async function save() {
+    setSaving(true)
+    const error = await persist(profile)
     setSaving(false)
     if (error) { showToast('Error: '+error.message, 'err'); return }
     showToast('💾 Financial Profile saved')
     setDirty(false)
   }
+
+  // Autosave: ~1.5s after the last edit, persist silently in the background.
+  useEffect(() => {
+    if (loading || !dirty) return
+    const timer = setTimeout(async () => {
+      setSaving(true)
+      const error = await persist(profile)
+      setSaving(false)
+      if (!error) setDirty(false)
+      // Silent on success; errors still surface so the user knows to retry/manually save.
+      if (error) showToast('Autosave error: '+error.message, 'err')
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [profile, dirty, loading])
 
   async function exportExcel() {
     setExporting(true)
@@ -233,9 +262,13 @@ export default function FinancialProfile({ clientName, client }) {
           }}>{t.label}</button>
         ))}
         <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:10}}>
-          {dirty && <span style={{fontSize:11,color:'var(--warn)'}}>Unsaved changes</span>}
+          {saving
+            ? <span style={{fontSize:11,color:'var(--t3)'}}>Saving…</span>
+            : dirty
+              ? <span style={{fontSize:11,color:'var(--warn)'}}>Unsaved changes…</span>
+              : <span style={{fontSize:11,color:'var(--t3)'}}>✓ Saved</span>}
           <button className="btn sec" style={{marginBottom:6}} onClick={exportExcel} disabled={exporting}>{exporting?'Exporting…':'📥 Export to Excel'}</button>
-          <button className="btn pri" style={{marginBottom:6}} onClick={save} disabled={saving}>{saving?'Saving…':'💾 Save Profile'}</button>
+          <button className="btn pri" style={{marginBottom:6}} onClick={save} disabled={saving}>{saving?'Saving…':'💾 Save Now'}</button>
         </div>
       </div>
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 
@@ -141,7 +142,16 @@ export default function ComplianceGrids({ clientName }) {
   const { showToast } = useApp()
   const [records, setRecords] = useState([])
   const [loading, setLoading] = useState(true)
-  const [activeForm, setActiveForm] = useState('1040')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [activeForm, setActiveFormRaw] = useState(() => searchParams.get('ctab') || '1040')
+  function setActiveForm(f) {
+    setActiveFormRaw(f)
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.set('ctab', f)
+      return next
+    }, { replace: true })
+  }
   const [pendingSaves, setPendingSaves] = useState({})
 
   useEffect(() => { load() }, [clientName])
