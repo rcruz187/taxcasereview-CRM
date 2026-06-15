@@ -780,13 +780,13 @@ export default function Clients() {
           <div style={{display:'flex',borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
             {[
               {key:'overview', label:'📋 Overview'},
-              {key:'finprofile', label:'🧮 Financial Profile'},
-              {key:'docs',     label:'📁 Docs'},
               {key:'notes',    label:'📝 Notes'},
-              {key:'payments', label:'💳 Payments'},
               {key:'tasks',    label:'✅ Tasks'},
-              {key:'cases',    label:'📁 Cases'},
+              {key:'docs',     label:'📁 Docs'},
               {key:'invoices', label:'🧾 Invoices'},
+              {key:'payments', label:'💳 Payments'},
+              {key:'cases',    label:'📁 Cases'},
+              {key:'finprofile', label:'🧮 Financial Profile'},
             ].map(t=>(
               <button key={t.key} onClick={()=>setDetailTab(t.key)}
                 style={{padding:'10px 16px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
