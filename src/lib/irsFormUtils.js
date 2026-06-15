@@ -188,7 +188,7 @@ export async function fillForm(formType, client, useEin = false) {
 
 // Stamps a taxpayer signature + date onto the blank signature line of an
 // already-filled IRS form PDF. Returns new PDF bytes (Uint8Array).
-export async function stampSignature(pdfBytes, formType, signatureText, dateText) {
+export async function stampSignature(pdfBytes, formType, signatureText, dateText, signatureImage) {
   const pos = SIGNATURE_POSITIONS[formType];
   if (!pos) return pdfBytes; // unknown form type — return unchanged
 
@@ -196,10 +196,15 @@ export async function stampSignature(pdfBytes, formType, signatureText, dateText
   const pages = pdfDoc.getPages();
   const page = pages[pos.page] || pages[0];
 
-  const sigFont = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
   const dateFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-  if (signatureText) {
+  if (signatureImage) {
+    const pngImage = await pdfDoc.embedPng(signatureImage);
+    const h = 26;
+    const w = (pngImage.width / pngImage.height) * h;
+    page.drawImage(pngImage, { x: pos.sigX, y: pos.sigY - 4, width: w, height: h });
+  } else if (signatureText) {
+    const sigFont = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
     page.drawText(signatureText, { x: pos.sigX, y: pos.sigY, size: pos.size, font: sigFont });
   }
 

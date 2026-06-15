@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { PDFDocument, StandardFonts } from 'pdf-lib'
-import { SIGNATURE_POSITIONS } from '../lib/irsFormUtils'
+import { stampSignature } from '../lib/irsFormUtils'
 
 export default function SignPage() {
   const { id } = useParams()
@@ -123,24 +122,13 @@ export default function SignPage() {
     for (const att of pdfAttachments) {
       try {
         const bytes = await fetch(att.url).then(r => r.arrayBuffer())
-        const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true })
-        const pos = SIGNATURE_POSITIONS[att.formType]
-        if (pos) {
-          const pages = pdfDoc.getPages()
-          const page = pages[pos.page] || pages[0]
-          if (mode === 'draw' && sigImage) {
-            const pngImage = await pdfDoc.embedPng(sigImage)
-            const h = 26
-            const w = (pngImage.width / pngImage.height) * h
-            page.drawImage(pngImage, { x: pos.sigX, y: pos.sigY - 4, width: w, height: h })
-          } else {
-            const sigFont = await pdfDoc.embedFont(StandardFonts.HelveticaOblique)
-            page.drawText(signatureText, { x: pos.sigX, y: pos.sigY, size: pos.size, font: sigFont })
-          }
-          const dateFont = await pdfDoc.embedFont(StandardFonts.Helvetica)
-          page.drawText(signedDate, { x: pos.dateX, y: pos.dateY, size: (pos.size || 12) - 2, font: dateFont })
-        }
-        const signedBytes = await pdfDoc.save()
+        const signedBytes = await stampSignature(
+          bytes,
+          att.formType,
+          signatureText,
+          signedDate,
+          mode === 'draw' ? sigImage : null
+        )
         const path = `docs/${safeName}/signed/${att.formType}_signed.pdf`
         await supabase.storage.from('documents')
           .upload(path, new Blob([signedBytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
