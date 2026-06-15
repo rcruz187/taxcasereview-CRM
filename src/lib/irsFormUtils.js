@@ -234,3 +234,323 @@ export async function stampSignature(pdfBytes, formType, signatureText, dateText
 export function getPackageFormTypes(clientType) {
   return PACKAGE_FORMS_BY_TYPE[clientType] || PACKAGE_FORMS_BY_TYPE['Individual'];
 }
+
+// ─── 433-F / 433-A Collection Information Statement filling ──────────────────
+// These pull from the client record + Financial Profile (profile object as
+// stored in financial_profiles table) rather than just the client row.
+
+export const F433_TEMPLATE_PATHS = {
+  '433f': '433F_Blank.pdf',
+  '433a': '433A_Blank.pdf',
+};
+
+export const F433_LABELS = {
+  '433f': 'Form 433-F — Collection Information Statement',
+  '433a': 'Form 433-A — Collection Information Statement (Wage Earners & Self-Employed)',
+};
+
+function n(v) { const x = parseFloat(v); return isNaN(x) ? 0 : x; }
+function money(v) { const x = n(v); return x ? x.toFixed(2) : ''; }
+
+// Split a phone string into (area code, number) for forms that have
+// separate boxes, e.g. "(407) 555-1234" -> ["407", "555-1234"]
+function splitPhone(phone) {
+  if (!phone) return ['', ''];
+  const digits = (phone.match(/\d/g) || []).join('');
+  if (digits.length >= 10) {
+    return [digits.slice(0, 3), digits.slice(3)];
+  }
+  return ['', phone];
+}
+
+// Fills Form 433-F (Collection Information Statement) from the client row
+// and their Financial Profile. Returns filled PDF bytes (Uint8Array).
+export async function fillForm433F(client, profile) {
+  const templateBytes = await fetchTemplate(F433_TEMPLATE_PATHS['433f']);
+  const pdfDoc = await PDFDocument.load(templateBytes, { ignoreEncryption: true });
+  const form = pdfDoc.getForm();
+  const p = profile || {};
+  const et1 = p.employment_taxpayer_1 || {};
+  const es1 = p.employment_spouse_1 || {};
+  const b1 = p.business_1 || {};
+  const re0 = (p.real_estate || [])[0] || {};
+  const re1 = (p.real_estate || [])[1] || {};
+  const vehicles = (p.vehicles || []).filter(v => v.make_model);
+  const cc = p.credit_cards || [];
+  const extra = p.f433_extra || {};
+  const exp = p.expenses || {};
+
+  const setText = (fieldName, value) => {
+    if (!fieldName) return;
+    try {
+      const field = form.getTextField(fieldName);
+      field.setText(value != null ? String(value) : '');
+    } catch (_) { /* field not present — skip */ }
+  };
+  const setCheck = (fieldName, on) => {
+    if (!fieldName) return;
+    try {
+      const field = form.getCheckBox(fieldName);
+      if (on) field.check(); else field.uncheck();
+    } catch (_) { /* skip */ }
+  };
+
+  // ── Header / Identifying info ──
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_ACCOUNT_NAME_NAME', client?.name || '');
+  setText('TOInfo.ACCOUNT_NAME_ADDRESS', client?.street || '');
+  setText('TOInfo.ACCOUNT_NAME_CITY_STATE_ZIP_CODE', [client?.city, client?.state, client?.zip].filter(Boolean).join(', '));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_PRIMARY_SSN', client?.ssn || '');
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_SPOUSE_SSN', client?.spouseSsn || '');
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_COUNTY_OF_RESIDENCE', p.county || '');
+
+  // Taxpayer phones
+  setText('ClientInfo.ACCOUNT_NAME1_PHONE', client?.phone || '');         // Home
+  setText('ClientInfo.ACCOUNT_NAME1_WORK_PHONE', '');                      // Work (no field in CRM)
+  setText('ClientInfo.ACCOUNT_NAME1_CELL_PHONE', client?.phone || '');     // Cell
+  // Spouse phones
+  setText('ClientInfo.ACCOUNT_NAME1_SPOUSE_PHONE', client?.spousePhone || '');
+  setText('Work_2', '');
+  setText('Cell', '');
+
+  // Household size
+  setText('TOInfo.ACCOUNT_NAME_HOUSEHOLD_UNDER_65', p.household_under_65 ?? '');
+  setText('TOInfo.ACCOUNT_NAME_HOUSEHOLD_OVER_65', p.household_over_65 ?? '');
+
+  // Business info (self-employed)
+  setText('Name of Business', b1.name || '');
+  setText('Business EIN', extra.business_ein || b1.ein || '');
+  setText('Type of Business', extra.business_type || '');
+  setText('Number of Employees not counting owner', extra.num_employees ?? b1.num_employees ?? '');
+
+  // ── Section A: Bank accounts (from Assets & Equity, type=bank_account) ──
+  const bankAssets = (p.assets || []).filter(a => a.type === 'bank_account');
+  if (bankAssets[0]) {
+    setText('TOInfo.ACCOUNT_NAME_BANK_NAME', bankAssets[0].description || '');
+    setText('TOInfo.ACCOUNT_NAME_ACCOUNT_BALANCE', money(bankAssets[0].value));
+  }
+  if (bankAssets[1]) {
+    setText('TOInfo.ACCOUNT_NAME_BANK_NAME1', bankAssets[1].description || '');
+    setText('TOInfo.ACCOUNT_NAME_ACCOUNT_BALANCE2', money(bankAssets[1].value));
+  }
+
+  // ── Section B: Real Estate ──
+  if (re0.address) {
+    setText('TOInfo.ACCOUNT_NAME_PRIMARY_ADDRESS_ONLY_IF_OWN_HOME', re0.address || '');
+    setText('TOInfo.ACCOUNT_NAME_MONTHLY_MORTGAGE_EXPENSE', money(n(re0.mortgage_1) + n(re0.mortgage_2)));
+    setText('TOInfo.ACCOUNT_NAME_PURCHASE_YEAR', re0.purchase_year || '');
+    setText('TOInfo.ACCOUNT_NAME_PURCHASE_AMOUNT', money(re0.purchase_amount));
+    setText('TOInfo.ACCOUNT_NAME_REFINANCE_YEAR', re0.refi_year || '');
+    setText('TOInfo.ACCOUNT_NAME_AMOUNT_OF_REFINANCE', money(re0.refi_amount));
+    setText('TOInfo.ACCOUNT_NAME_VALUE_OF_HOME_ZILLOW', money(re0.zillow_value));
+    setText('TOInfo.ACCOUNT_NAME_BALANCE_OF_MORTGAGE', money(re0.mortgage_balance));
+    const equity0 = n(re0.zillow_value) - n(re0.mortgage_balance);
+    setText('TOInfo.ACCOUNT_NAME_EQUITY_IN_PROPERTY', equity0 ? money(equity0) : '');
+    setCheck('Primary Residence', true);
+  }
+  if (re1.address) {
+    setText('TOInfo.ACCOUNT_NAME_ADDITIONAL_PROPERTY_ADDRESS', re1.address || '');
+    setText('TOInfo.ACCOUNT_NAME_MONTHLY_MORTGAGE_EXPENSE1', money(n(re1.mortgage_1) + n(re1.mortgage_2)));
+    setText('TOInfo.ACCOUNT_NAME_PURCHASE_YEAR_ADDITIONAL_PROPERTY', re1.purchase_year || '');
+    setText('TOInfo.ACCOUNT_NAME_PURCHASE_AMOUNT_ADDITIONAL_PROPERTY', money(re1.purchase_amount));
+    setText('TOInfo.ACCOUNT_NAME_REFINANCE_YEAR_ADDITIONAL_PROPERTY', re1.refi_year || '');
+    setText('TOInfo.ACCOUNT_NAME_AMOUNT_OF_REFINANCE_ADDITIONAL_PROPERTY', money(re1.refi_amount));
+    setText('TOInfo.ACCOUNT_NAME_VALUE_OF_HOME_ADDITIONAL_PROPERTY', money(re1.zillow_value));
+    setText('TOInfo.ACCOUNT_NAME_BALANCE_OF_MORTGAGE_ADDITIONAL_PROPERTY', money(re1.mortgage_balance));
+    const equity1 = n(re1.zillow_value) - n(re1.mortgage_balance);
+    setText('TOInfo.ACCOUNT_NAME_EQUITY_IN_PROPERTY2', equity1 ? money(equity1) : '');
+    setCheck('Other', true);
+  }
+
+  // ── Vehicles ──
+  if (vehicles[0]) {
+    const v = vehicles[0];
+    setText('TOInfo.ACCOUNT_NAME_VEHICLE_1_MAKE_MODEL', `${v.year || ''} ${v.make_model || ''}`.trim());
+    setText('TOInfo.ACCOUNT_NAME_VEHICLE_1_MONTHLY_PAYMENT', money(v.monthly_payment));
+    setText('TOInfo.ACCOUNT_NAME_VEHICLE_1_PURCHASE_DATE(Date yyyy)', v.purchase_date || '');
+    setText('TOInfo.ACCOUNT_NAME_VEHICLE_1_FINAL_PAYMENT_DATE(Date MM/yyyy)', v.final_payment_date || '');
+    setText('TOInfo.ACCOUNT_NAME_VEHICLE_1_FMV', money(v.kbb_value));
+    setText('TOInfo.ACCOUNT_NAME_VEHICLE_1_PAYOFF_AMOUNT', money(v.remaining_balance));
+    const eq = n(v.kbb_value) - n(v.remaining_balance);
+    setText('TOInfo.ACCOUNT_NAME_VEHICLE_EQUITY', eq ? money(eq) : '');
+  }
+  if (vehicles[1]) {
+    const v = vehicles[1];
+    setText('TOInfo.ACCOUNT_NAME_VEHICLE_2_MAKE_MODEL', `${v.year || ''} ${v.make_model || ''}`.trim());
+    setText('TOInfo.ACCOUNT_NAME_VEHICLE_2_MONTHLY_PAYMENT', money(v.monthly_payment));
+    setText('TOInfo.ACCOUNT_NAME_VEHICLE_2_PURCHASE_DATE(Date yyyy)', v.purchase_date || '');
+    setText('TOInfo.ACCOUNT_NAME_VEHICLE_2_FINAL_PAYMENT_DATE(Date MM/yyyy)', v.final_payment_date || '');
+    setText('TOInfo.ACCOUNT_NAME_VEHICLE_2_FMV', money(v.kbb_value));
+    setText('TOInfo.ACCOUNT_NAME_VEHICLE_2_PAYOFF_AMOUNT', money(v.remaining_balance));
+    const eq2 = n(v.kbb_value) - n(v.remaining_balance);
+    setText('TOInfo.ACCOUNT_NAME_VEHICLE_EQUITY2', eq2 ? money(eq2) : '');
+  }
+
+  // ── Credit cards / lines of credit ──
+  if (cc[0]) {
+    setText('TypeRow1', cc[0].name || '');
+    setText('Credit LimitRow1', money(cc[0].limit));
+    setText('Balance OwedRow1_2', money(cc[0].balance));
+    setText('Minimum Monthly PaymentRow1', money(cc[0].min_payment));
+  }
+  if (cc[1]) {
+    setText('TypeRow2', cc[1].name || '');
+    setText('Credit LimitRow2', money(cc[1].limit));
+    setText('Balance OwedRow2_2', money(cc[1].balance));
+    setText('Minimum Monthly PaymentRow2', money(cc[1].min_payment));
+  }
+
+  // ── Section E: Employment ──
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_PRIMARY_TAXPAYER_EMPLOYER', et1.employer || '');
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_SPOUSE_EMPLOYER', es1.employer || '');
+  setText('TOInfo.ACCOUNT_NAME_PAY_FREQUENCY', et1.pay_frequency || '');
+  setText('TOInfo.ACCOUNT_NAME_SPOUSE_PAY_FREQUENCY', es1.pay_frequency || '');
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_GROSS_WAGES_PER_PAY_PERIOD', money(et1.gross_monthly_salary));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_SPOUSE_GROSS_WAGES_PER_PAY_PERIOD', money(es1.gross_monthly_salary));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_TAX_PER_PAY_PERIOD_FED', money(et1.fed_withheld));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_TAX_PER_PAY_PERIOD_STATE', money(et1.state_withheld));
+  setText('Local', money(et1.ss_med_withheld));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_TAX_PER_PAY_PERIOD_FEDSPOUSE', money(es1.fed_withheld));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_TAX_PER_PAY_PERIOD_STATESPOUSE', money(es1.state_withheld));
+  setText('Local_2', money(es1.ss_med_withheld));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_HOW_LONG_AT_CURRENT_EMPLOYER', et1.length || '');
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_HOW_LONG_AT_CURRENT_EMPLOYERSPOUSE', es1.length || '');
+
+  // Pay frequency checkboxes (taxpayer / spouse)
+  const freqMap = { 'Weekly': 'Weekly', 'Bi-weekly': 'Biweekly', 'Biweekly': 'Biweekly', 'Semi-monthly': 'Semimonthly', 'Semimonthly': 'Semimonthly', 'Monthly': 'Monthly' };
+  if (freqMap[et1.pay_frequency]) setCheck(freqMap[et1.pay_frequency], true);
+  if (freqMap[es1.pay_frequency]) setCheck(freqMap[es1.pay_frequency] + '_2', true);
+
+  // ── Section G: Non-wage household income ──
+  setText('TOInfo.ACCOUNT_NAME_MONTHLY_NET_INCOME_FROM_BUSINESS', money(b1.net_income));
+
+  // ── Section H: Monthly Necessary Living Expenses ──
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_FOOD', money(exp.food));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_HOUSEKEEPING_SUPPLIES', money(exp.housekeeping_supplies));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_CLOTHING_AND_CLOTHING_SERVICE', money(exp.clothing));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_PERSONAL_CARE_PRODUCTS_SERVICES', money(exp.personal_care));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_MISC', money(exp.misc));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_FOOD_CLOTHING_AND_MISC_EXPENSES', money(exp.food_clothing));
+
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_OPERATING_EXPENSES', money(n(exp.car_misc)));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_PUBLIC_TRANSPORTATION', money(exp.public_transportation));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_TOTAL_TRANSPORTATION_EXPENSE',
+    money(n(exp.car_misc) + n(exp.public_transportation) + n(vehicles[0]?.monthly_payment) + n(vehicles[1]?.monthly_payment)));
+
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_RENT', money(exp.rent));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_ELECTRIC_OIL_GAS_WATER_TRASH',
+    money(n(exp.electricity) + n(exp.heating_gas) + n(exp.heating_propane) + n(exp.water_sewer_trash) + n(exp.waste_sewer) + n(exp.trash)));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_TELEPHONE_CELL_CABLE_INTERNET',
+    money(n(exp.cell_phone) + n(exp.internet) + n(exp.cable)));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_REAL_ESTATE_TAXES_AND_INSURANCE',
+    money(n(exp.homeowners_insurance) + n(exp.property_taxes) + n(exp.hoa_dues) + n(exp.renters_insurance)));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_MAINTENANCE_AND_REPAIRS', money(n(exp.maintenance) + n(exp.pest_control) + n(exp.lawn)));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_TOTAL_HOUSING_UTILITIES_EXPENSE',
+    money(n(re0.mortgage_1) + n(re0.mortgage_2) + n(exp.rent) + n(exp.electricity) + n(exp.heating_gas) + n(exp.heating_propane) +
+      n(exp.water_sewer_trash) + n(exp.waste_sewer) + n(exp.trash) + n(exp.cell_phone) + n(exp.internet) + n(exp.cable) +
+      n(exp.homeowners_insurance) + n(exp.property_taxes) + n(exp.hoa_dues) + n(exp.renters_insurance) +
+      n(exp.maintenance) + n(exp.pest_control) + n(exp.lawn)));
+
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_HEALTH_INSURANCE',
+    money(n(exp.health_major_medical) + n(exp.health_supplemental) + n(exp.health_dental) + n(exp.health_vision)));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_OUT_OF_POCKET_HEALTH_CARE_EXPENSES', money(exp.health_oop));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_TOTAL_HEALTH_CARE_EXPENSES',
+    money(n(exp.health_major_medical) + n(exp.health_supplemental) + n(exp.health_dental) + n(exp.health_vision) + n(exp.health_oop)));
+
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_CHILD_DEPENDENT_CARE', money(exp.child_care));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_ESTIMATED_TAX_PAYMENTS', money(exp.estimated_tax_payments));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_RETIREMENT_EMPLOYER_REQUIRED', money(exp.retirement_employer));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_RETIREMENT_VOLUNTARY', money(exp.retirement_voluntary));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_UNION_DUES', money(extra.union_dues));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_DELINQUENT_STATE_LOCAL_TAXES', money(exp.delinquent_state_local));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_STUDENT_LOAN_PAYMENTS', money(p.other_secured_debt?.monthly_payment));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_COURT_ORDERED_CHILD_SUPPORT', money(exp.court_ordered_child_support));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_COURT_ORDERED_ALIMONY', money(extra.court_ordered_alimony));
+  setText('Master.INCOME_EXPENSE_EQUITY_WORKSHEET_OTHER_COURT_ORDERED_PAYMENTS', money(exp.other_court_ordered));
+
+  const filledBytes = await pdfDoc.save();
+  return filledBytes;
+}
+
+// Fills Form 433-A (Section 1: Personal Information) from the client row
+// and Financial Profile. Other sections (assets, income/expenses) are left
+// blank for manual completion in this first pass.
+export async function fillForm433A(client, profile) {
+  const templateBytes = await fetchTemplate(F433_TEMPLATE_PATHS['433a']);
+  const pdfDoc = await PDFDocument.load(templateBytes, { ignoreEncryption: true });
+  const form = pdfDoc.getForm();
+  const p = profile || {};
+
+  const setText = (fieldName, value) => {
+    if (!fieldName) return;
+    try {
+      const field = form.getTextField(fieldName);
+      field.setText(value != null ? String(value) : '');
+    } catch (_) { /* skip */ }
+  };
+  const setCheck = (fieldName, on) => {
+    if (!fieldName) return;
+    try {
+      const field = form.getCheckBox(fieldName);
+      if (on) field.check(); else field.uncheck();
+    } catch (_) { /* skip */ }
+  };
+
+  const base = 'topmostSubform[0].Page1[0].c1[0]';
+
+  // 1a — Full Name of Taxpayer and Spouse
+  const fullName = [client?.name, client?.spouseName].filter(Boolean).join(' & ');
+  setText(`${base}.Lines1a-b[0].p1-t4[0]`, fullName);
+
+  // 1b — Address
+  const addr = [client?.street, [client?.city, client?.state, client?.zip].filter(Boolean).join(', ')]
+    .filter(Boolean).join(', ');
+  setText(`${base}.Lines1a-b[0].p1-t5[0]`, addr);
+
+  // 1c — County of Residence
+  setText(`${base}.Lines1a-b[1].p1-t4[0]`, p.county || '');
+
+  // 1d — Home Phone (area code / number)
+  const [hArea, hNum] = splitPhone(client?.phone);
+  setText(`${base}.Line1c[0].p1-t6c[0]`, hArea);
+  setText(`${base}.Line1c[0].p1-t7c[0]`, hNum);
+
+  // 1e — Cell Phone
+  const [cArea, cNum] = splitPhone(client?.phone);
+  setText(`${base}.Line1d[0].p1-t8d[0]`, cArea);
+  setText(`${base}.Line1d[0].p1-t9d[0]`, cNum);
+
+  // 1f — Work Phone (no source field in CRM, leave blank)
+  setText(`${base}.Line1e[0].p1-t10e[0]`, '');
+  setText(`${base}.Line1e[0].p1-t11e[0]`, '');
+
+  // 2a — Marital status: [0]="1"=Married, [1]="2"=Unmarried
+  if (p.filing_status) {
+    const fs = p.filing_status.toLowerCase();
+    if (fs.includes('married')) setCheck(`${base}.C1_01_2a[0]`, true);
+    else setCheck(`${base}.C1_01_2a[1]`, true);
+  }
+
+  // 2b — SSN/ITIN + DOB (Taxpayer row, Spouse row)
+  setText(`${base}.Table_Part4-Line5[0].Row1[0].F02_030_0_[0]`, client?.ssn || '');
+  setText(`${base}.Table_Part4-Line5[0].Row1[0].F02_031_0_[0]`, p.dob || '');
+  setText(`${base}.Table_Part4-Line5[0].Row2[0].F02_034_0_[0]`, client?.spouseSsn || '');
+  setText(`${base}.Table_Part4-Line5[0].Row2[0].F02_035_0_[0]`, '');
+
+  // Section 1 — Dependents (from client.dependents JSON)
+  let deps = [];
+  try {
+    deps = client?.dependents
+      ? (typeof client.dependents === 'string' ? JSON.parse(client.dependents || '[]') : client.dependents)
+      : [];
+  } catch (_) { deps = []; }
+  const depBase = 'topmostSubform[0].Page1[0].c2[0].ClaimedAsDependents[0]';
+  deps.slice(0, 3).forEach((d, i) => {
+    const row = i + 1;
+    setText(`${depBase}.Row${row}[0].Name[0]`, d.name || '');
+    setText(`${depBase}.Row${row}[0].Age[0]`, d.age || '');
+    setText(`${depBase}.Row${row}[0].Relationship[0]`, d.relationship || '');
+  });
+
+  const filledBytes = await pdfDoc.save();
+  return filledBytes;
+}

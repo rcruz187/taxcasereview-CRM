@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import { fillForm433F, fillForm433A } from '../lib/irsFormUtils'
+
 function n(v) { const x = parseFloat(v); return isNaN(x) ? 0 : x }
 function fmt(v) { return '$' + n(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
@@ -18,8 +21,20 @@ function ReadRow({ label, value }) {
   return <div className="dr"><span className="dl">{label}</span><span className="dv">{value || '—'}</span></div>
 }
 
+function downloadPdf(bytes, filename) {
+  const blob = new Blob([bytes], { type: 'application/pdf' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function F433FTab({ profile, set, client, totalHousehold, income, exp, assets }) {
   const extra = profile.f433_extra || {}
+  const [filling, setFilling] = useState(null)
+  const [fillError, setFillError] = useState('')
   function setExtra(key, value) {
     set('f433_extra', { ...extra, [key]: value })
   }
@@ -40,9 +55,32 @@ export default function F433FTab({ profile, set, client, totalHousehold, income,
     }, 50)
   }
 
+  async function handleFillPdf(formType) {
+    setFilling(formType)
+    setFillError('')
+    try {
+      const bytes = formType === '433f'
+        ? await fillForm433F(client, profile)
+        : await fillForm433A(client, profile)
+      const name = (client?.name || 'Client').replace(/\s+/g, '_')
+      downloadPdf(bytes, `${formType.toUpperCase()}_${name}.pdf`)
+    } catch (e) {
+      setFillError(e.message || 'Failed to fill form')
+    } finally {
+      setFilling(null)
+    }
+  }
+
   return (
     <div className="print-target">
-      <div className="no-print" style={{display:'flex',justifyContent:'flex-end',marginBottom:10}}>
+      <div className="no-print" style={{display:'flex',justifyContent:'flex-end',gap:8,marginBottom:10,flexWrap:'wrap'}}>
+        {fillError && <div style={{fontSize:11,color:'var(--bad)',alignSelf:'center'}}>{fillError}</div>}
+        <button className="btn sec" disabled={!!filling} onClick={()=>handleFillPdf('433a')}>
+          {filling==='433a'?'⏳':'📄'}&nbsp; Fill 433-A PDF
+        </button>
+        <button className="btn sec" disabled={!!filling} onClick={()=>handleFillPdf('433f')}>
+          {filling==='433f'?'⏳':'📄'}&nbsp; Fill 433-F PDF
+        </button>
         <button className="btn sec" onClick={handlePrint}>🖨️ Print / Save as PDF</button>
       </div>
       <div className="print-title">Form 433-F — Collection Information Statement Summary<br/>
