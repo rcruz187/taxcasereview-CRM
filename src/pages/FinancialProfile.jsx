@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
+import ComplianceGrids from './ComplianceGrids'
+import PnLTab from './PnLTab'
+import F433FTab from './F433FTab'
 
 const BLANK_PROFILE = {
   dob:'', county:'', household_under_65:0, household_over_65:0,
@@ -20,7 +23,9 @@ const BLANK_PROFILE = {
   irs_business_941_liability:'', irs_business_940_liability:'', state_personal_liability:'',
   recent_irs_notices:'',
   resolution_eta:'', total_recommended_fee:'', tax_prep_fee_only:'', proposed_resolution:'',
-  notes:''
+  notes:'',
+  pl_base_year:{}, pl_missing_years:[],
+  f433_extra:{}
 }
 
 // 2026 IRS Collection Financial Standards
@@ -52,7 +57,7 @@ function SectionHeader({ children }) {
   return <div style={{fontSize:12,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',margin:'18px 0 8px',paddingTop:14,borderTop:'1px solid var(--br)'}}>{children}</div>
 }
 
-export default function FinancialProfile({ clientName }) {
+export default function FinancialProfile({ clientName, client }) {
   const { showToast } = useApp()
   const [tab, setTab] = useState('intake')
   const [profile, setProfile] = useState(BLANK_PROFILE)
@@ -138,6 +143,9 @@ export default function FinancialProfile({ clientName }) {
           {key:'ie',     label:'💰 I&E'},
           {key:'assets', label:'🏦 Assets & Equity'},
           {key:'oic',    label:'🧮 OIC Calculator'},
+          {key:'pnl',    label:'📊 P&L'},
+          {key:'compliance', label:'📑 Compliance'},
+          {key:'f433f',  label:'🗂️ 433-F'},
         ].map(t=>(
           <button key={t.key} onClick={()=>setTab(t.key)} style={{
             padding:'8px 16px', borderRadius:'8px 8px 0 0',
@@ -158,6 +166,10 @@ export default function FinancialProfile({ clientName }) {
       {tab === 'ie'     && <IETab profile={profile} set={set} totalHousehold={totalHousehold} />}
       {tab === 'assets' && <AssetsTab profile={profile} set={set} setArr={setArr} addArrRow={addArrRow} removeArrRow={removeArrRow} />}
       {tab === 'oic'    && <OICTab profile={profile} totalHousehold={totalHousehold} />}
+      {tab === 'pnl'    && <PnLTab profile={profile} set={set} />}
+      {tab === 'compliance' && <ComplianceGrids clientName={clientName} />}
+      {tab === 'f433f'  && <F433FTab profile={profile} set={set} client={client} totalHousehold={totalHousehold}
+                              income={calcIncome(profile)} exp={calcExpenses(profile, totalHousehold)} assets={calcAssets(profile)} />}
     </div>
   )
 }

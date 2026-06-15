@@ -827,7 +827,7 @@ export default function Clients() {
           {detailTab==='finprofile'&&(
             <div style={{padding:16}}>
               <ErrorBoundary>
-                <FinancialProfile clientName={c.name}/>
+                <FinancialProfile clientName={c.name} client={c}/>
               </ErrorBoundary>
             </div>
           )}
