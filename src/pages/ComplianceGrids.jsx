@@ -35,6 +35,7 @@ const FORM_META = {
 }
 
 const FILED_STATUS_OPTIONS = ['', 'Filed', 'Not Filed', 'SFR (Substitute for Return)', 'Filed - Not Assessed', 'No Liability', 'N/A']
+const LIEN_OPTIONS = ['', 'Yes', 'No']
 
 function calcCSED(assessmentDate, years) {
   if (!assessmentDate || !years) return ''
@@ -62,10 +63,14 @@ function GridRow({ rec, onChange, showQuarter, csedYears }) {
           {FILED_STATUS_OPTIONS.map(o=><option key={o} value={o}>{o||'—'}</option>)}
         </select>
       </td>
-      <td style={{padding:'8px 8px'}}><input type="number" value={rec.amount ?? ''} onChange={e=>handle('amount', e.target.value)} placeholder="0.00" style={inpStyle}/></td>
-      <td style={{padding:'8px 8px'}}><input type="number" value={rec.credits ?? ''} onChange={e=>handle('credits', e.target.value)} placeholder="0.00" style={inpStyle}/></td>
-      {showQuarter && <td style={{padding:'8px 8px'}}><input type="number" value={rec.deposit ?? ''} onChange={e=>handle('deposit', e.target.value)} placeholder="0.00" style={inpStyle}/></td>}
-      <td style={{padding:'8px 8px'}}><input value={rec.lien||''} onChange={e=>handle('lien', e.target.value)} placeholder="Lien?" style={{...inpStyle,width:90}}/></td>
+      <td style={{padding:'8px 8px'}}><MoneyInput value={rec.amount ?? ''} onChange={v=>handle('amount', v)} style={inpStyle}/></td>
+      <td style={{padding:'8px 8px'}}><MoneyInput value={rec.credits ?? ''} onChange={v=>handle('credits', v)} style={inpStyle}/></td>
+      {showQuarter && <td style={{padding:'8px 8px'}}><MoneyInput value={rec.deposit ?? ''} onChange={v=>handle('deposit', v)} style={inpStyle}/></td>}
+      <td style={{padding:'8px 8px'}}>
+        <select value={rec.lien||''} onChange={e=>handle('lien', e.target.value)} style={{...selStyle,width:90}}>
+          {LIEN_OPTIONS.map(o=><option key={o} value={o}>{o||'—'}</option>)}
+        </select>
+      </td>
       <td style={{padding:'8px 8px'}}><input type="date" value={rec.assessment_date||''} onChange={e=>handle('assessment_date', e.target.value)} style={{...inpStyle,width:130}}/></td>
       <td style={{padding:'8px 8px'}}>
         <input type="date" value={rec.csed||''} onChange={e=>handle('csed', e.target.value)} style={{...inpStyle,width:130,
@@ -77,6 +82,31 @@ function GridRow({ rec, onChange, showQuarter, csedYears }) {
 
 const inpStyle = { width:110, padding:'7px 9px', fontSize:13.5, background:'var(--s2)', border:'1px solid var(--br)', borderRadius:6, color:'var(--tx)' }
 const selStyle = { ...inpStyle, width:175 }
+
+// Number input that displays comma-separated thousands while not focused,
+// and shows the raw editable number while focused. Emits plain numeric
+// strings (no commas) via onChange, same as a normal number input.
+function MoneyInput({ value, onChange, style, placeholder='0.00' }) {
+  const [focused, setFocused] = useState(false)
+  const display = (focused || value === '' || value == null)
+    ? (value ?? '')
+    : Number(value).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={display}
+      placeholder={placeholder}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onChange={e => {
+        const raw = e.target.value.replace(/,/g, '')
+        if (raw === '' || /^-?\d*\.?\d*$/.test(raw)) onChange(raw)
+      }}
+      style={style}
+    />
+  )
+}
 
 function FormGrid({ clientName, formType, records, onSaveRow }) {
   const meta = FORM_META[formType]
