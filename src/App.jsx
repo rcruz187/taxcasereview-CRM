@@ -128,7 +128,6 @@ function Shell() {
             <Route path="/books"       element={<Guard section="books"><Books /></Guard>} />
             <Route path="/formacorp"   element={<Guard section="books"><FormaCorp /></Guard>} />
             <Route path="/fax"         element={<Guard section="email"><Fax /></Guard>} />
-            <Route path="/sign/:id"    element={<SignPage />} />
             <Route path="*"            element={<Navigate to="/" />} />
           </Routes>
         </div>
@@ -153,6 +152,7 @@ function AuthRouter() {
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/kiosk" element={<Kiosk />} />
+      <Route path="/sign/:id" element={<SignPage />} />
       <Route path="*" element={<RequireAuth><Shell /></RequireAuth>} />
     </Routes>
   )

@@ -229,7 +229,7 @@ function InlineEsignForm({ client, onClose, showToast }) {
     }]).select().single()
     setSaving(false)
     if (error) { showToast('Error: '+error.message,'err'); return }
-    const url = window.location.origin+'/taxcasereview-CRM/#/sign/'+data.id
+    const url = window.location.origin+'/taxcasereview-CRM/sign/'+data.id
     setLink(url)
     navigator.clipboard.writeText(url).catch(()=>{})
     showToast('✅ Signing link copied!')

@@ -686,9 +686,7 @@ export default function Esign() {
   }
 
   function openSigningPage(item) {
-    const html = buildDocHtml(item, firmLogoUrl)
-    const blob = new Blob([html], { type: 'text/html' })
-    window.open(URL.createObjectURL(blob), '_blank')
+    window.open(signingUrl(item.id), '_blank')
   }
 
   // Reminder helper: days pending

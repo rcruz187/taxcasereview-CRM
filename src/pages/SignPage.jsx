@@ -168,7 +168,7 @@ export default function SignPage() {
       <div style={styles.card}>
         <div style={{ textAlign:'center', padding:40 }}>
           <div style={{ fontSize:48, marginBottom:16 }}>⚠️</div>
-          <div style={{ fontSize:18, fontWeight:700, marginBottom:8, color:'#0f172a' }}>Link Not Found</div>
+          <div style={{ fontSize:18, fontWeight:700, marginBottom:8, color:'#f1f5f9' }}>Link Not Found</div>
           <div style={{ color:'#64748b', fontSize:14 }}>{error}</div>
         </div>
       </div>
@@ -180,29 +180,21 @@ export default function SignPage() {
       <div style={styles.card}>
         <div style={{ textAlign:'center', padding:'32px 20px' }}>
           <div style={{ fontSize:56, marginBottom:16 }}>✅</div>
-          <div style={{ fontSize:22, fontWeight:800, color:'#16a34a', marginBottom:8 }}>Document Signed!</div>
-          <div style={{ color:'#64748b', fontSize:14, lineHeight:1.7, marginBottom:20 }}>
-            Thank you, <strong>{doc?.signer_full_name || doc?.client_name}</strong>.<br/>
+          <div style={{ fontSize:22, fontWeight:800, color:'#4ade80', marginBottom:8 }}>Agreement Signed!</div>
+          <div style={{ color:'#94a3b8', fontSize:14, lineHeight:1.7, marginBottom:20 }}>
+            Thank you, <strong style={{color:'#f1f5f9'}}>{doc?.signer_full_name || doc?.client_name}</strong>.<br/>
             Your signature has been recorded and saved.<br/>
             Tax Case Review has been notified.
           </div>
-          <div style={{ background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:10, padding:'14px 16px', fontSize:12, color:'#166534', textAlign:'left', lineHeight:1.8 }}>
-            <strong>Certificate of Completion</strong><br/>
+          <div style={{ background:'#0a2540', border:'1px solid #166534', borderRadius:10, padding:'14px 16px', fontSize:12, color:'#86efac', textAlign:'left', lineHeight:2, fontFamily:'monospace' }}>
+            <strong>CERTIFICATE OF COMPLETION</strong><br/>
             Document: {doc?.doc_type}<br/>
             Client: {doc?.client_name}<br/>
-            Signed: {doc?.signed_at ? new Date(doc.signed_at).toLocaleString() : new Date().toLocaleString()}
+            Signed By: {doc?.signed_name}<br/>
+            IP Address: {doc?.signer_ip || 'Recorded'}<br/>
+            Timestamp: {doc?.signed_at ? new Date(doc.signed_at).toLocaleString() : new Date().toLocaleString()}
           </div>
-          {Array.isArray(doc?.signed_attachments) && doc.signed_attachments.length > 0 && (
-            <div style={{ marginTop:16, textAlign:'left' }}>
-              <div style={{ fontSize:12, fontWeight:700, color:'#0f172a', marginBottom:8 }}>Signed Forms</div>
-              {doc.signed_attachments.map(att => (
-                <div key={att.formType} style={{ marginBottom:6 }}>
-                  <a href={att.url} target="_blank" rel="noreferrer" style={{ fontSize:13, color:'#2563eb', textDecoration:'underline' }}>{att.label} (PDF)</a>
-                </div>
-              ))}
-            </div>
-          )}
-          <div style={{ marginTop:16, fontSize:11, color:'#94a3b8' }}>You may close this window.</div>
+          <div style={{ marginTop:16, fontSize:11, color:'#475569' }}>A copy has been saved to your file. You may close this window.</div>
         </div>
       </div>
     </div>
@@ -211,16 +203,62 @@ export default function SignPage() {
   return (
     <div style={styles.page}>
       {/* Header */}
-      <div style={{ textAlign:'center', marginBottom:20 }}>
-        <div style={{ fontSize:13, fontWeight:700, color:'#64748b', letterSpacing:'.05em' }}>TAX CASE REVIEW — Secure Document Signing</div>
+      <div style={{ textAlign:'center', marginBottom:24, paddingBottom:18, borderBottom:'1px solid #1e3a5f', width:'100%', maxWidth:660 }}>
+        <div style={{ fontSize:12, fontWeight:800, color:'#60a5fa', letterSpacing:'.12em', textTransform:'uppercase', marginBottom:4 }}>Tax Case Review</div>
+        <div style={{ fontSize:11, color:'#475569' }}>Secure Document Signing Portal</div>
       </div>
 
       <div style={styles.card}>
-        <h1 style={styles.h1}>{doc.doc_type}</h1>
-        <div style={styles.sub}>Prepared for: <strong>{doc.client_name}</strong></div>
+        <h1 style={styles.h1}>{doc.doc_type === 'Tax Service Agreement' ? 'Tax Service Agreement' : doc.doc_type}</h1>
+        <div style={styles.sub}>Prepared for: <strong style={{color:'#93c5fd'}}>{doc.client_name}</strong></div>
 
-        {/* Document message */}
-        <div style={styles.docBody}>{doc.message || 'Please review and sign this document.'}</div>
+        {/* Tax Service Agreement full content */}
+        {doc.doc_type === 'Tax Service Agreement' ? (
+          <div>
+            <div style={styles.section}>
+              <div style={styles.secTitle}>Tax Investigation Service Agreement</div>
+              <div style={styles.docBody}>{`Dear ${doc.client_name},
+
+Thank you for choosing Tax Case Review. This document confirms our engagement to assist you with your tax matter for tax year(s): ${doc.tax_years || '_______________'}.`}</div>
+            </div>
+
+            <div style={styles.section}>
+              <div style={styles.secTitle}>1. Scope of Services</div>
+              <div style={styles.docBody}>{`- Review of IRS and/or state tax transcripts
+- Identification of outstanding tax liabilities and unfiled returns
+- Evaluation of eligibility for IRS resolution programs (OIC, CNC, IA, Penalty Abatement)
+- Preparation of a written resolution strategy within 21 business days
+- Full IRS/state representation — Case Rep: ${doc.rep_name || 'Tax Case Review'}`}</div>
+            </div>
+
+            <div style={styles.section}>
+              <div style={styles.secTitle}>2. Authorization</div>
+              <div style={styles.docBody}>{`By signing below, you authorize Tax Case Review to obtain IRS transcripts via Form 2848/8821 and represent you before the IRS and/or applicable state tax authority.`}</div>
+            </div>
+
+            <div style={styles.section}>
+              <div style={styles.secTitle}>3. Investigation Fee</div>
+              <div style={styles.feeBox}>💰 Investigation Fee: <strong style={{color:'#fff',fontSize:16}}>{doc.investigation_fee ? `$${doc.investigation_fee}` : '_____________'}</strong></div>
+              <div style={{...styles.docBody, marginBottom:0}}>Non-refundable once transcript review has commenced. Full payment due prior to commencement.</div>
+            </div>
+
+            <div style={styles.section}>
+              <div style={styles.secTitle}>4. Client Responsibilities</div>
+              <div style={styles.docBody}>{`- Provide accurate and complete financial and tax information
+- Respond to document requests within 5 business days
+- Notify Tax Case Review of any IRS communications received
+- Make timely payment of agreed fees`}</div>
+            </div>
+
+            <div style={styles.section}>
+              <div style={styles.secTitle}>5. Terms & Conditions</div>
+              <div style={{...styles.docBody, marginBottom:0}}>This agreement does not guarantee a specific resolution outcome. Tax Case Review will act diligently and professionally on your behalf. This agreement is governed by the laws of the State of Florida.</div>
+            </div>
+          </div>
+        ) : (
+          /* Generic document body for non-TSA doc types */
+          <div style={styles.docBody}>{doc.message || 'Please review and sign this document.'}</div>
+        )}
 
         {/* Attached IRS forms (pre-filled, signature pending) */}
         {Array.isArray(doc.pdf_attachments) && doc.pdf_attachments.length > 0 && (
@@ -301,19 +339,22 @@ export default function SignPage() {
 }
 
 const styles = {
-  page:       { minHeight:'100vh', background:'#f4f6f9', display:'flex', flexDirection:'column', alignItems:'center', padding:'24px 16px', fontFamily:'Arial,sans-serif' },
-  card:       { background:'#fff', borderRadius:14, padding:32, maxWidth:600, width:'100%', boxShadow:'0 4px 24px rgba(0,0,0,.10)' },
-  h1:         { fontSize:22, fontWeight:800, marginBottom:4, color:'#0f172a' },
-  sub:        { fontSize:13, color:'#64748b', marginBottom:20 },
-  docBody:    { background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:9, padding:18, marginBottom:20, fontSize:14, lineHeight:1.7, color:'#1e293b', whiteSpace:'pre-wrap' },
+  page:       { minHeight:'100vh', background:'#0a1628', display:'flex', flexDirection:'column', alignItems:'center', padding:'24px 16px 48px', fontFamily:'"Segoe UI",Arial,sans-serif' },
+  card:       { background:'#0f1e35', border:'1px solid #1e3a5f', borderRadius:14, padding:'28px 32px', maxWidth:660, width:'100%' },
+  h1:         { fontSize:20, fontWeight:800, marginBottom:4, color:'#f1f5f9', textAlign:'center' },
+  sub:        { fontSize:13, color:'#64748b', marginBottom:20, textAlign:'center' },
+  docBody:    { background:'#0a1628', border:'1px solid #1e3a5f', borderRadius:9, padding:18, marginBottom:20, fontSize:13.5, lineHeight:1.8, color:'#cbd5e1', whiteSpace:'pre-wrap' },
   field:      { marginBottom:18 },
-  label:      { display:'block', fontSize:12, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:8 },
-  input:      { width:'100%', padding:'11px 14px', border:'1px solid #cbd5e1', borderRadius:8, fontSize:14, outline:'none', boxSizing:'border-box' },
-  sigPad:     { border:'2px dashed #cbd5e1', borderRadius:9, padding:'8px 0', background:'#fafafa' },
-  sigInput:   { width:'100%', border:'none', background:'none', outline:'none', padding:'8px 14px', boxSizing:'border-box' },
-  canvas:     { width:'100%', height:130, border:'2px dashed #cbd5e1', borderRadius:9, background:'#fafafa', cursor:'crosshair', display:'block', touchAction:'none' },
-  clearBtn:   { background:'none', border:'none', color:'#94a3b8', fontSize:11, cursor:'pointer', textDecoration:'underline', marginTop:4 },
-  legal:      { fontSize:11, color:'#94a3b8', marginTop:8 },
-  meta:       { fontSize:11, color:'#94a3b8', marginBottom:14 },
-  disclaimer: { fontSize:11, color:'#94a3b8', textAlign:'center', marginTop:18, lineHeight:1.6 },
+  label:      { display:'block', fontSize:11, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:8 },
+  input:      { width:'100%', padding:'11px 14px', border:'1px solid #1e3a5f', borderRadius:8, fontSize:14, outline:'none', boxSizing:'border-box', background:'#0a1628', color:'#f1f5f9' },
+  sigPad:     { border:'2px dashed #1e3a5f', borderRadius:9, padding:'8px 0', background:'#0a1628' },
+  sigInput:   { width:'100%', border:'none', background:'none', outline:'none', padding:'8px 14px', boxSizing:'border-box', fontSize:28, fontFamily:'"Brush Script MT",cursive,Georgia,serif', color:'#60a5fa' },
+  canvas:     { width:'100%', height:130, border:'2px dashed #1e3a5f', borderRadius:9, background:'#0a1628', cursor:'crosshair', display:'block', touchAction:'none' },
+  clearBtn:   { background:'none', border:'none', color:'#475569', fontSize:11, cursor:'pointer', textDecoration:'underline', marginTop:4 },
+  legal:      { fontSize:11, color:'#475569', marginTop:8 },
+  meta:       { fontSize:11, color:'#475569', marginBottom:14, background:'#0a1628', border:'1px solid #1e3a5f', borderRadius:6, padding:'7px 12px', lineHeight:1.6 },
+  disclaimer: { fontSize:11, color:'#475569', textAlign:'center', marginTop:18, lineHeight:1.6 },
+  section:    { marginBottom:18 },
+  secTitle:   { fontSize:11, fontWeight:800, color:'#3b82f6', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:6, paddingBottom:4, borderBottom:'1px solid #1e3a5f' },
+  feeBox:     { background:'#0a2540', border:'1px solid #1e40af', borderRadius:8, padding:'10px 14px', marginBottom:10, fontSize:14, color:'#93c5fd', fontWeight:600 },
 }
