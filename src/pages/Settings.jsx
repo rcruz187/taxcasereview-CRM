@@ -85,7 +85,7 @@ export default function Settings() {
     setSaving(true)
     try {
       // Only save known DB columns - exclude any React state extras
-      const payload = {
+      let payload = {
         name: firm.name, tagline: firm.tagline, phone: firm.phone,
         email: firm.email, address: firm.address, city: firm.city,
         state: firm.state, zip: firm.zip, website: firm.website,
@@ -112,21 +112,46 @@ export default function Settings() {
         qb_client_id: firm.qb_client_id,
         qb_client_secret: firm.qb_client_secret,
       }
+
       const { data: existing, error: fetchErr } = await supabase.from('settings').select('id').limit(1).maybeSingle()
       if (fetchErr) throw fetchErr
+
+      // Self-healing save: if Postgres reports an unknown column, strip it and retry.
+      // This guarantees the core Firm Info fields always save even if a newer
+      // integration column hasn't been migrated into the DB yet.
+      const skipped = []
       let saveErr
-      if (existing?.id) {
-        const { error } = await supabase.from('settings').update(payload).eq('id', existing.id)
-        saveErr = error
-      } else {
-        const { error } = await supabase.from('settings').insert([payload])
-        saveErr = error
+      for (let attempt = 0; attempt < 12; attempt++) {
+        if (existing?.id) {
+          ({ error: saveErr } = await supabase.from('settings').update(payload).eq('id', existing.id))
+        } else {
+          ({ error: saveErr } = await supabase.from('settings').insert([payload]))
+        }
+        if (!saveErr) break
+        // Postgres "column does not exist" error: 42703, message names the column
+        const match = saveErr.message?.match(/column ['"]?(\w+)['"]? (of relation .* )?does not exist/i)
+          || saveErr.message?.match(/Could not find the '(\w+)' column/i)
+        if (saveErr.code === '42703' && match) {
+          const badCol = match[1]
+          if (badCol in payload) {
+            const { [badCol]: _, ...rest } = payload
+            payload = rest
+            skipped.push(badCol)
+            continue
+          }
+        }
+        // Not a recoverable "unknown column" error — stop retrying
+        break
       }
       if (saveErr) throw saveErr
+
       if (firm.primary_color) applyBrandColor(firm.primary_color)
-      // Refresh the Sidebar firm name
       window.dispatchEvent(new Event('firm-updated'))
-      showToast('✅ Settings saved!')
+      if (skipped.length) {
+        showToast(`✅ Saved — but these fields aren't set up in the database yet and were skipped: ${skipped.join(', ')}. Ask to add these columns.`)
+      } else {
+        showToast('✅ Settings saved!')
+      }
     } catch (e) { showToast('Error: ' + e.message, 'err') } finally { setSaving(false) }
   }
 
@@ -154,14 +179,14 @@ export default function Settings() {
   }
 
   const set = k => e => setFirm(f => ({ ...f, [k]: e.target.value }))
-  const tabs = ['firm', 'integrations', 'fax', 'branding', 'users', 'security']
+  const tabs = ['firm', 'integrations', 'branding', 'users', 'security']
 
   return (
     <div style={{ maxWidth: 860, margin: '0 auto' }}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
         {tabs.map(t => (
           <button key={t} className={`btn${tab === t ? ' pri' : ''}`} onClick={() => setTab(t)}>
-            {t === 'firm' ? '🏢 Firm Info' : t === 'integrations' ? '🔌 Integrations' : t === 'fax' ? '📠 Fax' : t === 'branding' ? '🎨 Branding' : t === 'users' ? '👥 Users' : '🔒 Security'}
+            {t === 'firm' ? '🏢 Firm Info' : t === 'integrations' ? '🔌 Integrations' : t === 'branding' ? '🎨 Branding' : t === 'users' ? '👥 Users' : '🔒 Security'}
           </button>
         ))}
       </div>
@@ -356,6 +381,29 @@ export default function Settings() {
             </div>
           </div>
 
+          {/* Fax (uses SignalWire credentials above) */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">📠 Fax Integration</span></div>
+            <div style={{ padding: '0 20px 20px' }}>
+              <div style={{fontSize:12,color:'var(--t3)',marginBottom:16,lineHeight:1.7}}>
+                Fax is sent via your SignalWire backend's <code>/fax/send</code> endpoint, using the same SignalWire project as your dialer and SMS above.
+              </div>
+              <div style={{background:'var(--s2)',borderRadius:8,padding:'12px 16px',marginBottom:16,fontSize:12,lineHeight:1.8}}>
+                <div style={{fontWeight:700,color:'var(--tx)',marginBottom:6}}>Setup:</div>
+                {[['1','Set up SignalWire credentials in the SignalWire Dialer card above'],['2','Deploy signalwire-backend (server.js) to a host like Render or Railway'],['3','Enter the deployed Backend Server URL in the SignalWire card'],['4','Your SignalWire phone number (Inbound DID) is used as the fax From number']].map(([step,text])=>(
+                  <div key={step} style={{display:'flex',gap:10,marginBottom:4,alignItems:'flex-start'}}>
+                    <div style={{width:20,height:20,borderRadius:'50%',background:'var(--blue)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,flexShrink:0,marginTop:1}}>{step}</div>
+                    <div style={{color:'var(--t2)'}}>{text}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{background:'rgba(26,127,212,.08)',border:'1px solid rgba(26,127,212,.2)',borderRadius:8,padding:'10px 14px',fontSize:12,color:'var(--t2)',lineHeight:1.6}}>
+                Backend URL: <strong>{firm.signalwire_backend || 'Not configured'}</strong><br/>
+                Fax From Number: <strong>{firm.sw_inbound_did || 'Not configured'}</strong>
+              </div>
+            </div>
+          </div>
+
           {/* QuickBooks Online */}
           <div className="card">
             <div className="card-header"><span className="card-title">📊 QuickBooks Online</span></div>
@@ -419,31 +467,6 @@ export default function Settings() {
           </div>
         </div>
       )}
-
-      {tab === 'fax' && (
-        <div className="card">
-          <div style={{fontWeight:700,fontSize:14,marginBottom:4}}>📠 Fax Integration — SignalWire</div>
-          <div style={{fontSize:12,color:'var(--t3)',marginBottom:16,lineHeight:1.7}}>
-            Fax is sent via your SignalWire backend's <code>/fax/send</code> endpoint, using the same SignalWire project as your dialer and SMS.
-          </div>
-          <div style={{background:'var(--s2)',borderRadius:8,padding:'12px 16px',marginBottom:16,fontSize:12,lineHeight:1.8}}>
-            <div style={{fontWeight:700,color:'var(--tx)',marginBottom:6}}>Setup:</div>
-            {[['1','Set up SignalWire credentials in 📞 Integrations → SignalWire Dialer'],['2','Deploy signalwire-backend (server.js) to a host like Render or Railway'],['3','Enter the deployed Backend Server URL in the SignalWire card'],['4','Your SignalWire phone number (Inbound DID) is used as the fax From number']].map(([step,text])=>(
-              <div key={step} style={{display:'flex',gap:10,marginBottom:4,alignItems:'flex-start'}}>
-                <div style={{width:20,height:20,borderRadius:'50%',background:'var(--blue)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,flexShrink:0,marginTop:1}}>{step}</div>
-                <div style={{color:'var(--t2)'}}>{text}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{background:'rgba(26,127,212,.08)',border:'1px solid rgba(26,127,212,.2)',borderRadius:8,padding:'10px 14px',marginBottom:16,fontSize:12,color:'var(--t2)',lineHeight:1.6}}>
-            Backend URL: <strong>{firm.signalwire_backend || 'Not configured'}</strong><br/>
-            Fax From Number: <strong>{firm.sw_inbound_did || 'Not configured'}</strong><br/>
-            Configure both in 🔌 Integrations → SignalWire Dialer.
-          </div>
-        </div>
-      )}
-
-      {tab === 'integrations_smtp' && null}
 
       {tab === 'branding' && (
         <div className="card">
