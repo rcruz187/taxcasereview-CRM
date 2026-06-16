@@ -32,6 +32,7 @@ const BLANK = {
   ssn:'', ein:'', dobM:'', dobD:'', dobY:'',
   spouseName:'', spouseSsn:'', filingStatus:'Single',
   irsBalance:'', issueType:'OIC', irsOrState:'IRS Federal', taxYears:'',
+  filingRequirements:[],
   irsStatus:'', irsStatusOther:'', irsDeadline:'',
   stateStatus:'', stateStatusOther:'', stateDeadline:'',
   clientSince:'', status:'Active', notes:'', assignedTo:'',
@@ -724,7 +725,7 @@ export default function Clients() {
     const {dobM,dobD,dobY,id,created_at,pipelineStage,...rest}=f
     const dob=dobM&&dobD&&dobY?`${dobM}/${dobD}/${dobY}`:f.dob||''
     // pipelineStage excluded from main payload — updated separately
-    const safe={...rest,dob,dependents:JSON.stringify(f.dependents||[])}
+    const safe={...rest,dob,dependents:JSON.stringify(f.dependents||[]),filingRequirements:JSON.stringify(f.filingRequirements||[])}
     return safe
   }
 
@@ -833,9 +834,10 @@ export default function Clients() {
 
   function openEdit(c) {
     const deps=parseDependents(c.dependents)
+    const filingReqs=parseDependents(c.filingRequirements)
     let dobM='',dobD='',dobY=''
     if (c.dob){const p=c.dob.split('/');if(p.length===3){dobM=p[0];dobD=p[1];dobY=p[2]}}
-    setForm({...BLANK,...c,dobM,dobD,dobY,dependents:deps})
+    setForm({...BLANK,...c,dobM,dobD,dobY,dependents:deps,filingRequirements:filingReqs})
     setEditModal(true)
   }
 
@@ -1293,6 +1295,7 @@ export default function Clients() {
               <DR label="Issue Type"   val={c.issueType}/>
               <DR label="IRS or State" val={c.irsOrState}/>
               <DR label="Tax Years"    val={c.taxYears}/>
+              <DR label="Filing Reqs"  val={parseDependents(c.filingRequirements).join(', ')}/>
               {(c.irsOrState||'IRS Federal')!=='State' && (
                 <>
                   <DR label="IRS Status"   val={c.irsStatus==='Other'?c.irsStatusOther:c.irsStatus}/>
@@ -1658,6 +1661,21 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
             </select>
           </div>
           <div className="field"><label>Tax Years</label><input value={form.taxYears||''} onChange={e=>fld('taxYears',e.target.value)} placeholder="2020, 2021, 2022"/></div>
+        </div>
+        <div className="field">
+          <label>Filing Requirements</label>
+          <div style={{display:'flex',gap:14,flexWrap:'wrap',padding:'6px 0'}}>
+            {['1040','1120','1065','1120S','940','941'].map(ft=>(
+              <label key={ft} style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:13,cursor:'pointer'}}>
+                <input type="checkbox" style={{width:'auto'}}
+                  checked={(form.filingRequirements||[]).includes(ft)}
+                  onChange={()=>fld('filingRequirements', (form.filingRequirements||[]).includes(ft)
+                    ? form.filingRequirements.filter(x=>x!==ft)
+                    : [...(form.filingRequirements||[]),ft])}/>
+                {ft}
+              </label>
+            ))}
+          </div>
         </div>
         {(form.irsOrState||'IRS Federal')!=='State' && (
           <div className="fg2">

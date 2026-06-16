@@ -244,13 +244,13 @@ export default function FinancialProfile({ clientName, client }) {
       {/* Sub-tabs */}
       <div style={{display:'flex',gap:4,marginBottom:16,borderBottom:'1px solid var(--br)',flexWrap:'wrap'}}>
         {[
+          {key:'compliance', label:'📑 Compliance'},
           {key:'intake', label:'📋 TO Intake'},
           {key:'ie',     label:'💰 I&E'},
           {key:'assets', label:'🏦 Assets & Equity'},
           {key:'oic',    label:'🧮 OIC Calculator'},
           {key:'pnl',    label:'📊 P&L'},
-          {key:'compliance', label:'📑 Compliance'},
-          {key:'f433f',  label:'🗂️ 433-F'},
+          {key:'f433f',  label:'🗂️ 433'},
         ].map(t=>(
           <button key={t.key} onClick={()=>setTab(t.key)} style={{
             padding:'8px 16px', borderRadius:'8px 8px 0 0',
