@@ -7,6 +7,7 @@ import { generateClientPackage, generateAddendum, generatePOACoverLetter, sendFu
 import BookingWidget from '../components/BookingWidget'
 import IRSFormFiller from '../components/IRSFormFiller'
 import ErrorBoundary from '../components/ErrorBoundary'
+import ComplianceGrids from './ComplianceGrids'
 
 const STATUSES = ['New Lead','Contacted','Consultation Scheduled','Consultation Completed',
   'Tax Inv Agreement Sent','Tax Inv Agreement Signed','Tax Inv Fee Paid',
@@ -44,7 +45,7 @@ const YEARS  = Array.from({length:20},(_,i)=>2026-i)
 const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']
 
 const BLANK = {
-  clientType:'Individual', name:'', first:'', mi:'', last:'', phone:'', email:'',
+  clientType:'Individual', name:'', first:'', mi:'', last:'', phone:'', phone2:'', email:'',
   ssn:'', dob:'',
   street:'', city:'', state:'', zip:'', county:'', source:'Referral',
   irsBalance:'', issueType:'OIC', irsOrState:'IRS Federal', taxYears:[],
@@ -213,6 +214,7 @@ export default function Leads() {
   const [bookingLead, setBookingLead] = useState(null)
   const [fillerLead, setFillerLead] = useState(null)
   const [detail, setDetail] = useState(null)
+  const [showCompliance, setShowCompliance] = useState(false)
   const [leadNotes, setLeadNotes]     = useState([])
   const [newLeadNote, setNewLeadNote] = useState('')
   const [addingLeadNote, setAddingLeadNote] = useState(false)
@@ -282,8 +284,10 @@ export default function Leads() {
     setSaving(true)
     const payload = { ...form, taxYears: JSON.stringify(form.taxYears) }
     let error
+    let oldName = null
     if (modal === 'edit') {
       const { id, created_at, ...rest } = payload
+      oldName = detail?.name
       ;({ error } = await supabase.from('leads').update(rest).eq('id', form.id))
     } else {
       payload.created_at = new Date().toISOString()
@@ -291,6 +295,11 @@ export default function Leads() {
     }
     setSaving(false)
     if (error) { showToast('Error: '+error.message); return }
+    // If the name changed, repoint any compliance records gathered under the old name
+    // so they don't get orphaned (compliance is stored keyed by client_name text).
+    if (oldName && oldName !== form.name) {
+      await supabase.from('client_compliance_records').update({ client_name: form.name }).eq('client_name', oldName)
+    }
     showToast(modal==='edit' ? '✅ Lead updated!' : '✅ Lead added!')
     setModal(false); setForm(BLANK); load()
     if (modal==='edit' && detail) {
@@ -353,7 +362,7 @@ export default function Leads() {
     const { error } = await supabase.from('clients').insert([{
       name: l.name, clientType: l.clientType || 'Individual',
       first: l.first, mi: l.mi, last: l.last,
-      phone: l.phone, email: l.email,
+      phone: l.phone, phone2: l.phone2, email: l.email,
       ssn: l.ssn, dob: l.dob,
       street: l.street, city: l.city, state: l.state, zip: l.zip, county: l.county,
       source: l.source, assignedTo: l.assignedTo,
@@ -367,7 +376,8 @@ export default function Leads() {
     // Update lead status
     await supabase.from('leads').update({ status: 'Converted to Client' }).eq('id', l.id)
     setConverting(false)
-    showToast(`✅ ${l.name} converted to Client!`)
+    const { count } = await supabase.from('client_compliance_records').select('*', { count: 'exact', head: true }).eq('client_name', l.name)
+    showToast(count ? `✅ ${l.name} converted to Client! Compliance data (${count} records) carried over.` : `✅ ${l.name} converted to Client!`)
     setDetail(null); load()
   }
 
@@ -407,6 +417,7 @@ export default function Leads() {
             </div>
             <div className="fg2">
               <div className="field"><label>Phone</label><input value={form.phone} onChange={e=>fld('phone',e.target.value)} placeholder="(305) 555-0000"/></div>
+              <div className="field"><label>Phone 2 <span style={{color:'var(--t3)',fontWeight:400}}>(optional)</span></label><input value={form.phone2||''} onChange={e=>fld('phone2',e.target.value)} placeholder="(305) 555-0000"/></div>
               <div className="field"><label>Email</label><input value={form.email} onChange={e=>fld('email',e.target.value)}/></div>
             </div>
             <div className="fg2">
@@ -665,7 +676,7 @@ export default function Leads() {
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
           <div className="card">
             <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>Contact Info</div>
-            {[['Phone',l.phone],['Email',l.email],['SSN',l.ssn?'***-**-'+l.ssn.replace(/-/g,'').slice(-4):null],['Date of Birth',l.dob],['Address',[l.street,l.city,l.state,l.zip].filter(Boolean).join(', ')],['County',l.county],['Source',l.source]].map(([label,val])=>(
+            {[['Phone',l.phone],['Phone 2',l.phone2],['Email',l.email],['SSN',l.ssn?'***-**-'+l.ssn.replace(/-/g,'').slice(-4):null],['Date of Birth',l.dob],['Address',[l.street,l.city,l.state,l.zip].filter(Boolean).join(', ')],['County',l.county],['Source',l.source]].map(([label,val])=>(
               <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">{val||'—'}</span></div>
             ))}
           </div>
@@ -682,6 +693,27 @@ export default function Leads() {
               <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">{val||'—'}</span></div>
             ))}
           </div>
+        </div>
+
+        {/* Compliance — filing/balance data gathered during the tax investigation.
+            Stored against the lead's name in client_compliance_records, so it
+            carries forward automatically once this lead converts to a client
+            (clients keep the same name, so the records stay attached). */}
+        <div className="card" style={{marginBottom:12}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer'}} onClick={()=>setShowCompliance(s=>!s)}>
+            <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>
+              📋 Compliance — Tax Investigation Findings
+            </div>
+            <span style={{fontSize:11,color:'var(--blue)',fontWeight:600}}>{showCompliance?'Hide ▲':'Show ▼'}</span>
+          </div>
+          {showCompliance && (
+            <div style={{marginTop:14}}>
+              <div style={{fontSize:11,color:'var(--t3)',marginBottom:10,lineHeight:1.6}}>
+                Enter what the tax investigation finds (filed status, balances, liens, assessment dates) for each year/form. This is the data you use to convert the lead — and it automatically stays attached once they become a client.
+              </div>
+              <ComplianceGrids clientName={l.name}/>
+            </div>
+          )}
         </div>
 
         {/* Initial Notes */}
