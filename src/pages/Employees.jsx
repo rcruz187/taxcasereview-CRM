@@ -106,7 +106,6 @@ export default function Employees() {
   const [editing, setEditing]     = useState(null)
   const [form, setForm]           = useState(blankEmp)
   const [tab, setTab]             = useState('info')
-  const TABS = ['info', 'irs', 'pay', 'permissions']
   const [saving, setSaving]       = useState(false)
   const [resetEmail, setResetEmail] = useState('')
   const [showReset, setShowReset]   = useState(false)
@@ -308,7 +307,7 @@ export default function Employees() {
 
             {/* Tabs */}
             <div style={{ display: 'flex', gap: 4, padding: '12px 24px 0', borderBottom: '1px solid var(--br)' }}>
-              {['info', 'pay', ...(can('edit','employees') || form.email === user?.email ? ['irs'] : []), 'permissions'].map(t => (
+              {['info', ...(can('edit','employees') || form.email === user?.email ? ['irs'] : []), 'pay', 'permissions'].map(t => (
                 <button key={t} onClick={() => setTab(t)} style={{
                   padding: '8px 18px', borderRadius: '8px 8px 0 0',
                   border: '1px solid var(--br)', borderBottom: tab === t ? '1px solid var(--sf)' : '1px solid var(--br)',
