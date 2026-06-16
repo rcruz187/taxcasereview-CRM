@@ -245,10 +245,22 @@ export default function ComplianceGrids({ clientName }) {
 
   return (
     <div>
-      <div style={{fontSize:12,color:'var(--t3)',marginBottom:14,lineHeight:1.6}}>
-        Year-by-year compliance status for each filing type. CSED auto-calculates as Assessment Date + 10 years
-        (federal forms) when an assessment date is entered — edit manually if a different statute applies.
-        Changes save automatically.
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12,marginBottom:14,flexWrap:'wrap'}}>
+        <div style={{fontSize:12,color:'var(--t3)',lineHeight:1.6,flex:1,minWidth:240}}>
+          Year-by-year compliance status for each filing type. CSED auto-calculates as Assessment Date + 10 years
+          (federal forms) when an assessment date is entered — edit manually if a different statute applies.
+          Changes save automatically.
+        </div>
+        <button
+          className="btn sec"
+          style={{fontSize:11,padding:'5px 12px',whiteSpace:'nowrap'}}
+          disabled={records.length===0}
+          onClick={async()=>{
+            const { exportComplianceToExcel } = await import('../lib/complianceExport')
+            exportComplianceToExcel(clientName, records)
+            showToast('✅ Compliance spreadsheet downloaded!')
+          }}
+        >⬇ Export to Excel</button>
       </div>
 
       {(expiredCsed.length > 0 || upcomingCsed.length > 0) && (

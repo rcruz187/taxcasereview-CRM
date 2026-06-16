@@ -193,6 +193,94 @@ function LeadInlineEsign({ lead, onClose }) {
   </div>
 }
 
+function LeadInlinePortalForm({ lead, onClose, showToast }) {
+  const [sendVia, setSendVia] = useState(lead?.email ? 'email' : 'sms')
+  const [sending, setSending] = useState(false)
+  const [done, setDone] = useState(null)
+
+  const url = window.location.origin + '/taxcasereview-CRM/portal/' + lead?.id
+  const last4 = (lead?.ssn || '').replace(/\D/g, '').slice(-4)
+
+  async function send() {
+    setSending(true)
+    await navigator.clipboard.writeText(url).catch(() => {})
+    let emailSent = false, smsSent = false
+    const { data: cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
+
+    if ((sendVia === 'email' || sendVia === 'both') && lead?.email) {
+      try {
+        const { error } = await supabase.functions.invoke('send-email', {
+          body: {
+            to: lead.email,
+            subject: `Your Tax Compliance Information — Tax Case Review`,
+            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${lead.name}</strong>,</p><p>You can now view your tax compliance information online — filing status, balances, and key dates for each tax year on file.</p><p style="text-align:center;margin:24px 0"><a href="${url}" style="background:#3b82f6;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">View My Information</a></p><p style="font-size:12px;color:#64748b">You'll be asked to confirm the last 4 digits of your SSN to access your information. Link: ${url}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403</p></div>`
+          }
+        })
+        if (!error) emailSent = true
+      } catch (e) { console.error('Email error:', e) }
+    }
+    if ((sendVia === 'sms' || sendVia === 'both') && lead?.phone && cfg?.signalwire_backend) {
+      try {
+        const r = await fetch(cfg.signalwire_backend + '/sms/send', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: lead.phone, body: `Hi ${lead.name}, view your tax compliance info here: ${url} (you'll need the last 4 of your SSN to access it)` })
+        })
+        const d = await r.json()
+        if (d.success) smsSent = true
+      } catch (e) { console.error('SMS error:', e) }
+    }
+    setSending(false)
+    const sent = [emailSent && 'email', smsSent && 'SMS'].filter(Boolean)
+    setDone({ sent })
+  }
+
+  if (done) return (
+    <div style={{padding:'0 4px 4px'}}>
+      <div style={{background:'rgba(34,197,94,.08)',border:'1px solid rgba(34,197,94,.3)',borderRadius:8,padding:'12px 14px',marginBottom:14}}>
+        <div style={{fontSize:12,fontWeight:700,color:'var(--ok)',marginBottom:6}}>
+          {done.sent.length ? `Sent via ${done.sent.join(' & ')}!` : 'Link copied to clipboard'}
+        </div>
+        {!done.sent.length && <div style={{fontSize:11,color:'var(--warn)',marginBottom:6}}>Email/SMS not configured — share the link manually.</div>}
+        <div style={{fontSize:11,color:'var(--t3)',wordBreak:'break-all'}}>{url}</div>
+      </div>
+      <button className="btn sec" style={{width:'100%',justifyContent:'center'}} onClick={onClose}>Done</button>
+    </div>
+  )
+
+  return (
+    <div style={{padding:'0 4px 4px'}}>
+      <div style={{fontSize:12,color:'var(--t2)',marginBottom:14,lineHeight:1.6}}>
+        {lead?.name} can view their tax compliance findings (filing status, balances, liens, CSED dates) and download their own Excel copy — without logging into the CRM. Works even before they convert to a full client.
+      </div>
+      <div style={{background:'var(--s2)',borderRadius:6,padding:'9px 12px',marginBottom:12,fontSize:12,color:'var(--t3)',lineHeight:1.7}}>
+        <div>Email: {lead?.email || <span style={{color:'var(--warn)'}}>No email on file</span>}</div>
+        <div>Phone: {lead?.phone || <span style={{color:'var(--warn)'}}>No phone on file</span>}</div>
+        <div style={{marginTop:6}}>
+          Access requires last 4 of SSN: {last4 ? <strong style={{color:'var(--tx)'}}>***{last4}</strong> : <span style={{color:'var(--bad)'}}>No SSN on file — lead won't be able to unlock the portal</span>}
+        </div>
+      </div>
+      <div className="field"><label>Send Via</label>
+        <div style={{display:'flex',gap:8}}>
+          {[['email','Email Only'],['sms','SMS Only'],['both','Both']].map(([v,l])=>(
+            <button key={v} type="button"
+              style={{flex:1,padding:'7px 4px',borderRadius:7,border:'1px solid',fontSize:12,fontWeight:600,cursor:'pointer',
+                borderColor:sendVia===v?'var(--blue)':'var(--br)',
+                background:sendVia===v?'var(--blue)22':'var(--s2)',
+                color:sendVia===v?'var(--blue)':'var(--t2)'}}
+              onClick={()=>setSendVia(v)}>{l}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{display:'flex',gap:8,marginTop:14}}>
+        <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={onClose}>Cancel</button>
+        <button className="btn sm" style={{flex:1,justifyContent:'center',background:'#0ea5e9',color:'#fff',borderColor:'#0ea5e9'}} onClick={send} disabled={sending || !last4}>
+          {sending?'Sending…':'Send Portal Link'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function Leads() {
   const { user } = useApp()
   const { id: urlLeadId } = useParams()
@@ -230,6 +318,8 @@ export default function Leads() {
   const [inlineEsignLead, setInlineEsignLead] = useState(null)
   const [showEsignModal, setShowEsignModal] = useState(false)
   const [showFlow, setShowFlow]     = useState(false)
+  const [showPortalModal, setShowPortalModal] = useState(false)
+  const [portalLead, setPortalLead] = useState(null)
 
   useEffect(() => { load() }, [])
   // Fast path: same fix as Clients — don't make opening one lead wait on
@@ -669,6 +759,7 @@ export default function Leads() {
 
             <ActionBtn color="#dc2626" icon="📠" label="Send Fax" sub="SignalWire Fax" onClick={()=>{setInlineFaxLead(l);setShowFaxModal(true)}}/>
             <ActionBtn color="#7c3aed" icon="✍️" label="E-Signature" sub="Request Sign" onClick={()=>{setInlineEsignLead(l);setShowEsignModal(true)}}/>
+            <ActionBtn color="#0ea5e9" icon="🔓" label="Client Portal" sub="Compliance Access" onClick={()=>{setPortalLead(l);setShowPortalModal(true)}}/>
           </div>
         </div>
 
@@ -779,6 +870,15 @@ export default function Leads() {
             <div className="modal" style={{width:520}}>
               <div className="mh"><span className="mt">✍️ E-Signature — {inlineEsignLead.name}</span><button className="xbtn" onClick={()=>setShowEsignModal(false)}>&times;</button></div>
               <LeadInlineEsign lead={inlineEsignLead} onClose={()=>setShowEsignModal(false)}/>
+            </div>
+          </div>
+        )}
+
+        {showPortalModal && portalLead && (
+          <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setShowPortalModal(false)}>
+            <div className="modal" style={{width:520}}>
+              <div className="mh"><span className="mt">🔓 Client Portal — {portalLead.name}</span><button className="xbtn" onClick={()=>setShowPortalModal(false)}>&times;</button></div>
+              <LeadInlinePortalForm lead={portalLead} onClose={()=>setShowPortalModal(false)} showToast={showToast}/>
             </div>
           </div>
         )}

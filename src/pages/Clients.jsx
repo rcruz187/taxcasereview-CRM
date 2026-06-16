@@ -276,6 +276,94 @@ function InlineEsignForm({ client, onClose, showToast }) {
 }
 
 
+function InlinePortalForm({ client, onClose, showToast }) {
+  const [sendVia, setSendVia] = useState(client?.email ? 'email' : 'sms')
+  const [sending, setSending] = useState(false)
+  const [done, setDone] = useState(null)
+
+  const url = window.location.origin + '/taxcasereview-CRM/portal/' + client?.id
+  const last4 = (client?.ssn || '').replace(/\D/g, '').slice(-4)
+
+  async function send() {
+    setSending(true)
+    await navigator.clipboard.writeText(url).catch(() => {})
+    let emailSent = false, smsSent = false
+    const { data: cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
+
+    if ((sendVia === 'email' || sendVia === 'both') && client?.email) {
+      try {
+        const { error } = await supabase.functions.invoke('send-email', {
+          body: {
+            to: client.email,
+            subject: `Your Tax Compliance Information — Tax Case Review`,
+            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${client.name}</strong>,</p><p>You can now view your tax compliance information online — filing status, balances, and key dates for each tax year on file.</p><p style="text-align:center;margin:24px 0"><a href="${url}" style="background:#3b82f6;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">View My Information</a></p><p style="font-size:12px;color:#64748b">You'll be asked to confirm the last 4 digits of your SSN to access your information. Link: ${url}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403</p></div>`
+          }
+        })
+        if (!error) emailSent = true
+      } catch (e) { console.error('Email error:', e) }
+    }
+    if ((sendVia === 'sms' || sendVia === 'both') && client?.phone && cfg?.signalwire_backend) {
+      try {
+        const r = await fetch(cfg.signalwire_backend + '/sms/send', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: client.phone, body: `Hi ${client.name}, view your tax compliance info here: ${url} (you'll need the last 4 of your SSN to access it)` })
+        })
+        const d = await r.json()
+        if (d.success) smsSent = true
+      } catch (e) { console.error('SMS error:', e) }
+    }
+    setSending(false)
+    const sent = [emailSent && 'email', smsSent && 'SMS'].filter(Boolean)
+    setDone({ sent })
+  }
+
+  if (done) return (
+    <div style={{padding:'0 4px 4px'}}>
+      <div style={{background:'rgba(34,197,94,.08)',border:'1px solid rgba(34,197,94,.3)',borderRadius:8,padding:'12px 14px',marginBottom:14}}>
+        <div style={{fontSize:12,fontWeight:700,color:'var(--ok)',marginBottom:6}}>
+          {done.sent.length ? `✅ Portal link sent via ${done.sent.join(' & ')}!` : '📋 Link copied to clipboard'}
+        </div>
+        {!done.sent.length && <div style={{fontSize:11,color:'var(--warn)',marginBottom:6}}>Email/SMS not configured — share the link manually.</div>}
+        <div style={{fontSize:11,color:'var(--t3)',wordBreak:'break-all'}}>{url}</div>
+      </div>
+      <button className="btn sec" style={{width:'100%',justifyContent:'center'}} onClick={onClose}>Done</button>
+    </div>
+  )
+
+  return (
+    <div style={{padding:'0 4px 4px'}}>
+      <div style={{fontSize:12,color:'var(--t2)',marginBottom:14,lineHeight:1.6}}>
+        {client?.name} can view their tax compliance findings (filing status, balances, liens, CSED dates) and download their own Excel copy — without logging into the CRM.
+      </div>
+      <div style={{background:'var(--s2)',borderRadius:6,padding:'9px 12px',marginBottom:12,fontSize:12,color:'var(--t3)',lineHeight:1.7}}>
+        <div>📧 {client?.email || <span style={{color:'var(--warn)'}}>No email on file</span>}</div>
+        <div>📱 {client?.phone || <span style={{color:'var(--warn)'}}>No phone on file</span>}</div>
+        <div style={{marginTop:6}}>
+          🔒 Access requires last 4 of SSN: {last4 ? <strong style={{color:'var(--tx)'}}>***{last4}</strong> : <span style={{color:'var(--bad)'}}>No SSN on file — client won't be able to unlock the portal</span>}
+        </div>
+      </div>
+      <div className="field"><label>Send Via</label>
+        <div style={{display:'flex',gap:8}}>
+          {[['email','Email Only'],['sms','SMS Only'],['both','Both']].map(([v,l])=>(
+            <button key={v} type="button"
+              style={{flex:1,padding:'7px 4px',borderRadius:7,border:'1px solid',fontSize:12,fontWeight:600,cursor:'pointer',
+                borderColor:sendVia===v?'var(--blue)':'var(--br)',
+                background:sendVia===v?'var(--blue)22':'var(--s2)',
+                color:sendVia===v?'var(--blue)':'var(--t2)'}}
+              onClick={()=>setSendVia(v)}>{l}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{display:'flex',gap:8,marginTop:14}}>
+        <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={onClose}>Cancel</button>
+        <button className="btn sm" style={{flex:1,justifyContent:'center',background:'#0ea5e9',color:'#fff',borderColor:'#0ea5e9'}} onClick={send} disabled={sending || !last4}>
+          {sending?'Sending…':'🔓 Send Portal Link'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Canopy-style Document Manager for a specific client ──────────────────────
 const DOC_FOLDERS = ['IRS Docs','Tax Returns','Agreements','POA & Forms','Transcripts','Correspondence','Financial Statements','E-Signatures','Other']
 const FILE_EXT_ICON = n => { const e=(n||'').split('.').pop().toLowerCase(); return {pdf:'📄',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',jpg:'🖼️',jpeg:'🖼️',png:'🖼️',tiff:'🖼️'}[e]||'📎' }
@@ -519,6 +607,8 @@ export default function Clients() {
   const [faxClient,   setFaxClient]   = useState(null)
   const [esignModal,  setEsignModal]  = useState(false)
   const [esignClient, setEsignClient] = useState(null)
+  const [portalModal, setPortalModal] = useState(false)
+  const [portalClient, setPortalClient] = useState(null)
   const [payForm,     setPayForm]     = useState({ amount:'', method:'Credit Card', date:'', notes:'' })
   const [savingPay,   setSavingPay]   = useState(false)
 
@@ -871,6 +961,7 @@ export default function Clients() {
             <ActionBtn color="#0f766e" icon="📊" label="P&amp;L" sub="Books &amp; Ledger" onClick={()=>navigate('/books?client='+encodeURIComponent(c.name))}/>
             <ActionBtn color="#dc2626" icon="📠" label="Send Fax" sub="SignalWire Fax" onClick={()=>{setFaxClient(c);setFaxModal(true)}}/>
             <ActionBtn color="#7c3aed" icon="✍️" label="E-Signature" sub="Request Sign" onClick={()=>{setEsignClient(c);setEsignModal(true)}}/>
+            <ActionBtn color="#0ea5e9" icon="🔓" label="Client Portal" sub="Compliance Access" onClick={()=>{setPortalClient(c);setPortalModal(true)}}/>
           </div>
         </div>
 
@@ -1304,6 +1395,15 @@ export default function Clients() {
           </div>
         </div>
       )}
+
+      {portalModal && portalClient && (
+        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setPortalModal(false)}>
+          <div className="modal" style={{width:500}}>
+            <div className="mh"><span className="mt">🔓 Client Portal — {portalClient.name}</span><button className="xbtn" onClick={()=>setPortalModal(false)}>&times;</button></div>
+            <InlinePortalForm client={portalClient} onClose={()=>setPortalModal(false)} showToast={showToast}/>
+          </div>
+        </div>
+      )}
       </div>
     )
   }
@@ -1366,6 +1466,15 @@ export default function Clients() {
           <div className="modal" style={{width:500}}>
             <div className="mh"><span className="mt">✍️ E-Signature — {esignClient.name}</span><button className="xbtn" onClick={()=>setEsignModal(false)}>&times;</button></div>
             <InlineEsignForm client={esignClient} onClose={()=>setEsignModal(false)} showToast={showToast}/>
+          </div>
+        </div>
+      )}
+
+      {portalModal && portalClient && (
+        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setPortalModal(false)}>
+          <div className="modal" style={{width:500}}>
+            <div className="mh"><span className="mt">🔓 Client Portal — {portalClient.name}</span><button className="xbtn" onClick={()=>setPortalModal(false)}>&times;</button></div>
+            <InlinePortalForm client={portalClient} onClose={()=>setPortalModal(false)} showToast={showToast}/>
           </div>
         </div>
       )}

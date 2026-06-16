@@ -12,6 +12,7 @@ import Login      from './pages/Login'
 import Kiosk      from './pages/Kiosk'
 import SignPage     from './pages/SignPage'
 import ClockIn       from './pages/ClockIn'
+import ClientPortal  from './pages/ClientPortal'
 import AuthCallback from './pages/AuthCallback'
 
 // Everything behind login is lazy-loaded — each page's code only downloads
@@ -169,6 +170,7 @@ function AuthRouter() {
       <Route path="/kiosk" element={<Kiosk />} />
       <Route path="/clockin" element={<ClockIn />} />
       <Route path="/sign/:id" element={<SignPage />} />
+      <Route path="/portal/:id" element={<ClientPortal />} />
       <Route path="*" element={<RequireAuth><Shell /></RequireAuth>} />
     </Routes>
   )
