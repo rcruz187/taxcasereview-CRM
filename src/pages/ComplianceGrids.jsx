@@ -42,6 +42,12 @@ const FORM_META = {
   'BIZ_STATE': { label: 'Business State',           sheet: 'Biz State Tax Prac',  csedYears: 0 },
 }
 
+// IMPORTANT: numeric-looking object keys ('940','1065','1120','1040','941') get
+// auto-sorted to the front by JS regardless of insertion order (ECMA spec behavior
+// for integer-index-like string keys). Object.keys(FORM_META) is NOT reliable for
+// display order. This explicit array is the single source of truth for tab order.
+const FORM_ORDER = ['1040','STATE','PERS_CP','940','1065','1120','1120S','941','CP','BIZ_STATE']
+
 const FILED_STATUS_OPTIONS = ['', 'Filed', 'Not Filed', 'SFR (Substitute for Return)', 'Filed - Not Assessed', 'No Liability', 'N/A']
 const LIEN_OPTIONS = ['', 'Yes', 'No']
 
@@ -288,13 +294,13 @@ export default function ComplianceGrids({ clientName }) {
       )}
 
       <div style={{display:'flex',gap:4,marginBottom:16,flexWrap:'wrap'}}>
-        {Object.entries(FORM_META).map(([key,meta])=>(
+        {FORM_ORDER.map(key=>{ const meta = FORM_META[key]; return (
           <button key={key} onClick={()=>setActiveForm(key)} className="btn sm" style={{
             background: activeForm===key ? 'var(--blue)' : 'var(--s2)',
             color: activeForm===key ? '#fff' : 'var(--t2)',
             border:'1px solid var(--br)',
           }}>{meta.label}</button>
-        ))}
+        )})}
       </div>
 
       <FormGrid clientName={clientName} formType={activeForm}
