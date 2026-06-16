@@ -23,6 +23,8 @@ const PIPELINE_STAGES = [
   { label:'Closed',        key:'closed' },
 ]
 
+const IRS_STATUS_OPTIONS = ['ACS','Notice Status','Queue for ACS','Currently Not Collectible','Installment Agreement','Garnishment','Levy Issued','Levied','Lien Filed','Appeals','Litigation','Released','Other']
+
 const BLANK_DEP = { name:'', ssn:'', dob:'', relationship:'Child' }
 const BLANK = {
   clientType:'Individual', name:'', phone:'', phone2:'', email:'',
@@ -30,6 +32,8 @@ const BLANK = {
   ssn:'', ein:'', dobM:'', dobD:'', dobY:'',
   spouseName:'', spouseSsn:'', filingStatus:'Single',
   irsBalance:'', issueType:'OIC', irsOrState:'IRS Federal', taxYears:'',
+  irsStatus:'', irsStatusOther:'', irsDeadline:'',
+  stateStatus:'', stateStatusOther:'', stateDeadline:'',
   clientSince:'', status:'Active', notes:'', assignedTo:'',
   pipelineStage:'investigation', dependents:[]
 }
@@ -110,6 +114,31 @@ function DR({label,val,name}) {
     <div style={{display:'flex',borderBottom:'1px solid var(--br)',padding:'7px 0',gap:12}}>
       <div style={{minWidth:130,fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em',color:'var(--t3)',paddingTop:1}}>{label}</div>
       <div style={{flex:1,fontSize:13,color:'var(--tx)'}}>{renderVal()}</div>
+    </div>
+  )
+}
+const CSED_FORM_LABELS = {
+  '1040':'Personal Federal (1040)', 'STATE':'Personal State', 'CP':'Business CP (Federal)',
+  '940':'Business 940 (FUTA)', '941':'Business 941 (Payroll)', '1120S':'Business 1120-S'
+}
+function CsedSummaryCard({clientName}) {
+  const [recs, setRecs] = useState(null)
+  useEffect(() => {
+    if (!clientName) return
+    supabase.from('client_compliance_records').select('form_type,tax_year,quarter,csed')
+      .eq('client_name', clientName).not('csed','is',null)
+      .then(({data}) => setRecs(data||[]))
+  }, [clientName])
+  if (!recs || recs.length===0) return null
+  const sorted = [...recs].sort((a,b)=>new Date(a.csed)-new Date(b.csed))
+  const first = sorted[0]
+  const last = sorted[sorted.length-1]
+  const fmt = r => `${CSED_FORM_LABELS[r.form_type]||r.form_type} ${r.tax_year}${r.quarter?` Q${r.quarter}`:''} — ${r.csed}`
+  return (
+    <div className="card">
+      <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>CSED Summary</div>
+      <DR label="1st to Expire" val={fmt(first)}/>
+      <DR label="Last to be Removed" val={fmt(last)}/>
     </div>
   )
 }
@@ -1264,9 +1293,24 @@ export default function Clients() {
               <DR label="Issue Type"   val={c.issueType}/>
               <DR label="IRS or State" val={c.irsOrState}/>
               <DR label="Tax Years"    val={c.taxYears}/>
+              {(c.irsOrState||'IRS Federal')!=='State' && (
+                <>
+                  <DR label="IRS Status"   val={c.irsStatus==='Other'?c.irsStatusOther:c.irsStatus}/>
+                  <DR label="IRS Deadline" val={c.irsDeadline}/>
+                </>
+              )}
+              {(c.irsOrState||'IRS Federal')!=='IRS Federal' && (
+                <>
+                  <DR label="State Status"   val={c.stateStatus==='Other'?c.stateStatusOther:c.stateStatus}/>
+                  <DR label="State Deadline" val={c.stateDeadline}/>
+                </>
+              )}
               <DR label="Assigned Rep" val={c.assignedTo}/>
               <DR label="Client Since" val={c.clientSince}/>
             </div>
+
+            {/* CSED Summary */}
+            <CsedSummaryCard clientName={c.name}/>
 
           </div>
         </div>
@@ -1615,6 +1659,30 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
           </div>
           <div className="field"><label>Tax Years</label><input value={form.taxYears||''} onChange={e=>fld('taxYears',e.target.value)} placeholder="2020, 2021, 2022"/></div>
         </div>
+        {(form.irsOrState||'IRS Federal')!=='State' && (
+          <div className="fg2">
+            <div className="field"><label>IRS Status</label>
+              <select value={form.irsStatus||''} onChange={e=>fld('irsStatus',e.target.value)}>
+                <option value="">— Select —</option>
+                {IRS_STATUS_OPTIONS.map(o=><option key={o}>{o}</option>)}
+              </select>
+              {form.irsStatus==='Other'&&<input style={{marginTop:6}} value={form.irsStatusOther||''} onChange={e=>fld('irsStatusOther',e.target.value)} placeholder="Specify status"/>}
+            </div>
+            <div className="field"><label>IRS Deadline</label><input type="date" value={form.irsDeadline||''} onChange={e=>fld('irsDeadline',e.target.value)}/></div>
+          </div>
+        )}
+        {(form.irsOrState||'IRS Federal')!=='IRS Federal' && (
+          <div className="fg2">
+            <div className="field"><label>State Status</label>
+              <select value={form.stateStatus||''} onChange={e=>fld('stateStatus',e.target.value)}>
+                <option value="">— Select —</option>
+                {IRS_STATUS_OPTIONS.map(o=><option key={o}>{o}</option>)}
+              </select>
+              {form.stateStatus==='Other'&&<input style={{marginTop:6}} value={form.stateStatusOther||''} onChange={e=>fld('stateStatusOther',e.target.value)} placeholder="Specify status"/>}
+            </div>
+            <div className="field"><label>State Deadline</label><input type="date" value={form.stateDeadline||''} onChange={e=>fld('stateDeadline',e.target.value)}/></div>
+          </div>
+        )}
         <div className="fg2">
           <div className="field"><label>Pipeline Stage</label>
             <select value={form.pipelineStage||'investigation'} onChange={e=>fld('pipelineStage',e.target.value)}>
