@@ -329,6 +329,32 @@ export default function Employees() {
                       <input type="date" value={form.hireDate||''} onChange={e => setForm(f => ({ ...f, hireDate: e.target.value }))}/>
                     </div>
                   </div>
+                  {(form.paymentMethod === 'Direct Deposit' || !form.paymentMethod) && (
+                    <div style={{ background:'var(--s2)', border:'1px solid var(--br)', borderRadius:8, padding:'12px 14px', marginBottom:4 }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:'var(--b2)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:10 }}>🏦 Direct Deposit Banking Info</div>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+                        <div className="field">
+                          <label>Bank Name</label>
+                          <input value={form.bankName||''} onChange={e => setForm(f => ({ ...f, bankName: e.target.value }))} placeholder="Chase Bank"/>
+                        </div>
+                        <div className="field">
+                          <label>Account Type</label>
+                          <select value={form.bankAccountType||'Checking'} onChange={e => setForm(f => ({ ...f, bankAccountType: e.target.value }))}>
+                            <option>Checking</option>
+                            <option>Savings</option>
+                          </select>
+                        </div>
+                        <div className="field">
+                          <label>Routing Number</label>
+                          <input value={form.routingNumber||''} onChange={e => setForm(f => ({ ...f, routingNumber: e.target.value }))} placeholder="021000021" maxLength={9}/>
+                        </div>
+                        <div className="field">
+                          <label>Account Number</label>
+                          <input value={form.accountNumber||''} onChange={e => setForm(f => ({ ...f, accountNumber: e.target.value }))} placeholder="••••••••••"/>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                     <div className="field">
                       <label>Emergency Contact Name</label>

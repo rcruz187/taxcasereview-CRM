@@ -405,8 +405,8 @@ export default function Leads() {
             <div style={{background:'var(--s3)',borderRadius:7,padding:10,marginBottom:8}}>
               <div style={{fontSize:10,fontWeight:700,color:'var(--ok)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>💰 Tax Investigation Fee</div>
               <div className="fg2">
-                <div className="field"><label>Fee Amount ($499–$699)</label>
-                  <input type="number" value={form.taxFee} onChange={e=>fld('taxFee',e.target.value)} min={499} max={699} placeholder="599"/>
+                <div className="field"><label>Fee Amount ($399–$599)</label>
+                  <input type="number" value={form.taxFee} onChange={e=>fld('taxFee',e.target.value)} min={399} max={599} placeholder="399"/>
                 </div>
                 <div className="field"><label>Manager Override?</label>
                   <select value={form.taxFeeOverride} onChange={e=>fld('taxFeeOverride',e.target.value)}>
@@ -450,11 +450,11 @@ export default function Leads() {
                   ]},
                   {step:'5',color:'#10b981',title:'Introduce Tax Investigation',lines:[
                     '"The first thing we do is a Tax Investigation — we pull your IRS transcripts and give you the full picture: what you owe, what years, and exactly what your options are."',
-                    '"It is a one-time fee of $599. That gets you a complete analysis and a clear resolution plan."',
+                    '"Our Tax Investigation fee starts at $399 and goes up to $599 depending on complexity. That gets you a complete analysis and a clear resolution plan."',
                     'Frame it as the only logical next step — not a sales pitch.',
                   ]},
                   {step:'6',color:'#f97316',title:'Handle Objections',lines:[
-                    'PRICE: "I understand — $599 is a fraction of what the IRS can take. Without knowing your real position, you are flying blind."',
+                    'PRICE: "I understand — starting at $399 is a fraction of what the IRS can take. Without knowing your real position, you are flying blind."',
                     'NEED TO THINK: "Totally fair. What specific questions can I answer for you right now?"',
                     'HAVE SOMEONE: "Great — are they pulling your IRS transcripts? That is the only way to truly know what you are dealing with."',
                     'DOING IT MYSELF: "You can — but the IRS has deadlines and rules most people do not know about. One missed step can permanently close your options."',
