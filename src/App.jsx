@@ -35,6 +35,7 @@ import Books         from './pages/Books'
 import FormaCorp     from './pages/FormaCorp'
 import Fax          from './pages/Fax'
 import SignPage     from './pages/SignPage'
+import ClockIn       from './pages/ClockIn'
 import AuthCallback from './pages/AuthCallback'
 
 const style = document.createElement('style')
@@ -152,6 +153,7 @@ function AuthRouter() {
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/kiosk" element={<Kiosk />} />
+      <Route path="/clockin" element={<ClockIn />} />
       <Route path="/sign/:id" element={<SignPage />} />
       <Route path="*" element={<RequireAuth><Shell /></RequireAuth>} />
     </Routes>
