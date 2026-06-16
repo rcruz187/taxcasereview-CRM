@@ -1,42 +1,50 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { Suspense, lazy } from 'react'
 import { AppProvider, useApp } from './context/AppContext'
 import Sidebar  from './components/layout/Sidebar'
 import TopBar   from './components/layout/TopBar'
 import { Modal, Toast } from './components/ui'
 
+// Public, unauthenticated entry points stay eager — loaded immediately on
+// first paint with no extra network round-trip, since these are the very
+// first thing a visitor (employee or client) sees.
 import Login      from './pages/Login'
 import Kiosk      from './pages/Kiosk'
-import Dashboard  from './pages/Dashboard'
-import Leads      from './pages/Leads'
-import Clients    from './pages/Clients'
-import Cases      from './pages/Cases'
-import Tasks      from './pages/Tasks'
-import Calendar   from './pages/Calendar'
-import Transcripts from './pages/Transcripts'
-import IrsForms   from './pages/IrsForms'
-import IrsReference from './pages/IrsReference'
-import TaxReturns from './pages/TaxReturns'
-import Deadlines  from './pages/Deadlines'
-import Estimates  from './pages/Estimates'
-import Invoices   from './pages/Invoices'
-import Payments   from './pages/Payments'
-import Sms        from './pages/Sms'
-import Email      from './pages/Email'
-import Documents  from './pages/Documents'
-import Esign      from './pages/Esign'
-import TimeClock  from './pages/TimeClock'
-import Payroll    from './pages/Payroll'
-import Employees  from './pages/Employees'
-import Reports    from './pages/Reports'
-import Settings   from './pages/Settings'
-import Dialer     from './pages/Dialer'
-import Chat       from './pages/Chat'
-import Books         from './pages/Books'
-import FormaCorp     from './pages/FormaCorp'
-import Fax          from './pages/Fax'
 import SignPage     from './pages/SignPage'
 import ClockIn       from './pages/ClockIn'
 import AuthCallback from './pages/AuthCallback'
+
+// Everything behind login is lazy-loaded — each page's code only downloads
+// when you actually navigate to it, instead of all ~30 pages loading upfront
+// in one giant bundle. This is what was making the whole CRM feel slow.
+const Dashboard     = lazy(() => import('./pages/Dashboard'))
+const Leads         = lazy(() => import('./pages/Leads'))
+const Clients       = lazy(() => import('./pages/Clients'))
+const Cases         = lazy(() => import('./pages/Cases'))
+const Tasks         = lazy(() => import('./pages/Tasks'))
+const Calendar      = lazy(() => import('./pages/Calendar'))
+const Transcripts   = lazy(() => import('./pages/Transcripts'))
+const IrsForms      = lazy(() => import('./pages/IrsForms'))
+const IrsReference  = lazy(() => import('./pages/IrsReference'))
+const TaxReturns    = lazy(() => import('./pages/TaxReturns'))
+const Deadlines     = lazy(() => import('./pages/Deadlines'))
+const Estimates     = lazy(() => import('./pages/Estimates'))
+const Invoices      = lazy(() => import('./pages/Invoices'))
+const Payments      = lazy(() => import('./pages/Payments'))
+const Sms           = lazy(() => import('./pages/Sms'))
+const Email         = lazy(() => import('./pages/Email'))
+const Documents     = lazy(() => import('./pages/Documents'))
+const Esign         = lazy(() => import('./pages/Esign'))
+const TimeClock     = lazy(() => import('./pages/TimeClock'))
+const Payroll       = lazy(() => import('./pages/Payroll'))
+const Employees     = lazy(() => import('./pages/Employees'))
+const Reports       = lazy(() => import('./pages/Reports'))
+const Settings      = lazy(() => import('./pages/Settings'))
+const Dialer        = lazy(() => import('./pages/Dialer'))
+const Chat          = lazy(() => import('./pages/Chat'))
+const Books         = lazy(() => import('./pages/Books'))
+const FormaCorp     = lazy(() => import('./pages/FormaCorp'))
+const Fax           = lazy(() => import('./pages/Fax'))
 
 const style = document.createElement('style')
 style.textContent = `@keyframes spin { to { transform: rotate(360deg) } }`
@@ -96,6 +104,11 @@ function Shell() {
       <div className="main-area">
         <TopBar onNew={handleNew} />
         <div className="page-content">
+          <Suspense fallback={
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'40vh', color:'var(--t3)', fontSize:13 }}>
+              Loading…
+            </div>
+          }>
           <Routes>
             <Route path="/"            element={<Dashboard />} />
             <Route path="/leads/:id"    element={<Guard section="leads"><Leads /></Guard>} />
@@ -131,6 +144,7 @@ function Shell() {
             <Route path="/fax"         element={<Guard section="email"><Fax /></Guard>} />
             <Route path="*"            element={<Navigate to="/" />} />
           </Routes>
+          </Suspense>
         </div>
       </div>
       <Modal />
