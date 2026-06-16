@@ -43,6 +43,60 @@ const blankEmp = {
   ...ROLE_PERM_DEFAULTS['Staff']
 }
 
+// Map camelCase form state → snake_case DB columns
+function toDbPayload(form) {
+  const { hourlyRate, payType, paymentMethod, hireDate, emergencyContact, emergencyPhone,
+          filingStatus, sorShortId, sorUsername, ...rest } = form
+  return {
+    ...rest,
+    hourly_rate:       hourlyRate,
+    pay_type:          payType,
+    payment_method:    paymentMethod,
+    hire_date:         hireDate || null,
+    emergency_contact: emergencyContact,
+    emergency_phone:   emergencyPhone,
+    filing_status:     filingStatus,
+    sor_short_id:      sorShortId,
+    sor_username:      sorUsername,
+  }
+}
+
+// Map snake_case DB row → camelCase form state
+function fromDbRow(emp) {
+  return {
+    name:             emp.name || '',
+    email:            emp.email || '',
+    phone:            emp.phone || '',
+    title:            emp.title ?? '',
+    access:           emp.access || 'Staff',
+    hourlyRate:       emp.hourly_rate ?? emp.hourlyRate ?? '',
+    payType:          emp.pay_type || emp.payType || 'Hourly',
+    paymentMethod:    emp.payment_method || emp.paymentMethod || 'Direct Deposit',
+    hireDate:         emp.hire_date ?? emp.hireDate ?? '',
+    emergencyContact: emp.emergency_contact ?? emp.emergencyContact ?? '',
+    emergencyPhone:   emp.emergency_phone ?? emp.emergencyPhone ?? '',
+    address:          emp.address ?? '',
+    filingStatus:     emp.filing_status || emp.filingStatus || 'Single',
+    caf:              emp.caf ?? '',
+    ptin:             emp.ptin ?? '',
+    sorShortId:       emp.sor_short_id ?? emp.sorShortId ?? '',
+    sorUsername:      emp.sor_username ?? emp.sorUsername ?? '',
+    bank_name:        emp.bank_name ?? '',
+    bank_account_type: emp.bank_account_type ?? 'Checking',
+    routing_number:   emp.routing_number ?? '',
+    account_number:   emp.account_number ?? '',
+    perm_clients:     emp.perm_clients  ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_clients,
+    perm_billing:     emp.perm_billing  ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_billing,
+    perm_schedule:    emp.perm_schedule ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_schedule,
+    perm_documents:   emp.perm_documents?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_documents,
+    perm_irs:         emp.perm_irs      ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_irs,
+    perm_comms:       emp.perm_comms    ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_comms,
+    perm_reports:     emp.perm_reports  ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_reports,
+    perm_hr:          emp.perm_hr       ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_hr,
+    perm_settings:    emp.perm_settings ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_settings,
+  }
+}
+
 export default function Employees() {
   const { showToast, can, user } = useApp()
   const [employees, setEmployees] = useState([])
@@ -77,38 +131,7 @@ export default function Employees() {
 
   function openEdit(emp) {
     setEditing(emp.id)
-    setForm({
-      name: emp.name || '',
-      email: emp.email || '',
-      phone: emp.phone || '',
-      title: emp.title ?? '',
-      access: emp.access || 'Staff',
-      perm_clients:  emp.perm_clients  ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_clients,
-      perm_billing:  emp.perm_billing  ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_billing,
-      perm_schedule: emp.perm_schedule ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_schedule,
-      perm_documents:emp.perm_documents?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_documents,
-      perm_irs:      emp.perm_irs      ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_irs,
-      perm_comms:    emp.perm_comms    ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_comms,
-      perm_reports:  emp.perm_reports  ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_reports,
-      perm_hr:       emp.perm_hr       ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_hr,
-      perm_settings: emp.perm_settings ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_settings,
-      hourlyRate: emp.hourlyRate ?? '',
-      payType: emp.payType || 'Hourly',
-      paymentMethod: emp.paymentMethod || 'Direct Deposit',
-      hireDate: emp.hireDate ?? '',
-      emergencyContact: emp.emergencyContact ?? '',
-      emergencyPhone: emp.emergencyPhone ?? '',
-      address: emp.address ?? '',
-      filingStatus: emp.filingStatus || 'Single',
-      caf: emp.caf ?? '',
-      ptin: emp.ptin ?? '',
-      sorShortId: emp.sorShortId ?? '',
-      sorUsername: emp.sorUsername ?? '',
-      bank_name: emp.bank_name ?? '',
-      bank_account_type: emp.bank_account_type ?? 'Checking',
-      routing_number: emp.routing_number ?? '',
-      account_number: emp.account_number ?? '',
-    })
+    setForm(fromDbRow(emp))
     setTab('info')
     setShowForm(true)
   }
@@ -120,10 +143,7 @@ export default function Employees() {
   async function save() {
     if (!form.name || !form.email) return showToast('Name and email required', 'err')
     setSaving(true)
-    // Strip any fields that may not exist in DB yet
-    const payload = Object.fromEntries(
-      Object.entries(form).filter(([, v]) => v !== undefined)
-    )
+    const payload = toDbPayload(form)
     let error
     if (editing) {
       ({ error } = await supabase.from('employees').update(payload).eq('id', editing))

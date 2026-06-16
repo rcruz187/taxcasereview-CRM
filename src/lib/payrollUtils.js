@@ -60,8 +60,8 @@ export function buildLineItems(employees, timeEntries, periodStart, periodEnd) {
     })
     const hrs = regularHrs + otHrs
 
-    const isHourly = emp.payType === 'Hourly'
-    const rate = parseFloat(emp.hourlyRate || 0)
+    const isHourly = (emp.pay_type || emp.payType) === 'Hourly'
+    const rate = parseFloat(emp.hourly_rate || emp.hourlyRate || 0)
     const salary = parseFloat(emp.salary || 0)
     const regularPay = isHourly ? rate * regularHrs : (salary / 24) || 0
     const otPay = isHourly ? rate * 1.5 * otHrs : 0
@@ -78,7 +78,7 @@ export function buildLineItems(employees, timeEntries, periodStart, periodEnd) {
     const employerTaxes = ss + medicare
 
     return {
-      name: emp.name, payType: emp.payType || 'Salary', rate,
+      name: emp.name, payType: emp.pay_type || emp.payType || 'Salary', rate,
       hours: hrs.toFixed(2),
       regularHours: regularHrs.toFixed(2), otHours: otHrs.toFixed(2),
       gross: gross.toFixed(2), fedTax: fedTax.toFixed(2),
