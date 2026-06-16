@@ -112,37 +112,82 @@ function LeadInlineFax({ lead, onClose }) {
 }
 
 function LeadInlineEsign({ lead, onClose }) {
-  const [docType,set0]=useState('Engagement Letter')
-  const [message,set1]=useState('Please review and sign the attached document.')
+  const [docType,set0]=useState('Tax Service Agreement')
+  const [sendVia,setSendVia]=useState(lead?.email ? 'email' : 'sms')
   const [saving,set2]=useState(false)
-  const [link,set3]=useState('')
+  const [done,setDone]=useState(null)
   async function create() {
     set2(true)
-    const{data,error}=await supabase.from('esigns').insert([{doc_type:docType,client_name:lead?.name,client_email:lead?.email||'',message,priority:'Normal',status:'Awaiting',sent_at:new Date().toISOString(),created_at:new Date().toISOString()}]).select().single()
+    const{data,error}=await supabase.from('esigns').insert([{
+      doc_type:docType,
+      client_name:lead?.name,
+      client_email:lead?.email||'',
+      client_phone:lead?.phone||'',
+      investigation_fee:lead?.taxFee||null,
+      tax_years:lead?.taxYearsCustom||lead?.taxYears||null,
+      rep_name:lead?.assignedTo||null,
+      send_via:sendVia,
+      priority:'Normal',status:'Awaiting',
+      sent_at:new Date().toISOString(),created_at:new Date().toISOString()
+    }]).select().single()
+    if(error){set2(false);alert('Error: '+error.message);return}
+    const url=window.location.origin+'/taxcasereview-CRM/sign/'+data.id
+    await navigator.clipboard.writeText(url).catch(()=>{})
+    let smsSent=false,emailSent=false
+    const{data:cfg}=await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
+    if((sendVia==='email'||sendVia==='both')&&lead?.email){
+      try{
+        const{error:eErr}=await supabase.functions.invoke('send-email',{body:{
+          to:lead.email,
+          subject:`Please Sign: ${docType} — Tax Case Review`,
+          html:`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${lead.name}</strong>,</p><p>Please review and sign your <strong>${docType}</strong>.</p><p style="text-align:center;margin:24px 0"><a href="${url}" style="background:#16a34a;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Sign Document</a></p><p style="font-size:12px;color:#64748b">Link: ${url}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403</p></div>`
+        }})
+        if(!eErr)emailSent=true
+      }catch(e){console.error('Email error:',e)}
+    }
+    if((sendVia==='sms'||sendVia==='both')&&lead?.phone&&cfg?.signalwire_backend){
+      try{
+        const r=await fetch(cfg.signalwire_backend+'/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:lead.phone,body:`Hi ${lead?.name}, Tax Case Review sent you a document to sign: ${url}`})})
+        const d=await r.json();if(d.success)smsSent=true
+      }catch(e){console.error('SMS error:',e)}
+    }
     set2(false)
-    if(error){alert('Error: '+error.message);return}
-    const url=window.location.origin+'/taxcasereview-CRM/#/sign/'+data.id
-    set3(url);navigator.clipboard.writeText(url).catch(()=>{})
+    const sent=[emailSent&&'email',smsSent&&'SMS'].filter(Boolean)
+    setDone({url,sent})
   }
-  if(link) return <div style={{padding:'0 4px 4px'}}>
+  if(done) return <div style={{padding:'0 4px 12px'}}>
     <div style={{background:'rgba(34,197,94,.08)',border:'1px solid rgba(34,197,94,.3)',borderRadius:8,padding:'12px 14px',marginBottom:14}}>
-      <div style={{fontSize:12,fontWeight:700,color:'var(--ok)',marginBottom:6}}>✅ Link copied!</div>
-      <div style={{fontSize:11,color:'var(--t3)',wordBreak:'break-all'}}>{link}</div>
+      <div style={{fontSize:13,fontWeight:700,color:'var(--ok)',marginBottom:6}}>{done.sent.length?`Sent via ${done.sent.join(' & ')}!`:'Link copied — share manually'}</div>
+      {!done.sent.length&&<div style={{fontSize:11,color:'var(--warn)',marginBottom:4}}>Email/SMS not configured in Settings yet.</div>}
+      <div style={{fontSize:11,color:'var(--t3)',wordBreak:'break-all'}}>{done.url}</div>
     </div>
     <button className="btn sec" style={{width:'100%',justifyContent:'center'}} onClick={onClose}>Done</button>
   </div>
   return <div style={{padding:'0 4px 4px'}}>
     <div className="field"><label>Document Type</label>
       <select value={docType} onChange={e=>set0(e.target.value)}>
-        {['Engagement Letter','Form 2848 — Power of Attorney','Form 8821 — Tax Info Auth','Service Agreement','Fee Agreement Addendum','Custom Document'].map(t=><option key={t}>{t}</option>)}
+        {['Tax Service Agreement','Engagement Letter','Form 2848 — Power of Attorney','Form 8821 — Tax Info Auth','Fee Agreement Addendum','Custom Document'].map(t=><option key={t}>{t}</option>)}
       </select>
     </div>
-    <div className="field"><label>Message</label>
-      <textarea value={message} onChange={e=>set1(e.target.value)} rows={3} style={{width:'100%',resize:'none',padding:'8px 12px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:13,fontFamily:'inherit'}}/>
+    <div style={{background:'var(--s2)',borderRadius:6,padding:'9px 12px',marginBottom:12,fontSize:12,color:'var(--t3)',lineHeight:1.7}}>
+      <div>Email: {lead?.email||<span style={{color:'var(--warn)'}}>No email on file</span>}</div>
+      <div>Phone: {lead?.phone||<span style={{color:'var(--warn)'}}>No phone on file</span>}</div>
     </div>
-    <div style={{display:'flex',gap:8}}>
+    <div className="field"><label>Send Via</label>
+      <div style={{display:'flex',gap:8}}>
+        {[['email','Email Only'],['sms','SMS Only'],['both','Both']].map(([v,l])=>(
+          <button key={v} type="button"
+            style={{flex:1,padding:'7px 4px',borderRadius:7,border:'1px solid',fontSize:12,fontWeight:600,cursor:'pointer',
+              borderColor:sendVia===v?'var(--blue)':'var(--br)',
+              background:sendVia===v?'var(--blue)22':'var(--s2)',
+              color:sendVia===v?'var(--blue)':'var(--t2)'}}
+            onClick={()=>setSendVia(v)}>{l}</button>
+        ))}
+      </div>
+    </div>
+    <div style={{display:'flex',gap:8,marginTop:4}}>
       <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={onClose}>Cancel</button>
-      <button className="btn sm" style={{flex:1,justifyContent:'center',background:'#7c3aed',color:'#fff',borderColor:'#7c3aed'}} onClick={create} disabled={saving}>{saving?'Creating…':'✍️ Create Link'}</button>
+      <button className="btn sm" style={{flex:1,justifyContent:'center',background:'#7c3aed',color:'#fff',borderColor:'#7c3aed'}} onClick={create} disabled={saving}>{saving?'Sending...':'Send Request'}</button>
     </div>
   </div>
 }
@@ -267,12 +312,38 @@ export default function Leads() {
   }
 
   async function handleSendFullPackage(l) {
+    if (!l.email && !l.phone) { showToast('Lead needs an email or phone to send the package.'); return }
     setPkgSending(true)
     const res = await sendFullPackage({...l, address:l.street, business_name:l.entityName}, supabase)
+    if (res.error) { setPkgSending(false); showToast('Error: '+res.error); return }
+
+    const url = res.url
+    await navigator.clipboard.writeText(url).catch(()=>{})
+    let smsSent=false,emailSent=false
+    const{data:cfg}=await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
+
+    if(l.email){
+      try{
+        const{error:eErr}=await supabase.functions.invoke('send-email',{body:{
+          to:l.email,
+          subject:`Action Required: Sign Your Tax Investigation Package — Tax Case Review`,
+          html:`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:24px"><div style="font-size:20px;font-weight:800;color:#1d4ed8">Tax Case Review</div></div><p>Dear <strong>${l.name}</strong>,</p><p>Your Tax Investigation Package is ready for review and signature. This package includes your Tax Service Agreement and IRS authorization forms (Form 2848 / Form 8821).</p><p style="text-align:center;margin:28px 0"><a href="${url}" style="background:#16a34a;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Review &amp; Sign Package</a></p><p style="font-size:12px;color:#64748b">Or copy this link: ${url}</p><hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"/><p style="font-size:11px;color:#94a3b8;text-align:center">Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403</p></div>`
+        }})
+        if(!eErr)emailSent=true
+      }catch(e){console.error('Email error:',e)}
+    }
+    if(l.phone&&cfg?.signalwire_backend){
+      try{
+        const r=await fetch(cfg.signalwire_backend+'/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:l.phone,body:`Hi ${l.name}, Tax Case Review sent you a Tax Investigation Package to review and sign: ${url}`})})
+        const d=await r.json();if(d.success)smsSent=true
+      }catch(e){console.error('SMS error:',e)}
+    }
+
     setPkgSending(false)
-    if (res.error) { showToast('Error: '+res.error); return }
-    await navigator.clipboard.writeText(res.url).catch(()=>{})
-    showToast('✅ Full package created — signing link copied to clipboard!')
+    const sent=[emailSent&&`email to ${l.email}`,smsSent&&`SMS to ${l.phone}`].filter(Boolean)
+    showToast(sent.length?`Package sent via ${sent.join(' & ')}!`:'Package created — link copied (configure email/SMS in Settings to auto-send).')
+    await supabase.from('leads').update({status:'Tax Inv Agreement Sent'}).eq('id',l.id)
+    load()
   }
 
   async function convertToClient(l) {
