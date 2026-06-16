@@ -49,6 +49,7 @@ const BLANK = {
   ssn:'', dob:'',
   street:'', city:'', state:'', zip:'', county:'', source:'Referral',
   irsBalance:'', issueType:'OIC', irsOrState:'IRS Federal', taxYears:[],
+  filingRequirements:[],
   irsStatus:'', irsStatusOther:'', irsDeadline:'',
   stateStatus:'', stateStatusOther:'', stateDeadline:'',
   taxYearsCustom:'', notes:'', assignedTo:'', status:'New Lead', taxFee:'', taxFeeOverride:''
@@ -386,7 +387,7 @@ export default function Leads() {
   async function save() {
     if (!form.name.trim()) { showToast('Name is required'); return }
     setSaving(true)
-    const payload = { ...form, taxYears: JSON.stringify(form.taxYears) }
+    const payload = { ...form, taxYears: JSON.stringify(form.taxYears), filingRequirements: JSON.stringify(form.filingRequirements||[]) }
     let error
     let oldName = null
     if (modal === 'edit') {
@@ -473,6 +474,7 @@ export default function Leads() {
       irsBalance: l.irsBalance, issueType: l.issueType, irsOrState: l.irsOrState,
       irsStatus: l.irsStatus, irsStatusOther: l.irsStatusOther, irsDeadline: l.irsDeadline,
       stateStatus: l.stateStatus, stateStatusOther: l.stateStatusOther, stateDeadline: l.stateDeadline,
+      filingRequirements: l.filingRequirements,
       taxYears: taxYearsStr,
       notes: l.notes, status: 'Active',
       clientSince: new Date().toISOString().slice(0,10),
@@ -600,6 +602,21 @@ export default function Leads() {
               </div>
               <input value={form.taxYearsCustom} onChange={e=>fld('taxYearsCustom',e.target.value)} placeholder="Or type custom years: 2019, 2020" style={{marginTop:5}}/>
             </div>
+            <div className="field">
+              <label>Filing Requirements</label>
+              <div style={{display:'flex',gap:14,flexWrap:'wrap',padding:'6px 0'}}>
+                {['1040','1120','1065','1120S','940','941'].map(ft=>(
+                  <label key={ft} style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:13,cursor:'pointer'}}>
+                    <input type="checkbox" style={{width:'auto'}}
+                      checked={(form.filingRequirements||[]).includes(ft)}
+                      onChange={()=>fld('filingRequirements', (form.filingRequirements||[]).includes(ft)
+                        ? form.filingRequirements.filter(x=>x!==ft)
+                        : [...(form.filingRequirements||[]),ft])}/>
+                    {ft}
+                  </label>
+                ))}
+              </div>
+            </div>
             <div className="field"><label>Notes</label><textarea value={form.notes} onChange={e=>fld('notes',e.target.value)}/></div>
             <div className="fg2">
               <div className="field"><label>Assigned Rep</label>
@@ -720,7 +737,7 @@ export default function Leads() {
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,flexWrap:'wrap'}}>
           <button className="btn" style={{padding:'8px 16px',fontSize:13,fontWeight:600}} onClick={()=>{ setDetail(null); navigate('/leads',{replace:true}); window.scrollTo(0,0) }}>← Back</button>
           {(l.status !== 'Converted to Client' || user?.role === 'Admin' || user?.role === 'Manager') ? (
-            <button className="btn pri" style={{marginLeft:'auto',padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>{setForm({...BLANK,...l,taxYears:(() => {try{return JSON.parse(l.taxYears||'[]')}catch{return []}})()});setModal('edit')}}>✏️ Edit</button>
+            <button className="btn pri" style={{marginLeft:'auto',padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>{setForm({...BLANK,...l,taxYears:(() => {try{return JSON.parse(l.taxYears||'[]')}catch{return []}})(),filingRequirements:(() => {try{return JSON.parse(l.filingRequirements||'[]')}catch{return []}})()});setModal('edit')}}>✏️ Edit</button>
           ) : (
             <span style={{marginLeft:'auto',fontSize:11,color:'var(--t3)',padding:'8px 12px',background:'var(--s2)',borderRadius:6}}>🔒 Admin Only</span>
           )}
@@ -818,6 +835,7 @@ export default function Leads() {
               ['Issue Type',   <TypeBdg t={l.issueType||'—'}/>],
               ['IRS or State', l.irsOrState],
               ['Tax Years',    taxYearsList],
+              ['Filing Reqs',  (()=>{try{return JSON.parse(l.filingRequirements||'[]').join(', ')}catch{return ''}})()],
               ...((l.irsOrState||'IRS Federal')!=='State' ? [
                 ['IRS Status',   l.irsStatus==='Other'?l.irsStatusOther:l.irsStatus],
                 ['IRS Deadline', l.irsDeadline],
