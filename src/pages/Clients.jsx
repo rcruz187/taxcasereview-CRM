@@ -837,19 +837,49 @@ export default function Clients() {
   async function save() {
     if (!form.name.trim()){showToast('Name is required');return}
     setSaving(true)
-    const {error}=await supabase.from('clients').insert([{...buildPayload(form),created_at:new Date().toISOString()}])
+    let payload = {...buildPayload(form),created_at:new Date().toISOString()}
+    let error
+    const skipped = []
+    for (let attempt = 0; attempt < 12; attempt++) {
+      ;({error} = await supabase.from('clients').insert([payload]))
+      if (!error) break
+      const match = error.message?.match(/column ['"]?(\w+)['"]? (of relation .* )?does not exist/i)
+        || error.message?.match(/Could not find the '(\w+)' column/i)
+      if (match && match[1] in payload) {
+        const { [match[1]]: _, ...rest } = payload
+        payload = rest
+        skipped.push(match[1])
+        continue
+      }
+      break
+    }
     setSaving(false)
     if (error){showToast('Error: '+error.message);return}
-    showToast('✅ Client added!')
+    showToast(skipped.length ? `✅ Client added — but skipped fields not in the database yet: ${skipped.join(', ')}` : '✅ Client added!')
     setModal(false);setForm(BLANK);load()
   }
 
   async function saveEdit() {
     setSaving(true)
-    const {error}=await supabase.from('clients').update(buildPayload(form)).eq('id',form.id)
+    let payload = buildPayload(form)
+    let error
+    const skipped = []
+    for (let attempt = 0; attempt < 12; attempt++) {
+      ;({error} = await supabase.from('clients').update(payload).eq('id',form.id))
+      if (!error) break
+      const match = error.message?.match(/column ['"]?(\w+)['"]? (of relation .* )?does not exist/i)
+        || error.message?.match(/Could not find the '(\w+)' column/i)
+      if (match && match[1] in payload) {
+        const { [match[1]]: _, ...rest } = payload
+        payload = rest
+        skipped.push(match[1])
+        continue
+      }
+      break
+    }
     setSaving(false)
     if (error){showToast('Error: '+error.message);return}
-    showToast('✅ Saved!')
+    showToast(skipped.length ? `✅ Saved — but skipped fields not in the database yet: ${skipped.join(', ')}` : '✅ Saved!')
     setEditModal(false)
     const {data}=await supabase.from('clients').select('*').eq('id',form.id).single()
     if (data){setDetail(data);loadRelated(data.name)}

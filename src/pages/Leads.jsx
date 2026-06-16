@@ -388,25 +388,45 @@ export default function Leads() {
   async function save() {
     if (!form.name.trim()) { showToast('Name is required'); return }
     setSaving(true)
-    const payload = { ...form, taxYears: JSON.stringify(form.taxYears), filingRequirements: JSON.stringify(form.filingRequirements||[]) }
+    let payload = { ...form, taxYears: JSON.stringify(form.taxYears), filingRequirements: JSON.stringify(form.filingRequirements||[]) }
     let error
     let oldName = null
     if (modal === 'edit') {
       const { id, created_at, ...rest } = payload
+      payload = rest
       oldName = detail?.name
-      ;({ error } = await supabase.from('leads').update(rest).eq('id', form.id))
     } else {
       payload.created_at = new Date().toISOString()
-      ;({ error } = await supabase.from('leads').insert([payload]))
+    }
+    // Self-healing save: if Postgres/PostgREST reports an unknown column,
+    // strip it and retry so one missing field doesn't block the whole save.
+    const skipped = []
+    for (let attempt = 0; attempt < 12; attempt++) {
+      if (modal === 'edit') {
+        ;({ error } = await supabase.from('leads').update(payload).eq('id', form.id))
+      } else {
+        ;({ error } = await supabase.from('leads').insert([payload]))
+      }
+      if (!error) break
+      const match = error.message?.match(/column ['"]?(\w+)['"]? (of relation .* )?does not exist/i)
+        || error.message?.match(/Could not find the '(\w+)' column/i)
+      if (match && match[1] in payload) {
+        const { [match[1]]: _, ...rest } = payload
+        payload = rest
+        skipped.push(match[1])
+        continue
+      }
+      break
     }
     setSaving(false)
     if (error) { showToast('Error: '+error.message); return }
+    if (skipped.length) showToast(`✅ Saved — but these fields aren't set up in the database yet and were skipped: ${skipped.join(', ')}`)
     // If the name changed, repoint any compliance records gathered under the old name
     // so they don't get orphaned (compliance is stored keyed by client_name text).
     if (oldName && oldName !== form.name) {
       await supabase.from('client_compliance_records').update({ client_name: form.name }).eq('client_name', oldName)
     }
-    showToast(modal==='edit' ? '✅ Lead updated!' : '✅ Lead added!')
+    if (!skipped.length) showToast(modal==='edit' ? '✅ Lead updated!' : '✅ Lead added!')
     setModal(false); setForm(BLANK); load()
     if (modal==='edit' && detail) {
       const { data } = await supabase.from('leads').select('*').eq('id', form.id).single()
