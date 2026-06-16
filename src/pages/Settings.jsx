@@ -112,6 +112,9 @@ export default function Settings() {
         qb_client_id: firm.qb_client_id,
         qb_client_secret: firm.qb_client_secret,
       }
+      // Empty-string values blow up non-text columns (date, numeric) with
+      // "invalid input syntax" — Postgres wants null for "no value", not ''.
+      Object.keys(payload).forEach(k => { if (payload[k] === '') payload[k] = null })
 
       const { data: existing, error: fetchErr } = await supabase.from('settings').select('id').limit(1).maybeSingle()
       if (fetchErr) throw fetchErr

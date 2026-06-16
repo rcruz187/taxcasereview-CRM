@@ -832,6 +832,9 @@ export default function Clients() {
     const dob=dobM&&dobD&&dobY?`${dobM}/${dobD}/${dobY}`:f.dob||''
     // pipelineStage excluded from main payload — updated separately
     const safe={...rest,dob,dependents:JSON.stringify(f.dependents||[]),filingRequirements:JSON.stringify(f.filingRequirements||[])}
+    // Empty-string values blow up non-text columns (date, numeric) with
+    // "invalid input syntax" — Postgres wants null for "no value", not ''.
+    Object.keys(safe).forEach(k => { if (safe[k] === '') safe[k] = null })
     return safe
   }
 

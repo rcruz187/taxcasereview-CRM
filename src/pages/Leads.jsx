@@ -391,6 +391,9 @@ export default function Leads() {
     if (!form.name.trim()) { showToast('Name is required'); return }
     setSaving(true)
     let payload = { ...form, taxYears: JSON.stringify(form.taxYears), filingRequirements: JSON.stringify(form.filingRequirements||[]) }
+    // Empty-string values blow up non-text columns (date, numeric) with
+    // "invalid input syntax" — Postgres wants null for "no value", not ''.
+    Object.keys(payload).forEach(k => { if (payload[k] === '') payload[k] = null })
     let error
     let oldName = null
     if (modal === 'edit') {
