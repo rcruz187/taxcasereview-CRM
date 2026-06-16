@@ -39,6 +39,7 @@ const blankEmp = {
   hireDate: '', emergencyContact: '', emergencyPhone: '',
   address: '', filingStatus: 'Single',
   caf: '', ptin: '', sorShortId: '', sorUsername: '',
+  bank_name: '', bank_account_type: 'Checking', routing_number: '', account_number: '',
   ...ROLE_PERM_DEFAULTS['Staff']
 }
 
@@ -103,6 +104,10 @@ export default function Employees() {
       ptin: emp.ptin ?? '',
       sorShortId: emp.sorShortId ?? '',
       sorUsername: emp.sorUsername ?? '',
+      bank_name: emp.bank_name ?? '',
+      bank_account_type: emp.bank_account_type ?? 'Checking',
+      routing_number: emp.routing_number ?? '',
+      account_number: emp.account_number ?? '',
     })
     setTab('info')
     setShowForm(true)
@@ -335,22 +340,22 @@ export default function Employees() {
                       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
                         <div className="field">
                           <label>Bank Name</label>
-                          <input value={form.bankName||''} onChange={e => setForm(f => ({ ...f, bankName: e.target.value }))} placeholder="Chase Bank"/>
+                          <input value={form.bank_name||''} onChange={e => setForm(f => ({ ...f, bank_name: e.target.value }))} placeholder="Chase Bank"/>
                         </div>
                         <div className="field">
                           <label>Account Type</label>
-                          <select value={form.bankAccountType||'Checking'} onChange={e => setForm(f => ({ ...f, bankAccountType: e.target.value }))}>
+                          <select value={form.bank_account_type||'Checking'} onChange={e => setForm(f => ({ ...f, bank_account_type: e.target.value }))}>
                             <option>Checking</option>
                             <option>Savings</option>
                           </select>
                         </div>
                         <div className="field">
                           <label>Routing Number</label>
-                          <input value={form.routingNumber||''} onChange={e => setForm(f => ({ ...f, routingNumber: e.target.value }))} placeholder="021000021" maxLength={9}/>
+                          <input value={form.routing_number||''} onChange={e => setForm(f => ({ ...f, routing_number: e.target.value }))} placeholder="021000021" maxLength={9}/>
                         </div>
                         <div className="field">
                           <label>Account Number</label>
-                          <input value={form.accountNumber||''} onChange={e => setForm(f => ({ ...f, accountNumber: e.target.value }))} placeholder="••••••••••"/>
+                          <input value={form.account_number||''} onChange={e => setForm(f => ({ ...f, account_number: e.target.value }))} placeholder="••••••••••"/>
                         </div>
                       </div>
                     </div>
