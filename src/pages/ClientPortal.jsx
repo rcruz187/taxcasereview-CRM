@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
@@ -11,6 +11,16 @@ const FORM_TABS = [
   { key: '1120S', label: 'Business 1120-S',          quarterly: false },
 ]
 
+const DOC_FOLDERS = ['IRS Docs','Tax Returns','Agreements','POA & Forms','Transcripts','Correspondence','Financial Statements','Other']
+
+const SECTIONS = [
+  { key: 'compliance', label: '📋 Compliance' },
+  { key: 'docs',       label: '📁 Documents' },
+  { key: 'pnl',        label: '📊 P&L' },
+  { key: 'payments',   label: '💳 Payments' },
+  { key: 'notes',      label: '💬 Notes' },
+]
+
 function fmt(v) {
   const n = parseFloat(v)
   if (isNaN(n)) return '—'
@@ -20,22 +30,38 @@ function fmt(v) {
 export default function ClientPortal() {
   const { id } = useParams()
   const [client, setClient] = useState(null)
-  const [records, setRecords] = useState([])
   const [loading, setLoading] = useState(true)
-  const [unlocked, setUnlocked] = useState(false)
-  const [pin, setPin] = useState('')
-  const [pinError, setPinError] = useState('')
-  const [activeTab, setActiveTab] = useState(null)
   const [notFound, setNotFound] = useState(false)
+  const [unlocked, setUnlocked] = useState(false)
+  const [emailInput, setEmailInput] = useState('')
+  const [pin, setPin] = useState('')
+  const [authError, setAuthError] = useState('')
+
+  const [section, setSection] = useState('compliance')
+
+  // Compliance
+  const [records, setRecords] = useState([])
+  const [activeForm, setActiveForm] = useState(null)
+  // Docs
+  const [docs, setDocs] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const [uploadFolder, setUploadFolder] = useState('IRS Docs')
+  const fileRef = useRef(null)
+  // P&L
+  const [bookEntries, setBookEntries] = useState([])
+  // Payments
+  const [payments, setPayments] = useState([])
+  // Notes (client-visible only)
+  const [notes, setNotes] = useState([])
 
   useEffect(() => { load() }, [id])
 
   async function load() {
     setLoading(true)
-    let { data: c } = await supabase.from('clients').select('id,name,ssn').eq('id', id).maybeSingle()
+    let { data: c } = await supabase.from('clients').select('id,name,ssn,email').eq('id', id).maybeSingle()
     let isLead = false
     if (!c) {
-      const { data: l } = await supabase.from('leads').select('id,name,ssn').eq('id', id).maybeSingle()
+      const { data: l } = await supabase.from('leads').select('id,name,ssn,email').eq('id', id).maybeSingle()
       if (l) { c = l; isLead = true }
     }
     if (!c) { setNotFound(true); setLoading(false); return }
@@ -43,16 +69,58 @@ export default function ClientPortal() {
     setLoading(false)
   }
 
-  async function checkPin() {
+  function checkAuth() {
     const last4 = (client.ssn || '').replace(/\D/g, '').slice(-4)
-    if (!last4) { setPinError("No SSN on file to verify against — contact your representative."); return }
-    if (pin.trim() !== last4) { setPinError("That doesn't match what we have on file. Please try again."); return }
-    setPinError('')
+    const emailOnFile = (client.email || '').trim().toLowerCase()
+    if (!last4 || !emailOnFile) { setAuthError("We don't have enough information on file to verify you — contact your representative."); return }
+    if (emailInput.trim().toLowerCase() !== emailOnFile) { setAuthError("That email doesn't match what we have on file."); return }
+    if (pin.trim() !== last4) { setAuthError("That doesn't match the last 4 of your SSN on file."); return }
+    setAuthError('')
     setUnlocked(true)
-    const { data } = await supabase.from('client_compliance_records').select('*').eq('client_name', client.name)
-    setRecords(data || [])
-    const firstWithData = FORM_TABS.find(t => (data || []).some(r => r.form_type === t.key))
-    setActiveTab(firstWithData?.key || '1040')
+    loadAllData()
+  }
+
+  async function loadAllData() {
+    const [{ data: comp }, { data: docsData }, { data: books }, { data: pays }, { data: notesData }] = await Promise.all([
+      supabase.from('client_compliance_records').select('*').eq('client_name', client.name),
+      supabase.from('documents').select('*').eq('client', client.name).order('created_at', { ascending: false }),
+      supabase.from('bookkeeping').select('*').eq('client_name', client.name).order('date', { ascending: false }),
+      supabase.from('payments').select('*').eq('clientName', client.name).order('created_at', { ascending: false }),
+      supabase.from('client_notes').select('*').eq('client_name', client.name).eq('visible_to_client', true).order('created_at', { ascending: false }),
+    ])
+    setRecords(comp || [])
+    setDocs(docsData || [])
+    setBookEntries(books || [])
+    setPayments(pays || [])
+    setNotes(notesData || [])
+    const firstWithData = FORM_TABS.find(t => (comp || []).some(r => r.form_type === t.key))
+    setActiveForm(firstWithData?.key || '1040')
+  }
+
+  async function handleUpload() {
+    const file = fileRef.current?.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const path = `docs/${client.name.replace(/\s+/g, '-')}/${Date.now()}_${file.name}`
+      const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
+      if (upErr) throw upErr
+      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+      const { error } = await supabase.from('documents').insert([{
+        name: file.name, client: client.name, docType: uploadFolder,
+        notes: 'Uploaded by client via portal',
+        file_url: urlData.publicUrl, file_name: file.name, file_size: file.size,
+        created_at: new Date().toISOString(),
+      }])
+      if (error) throw error
+      const { data: docsData } = await supabase.from('documents').select('*').eq('client', client.name).order('created_at', { ascending: false })
+      setDocs(docsData || [])
+      if (fileRef.current) fileRef.current.value = ''
+    } catch (e) {
+      alert('Upload failed: ' + e.message)
+    } finally {
+      setUploading(false)
+    }
   }
 
   async function downloadExcel() {
@@ -60,9 +128,7 @@ export default function ClientPortal() {
     exportComplianceToExcel(client.name, records)
   }
 
-  if (loading) return (
-    <div style={styles.page}><div style={{ color: '#94a3b8', fontSize: 13 }}>Loading…</div></div>
-  )
+  if (loading) return <div style={styles.page}><div style={{ color: '#94a3b8', fontSize: 13 }}>Loading…</div></div>
 
   if (notFound) return (
     <div style={styles.page}>
@@ -84,20 +150,32 @@ export default function ClientPortal() {
           <div style={{ fontSize: 19, fontWeight: 800, color: '#fff', marginTop: 6 }}>Client Portal</div>
         </div>
         <div style={{ fontSize: 13, color: '#cbd5e1', textAlign: 'center', marginBottom: 18, lineHeight: 1.6 }}>
-          Hi {client?.name}, to view your tax compliance information, please confirm the <strong>last 4 digits of your SSN</strong>.
+          Hi {client?.name}, please verify your identity to view your information.
         </div>
-        <input
-          value={pin}
-          onChange={e => { setPin(e.target.value.replace(/\D/g, '').slice(0, 4)); setPinError('') }}
-          onKeyDown={e => e.key === 'Enter' && checkPin()}
-          placeholder="••••"
-          maxLength={4}
-          inputMode="numeric"
-          style={styles.pinInput}
-          autoFocus
-        />
-        {pinError && <div style={{ color: '#f87171', fontSize: 12, textAlign: 'center', marginTop: 10 }}>{pinError}</div>}
-        <button onClick={checkPin} disabled={pin.length !== 4} style={{ ...styles.bigBtn, opacity: pin.length === 4 ? 1 : 0.5 }}>
+        <div style={{ marginBottom: 12 }}>
+          <label style={styles.label}>Email Address</label>
+          <input
+            value={emailInput}
+            onChange={e => { setEmailInput(e.target.value); setAuthError('') }}
+            placeholder="you@email.com"
+            type="email"
+            style={styles.textInput}
+          />
+        </div>
+        <div style={{ marginBottom: 4 }}>
+          <label style={styles.label}>Last 4 Digits of SSN</label>
+          <input
+            value={pin}
+            onChange={e => { setPin(e.target.value.replace(/\D/g, '').slice(0, 4)); setAuthError('') }}
+            onKeyDown={e => e.key === 'Enter' && checkAuth()}
+            placeholder="••••"
+            maxLength={4}
+            inputMode="numeric"
+            style={{ ...styles.textInput, fontSize: 20, letterSpacing: 6, textAlign: 'center' }}
+          />
+        </div>
+        {authError && <div style={{ color: '#f87171', fontSize: 12, textAlign: 'center', marginTop: 10 }}>{authError}</div>}
+        <button onClick={checkAuth} disabled={pin.length !== 4 || !emailInput.trim()} style={{ ...styles.bigBtn, opacity: pin.length === 4 && emailInput.trim() ? 1 : 0.5 }}>
           View My Information
         </button>
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', textAlign: 'center', marginTop: 16 }}>
@@ -107,81 +185,206 @@ export default function ClientPortal() {
     </div>
   )
 
-  const recordsForTab = records.filter(r => r.form_type === activeTab)
+  const recordsForTab = records.filter(r => r.form_type === activeForm)
   const tabsWithData = FORM_TABS.filter(t => records.some(r => r.form_type === t.key))
-  const activeMeta = FORM_TABS.find(t => t.key === activeTab)
+  const activeMeta = FORM_TABS.find(t => t.key === activeForm)
+  const docsByFolder = {}
+  DOC_FOLDERS.forEach(f => { docsByFolder[f] = [] })
+  docs.forEach(d => { const f = d.docType || 'Other'; if (!docsByFolder[f]) docsByFolder[f] = []; docsByFolder[f].push(d) })
+  const totalIn = bookEntries.filter(e => parseFloat(e.amount || 0) > 0).reduce((s, e) => s + parseFloat(e.amount || 0), 0)
+  const totalOut = Math.abs(bookEntries.filter(e => parseFloat(e.amount || 0) < 0).reduce((s, e) => s + parseFloat(e.amount || 0), 0))
 
   return (
     <div style={styles.page}>
-      <div style={{ ...styles.card, maxWidth: 760 }}>
+      <div style={{ ...styles.card, maxWidth: 880 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
           <div>
             <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', letterSpacing: '.1em', textTransform: 'uppercase' }}>Tax Case Review</div>
             <div style={{ fontSize: 19, fontWeight: 800, color: '#fff', marginTop: 4 }}>{client?.name}</div>
-            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>Tax Compliance Overview</div>
+            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>Client Portal</div>
           </div>
-          <button onClick={downloadExcel} disabled={records.length === 0} style={styles.downloadBtn}>
-            ⬇ Download as Excel
-          </button>
         </div>
 
-        {records.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '32px 0', color: '#64748b', fontSize: 13 }}>
-            No compliance information has been entered yet. Check back after your investigation findings are recorded.
-          </div>
-        ) : (
-          <>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
-              {tabsWithData.map(t => (
-                <button
-                  key={t.key}
-                  onClick={() => setActiveTab(t.key)}
-                  style={{
-                    padding: '6px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                    border: '1px solid ' + (activeTab === t.key ? '#3b82f6' : 'rgba(255,255,255,.15)'),
-                    background: activeTab === t.key ? 'rgba(59,130,246,.2)' : 'rgba(255,255,255,.05)',
-                    color: activeTab === t.key ? '#93c5fd' : '#94a3b8',
-                  }}
-                >{t.label}</button>
-              ))}
-            </div>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap', borderBottom: '1px solid rgba(255,255,255,.1)', paddingBottom: 14 }}>
+          {SECTIONS.map(s => (
+            <button key={s.key} onClick={() => setSection(s.key)} style={{
+              padding: '7px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+              border: '1px solid ' + (section === s.key ? '#3b82f6' : 'rgba(255,255,255,.15)'),
+              background: section === s.key ? 'rgba(59,130,246,.2)' : 'rgba(255,255,255,.05)',
+              color: section === s.key ? '#93c5fd' : '#94a3b8',
+            }}>{s.label}</button>
+          ))}
+        </div>
 
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,.15)' }}>
-                    {['Tax Year', activeMeta?.quarterly ? 'Quarter' : null, 'Filed Status', 'Amount', 'Credits', activeMeta?.quarterly ? 'Deposits' : null, 'Lien', 'CSED'].filter(Boolean).map(h => (
-                      <th key={h} style={{ padding: '7px 8px', textAlign: 'left', color: '#64748b', fontSize: 10, textTransform: 'uppercase', fontWeight: 700 }}>{h}</th>
+        {/* ── COMPLIANCE ── */}
+        {section === 'compliance' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+              <button onClick={downloadExcel} disabled={records.length === 0} style={styles.downloadBtn}>⬇ Download as Excel</button>
+            </div>
+            {records.length === 0 ? (
+              <Empty msg="No compliance information has been entered yet." />
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+                  {tabsWithData.map(t => (
+                    <button key={t.key} onClick={() => setActiveForm(t.key)} style={{
+                      padding: '6px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      border: '1px solid ' + (activeForm === t.key ? '#3b82f6' : 'rgba(255,255,255,.15)'),
+                      background: activeForm === t.key ? 'rgba(59,130,246,.2)' : 'rgba(255,255,255,.05)',
+                      color: activeForm === t.key ? '#93c5fd' : '#94a3b8',
+                    }}>{t.label}</button>
+                  ))}
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={styles.table}>
+                    <thead>
+                      <tr style={styles.tr}>
+                        {['Tax Year', activeMeta?.quarterly ? 'Quarter' : null, 'Filed Status', 'Amount', 'Credits', activeMeta?.quarterly ? 'Deposits' : null, 'Lien', 'CSED'].filter(Boolean).map(h => (
+                          <th key={h} style={styles.th}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...recordsForTab].sort((a, b) => (b.tax_year - a.tax_year) || ((b.quarter || 0) - (a.quarter || 0))).map(r => (
+                        <tr key={r.id} style={styles.tr}>
+                          <td style={{ ...styles.td, fontWeight: 700, color: '#f1f5f9' }}>{r.tax_year}</td>
+                          {activeMeta?.quarterly && <td style={styles.td}>Q{r.quarter || '—'}</td>}
+                          <td style={styles.td}>{r.filed_status || '—'}</td>
+                          <td style={styles.td}>{fmt(r.amount)}</td>
+                          <td style={styles.td}>{fmt(r.credits)}</td>
+                          {activeMeta?.quarterly && <td style={styles.td}>{fmt(r.deposit)}</td>}
+                          <td style={styles.td}>{r.lien === 'Yes' ? <span style={{ color: '#f87171', fontWeight: 700 }}>Yes</span> : <span style={{ color: '#64748b' }}>{r.lien || '—'}</span>}</td>
+                          <td style={styles.td}>{r.csed || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── DOCUMENTS ── */}
+        {section === 'docs' && (
+          <div>
+            <div style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, padding: 14, marginBottom: 18 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: '#f1f5f9', marginBottom: 10 }}>📤 Upload a Document</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <select value={uploadFolder} onChange={e => setUploadFolder(e.target.value)} style={styles.select}>
+                  {DOC_FOLDERS.map(f => <option key={f}>{f}</option>)}
+                </select>
+                <input ref={fileRef} type="file" style={{ fontSize: 12, color: '#cbd5e1' }} />
+                <button onClick={handleUpload} disabled={uploading} style={styles.downloadBtn}>{uploading ? 'Uploading…' : '⬆ Upload'}</button>
+              </div>
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 8 }}>Files you upload here go straight to your file with your representative.</div>
+            </div>
+            {docs.length === 0 ? <Empty msg="No documents yet." /> : (
+              DOC_FOLDERS.filter(f => docsByFolder[f]?.length).map(folder => (
+                <div key={folder} style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>{folder}</div>
+                  {docsByFolder[folder].map(d => (
+                    <a key={d.id} href={d.file_url} target="_blank" rel="noreferrer" style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', marginBottom: 6,
+                      background: 'rgba(255,255,255,.04)', borderRadius: 8, textDecoration: 'none',
+                      border: '1px solid rgba(255,255,255,.08)',
+                    }}>
+                      <span style={{ fontSize: 16 }}>📄</span>
+                      <span style={{ fontSize: 13, color: '#f1f5f9', flex: 1 }}>{d.name || d.file_name}</span>
+                      <span style={{ fontSize: 11, color: '#64748b' }}>{d.created_at ? new Date(d.created_at).toLocaleDateString() : ''}</span>
+                    </a>
+                  ))}
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* ── P&L ── */}
+        {section === 'pnl' && (
+          <div>
+            {bookEntries.length === 0 ? <Empty msg="No bookkeeping entries yet." /> : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 18 }}>
+                  <StatBox label="Income" value={fmt(totalIn)} color="#4ade80" />
+                  <StatBox label="Expenses" value={fmt(totalOut)} color="#f87171" />
+                  <StatBox label="Net" value={fmt(totalIn - totalOut)} color={totalIn - totalOut >= 0 ? '#4ade80' : '#f87171'} />
+                </div>
+                <table style={styles.table}>
+                  <thead><tr style={styles.tr}>{['Date', 'Description', 'Category', 'Amount'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {bookEntries.map(e => (
+                      <tr key={e.id} style={styles.tr}>
+                        <td style={{ ...styles.td, color: '#94a3b8', fontSize: 11.5 }}>{e.date || '—'}</td>
+                        <td style={{ ...styles.td, fontWeight: 600, color: '#f1f5f9' }}>{e.description || '—'}</td>
+                        <td style={styles.td}>{e.category || '—'}</td>
+                        <td style={{ ...styles.td, fontWeight: 700, color: parseFloat(e.amount || 0) >= 0 ? '#4ade80' : '#f87171' }}>{fmt(Math.abs(parseFloat(e.amount || 0)))}</td>
+                      </tr>
                     ))}
-                  </tr>
-                </thead>
+                  </tbody>
+                </table>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── PAYMENTS ── */}
+        {section === 'payments' && (
+          <div>
+            {payments.length === 0 ? <Empty msg="No payments on file yet." /> : (
+              <table style={styles.table}>
+                <thead><tr style={styles.tr}>{['Date', 'Amount', 'Method', 'Status'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr></thead>
                 <tbody>
-                  {[...recordsForTab].sort((a, b) => (b.tax_year - a.tax_year) || ((b.quarter || 0) - (a.quarter || 0))).map(r => (
-                    <tr key={r.id} style={{ borderBottom: '1px solid rgba(255,255,255,.08)' }}>
-                      <td style={{ padding: '8px 8px', fontWeight: 700, color: '#f1f5f9' }}>{r.tax_year}</td>
-                      {activeMeta?.quarterly && <td style={{ padding: '8px 8px', color: '#cbd5e1' }}>Q{r.quarter || '—'}</td>}
-                      <td style={{ padding: '8px 8px', color: '#cbd5e1' }}>{r.filed_status || '—'}</td>
-                      <td style={{ padding: '8px 8px', color: '#cbd5e1' }}>{fmt(r.amount)}</td>
-                      <td style={{ padding: '8px 8px', color: '#cbd5e1' }}>{fmt(r.credits)}</td>
-                      {activeMeta?.quarterly && <td style={{ padding: '8px 8px', color: '#cbd5e1' }}>{fmt(r.deposit)}</td>}
-                      <td style={{ padding: '8px 8px' }}>
-                        {r.lien === 'Yes'
-                          ? <span style={{ color: '#f87171', fontWeight: 700 }}>Yes</span>
-                          : <span style={{ color: '#64748b' }}>{r.lien || '—'}</span>}
+                  {payments.map(p => (
+                    <tr key={p.id} style={styles.tr}>
+                      <td style={{ ...styles.td, color: '#94a3b8', fontSize: 11.5 }}>{p.date || '—'}</td>
+                      <td style={{ ...styles.td, fontWeight: 700, color: '#4ade80' }}>{fmt(p.amount)}</td>
+                      <td style={styles.td}>{p.method || '—'}</td>
+                      <td style={styles.td}>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: p.status === 'Cleared' ? 'rgba(74,222,128,.15)' : 'rgba(250,204,21,.15)', color: p.status === 'Cleared' ? '#4ade80' : '#facc15' }}>
+                          {p.status || 'Pending'}
+                        </span>
                       </td>
-                      <td style={{ padding: '8px 8px', color: '#cbd5e1' }}>{r.csed || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
-          </>
+            )}
+          </div>
         )}
 
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', textAlign: 'center', marginTop: 24 }}>
+        {/* ── NOTES ── */}
+        {section === 'notes' && (
+          <div>
+            {notes.length === 0 ? <Empty msg="No updates yet — your representative will post updates here." /> : (
+              notes.map(n => (
+                <div key={n.id} style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+                  <div style={{ fontSize: 13.5, lineHeight: 1.6, color: '#f1f5f9', whiteSpace: 'pre-wrap' }}>{n.content}</div>
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 5 }}>{n.created_at ? new Date(n.created_at).toLocaleDateString() : ''}</div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', textAlign: 'center', marginTop: 28 }}>
           Questions about this information? Contact your Tax Case Review representative.
         </div>
       </div>
+    </div>
+  )
+}
+
+function Empty({ msg }) {
+  return <div style={{ textAlign: 'center', padding: '32px 0', color: '#64748b', fontSize: 13 }}>{msg}</div>
+}
+
+function StatBox({ label, value, color }) {
+  return (
+    <div style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, padding: '12px 14px' }}>
+      <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 18, fontWeight: 800, color }}>{value}</div>
     </div>
   )
 }
@@ -202,10 +405,11 @@ const styles = {
     width: '100%',
     maxWidth: 420,
   },
-  pinInput: {
-    width: '100%', padding: '14px 16px', fontSize: 24, letterSpacing: 8, textAlign: 'center',
+  label: { fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6, display: 'block' },
+  textInput: {
+    width: '100%', padding: '11px 14px', fontSize: 14,
     background: '#0a1628', border: '1px solid #1e3a5f', borderRadius: 10,
-    color: '#f1f5f9', outline: 'none', boxSizing: 'border-box', fontWeight: 700,
+    color: '#f1f5f9', outline: 'none', boxSizing: 'border-box',
   },
   bigBtn: {
     marginTop: 16, width: '100%', padding: 13,
@@ -217,4 +421,12 @@ const styles = {
     background: 'rgba(34,197,94,.15)', border: '1px solid rgba(34,197,94,.3)', color: '#4ade80',
     whiteSpace: 'nowrap',
   },
+  select: {
+    padding: '7px 10px', fontSize: 12, borderRadius: 7, background: '#0a1628',
+    border: '1px solid #1e3a5f', color: '#f1f5f9',
+  },
+  table: { width: '100%', fontSize: 12.5, borderCollapse: 'collapse' },
+  tr: { borderBottom: '1px solid rgba(255,255,255,.08)' },
+  th: { padding: '7px 8px', textAlign: 'left', color: '#64748b', fontSize: 10, textTransform: 'uppercase', fontWeight: 700 },
+  td: { padding: '8px 8px', color: '#cbd5e1' },
 }

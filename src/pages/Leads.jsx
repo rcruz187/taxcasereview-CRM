@@ -213,7 +213,7 @@ function LeadInlinePortalForm({ lead, onClose, showToast }) {
           body: {
             to: lead.email,
             subject: `Your Tax Compliance Information — Tax Case Review`,
-            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${lead.name}</strong>,</p><p>You can now view your tax compliance information online — filing status, balances, and key dates for each tax year on file.</p><p style="text-align:center;margin:24px 0"><a href="${url}" style="background:#3b82f6;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">View My Information</a></p><p style="font-size:12px;color:#64748b">You'll be asked to confirm the last 4 digits of your SSN to access your information. Link: ${url}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403</p></div>`
+            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${lead.name}</strong>,</p><p>You can now view your tax compliance information online — filing status, balances, and key dates for each tax year on file.</p><p style="text-align:center;margin:24px 0"><a href="${url}" style="background:#3b82f6;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">View My Information</a></p><p style="font-size:12px;color:#64748b">You'll be asked to confirm your email and the last 4 digits of your SSN to access your information. Link: ${url}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403</p></div>`
           }
         })
         if (!error) emailSent = true
@@ -256,7 +256,7 @@ function LeadInlinePortalForm({ lead, onClose, showToast }) {
         <div>Email: {lead?.email || <span style={{color:'var(--warn)'}}>No email on file</span>}</div>
         <div>Phone: {lead?.phone || <span style={{color:'var(--warn)'}}>No phone on file</span>}</div>
         <div style={{marginTop:6}}>
-          Access requires last 4 of SSN: {last4 ? <strong style={{color:'var(--tx)'}}>***{last4}</strong> : <span style={{color:'var(--bad)'}}>No SSN on file — lead won't be able to unlock the portal</span>}
+          Access requires email + last 4 of SSN: {last4 && lead?.email ? <strong style={{color:'var(--tx)'}}>{lead.email} / ***{last4}</strong> : <span style={{color:'var(--bad)'}}>{!last4 && !lead?.email ? 'No SSN or email on file' : !last4 ? 'No SSN on file' : 'No email on file'} — lead won't be able to unlock the portal</span>}
         </div>
       </div>
       <div className="field"><label>Send Via</label>
@@ -273,7 +273,7 @@ function LeadInlinePortalForm({ lead, onClose, showToast }) {
       </div>
       <div style={{display:'flex',gap:8,marginTop:14}}>
         <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={onClose}>Cancel</button>
-        <button className="btn sm" style={{flex:1,justifyContent:'center',background:'#0ea5e9',color:'#fff',borderColor:'#0ea5e9'}} onClick={send} disabled={sending || !last4}>
+        <button className="btn sm" style={{flex:1,justifyContent:'center',background:'#0ea5e9',color:'#fff',borderColor:'#0ea5e9'}} onClick={send} disabled={sending || !last4 || !lead?.email}>
           {sending?'Sending…':'Send Portal Link'}
         </button>
       </div>
