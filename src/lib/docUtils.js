@@ -84,7 +84,7 @@ function clientBlock(c) {
   const address = [c.street, c.city, c.state, c.zip].filter(Boolean).join(', ') || '___________________'
   const balance = c.irsBalance ? (isNaN(Number(c.irsBalance)) ? c.irsBalance : '$'+Number(c.irsBalance).toLocaleString()) : '___________________'
   const fee     = c.taxFee ? `$${Number(c.taxFee).toLocaleString()}` : (c.investigationFee ? `$${c.investigationFee}` : '$___________')
-  const years   = c.taxYears || '___________________'
+  const years   = (() => { try { const p = JSON.parse(c.taxYears); return Array.isArray(p) ? p.join(', ') : (c.taxYears || '___________________') } catch { return c.taxYears || '___________________' } })()
   const issue   = c.issueType || '___________________'
   return `
     <div class="client-box">
@@ -899,6 +899,23 @@ export function generateClientPackage(c = null) {
     <p>Tax Case Review makes no guarantee as to any specific outcome. Acceptance into any IRS program is solely at the discretion of the IRS.</p>
     <h3>6. Not a Law Firm</h3>
     <p>Tax Case Review is a tax resolution consulting firm and is <b>not a law firm</b>. All representation is performed by Enrolled Agents and/or licensed tax professionals.</p>
+    <h3>7. Termination</h3>
+    <p>Either party may terminate this Agreement at any time by written notice, effective upon actual receipt or five days after transmittal. Upon termination, all service fees shall be apportioned or prorated on a reasonable basis determined by Company.</p>
+    <h3>8. Arbitration of Disputes — No Class Actions</h3>
+    <p>Any controversy, claim, or dispute arising out of or relating to this Agreement shall be determined by binding arbitration in Palm Beach County, Florida, or in the county in which Client resides, administered by a nationally recognized arbitration service mutually agreed upon by the parties. The arbitrator's award shall be final. Both parties waive the right to bring claims as a plaintiff or class member in any class or representative proceeding. The parties shall share arbitration costs, including attorney's fees, equally; if Client's share exceeds $1,000, Company will pay Client's reasonable share of costs in excess of that amount.</p>
+    <h3>9. No Trial By Jury</h3>
+    <p>Company and Client each waive any right to trial by jury in any lawsuit or other similar proceeding arising from this Agreement.</p>
+    <h3>10. Limitation of Obligations</h3>
+    <p>Company's obligations hereunder in the event of any breach shall in no event exceed 200% of the fees actually collected by Company. In no event shall Company be liable for penalties, interest charges, or consequential damages of any amount whatsoever.</p>
+    <h3>11. Governing Law &amp; Entire Agreement</h3>
+    <p>This Agreement is made and services are performed in the State of Florida and is governed by Florida law. This Agreement and any Addendums constitute the full and complete agreement and supersede any prior agreements, whether written or oral. No amendment, change, or modification other than an Addendum shall be valid unless in writing and signed by all parties.</p>
+    <h3>12. Electronic Communication Disclosures</h3>
+    <p>Client consents to receive, in electronic format, all information, copies of agreements, and correspondence from Company, with the same legal effect as written and signed paper communications. Consent may be withdrawn at any time by emailing info@taxcasereview.com or writing to Tax Case Review, 238 Evergreen Dr, Lake Park, FL 33403.</p>
+    <h3>13. Right of Cancellation</h3>
+    <p>Client may cancel this Agreement at any time prior to midnight of the third (3rd) business day after the date of execution, without penalty or obligation. If Client cancels, any payments made will be returned within three (3) days following receipt of Client's cancellation notice, prorated at a $250 hourly rate for any work product services already performed. To cancel, Client must mail or deliver a signed and dated cancellation notice to Tax Case Review, 238 Evergreen Dr, Lake Park, FL 33403, not later than midnight of the third business day after execution of this Agreement. See the attached Notice of Right of Cancellation for further detail.</p>
+    <div class="notice">
+      <b>Privacy Policy:</b> Tax Case Review uses and shares your information only to perform our obligations under this Agreement and related purposes, or as permitted or required by law. Calls may be recorded or monitored for quality purposes. Contact info@taxcasereview.com with any privacy concerns.
+    </div>
     ${sigBlock('Client Signature', 'Authorized Representative — Tax Case Review')}
   `)
 }

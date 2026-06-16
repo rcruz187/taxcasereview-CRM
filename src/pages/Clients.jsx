@@ -241,11 +241,11 @@ function InlineFaxForm({ client, onClose, showToast }) {
 }
 
 // ── Inline E-Sign Form ───────────────────────────────────────────────────────
-const DOC_TYPES_INLINE = ['Engagement Letter','Form 2848 — Power of Attorney','Form 8821 — Tax Info Auth',
-  'Service Agreement','Fee Agreement Addendum','9465 Installment Agreement','OIC Application (656)','Custom Document']
+const DOC_TYPES_INLINE = ['Tax Service Agreement','Engagement Letter','Form 2848 — Power of Attorney','Form 8821 — Tax Info Auth',
+  'Fee Agreement Addendum','9465 Installment Agreement','OIC Application (656)','Custom Document']
 
 function InlineEsignForm({ client, onClose, showToast }) {
-  const [docType,  setDocType]  = useState('Engagement Letter')
+  const [docType,  setDocType]  = useState('Tax Service Agreement')
   const [message,  setMessage]  = useState('Please review and sign the attached document at your earliest convenience.')
   const [priority, setPriority] = useState('Normal')
   const [saving,   setSaving]   = useState(false)
