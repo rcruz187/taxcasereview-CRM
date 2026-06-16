@@ -49,8 +49,12 @@ const BLANK = {
   ssn:'', dob:'',
   street:'', city:'', state:'', zip:'', county:'', source:'Referral',
   irsBalance:'', issueType:'OIC', irsOrState:'IRS Federal', taxYears:[],
+  irsStatus:'', irsStatusOther:'', irsDeadline:'',
+  stateStatus:'', stateStatusOther:'', stateDeadline:'',
   taxYearsCustom:'', notes:'', assignedTo:'', status:'New Lead', taxFee:'', taxFeeOverride:''
 }
+
+const IRS_STATUS_OPTIONS = ['ACS','Notice Status','Queue for ACS','Currently Not Collectible','Installment Agreement','Garnishment','Levy Issued','Levied','Lien Filed','Appeals','Litigation','Released','Other']
 
 function Bdg({s}) { return <span className={`bdg ${STATUS_C[s]||'bn'}`}>{s}</span> }
 
@@ -467,6 +471,8 @@ export default function Leads() {
       street: l.street, city: l.city, state: l.state, zip: l.zip, county: l.county,
       source: l.source, assignedTo: l.assignedTo,
       irsBalance: l.irsBalance, issueType: l.issueType, irsOrState: l.irsOrState,
+      irsStatus: l.irsStatus, irsStatusOther: l.irsStatusOther, irsDeadline: l.irsDeadline,
+      stateStatus: l.stateStatus, stateStatusOther: l.stateStatusOther, stateDeadline: l.stateDeadline,
       taxYears: taxYearsStr,
       notes: l.notes, status: 'Active',
       clientSince: new Date().toISOString().slice(0,10),
@@ -559,6 +565,30 @@ export default function Leads() {
                 </select>
               </div>
             </div>
+            {(form.irsOrState||'IRS Federal')!=='State' && (
+              <div className="fg2">
+                <div className="field"><label>IRS Status</label>
+                  <select value={form.irsStatus||''} onChange={e=>fld('irsStatus',e.target.value)}>
+                    <option value="">— Select —</option>
+                    {IRS_STATUS_OPTIONS.map(o=><option key={o}>{o}</option>)}
+                  </select>
+                  {form.irsStatus==='Other'&&<input style={{marginTop:6}} value={form.irsStatusOther||''} onChange={e=>fld('irsStatusOther',e.target.value)} placeholder="Specify status"/>}
+                </div>
+                <div className="field"><label>IRS Deadline</label><input type="date" value={form.irsDeadline||''} onChange={e=>fld('irsDeadline',e.target.value)}/></div>
+              </div>
+            )}
+            {(form.irsOrState||'IRS Federal')!=='IRS Federal' && (
+              <div className="fg2">
+                <div className="field"><label>State Status</label>
+                  <select value={form.stateStatus||''} onChange={e=>fld('stateStatus',e.target.value)}>
+                    <option value="">— Select —</option>
+                    {IRS_STATUS_OPTIONS.map(o=><option key={o}>{o}</option>)}
+                  </select>
+                  {form.stateStatus==='Other'&&<input style={{marginTop:6}} value={form.stateStatusOther||''} onChange={e=>fld('stateStatusOther',e.target.value)} placeholder="Specify status"/>}
+                </div>
+                <div className="field"><label>State Deadline</label><input type="date" value={form.stateDeadline||''} onChange={e=>fld('stateDeadline',e.target.value)}/></div>
+              </div>
+            )}
             <div className="field"><label>Tax Years</label>
               <div style={{background:'var(--s2)',border:'1px solid var(--b2c)',borderRadius:7,padding:'8px 10px',maxHeight:80,overflowY:'auto',display:'flex',flexWrap:'wrap',gap:'2px 12px'}}>
                 {YEARS.map(y=>(
@@ -788,6 +818,14 @@ export default function Leads() {
               ['Issue Type',   <TypeBdg t={l.issueType||'—'}/>],
               ['IRS or State', l.irsOrState],
               ['Tax Years',    taxYearsList],
+              ...((l.irsOrState||'IRS Federal')!=='State' ? [
+                ['IRS Status',   l.irsStatus==='Other'?l.irsStatusOther:l.irsStatus],
+                ['IRS Deadline', l.irsDeadline],
+              ] : []),
+              ...((l.irsOrState||'IRS Federal')!=='IRS Federal' ? [
+                ['State Status',   l.stateStatus==='Other'?l.stateStatusOther:l.stateStatus],
+                ['State Deadline', l.stateDeadline],
+              ] : []),
               ['Assigned Rep', l.assignedTo||<span style={{color:'var(--warn)'}}>Unassigned</span>],
               ['Tax Inv Fee',  l.taxFee?<span style={{fontWeight:700,color:'var(--ok)'}}>${l.taxFee}</span>:'Not set'],
             ].map(([label,val])=>(
