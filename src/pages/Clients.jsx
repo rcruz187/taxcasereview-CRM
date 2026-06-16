@@ -30,7 +30,7 @@ const BLANK = {
   clientType:'Individual', name:'', phone:'', phone2:'', email:'',
   street:'', city:'', state:'', zip:'', county:'',
   ssn:'', ein:'', dobM:'', dobD:'', dobY:'',
-  spouseName:'', spouseSsn:'', filingStatus:'Single',
+  spouseName:'', spouseSsn:'', spouseDob:'', filingStatus:'Single',
   irsBalance:'', issueType:'OIC', irsOrState:'IRS Federal', taxYears:'',
   filingRequirements:[],
   irsStatus:'', irsStatusOther:'', irsDeadline:'',
@@ -394,6 +394,109 @@ function InlinePortalForm({ client, onClose, showToast }) {
   )
 }
 
+// ── Tax Organizer Quick Action — picks a year, creates the record, sends link ──
+function InlineOrganizerForm({ client, onClose, showToast }) {
+  const [year, setYear] = useState(String(new Date().getFullYear() + 1))
+  const [sendVia, setSendVia] = useState(client?.email ? 'email' : 'sms')
+  const [sending, setSending] = useState(false)
+  const [done, setDone] = useState(null)
+
+  async function send() {
+    if (!/^\d{4}$/.test(year.trim())) { showToast('Enter a valid 4-digit tax year'); return }
+    setSending(true)
+    let orgId
+    const { data: existing } = await supabase.from('tax_organizer_responses')
+      .select('id').eq('client_name', client.name).eq('tax_year', year.trim()).maybeSingle()
+    if (existing) {
+      orgId = existing.id
+    } else {
+      const { data: created, error: createErr } = await supabase.from('tax_organizer_responses').insert([{
+        client_name: client.name, client_email: client.email || '', tax_year: year.trim(),
+        answers: {}, status: 'In Progress', created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      }]).select().single()
+      if (createErr) { setSending(false); showToast('Error: ' + createErr.message); return }
+      orgId = created.id
+    }
+
+    const url = window.location.origin + '/taxcasereview-CRM/organizer/' + orgId
+    await navigator.clipboard.writeText(url).catch(() => {})
+    let emailSent = false, smsSent = false
+    const { data: cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
+
+    if ((sendVia === 'email' || sendVia === 'both') && client?.email) {
+      try {
+        const { error } = await supabase.functions.invoke('send-email', {
+          body: {
+            to: client.email,
+            subject: `Your ${year.trim()} Tax Organizer — Tax Case Review`,
+            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${client.name}</strong>,</p><p>Please complete your ${year.trim()} tax organizer so we can begin preparing your return. It only takes a few minutes, and you can save your progress and come back anytime.</p><p style="text-align:center;margin:24px 0"><a href="${url}" style="background:#9333ea;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Tax Organizer</a></p><p style="font-size:12px;color:#64748b">Link: ${url}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403</p></div>`
+          }
+        })
+        if (!error) emailSent = true
+      } catch (e) { console.error('Email error:', e) }
+    }
+    if ((sendVia === 'sms' || sendVia === 'both') && client?.phone && cfg?.signalwire_backend) {
+      try {
+        const r = await fetch(cfg.signalwire_backend + '/sms/send', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: client.phone, body: `Hi ${client.name}, please complete your ${year.trim()} tax organizer here: ${url}` })
+        })
+        const d = await r.json()
+        if (d.success) smsSent = true
+      } catch (e) { console.error('SMS error:', e) }
+    }
+    setSending(false)
+    const sent = [emailSent && 'email', smsSent && 'SMS'].filter(Boolean)
+    setDone({ sent, url })
+  }
+
+  if (done) return (
+    <div style={{padding:'0 4px 4px'}}>
+      <div style={{background:'rgba(34,197,94,.08)',border:'1px solid rgba(34,197,94,.3)',borderRadius:8,padding:'12px 14px',marginBottom:14}}>
+        <div style={{fontSize:12,fontWeight:700,color:'var(--ok)',marginBottom:6}}>
+          {done.sent.length ? `✅ Organizer link sent via ${done.sent.join(' & ')}!` : '📋 Link copied to clipboard'}
+        </div>
+        {!done.sent.length && <div style={{fontSize:11,color:'var(--warn)',marginBottom:6}}>Email/SMS not configured — share the link manually.</div>}
+        <div style={{fontSize:11,color:'var(--t3)',wordBreak:'break-all'}}>{done.url}</div>
+      </div>
+      <button className="btn sec" style={{width:'100%',justifyContent:'center'}} onClick={onClose}>Done</button>
+    </div>
+  )
+
+  return (
+    <div style={{padding:'0 4px 4px'}}>
+      <div style={{fontSize:12,color:'var(--t2)',marginBottom:14,lineHeight:1.6}}>
+        Send {client?.name} a multi-step tax organizer to fill out for a specific filing year. Their answers sync straight into the CRM, and the same organizer is also available inside their Client Portal.
+      </div>
+      <div className="field"><label>Tax Year</label>
+        <input value={year} onChange={e=>setYear(e.target.value)} maxLength={4} style={{maxWidth:120}}/>
+      </div>
+      <div style={{background:'var(--s2)',borderRadius:6,padding:'9px 12px',marginTop:10,marginBottom:12,fontSize:12,color:'var(--t3)',lineHeight:1.7}}>
+        <div>📧 {client?.email || <span style={{color:'var(--warn)'}}>No email on file</span>}</div>
+        <div>📱 {client?.phone || <span style={{color:'var(--warn)'}}>No phone on file</span>}</div>
+      </div>
+      <div className="field"><label>Send Via</label>
+        <div style={{display:'flex',gap:8}}>
+          {[['email','Email Only'],['sms','SMS Only'],['both','Both']].map(([v,l])=>(
+            <button key={v} type="button"
+              style={{flex:1,padding:'7px 4px',borderRadius:7,border:'1px solid',fontSize:12,fontWeight:600,cursor:'pointer',
+                borderColor:sendVia===v?'var(--blue)':'var(--br)',
+                background:sendVia===v?'var(--blue)22':'var(--s2)',
+                color:sendVia===v?'var(--blue)':'var(--t2)'}}
+              onClick={()=>setSendVia(v)}>{l}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{display:'flex',gap:8,marginTop:14}}>
+        <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={onClose}>Cancel</button>
+        <button className="btn sm" style={{flex:1,justifyContent:'center',background:'#9333ea',color:'#fff',borderColor:'#9333ea'}} onClick={send} disabled={sending || !year.trim()}>
+          {sending?'Sending…':'🧾 Send Tax Organizer'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Canopy-style Document Manager for a specific client ──────────────────────
 const DOC_FOLDERS = ['IRS Docs','Tax Returns','Agreements','POA & Forms','Transcripts','Correspondence','Financial Statements','E-Signatures','Other']
 const FILE_EXT_ICON = n => { const e=(n||'').split('.').pop().toLowerCase(); return {pdf:'📄',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',jpg:'🖼️',jpeg:'🖼️',png:'🖼️',tiff:'🖼️'}[e]||'📎' }
@@ -640,6 +743,8 @@ export default function Clients() {
   const [esignClient, setEsignClient] = useState(null)
   const [portalModal, setPortalModal] = useState(false)
   const [portalClient, setPortalClient] = useState(null)
+  const [orgModal, setOrgModal] = useState(false)
+  const [orgClient, setOrgClient] = useState(null)
   const [payForm,     setPayForm]     = useState({ amount:'', method:'Credit Card', date:'', notes:'' })
   const [savingPay,   setSavingPay]   = useState(false)
 
@@ -994,6 +1099,7 @@ export default function Clients() {
             <ActionBtn color="#be185d" icon="🧾" label="New Invoice" sub="Bill Client" onClick={()=>navigate('/invoices')}/>
             <ActionBtn color="#0f766e" icon="📊" label="P&amp;L" sub="Books &amp; Ledger" onClick={()=>navigate('/books?client='+encodeURIComponent(c.name))}/>
             <ActionBtn color="#0ea5e9" icon="🔓" label="Client Portal" sub="Compliance Access" onClick={()=>{setPortalClient(c);setPortalModal(true)}}/>
+            <ActionBtn color="#9333ea" icon="🧾" label="Tax Organizer" sub="Send for Filing" onClick={()=>{setOrgClient(c);setOrgModal(true)}}/>
           </div>
         </div>
 
@@ -1259,6 +1365,7 @@ export default function Clients() {
               <DR label="Date of Birth" val={c.dob}/>
               <DR label="Filing Status" val={c.filingStatus}/>
               <DR label="Spouse Name"   val={c.spouseName}/>
+              <DR label="Spouse DOB"    val={c.spouseDob}/>
               <DR label="Spouse SSN"    val={c.spouseSsn?'***-**-'+c.spouseSsn.replace(/-/g,'').slice(-4):null}/>
             </div>
 
@@ -1461,6 +1568,15 @@ export default function Clients() {
           </div>
         </div>
       )}
+
+      {orgModal && orgClient && (
+        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setOrgModal(false)}>
+          <div className="modal" style={{width:500}}>
+            <div className="mh"><span className="mt">🧾 Tax Organizer — {orgClient.name}</span><button className="xbtn" onClick={()=>setOrgModal(false)}>&times;</button></div>
+            <InlineOrganizerForm client={orgClient} onClose={()=>setOrgModal(false)} showToast={showToast}/>
+          </div>
+        </div>
+      )}
       </div>
     )
   }
@@ -1532,6 +1648,15 @@ export default function Clients() {
           <div className="modal" style={{width:500}}>
             <div className="mh"><span className="mt">🔓 Client Portal — {portalClient.name}</span><button className="xbtn" onClick={()=>setPortalModal(false)}>&times;</button></div>
             <InlinePortalForm client={portalClient} onClose={()=>setPortalModal(false)} showToast={showToast}/>
+          </div>
+        </div>
+      )}
+
+      {orgModal && orgClient && (
+        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setOrgModal(false)}>
+          <div className="modal" style={{width:500}}>
+            <div className="mh"><span className="mt">🧾 Tax Organizer — {orgClient.name}</span><button className="xbtn" onClick={()=>setOrgModal(false)}>&times;</button></div>
+            <InlineOrganizerForm client={orgClient} onClose={()=>setOrgModal(false)} showToast={showToast}/>
           </div>
         </div>
       )}
@@ -1609,10 +1734,13 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
             <div className="field"><label>Spouse Full Name</label><input value={form.spouseName||''} onChange={e=>fld('spouseName',e.target.value)}/></div>
             <div className="field"><label>Spouse SSN</label><input value={form.spouseSsn||''} onChange={e=>fld('spouseSsn',e.target.value)} placeholder="XXX-XX-XXXX" maxLength={11}/></div>
           </div>
-          <div className="field"><label>Filing Status</label>
-            <select value={form.filingStatus||'Single'} onChange={e=>fld('filingStatus',e.target.value)}>
-              {['Single','Married Filing Jointly','Married Filing Separately','Head of Household','Qualifying Widow(er)'].map(o=><option key={o}>{o}</option>)}
-            </select>
+          <div className="fg2">
+            <div className="field"><label>Spouse Date of Birth</label><input type="date" value={form.spouseDob||''} onChange={e=>fld('spouseDob',e.target.value)}/></div>
+            <div className="field"><label>Filing Status</label>
+              <select value={form.filingStatus||'Single'} onChange={e=>fld('filingStatus',e.target.value)}>
+                {['Single','Married Filing Jointly','Married Filing Separately','Head of Household','Qualifying Widow(er)'].map(o=><option key={o}>{o}</option>)}
+              </select>
+            </div>
           </div>
         </div>
 
