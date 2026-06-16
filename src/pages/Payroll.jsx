@@ -45,17 +45,17 @@ export default function Payroll() {
 
   useEffect(() => {
     load()
-    // Auto-sync with TimeClock every 30 seconds
+    // Auto-sync with TimeClock — keeps Payroll's view of punches and employees fresh in the background
     const interval = setInterval(() => {
       supabase.from('timeentries').select('*').then(({ data }) => {
         if (data) setTimeEntries(data)
       })
-    }, 30000)
+    }, 5000)
     const empInterval = setInterval(() => {
       supabase.from('employees').select('*').order('name').then(({ data }) => {
         if (data) setEmployees(data)
       })
-    }, 30000)
+    }, 5000)
     return () => { clearInterval(interval); clearInterval(empInterval) }
   }, [])
 
@@ -243,18 +243,7 @@ export default function Payroll() {
       {toast && <div className="toast show">{toast}</div>}
 
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, flexWrap:'wrap', gap:8 }}>
-        <div style={{display:'flex',alignItems:'center',gap:10}}>
-          <h2 style={{ fontSize:15, fontWeight:700, margin:0 }}>💼 Payroll</h2>
-          <button className="btn sec" style={{fontSize:11,padding:'4px 10px'}} onClick={async()=>{
-            const [{data:t},{data:e}] = await Promise.all([
-              supabase.from('timeentries').select('*'),
-              supabase.from('employees').select('*').order('name'),
-            ])
-            if(t) setTimeEntries(t)
-            if(e) setEmployees(e)
-            showToast('✅ Synced with Time Clock')
-          }}>⟳ Sync Time Clock</button>
-        </div>
+        <h2 style={{ fontSize:15, fontWeight:700, margin:0 }}>💼 Payroll</h2>
         <button className="btn pri" onClick={openNewRun} disabled={employees.length===0}>
           {employees.length===0 ? 'Add Employees First' : '+ Process Payroll'}
         </button>

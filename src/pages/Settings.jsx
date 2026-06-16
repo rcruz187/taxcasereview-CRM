@@ -493,8 +493,38 @@ export default function Settings() {
                 </div>
               </div>
             </div>
-            <div className="field" style={{ maxWidth: 260 }}>
-              <label>Primary Color</label>
+            <div className="field" style={{ maxWidth: 420 }}>
+              <label>Accent Color</label>
+              <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 10, lineHeight: 1.6 }}>
+                Controls the highlight color for the active sidebar item, selected tabs (like in Reports), buttons, and badges throughout the CRM.
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                {[
+                  ['#2563eb', 'Blue'],
+                  ['#16a34a', 'Green'],
+                  ['#9333ea', 'Purple'],
+                  ['#dc2626', 'Red'],
+                  ['#ea580c', 'Orange'],
+                  ['#0891b2', 'Teal'],
+                  ['#db2777', 'Pink'],
+                  ['#475569', 'Slate'],
+                ].map(([hex, name]) => (
+                  <button
+                    key={hex}
+                    type="button"
+                    onClick={() => { setFirm(f => ({ ...f, primary_color: hex })); applyBrandColor(hex) }}
+                    title={name}
+                    style={{
+                      width: 34, height: 34, borderRadius: 8, background: hex, cursor: 'pointer',
+                      border: firm.primary_color?.toLowerCase() === hex ? '2px solid var(--tx)' : '2px solid transparent',
+                      boxShadow: firm.primary_color?.toLowerCase() === hex ? '0 0 0 2px var(--bg)' : 'none',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+                    }}
+                  >
+                    {firm.primary_color?.toLowerCase() === hex && <span style={{ color: '#fff', fontSize: 14, fontWeight: 800 }}>✓</span>}
+                  </button>
+                ))}
+              </div>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                 <input type="color" value={firm.primary_color} onChange={e => { set('primary_color')(e); applyBrandColor(e.target.value) }} style={{ width: 48, height: 36, borderRadius: 6, border: 'none', cursor: 'pointer' }} />
                 <input value={firm.primary_color} onChange={e => { set('primary_color')(e); applyBrandColor(e.target.value) }} style={{ flex: 1 }} placeholder="#2563eb" />

@@ -194,9 +194,9 @@ export default function Reports() {
         {TABS.map(t=>(
           <button key={t.key} onClick={()=>setTab(t.key)}
             style={{padding:'6px 12px',fontSize:11,fontWeight:tab===t.key?700:400,
-              borderBottom:tab===t.key?'2px solid var(--b2c)':'2px solid transparent',
-              background:'none',border:'none',borderBottom:tab===t.key?'2px solid var(--b2c)':'2px solid transparent',
-              color:tab===t.key?'var(--b2c)':'var(--t2)',cursor:'pointer',whiteSpace:'nowrap',paddingBottom:8}}>
+              borderBottom:tab===t.key?'2px solid var(--blue)':'2px solid transparent',
+              background:'none',border:'none',
+              color:tab===t.key?'var(--blue)':'var(--t2)',cursor:'pointer',whiteSpace:'nowrap',paddingBottom:8}}>
             {t.label}
           </button>
         ))}
