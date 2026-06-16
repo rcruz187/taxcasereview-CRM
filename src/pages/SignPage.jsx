@@ -3,6 +3,33 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { stampSignature } from '../lib/irsFormUtils'
 
+function printCancellationNotice(doc) {
+  const w = window.open('', '_blank', 'width=700,height=900')
+  const signedDate = doc?.signed_at ? new Date(doc.signed_at).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}) : ''
+  w.document.write(`<!DOCTYPE html><html><head><title>Notice of Right of Cancellation</title>
+    <style>
+      body{font-family:Arial,sans-serif;font-size:13px;color:#111;padding:40px 56px;max-width:700px;margin:0 auto;line-height:1.7}
+      h1{font-size:16px;text-align:center;margin-bottom:20px}
+      .blank{border-bottom:1.5px solid #333;height:26px;margin-bottom:4px}
+      .lbl{font-size:11px;color:#555;margin-bottom:16px}
+    </style></head><body>
+    <h1>Notice of Right of Cancellation</h1>
+    <p>You may cancel the Tax Service Agreement signed on ${signedDate || '_______________'}, without any penalty or obligation, within three (3) business days after the date you signed it.</p>
+    <p>If you cancel, any payments made by you will be returned within three (3) days following receipt of your cancellation notice. In the event of a cancellation, payments made will be prorated at a $250 hourly rate for all work product services already performed by Tax Case Review.</p>
+    <p>You may also terminate the Tax Service Agreement at any later time as provided therein, but Tax Case Review is not required to refund fees you have paid except as set forth in the Agreement.</p>
+    <p>To cancel, mail or deliver a signed and dated copy of this notice to <b>Tax Case Review, 238 Evergreen Dr, Lake Park, FL 33403</b>, not later than midnight of the third business day after you signed the Tax Service Agreement.</p>
+    <h3 style="margin-top:28px">I Hereby Cancel the Tax Service Agreement</h3>
+    <div class="blank" style="margin-top:24px"></div><div class="lbl">Full Client Name</div>
+    <div style="display:flex;gap:48px">
+      <div style="flex:1"><div class="blank"></div><div class="lbl">Signature</div></div>
+      <div style="flex:1"><div class="blank"></div><div class="lbl">Date</div></div>
+    </div>
+    <p style="margin-top:20px;font-size:11px;color:#888"><em>This notice is provided for your protection and should be left blank unless you decide to cancel.</em></p>
+  </body></html>`)
+  w.document.close()
+  setTimeout(() => w.print(), 400)
+}
+
 export default function SignPage() {
   const { id } = useParams()
   const [doc,      setDoc]      = useState(null)
@@ -195,6 +222,12 @@ export default function SignPage() {
             Timestamp: {doc?.signed_at ? new Date(doc.signed_at).toLocaleString() : new Date().toLocaleString()}
           </div>
           <div style={{ marginTop:16, fontSize:11, color:'#475569' }}>A copy has been saved to your file. You may close this window.</div>
+          {doc?.doc_type === 'Tax Service Agreement' && (
+            <button onClick={() => printCancellationNotice(doc)} style={{
+              marginTop:18, padding:'10px 20px', background:'transparent', border:'1px solid #334155',
+              borderRadius:8, color:'#93c5fd', fontSize:12.5, fontWeight:600, cursor:'pointer'
+            }}>📄 Download / Print Your Cancellation Notice</button>
+          )}
         </div>
       </div>
     </div>
@@ -216,43 +249,123 @@ export default function SignPage() {
         {doc.doc_type === 'Tax Service Agreement' ? (
           <div>
             <div style={styles.section}>
-              <div style={styles.secTitle}>Tax Investigation Service Agreement</div>
-              <div style={styles.docBody}>{`Dear ${doc.client_name},
-
-Thank you for choosing Tax Case Review. This document confirms our engagement to assist you with your tax matter for tax year(s): ${doc.tax_years || '_______________'}.`}</div>
+              <div style={styles.secTitle}>Tax Service Agreement</div>
+              <div style={styles.docBody}>{`This Tax Service Agreement (as the same may be amended from time to time by any Addendum, the "Agreement"), dated as of ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}, by and between Tax Case Review, with its principal offices located at 238 Evergreen Dr, Lake Park, FL 33403 (together with any successors or assigns, "Company") and ${doc.client_name} ("Client").`}</div>
             </div>
 
             <div style={styles.section}>
-              <div style={styles.secTitle}>1. Scope of Services</div>
-              <div style={styles.docBody}>{`- Review of IRS and/or state tax transcripts
-- Identification of outstanding tax liabilities and unfiled returns
-- Evaluation of eligibility for IRS resolution programs (OIC, CNC, IA, Penalty Abatement)
-- Preparation of a written resolution strategy within 21 business days
-- Full IRS/state representation — Case Rep: ${doc.rep_name || 'Tax Case Review'}`}</div>
+              <div style={styles.secTitle}>1. Company Obligations</div>
+              <div style={styles.docBody}>{`Company will provide the following service(s):
+- Company will contact the Internal Revenue Service ("IRS") on behalf of Client, to determine the total amount of Client's current tax liability accrued, if any
+- Company will obtain a copy of Client's master file from the IRS if necessary
+- Company will identify any unfiled tax returns by Client
+- Company will identify any outstanding tax liens filed against Client
+- Company will identify the collection statute expiration date
+- Company will conduct a consultation with Client to determine Client's financial status and ability to pay unpaid taxes
+- Company will analyze the information obtained from the IRS in comparison to Client's financial status and ability to pay unpaid taxes, and present Client with a proposed strategy for resolution. Once the analysis is complete, should Client enter into a separate engagement with Company as Client's tax representative, Company will immediately notify the IRS of Client's intentions in order to help prevent any and all collection action(s)
+- Company will perform those additional services for additional fees described in any addendum or other modification relating to this instrument (each, an "Addendum") signed, or electronically transmitted to Company, by Client and which is in form and substance acceptable to Company, such acceptance being presumed by the commencement by Company of any additional services set forth in such addendum or modification`}</div>
             </div>
 
             <div style={styles.section}>
-              <div style={styles.secTitle}>2. Authorization</div>
-              <div style={styles.docBody}>{`By signing below, you authorize Tax Case Review to obtain IRS transcripts via Form 2848/8821 and represent you before the IRS and/or applicable state tax authority.`}</div>
+              <div style={styles.secTitle}>2. Client Obligations and Authority</div>
+              <div style={styles.docBody}>{`- Client authorizes Company to obtain necessary tax information concerning Client from the IRS and/or state taxing authority
+- Client agrees to provide all necessary information and any requested financial statements to Company promptly following the original execution of this Agreement or any Addendum providing for services not originally contemplated in this Agreement
+- Client agrees to respond promptly to all Company requests for information or documentation
+- Client will promptly notify Company of any changes in Client's financial circumstances, marital status, contact information, or any other information that is material to the rendition of services hereunder
+- Client agrees to make timely payments for services rendered by Company and to reimburse Company for costs as agreed upon in this Agreement
+- Client agrees to indemnify and hold harmless Company from any and all liability, claims, actions, demands, proceedings, or damages, and all expenses related thereto, incurred as a result of any fraudulence, negligence, or acts or omission of Client or breach of Client's obligations under this Agreement`}</div>
             </div>
 
             <div style={styles.section}>
-              <div style={styles.secTitle}>3. Investigation Fee</div>
-              <div style={styles.feeBox}>💰 Investigation Fee: <strong style={{color:'#fff',fontSize:16}}>{doc.investigation_fee ? `$${doc.investigation_fee}` : '_____________'}</strong></div>
-              <div style={{...styles.docBody, marginBottom:0}}>Non-refundable once transcript review has commenced. Full payment due prior to commencement.</div>
+              <div style={styles.secTitle}>3. Not Included in Agreement</div>
+              <div style={styles.docBody}>{`Client expressly acknowledges that Company is not a law firm and does not provide legal, tax law, or investment advice. Unless otherwise agreed upon by Client in an Addendum, Client has not retained Company for any services other than those identified above or in an Addendum. Without limiting the foregoing, Company's services do not include representation in connection with any litigation in tax, federal, or state court.`}</div>
             </div>
 
             <div style={styles.section}>
-              <div style={styles.secTitle}>4. Client Responsibilities</div>
-              <div style={styles.docBody}>{`- Provide accurate and complete financial and tax information
-- Respond to document requests within 5 business days
-- Notify Tax Case Review of any IRS communications received
-- Make timely payment of agreed fees`}</div>
+              <div style={styles.secTitle}>4. Client Acknowledgments</div>
+              <div style={styles.docBody}>{`Client understands and acknowledges that:
+- Unless otherwise agreed upon by Client in an Addendum, Company will not prepare, submit, and negotiate with the IRS a Federal Offer in Compromise, an Installment Agreement, or any other negotiation services
+- Company will not prevent any collection action by the IRS
+- Company does not provide legal advice. Legal advice or representation must be provided by an attorney at law of the Client's selection, licensed by the state where the Client resides
+- At all times, Client's IRS obligations remain those of Client. Company will not assume or pay any IRS obligation of Client
+- Company has based qualification for its services on information provided by Client during the Client's initial consultation
+- Company makes no warranties or representations as to the time to perform or complete services hereunder or to the outcome of any claim or controversy applicable to Client
+- All fees paid to Company are for the limited services, as identified herein, rendered by Company and do not include any amount required to settle any claim by the IRS or state taxing authority`}</div>
             </div>
 
             <div style={styles.section}>
-              <div style={styles.secTitle}>5. Terms & Conditions</div>
-              <div style={{...styles.docBody, marginBottom:0}}>This agreement does not guarantee a specific resolution outcome. Tax Case Review will act diligently and professionally on your behalf. This agreement is governed by the laws of the State of Florida.</div>
+              <div style={styles.secTitle}>5. Payment of Fees</div>
+              <div style={styles.feeBox}>💰 Tax Investigation Fee: <strong style={{color:'#fff',fontSize:16}}>{doc.investigation_fee ? `$${doc.investigation_fee}` : '_____________'}</strong></div>
+              <div style={{...styles.docBody, marginBottom:0}}>{`Client agrees to pay the fee above for the limited services rendered by Company as described in this Agreement, it being understood that Client authorizes payment via the agreed method identified at signing. Those additional fees that may be described in any Addendum shall be payable at the times and in the manner set forth in such Addendum. Client understands and agrees that a returned check fee of $25.00 will be charged for each bounced check or draft returned for insufficient funds.`}</div>
+            </div>
+
+            <div style={styles.section}>
+              <div style={styles.secTitle}>6. Additional Obligations of Company</div>
+              <div style={styles.docBody}>{`Company will deal with Client's personal information only as contemplated in the Privacy Policy below. Company will keep Client reasonably informed of progress in the rendition of services hereunder, and will respond promptly to Client's reasonable inquiries and communications.`}</div>
+            </div>
+
+            <div style={styles.section}>
+              <div style={styles.secTitle}>7. Termination</div>
+              <div style={styles.docBody}>{`Either party may terminate this Agreement at any time by written notice, which shall be effective upon the sooner of actual receipt by the intended recipient or the passage of five days after transmittal. Upon any termination, all service fees shall be apportioned or prorated on such reasonable basis as Company shall determine, taking into account the time, money, and effort expended by Company to render services prior to the effectiveness of any such termination.`}</div>
+            </div>
+
+            <div style={styles.section}>
+              <div style={styles.secTitle}>8. Arbitration of Disputes — No Class Actions</div>
+              <div style={styles.docBody}>{`In the event of any controversy, claim, or dispute between the parties arising out of or relating to this Agreement, including its termination, enforcement, interpretation, or validity, the dispute shall be determined by binding arbitration in Palm Beach County, Florida, or in the county in which Client resides, in accordance with the laws of the State of Florida. The arbitration shall be administered by a nationally recognized arbitration service mutually agreed upon by the parties. The arbitrator shall be neutral, independent, and shall comply with the AAA code of ethics. The award rendered shall be final and shall not be subject to vacation or modification. The parties agree that either party may bring claims against the other only in an individual capacity and not as a plaintiff or class member in any purported class or representative proceeding, and the arbitrator may not consolidate proceedings of more than one person's claims. The parties shall share the cost of arbitration, including attorney's fees, equally; provided that if Client's share of the cost is greater than $1,000, Company will pay Client's reasonable share of costs in excess of that amount.`}</div>
+            </div>
+
+            <div style={styles.section}>
+              <div style={styles.secTitle}>9. No Trial By Jury</div>
+              <div style={styles.docBody}>{`Without limiting any other provision of this Agreement, Company and Client each waive any right to trial by jury in any lawsuit or other similar proceeding arising from this Agreement.`}</div>
+            </div>
+
+            <div style={styles.section}>
+              <div style={styles.secTitle}>10. Limitation of Obligations</div>
+              <div style={styles.docBody}>{`Company's obligations hereunder in the event of any breach of this Agreement shall in no event exceed an amount equal to 200% of the fees actually collected by Company. Without limiting the foregoing, in no event shall Company be liable for penalties, interest charges, or consequential damages of any amount whatsoever, irrespective of any matter that may hereafter occur or any omission or act by Company. Client understands that its agreement to this provision was a material inducement to Company to enter this Agreement, and that in the absence of such agreement Company would not have entered into this Agreement.`}</div>
+            </div>
+
+            <div style={styles.section}>
+              <div style={styles.secTitle}>11. Governing Law &amp; Entire Agreement</div>
+              <div style={styles.docBody}>{`This Agreement is made and the services are to be performed in the State of Florida and shall be governed by the laws of the State of Florida, notwithstanding any conflicts of law principles to the contrary. In the event of a dispute not resolved by arbitration as set forth above, venue shall be Palm Beach County, Florida, and in no other location. This Agreement and any Addendums constitute the full and complete agreement between the parties and supersede any prior agreements or understandings, whether written or oral. If any portion is held invalid or unenforceable, the remaining portions shall not be affected. No amendment, change, or modification of this Agreement other than an Addendum shall be valid unless in writing and signed by all parties.`}</div>
+            </div>
+
+            <div style={styles.section}>
+              <div style={styles.secTitle}>12. Electronic Communication Disclosures</div>
+              <div style={styles.docBody}>{`Client agrees, unless specifically requested otherwise, that by entering into transactions with Company, Client affirms consent to receive, in electronic format, all information, copies of agreements, and correspondence from Company, and to send information in electronic format. Client agrees that Company may provide all disclosures, periodic statements, notices, receipts, modifications, amendments, and all other evidence of transactions electronically, and that electronic communications will be given the same legal effect as written and signed paper communications. Client's consent may be withdrawn at any time upon Company's receipt of such withdrawal, which may impair the timing of delivery of services. Client may withdraw consent by emailing info@taxcasereview.com or writing to Tax Case Review, 238 Evergreen Dr, Lake Park, FL 33403. Client acknowledges that the internet is inherently unsecure and that Client maintains the sole obligation to ensure it can receive and regularly access Company's electronic communications.`}</div>
+            </div>
+
+            <div style={styles.section}>
+              <div style={styles.secTitle}>13. Right of Cancellation</div>
+              <div style={{...styles.docBody, marginBottom:0}}>{`Client may cancel this transaction at any time prior to midnight of the third (3rd) business day after the date of execution of this Agreement, without any penalty or obligation. If Client cancels, any payments made and any negotiable instrument executed by Client will be returned within three (3) days following receipt of Client's cancellation notice. In the event of a cancellation, payments made will be prorated at a $250 hourly rate for all work product services performed by Company. Client may also terminate this Agreement at any later time as provided herein, but Company is not required to refund fees already paid except as set forth in this Agreement. To cancel, Client must mail or deliver a signed and dated copy of the cancellation notice (provided to Client separately as part of this signing package) to Tax Case Review, 238 Evergreen Dr, Lake Park, FL 33403, not later than midnight of the third business day after execution of this Agreement.`}</div>
+            </div>
+
+            <div style={{...styles.section, background:'#1e2a3a', border:'1px solid #334155', borderRadius:10, padding:'14px 16px'}}>
+              <div style={styles.secTitle}>Privacy Policy</div>
+              <div style={{...styles.docBody, marginBottom:0, fontSize:11.5, color:'#94a3b8'}}>{`Tax Case Review recognizes that your financial information is personal. We use and share information about you to perform our obligations under this Agreement, and for related purposes, or as permitted or required by law. We may also share information with a successor in interest in connection with a merger, acquisition, or sale of assets. Calls between Company and Client may be recorded or monitored to ensure quality of service. We are careful to use only accurate, current, and complete information and will correct erroneous information promptly upon request. This policy is subject to change. Contact info@taxcasereview.com with any privacy concerns or to opt out.`}</div>
+            </div>
+
+            {/* Right of Cancellation — blank notice for client to print, fill out, and mail back if they choose to cancel. Intentionally left unfilled. */}
+            <div style={{...styles.section, background:'#0a1628', border:'1px dashed #475569', borderRadius:10, padding:'16px 18px'}}>
+              <div style={styles.secTitle}>Notice of Right of Cancellation (Keep for Your Records)</div>
+              <div style={{...styles.docBody, marginBottom:10, fontSize:12.5}}>{`You may cancel this Tax Service Agreement, without any penalty or obligation, within three (3) business days after the date you sign it below. If you cancel, any payments made by you will be returned within three (3) days following receipt of your cancellation notice. In the event of a cancellation, payments made will be prorated at a $250 hourly rate for work product services already performed by Tax Case Review.
+
+To cancel, complete and sign this notice, then mail or deliver it to: Tax Case Review, 238 Evergreen Dr, Lake Park, FL 33403 — not later than midnight of the third business day after you sign this Agreement.`}</div>
+              <div style={{background:'#fff',color:'#111',borderRadius:6,padding:'16px 18px',fontSize:12.5,lineHeight:1.9}}>
+                <div style={{fontWeight:700,marginBottom:10}}>I HEREBY CANCEL THE TAX SERVICE AGREEMENT</div>
+                <div style={{borderBottom:'1px solid #333',height:22,marginBottom:4}}></div>
+                <div style={{fontSize:10,color:'#666',marginBottom:14}}>Full Client Name</div>
+                <div style={{display:'flex',gap:24}}>
+                  <div style={{flex:1}}>
+                    <div style={{borderBottom:'1px solid #333',height:22,marginBottom:4}}></div>
+                    <div style={{fontSize:10,color:'#666'}}>Signature</div>
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={{borderBottom:'1px solid #333',height:22,marginBottom:4}}></div>
+                    <div style={{fontSize:10,color:'#666'}}>Date</div>
+                  </div>
+                </div>
+              </div>
+              <div style={{fontSize:11,color:'#64748b',marginTop:8}}>This notice is provided for your protection and is left blank — only fill it out and send it if you decide to cancel.</div>
             </div>
           </div>
         ) : (

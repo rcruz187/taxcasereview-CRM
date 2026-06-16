@@ -104,63 +104,113 @@ function clientBlock(c) {
 export function generateServiceAgreement(c = null) {
   const fee  = c?.taxFee ? `$${Number(c.taxFee).toLocaleString()}` : (c?.investigationFee ? `$${c.investigationFee}` : '$___________')
   const date = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})
-  printBase('Tax Investigation Service Agreement', `
+  printBase('Tax Service Agreement', `
     <p style="text-align:right;font-size:11px;color:#666;margin-bottom:4px">Date: ${date}</p>
     ${clientBlock(c)}
 
-    <p>This Tax Investigation Service Agreement (<b>"Agreement"</b>) is entered into between <b>Tax Case Review</b> ("Company") and the undersigned client ("Client") as of the date signed below.</p>
+    <p>This Tax Service Agreement (as the same may be amended from time to time by any Addendum, the <b>"Agreement"</b>), dated as of ${date}, by and between <b>Tax Case Review</b>, with its principal offices located at 238 Evergreen Dr, Lake Park, FL 33403 (together with any successors or assigns, <b>"Company"</b>) and the undersigned Client.</p>
 
-    <h3>1. Scope of Services</h3>
-    <p>The Company agrees to perform an initial tax investigation, which includes:</p>
+    <h3>1. Company Obligations</h3>
     <ul>
-      <li>Review of IRS and/or state tax transcripts</li>
-      <li>Identification of outstanding tax liabilities</li>
-      <li>Evaluation of available resolution programs</li>
-      <li>Preparation of a written summary and recommended resolution strategy</li>
+      <li>Company will contact the Internal Revenue Service ("IRS") on behalf of Client, to determine the total amount of Client's current tax liability accrued, if any</li>
+      <li>Company will obtain a copy of Client's master file from the IRS if necessary</li>
+      <li>Company will identify any unfiled tax returns by Client</li>
+      <li>Company will identify any outstanding tax liens filed against Client</li>
+      <li>Company will identify the collection statute expiration date</li>
+      <li>Company will conduct a consultation with Client to determine Client's financial status and ability to pay unpaid taxes</li>
+      <li>Company will analyze the information obtained from the IRS in comparison to Client's financial status and ability to pay unpaid taxes, and present Client with a proposed strategy for resolution. Once the analysis is complete, should Client enter into a separate engagement with Company as Client's tax representative, Company will immediately notify the IRS of Client's intentions in order to help prevent any and all collection action(s)</li>
+      <li>Company will perform those additional services for additional fees described in any Addendum signed, or electronically transmitted to Company, by Client and which is in form and substance acceptable to Company</li>
     </ul>
 
-    <h3>2. Company Obligations</h3>
+    <h3>2. Client Obligations and Authority</h3>
     <ul>
-      <li>Obtain IRS transcripts via Form 2848 or 8821</li>
-      <li>Analyze outstanding tax liabilities and compliance history</li>
-      <li>Identify applicable IRS resolution programs (OIC, CNC, IA, Abatement, etc.)</li>
-      <li>Deliver a written resolution recommendation within 21 business days of full access being granted</li>
-      <li>Assign a dedicated case representative to the Client</li>
+      <li>Client authorizes Company to obtain necessary tax information concerning Client from the IRS and/or state taxing authority</li>
+      <li>Client agrees to provide all necessary information and any requested financial statements to Company promptly</li>
+      <li>Client agrees to respond promptly to all Company requests for information or documentation</li>
+      <li>Client will promptly notify Company of any changes in Client's financial circumstances, marital status, contact information, or any other material information</li>
+      <li>Client agrees to make timely payments for services rendered by Company and to reimburse Company for costs as agreed upon in this Agreement</li>
+      <li>Client agrees to indemnify and hold harmless Company from any and all liability, claims, actions, demands, proceedings, or damages incurred as a result of any fraudulence, negligence, or acts or omission of Client or breach of Client's obligations under this Agreement</li>
     </ul>
 
-    <h3>3. Client Obligations</h3>
+    <h3>3. Not Included in Agreement</h3>
+    <p>Client expressly acknowledges that Company is not a law firm and does not provide legal, tax law, or investment advice. Unless otherwise agreed upon by Client in an Addendum, Client has not retained Company for any services other than those identified above or in an Addendum. Company's services do not include representation in connection with any litigation in tax, federal, or state court.</p>
+
+    <h3>4. Client Acknowledgments</h3>
     <ul>
-      <li>Provide accurate and complete personal, financial, and tax information</li>
-      <li>Execute IRS authorization forms (Form 2848 / 8821) promptly</li>
-      <li>Respond to company requests for documents within 5 business days</li>
-      <li>Pay the investigation fee in full prior to commencement of services</li>
+      <li>Unless otherwise agreed upon in an Addendum, Company will not prepare, submit, and negotiate with the IRS a Federal Offer in Compromise, an Installment Agreement, or any other negotiation services</li>
+      <li>Company will not prevent any collection action by the IRS</li>
+      <li>Company does not provide legal advice; legal advice or representation must be provided by an attorney licensed by Client's state of residence</li>
+      <li>At all times, Client's IRS obligations remain those of Client. Company will not assume or pay any IRS obligation of Client</li>
+      <li>Company makes no warranties or representations as to the time to perform or complete services, or to the outcome of any claim or controversy</li>
+      <li>All fees paid to Company are for the limited services identified herein and do not include any amount required to settle any claim by the IRS or state taxing authority</li>
     </ul>
 
-    <h3>4. Tax Investigation Fee</h3>
+    <h3>5. Payment of Fees</h3>
     <div class="fee-box">
-      <div class="fee-main">Investigation Fee: ${fee}</div>
+      <div class="fee-main">Tax Investigation Fee: ${fee}</div>
       <div class="fee-sub">
-        This fee is non-refundable once transcript review has commenced.<br/>
-        Standard range: $499 – $699. Manager-approved rates may vary.
+        Client agrees to pay the fee above for the limited services rendered by Company as described in this Agreement. Additional fees described in any Addendum shall be payable as set forth in such Addendum.<br/>
+        A returned check fee of $25.00 will be charged for each bounced check or draft returned for insufficient funds.
       </div>
     </div>
 
-    <h3>5. Not a Law Firm</h3>
-    <p>Tax Case Review is a tax resolution consulting firm and is <b>not a law firm</b>. No attorney-client relationship is created by this Agreement. Enrolled Agents and/or licensed tax professionals perform all representation services.</p>
-
-    <h3>6. No Guarantee of Outcome</h3>
-    <p>The Company makes no guarantee as to the specific outcome of any IRS or state tax resolution matter. Acceptance into any IRS program (including Offer in Compromise) is solely at the discretion of the IRS.</p>
+    <h3>6. Additional Obligations of Company</h3>
+    <p>Company will deal with Client's personal information only as contemplated in the Privacy Policy below. Company will keep Client reasonably informed of progress in the rendition of services hereunder, and will respond promptly to Client's reasonable inquiries and communications.</p>
 
     <h3>7. Termination</h3>
-    <p>Either party may terminate this Agreement with 5 business days written notice. Investigation fees already paid are non-refundable once services have commenced. The Company may terminate immediately for non-cooperation or material misrepresentation.</p>
+    <p>Either party may terminate this Agreement at any time by written notice, effective upon actual receipt or five days after transmittal. Upon termination, all service fees shall be apportioned or prorated on a reasonable basis determined by Company.</p>
 
-    <h3>8. Dispute Resolution</h3>
-    <p>Any dispute arising from this Agreement shall be resolved by binding arbitration under the rules of the American Arbitration Association in Palm Beach County, Florida. Both parties waive their right to a jury trial.</p>
+    <h3>8. Arbitration of Disputes — No Class Actions</h3>
+    <p>Any controversy, claim, or dispute arising out of or relating to this Agreement shall be determined by binding arbitration in Palm Beach County, Florida, or in the county in which Client resides, administered by a nationally recognized arbitration service mutually agreed upon by the parties. The arbitrator's award shall be final. Both parties waive the right to bring claims as a plaintiff or class member in any class or representative proceeding. The parties shall share arbitration costs, including attorney's fees, equally; if Client's share exceeds $1,000, Company will pay Client's reasonable share of costs in excess of that amount.</p>
 
-    <h3>9. Governing Law</h3>
-    <p>This Agreement is governed by the laws of the State of Florida.</p>
+    <h3>9. No Trial By Jury</h3>
+    <p>Company and Client each waive any right to trial by jury in any lawsuit or other similar proceeding arising from this Agreement.</p>
+
+    <h3>10. Limitation of Obligations</h3>
+    <p>Company's obligations hereunder in the event of any breach shall in no event exceed 200% of the fees actually collected by Company. In no event shall Company be liable for penalties, interest charges, or consequential damages of any amount whatsoever.</p>
+
+    <h3>11. Governing Law &amp; Entire Agreement</h3>
+    <p>This Agreement is made and services are performed in the State of Florida and is governed by Florida law. This Agreement and any Addendums constitute the full and complete agreement and supersede any prior agreements, whether written or oral. No amendment, change, or modification other than an Addendum shall be valid unless in writing and signed by all parties.</p>
+
+    <h3>12. Electronic Communication Disclosures</h3>
+    <p>Client consents to receive, in electronic format, all information, copies of agreements, and correspondence from Company, with the same legal effect as written and signed paper communications. Consent may be withdrawn at any time by emailing info@taxcasereview.com or writing to Tax Case Review, 238 Evergreen Dr, Lake Park, FL 33403.</p>
+
+    <h3>13. Right of Cancellation</h3>
+    <p>Client may cancel this Agreement at any time prior to midnight of the third (3rd) business day after the date of execution, without penalty or obligation. If Client cancels, any payments made will be returned within three (3) days following receipt of Client's cancellation notice, prorated at a $250 hourly rate for any work product services already performed. To cancel, Client must mail or deliver a signed and dated cancellation notice to Tax Case Review, 238 Evergreen Dr, Lake Park, FL 33403, not later than midnight of the third business day after execution of this Agreement. See the attached Notice of Right of Cancellation for further detail.</p>
+
+    <div class="notice">
+      <b>Privacy Policy:</b> Tax Case Review uses and shares your information only to perform our obligations under this Agreement and related purposes, or as permitted or required by law. Calls may be recorded or monitored for quality purposes. Contact info@taxcasereview.com with any privacy concerns.
+    </div>
 
     ${sigBlock('Client Signature', 'Authorized Representative')}
+  `)
+}
+
+// ─── Notice of Right of Cancellation — blank, standalone printable form ───────
+export function generateCancellationNotice(c = null) {
+  printBase('Notice of Right of Cancellation', `
+    ${clientBlock(c)}
+    <p>You may cancel the Tax Service Agreement, without any penalty or obligation, within three (3) business days after the date you sign it.</p>
+    <p>If you cancel, any payments made by you will be returned within three (3) days following receipt of your cancellation notice. In the event of a cancellation, payments made will be prorated at a $250 hourly rate for all work product services already performed by Tax Case Review.</p>
+    <p>You may also terminate the Tax Service Agreement at any later time as provided therein, but we are not required to refund fees you have paid us except as set forth in the Agreement.</p>
+    <p>To cancel, mail or deliver a signed and dated copy of this notice to <b>Tax Case Review, 238 Evergreen Dr, Lake Park, FL 33403</b>, not later than midnight of the third business day after the execution of the Tax Service Agreement.</p>
+
+    <h3 style="margin-top:32px">I Hereby Cancel the Tax Service Agreement</h3>
+    <div style="margin-top:24px">
+      <div style="border-bottom:1.5px solid #333;height:28px;margin-bottom:6px"></div>
+      <div style="font-size:11px;color:#555">Full Client Name</div>
+    </div>
+    <div style="display:flex;gap:48px;margin-top:28px">
+      <div style="flex:1">
+        <div style="border-bottom:1.5px solid #333;height:28px;margin-bottom:6px"></div>
+        <div style="font-size:11px;color:#555">Signature</div>
+      </div>
+      <div style="flex:1">
+        <div style="border-bottom:1.5px solid #333;height:28px;margin-bottom:6px"></div>
+        <div style="font-size:11px;color:#555">Date</div>
+      </div>
+    </div>
+    <p style="margin-top:24px;font-size:11px;color:#888"><em>This notice is provided for your protection and should be left blank unless you decide to cancel.</em></p>
   `)
 }
 
@@ -862,42 +912,58 @@ export function generateClientPackage(c = null) {
 export function getAgreementMessageText(c = null) {
   const fee  = c?.taxFee ? `$${Number(c.taxFee).toLocaleString()}` : (c?.investigationFee ? `$${c.investigationFee}` : '$___________')
   const name = c ? (c.name || '') : 'Valued Client'
-  const rep  = c?.assignedTo || 'Tax Case Review'
-  const years= (() => { try { return JSON.parse(c?.taxYears||'[]').join(', ') } catch { return c?.taxYears || '' } })()
-  const issue= c?.issueType || 'tax resolution matter'
+  const date = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})
 
-  return `TAX INVESTIGATION SERVICE AGREEMENT & ENGAGEMENT LETTER
+  return `TAX SERVICE AGREEMENT
 
-Dear ${name},
+This Tax Service Agreement (as the same may be amended from time to time by any Addendum, the "Agreement"), dated as of ${date}, by and between Tax Case Review, with its principal offices located at 238 Evergreen Dr, Lake Park, FL 33403 ("Company") and ${name} ("Client").
 
-Thank you for choosing Tax Case Review. This document serves as your Tax Investigation Service Agreement and Engagement Letter confirming our engagement to assist you with your ${issue} matter${years ? ` for tax year(s) ${years}` : ''}.
+1. COMPANY OBLIGATIONS
+- Company will contact the IRS on behalf of Client to determine the total amount of Client's current tax liability accrued, if any
+- Company will obtain a copy of Client's master file from the IRS if necessary
+- Company will identify any unfiled tax returns, outstanding tax liens, and the collection statute expiration date
+- Company will conduct a consultation with Client to determine Client's financial status and ability to pay unpaid taxes
+- Company will analyze the information obtained from the IRS and present Client with a proposed strategy for resolution
+- Company will perform additional services for additional fees described in any signed Addendum
 
-1. SCOPE OF SERVICES
-- Review of IRS and/or state tax transcripts
-- Identification of outstanding tax liabilities and unfiled returns
-- Evaluation of eligibility for IRS resolution programs (OIC, CNC, IA, Penalty Abatement)
-- Preparation of a written resolution strategy within 21 business days
-- Full IRS/state representation — Case Rep: ${rep}
+2. CLIENT OBLIGATIONS AND AUTHORITY
+- Client authorizes Company to obtain necessary tax information from the IRS and/or state taxing authority
+- Client agrees to provide all necessary information and financial statements promptly, and to respond to Company requests within a reasonable time
+- Client will promptly notify Company of any changes in financial circumstances, marital status, or contact information
+- Client agrees to make timely payments and to indemnify and hold Company harmless from claims arising from Client's negligence or breach
 
-2. AUTHORIZATION
-By signing below, you authorize Tax Case Review to obtain IRS transcripts via Form 2848/8821 and represent you before the IRS and/or applicable state tax authority. The Form 2848 (Power of Attorney) and Form 8821 (Tax Information Authorization) included with this package are part of this authorization — please review and sign each.
+3. NOT INCLUDED IN AGREEMENT
+Client acknowledges that Company is not a law firm and does not provide legal, tax law, or investment advice. Company's services do not include representation in litigation in tax, federal, or state court, unless agreed in an Addendum.
 
-3. INVESTIGATION FEE
-Investigation Fee: ${fee}
-Non-refundable once transcript review has commenced. Full payment due prior to commencement.
+4. CLIENT ACKNOWLEDGMENTS
+Client understands that, unless otherwise agreed in an Addendum, Company will not prepare, submit, or negotiate a Federal Offer in Compromise, Installment Agreement, or other negotiation; Company will not prevent IRS collection action; legal advice must come from a licensed attorney; Client's IRS obligations remain Client's own; and fees paid do not include any amount required to settle a claim with the IRS or state.
 
-4. CLIENT RESPONSIBILITIES
-- Provide accurate and complete financial and tax information
-- Respond to document requests within 5 business days
-- Notify us immediately of any IRS notices, levies, or contacts
+5. PAYMENT OF FEES
+Tax Investigation Fee: ${fee}
+A returned check fee of $25.00 applies to any bounced check or draft returned for insufficient funds.
 
-5. NO GUARANTEE OF OUTCOME
-Tax Case Review makes no guarantee as to any specific outcome. Acceptance into any IRS program is solely at the discretion of the IRS.
+6. TERMINATION
+Either party may terminate this Agreement at any time by written notice. Fees shall be apportioned or prorated on a reasonable basis determined by Company.
 
-6. NOT A LAW FIRM
-Tax Case Review is a tax resolution consulting firm and is not a law firm. All representation is performed by Enrolled Agents and/or licensed tax professionals.
+7. ARBITRATION OF DISPUTES — NO CLASS ACTIONS
+Disputes shall be resolved by binding arbitration in Palm Beach County, Florida (or Client's county of residence), administered by a nationally recognized arbitration service. No class or representative proceedings are permitted. Arbitration costs are shared equally, except Company will cover Client's share above $1,000.
 
-By typing/drawing your signature below, you electronically sign this Service Agreement AND each IRS authorization form included in this package.`
+8. NO TRIAL BY JURY
+Company and Client each waive the right to trial by jury for any dispute arising from this Agreement.
+
+9. LIMITATION OF OBLIGATIONS
+Company's liability for any breach shall not exceed 200% of fees actually collected. Company is not liable for penalties, interest, or consequential damages.
+
+10. GOVERNING LAW & ENTIRE AGREEMENT
+This Agreement is governed by Florida law and constitutes the entire agreement between the parties, superseding prior agreements.
+
+11. ELECTRONIC COMMUNICATION DISCLOSURES
+Client consents to receive all agreements, notices, and disclosures electronically, with the same legal effect as paper communications. Consent may be withdrawn by emailing info@taxcasereview.com.
+
+12. RIGHT OF CANCELLATION
+Client may cancel this Agreement without penalty within three (3) business days after signing. Payments will be returned within three (3) days of Company's receipt of a cancellation notice, prorated at $250/hour for work already performed. To cancel, mail a signed cancellation notice to Tax Case Review, 238 Evergreen Dr, Lake Park, FL 33403, before midnight of the third business day after signing.
+
+By typing/drawing your signature below, you electronically sign this Tax Service Agreement AND each IRS authorization form included in this package.`
 }
 
 // Builds the pre-filled 2848/8821 PDFs for a client (based on clientType),
