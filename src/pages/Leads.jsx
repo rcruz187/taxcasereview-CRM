@@ -232,6 +232,16 @@ export default function Leads() {
   const [showFlow, setShowFlow]     = useState(false)
 
   useEffect(() => { load() }, [])
+  // Fast path: same fix as Clients — don't make opening one lead wait on
+  // the entire leads table downloading first.
+  useEffect(() => {
+    if (!urlLeadId || detail) return
+    let cancelled = false
+    supabase.from('leads').select('*').eq('id', urlLeadId).single().then(({ data }) => {
+      if (!cancelled && data) setDetail(data)
+    })
+    return () => { cancelled = true }
+  }, [urlLeadId])
   useEffect(() => {
     if (urlLeadId && leads.length > 0 && !detail) {
       const found = leads.find(l => String(l.id) === String(urlLeadId))

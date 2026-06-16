@@ -547,6 +547,20 @@ export default function Clients() {
       requestAnimationFrame(() => window.scrollTo(0, parseInt(saved, 10) || 0))
     }
   }, [detail?.id, loadingRel])
+  // Fast path: arriving directly at /clients/:id (e.g. clicking a record,
+  // a deep link, or a page refresh) shouldn't wait on the entire client
+  // list to download first just to find one row client-side. Fetch that
+  // single record immediately; the full list still loads in the
+  // background for the table view, but it no longer blocks opening
+  // a record you already know the id of.
+  useEffect(() => {
+    if (!urlId || detail) return
+    let cancelled = false
+    supabase.from('clients').select('*').eq('id', urlId).single().then(({ data }) => {
+      if (!cancelled && data) openDetail(data, { preserveTab: true })
+    })
+    return () => { cancelled = true }
+  }, [urlId])
   useEffect(() => {
     if (urlId && clients.length > 0 && !detail) {
       const found = clients.find(c => String(c.id) === String(urlId))
