@@ -642,10 +642,14 @@ export function exportFinancialProfileToExcel(profile, client, complianceRecords
   const recs = complianceRecords || []
   addSheet('Pers Fed Tax Prac', buildComplianceSheet('1040', recs.filter(r=>r.form_type==='1040'), 'Personal Federal (1040)', false))
   addSheet('Pers State Tax Prac', buildComplianceSheet('STATE', recs.filter(r=>r.form_type==='STATE'), 'Personal State', false))
-  addSheet('CP Fed Tax Prac', buildComplianceSheet('CP', recs.filter(r=>r.form_type==='CP'), 'Business CP (Federal)', true))
+  addSheet('Pers CP Tax Prac', buildComplianceSheet('PERS_CP', recs.filter(r=>r.form_type==='PERS_CP'), 'Personal CP', true))
   addSheet('Biz 940 Tax Prac Sheet', buildComplianceSheet('940', recs.filter(r=>r.form_type==='940'), 'Business 940 (FUTA)', false))
-  addSheet('Biz 941 Tax Prac Sheet', buildComplianceSheet('941', recs.filter(r=>r.form_type==='941'), 'Business 941 (Payroll)', true))
+  addSheet('Biz 1065 Tax Prac Sheet', buildComplianceSheet('1065', recs.filter(r=>r.form_type==='1065'), 'Business 1065', false))
+  addSheet('Biz 1120 Tax Prac Sheet', buildComplianceSheet('1120', recs.filter(r=>r.form_type==='1120'), 'Business 1120', false))
   addSheet('Biz 1120s Tax Prac Sheet', buildComplianceSheet('1120S', recs.filter(r=>r.form_type==='1120S'), 'Business 1120-S', false))
+  addSheet('Biz 941 Tax Prac Sheet', buildComplianceSheet('941', recs.filter(r=>r.form_type==='941'), 'Business 941 (Payroll)', true))
+  addSheet('CP Fed Tax Prac', buildComplianceSheet('CP', recs.filter(r=>r.form_type==='CP'), 'Business CP (Federal)', true))
+  addSheet('Biz State Tax Prac', buildComplianceSheet('BIZ_STATE', recs.filter(r=>r.form_type==='BIZ_STATE'), 'Business State', false))
 
   addSheet('433F', build433F(profile, client, totalHousehold, income, exp, assets))
 

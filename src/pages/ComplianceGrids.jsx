@@ -9,12 +9,16 @@ function fmt(v) { return '$' + n(v).toLocaleString('en-US', { minimumFractionDig
 // Default tax-year ranges per form, matching the original TO Worksheet tabs
 const CURRENT_YEAR = new Date().getFullYear() + 1 // include next tax year
 const YEAR_RANGES = {
-  '1040':  range(2007, CURRENT_YEAR),
-  'STATE': range(2009, CURRENT_YEAR),
-  '940':   range(2007, CURRENT_YEAR),
-  '1120S': range(2007, CURRENT_YEAR),
-  'CP':    range(2010, CURRENT_YEAR),  // CP & 941 are quarterly
-  '941':   range(2010, CURRENT_YEAR),
+  '1040':       range(2007, CURRENT_YEAR),
+  'STATE':      range(2009, CURRENT_YEAR),
+  'PERS_CP':    range(2010, CURRENT_YEAR),  // quarterly-style notice form
+  '940':        range(2007, CURRENT_YEAR),
+  '1065':       range(2007, CURRENT_YEAR),
+  '1120':       range(2007, CURRENT_YEAR),
+  '1120S':      range(2007, CURRENT_YEAR),
+  '941':        range(2010, CURRENT_YEAR),  // quarterly
+  'CP':         range(2010, CURRENT_YEAR),  // quarterly
+  'BIZ_STATE':  range(2007, CURRENT_YEAR),
 }
 
 function range(start, end) {
@@ -23,15 +27,19 @@ function range(start, end) {
   return out
 }
 
-const QUARTERLY_FORMS = ['CP', '941']
+const QUARTERLY_FORMS = ['CP', '941', 'PERS_CP']
 
 const FORM_META = {
-  '1040':  { label: 'Personal Federal (1040)',  sheet: 'Pers Fed Tax Prac',  csedYears: 10 },
-  'STATE': { label: 'Personal State',           sheet: 'Pers State Tax Prac', csedYears: 0 },
-  'CP':    { label: 'Business CP (Federal)',    sheet: 'CP Fed Tax Prac',     csedYears: 10 },
-  '940':   { label: 'Business 940 (FUTA)',      sheet: 'Biz 940 Tax Prac Sheet', csedYears: 10 },
-  '941':   { label: 'Business 941 (Payroll)',   sheet: 'Biz 941 Tax Prac Sheet', csedYears: 10 },
-  '1120S': { label: 'Business 1120-S',          sheet: 'Biz 1120s Tax Prac Sheet', csedYears: 10 },
+  '1040':      { label: 'Personal Federal (1040)',  sheet: 'Pers Fed Tax Prac',   csedYears: 10 },
+  'STATE':     { label: 'Personal State',           sheet: 'Pers State Tax Prac', csedYears: 0 },
+  'PERS_CP':   { label: 'Personal CP',              sheet: 'Pers CP Tax Prac',    csedYears: 10 },
+  '940':       { label: 'Business 940 (FUTA)',      sheet: 'Biz 940 Tax Prac Sheet', csedYears: 10 },
+  '1065':      { label: 'Business 1065',            sheet: 'Biz 1065 Tax Prac Sheet', csedYears: 10 },
+  '1120':      { label: 'Business 1120',            sheet: 'Biz 1120 Tax Prac Sheet', csedYears: 10 },
+  '1120S':     { label: 'Business 1120-S',          sheet: 'Biz 1120s Tax Prac Sheet', csedYears: 10 },
+  '941':       { label: 'Business 941 (Payroll)',   sheet: 'Biz 941 Tax Prac Sheet', csedYears: 10 },
+  'CP':        { label: 'Business CP (Federal)',    sheet: 'CP Fed Tax Prac',     csedYears: 10 },
+  'BIZ_STATE': { label: 'Business State',           sheet: 'Biz State Tax Prac',  csedYears: 0 },
 }
 
 const FILED_STATUS_OPTIONS = ['', 'Filed', 'Not Filed', 'SFR (Substitute for Return)', 'Filed - Not Assessed', 'No Liability', 'N/A']

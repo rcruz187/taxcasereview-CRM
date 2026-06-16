@@ -3,12 +3,16 @@ import * as XLSX from 'xlsx'
 function n(v) { const x = parseFloat(v); return isNaN(x) ? 0 : x }
 
 const FORM_SHEETS = [
-  { key: '1040',  sheet: 'Pers Fed Tax Prac',       label: 'Personal Federal (1040)', quarterly: false },
-  { key: 'STATE', sheet: 'Pers State Tax Prac',      label: 'Personal State',          quarterly: false },
-  { key: 'CP',    sheet: 'CP Fed Tax Prac',          label: 'Business CP (Federal)',   quarterly: true  },
-  { key: '940',   sheet: 'Biz 940 Tax Prac Sheet',   label: 'Business 940 (FUTA)',      quarterly: false },
-  { key: '941',   sheet: 'Biz 941 Tax Prac Sheet',   label: 'Business 941 (Payroll)',   quarterly: true  },
-  { key: '1120S', sheet: 'Biz 1120s Tax Prac Sheet', label: 'Business 1120-S',          quarterly: false },
+  { key: '1040',      sheet: 'Pers Fed Tax Prac',       label: 'Personal Federal (1040)', quarterly: false },
+  { key: 'STATE',     sheet: 'Pers State Tax Prac',      label: 'Personal State',          quarterly: false },
+  { key: 'PERS_CP',   sheet: 'Pers CP Tax Prac',         label: 'Personal CP',             quarterly: true  },
+  { key: '940',       sheet: 'Biz 940 Tax Prac Sheet',   label: 'Business 940 (FUTA)',      quarterly: false },
+  { key: '1065',      sheet: 'Biz 1065 Tax Prac Sheet',  label: 'Business 1065',           quarterly: false },
+  { key: '1120',      sheet: 'Biz 1120 Tax Prac Sheet',  label: 'Business 1120',           quarterly: false },
+  { key: '1120S',     sheet: 'Biz 1120s Tax Prac Sheet', label: 'Business 1120-S',          quarterly: false },
+  { key: '941',       sheet: 'Biz 941 Tax Prac Sheet',   label: 'Business 941 (Payroll)',   quarterly: true  },
+  { key: 'CP',        sheet: 'CP Fed Tax Prac',          label: 'Business CP (Federal)',   quarterly: true  },
+  { key: 'BIZ_STATE', sheet: 'Biz State Tax Prac',       label: 'Business State',          quarterly: false },
 ]
 
 function buildSheet(label, records, isQuarterly) {
