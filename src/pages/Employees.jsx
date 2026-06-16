@@ -106,7 +106,7 @@ export default function Employees() {
   const [editing, setEditing]     = useState(null)
   const [form, setForm]           = useState(blankEmp)
   const [tab, setTab]             = useState('info')
-  const TABS = ['info', 'pay', 'permissions']
+  const TABS = ['info', 'irs', 'pay', 'permissions']
   const [saving, setSaving]       = useState(false)
   const [resetEmail, setResetEmail] = useState('')
   const [showReset, setShowReset]   = useState(false)
