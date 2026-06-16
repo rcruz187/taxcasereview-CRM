@@ -147,7 +147,7 @@ export default function Payments() {
     <div class="row"><span class="label">Status</span><span class="value">${pay.status||'Cleared'}</span></div>
     ${pay.notes?`<div class="row"><span class="label">Notes</span><span class="value">${pay.notes}</span></div>`:''}
   </div>
-  <div class="footer">Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403 · Not a Law Firm</div>
+  <div class="footer">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408 · Not a Law Firm</div>
 </body></html>`)
     w.document.close()
   }

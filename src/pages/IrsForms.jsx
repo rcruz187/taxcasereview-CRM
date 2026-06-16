@@ -207,8 +207,8 @@ function generatePOALetter() {
 
     <div style="border-left:3px solid #1A7FD4;padding-left:16px;margin:16px 0">
       <b>${firmName}</b><br/>
-      238 Evergreen Dr<br/>
-      Lake Park, FL 33403<br/>
+      631 US Highway One Ste 304<br/>
+      North Palm Beach, FL 33408<br/>
       Phone: (561) ___-____<br/>
       Fax: (561) ___-____<br/>
       Email: ${email}

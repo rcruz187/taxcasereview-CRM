@@ -131,7 +131,7 @@ export default function Settings() {
         // Postgres "column does not exist" error: 42703, message names the column
         const match = saveErr.message?.match(/column ['"]?(\w+)['"]? (of relation .* )?does not exist/i)
           || saveErr.message?.match(/Could not find the '(\w+)' column/i)
-        if (saveErr.code === '42703' && match) {
+        if (match) {
           const badCol = match[1]
           if (badCol in payload) {
             const { [badCol]: _, ...rest } = payload

@@ -3,11 +3,12 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import { useFirm } from '../lib/useFirm'
-import { generateClientPackage, generateAddendum, generatePOACoverLetter, sendFullPackage, generateCreditCardAuthForm } from '../lib/docUtils'
+import { generateClientPackage, generateAddendum, generatePOACoverLetter, sendFullPackage, generateCreditCardAuthForm, generateCancellationNotice } from '../lib/docUtils'
 import BookingWidget from '../components/BookingWidget'
 import IRSFormFiller from '../components/IRSFormFiller'
 import ErrorBoundary from '../components/ErrorBoundary'
 import ComplianceGrids from './ComplianceGrids'
+import { ClientDocs } from './Clients'
 
 const STATUSES = ['New Lead','Contacted','Consultation Scheduled','Consultation Completed',
   'Tax Inv Agreement Sent','Tax Inv Agreement Signed','Tax Inv Fee Paid',
@@ -23,13 +24,13 @@ const STATUS_C = {
 }
 
 const PIPELINE_STAGES = [
-  { label:'Contacted',    key:'contacted' },
-  { label:'Consultation', key:'consult' },
-  { label:'Agr Signed',   key:'agreement' },
-  { label:'Fee Paid',     key:'paid' },
-  { label:'Tax Inv',      key:'taxinv' },
-  { label:'Addendum',     key:'addendum' },
-  { label:'Converted',    key:'client' },
+  { label:'Contacted',    key:'contacted', statusMap:'Contacted' },
+  { label:'Consultation', key:'consult',   statusMap:'Consultation Completed' },
+  { label:'Agr Signed',   key:'agreement', statusMap:'Tax Inv Agreement Signed' },
+  { label:'Fee Paid',     key:'paid',      statusMap:'Tax Inv Fee Paid' },
+  { label:'Tax Inv',      key:'taxinv',    statusMap:'Tax Investigation Active' },
+  { label:'Addendum',     key:'addendum',  statusMap:'Addendum Signed' },
+  { label:'Converted',    key:'client',    statusMap:'Converted to Client' },
 ]
 
 function stagesDone(status) {
@@ -38,7 +39,7 @@ function stagesDone(status) {
     'Tax Investigation Active','IRS Facts Received','Addendum Sent','Addendum Signed',
     'Resolution Fee Paid','Converted to Client']
   const idx = order.indexOf(status)
-  return [idx>=0, idx>=2, idx>=5, idx>=6, idx>=8, idx>=10, idx>=11]
+  return [idx>=0, idx>=2, idx>=4, idx>=5, idx>=6, idx>=9, idx>=11]
 }
 
 const YEARS  = Array.from({length:21},(_,i)=>2027-i)
@@ -146,7 +147,7 @@ function LeadInlineEsign({ lead, onClose }) {
         const{error:eErr}=await supabase.functions.invoke('send-email',{body:{
           to:lead.email,
           subject:`Please Sign: ${docType} — Tax Case Review`,
-          html:`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${lead.name}</strong>,</p><p>Please review and sign your <strong>${docType}</strong>.</p><p style="text-align:center;margin:24px 0"><a href="${url}" style="background:#16a34a;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Sign Document</a></p><p style="font-size:12px;color:#64748b">Link: ${url}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403</p></div>`
+          html:`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${lead.name}</strong>,</p><p>Please review and sign your <strong>${docType}</strong>.</p><p style="text-align:center;margin:24px 0"><a href="${url}" style="background:#16a34a;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Sign Document</a></p><p style="font-size:12px;color:#64748b">Link: ${url}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
         }})
         if(!eErr)emailSent=true
       }catch(e){console.error('Email error:',e)}
@@ -218,7 +219,7 @@ function LeadInlinePortalForm({ lead, onClose, showToast }) {
           body: {
             to: lead.email,
             subject: `Your Tax Compliance Information — Tax Case Review`,
-            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${lead.name}</strong>,</p><p>You can now view your tax compliance information online — filing status, balances, and key dates for each tax year on file.</p><p style="text-align:center;margin:24px 0"><a href="${url}" style="background:#3b82f6;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">View My Information</a></p><p style="font-size:12px;color:#64748b">You'll be asked to confirm your email and the last 4 digits of your SSN to access your information. Link: ${url}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403</p></div>`
+            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${lead.name}</strong>,</p><p>You can now view your tax compliance information online — filing status, balances, and key dates for each tax year on file.</p><p style="text-align:center;margin:24px 0"><a href="${url}" style="background:#3b82f6;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">View My Information</a></p><p style="font-size:12px;color:#64748b">You'll be asked to confirm your email and the last 4 digits of your SSN to access your information. Link: ${url}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
           }
         })
         if (!error) emailSent = true
@@ -420,9 +421,20 @@ export default function Leads() {
     showToast('Deleted'); setDetail(null); load()
   }
 
-  async function updateStatus(id, status) {
-    await supabase.from('leads').update({ status }).eq('id', id)
-    showToast('Status updated!'); load()
+  async function updateStatus(l, status) {
+    if (status === l.status) return
+    const prevStatus = l.status || 'New Lead'
+    const { error } = await supabase.from('leads').update({ status }).eq('id', l.id)
+    if (error) { showToast('Error: ' + error.message); return }
+    const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    await supabase.from('lead_notes').insert([{
+      lead_id: l.id, lead_name: l.name,
+      text: `📊 Status changed: ${prevStatus} → ${status}`,
+      type: 'System', author: actor, created_at: new Date().toISOString()
+    }])
+    showToast('Status updated!')
+    load()
+    if (detail?.id === l.id) loadLeadNotes(l.id)
   }
 
   async function handleSendFullPackage(l) {
@@ -441,7 +453,7 @@ export default function Leads() {
         const{error:eErr}=await supabase.functions.invoke('send-email',{body:{
           to:l.email,
           subject:`Action Required: Sign Your Tax Investigation Package — Tax Case Review`,
-          html:`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:24px"><div style="font-size:20px;font-weight:800;color:#1d4ed8">Tax Case Review</div></div><p>Dear <strong>${l.name}</strong>,</p><p>Your Tax Investigation Package is ready for review and signature. This package includes your Tax Service Agreement and IRS authorization forms (Form 2848 / Form 8821).</p><p style="text-align:center;margin:28px 0"><a href="${url}" style="background:#16a34a;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Review &amp; Sign Package</a></p><p style="font-size:12px;color:#64748b">Or copy this link: ${url}</p><hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"/><p style="font-size:11px;color:#94a3b8;text-align:center">Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403</p></div>`
+          html:`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:24px"><div style="font-size:20px;font-weight:800;color:#1d4ed8">Tax Case Review</div></div><p>Dear <strong>${l.name}</strong>,</p><p>Your Tax Investigation Package is ready for review and signature. This package includes your Tax Service Agreement and IRS authorization forms (Form 2848 / Form 8821).</p><p style="text-align:center;margin:28px 0"><a href="${url}" style="background:#16a34a;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Review &amp; Sign Package</a></p><p style="font-size:12px;color:#64748b">Or copy this link: ${url}</p><hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"/><p style="font-size:11px;color:#94a3b8;text-align:center">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
         }})
         if(!eErr)emailSent=true
       }catch(e){console.error('Email error:',e)}
@@ -483,6 +495,13 @@ export default function Leads() {
     if (error) { showToast('Error: '+error.message); setConverting(false); return }
     // Update lead status
     await supabase.from('leads').update({ status: 'Converted to Client' }).eq('id', l.id)
+    // Carry lead notes over to the new client record so case history isn't lost
+    const { data: oldNotes } = await supabase.from('lead_notes').select('*').eq('lead_id', l.id)
+    if (oldNotes && oldNotes.length) {
+      await supabase.from('client_notes').insert(
+        oldNotes.map(n => ({ client_name: l.name, content: n.text, created_by: n.author || 'Staff', created_at: n.created_at }))
+      )
+    }
     setConverting(false)
     const { count } = await supabase.from('client_compliance_records').select('*', { count: 'exact', head: true }).eq('client_name', l.name)
     showToast(count ? `✅ ${l.name} converted to Client! Compliance data (${count} records) carried over.` : `✅ ${l.name} converted to Client!`)
@@ -779,7 +798,7 @@ export default function Leads() {
                     color:done[i]?'#fff':'var(--t3)',
                     border:done[i]&&i===done.lastIndexOf(true)?'2px solid var(--ok)':'2px solid transparent',
                     transition:'all .15s'
-                  }} onClick={()=>updateStatus(l.id, stage.statusMap || stage.label)}>
+                  }} onClick={()=>updateStatus(l, stage.statusMap || stage.label)}>
                     {stage.label}
                   </div>
                   {i < PIPELINE_STAGES.length-1 && <div style={{width:16,height:2,background:done[i]?'var(--ok)':'var(--br)',flexShrink:0}}/>}
@@ -796,6 +815,7 @@ export default function Leads() {
             <ActionBtn color="#16a34a" icon="📦" label={pkgSending?'Building…':'Full Package'} sub="2848/8821 + Agreement" onClick={()=>!pkgSending&&handleSendFullPackage(l)}/>
             <ActionBtn color="#22863a" icon="📄" label="Tax Engagement" sub="Service Agreement" onClick={()=>generateClientPackage(l)}/>
             <ActionBtn color="#16a34a" icon="💳" label="Credit Card Auth" sub="Print" onClick={()=>generateCreditCardAuthForm(l)}/>
+            <ActionBtn color="#64748b" icon="📋" label="Cancellation Notice" sub="Print" onClick={()=>generateCancellationNotice(l)}/>
             <ActionBtn color="#0369a1" icon="🖋️" label="Pre-Fill 8821/2848" sub="IRS PDF Forms" onClick={()=>{
               try {
                 if (!l) { showToast('Error: no lead data found'); return }
@@ -816,9 +836,42 @@ export default function Leads() {
           <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Update Status</div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
             {STATUSES.map(st => (
-              <span key={st} className={`chip${l.status===st?' on':''}`} onClick={()=>updateStatus(l.id, st)} style={{fontSize:11}}>{st}</span>
+              <span key={st} className={`chip${l.status===st?' on':''}`} onClick={()=>updateStatus(l, st)} style={{fontSize:11}}>{st}</span>
             ))}
           </div>
+        </div>
+
+        {/* Notes — call/activity log, carries over to client_notes on conversion */}
+        <div className="card" style={{marginBottom:12}}>
+          <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Notes &amp; Activity ({leadNotes.length})</div>
+          <div style={{display:'flex',gap:8,marginBottom:14}}>
+            <textarea
+              value={newLeadNote} onChange={e=>setNewLeadNote(e.target.value)}
+              placeholder="Log a call, email, or note about this lead…"
+              style={{flex:1,padding:'8px 10px',borderRadius:8,border:'1px solid var(--br)',resize:'vertical',minHeight:60,fontSize:13,fontFamily:'inherit',background:'var(--s2)',color:'var(--tx)'}}
+            />
+            <div style={{display:'flex',flexDirection:'column',gap:6}}>
+              <select value={noteType} onChange={e=>setNoteType(e.target.value)} style={{fontSize:11,padding:'5px 8px',borderRadius:6}}>
+                {['Call','Email','Text','Voicemail','Meeting','Note'].map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+              <button className="btn pri" style={{padding:'8px 14px',fontSize:12}} disabled={!newLeadNote.trim()||addingLeadNote} onClick={addLeadNote}>
+                {addingLeadNote?'…':'+ Add'}
+              </button>
+            </div>
+          </div>
+          {leadNotes.length===0&&<div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No notes yet.</div>}
+          {leadNotes.map((n,i)=>(
+            <div key={n.id||i} style={{padding:'10px 0',borderBottom:'1px solid var(--br)'}}>
+              {n.type&&n.type!=='System'&&<Bdg s={n.type} c="bn"/>}
+              <div style={{fontSize:13,lineHeight:1.6,color:'var(--tx)',whiteSpace:'pre-wrap',marginTop:n.type&&n.type!=='System'?4:0}}>{n.text}</div>
+              <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>{n.author||'Staff'} · {n.created_at?new Date(n.created_at).toLocaleString():''}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Documents — reuses the same component as Clients so signed e-sign copies show up here */}
+        <div style={{marginBottom:12}}>
+          <ClientDocs clientName={l.name} supabase={supabase} showToast={showToast}/>
         </div>
 
         {/* Info grid — side by side like clients */}

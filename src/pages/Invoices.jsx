@@ -192,7 +192,7 @@ export default function Invoices() {
     <div>
       <div class="firm-name">Tax Case Review</div>
       <div class="firm-sub">IRS Resolution Services</div>
-      <div class="firm-sub">238 Evergreen Dr, Lake Park, FL 33403</div>
+      <div class="firm-sub">631 US Highway One Ste 304, North Palm Beach, FL 33408</div>
     </div>
     <div style="text-align:right">
       <div class="inv-title">INVOICE</div>
@@ -227,7 +227,7 @@ export default function Invoices() {
   </table>
   ${inv.notes?`<div class="notes"><strong>Notes:</strong> ${inv.notes}</div>`:''}
   <div class="footer">
-    Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403 · Not a Law Firm<br/>
+    Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408 · Not a Law Firm<br/>
     Thank you for your business.
   </div>
 </body></html>`)

@@ -6,7 +6,7 @@ import BookingWidget from '../components/BookingWidget'
 import FinancialProfile from './FinancialProfile'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
-import { generateServiceAgreement, generateAddendum, generateEngagementLetter, generatePOACoverLetter, sendFullPackage, generateCreditCardAuthForm } from '../lib/docUtils'
+import { generateServiceAgreement, generateAddendum, generateEngagementLetter, generatePOACoverLetter, sendFullPackage, generateCreditCardAuthForm, generateCancellationNotice } from '../lib/docUtils'
 
 const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -254,7 +254,7 @@ function InlineEsignForm({ client, onClose, showToast }) {
   async function create() {
     setSaving(true)
     const { data, error } = await supabase.from('esigns').insert([{
-      doc_type: docType, client_name: client?.name, client_email: client?.email||'',
+      doc_type: docType, client_name: client?.name, client_email: client?.email||'', client_phone: client?.phone||'',
       message, priority, status:'Awaiting', sent_at: new Date().toISOString(), created_at: new Date().toISOString()
     }]).select().single()
     setSaving(false)
@@ -326,7 +326,7 @@ function InlinePortalForm({ client, onClose, showToast }) {
           body: {
             to: client.email,
             subject: `Your Tax Compliance Information — Tax Case Review`,
-            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${client.name}</strong>,</p><p>You can now view your tax compliance information online — filing status, balances, and key dates for each tax year on file.</p><p style="text-align:center;margin:24px 0"><a href="${url}" style="background:#3b82f6;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">View My Information</a></p><p style="font-size:12px;color:#64748b">You'll be asked to confirm your email and the last 4 digits of your SSN to access your information. Link: ${url}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403</p></div>`
+            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${client.name}</strong>,</p><p>You can now view your tax compliance information online — filing status, balances, and key dates for each tax year on file.</p><p style="text-align:center;margin:24px 0"><a href="${url}" style="background:#3b82f6;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">View My Information</a></p><p style="font-size:12px;color:#64748b">You'll be asked to confirm your email and the last 4 digits of your SSN to access your information. Link: ${url}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
           }
         })
         if (!error) emailSent = true
@@ -429,7 +429,7 @@ function InlineOrganizerForm({ client, onClose, showToast }) {
           body: {
             to: client.email,
             subject: `Your ${year.trim()} Tax Organizer — Tax Case Review`,
-            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${client.name}</strong>,</p><p>Please complete your ${year.trim()} tax organizer so we can begin preparing your return. It only takes a few minutes, and you can save your progress and come back anytime.</p><p style="text-align:center;margin:24px 0"><a href="${url}" style="background:#9333ea;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Tax Organizer</a></p><p style="font-size:12px;color:#64748b">Link: ${url}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 238 Evergreen Dr, Lake Park, FL 33403</p></div>`
+            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${client.name}</strong>,</p><p>Please complete your ${year.trim()} tax organizer so we can begin preparing your return. It only takes a few minutes, and you can save your progress and come back anytime.</p><p style="text-align:center;margin:24px 0"><a href="${url}" style="background:#9333ea;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Tax Organizer</a></p><p style="font-size:12px;color:#64748b">Link: ${url}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
           }
         })
         if (!error) emailSent = true
@@ -498,11 +498,11 @@ function InlineOrganizerForm({ client, onClose, showToast }) {
 }
 
 // ── Canopy-style Document Manager for a specific client ──────────────────────
-const DOC_FOLDERS = ['IRS Docs','Tax Returns','Agreements','POA & Forms','Transcripts','Correspondence','Financial Statements','E-Signatures','Other']
+export const DOC_FOLDERS = ['IRS Docs','Tax Returns','Agreements','POA & Forms','Transcripts','Correspondence','Financial Statements','E-Signatures','Other']
 const FILE_EXT_ICON = n => { const e=(n||'').split('.').pop().toLowerCase(); return {pdf:'📄',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',jpg:'🖼️',jpeg:'🖼️',png:'🖼️',tiff:'🖼️'}[e]||'📎' }
 const fmt = b => b<1024?b+'B':b<1048576?(b/1024).toFixed(1)+'KB':(b/1048576).toFixed(1)+'MB'
 
-function ClientDocs({ clientName, supabase, showToast }) {
+export function ClientDocs({ clientName, supabase, showToast }) {
   const [docs,       setDocs]       = useState([])
   const [folder,     setFolder]     = useState('All')
   const [uploading,  setUploading]  = useState(false)
@@ -1093,6 +1093,7 @@ export default function Clients() {
             <ActionBtn color="#16a34a" icon="📦" label={pkgSending?'Building…':'Full Package'} sub="2848/8821 + Agreement" onClick={()=>!pkgSending&&handleSendFullPackage(c)}/>
             <ActionBtn color="#22863a" icon="📄" label="Service Agreement" sub="Print/Sign" onClick={()=>generateServiceAgreement(c)}/>
             <ActionBtn color="#16a34a" icon="💳" label="Credit Card Auth" sub="Print" onClick={()=>generateCreditCardAuthForm(c)}/>
+            <ActionBtn color="#64748b" icon="📋" label="Cancellation Notice" sub="Print" onClick={()=>generateCancellationNotice(c)}/>
             <ActionBtn color="#d97706" icon="📋" label="Addendum" sub="Add Services" onClick={()=>{setAddForm({resolutionFee:'',paymentPlan:'',startDate:'',notes:''});setAddModal(true)}}/>
             <ActionBtn color="#dc2626" icon="📠" label="Send Fax" sub="SignalWire Fax" onClick={()=>{setFaxClient(c);setFaxModal(true)}}/>
             <ActionBtn color="#7c3aed" icon="✍️" label="E-Signature" sub="Request Sign" onClick={()=>{setEsignClient(c);setEsignModal(true)}}/>
