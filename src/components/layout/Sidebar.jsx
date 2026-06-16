@@ -54,9 +54,9 @@ const SECTIONS = [
     key: 'irs',
     label: 'IRS Resolution',
     items: [
-      { path: '/transcripts', icon: DocIcon,   label: 'Transcripts',   section: 'transcripts' },
-      { path: '/irsforms',    icon: FormIcon,  label: 'IRS Forms',     section: 'irsforms' },
+      { path: '/irsforms',    icon: FormIcon,  label: 'IRS Forms & Docs', section: 'irsforms' },
       { path: '/irsreference', icon: PhoneBookIcon, label: 'IRS Reference', section: 'irsreference' },
+      { path: '/transcripts', icon: DocIcon,   label: 'Transcripts',   section: 'transcripts' },
       { path: '/taxreturns',  icon: ReturnIcon,label: 'Tax Returns',   section: 'taxreturns' },
     ]
   },
