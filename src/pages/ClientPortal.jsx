@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import OrganizerWizard from '../components/OrganizerWizard'
 
 const FORM_TABS = [
   { key: '1040',  label: 'Personal Federal (1040)', quarterly: false },
@@ -15,6 +16,7 @@ const DOC_FOLDERS = ['IRS Docs','Tax Returns','Agreements','POA & Forms','Transc
 
 const SECTIONS = [
   { key: 'compliance', label: '📋 Compliance' },
+  { key: 'organizer',  label: '🧾 Tax Organizer' },
   { key: 'docs',       label: '📁 Documents' },
   { key: 'pnl',        label: '📊 P&L' },
   { key: 'payments',   label: '💳 Payments' },
@@ -38,6 +40,12 @@ export default function ClientPortal() {
   const [authError, setAuthError] = useState('')
 
   const [section, setSection] = useState('compliance')
+
+  // Tax Organizer
+  const [organizers, setOrganizers] = useState([])
+  const [activeOrganizerId, setActiveOrganizerId] = useState(null)
+  const [newOrgYear, setNewOrgYear] = useState('')
+  const [creatingOrg, setCreatingOrg] = useState(false)
 
   // Compliance
   const [records, setRecords] = useState([])
@@ -81,20 +89,41 @@ export default function ClientPortal() {
   }
 
   async function loadAllData() {
-    const [{ data: comp }, { data: docsData }, { data: books }, { data: pays }, { data: notesData }] = await Promise.all([
+    const [{ data: comp }, { data: docsData }, { data: books }, { data: pays }, { data: notesData }, { data: orgs }] = await Promise.all([
       supabase.from('client_compliance_records').select('*').eq('client_name', client.name),
       supabase.from('documents').select('*').eq('client', client.name).order('created_at', { ascending: false }),
       supabase.from('bookkeeping').select('*').eq('client_name', client.name).order('date', { ascending: false }),
       supabase.from('payments').select('*').eq('clientName', client.name).order('created_at', { ascending: false }),
       supabase.from('client_notes').select('*').eq('client_name', client.name).eq('visible_to_client', true).order('created_at', { ascending: false }),
+      supabase.from('tax_organizer_responses').select('id,tax_year,status,updated_at').eq('client_name', client.name).order('tax_year', { ascending: false }),
     ])
     setRecords(comp || [])
     setDocs(docsData || [])
     setBookEntries(books || [])
     setPayments(pays || [])
     setNotes(notesData || [])
+    setOrganizers(orgs || [])
     const firstWithData = FORM_TABS.find(t => (comp || []).some(r => r.form_type === t.key))
     setActiveForm(firstWithData?.key || '1040')
+  }
+
+  async function createOrganizer() {
+    const year = newOrgYear.trim()
+    if (!year || !/^\d{4}$/.test(year)) return
+    if (organizers.some(o => String(o.tax_year) === year)) {
+      setActiveOrganizerId(organizers.find(o => String(o.tax_year) === year).id)
+      return
+    }
+    setCreatingOrg(true)
+    const { data, error } = await supabase.from('tax_organizer_responses').insert([{
+      client_name: client.name, client_email: client.email || '', tax_year: year,
+      answers: {}, status: 'In Progress', created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }]).select().single()
+    setCreatingOrg(false)
+    if (error) return
+    setOrganizers(prev => [data, ...prev])
+    setActiveOrganizerId(data.id)
+    setNewOrgYear('')
   }
 
   async function handleUpload() {
@@ -262,6 +291,51 @@ export default function ClientPortal() {
                   </table>
                 </div>
               </>
+            )}
+          </div>
+        )}
+
+        {/* ── TAX ORGANIZER ── */}
+        {section === 'organizer' && (
+          <div>
+            {activeOrganizerId ? (
+              <div>
+                <button onClick={()=>setActiveOrganizerId(null)} style={{...styles.downloadBtn, marginBottom:14}}>← Back to Organizer List</button>
+                <OrganizerWizard organizerId={activeOrganizerId} embedded={true} onComplete={loadAllData}/>
+              </div>
+            ) : (
+              <div>
+                <div style={{ fontSize:12.5, color:'#94a3b8', marginBottom:16, lineHeight:1.6 }}>
+                  Fill out your tax organizer for any year you need filed. Your progress is saved automatically as you go.
+                </div>
+                <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
+                  <input type="text" placeholder="e.g. 2026" value={newOrgYear} onChange={e=>setNewOrgYear(e.target.value)}
+                    style={{ width:120, padding:'9px 12px', background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.15)', borderRadius:8, color:'#fff', fontSize:13 }} maxLength={4}/>
+                  <button onClick={createOrganizer} disabled={creatingOrg || !newOrgYear.trim()} style={styles.downloadBtn}>
+                    {creatingOrg ? 'Starting…' : '+ Start New Tax Year'}
+                  </button>
+                </div>
+                {organizers.length === 0 ? (
+                  <Empty msg="You haven't started a tax organizer yet." />
+                ) : (
+                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                    {organizers.map(o => (
+                      <button key={o.id} onClick={()=>setActiveOrganizerId(o.id)} style={{
+                        display:'flex', justifyContent:'space-between', alignItems:'center',
+                        padding:'12px 16px', borderRadius:9, cursor:'pointer', textAlign:'left',
+                        border:'1px solid rgba(255,255,255,.12)', background:'rgba(255,255,255,.04)', color:'#e2e8f0'
+                      }}>
+                        <span style={{ fontWeight:700, fontSize:13.5 }}>Tax Year {o.tax_year}</span>
+                        <span style={{
+                          fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20,
+                          background: o.status === 'Submitted' ? 'rgba(34,197,94,.18)' : 'rgba(251,191,36,.18)',
+                          color: o.status === 'Submitted' ? '#4ade80' : '#fbbf24'
+                        }}>{o.status === 'Submitted' ? '✅ Submitted' : '🕓 In Progress'}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
