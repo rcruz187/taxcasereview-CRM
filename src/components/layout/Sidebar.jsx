@@ -33,11 +33,11 @@ const SECTIONS = [
     key: 'comms',
     label: 'Communications',
     items: [
-      { path: '/sms',       icon: SmsIcon,     label: 'SMS',           section: 'sms' },
       { path: '/dialer',    icon: DialIcon,    label: 'Dialer',        section: 'dialer' },
+      { path: '/sms',       icon: SmsIcon,     label: 'SMS',           section: 'sms' },
+      { path: '/fax',       icon: FaxIcon,     label: 'Fax',           section: 'fax' },
       { path: '/documents', icon: FolderIcon,  label: 'Documents',     section: 'documents' },
       { path: '/esign',     icon: SignIcon,    label: 'E-Signatures',  section: 'esign' },
-      { path: '/fax',       icon: FaxIcon,     label: 'Fax',           section: 'fax' },
     ]
   },
   {
