@@ -41,7 +41,7 @@ function stagesDone(status) {
   return [idx>=0, idx>=2, idx>=5, idx>=6, idx>=8, idx>=10, idx>=11]
 }
 
-const YEARS  = Array.from({length:20},(_,i)=>2026-i)
+const YEARS  = Array.from({length:21},(_,i)=>2027-i)
 const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']
 
 const BLANK = {

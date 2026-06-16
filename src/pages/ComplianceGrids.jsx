@@ -151,6 +151,13 @@ function FormGrid({ clientName, formType, records, onSaveRow }) {
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6,flexWrap:'wrap',gap:8}}>
         <div style={{fontWeight:700,fontSize:13,color:'var(--t2)'}}>{meta.label}</div>
       </div>
+      <div style={{display:'flex',gap:24,alignItems:'baseline',padding:'8px 10px',marginBottom:8,background:'var(--s3)',border:'1px solid var(--br)',borderRadius:6,flexWrap:'wrap'}}>
+        <div style={{fontWeight:700,fontSize:12,color:'var(--t2)',textTransform:'uppercase',letterSpacing:'.04em'}}>Totals</div>
+        <div style={{fontSize:13.5}}><span style={{color:'var(--t3)'}}>Amount: </span><span style={{color:'var(--tx)',fontWeight:700}}>{fmt(totalAmount)}</span></div>
+        <div style={{fontSize:13.5}}><span style={{color:'var(--t3)'}}>Credits/Payments: </span><span style={{color:'var(--ok)',fontWeight:700}}>{fmt(totalCredits)}</span></div>
+        {isQuarterly && <div style={{fontSize:13.5}}><span style={{color:'var(--t3)'}}>Deposits: </span><span style={{color:'var(--tx)',fontWeight:700}}>{fmt(records.reduce((s,r)=>s+n(r.deposit),0))}</span></div>}
+        {overdueCount > 0 && <div style={{fontSize:12,color:'var(--bad)',fontWeight:700}}>{overdueCount} CSED{overdueCount>1?'s':''} expired</div>}
+      </div>
       <div style={{overflowX:'auto'}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:13.5}}>
           <thead>
@@ -171,18 +178,6 @@ function FormGrid({ clientName, formType, records, onSaveRow }) {
                 csedYears={meta.csedYears} onChange={(updated)=>onSaveRow(updated)}/>
             ))}
           </tbody>
-          <tfoot>
-            <tr style={{borderTop:'2px solid var(--br)',background:'var(--s3)',fontWeight:700}}>
-              <td style={{padding:'9px 8px',fontSize:13,color:'var(--t2)'}}>TOTALS</td>
-              <td style={{padding:'9px 8px'}}></td>
-              <td style={{padding:'9px 8px',color:'var(--tx)',fontSize:13}}>{fmt(totalAmount)}</td>
-              <td style={{padding:'9px 8px',color:'var(--ok)',fontSize:13}}>{fmt(totalCredits)}</td>
-              {isQuarterly && <td style={{padding:'9px 8px',color:'var(--tx)',fontSize:13}}>{fmt(records.reduce((s,r)=>s+n(r.deposit),0))}</td>}
-              <td colSpan={3} style={{padding:'9px 8px',fontSize:11,color:'var(--t3)'}}>
-                {overdueCount > 0 && <span style={{color:'var(--bad)',fontWeight:700}}>{overdueCount} CSED{overdueCount>1?'s':''} expired</span>}
-              </td>
-            </tr>
-          </tfoot>
         </table>
       </div>
     </div>
