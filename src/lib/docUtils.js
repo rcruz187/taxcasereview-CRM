@@ -214,6 +214,42 @@ export function generateCancellationNotice(c = null) {
   `)
 }
 
+// ─── Credit Card Authorization Form — blank, standalone printable form ───────
+// Mirrors the original Freedom Tax Calling form, rebranded. Intentionally a
+// blank PRINTABLE form (client fills it by hand and returns it) rather than
+// a digital card-capture field — collecting raw card numbers through a web
+// form/e-sign page and storing them in Supabase would be a PCI-DSS problem.
+// Actual digital payment collection should go through Stripe/Square, not this.
+export function generateCreditCardAuthForm(c = null) {
+  const fee = c?.taxFee ? `$${Number(c.taxFee).toLocaleString()}` : (c?.investigationFee ? `$${c.investigationFee}` : '$___________')
+  printBase('Credit Card Authorization Form', `
+    ${clientBlock(c)}
+    <p>Complete the following form to authorize <b>Tax Case Review</b> to charge fees to the credit or debit card listed below. If you need assistance completing this form, please contact a Tax Case Review representative at (850) 459-9039.</p>
+
+    <h3>Cardholder Information</h3>
+    <p>Client Name(s): <span style="display:inline-block;min-width:340px;border-bottom:1px solid #333">&nbsp;${c?.name ? `<b>${c.name}</b>` : ''}</span></p>
+    <p>Client Address: <span style="display:inline-block;min-width:320px;border-bottom:1px solid #333">&nbsp;</span></p>
+    <p>City: <span style="display:inline-block;min-width:160px;border-bottom:1px solid #333">&nbsp;</span>&nbsp;&nbsp; State: <span style="display:inline-block;min-width:60px;border-bottom:1px solid #333">&nbsp;</span>&nbsp;&nbsp; Zip: <span style="display:inline-block;min-width:90px;border-bottom:1px solid #333">&nbsp;</span></p>
+    <p>Name on Account: <span style="display:inline-block;min-width:300px;border-bottom:1px solid #333">&nbsp;</span></p>
+
+    <h3>Payment Details</h3>
+    <div class="fee-box">
+      <div class="fee-main">Payment Amount: ${fee}</div>
+      <div class="fee-sub">Date: ___________________</div>
+    </div>
+    <p>Method of Payment: &nbsp;&#9633; Debit &nbsp;&nbsp; &#9633; Credit</p>
+    <p>Card Type: &nbsp;&#9633; Visa &nbsp;&nbsp; &#9633; Mastercard &nbsp;&nbsp; &#9633; Amex &nbsp;&nbsp; &#9633; Discover</p>
+    <p>Credit/Debit Card #: <span style="display:inline-block;min-width:280px;border-bottom:1px solid #333">&nbsp;</span></p>
+    <p>Expiration Date: <span style="display:inline-block;min-width:90px;border-bottom:1px solid #333">&nbsp;</span> &nbsp;&nbsp; Security Code: <span style="display:inline-block;min-width:90px;border-bottom:1px solid #333">&nbsp;</span></p>
+
+    <div class="notice">
+      <b>Electronic Payment Authorization:</b> Client authorizes Tax Case Review to charge amounts owed under the Tax Service Agreement, and any Addendums, to the credit or debit card identified above. Fees charged by Tax Case Review are non-refundable except as set forth in the Tax Service Agreement.
+    </div>
+
+    ${sigBlock('Client Signature', 'Authorized Representative — Tax Case Review')}
+  `)
+}
+
 // ─── Addendum — called with pre-filled fee/scope from modal ──────────────────
 export function generateAddendum(c = null, opts = {}) {
   const {
