@@ -9,6 +9,7 @@ import IRSFormFiller from '../components/IRSFormFiller'
 import ErrorBoundary from '../components/ErrorBoundary'
 import ComplianceGrids from './ComplianceGrids'
 import { ClientDocs } from './Clients'
+import InPlaceCaller from '../components/InPlaceCaller'
 
 const STATUSES = ['New Lead','Contacted','Consultation Scheduled','Consultation Completed',
   'Tax Inv Agreement Sent','Tax Inv Agreement Signed','Tax Inv Fee Paid',
@@ -310,6 +311,7 @@ export default function Leads() {
   const [detail, setDetail] = useState(null)
   const [showCompliance, setShowCompliance] = useState(false)
   const [leadNotes, setLeadNotes]     = useState([])
+  const [leadDetailTab, setLeadDetailTab] = useState('notes')
   const [newLeadNote, setNewLeadNote] = useState('')
   const [addingLeadNote, setAddingLeadNote] = useState(false)
   const [noteType, setNoteType]       = useState('Call')
@@ -861,37 +863,55 @@ export default function Leads() {
           </div>
         </div>
 
-        {/* Notes — call/activity log, carries over to client_notes on conversion */}
-        <div className="card" style={{marginBottom:12}}>
-          <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Notes &amp; Activity ({leadNotes.length})</div>
-          <div style={{display:'flex',gap:8,marginBottom:14}}>
-            <textarea
-              value={newLeadNote} onChange={e=>setNewLeadNote(e.target.value)}
-              placeholder="Log a call, email, or note about this lead…"
-              style={{flex:1,padding:'8px 10px',borderRadius:8,border:'1px solid var(--br)',resize:'vertical',minHeight:60,fontSize:13,fontFamily:'inherit',background:'var(--s2)',color:'var(--tx)'}}
-            />
-            <div style={{display:'flex',flexDirection:'column',gap:6}}>
-              <select value={noteType} onChange={e=>setNoteType(e.target.value)} style={{fontSize:11,padding:'5px 8px',borderRadius:6}}>
-                {['Call','Email','Text','Voicemail','Meeting','Note'].map(t=><option key={t} value={t}>{t}</option>)}
-              </select>
-              <button className="btn pri" style={{padding:'8px 14px',fontSize:12}} disabled={!newLeadNote.trim()||addingLeadNote} onClick={addLeadNote}>
-                {addingLeadNote?'…':'+ Add'}
+        {/* Notes & Documents — tabbed, matching the Clients detail page style */}
+        <div className="card" style={{padding:0,overflow:'hidden',marginBottom:12}}>
+          <div style={{display:'flex',borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
+            {[
+              {key:'notes', label:`📝 Notes & Activity (${leadNotes.length})`},
+              {key:'docs',  label:'📁 Documents'},
+            ].map(t=>(
+              <button key={t.key} onClick={()=>setLeadDetailTab(t.key)}
+                style={{padding:'10px 16px',border:'none',borderBottom:leadDetailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
+                  background:'none',cursor:'pointer',fontSize:12,fontWeight:leadDetailTab===t.key?700:500,
+                  color:leadDetailTab===t.key?'var(--blue)':'var(--t2)',whiteSpace:'nowrap',transition:'all .15s'}}>
+                {t.label}
               </button>
-            </div>
+            ))}
           </div>
-          {leadNotes.length===0&&<div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No notes yet.</div>}
-          {leadNotes.map((n,i)=>(
-            <div key={n.id||i} style={{padding:'10px 0',borderBottom:'1px solid var(--br)'}}>
-              {n.type&&n.type!=='System'&&<Bdg s={n.type} c="bn"/>}
-              <div style={{fontSize:13,lineHeight:1.6,color:'var(--tx)',whiteSpace:'pre-wrap',marginTop:n.type&&n.type!=='System'?4:0}}>{n.text}</div>
-              <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>{n.author||'Staff'} · {n.created_at?new Date(n.created_at).toLocaleString():''}</div>
-            </div>
-          ))}
-        </div>
 
-        {/* Documents — reuses the same component as Clients so signed e-sign copies show up here */}
-        <div style={{marginBottom:12}}>
-          <ClientDocs clientName={l.name} supabase={supabase} showToast={showToast}/>
+          {leadDetailTab==='notes' && (
+            <div style={{padding:16}}>
+              <div style={{display:'flex',gap:8,marginBottom:14}}>
+                <textarea
+                  value={newLeadNote} onChange={e=>setNewLeadNote(e.target.value)}
+                  placeholder="Log a call, email, or note about this lead…"
+                  style={{flex:1,padding:'8px 10px',borderRadius:8,border:'1px solid var(--br)',resize:'vertical',minHeight:60,fontSize:13,fontFamily:'inherit',background:'var(--s2)',color:'var(--tx)'}}
+                />
+                <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                  <select value={noteType} onChange={e=>setNoteType(e.target.value)} style={{fontSize:11,padding:'5px 8px',borderRadius:6}}>
+                    {['Call','Email','Text','Voicemail','Meeting','Note'].map(t=><option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <button className="btn pri" style={{padding:'8px 14px',fontSize:12}} disabled={!newLeadNote.trim()||addingLeadNote} onClick={addLeadNote}>
+                    {addingLeadNote?'…':'+ Add'}
+                  </button>
+                </div>
+              </div>
+              {leadNotes.length===0&&<div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No notes yet.</div>}
+              {leadNotes.map((n,i)=>(
+                <div key={n.id||i} style={{padding:'10px 0',borderBottom:'1px solid var(--br)'}}>
+                  {n.type&&n.type!=='System'&&<Bdg s={n.type} c="bn"/>}
+                  <div style={{fontSize:13,lineHeight:1.6,color:'var(--tx)',whiteSpace:'pre-wrap',marginTop:n.type&&n.type!=='System'?4:0}}>{n.text}</div>
+                  <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>{n.author||'Staff'} · {n.created_at?new Date(n.created_at).toLocaleString():''}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {leadDetailTab==='docs' && (
+            <div style={{padding:0}}>
+              <ClientDocs clientName={l.name} supabase={supabase} showToast={showToast}/>
+            </div>
+          )}
         </div>
 
         {/* Info grid — side by side like clients */}
@@ -899,7 +919,11 @@ export default function Leads() {
           <div className="card">
             <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>Contact Info</div>
             {[['Phone',l.phone],['Phone 2',l.phone2],['Email',l.email],['SSN',l.ssn?'***-**-'+l.ssn.replace(/-/g,'').slice(-4):null],['Date of Birth',l.dob],['Address',[l.street,l.city,l.state,l.zip].filter(Boolean).join(', ')],['County',l.county],['Source',l.source]].map(([label,val])=>(
-              <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">{val||'—'}</span></div>
+              <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">
+                {(label==='Phone'||label==='Phone 2') && val
+                  ? <InPlaceCaller phone={val} name={l.name} entityType="lead" entityId={l.id} supabase={supabase} showToast={showToast} onLogged={()=>loadLeadNotes(l.id)}/>
+                  : (val||'—')}
+              </span></div>
             ))}
           </div>
           <div className="card">

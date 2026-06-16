@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import IRSFormFiller from '../components/IRSFormFiller'
 import ErrorBoundary from '../components/ErrorBoundary'
+import InPlaceCaller from '../components/InPlaceCaller'
 import BookingWidget from '../components/BookingWidget'
 import FinancialProfile from './FinancialProfile'
 import { supabase } from '../lib/supabase'
@@ -102,12 +103,12 @@ const menuBtnStyle = {
   display:'block', width:'100%', textAlign:'left', padding:'9px 14px', fontSize:12.5,
   background:'none', border:'none', color:'var(--tx)', cursor:'pointer'
 }
-function DR({label,val,name}) {
+function DR({label,val,name,entityId,onLogged,showToast}) {
   const isPhone = label==='Phone'||label==='Phone 2'||label==='Phone2'
   const renderVal = () => {
     if (!val) return <span style={{color:'var(--t3)'}}>—</span>
     if (isPhone) return (
-      <PhoneLink val={val} name={name}/>
+      <InPlaceCaller phone={val} name={name} entityType="client" entityId={entityId} supabase={supabase} showToast={showToast} onLogged={onLogged}/>
     )
     return val
   }
@@ -1382,8 +1383,8 @@ export default function Clients() {
             {/* Contact Info */}
             <div className="card">
               <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>Contact Info</div>
-              <DR label="Phone"   val={c.phone} name={c.name}/>
-              <DR label="Phone 2" val={c.phone2} name={c.name}/>
+              <DR label="Phone"   val={c.phone} name={c.name} entityId={c.id} showToast={showToast} onLogged={()=>{ loadRelated(c.name) }}/>
+              <DR label="Phone 2" val={c.phone2} name={c.name} entityId={c.id} showToast={showToast} onLogged={()=>{ loadRelated(c.name) }}/>
               <DR label="Email"   val={c.email}/>
               <DR label="Address" val={[c.street,c.city,c.state,c.zip].filter(Boolean).join(', ')}/>
               <DR label="County"  val={c.county}/>
