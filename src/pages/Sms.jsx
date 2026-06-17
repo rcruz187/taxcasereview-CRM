@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useApp } from '../context/AppContext'
 
 const TEMPLATES = [
   { label:'Appointment Reminder', body:'Hi {name}, this is Tax Case Review reminding you of your upcoming appointment. Reply CONFIRM to confirm or call us to reschedule.' },
@@ -12,6 +13,7 @@ const TEMPLATES = [
 const BLANK = { phone:'', clientName:'', body:'', status:'Sent' }
 
 export default function Sms() {
+  const { user } = useApp()
   const [sent,    setSent]    = useState([])
   const [clients, setClients] = useState([])
   const [form,    setForm]    = useState(BLANK)
@@ -20,15 +22,19 @@ export default function Sms() {
   const [toast,   setToast]   = useState('')
   const [view,    setView]    = useState('compose')
 
+  const [settings, setSettings] = useState({})
+
   useEffect(()=>{load()},[])
 
   async function load(){
-    const [{data:sms},{data:clients}]=await Promise.all([
+    const [{data:sms},{data:clients},{data:s}]=await Promise.all([
       supabase.from('sms_messages').select('*').order('created_at',{ascending:false}),
-      supabase.from('clients').select('id,name,phone')
+      supabase.from('clients').select('id,name,phone'),
+      supabase.from('settings').select('signalwire_backend,sw_inbound_did').limit(1).maybeSingle(),
     ])
     if(sms)setSent(sms)
     if(clients)setClients(clients)
+    if(s)setSettings(s)
   }
 
   function showToast(msg){setToast(msg);setTimeout(()=>setToast(''),3500)}
@@ -48,11 +54,45 @@ export default function Sms() {
 
   async function send(){
     if(!form.clientName||!form.body){showToast('Client and message required');return}
+    if(!form.phone){showToast('Recipient phone number required');return}
     setSaving(true)
-    const {error}=await supabase.from('sms_messages').insert([{...form,created_at:new Date().toISOString()}])
+
+    const toNum = '+1' + form.phone.replace(/\D/g,'').slice(-10)
+    let status = 'Sent', sw_id = null, errMsg = null
+
+    if (settings?.signalwire_backend) {
+      try {
+        const res = await fetch(settings.signalwire_backend + '/sms/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: toNum, body: form.body, from: settings.sw_inbound_did || undefined })
+        })
+        const resData = await res.json()
+        if (res.ok && resData?.success) {
+          sw_id = resData.sid || null
+        } else {
+          status = 'Failed'
+          errMsg = resData?.error || 'SignalWire send failed'
+        }
+      } catch (e) {
+        status = 'Failed'
+        errMsg = e.message
+      }
+    } else {
+      // No backend configured yet — log only, same as before
+      status = 'Logged (not sent)'
+    }
+
+    const {error}=await supabase.from('sms_messages').insert([{
+      ...form, phone: toNum, status,
+      signalwire_sms_id: sw_id, sent_by: user?.email || 'Unknown',
+      error_msg: errMsg, created_at:new Date().toISOString()
+    }])
     setSaving(false)
     if(error){showToast('Error: '+error.message);return}
-    showToast('✅ SMS logged!')
+    if (status === 'Sent') showToast('✅ SMS sent via SignalWire!')
+    else if (status === 'Failed') showToast('SignalWire error: ' + (errMsg||'send failed'))
+    else showToast('Logged — add your SignalWire backend URL in Settings to actually send')
     setForm(BLANK);load()
   }
 
@@ -102,10 +142,12 @@ export default function Sms() {
               <textarea value={form.body} onChange={e=>fld('body',e.target.value)} style={{minHeight:120}} placeholder="Type your message..."/>
             </div>
             <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:10}} onClick={send} disabled={saving}>
-              {saving?'Saving…':'📱 Log SMS as Sent'}
+              {saving?'Sending…':(settings?.signalwire_backend?'📱 Send SMS':'📱 Log SMS as Sent')}
             </button>
             <div style={{marginTop:10,padding:10,background:'var(--s2)',borderRadius:7,fontSize:12,color:'var(--t3)'}}>
-              💡 Connect Twilio in Settings to enable actual SMS sending. Messages are logged for records.
+              {settings?.signalwire_backend
+                ? '✅ SignalWire is connected — messages send for real and get logged here.'
+                : '💡 Add your SignalWire backend URL in Settings → SignalWire to enable actual sending. Until then, messages are only logged for records.'}
             </div>
           </div>
           <div className="card">
