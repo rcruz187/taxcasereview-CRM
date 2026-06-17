@@ -97,13 +97,22 @@ export default function Invoices() {
     const to = client?.email || lead?.email
     if (!to) { showToast('No email on file for this client'); return }
 
-    const invNum = inv.invoiceNum || inv.id?.slice(-6) || ''
+    const invNum = inv.invNum || inv.id?.slice(-6) || ''
+    const subtotal = parseFloat(inv.total||0)
+    const taxRate  = parseFloat(inv.taxRate||0)
+    const tax      = subtotal * (taxRate/100)
+    const paid     = parseFloat(inv.paid||0)
+    const balance  = (subtotal + tax) - paid
     const subject = isReminder
       ? `Payment Reminder — Invoice #${invNum} — Tax Case Review`
       : `Invoice #${invNum} — Tax Case Review`
+    const breakdown = `Subtotal: $${subtotal.toLocaleString()}`
+      + (taxRate>0 ? `\nTax (${taxRate}%): $${tax.toLocaleString()}` : '')
+      + (paid>0 ? `\nPaid: -$${paid.toLocaleString()}` : '')
+      + `\nBalance Due: $${balance.toLocaleString()}`
     const body = isReminder
-      ? `Dear ${inv.clientName},\n\nThis is a friendly reminder that Invoice #${invNum} for $${parseFloat(inv.total||0).toLocaleString()} is due on ${inv.dueDate||'soon'} and remains unpaid.\n\nPlease contact our office if you have any questions.\n\nBest regards,\nTax Case Review\n(305) 555-0000`
-      : `Dear ${inv.clientName},\n\nPlease find your invoice attached.\n\nInvoice #: ${invNum}\nAmount Due: $${parseFloat(inv.total||0).toLocaleString()}\nDue Date: ${inv.dueDate||'Upon receipt'}\n\n${inv.lineItems||''}\n\nPlease contact our office with any questions.\n\nBest regards,\nTax Case Review`
+      ? `Dear ${inv.clientName},\n\nThis is a friendly reminder that Invoice #${invNum} for $${balance.toLocaleString()} is due on ${inv.dueDate||'soon'} and remains unpaid.\n\nPlease contact our office if you have any questions.\n\nBest regards,\nTax Case Review\n(305) 555-0000`
+      : `Dear ${inv.clientName},\n\nHere are the details for your invoice:\n\nInvoice #: ${invNum}\nDue Date: ${inv.dueDate||'Upon receipt'}\n\n${inv.lineItems||''}\n\n${breakdown}\n\nPlease contact our office with any questions.\n\nBest regards,\nTax Case Review`
 
     try {
       await sendGmailEmail(supabase, { to, subject, body })
@@ -159,7 +168,13 @@ export default function Invoices() {
     const w = window.open('','_blank','width=800,height=900')
     const date = inv.date ? new Date(inv.date).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}) : new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})
     const dueDate = inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}) : 'Upon Receipt'
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Invoice ${inv.invoiceNum||inv.id?.slice(-6)||''}</title>
+    const subtotal = parseFloat(inv.total||0)
+    const taxRate  = parseFloat(inv.taxRate||0)
+    const tax      = subtotal * (taxRate/100)
+    const paid     = parseFloat(inv.paid||0)
+    const balance  = (subtotal + tax) - paid
+    const lineRows = (inv.lineItems||'Professional Tax Resolution Services').split('\n').filter(Boolean)
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Invoice ${inv.invNum||inv.id?.slice(-6)||''}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
   body{padding:40px;color:#111;font-size:13px;line-height:1.5;max-width:720px;margin:auto}
@@ -176,11 +191,13 @@ export default function Invoices() {
   .section-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;margin-bottom:6px}
   .section-value{font-size:13px;font-weight:600;color:#111}
   .section-sub{font-size:12px;color:#64748b;margin-top:2px}
-  table{width:100%;border-collapse:collapse;margin-bottom:24px}
+  table{width:100%;border-collapse:collapse;margin-bottom:16px}
   thead tr{background:#f1f5f9}
   th{padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;border-bottom:1px solid #e2e8f0}
   td{padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:13px}
-  .total-row td{font-weight:700;font-size:14px;border-top:2px solid #1A7FD4;border-bottom:none;padding-top:14px}
+  .totals{margin-left:auto;width:280px;margin-bottom:24px}
+  .totals-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;color:#475569}
+  .totals-row.due{font-weight:800;font-size:16px;color:#111;border-top:2px solid #1A7FD4;padding-top:10px;margin-top:4px}
   .notes{background:#f8fafc;border-radius:8px;padding:14px 16px;margin-bottom:24px;font-size:12px;color:#64748b;line-height:1.7}
   .footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:32px;padding-top:16px;border-top:1px solid #e2e8f0}
   @media print{body{padding:20px}.no-print{display:none}}
@@ -196,14 +213,15 @@ export default function Invoices() {
     </div>
     <div style="text-align:right">
       <div class="inv-title">INVOICE</div>
-      <div class="inv-num">#${inv.invoiceNum||inv.id?.slice(-6)||'INV-001'}</div>
-      <div><span class="status-badge">${inv.status||'Pending'}</span></div>
+      <div class="inv-num">#${inv.invNum||inv.id?.slice(-6)||'INV-001'}</div>
+      <div><span class="status-badge">${inv.status||'Unpaid'}</span></div>
     </div>
   </div>
   <div class="section">
     <div class="section-block">
       <div class="section-label">Bill To</div>
       <div class="section-value">${inv.clientName||'Client'}</div>
+      ${inv.caseNum?`<div class="section-sub">Case #${inv.caseNum}</div>`:''}
     </div>
     <div class="section-block">
       <div class="section-label">Invoice Date</div>
@@ -214,17 +232,22 @@ export default function Invoices() {
       <div class="section-value">${dueDate}</div>
     </div>
     <div class="section-block">
-      <div class="section-label">Amount Due</div>
-      <div class="section-value" style="color:#1A7FD4;font-size:18px">$${Number(inv.amount||0).toLocaleString('en-US',{minimumFractionDigits:2})}</div>
+      <div class="section-label">Balance Due</div>
+      <div class="section-value" style="color:#1A7FD4;font-size:18px">$${balance.toLocaleString('en-US',{minimumFractionDigits:2})}</div>
     </div>
   </div>
   <table>
-    <thead><tr><th>Description</th><th style="text-align:right">Amount</th></tr></thead>
+    <thead><tr><th>Description</th></tr></thead>
     <tbody>
-      <tr><td>${inv.description||inv.service||'Professional Tax Resolution Services'}</td><td style="text-align:right">$${Number(inv.amount||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td></tr>
+      ${lineRows.map(r=>`<tr><td>${r}</td></tr>`).join('')}
     </tbody>
-    <tfoot><tr class="total-row"><td>Total Due</td><td style="text-align:right;color:#1A7FD4">$${Number(inv.amount||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td></tr></tfoot>
   </table>
+  <div class="totals">
+    <div class="totals-row"><span>Subtotal</span><span>$${subtotal.toLocaleString('en-US',{minimumFractionDigits:2})}</span></div>
+    ${taxRate>0?`<div class="totals-row"><span>Tax (${taxRate}%)</span><span>$${tax.toLocaleString('en-US',{minimumFractionDigits:2})}</span></div>`:''}
+    ${paid>0?`<div class="totals-row"><span>Amount Paid</span><span>-$${paid.toLocaleString('en-US',{minimumFractionDigits:2})}</span></div>`:''}
+    <div class="totals-row due"><span>Balance Due</span><span>$${balance.toLocaleString('en-US',{minimumFractionDigits:2})}</span></div>
+  </div>
   ${inv.notes?`<div class="notes"><strong>Notes:</strong> ${inv.notes}</div>`:''}
   <div class="footer">
     Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408 · Not a Law Firm<br/>
