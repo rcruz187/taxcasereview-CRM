@@ -66,6 +66,7 @@ const SECTIONS = [
     items: [
       { path: '/kiosk',     icon: KioskIcon,   label: 'Time Kiosk',    section: null },
       { path: '/timeclock', icon: ClockIcon,   label: 'Time Clock',    section: 'timeclock' },
+      { path: '/timeoff',   icon: TimeOffIcon, label: 'Time Off',      badge: 'timeoff', section: 'timeoff' },
       { path: '/payroll',   icon: PayrollIcon, label: 'Payroll',       section: 'payroll' },
     ]
   },
@@ -104,6 +105,19 @@ export default function Sidebar() {
   }, [location.pathname])
 
   const [firmName, setFirmName] = useState('Tax Case Review')
+  const [pendingTimeOff, setPendingTimeOff] = useState(0)
+
+  useEffect(() => {
+    async function loadPendingTimeOff() {
+      const { count } = await supabase.from('time_off_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending')
+      setPendingTimeOff(count || 0)
+    }
+    loadPendingTimeOff()
+    const ch = supabase.channel('sidebar-timeoff-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_off_requests' }, loadPendingTimeOff)
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [])
   const [tagline,  setTagline]  = useState('IRS Resolution Services')
 
   useEffect(() => {
@@ -186,7 +200,11 @@ export default function Sidebar() {
                 >
                   <Icon />
                   {item.label}
-                  {item.badge && <span className={`nav-badge${item.badgeWarn ? ' warn' : ''}`} id={`badge-${item.badge}`}>0</span>}
+                  {item.badge && (
+                    item.badge === 'timeoff'
+                      ? (pendingTimeOff > 0 && <span className="nav-badge" id="badge-timeoff">{pendingTimeOff}</span>)
+                      : <span className={`nav-badge${item.badgeWarn ? ' warn' : ''}`} id={`badge-${item.badge}`}>0</span>
+                  )}
                 </NavLink>
               )
             })}
@@ -222,6 +240,7 @@ function FormIcon()    { return <svg viewBox="0 0 24 24" fill="none" stroke="cur
 function ReturnIcon()  { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg> }
 function PhoneBookIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 3h13a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4z"/><path d="M4 7h2"/><path d="M4 12h2"/><path d="M4 17h2"/></svg> }
 function ClockIcon()   { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> }
+function TimeOffIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v7"/><path d="M4.93 13a8 8 0 0 1 14.14 0"/><path d="M2 13h20"/><path d="M12 13v8"/><path d="M9 21h6"/></svg> }
 function EstIcon()     { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg> }
 function InvIcon()     { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg> }
 function PayIcon()     { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> }

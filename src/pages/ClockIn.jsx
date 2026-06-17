@@ -35,6 +35,13 @@ export default function ClockIn() {
   const [done, setDone] = useState(null) // { name, action: 'in'|'out', time, hours }
   const [search, setSearch] = useState('')
   const [now, setNow] = useState(new Date())
+  const [reqEmp, setReqEmp] = useState(null) // employee currently filling out a time-off request
+  const [reqType, setReqType] = useState('pto')
+  const [reqStart, setReqStart] = useState('')
+  const [reqEnd, setReqEnd] = useState('')
+  const [reqReason, setReqReason] = useState('')
+  const [reqSaving, setReqSaving] = useState(false)
+  const [reqMsg, setReqMsg] = useState('')
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000)
@@ -91,6 +98,34 @@ export default function ClockIn() {
     }
   }
 
+  function openTimeOffRequest(emp) {
+    setReqEmp(emp); setReqType('pto'); setReqStart(''); setReqEnd(''); setReqReason(''); setReqMsg('')
+  }
+
+  async function submitTimeOffRequest() {
+    if (!reqEmp || !reqStart || !reqEnd) { setReqMsg('Please pick start and end dates.'); return }
+    const start = new Date(reqStart + 'T00:00:00')
+    const end = new Date(reqEnd + 'T00:00:00')
+    if (end < start) { setReqMsg('End date must be after start date.'); return }
+    const days = Math.round((end.getTime() - start.getTime()) / 86400000) + 1
+
+    setReqSaving(true); setReqMsg('')
+    const { error } = await supabase.from('time_off_requests').insert({
+      employee_id: reqEmp.id,
+      employee_name: reqEmp.name,
+      type: reqType,
+      start_date: reqStart,
+      end_date: reqEnd,
+      days,
+      reason: reqReason.trim() || null,
+      status: 'pending',
+    })
+    setReqSaving(false)
+    if (error) { setReqMsg('❌ ' + error.message); return }
+    setDone({ name: reqEmp.name, action: 'timeoff' })
+    setReqEmp(null)
+  }
+
   const filtered = employees.filter(e => e.name?.toLowerCase().includes(search.toLowerCase()))
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
@@ -99,17 +134,20 @@ export default function ClockIn() {
   if (done) {
     const isOut = done.action === 'out'
     const isErr = done.action === 'error'
+    const isReq = done.action === 'timeoff'
     return (
       <div style={styles.page}>
         <div style={styles.card}>
           <div style={{ textAlign: 'center', padding: '24px 8px' }}>
-            <div style={{ fontSize: 64, marginBottom: 16 }}>{isErr ? '⚠️' : isOut ? '👋' : '✅'}</div>
+            <div style={{ fontSize: 64, marginBottom: 16 }}>{isErr ? '⚠️' : isReq ? '🌴' : isOut ? '👋' : '✅'}</div>
             <div style={{ fontSize: 22, fontWeight: 800, color: isErr ? '#f87171' : '#4ade80', marginBottom: 8 }}>
-              {isErr ? 'Something went wrong' : isOut ? 'Clocked Out' : 'Clocked In'}
+              {isErr ? 'Something went wrong' : isReq ? 'Request Submitted' : isOut ? 'Clocked Out' : 'Clocked In'}
             </div>
             <div style={{ fontSize: 16, color: '#f1f5f9', marginBottom: 6 }}>{done.name}</div>
             {isErr ? (
               <div style={{ fontSize: 13, color: '#94a3b8' }}>{done.error}</div>
+            ) : isReq ? (
+              <div style={{ fontSize: 13, color: '#94a3b8' }}>Your time off request is waiting on approval.</div>
             ) : (
               <div style={{ fontSize: 13, color: '#94a3b8', lineHeight: 1.7 }}>
                 {isOut ? `Out at ${done.time}` : `In at ${done.time}`}
@@ -181,6 +219,10 @@ export default function ClockIn() {
                   }}>
                     {isSaving ? 'Saving…' : isIn ? '🟢 Clocked In — Tap to Out' : '⚪ Tap to Clock In'}
                   </div>
+                  <div onClick={e => { e.stopPropagation(); openTimeOffRequest(emp) }}
+                    style={{ fontSize: 10, fontWeight: 700, marginTop: 6, color: '#60a5fa', cursor: 'pointer' }}>
+                    🌴 Request Time Off
+                  </div>
                 </button>
               )
             })}
@@ -191,6 +233,53 @@ export default function ClockIn() {
       <div style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', textAlign: 'center', marginTop: 18 }}>
         No app or login needed — works on any phone, tablet, or computer
       </div>
+
+      {reqEmp && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}
+          onClick={e => e.target === e.currentTarget && setReqEmp(null)}>
+          <div style={{ ...styles.card, maxWidth: 420, maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#f1f5f9' }}>Request Time Off — {reqEmp.name}</div>
+              <button onClick={() => setReqEmp(null)} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 20, cursor: 'pointer' }}>×</button>
+            </div>
+
+            {reqMsg && <div style={{ fontSize: 13, color: reqMsg.startsWith('❌') ? '#f87171' : '#4ade80', marginBottom: 10 }}>{reqMsg}</div>}
+
+            <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', display: 'block', marginBottom: 6 }}>TYPE</label>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+              {(['pto', 'sick', 'vacation']).map(t => (
+                <button key={t} onClick={() => setReqType(t)}
+                  style={{ flex: 1, padding: 8, borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, textTransform: 'capitalize',
+                    background: reqType === t ? 'rgba(74,222,128,0.15)' : '#1e293b', color: reqType === t ? '#4ade80' : '#64748b' }}>
+                  {t}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', display: 'block', marginBottom: 6 }}>START DATE</label>
+                <input type="date" value={reqStart} onChange={e => setReqStart(e.target.value)}
+                  style={{ width: '100%', padding: 10, background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9', fontSize: 13, boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', display: 'block', marginBottom: 6 }}>END DATE</label>
+                <input type="date" value={reqEnd} onChange={e => setReqEnd(e.target.value)}
+                  style={{ width: '100%', padding: 10, background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9', fontSize: 13, boxSizing: 'border-box' }} />
+              </div>
+            </div>
+
+            <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', display: 'block', marginBottom: 6 }}>REASON (OPTIONAL)</label>
+            <textarea value={reqReason} onChange={e => setReqReason(e.target.value)} rows={2} placeholder="e.g. family trip"
+              style={{ width: '100%', padding: 10, background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9', fontSize: 13, boxSizing: 'border-box', marginBottom: 14, resize: 'vertical' }} />
+
+            <button onClick={submitTimeOffRequest} disabled={reqSaving}
+              style={{ width: '100%', padding: 12, background: '#16a34a', border: 'none', borderRadius: 10, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: reqSaving ? 0.6 : 1 }}>
+              {reqSaving ? 'Submitting…' : 'Submit Request'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

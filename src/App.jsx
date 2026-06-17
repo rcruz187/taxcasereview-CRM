@@ -20,6 +20,7 @@ import AuthCallback from './pages/AuthCallback'
 // when you actually navigate to it, instead of all ~30 pages loading upfront
 // in one giant bundle. This is what was making the whole CRM feel slow.
 const Dashboard     = lazy(() => import('./pages/Dashboard'))
+const TimeOff       = lazy(() => import('./pages/TimeOff'))
 const Leads         = lazy(() => import('./pages/Leads'))
 const Clients       = lazy(() => import('./pages/Clients'))
 const Cases         = lazy(() => import('./pages/Cases'))
@@ -136,6 +137,7 @@ function Shell() {
             <Route path="/esign"       element={<Guard section="esign"><Esign /></Guard>} />
             <Route path="/timeclock"   element={<Guard section="timeclock"><TimeClock /></Guard>} />
             <Route path="/payroll"     element={<Guard section="payroll"><Payroll /></Guard>} />
+            <Route path="/timeoff"     element={<Guard section="timeoff"><TimeOff /></Guard>} />
             <Route path="/employees"   element={<Guard section="employees"><Employees /></Guard>} />
             <Route path="/reports"     element={<Guard section="reports"><Reports /></Guard>} />
             <Route path="/settings"    element={<Guard section="settings"><Settings /></Guard>} />

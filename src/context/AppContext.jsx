@@ -28,6 +28,7 @@ export const SECTION_COLS = {
   timeclock:   'perm_hr',
   payroll:     'perm_hr',
   employees:   'perm_hr',
+  timeoff:     'perm_hr',
   sms:         'perm_comms',
   email:       'perm_comms',
   dialer:      'perm_comms',

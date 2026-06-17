@@ -40,6 +40,7 @@ const blankEmp = {
   address: '', filingStatus: 'Single',
   caf: '', ptin: '', sorShortId: '', sorUsername: '',
   bank_name: '', bank_account_type: 'Checking', routing_number: '', account_number: '',
+  pto_balance: 0, sick_balance: 0, vacation_balance: 0,
   ...ROLE_PERM_DEFAULTS['Staff']
 }
 
@@ -85,6 +86,9 @@ function fromDbRow(emp) {
     bank_account_type: emp.bank_account_type ?? 'Checking',
     routing_number:   emp.routing_number ?? '',
     account_number:   emp.account_number ?? '',
+    pto_balance:      emp.pto_balance ?? 0,
+    sick_balance:     emp.sick_balance ?? 0,
+    vacation_balance: emp.vacation_balance ?? 0,
     perm_clients:     emp.perm_clients  ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_clients,
     perm_billing:     emp.perm_billing  ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_billing,
     perm_schedule:    emp.perm_schedule ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_schedule,
@@ -379,6 +383,24 @@ export default function Employees() {
                       </div>
                     </div>
                   )}
+                  <div style={{ background:'var(--s2)', border:'1px solid var(--br)', borderRadius:8, padding:'12px 14px', marginBottom:4 }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'var(--b2)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:10 }}>🌴 Time Off Balances</div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:14 }}>
+                      <div className="field">
+                        <label>PTO days</label>
+                        <input type="number" step="0.5" value={form.pto_balance??0} onChange={e => setForm(f => ({ ...f, pto_balance: e.target.value }))}/>
+                      </div>
+                      <div className="field">
+                        <label>Sick days</label>
+                        <input type="number" step="0.5" value={form.sick_balance??0} onChange={e => setForm(f => ({ ...f, sick_balance: e.target.value }))}/>
+                      </div>
+                      <div className="field">
+                        <label>Vacation days</label>
+                        <input type="number" step="0.5" value={form.vacation_balance??0} onChange={e => setForm(f => ({ ...f, vacation_balance: e.target.value }))}/>
+                      </div>
+                    </div>
+                    <div style={{ fontSize:11, color:'var(--t3)', marginTop:8 }}>Approving a request on the Time Off page automatically deducts the days from the matching balance here.</div>
+                  </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                     <div className="field">
                       <label>Emergency Contact Name</label>
