@@ -12,7 +12,7 @@ ALTER TABLE employees
 
 CREATE TABLE IF NOT EXISTS time_off_requests (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  employee_id   uuid REFERENCES employees(id) ON DELETE SET NULL,
+  employee_id   text REFERENCES employees(id) ON DELETE SET NULL,
   employee_name text NOT NULL,
   type          text NOT NULL CHECK (type IN ('pto','sick','vacation')),
   start_date    date NOT NULL,

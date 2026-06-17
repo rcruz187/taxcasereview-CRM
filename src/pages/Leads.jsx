@@ -415,7 +415,16 @@ export default function Leads() {
     const el = document.querySelector('.page-content')
     const y = el ? el.scrollTop : 0
     setLeadDetailTab(tab)
-    requestAnimationFrame(() => { if (el) el.scrollTop = y })
+    // One restore isn't enough — the Documents tab loads its data async
+    // *after* mount, which changes page height after the first restore and
+    // lets the browser re-clamp scrollTop right back down. Keep reapplying
+    // for a short window to catch that late content settling in.
+    const restore = () => { if (el) el.scrollTop = y }
+    requestAnimationFrame(restore)
+    setTimeout(restore, 50)
+    setTimeout(restore, 150)
+    setTimeout(restore, 350)
+    setTimeout(restore, 700)
   }
   function composeName(first,mi,last) { return [first, mi?mi+'.':'', last].filter(Boolean).join(' ').replace(/\s+/g,' ').trim() }
   // For Individual leads the Full Name is derived automatically from First/MI/Last

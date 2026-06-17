@@ -727,7 +727,15 @@ export default function Clients() {
       next.set('tab', tab)
       return next
     }, { replace: true })
-    requestAnimationFrame(() => { if (el) el.scrollTop = y })
+    // Same fix as Leads: the Documents tab loads data async after mount,
+    // which changes page height after the first restore. Keep reapplying
+    // for a short window to catch that late content settling in.
+    const restore = () => { if (el) el.scrollTop = y }
+    requestAnimationFrame(restore)
+    setTimeout(restore, 50)
+    setTimeout(restore, 150)
+    setTimeout(restore, 350)
+    setTimeout(restore, 700)
   }
   const [fillerClient, setFillerClient] = useState(null)
   const [pkgSending, setPkgSending] = useState(false)
