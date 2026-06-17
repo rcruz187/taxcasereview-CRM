@@ -20,7 +20,7 @@ const TEMPLATES = [
 
 const TRIAGE = ['Inbox','Action Needed','Waiting','Sent','Archive']
 const TRIAGE_COLORS = { 'Action Needed':'var(--bad)', 'Waiting':'var(--warn)', 'Inbox':'var(--blue)', 'Sent':'var(--ok)', 'Archive':'var(--t3)' }
-const BLANK = { recipient:'', clientName:'', subject:'', body:'', triage:'Inbox', status:'Sent' }
+const BLANK = { recipient:'', clientName:'', subject:'', body:'', triage:'Sent', status:'Sent' }
 
 export default function Email() {
   const [emails, setEmails]     = useState([])
@@ -32,7 +32,7 @@ export default function Email() {
   const [toast, setToast]       = useState('')
   const [view, setView]         = useState('inbox') // inbox | compose | templates
   const [readLayout, setReadLayout] = useState(() => localStorage.getItem('tcr_email_layout') || 'side') // side | stacked
-  const [triageFilter, setTriageFilter] = useState('Inbox')
+  const [triageFilter, setTriageFilter] = useState('Sent')
   const [selected, setSelected] = useState(null)
   const [search, setSearch]     = useState('')
   const [gmailConnected, setGmailConnected] = useState(false)
