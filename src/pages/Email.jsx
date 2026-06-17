@@ -32,6 +32,11 @@ export default function Email() {
   const [toast, setToast]       = useState('')
   const [view, setView]         = useState('inbox') // inbox | compose | templates
   const [readLayout, setReadLayout] = useState(() => localStorage.getItem('tcr_email_layout') || 'side') // side | stacked
+  const [listSize, setListSize] = useState(() => ({
+    side: parseInt(localStorage.getItem('tcr_email_list_width')) || 320,
+    stacked: parseInt(localStorage.getItem('tcr_email_list_height')) || 260,
+  }))
+  const [resizing, setResizing] = useState(false)
   const [triageFilter, setTriageFilter] = useState('Sent')
   const [selected, setSelected] = useState(null)
   const [search, setSearch]     = useState('')
@@ -62,6 +67,32 @@ export default function Email() {
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3500) }
   function setLayout(l) { setReadLayout(l); localStorage.setItem('tcr_email_layout', l) }
+  function startResize(e) {
+    e.preventDefault()
+    setResizing(true)
+    const startX = e.clientX, startY = e.clientY
+    const startSize = listSize[readLayout]
+    function onMove(ev) {
+      let next
+      if (readLayout === 'side') {
+        next = Math.min(600, Math.max(220, startSize + (ev.clientX - startX)))
+      } else {
+        next = Math.min(600, Math.max(120, startSize + (ev.clientY - startY)))
+      }
+      setListSize(s => ({ ...s, [readLayout]: next }))
+    }
+    function onUp() {
+      setResizing(false)
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      setListSize(s => {
+        localStorage.setItem(readLayout === 'side' ? 'tcr_email_list_width' : 'tcr_email_list_height', s[readLayout])
+        return s
+      })
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
   function fld(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
   function searchClient(val) {
@@ -202,8 +233,8 @@ export default function Email() {
         {view === 'inbox' && (
           <div style={{ flex: 1, display: 'flex', flexDirection: readLayout === 'side' ? 'row' : 'column', overflow: 'hidden' }}>
             <div style={{
-              width: readLayout === 'side' ? 320 : '100%',
-              height: readLayout === 'side' ? '100%' : 260,
+              width: readLayout === 'side' ? listSize.side : '100%',
+              height: readLayout === 'side' ? '100%' : listSize.stacked,
               flexShrink: 0,
               borderRight: readLayout === 'side' ? '1px solid var(--br)' : 'none',
               borderBottom: readLayout === 'stacked' ? '1px solid var(--br)' : 'none',
@@ -238,6 +269,18 @@ export default function Email() {
                 ))}
               </div>
             </div>
+
+            {/* Drag handle to resize the list pane */}
+            <div
+              onMouseDown={startResize}
+              style={{
+                cursor: readLayout === 'side' ? 'col-resize' : 'row-resize',
+                width: readLayout === 'side' ? 5 : '100%',
+                height: readLayout === 'side' ? '100%' : 5,
+                flexShrink: 0,
+                background: resizing ? 'var(--blue)' : 'transparent',
+              }}
+            />
 
             {/* Email detail */}
             <div style={{ flex: 1, overflow: 'auto', padding: 24, background: 'var(--bg)' }}>

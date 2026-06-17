@@ -1002,10 +1002,17 @@ export default function Leads() {
 
           {leadDetailTab==='overview' && (
             <div style={{padding:16}}>
-              {l.notes && (
+              {(leadNotes.length>0||l.notes) && (
                 <div style={{marginBottom:12}}>
                   <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:6}}>Case Notes</div>
-                  <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.7,whiteSpace:'pre-wrap'}}>{l.notes}</div>
+                  {leadNotes.length>0?(
+                    <>
+                      <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.7,whiteSpace:'pre-wrap'}}>{leadNotes[0].text}</div>
+                      <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>{leadNotes[0].author||'Staff'} · {leadNotes[0].created_at?new Date(leadNotes[0].created_at).toLocaleString():''}</div>
+                    </>
+                  ):(
+                    <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.7,whiteSpace:'pre-wrap'}}>{l.notes}</div>
+                  )}
                 </div>
               )}
               <div style={{display:'flex',gap:24,flexWrap:'wrap'}}>

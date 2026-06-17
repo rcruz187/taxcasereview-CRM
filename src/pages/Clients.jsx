@@ -843,7 +843,7 @@ export default function Clients() {
       supabase.from('tasks').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('invoices').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('documents').select('*').eq('client', clientName).order('created_at',{ascending:false}),
-      supabase.from('client_notes').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
+      supabase.from('client_notes').select('*').eq('client_name', clientName).order('created_at',{ascending:false}),
       supabase.from('payments').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
     ])
     setRelCases(cases||[])
@@ -1211,10 +1211,17 @@ export default function Clients() {
           {/* Overview Tab */}
           {detailTab==='overview'&&(
             <div style={{padding:16}}>
-              {c.notes&&(
+              {(relNotes.length>0||c.notes)&&(
                 <div style={{marginBottom:12}}>
                   <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:6}}>Case Notes</div>
-                  <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.7,whiteSpace:'pre-wrap'}}>{c.notes}</div>
+                  {relNotes.length>0?(
+                    <>
+                      <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.7,whiteSpace:'pre-wrap'}}>{relNotes[0].content}</div>
+                      <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>{relNotes[0].created_by||'Staff'} · {relNotes[0].created_at?new Date(relNotes[0].created_at).toLocaleString():''}</div>
+                    </>
+                  ):(
+                    <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.7,whiteSpace:'pre-wrap'}}>{c.notes}</div>
+                  )}
                 </div>
               )}
               <div style={{display:'flex',gap:24,flexWrap:'wrap'}}>
