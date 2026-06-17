@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import OrganizerWizard from '../components/OrganizerWizard'
+import StripeInvoicePayModal from '../components/StripeInvoicePayModal'
 
 const FORM_TABS = [
   { key: '1040',  label: 'Personal Federal (1040)', quarterly: false },
@@ -39,7 +40,7 @@ export default function ClientPortal() {
   const [pin, setPin] = useState('')
   const [authError, setAuthError] = useState('')
 
-  const [section, setSection] = useState('compliance')
+  const [section, setSection] = useState(() => new URLSearchParams(window.location.search).get('section') || 'compliance')
 
   // Tax Organizer
   const [organizers, setOrganizers] = useState([])
@@ -59,6 +60,8 @@ export default function ClientPortal() {
   const [bookEntries, setBookEntries] = useState([])
   // Payments
   const [payments, setPayments] = useState([])
+  const [openInvoices, setOpenInvoices] = useState([])
+  const [payModalInv, setPayModalInv] = useState(null)
   // Notes (client-visible only)
   const [notes, setNotes] = useState([])
 
@@ -89,13 +92,14 @@ export default function ClientPortal() {
   }
 
   async function loadAllData() {
-    const [{ data: comp }, { data: docsData }, { data: books }, { data: pays }, { data: notesData }, { data: orgs }] = await Promise.all([
+    const [{ data: comp }, { data: docsData }, { data: books }, { data: pays }, { data: notesData }, { data: orgs }, { data: invs }] = await Promise.all([
       supabase.from('client_compliance_records').select('*').eq('client_name', client.name),
       supabase.from('documents').select('*').eq('client', client.name).order('created_at', { ascending: false }),
       supabase.from('bookkeeping').select('*').eq('client_name', client.name).order('date', { ascending: false }),
       supabase.from('payments').select('*').eq('clientName', client.name).order('created_at', { ascending: false }),
       supabase.from('client_notes').select('*').eq('client_name', client.name).eq('visible_to_client', true).order('created_at', { ascending: false }),
       supabase.from('tax_organizer_responses').select('id,tax_year,status,updated_at').eq('client_name', client.name).order('tax_year', { ascending: false }),
+      supabase.from('invoices').select('*').eq('clientName', client.name).neq('status', 'Paid').order('created_at', { ascending: false }),
     ])
     setRecords(comp || [])
     setDocs(docsData || [])
@@ -103,8 +107,20 @@ export default function ClientPortal() {
     setPayments(pays || [])
     setNotes(notesData || [])
     setOrganizers(orgs || [])
+    setOpenInvoices(invs || [])
     const firstWithData = FORM_TABS.find(t => (comp || []).some(r => r.form_type === t.key))
     setActiveForm(firstWithData?.key || '1040')
+  }
+
+  async function refreshPaymentsAndInvoices() {
+    const [{ data: pays }, { data: notesData }, { data: invs }] = await Promise.all([
+      supabase.from('payments').select('*').eq('clientName', client.name).order('created_at', { ascending: false }),
+      supabase.from('client_notes').select('*').eq('client_name', client.name).eq('visible_to_client', true).order('created_at', { ascending: false }),
+      supabase.from('invoices').select('*').eq('clientName', client.name).neq('status', 'Paid').order('created_at', { ascending: false }),
+    ])
+    setPayments(pays || [])
+    setNotes(notesData || [])
+    setOpenInvoices(invs || [])
   }
 
   async function createOrganizer() {
@@ -406,6 +422,24 @@ export default function ClientPortal() {
         {/* ── PAYMENTS ── */}
         {section === 'payments' && (
           <div>
+            {openInvoices.length > 0 && (
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 10 }}>Open Balance</div>
+                {openInvoices.map(inv => {
+                  const subtotal = parseFloat(inv.total||0), tax = subtotal*(parseFloat(inv.taxRate||0)/100), paidAmt = parseFloat(inv.paid||0)
+                  const balance = (subtotal+tax) - paidAmt
+                  return (
+                    <div key={inv.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 8, padding: '12px 16px', marginBottom: 8 }}>
+                      <div>
+                        <div style={{ fontWeight: 700, color: '#f1f5f9', fontSize: 13.5 }}>Invoice #{inv.invNum || '—'}</div>
+                        <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>Due {inv.dueDate || 'upon receipt'} · Balance ${balance.toLocaleString('en-US',{minimumFractionDigits:2})}</div>
+                      </div>
+                      <button onClick={() => setPayModalInv(inv)} style={{ padding: '8px 16px', background: '#1A7FD4', border: 'none', borderRadius: 6, color: '#fff', fontWeight: 600, fontSize: 12.5, cursor: 'pointer' }}>Pay Now</button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
             {payments.length === 0 ? <Empty msg="No payments on file yet." /> : (
               <table style={styles.table}>
                 <thead><tr style={styles.tr}>{['Date', 'Amount', 'Method', 'Status'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr></thead>
@@ -424,6 +458,10 @@ export default function ClientPortal() {
                   ))}
                 </tbody>
               </table>
+            )}
+            {payModalInv && (
+              <StripeInvoicePayModal invoice={payModalInv} onClose={() => setPayModalInv(null)}
+                onPaid={() => refreshPaymentsAndInvoices()} />
             )}
           </div>
         )}

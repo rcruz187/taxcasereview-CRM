@@ -107,7 +107,7 @@ export default function Invoices() {
 
   async function sendInvoiceEmail(inv, isReminder = false) {
     // Look up client email
-    const { data: client } = await supabase.from('clients').select('email').eq('name', inv.clientName).maybeSingle()
+    const { data: client } = await supabase.from('clients').select('id,email').eq('name', inv.clientName).maybeSingle()
     const { data: lead }   = await supabase.from('leads').select('email').eq('name', inv.clientName).maybeSingle()
     const to = client?.email || lead?.email
     if (!to) { showToast('No email on file for this client'); return }
@@ -118,6 +118,7 @@ export default function Invoices() {
     const tax      = subtotal * (taxRate/100)
     const paid     = parseFloat(inv.paid||0)
     const balance  = (subtotal + tax) - paid
+    const payLink  = client?.id ? `${window.location.origin}/taxcasereview-CRM/portal/${client.id}?section=payments` : null
     const subject = isReminder
       ? `Payment Reminder — Invoice #${invNum} — ${firm.name}`
       : `Invoice #${invNum} — ${firm.name}`
@@ -143,8 +144,8 @@ export default function Invoices() {
     }
 
     const body = isReminder
-      ? `Dear ${inv.clientName},\n\nThis is a friendly reminder that Invoice #${invNum} for $${balance.toLocaleString()} is due on ${inv.dueDate||'soon'} and remains unpaid.\n\nPlease contact our office if you have any questions.`
-      : `Dear ${inv.clientName},\n\n${attachedOk ? 'Please find your invoice attached.' : 'Here are the details for your invoice:'}\n\nInvoice #: ${invNum}\nDue Date: ${inv.dueDate||'Upon receipt'}\n\n${inv.lineItems||''}\n\n${breakdown}\n\nPlease contact our office with any questions.`
+      ? `Dear ${inv.clientName},\n\nThis is a friendly reminder that Invoice #${invNum} for $${balance.toLocaleString()} is due on ${inv.dueDate||'soon'} and remains unpaid.${payLink ? `\n\nPay securely online: ${payLink}` : ''}\n\nPlease contact our office if you have any questions.`
+      : `Dear ${inv.clientName},\n\n${attachedOk ? 'Please find your invoice attached.' : 'Here are the details for your invoice:'}\n\nInvoice #: ${invNum}\nDue Date: ${inv.dueDate||'Upon receipt'}\n\n${inv.lineItems||''}\n\n${breakdown}${payLink ? `\n\nPay securely online: ${payLink}` : ''}\n\nPlease contact our office with any questions.`
 
     try {
       await sendGmailEmail(supabase, { to, subject, body, attachments })
