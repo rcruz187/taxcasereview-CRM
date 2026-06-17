@@ -25,6 +25,12 @@ const STATUS_C = {
   'Dead':'br','Do Not Contact':'br'
 }
 
+// Setting a lead to either of these statuses means the lead is done —
+// no more follow-up is coming. Auto-archive it so it drops out of the
+// default working list, instead of relying on someone to remember to
+// click Archive separately. Still fully reversible via Restore.
+const AUTO_ARCHIVE_STATUSES = ['Dead', 'Do Not Contact']
+
 const PIPELINE_STAGES = [
   { label:'Contacted',    key:'contacted', statusMap:'Contacted' },
   { label:'Consultation', key:'consult',   statusMap:'Consultation Completed' },
@@ -521,15 +527,25 @@ export default function Leads() {
   async function updateStatus(l, status) {
     if (status === l.status) return
     const prevStatus = l.status || 'New Lead'
-    const { error } = await supabase.from('leads').update({ status }).eq('id', l.id)
+    const willArchive = AUTO_ARCHIVE_STATUSES.includes(status) && !l.archived
+    const willRestore = !AUTO_ARCHIVE_STATUSES.includes(status) && AUTO_ARCHIVE_STATUSES.includes(prevStatus) && l.archived
+    const payload = { status }
+    if (willArchive) payload.archived = true
+    if (willRestore) payload.archived = false
+    const { error } = await supabase.from('leads').update(payload).eq('id', l.id)
     if (error) { showToast('Error: ' + error.message); return }
     const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    const noteText = willArchive
+      ? `📊 Status changed: ${prevStatus} → ${status} (auto-archived)`
+      : willRestore
+        ? `📊 Status changed: ${prevStatus} → ${status} (auto-restored from archive)`
+        : `📊 Status changed: ${prevStatus} → ${status}`
     await supabase.from('lead_notes').insert([{
       lead_id: l.id, lead_name: l.name,
-      text: `📊 Status changed: ${prevStatus} → ${status}`,
+      text: noteText,
       type: 'System', author: actor, created_at: new Date().toISOString()
     }])
-    showToast('Status updated!')
+    showToast(willArchive ? 'Status updated — lead archived' : willRestore ? 'Status updated — lead restored' : 'Status updated!')
     load()
     if (detail?.id === l.id) loadLeadNotes(l.id)
   }
