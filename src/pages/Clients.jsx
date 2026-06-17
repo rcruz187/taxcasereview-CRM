@@ -8,7 +8,7 @@ import StripePaymentMethodModal from '../components/StripePaymentMethodModal'
 import FinancialProfile from './FinancialProfile'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
-import { generateServiceAgreement, generateAddendum, generateEngagementLetter, generatePOACoverLetter, sendFullPackage, generateCreditCardAuthForm } from '../lib/docUtils'
+import { generateServiceAgreement, generateAddendum, generatePOACoverLetter, sendFullPackage, generateCreditCardAuthForm } from '../lib/docUtils'
 
 const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -247,7 +247,7 @@ function InlineFaxForm({ client, onClose, showToast }) {
 }
 
 // ── Inline E-Sign Form ───────────────────────────────────────────────────────
-const DOC_TYPES_INLINE = ['Tax Service Agreement','Engagement Letter','Form 2848 — Power of Attorney','Form 8821 — Tax Info Auth',
+const DOC_TYPES_INLINE = ['Tax Service Agreement','Form 2848 — Power of Attorney','Form 8821 — Tax Info Auth',
   'Fee Agreement Addendum','9465 Installment Agreement','OIC Application (656)','Custom Document']
 
 function InlineEsignForm({ client, onClose, showToast }) {
@@ -1169,7 +1169,6 @@ export default function Clients() {
               } catch (err) { showToast('Error opening form: ' + err.message) }
             }}/>
             <ActionBtn color="#6c5ce7" icon="🔐" label="POA Cover Letter" sub="Form 2848" onClick={()=>generatePOACoverLetter(c)}/>
-            <ActionBtn color="#1A7FD4" icon="✉️" label="Engagement Letter" sub="Print" onClick={()=>generateEngagementLetter(c)}/>
             <ActionBtn color="#16a34a" icon="📦" label={pkgSending?'Building…':'Full Package'} sub="2848/8821 + Agreement" onClick={()=>!pkgSending&&handleSendFullPackage(c)}/>
             <ActionBtn color="#22863a" icon="📄" label="Service Agreement" sub="Print/Sign" onClick={()=>generateServiceAgreement(c)}/>
             <ActionBtn color="#16a34a" icon="💳" label="Credit Card Auth" sub="Print" onClick={()=>generateCreditCardAuthForm(c)}/>

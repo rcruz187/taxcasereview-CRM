@@ -182,7 +182,7 @@ function LeadInlineEsign({ lead, onClose }) {
   return <div style={{padding:'0 4px 4px'}}>
     <div className="field"><label>Document Type</label>
       <select value={docType} onChange={e=>set0(e.target.value)}>
-        {['Tax Service Agreement','Engagement Letter','Form 2848 — Power of Attorney','Form 8821 — Tax Info Auth','Fee Agreement Addendum','Custom Document'].map(t=><option key={t}>{t}</option>)}
+        {['Tax Service Agreement','Form 2848 — Power of Attorney','Form 8821 — Tax Info Auth','Fee Agreement Addendum','Custom Document'].map(t=><option key={t}>{t}</option>)}
       </select>
     </div>
     <div style={{background:'var(--s2)',borderRadius:6,padding:'9px 12px',marginBottom:12,fontSize:12,color:'var(--t3)',lineHeight:1.7}}>
