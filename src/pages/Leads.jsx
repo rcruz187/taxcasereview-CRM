@@ -617,9 +617,17 @@ export default function Leads() {
         oldNotes.map(n => ({ client_name: l.name, content: n.text, created_by: n.author || 'Staff', created_at: n.created_at }))
       )
     }
+    // Auto-create the 3 onboarding tasks now that contracts are signed
+    const today = new Date()
+    const addDays = n => { const d = new Date(today); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10) }
+    await supabase.from('tasks').insert([
+      { title: `Email IRS POA — ${l.name}`,        clientName: l.name, priority: 'High', dueDate: addDays(0), done: false, created_at: new Date().toISOString() },
+      { title: `Call IRS — ${l.name}`,             clientName: l.name, priority: 'High', dueDate: addDays(1), done: false, created_at: new Date().toISOString() },
+      { title: `Schedule TaxCase Review call — ${l.name}`, clientName: l.name, priority: 'Normal', dueDate: addDays(3), done: false, created_at: new Date().toISOString() },
+    ])
     setConverting(false)
     const { count } = await supabase.from('client_compliance_records').select('*', { count: 'exact', head: true }).eq('client_name', l.name)
-    showToast(count ? `✅ ${l.name} converted to Client! Compliance data (${count} records) carried over.` : `✅ ${l.name} converted to Client!`)
+    showToast(count ? `✅ ${l.name} converted to Client! 3 onboarding tasks created, compliance data (${count} records) carried over.` : `✅ ${l.name} converted to Client! 3 onboarding tasks created.`)
     setDetail(null); load()
   }
 
