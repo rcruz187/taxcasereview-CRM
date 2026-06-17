@@ -31,7 +31,7 @@ export default function Documents() {
 
   async function load() {
     let q = supabase.from('documents').select('*').order('created_at', { ascending: false })
-    if (clientFilter) q = q.eq('client', clientFilter)
+    if (clientFilter) q = q.ilike('client', `%${clientFilter}%`)
     if (folder !== 'All') q = q.eq('docType', folder)
     const { data } = await q
     setDocs(data || [])
@@ -101,19 +101,16 @@ export default function Documents() {
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search documents…"
             style={{width:'100%',padding:'7px 12px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12}}/>
         </div>
-        {clientFilter && (
-          <div style={{display:'flex',alignItems:'center',gap:6,background:'var(--blt)',borderRadius:6,padding:'4px 10px',fontSize:12}}>
-            <span style={{color:'var(--b2)',fontWeight:600}}>📋 {clientFilter}</span>
-            <button onClick={()=>setClientFilter('')} style={{background:'none',border:'none',color:'var(--blue)',cursor:'pointer',fontSize:14}}>×</button>
-          </div>
-        )}
-        {!clientFilter && (
-          <select value={clientFilter} onChange={e=>setClientFilter(e.target.value)}
-            style={{padding:'7px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12}}>
-            <option value="">All Clients</option>
-            {clients.map(c=><option key={c.name} value={c.name}>{c.name}</option>)}
-          </select>
-        )}
+        <div style={{position:'relative'}}>
+          <input list="doc-clients-filter" value={clientFilter} onChange={e=>setClientFilter(e.target.value)}
+            placeholder="Filter by client…"
+            style={{padding:'7px 28px 7px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12,width:180}}/>
+          <datalist id="doc-clients-filter">{clients.map(c=><option key={c.name} value={c.name}/>)}</datalist>
+          {clientFilter && (
+            <button onClick={()=>setClientFilter('')} title="Clear client filter"
+              style={{position:'absolute',right:6,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'var(--t3)',cursor:'pointer',fontSize:14,lineHeight:1}}>×</button>
+          )}
+        </div>
         <button className="btn pri" onClick={()=>setModal(true)}>+ Upload Document</button>
       </div>
 
