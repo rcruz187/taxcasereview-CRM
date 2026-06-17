@@ -86,6 +86,21 @@ function base64UrlEncode(str) {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
+// Email headers (Subject, the display-name part of From) are supposed to be
+// plain ASCII. Putting raw UTF-8 characters like an em dash (—) directly in
+// a header is non-conformant, and different mail systems handle that
+// inconsistently — some show mojibake ("Ã¢Â€Â"" instead of "—"), and it can
+// even cause a message to bounce. RFC 2047 encoded-word syntax sidesteps
+// this entirely by explicitly declaring the charset, so only encode when
+// the string actually contains non-ASCII characters.
+function encodeHeaderValue(str) {
+  if (!str || /^[\x00-\x7F]*$/.test(str)) return str
+  const utf8 = new TextEncoder().encode(str)
+  let binary = ''
+  utf8.forEach(b => { binary += String.fromCharCode(b) })
+  return `=?UTF-8?B?${btoa(binary)}?=`
+}
+
 // Sends an email via the Gmail API. Returns the Gmail message id.
 // attachments (optional): [{ filename, mimeType, base64Data }] — base64Data
 // is the standard (non-url) base64 encoding of the raw file bytes.
@@ -99,7 +114,8 @@ export async function sendGmailEmail(supabase, { to, subject, body, fromName, at
   // API reports success. Use a proper "Name <email>" format when we have
   // a real address on file; Gmail will still send as the authenticated
   // account either way, but a well-formed header improves deliverability.
-  const from = settings?.email ? `${fromDisplayName} <${settings.email}>` : fromDisplayName
+  const from = settings?.email ? `${encodeHeaderValue(fromDisplayName)} <${settings.email}>` : encodeHeaderValue(fromDisplayName)
+  const encodedSubject = encodeHeaderValue(subject)
   const finalBody = settings?.email_signature ? `${body}\n\n${settings.email_signature}` : body
 
   let message
@@ -107,7 +123,7 @@ export async function sendGmailEmail(supabase, { to, subject, body, fromName, at
     const headers = [
       `To: ${to}`,
       `From: ${from}`,
-      `Subject: ${subject}`,
+      `Subject: ${encodedSubject}`,
       `Date: ${new Date().toUTCString()}`,
       'Content-Type: text/plain; charset="UTF-8"',
       'MIME-Version: 1.0',
@@ -137,7 +153,7 @@ export async function sendGmailEmail(supabase, { to, subject, body, fromName, at
     const headers = [
       `To: ${to}`,
       `From: ${from}`,
-      `Subject: ${subject}`,
+      `Subject: ${encodedSubject}`,
       `Date: ${new Date().toUTCString()}`,
       `Content-Type: multipart/mixed; boundary="${boundary}"`,
       'MIME-Version: 1.0',

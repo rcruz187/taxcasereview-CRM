@@ -31,6 +31,7 @@ export default function Email() {
   const [saving, setSaving]     = useState(false)
   const [toast, setToast]       = useState('')
   const [view, setView]         = useState('inbox') // inbox | compose | templates
+  const [readLayout, setReadLayout] = useState(() => localStorage.getItem('tcr_email_layout') || 'side') // side | stacked
   const [triageFilter, setTriageFilter] = useState('Inbox')
   const [selected, setSelected] = useState(null)
   const [search, setSearch]     = useState('')
@@ -60,6 +61,7 @@ export default function Email() {
   }
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3500) }
+  function setLayout(l) { setReadLayout(l); localStorage.setItem('tcr_email_layout', l) }
   function fld(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
   function searchClient(val) {
@@ -198,11 +200,22 @@ export default function Email() {
 
         {/* Email list */}
         {view === 'inbox' && (
-          <>
-            <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid var(--br)', display: 'flex', flexDirection: 'column', background: 'var(--sf)' }}>
-              <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--br)' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: readLayout === 'side' ? 'row' : 'column', overflow: 'hidden' }}>
+            <div style={{
+              width: readLayout === 'side' ? 320 : '100%',
+              height: readLayout === 'side' ? '100%' : 260,
+              flexShrink: 0,
+              borderRight: readLayout === 'side' ? '1px solid var(--br)' : 'none',
+              borderBottom: readLayout === 'stacked' ? '1px solid var(--br)' : 'none',
+              display: 'flex', flexDirection: 'column', background: 'var(--sf)'
+            }}>
+              <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--br)', display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search emails…"
-                  style={{ width: '100%', padding: '7px 12px', borderRadius: 8, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--tx)', fontSize: 13 }} />
+                  style={{ flex: 1, padding: '7px 12px', borderRadius: 8, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--tx)', fontSize: 13 }} />
+                <div style={{ display: 'flex', border: '1px solid var(--br)', borderRadius: 7, overflow: 'hidden', flexShrink: 0 }}>
+                  <button title="Side-by-side" onClick={() => setLayout('side')} style={{ padding: '6px 9px', background: readLayout === 'side' ? 'rgba(26,127,212,.18)' : 'transparent', color: readLayout === 'side' ? 'var(--blue)' : 'var(--t3)', border: 'none', cursor: 'pointer', fontSize: 13 }}>▥</button>
+                  <button title="Top and bottom" onClick={() => setLayout('stacked')} style={{ padding: '6px 9px', background: readLayout === 'stacked' ? 'rgba(26,127,212,.18)' : 'transparent', color: readLayout === 'stacked' ? 'var(--blue)' : 'var(--t3)', border: 'none', cursor: 'pointer', fontSize: 13 }}>▤</button>
+                </div>
               </div>
               <div style={{ flex: 1, overflow: 'auto' }}>
                 {filtered.length === 0 ? (
@@ -257,7 +270,7 @@ export default function Email() {
                 </div>
               )}
             </div>
-          </>
+          </div>
         )}
 
         {/* Compose */}
