@@ -93,7 +93,13 @@ export async function sendGmailEmail(supabase, { to, subject, body, fromName, at
   const token = await getValidGmailToken(supabase)
 
   const { data: settings } = await supabase.from('settings').select('email,name,email_signature').limit(1).maybeSingle()
-  const from = fromName || settings?.name || 'Tax Case Review'
+  const fromDisplayName = fromName || settings?.name || 'Tax Case Review'
+  // A bare display name with no email address is malformed per the email
+  // spec, and can get a message silently spam-filtered even when Gmail's
+  // API reports success. Use a proper "Name <email>" format when we have
+  // a real address on file; Gmail will still send as the authenticated
+  // account either way, but a well-formed header improves deliverability.
+  const from = settings?.email ? `${fromDisplayName} <${settings.email}>` : fromDisplayName
   const finalBody = settings?.email_signature ? `${body}\n\n${settings.email_signature}` : body
 
   let message
@@ -102,6 +108,7 @@ export async function sendGmailEmail(supabase, { to, subject, body, fromName, at
       `To: ${to}`,
       `From: ${from}`,
       `Subject: ${subject}`,
+      `Date: ${new Date().toUTCString()}`,
       'Content-Type: text/plain; charset="UTF-8"',
       'MIME-Version: 1.0',
     ].join('\r\n')
@@ -131,6 +138,7 @@ export async function sendGmailEmail(supabase, { to, subject, body, fromName, at
       `To: ${to}`,
       `From: ${from}`,
       `Subject: ${subject}`,
+      `Date: ${new Date().toUTCString()}`,
       `Content-Type: multipart/mixed; boundary="${boundary}"`,
       'MIME-Version: 1.0',
     ].join('\r\n')

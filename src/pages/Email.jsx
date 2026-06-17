@@ -97,7 +97,7 @@ export default function Email() {
     const { error } = await supabase.from('emails').insert([{ ...form, status, created_at: new Date().toISOString() }])
     setSaving(false)
     if (error) { showToast('Error: ' + error.message); return }
-    showToast(status === 'Sent' ? '✅ Email sent via Gmail!' : '✅ Email logged!')
+    showToast(status === 'Sent' ? '✅ Email sent via Gmail!' : '⚠️ Gmail is not connected — this was only saved as a log entry, nothing was emailed')
     setForm(BLANK); setView('inbox'); load()
   }
 
