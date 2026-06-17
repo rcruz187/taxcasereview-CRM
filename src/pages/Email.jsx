@@ -3,13 +3,13 @@ import { supabase } from '../lib/supabase'
 import { sendGmailEmail } from '../lib/gmailUtils'
 
 const TEMPLATES = [
-  { label:'Welcome Letter',       subject:'Welcome to Tax Case Review', body:'Dear {name},\n\nWelcome to Tax Case Review! We are pleased to begin working on your tax resolution case. Your dedicated case representative will be in touch shortly.\n\nBest regards,\nTax Case Review' },
-  { label:'Document Request',     subject:'Documents Needed — Your Tax Case', body:'Dear {name},\n\nTo proceed with your case, we need the following documents:\n\n1. Last 2 years of tax returns\n2. Most recent IRS notice(s)\n3. Photo ID\n\nPlease provide these at your earliest convenience.\n\nThank you,\nTax Case Review' },
-  { label:'OIC Update',           subject:'Update on Your Offer in Compromise', body:'Dear {name},\n\nWe have an update regarding your Offer in Compromise. The IRS has reviewed your submission and we are awaiting their response.\n\nBest regards,\nTax Case Review' },
-  { label:'Appointment Reminder', subject:'Appointment Reminder — Tax Case Review', body:'Dear {name},\n\nThis is a reminder of your upcoming appointment. Please ensure you have all requested documents ready.\n\nThank you,\nTax Case Review' },
-  { label:'Resolution Complete',  subject:'Your Case Has Been Resolved', body:'Dear {name},\n\nWe are pleased to inform you that your tax resolution case has been successfully resolved.\n\nThank you for trusting Tax Case Review.\n\nBest regards,\nTax Case Review' },
-  { label:'IRS Notice Response',  subject:'Re: IRS Notice — Action Required', body:'Dear {name},\n\nWe have reviewed your IRS notice and are preparing a response on your behalf. No action is required from you at this time.\n\nWe will keep you updated on all developments.\n\nBest regards,\nTax Case Review' },
-  { label:'Payment Receipt',      subject:'Payment Received — Thank You', body:'Dear {name},\n\nThank you for your payment. Your account has been updated and we will continue working diligently on your case.\n\nBest regards,\nTax Case Review' },
+  { label:'Welcome Letter',       subject:'Welcome to Tax Case Review', body:'Dear {name},\n\nWelcome to Tax Case Review! We are pleased to begin working on your tax resolution case. Your dedicated case representative will be in touch shortly.' },
+  { label:'Document Request',     subject:'Documents Needed — Your Tax Case', body:'Dear {name},\n\nTo proceed with your case, we need the following documents:\n\n1. Last 2 years of tax returns\n2. Most recent IRS notice(s)\n3. Photo ID\n\nPlease provide these at your earliest convenience.' },
+  { label:'OIC Update',           subject:'Update on Your Offer in Compromise', body:'Dear {name},\n\nWe have an update regarding your Offer in Compromise. The IRS has reviewed your submission and we are awaiting their response.' },
+  { label:'Appointment Reminder', subject:'Appointment Reminder — Tax Case Review', body:'Dear {name},\n\nThis is a reminder of your upcoming appointment. Please ensure you have all requested documents ready.' },
+  { label:'Resolution Complete',  subject:'Your Case Has Been Resolved', body:'Dear {name},\n\nWe are pleased to inform you that your tax resolution case has been successfully resolved.\n\nThank you for trusting Tax Case Review.' },
+  { label:'IRS Notice Response',  subject:'Re: IRS Notice — Action Required', body:'Dear {name},\n\nWe have reviewed your IRS notice and are preparing a response on your behalf. No action is required from you at this time.\n\nWe will keep you updated on all developments.' },
+  { label:'Payment Receipt',      subject:'Payment Received — Thank You', body:'Dear {name},\n\nThank you for your payment. Your account has been updated and we will continue working diligently on your case.' },
 ]
 
 const TRIAGE = ['Inbox','Action Needed','Waiting','Sent','Archive']

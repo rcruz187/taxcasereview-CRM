@@ -92,8 +92,9 @@ function base64UrlEncode(str) {
 export async function sendGmailEmail(supabase, { to, subject, body, fromName, attachments = [] }) {
   const token = await getValidGmailToken(supabase)
 
-  const { data: settings } = await supabase.from('settings').select('email,name').limit(1).maybeSingle()
+  const { data: settings } = await supabase.from('settings').select('email,name,email_signature').limit(1).maybeSingle()
   const from = fromName || settings?.name || 'Tax Case Review'
+  const finalBody = settings?.email_signature ? `${body}\n\n${settings.email_signature}` : body
 
   let message
   if (attachments.length === 0) {
@@ -104,7 +105,7 @@ export async function sendGmailEmail(supabase, { to, subject, body, fromName, at
       'Content-Type: text/plain; charset="UTF-8"',
       'MIME-Version: 1.0',
     ].join('\r\n')
-    message = `${headers}\r\n\r\n${body}`
+    message = `${headers}\r\n\r\n${finalBody}`
   } else {
     const boundary = `====tcr_${Date.now()}====`
     const parts = [
@@ -113,7 +114,7 @@ export async function sendGmailEmail(supabase, { to, subject, body, fromName, at
         'Content-Type: text/plain; charset="UTF-8"',
         'Content-Transfer-Encoding: 7bit',
         '',
-        body,
+        finalBody,
       ].join('\r\n'),
       ...attachments.map(att => [
         `--${boundary}`,

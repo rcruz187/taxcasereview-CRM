@@ -112,7 +112,7 @@ export default function Deadlines() {
     if (!to) { showToast('No email on file for ' + clientName); return }
     const dy = daysLeft(d)
     const subject = `Reminder: ${getName(d)} — ${d.dueDate||d.due_date}`
-    const body = `Dear ${clientName},\n\nThis is a reminder regarding an upcoming deadline on your case:\n\n${getName(d)} (${d.type})\nDue: ${d.dueDate||d.due_date} (${daysText(dy)})\n\n${d.notes||''}\n\nPlease contact our office if you have any questions.\n\nBest regards,\nTax Case Review`
+    const body = `Dear ${clientName},\n\nThis is a reminder regarding an upcoming deadline on your case:\n\n${getName(d)} (${d.type})\nDue: ${d.dueDate||d.due_date} (${daysText(dy)})\n\n${d.notes||''}\n\nPlease contact our office if you have any questions.`
     try {
       await sendGmailEmail(supabase, { to, subject, body })
       showToast(`✅ Reminder sent to ${to}`)

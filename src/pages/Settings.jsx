@@ -17,7 +17,8 @@ export default function Settings() {
     address: '', city: '', state: '', zip: '',
     website: '', ein: '', primary_color: '#2563eb',
     preparer_name: '', ptin: '', caf_number: '', efin: '',
-    gmail_client_id: '', gmail_client_secret: '', gmail_redirect_uri: ''
+    gmail_client_id: '', gmail_client_secret: '', gmail_redirect_uri: '',
+    email_signature: ''
   })
 
   const [pw, setPw] = useState({ next: '', confirm: '' })
@@ -112,6 +113,7 @@ export default function Settings() {
         signalwire_backend: firm.signalwire_backend,
         qb_client_id: firm.qb_client_id,
         qb_client_secret: firm.qb_client_secret,
+        email_signature: firm.email_signature,
       }
       // Empty-string values blow up non-text columns (date, numeric) with
       // "invalid input syntax" — Postgres wants null for "no value", not ''.
@@ -553,6 +555,14 @@ export default function Settings() {
                 <input type="color" value={firm.primary_color} onChange={e => { set('primary_color')(e); applyBrandColor(e.target.value) }} style={{ width: 48, height: 36, borderRadius: 6, border: 'none', cursor: 'pointer' }} />
                 <input value={firm.primary_color} onChange={e => { set('primary_color')(e); applyBrandColor(e.target.value) }} style={{ flex: 1 }} placeholder="#2563eb" />
               </div>
+            </div>
+            <div className="field" style={{ maxWidth: 420 }}>
+              <label>Email Signature</label>
+              <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 10, lineHeight: 1.6 }}>
+                Added automatically to the bottom of every email sent from the CRM (invoices, reminders, the Email page, etc).
+              </div>
+              <textarea value={firm.email_signature||''} onChange={set('email_signature')} rows={4}
+                placeholder={"Best regards,\nTax Case Review\n(305) 555-0000\nwww.taxcasereview.org"} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
               <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Branding'}</button>

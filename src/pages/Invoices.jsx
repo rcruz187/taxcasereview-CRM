@@ -37,17 +37,20 @@ export default function Invoices() {
   const [filterStatus, setFilterStatus] = useState('All')
   const [suggestions, setSug]   = useState([])
   const [showSug,  setShowSug]  = useState(false)
+  const [cases,    setCases]    = useState([])
   const firm = useFirm()
 
   useEffect(() => { load() }, [])
 
   async function load() {
-    const [{ data:inv },{ data:cl }] = await Promise.all([
+    const [{ data:inv },{ data:cl },{ data:cs }] = await Promise.all([
       supabase.from('invoices').select('*').order('created_at',{ascending:false}),
-      supabase.from('clients').select('id,name,assignedTo')
+      supabase.from('clients').select('id,name,assignedTo'),
+      supabase.from('cases').select('clientName,caseNum,created_at').order('created_at',{ascending:false})
     ])
     if (inv) setItems(inv)
     if (cl)  setClients(cl)
+    if (cs)  setCases(cs)
   }
 
   function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''),3000) }
@@ -62,6 +65,9 @@ export default function Invoices() {
 
   function selectClient(c) {
     fld('clientName', c.name)
+    // Auto-fill Case # from this client's most recent case, if they have one
+    const match = cases.find(cs => cs.clientName === c.name)
+    if (match) fld('caseNum', match.caseNum)
     setSug([]); setShowSug(false)
   }
 
@@ -79,7 +85,13 @@ export default function Invoices() {
       if (error) { showToast('Error: '+error.message); setSaving(false); return }
       showToast('✅ Invoice updated!')
     } else {
-      const invNum = 'INV-' + Date.now().toString().slice(-6)
+      // Sequential, e.g. INV-000001, INV-000002 — easier to track for
+      // bookkeeping than a timestamp fragment that jumps around.
+      const maxNum = items.reduce((max,i) => {
+        const n = parseInt((i.invNum||'').replace(/\D/g,''), 10)
+        return Number.isFinite(n) && n > max ? n : max
+      }, 0)
+      const invNum = 'INV-' + String(maxNum+1).padStart(6,'0')
       const {error} = await supabase.from('invoices').insert([{...form, invNum, status:statusCalc, created_at:new Date().toISOString()}])
       if (error) { showToast('Error: '+error.message); setSaving(false); return }
       showToast('✅ Invoice created!')
@@ -131,8 +143,8 @@ export default function Invoices() {
     }
 
     const body = isReminder
-      ? `Dear ${inv.clientName},\n\nThis is a friendly reminder that Invoice #${invNum} for $${balance.toLocaleString()} is due on ${inv.dueDate||'soon'} and remains unpaid.\n\nPlease contact our office if you have any questions.\n\nBest regards,\n${firm.name}`
-      : `Dear ${inv.clientName},\n\n${attachedOk ? 'Please find your invoice attached.' : 'Here are the details for your invoice:'}\n\nInvoice #: ${invNum}\nDue Date: ${inv.dueDate||'Upon receipt'}\n\n${inv.lineItems||''}\n\n${breakdown}\n\nPlease contact our office with any questions.\n\nBest regards,\n${firm.name}`
+      ? `Dear ${inv.clientName},\n\nThis is a friendly reminder that Invoice #${invNum} for $${balance.toLocaleString()} is due on ${inv.dueDate||'soon'} and remains unpaid.\n\nPlease contact our office if you have any questions.`
+      : `Dear ${inv.clientName},\n\n${attachedOk ? 'Please find your invoice attached.' : 'Here are the details for your invoice:'}\n\nInvoice #: ${invNum}\nDue Date: ${inv.dueDate||'Upon receipt'}\n\n${inv.lineItems||''}\n\n${breakdown}\n\nPlease contact our office with any questions.`
 
     try {
       await sendGmailEmail(supabase, { to, subject, body, attachments })
@@ -145,7 +157,7 @@ export default function Invoices() {
   }
 
   async function recordPayment(inv) {
-    const amount = prompt(`Record payment for Invoice #${inv.invoiceNum||inv.id?.slice(-6)||''}.\nEnter amount received:`, inv.total)
+    const amount = prompt(`Record payment for Invoice #${inv.invNum||inv.id?.slice(-6)||''}.\nEnter amount received:`, inv.total)
     if (!amount) return
     const paid = parseFloat(amount)
     const total = parseFloat(inv.total || 0)
@@ -153,7 +165,7 @@ export default function Invoices() {
     const { error } = await supabase.from('invoices').update({ paid: String(paid), status, updated_at: new Date().toISOString() }).eq('id', inv.id)
     if (!error) {
       // Also create a payment record
-      await supabase.from('payments').insert([{ clientName: inv.clientName, amount: paid, method: 'Manual', invoiceId: inv.id, notes: `Payment for Invoice #${inv.invoiceNum||''}`, created_at: new Date().toISOString() }])
+      await supabase.from('payments').insert([{ clientName: inv.clientName, amount: paid, method: 'Manual', invoiceId: inv.id, notes: `Payment for Invoice #${inv.invNum||''}`, created_at: new Date().toISOString() }])
       showToast(`✅ Payment of $${paid.toLocaleString()} recorded`)
       load()
     }
@@ -395,7 +407,7 @@ export default function Invoices() {
             </div>
 
             <div className="fg2">
-              <div className="field"><label>Case #</label><input value={form.caseNum} onChange={e=>fld('caseNum',e.target.value)} placeholder="C-XXXXXX"/></div>
+              <div className="field"><label>Case #</label><input value={form.caseNum} onChange={e=>fld('caseNum',e.target.value)} placeholder="Auto-fills from client's case, or type manually"/></div>
               <div className="field"><label>Due Date</label><input type="date" value={form.dueDate} onChange={e=>fld('dueDate',e.target.value)}/></div>
             </div>
 
