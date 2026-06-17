@@ -1441,18 +1441,6 @@ export default function Clients() {
               <DR label="Spouse SSN"    val={c.spouseSsn?'***-**-'+c.spouseSsn.replace(/-/g,'').slice(-4):null}/>
             </div>
 
-            {/* Payment & Autopay */}
-            <div className="card">
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-                <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>💳 Payment & Autopay</div>
-                <button className="btn" style={{padding:'4px 10px',fontSize:11}} onClick={()=>setStripeModal(true)}>{c.default_payment_method_id?'Update':'+ Add'} Payment Method</button>
-              </div>
-              <DR label="Payment Method" val={c.default_payment_method_id ? `${c.payment_method_brand||''} •••• ${c.payment_method_last4||''}` : 'None on file'}/>
-              <DR label="Autopay" val={c.autopay_enabled ? `✅ ${c.autopay_frequency||'monthly'} — $${c.autopay_amount||0}` : 'Off'}/>
-              {c.autopay_enabled && <DR label="Next Charge" val={c.autopay_next_charge}/>}
-              {c.autopay_last_result && <DR label="Last Charge" val={c.autopay_last_result==='succeeded' ? `✅ Succeeded ${c.autopay_last_charged_at?new Date(c.autopay_last_charged_at).toLocaleDateString():''}` : `❌ Failed ${c.autopay_last_charged_at?new Date(c.autopay_last_charged_at).toLocaleDateString():''}`}/>}
-            </div>
-
             {/* Dependents */}
             {deps.length>0&&(
               <div className="card">
@@ -1501,6 +1489,18 @@ export default function Clients() {
               )}
               <DR label="Assigned Rep" val={c.assignedTo}/>
               <DR label="Client Since" val={c.clientSince}/>
+            </div>
+
+            {/* Payment & Autopay */}
+            <div className="card">
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>💳 Payment & Autopay</div>
+                <button className="btn" style={{padding:'4px 10px',fontSize:11}} onClick={()=>setStripeModal(true)}>{c.default_payment_method_id?'Update':'+ Add'} Payment Method</button>
+              </div>
+              <DR label="Payment Method" val={c.default_payment_method_id ? `${c.payment_method_brand||''} •••• ${c.payment_method_last4||''}` : 'None on file'}/>
+              <DR label="Autopay" val={c.autopay_enabled ? `✅ ${c.autopay_frequency||'monthly'} — $${c.autopay_amount||0}` : 'Off'}/>
+              {c.autopay_enabled && <DR label="Next Charge" val={c.autopay_next_charge}/>}
+              {c.autopay_last_result && <DR label="Last Charge" val={c.autopay_last_result==='succeeded' ? `✅ Succeeded ${c.autopay_last_charged_at?new Date(c.autopay_last_charged_at).toLocaleDateString():''}` : `❌ Failed ${c.autopay_last_charged_at?new Date(c.autopay_last_charged_at).toLocaleDateString():''}`}/>}
             </div>
 
             {/* CSED Summary */}
