@@ -87,20 +87,56 @@ function base64UrlEncode(str) {
 }
 
 // Sends an email via the Gmail API. Returns the Gmail message id.
-export async function sendGmailEmail(supabase, { to, subject, body, fromName }) {
+// attachments (optional): [{ filename, mimeType, base64Data }] — base64Data
+// is the standard (non-url) base64 encoding of the raw file bytes.
+export async function sendGmailEmail(supabase, { to, subject, body, fromName, attachments = [] }) {
   const token = await getValidGmailToken(supabase)
 
   const { data: settings } = await supabase.from('settings').select('email,name').limit(1).maybeSingle()
   const from = fromName || settings?.name || 'Tax Case Review'
 
-  const headers = [
-    `To: ${to}`,
-    `From: ${from}`,
-    `Subject: ${subject}`,
-    'Content-Type: text/plain; charset="UTF-8"',
-    'MIME-Version: 1.0',
-  ].join('\r\n')
-  const raw = base64UrlEncode(`${headers}\r\n\r\n${body}`)
+  let message
+  if (attachments.length === 0) {
+    const headers = [
+      `To: ${to}`,
+      `From: ${from}`,
+      `Subject: ${subject}`,
+      'Content-Type: text/plain; charset="UTF-8"',
+      'MIME-Version: 1.0',
+    ].join('\r\n')
+    message = `${headers}\r\n\r\n${body}`
+  } else {
+    const boundary = `====tcr_${Date.now()}====`
+    const parts = [
+      [
+        `--${boundary}`,
+        'Content-Type: text/plain; charset="UTF-8"',
+        'Content-Transfer-Encoding: 7bit',
+        '',
+        body,
+      ].join('\r\n'),
+      ...attachments.map(att => [
+        `--${boundary}`,
+        `Content-Type: ${att.mimeType}; name="${att.filename}"`,
+        `Content-Disposition: attachment; filename="${att.filename}"`,
+        'Content-Transfer-Encoding: base64',
+        '',
+        // wrap at 76 chars — conventional, and some mail servers expect it
+        att.base64Data.replace(/(.{76})/g, '$1\r\n'),
+      ].join('\r\n')),
+      `--${boundary}--`,
+    ]
+    const headers = [
+      `To: ${to}`,
+      `From: ${from}`,
+      `Subject: ${subject}`,
+      `Content-Type: multipart/mixed; boundary="${boundary}"`,
+      'MIME-Version: 1.0',
+    ].join('\r\n')
+    message = `${headers}\r\n\r\n${parts.join('\r\n')}`
+  }
+
+  const raw = base64UrlEncode(message)
 
   const res = await fetch(SEND_URL, {
     method: 'POST',

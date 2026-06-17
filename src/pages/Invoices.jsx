@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { sendGmailEmail } from '../lib/gmailUtils'
 import { useApp } from '../context/AppContext'
+import { useFirm } from '../lib/useFirm'
+import { generateInvoicePdfBase64 } from '../lib/invoicePdf'
 
 const BLANK = { clientName:'', caseNum:'', lineItems:'', total:'', paid:'0', dueDate:'', taxRate:'0', status:'Unpaid', notes:'' }
 const SERVICE_TEMPLATES = [
@@ -35,6 +37,7 @@ export default function Invoices() {
   const [filterStatus, setFilterStatus] = useState('All')
   const [suggestions, setSug]   = useState([])
   const [showSug,  setShowSug]  = useState(false)
+  const firm = useFirm()
 
   useEffect(() => { load() }, [])
 
@@ -104,18 +107,35 @@ export default function Invoices() {
     const paid     = parseFloat(inv.paid||0)
     const balance  = (subtotal + tax) - paid
     const subject = isReminder
-      ? `Payment Reminder — Invoice #${invNum} — Tax Case Review`
-      : `Invoice #${invNum} — Tax Case Review`
+      ? `Payment Reminder — Invoice #${invNum} — ${firm.name}`
+      : `Invoice #${invNum} — ${firm.name}`
     const breakdown = `Subtotal: $${subtotal.toLocaleString()}`
       + (taxRate>0 ? `\nTax (${taxRate}%): $${tax.toLocaleString()}` : '')
       + (paid>0 ? `\nPaid: -$${paid.toLocaleString()}` : '')
       + `\nBalance Due: $${balance.toLocaleString()}`
+
+    // Attach the real branded PDF on the initial send (not on reminders —
+    // those are just a nudge about an invoice already sent).
+    let attachments = []
+    let attachedOk = false
+    if (!isReminder) {
+      try {
+        const base64Data = await generateInvoicePdfBase64(inv, firm)
+        attachments = [{ filename: `Invoice-${invNum}.pdf`, mimeType: 'application/pdf', base64Data }]
+        attachedOk = true
+      } catch (e) {
+        // Don't block sending the invoice over a PDF generation hiccup —
+        // just fall back to the plain-text breakdown below.
+        console.error('Invoice PDF generation failed:', e)
+      }
+    }
+
     const body = isReminder
-      ? `Dear ${inv.clientName},\n\nThis is a friendly reminder that Invoice #${invNum} for $${balance.toLocaleString()} is due on ${inv.dueDate||'soon'} and remains unpaid.\n\nPlease contact our office if you have any questions.\n\nBest regards,\nTax Case Review\n(305) 555-0000`
-      : `Dear ${inv.clientName},\n\nHere are the details for your invoice:\n\nInvoice #: ${invNum}\nDue Date: ${inv.dueDate||'Upon receipt'}\n\n${inv.lineItems||''}\n\n${breakdown}\n\nPlease contact our office with any questions.\n\nBest regards,\nTax Case Review`
+      ? `Dear ${inv.clientName},\n\nThis is a friendly reminder that Invoice #${invNum} for $${balance.toLocaleString()} is due on ${inv.dueDate||'soon'} and remains unpaid.\n\nPlease contact our office if you have any questions.\n\nBest regards,\n${firm.name}`
+      : `Dear ${inv.clientName},\n\n${attachedOk ? 'Please find your invoice attached.' : 'Here are the details for your invoice:'}\n\nInvoice #: ${invNum}\nDue Date: ${inv.dueDate||'Upon receipt'}\n\n${inv.lineItems||''}\n\n${breakdown}\n\nPlease contact our office with any questions.\n\nBest regards,\n${firm.name}`
 
     try {
-      await sendGmailEmail(supabase, { to, subject, body })
+      await sendGmailEmail(supabase, { to, subject, body, attachments })
       await supabase.from('invoices').update({ status: isReminder ? inv.status : 'Sent', updated_at: new Date().toISOString() }).eq('id', inv.id)
       showToast(`✅ ${isReminder ? 'Reminder' : 'Invoice'} sent to ${to}`)
       load()
@@ -206,10 +226,13 @@ export default function Invoices() {
     <button onclick="window.print()" style="padding:8px 24px;background:#1A7FD4;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">🖨️ Print / Save PDF</button>
   </div>
   <div class="header">
-    <div>
-      <div class="firm-name">Tax Case Review</div>
-      <div class="firm-sub">IRS Resolution Services</div>
-      <div class="firm-sub">631 US Highway One Ste 304, North Palm Beach, FL 33408</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      ${firm.logoUrl ? `<img src="${firm.logoUrl}" style="height:48px;width:auto;object-fit:contain" onerror="this.style.display='none'"/>` : ''}
+      <div>
+        <div class="firm-name">${firm.name}</div>
+        <div class="firm-sub">${firm.tagline}</div>
+        <div class="firm-sub">${firm.address || '631 US Highway One Ste 304, North Palm Beach, FL 33408'}</div>
+      </div>
     </div>
     <div style="text-align:right">
       <div class="inv-title">INVOICE</div>
@@ -250,7 +273,7 @@ export default function Invoices() {
   </div>
   ${inv.notes?`<div class="notes"><strong>Notes:</strong> ${inv.notes}</div>`:''}
   <div class="footer">
-    Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408 · Not a Law Firm<br/>
+    ${firm.footer()}<br/>
     Thank you for your business.
   </div>
 </body></html>`)
