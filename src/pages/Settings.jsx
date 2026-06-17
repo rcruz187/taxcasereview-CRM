@@ -297,6 +297,15 @@ export default function Settings() {
           <div className="card">
             <div className="card-header"><span className="card-title">📧 Gmail OAuth Integration</span></div>
             <div style={{ padding: '0 20px 20px' }}>
+              {firm.gmail_refresh_token ? (
+                <div style={{background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.25)",borderRadius:8,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10,fontSize:12,color:"var(--ok)"}}>
+                  <span>✅</span><span>Gmail is connected{firm.gmail_connected_email ? ` as ${firm.gmail_connected_email}` : ''}. Emails will send from this account.</span>
+                </div>
+              ) : (
+                <div style={{background:"rgba(250,204,21,.08)",border:"1px solid rgba(250,204,21,.25)",borderRadius:8,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10,fontSize:12,color:"var(--warn)"}}>
+                  <span>⚠️</span><span>Not connected yet — emails won't send until you authorize below.</span>
+                </div>
+              )}
               <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.7 }}>
                 Connect Gmail to send emails directly from the Email page. Follow the setup steps below.
               </div>
