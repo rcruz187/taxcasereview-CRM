@@ -112,6 +112,9 @@ function DR({label,val,name,entityId,onLogged,showToast}) {
     if (isPhone) return (
       <InPlaceCaller phone={val} name={name} entityType="client" entityId={entityId} supabase={supabase} showToast={showToast} onLogged={onLogged}/>
     )
+    if (label==='Address') return (
+      <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(val)}`} target="_blank" rel="noopener noreferrer" style={{color:'var(--blue)'}}>{val} ↗</a>
+    )
     return val
   }
   return (

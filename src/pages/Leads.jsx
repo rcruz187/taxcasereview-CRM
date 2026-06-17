@@ -1036,6 +1036,8 @@ export default function Leads() {
               <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">
                 {(label==='Phone'||label==='Phone 2') && val
                   ? <InPlaceCaller phone={val} name={l.name} entityType="lead" entityId={l.id} supabase={supabase} showToast={showToast} onLogged={()=>loadLeadNotes(l.id)}/>
+                  : label==='Address' && val
+                  ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(val)}`} target="_blank" rel="noopener noreferrer" style={{color:'var(--blue)'}}>{val} ↗</a>
                   : (val||'—')}
               </span></div>
             ))}
