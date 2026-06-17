@@ -10,6 +10,7 @@ import ErrorBoundary from '../components/ErrorBoundary'
 import ComplianceGrids from './ComplianceGrids'
 import { ClientDocs } from './Clients'
 import InPlaceCaller from '../components/InPlaceCaller'
+import ChargeResolutionFeeModal from '../components/ChargeResolutionFeeModal'
 
 const STATUSES = ['New Lead','Contacted','Consultation Scheduled','Consultation Completed',
   'Tax Inv Agreement Sent','Tax Inv Agreement Signed','Tax Inv Fee Paid',
@@ -309,6 +310,7 @@ export default function Leads() {
   const [modal, setModal]   = useState(false)
   const [showScript, setShowScript] = useState(false)
   const [bookingLead, setBookingLead] = useState(null)
+  const [resolutionFeeLead, setResolutionFeeLead] = useState(null)
   const [fillerLead, setFillerLead] = useState(null)
   const [detail, setDetail] = useState(null)
   const [showCompliance, setShowCompliance] = useState(false)
@@ -559,8 +561,8 @@ export default function Leads() {
     load()
   }
 
-  async function convertToClient(l) {
-    if (!confirm(`Convert "${l.name}" to a full client?`)) return
+  async function convertToClient(l, skipConfirm) {
+    if (!skipConfirm && !confirm(`Convert "${l.name}" to a full client?`)) return
     setConverting(true)
     const taxYearsStr = l.taxYearsCustom || (()=>{try{return JSON.parse(l.taxYears||'[]').join(', ')}catch{return l.taxYears||''}})()
     const { error } = await supabase.from('clients').insert([{
@@ -937,6 +939,9 @@ export default function Leads() {
             }}/>
             <ActionBtn color="#0891b2" icon="📅" label="Schedule" sub="Book Appointment" onClick={()=>setBookingLead(l)}/>
             <ActionBtn color="#d97706" icon="📝" label="Addendum" sub="After IRS facts" onClick={()=>generateAddendum(l)}/>
+            {l.status==='Addendum Signed' && (
+              <ActionBtn color="#059669" icon="💰" label="Charge Resolution Fee" sub="& Convert to Client" onClick={()=>setResolutionFeeLead(l)}/>
+            )}
 
             <ActionBtn color="#dc2626" icon="📠" label="Send Fax" sub="SignalWire Fax" onClick={()=>{setInlineFaxLead(l);setShowFaxModal(true)}}/>
             <ActionBtn color="#7c3aed" icon="✍️" label="E-Signature" sub="Request Sign" onClick={()=>{setInlineEsignLead(l);setShowEsignModal(true)}}/>
@@ -1158,6 +1163,14 @@ export default function Leads() {
 
         {bookingLead && (
           <BookingWidget contact={{name:bookingLead.name, email:bookingLead.email, phone:bookingLead.phone}} onClose={()=>setBookingLead(null)} mode="lead"/>
+        )}
+        {resolutionFeeLead && (
+          <ChargeResolutionFeeModal
+            lead={resolutionFeeLead}
+            showToast={showToast}
+            onClose={()=>setResolutionFeeLead(null)}
+            onPaid={()=>{ setResolutionFeeLead(null); convertToClient(l, true) }}
+          />
         )}
         {fillerLead && (
           <ErrorBoundary onClose={()=>setFillerLead(null)}>
