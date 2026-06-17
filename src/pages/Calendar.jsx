@@ -137,7 +137,7 @@ export default function Calendar() {
   }
 
   async function deleteEvent(id) {
-    if (!confirmDel) { setConfirmDel('pending'); return }
+    if (confirmDel !== id) { setConfirmDel(id); return }
     setConfirmDel(null)
     await supabase.from('calevents').delete().eq('id', id)
     setSelectedEvent(null); showToast('Deleted'); load()
@@ -608,7 +608,7 @@ export default function Calendar() {
             <div style={{fontSize:13,color:'var(--t3)',marginBottom:20}}>This cannot be undone.</div>
             <div style={{display:'flex',gap:8}}>
               <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={()=>setConfirmDel(null)}>Cancel</button>
-              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>{ deleteEvent(confirmDel); setConfirmDel(null) }}>Delete</button>
+              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>deleteEvent(confirmDel)}>Delete</button>
             </div>
           </div>
         </div>

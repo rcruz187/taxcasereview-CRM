@@ -161,7 +161,7 @@ export default function Employees() {
   }
 
   async function remove(id) {
-    if (!confirmDel) { setConfirmDel('pending'); return }
+    if (confirmDel !== id) { setConfirmDel(id); return }
     setConfirmDel(null)
     await supabase.from('employees').delete().eq('id', id)
     showToast('Employee removed')
@@ -644,7 +644,7 @@ export default function Employees() {
             <div style={{fontSize:13,color:'var(--t3)',marginBottom:20}}>This cannot be undone.</div>
             <div style={{display:'flex',gap:8}}>
               <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={()=>setConfirmDel(null)}>Cancel</button>
-              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>{ deleteEmployee(confirmDel); setConfirmDel(null) }}>Delete</button>
+              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>remove(confirmDel)}>Delete</button>
             </div>
           </div>
         </div>

@@ -110,7 +110,7 @@ export default function Email() {
   }
 
   async function deleteEmail(id) {
-    if (!confirmDel) { setConfirmDel('pending'); return }
+    if (confirmDel !== id) { setConfirmDel(id); return }
     setConfirmDel(null)
     await supabase.from('emails').delete().eq('id', id)
     setSelected(null); load()
@@ -355,7 +355,7 @@ export default function Email() {
             <div style={{fontSize:13,color:'var(--t3)',marginBottom:20}}>This cannot be undone.</div>
             <div style={{display:'flex',gap:8}}>
               <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={()=>setConfirmDel(null)}>Cancel</button>
-              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>{ deleteEmail(confirmDel); setConfirmDel(null) }}>Delete</button>
+              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>deleteEmail(confirmDel)}>Delete</button>
             </div>
           </div>
         </div>
