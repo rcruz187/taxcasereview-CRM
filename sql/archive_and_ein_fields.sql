@@ -18,3 +18,9 @@ FROM information_schema.columns
 WHERE table_name IN ('leads','clients')
   AND column_name IN ('irsDeadline','stateDeadline','ein','archived')
 ORDER BY table_name, column_name;
+
+-- Spouse/filing status fields (added after Leads got a Spouse section to match Clients)
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS "spouseName" text;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS "spouseSsn" text;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS "spouseDob" date;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS "filingStatus" text;

@@ -49,6 +49,7 @@ const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL'
 const BLANK = {
   clientType:'Individual', name:'', first:'', mi:'', last:'', phone:'', phone2:'', email:'',
   ssn:'', ein:'', dob:'',
+  spouseName:'', spouseSsn:'', spouseDob:'', filingStatus:'Single',
   street:'', city:'', state:'', zip:'', county:'', source:'Referral',
   irsBalance:'', issueType:'OIC', irsOrState:'IRS Federal', taxYears:[],
   filingRequirements:[],
@@ -566,7 +567,8 @@ export default function Leads() {
       name: l.name, clientType: l.clientType || 'Individual',
       first: l.first, mi: l.mi, last: l.last,
       phone: l.phone, phone2: l.phone2, email: l.email,
-      ssn: l.ssn, dob: l.dob,
+      ssn: l.ssn, ein: l.ein, dob: l.dob,
+      spouseName: l.spouseName, spouseSsn: l.spouseSsn, spouseDob: l.spouseDob, filingStatus: l.filingStatus,
       street: l.street, city: l.city, state: l.state, zip: l.zip, county: l.county,
       source: l.source, assignedTo: l.assignedTo,
       irsBalance: l.irsBalance, issueType: l.issueType, irsOrState: l.irsOrState,
@@ -640,6 +642,24 @@ export default function Leads() {
               <div className="field"><label>EIN (if business)</label><input value={form.ein||''} onChange={e=>fld('ein',e.target.value)} placeholder="XX-XXXXXXX"/></div>
               <div className="field"><label>Date of Birth</label><input type="date" value={form.dob} onChange={e=>fld('dob',e.target.value)}/></div>
             </div>
+
+            {/* Spouse */}
+            <div style={{background:'var(--s3)',borderRadius:8,padding:12,marginBottom:10}}>
+              <div style={{fontWeight:700,fontSize:12,marginBottom:8}}>👥 Spouse / Partner</div>
+              <div className="fg2">
+                <div className="field"><label>Spouse Full Name</label><input value={form.spouseName||''} onChange={e=>fld('spouseName',e.target.value)}/></div>
+                <div className="field"><label>Spouse SSN</label><input value={form.spouseSsn||''} onChange={e=>fld('spouseSsn',e.target.value)} placeholder="XXX-XX-XXXX" maxLength={11}/></div>
+              </div>
+              <div className="fg2">
+                <div className="field"><label>Spouse Date of Birth</label><input type="date" value={form.spouseDob||''} onChange={e=>fld('spouseDob',e.target.value)}/></div>
+                <div className="field"><label>Filing Status</label>
+                  <select value={form.filingStatus||'Single'} onChange={e=>fld('filingStatus',e.target.value)}>
+                    {['Single','Married Filing Jointly','Married Filing Separately','Head of Household','Qualifying Widow(er)'].map(o=><option key={o}>{o}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+
             <div className="field"><label>Street Address</label><input value={form.street} onChange={e=>fld('street',e.target.value)}/></div>
             <div className="fg3">
               <div className="field"><label>City</label><input value={form.city} onChange={e=>fld('city',e.target.value)}/></div>
@@ -1011,7 +1031,7 @@ export default function Leads() {
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
           <div className="card">
             <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>Contact Info</div>
-            {[['Phone',l.phone],['Phone 2',l.phone2],['Email',l.email],['SSN',l.ssn?'***-**-'+l.ssn.replace(/-/g,'').slice(-4):null],['EIN',l.ein],['Date of Birth',l.dob],['Address',[l.street,l.city,l.state,l.zip].filter(Boolean).join(', ')],['County',l.county],['Source',l.source]].map(([label,val])=>(
+            {[['Phone',l.phone],['Phone 2',l.phone2],['Email',l.email],['SSN',l.ssn?'***-**-'+l.ssn.replace(/-/g,'').slice(-4):null],['EIN',l.ein],['Date of Birth',l.dob],['Filing Status',l.filingStatus],['Spouse Name',l.spouseName],['Spouse DOB',l.spouseDob],['Spouse SSN',l.spouseSsn?'***-**-'+l.spouseSsn.replace(/-/g,'').slice(-4):null],['Address',[l.street,l.city,l.state,l.zip].filter(Boolean).join(', ')],['County',l.county],['Source',l.source]].map(([label,val])=>(
               <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">
                 {(label==='Phone'||label==='Phone 2') && val
                   ? <InPlaceCaller phone={val} name={l.name} entityType="lead" entityId={l.id} supabase={supabase} showToast={showToast} onLogged={()=>loadLeadNotes(l.id)}/>
