@@ -48,7 +48,7 @@ const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL'
 
 const BLANK = {
   clientType:'Individual', name:'', first:'', mi:'', last:'', phone:'', phone2:'', email:'',
-  ssn:'', dob:'',
+  ssn:'', ein:'', dob:'',
   street:'', city:'', state:'', zip:'', county:'', source:'Referral',
   irsBalance:'', issueType:'OIC', irsOrState:'IRS Federal', taxYears:[],
   filingRequirements:[],
@@ -304,6 +304,7 @@ export default function Leads() {
   const navigate = useNavigate()
   const [leads, setLeads]   = useState([])
   const [filter, setFilter] = useState('All')
+  const [showArchived, setShowArchived] = useState(false)
   const [modal, setModal]   = useState(false)
   const [showScript, setShowScript] = useState(false)
   const [bookingLead, setBookingLead] = useState(null)
@@ -311,7 +312,7 @@ export default function Leads() {
   const [detail, setDetail] = useState(null)
   const [showCompliance, setShowCompliance] = useState(false)
   const [leadNotes, setLeadNotes]     = useState([])
-  const [leadDetailTab, setLeadDetailTab] = useState('notes')
+  const [leadDetailTab, setLeadDetailTab] = useState('overview')
   const [newLeadNote, setNewLeadNote] = useState('')
   const [addingLeadNote, setAddingLeadNote] = useState(false)
   const [noteType, setNoteType]       = useState('Call')
@@ -328,8 +329,14 @@ export default function Leads() {
   const [showFlow, setShowFlow]     = useState(false)
   const [showPortalModal, setShowPortalModal] = useState(false)
   const [portalLead, setPortalLead] = useState(null)
+  const [leadDocCount, setLeadDocCount] = useState(0)
 
   useEffect(() => { load() }, [])
+  useEffect(() => {
+    if (!detail) return
+    supabase.from('documents').select('id', { count: 'exact', head: true }).eq('client', detail.name)
+      .then(({ count }) => setLeadDocCount(count || 0))
+  }, [detail?.id])
   // Fast path: same fix as Clients — don't make opening one lead wait on
   // the entire leads table downloading first.
   useEffect(() => {
@@ -383,9 +390,19 @@ export default function Leads() {
 
   function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''),3000) }
   function fld(k,v) { setForm(f=>({...f,[k]:v})) }
+  function composeName(first,mi,last) { return [first, mi?mi+'.':'', last].filter(Boolean).join(' ').replace(/\s+/g,' ').trim() }
+  // For Individual leads the Full Name is derived automatically from First/MI/Last
+  // as the rep types, so there's no separate name to re-type. Business leads keep
+  // a dedicated Business Name field instead.
+  function fldClientType(v) { setForm(f=>({...f, clientType:v, name: v==='Individual' ? composeName(f.first,f.mi,f.last) : f.name })) }
+  function fldFirst(v) { setForm(f=>({...f, first:v, name: f.clientType==='Individual' ? composeName(v,f.mi,f.last) : f.name })) }
+  function fldMi(v)    { setForm(f=>({...f, mi:v,    name: f.clientType==='Individual' ? composeName(f.first,v,f.last) : f.name })) }
+  function fldLast(v)  { setForm(f=>({...f, last:v,  name: f.clientType==='Individual' ? composeName(f.first,f.mi,v) : f.name })) }
   function toggleYear(y) { setForm(f=>({...f, taxYears: f.taxYears.includes(y)?f.taxYears.filter(x=>x!==y):[...f.taxYears,y]})) }
 
-  const filtered = filter === 'All' ? leads : leads.filter(l => l.status === filter)
+  const filtered = leads
+    .filter(l => showArchived ? !!l.archived : !l.archived)
+    .filter(l => filter === 'All' || l.status === filter)
 
   async function save() {
     if (!form.name.trim()) { showToast('Name is required'); return }
@@ -439,11 +456,19 @@ export default function Leads() {
     }
   }
 
-  async function deleteLead(id) {
-    if (!confirmDel) { setConfirmDel(l.id); return }
-    setConfirmDel(null)
-    await supabase.from('leads').delete().eq('id', id)
-    showToast('Deleted'); setDetail(null); load()
+  // Leads are archived, never permanently deleted — this hides them from the
+  // active list but keeps every field, note, and document intact.
+  async function archiveLead(l) {
+    if (!window.confirm(`Archive ${l.name}? This hides it from the active list — nothing is deleted, and you can restore it anytime from the Archived view.`)) return
+    const { error } = await supabase.from('leads').update({ archived: true }).eq('id', l.id)
+    if (error) { showToast('Error: ' + error.message); return }
+    showToast('Lead archived'); setDetail(null); load()
+  }
+
+  async function restoreLead(l) {
+    const { error } = await supabase.from('leads').update({ archived: false }).eq('id', l.id)
+    if (error) { showToast('Error: ' + error.message); return }
+    showToast('Lead restored'); load()
   }
 
   async function updateStatus(l, status) {
@@ -465,7 +490,7 @@ export default function Leads() {
   async function handleSendFullPackage(l) {
     if (!l.email && !l.phone) { showToast('Lead needs an email or phone to send the package.'); return }
     setPkgSending(true)
-    const res = await sendFullPackage({...l, address:l.street, business_name:l.entityName}, supabase)
+    const res = await sendFullPackage({...l, address:l.street, business_name:l.name}, supabase)
     if (res.error) { setPkgSending(false); showToast('Error: '+res.error); return }
 
     const url = res.url
@@ -554,26 +579,29 @@ export default function Leads() {
 
             <div className="fg2">
               <div className="field"><label>Client Type</label>
-                <select value={form.clientType} onChange={e=>fld('clientType',e.target.value)}>
+                <select value={form.clientType} onChange={e=>fldClientType(e.target.value)}>
                   <option>Individual</option><option>Business</option><option>Individual &amp; Biz</option>
                 </select>
               </div>
-              <div className="field"><label>Full Name *</label>
-                <input value={form.name} onChange={e=>fld('name',e.target.value)} placeholder="First Last / Business Name"/>
-              </div>
+              {form.clientType !== 'Individual' && (
+                <div className="field"><label>Business Name *</label>
+                  <input value={form.name} onChange={e=>fld('name',e.target.value)} placeholder="Business Name"/>
+                </div>
+              )}
             </div>
             <div className="fg3">
-              <div className="field"><label>First Name</label><input value={form.first} onChange={e=>fld('first',e.target.value)}/></div>
-              <div className="field"><label>MI</label><input value={form.mi} onChange={e=>fld('mi',e.target.value)} maxLength={1}/></div>
-              <div className="field"><label>Last Name</label><input value={form.last} onChange={e=>fld('last',e.target.value)}/></div>
+              <div className="field"><label>First Name{form.clientType==='Individual'?' *':''}</label><input value={form.first} onChange={e=>fldFirst(e.target.value)}/></div>
+              <div className="field"><label>MI</label><input value={form.mi} onChange={e=>fldMi(e.target.value)} maxLength={1}/></div>
+              <div className="field"><label>Last Name{form.clientType==='Individual'?' *':''}</label><input value={form.last} onChange={e=>fldLast(e.target.value)}/></div>
             </div>
             <div className="fg2">
               <div className="field"><label>Phone</label><input value={form.phone} onChange={e=>fld('phone',e.target.value)} placeholder="(305) 555-0000"/></div>
               <div className="field"><label>Phone 2 <span style={{color:'var(--t3)',fontWeight:400}}>(optional)</span></label><input value={form.phone2||''} onChange={e=>fld('phone2',e.target.value)} placeholder="(305) 555-0000"/></div>
               <div className="field"><label>Email</label><input value={form.email} onChange={e=>fld('email',e.target.value)}/></div>
             </div>
-            <div className="fg2">
+            <div className="fg3">
               <div className="field"><label>SSN</label><input value={form.ssn} onChange={e=>fld('ssn',e.target.value)} placeholder="XXX-XX-XXXX" maxLength={11}/></div>
+              <div className="field"><label>EIN (if business)</label><input value={form.ein||''} onChange={e=>fld('ein',e.target.value)} placeholder="XX-XXXXXXX"/></div>
               <div className="field"><label>Date of Birth</label><input type="date" value={form.dob} onChange={e=>fld('dob',e.target.value)}/></div>
             </div>
             <div className="field"><label>Street Address</label><input value={form.street} onChange={e=>fld('street',e.target.value)}/></div>
@@ -786,7 +814,11 @@ export default function Leads() {
             <span style={{marginLeft:'auto',fontSize:11,color:'var(--t3)',padding:'8px 12px',background:'var(--s2)',borderRadius:6}}>🔒 Admin Only</span>
           )}
           <button className="btn ok" style={{padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>convertToClient(l)} disabled={converting}>{converting?'Converting…':'✓ Convert to Client'}</button>
-          <button className="btn del" style={{padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>deleteLead(l.id)}>🗑 Delete</button>
+          {l.archived ? (
+            <button className="btn" style={{padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>restoreLead(l)}>↩ Restore</button>
+          ) : (
+            <button className="btn del" style={{padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>archiveLead(l)}>🗑 Archive</button>
+          )}
         </div>
 
         {/* Header card — matches clients */}
@@ -844,7 +876,7 @@ export default function Leads() {
             <ActionBtn color="#0369a1" icon="🖋️" label="Pre-Fill 8821/2848" sub="IRS PDF Forms" onClick={()=>{
               try {
                 if (!l) { showToast('Error: no lead data found'); return }
-                setFillerLead({...l, address:l.street, business_name:l.entityName})
+                setFillerLead({...l, address:l.street, business_name:l.name})
               } catch (err) { showToast('Error opening form: ' + err.message) }
             }}/>
             <ActionBtn color="#0891b2" icon="📅" label="Schedule" sub="Book Appointment" onClick={()=>setBookingLead(l)}/>
@@ -866,10 +898,11 @@ export default function Leads() {
           </div>
         </div>
 
-        {/* Notes & Documents — tabbed, matching the Clients detail page style */}
+        {/* Overview / Notes / Documents — tabbed, matching the Clients detail page style */}
         <div className="card" style={{padding:0,overflow:'hidden',marginBottom:12}}>
           <div style={{display:'flex',borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
             {[
+              {key:'overview', label:'📋 Overview'},
               {key:'notes', label:`📝 Notes & Activity (${leadNotes.length})`},
               {key:'docs',  label:'📁 Documents'},
             ].map(t=>(
@@ -881,6 +914,27 @@ export default function Leads() {
               </button>
             ))}
           </div>
+
+          {leadDetailTab==='overview' && (
+            <div style={{padding:16}}>
+              {l.notes && (
+                <div style={{marginBottom:12}}>
+                  <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:6}}>Case Notes</div>
+                  <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.7,whiteSpace:'pre-wrap'}}>{l.notes}</div>
+                </div>
+              )}
+              <div style={{display:'flex',gap:24,flexWrap:'wrap'}}>
+                <div>
+                  <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Documents</div>
+                  <div style={{fontSize:22,fontWeight:800,color:'var(--blue)'}}>{leadDocCount}</div>
+                </div>
+                <div>
+                  <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Notes</div>
+                  <div style={{fontSize:22,fontWeight:800,color:'var(--blue)'}}>{leadNotes.length}</div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {leadDetailTab==='notes' && (
             <div style={{padding:16}}>
@@ -917,11 +971,12 @@ export default function Leads() {
           )}
         </div>
 
-        {/* Info grid — side by side like clients */}
+        {/* Info grid — side by side like clients, shown only on the Overview tab */}
+        {leadDetailTab==='overview' && (
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
           <div className="card">
             <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>Contact Info</div>
-            {[['Phone',l.phone],['Phone 2',l.phone2],['Email',l.email],['SSN',l.ssn?'***-**-'+l.ssn.replace(/-/g,'').slice(-4):null],['Date of Birth',l.dob],['Address',[l.street,l.city,l.state,l.zip].filter(Boolean).join(', ')],['County',l.county],['Source',l.source]].map(([label,val])=>(
+            {[['Phone',l.phone],['Phone 2',l.phone2],['Email',l.email],['SSN',l.ssn?'***-**-'+l.ssn.replace(/-/g,'').slice(-4):null],['EIN',l.ein],['Date of Birth',l.dob],['Address',[l.street,l.city,l.state,l.zip].filter(Boolean).join(', ')],['County',l.county],['Source',l.source]].map(([label,val])=>(
               <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">
                 {(label==='Phone'||label==='Phone 2') && val
                   ? <InPlaceCaller phone={val} name={l.name} entityType="lead" entityId={l.id} supabase={supabase} showToast={showToast} onLogged={()=>loadLeadNotes(l.id)}/>
@@ -952,6 +1007,7 @@ export default function Leads() {
             ))}
           </div>
         </div>
+        )}
 
         {/* Compliance — filing/balance data gathered during the tax investigation.
             Stored against the lead's name in client_compliance_records, so it
@@ -1058,10 +1114,11 @@ export default function Leads() {
     <div>
       {toast && <div className="toast show">{toast}</div>}
 
-      <div style={{marginBottom:10,display:'flex',flexWrap:'wrap',gap:4}}>
+      <div style={{marginBottom:10,display:'flex',flexWrap:'wrap',gap:4,alignItems:'center'}}>
         {['All',...STATUSES.slice(0,8)].map(s => (
           <span key={s} className={`chip${filter===s?' on':''}`} onClick={()=>setFilter(s)}>{s}</span>
         ))}
+        <span className={`chip${showArchived?' on':''}`} style={{marginLeft:8}} onClick={()=>setShowArchived(a=>!a)}>🗄 Archived</span>
       </div>
 
       <div className="card">
@@ -1088,7 +1145,9 @@ export default function Leads() {
                   <td><Bdg s={l.status||'New Lead'}/></td>
                   <td style={{color:'var(--t2)',fontSize:12}}>{l.assignedTo||<span style={{color:'var(--warn)'}}>Unassigned</span>}</td>
                   <td onClick={e=>e.stopPropagation()}>
-                    <button className="btn del" onClick={()=>deleteLead(l.id)}>Del</button>
+                    {l.archived
+                      ? <button className="btn" onClick={()=>restoreLead(l)}>↩</button>
+                      : <button className="btn del" onClick={()=>archiveLead(l)}>Del</button>}
                   </td>
                 </tr>
               ))}

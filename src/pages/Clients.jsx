@@ -693,6 +693,7 @@ export default function Clients() {
   const [clients,   setClients]   = useState([])
   const [employees, setEmployees] = useState([])
   const [filter,    setFilter]    = useState('All')
+  const [showArchived, setShowArchived] = useState(false)
   const [modal,     setModal]     = useState(false)
   const [editModal, setEditModal] = useState(false)
   const [form,      setForm]      = useState(BLANK)
@@ -825,7 +826,9 @@ export default function Clients() {
 
   function showToast(msg){setToast(msg);setTimeout(()=>setToast(''),3500)}
   function fld(k,v){setForm(f=>({...f,[k]:v}))}
-  const filtered = filter==='All'?clients:clients.filter(c=>c.clientType===filter)
+  const filtered = clients
+    .filter(c => showArchived ? !!c.archived : !c.archived)
+    .filter(c => filter==='All' || c.clientType===filter)
 
   function buildPayload(f) {
     const {dobM,dobD,dobY,id,created_at,pipelineStage,...rest}=f
@@ -890,16 +893,24 @@ export default function Clients() {
     load()
   }
 
-  async function deleteClient(id,name) {
-    if (!confirmDel) { setConfirmDel(id); return }
-    setConfirmDel(null)
-    await supabase.from('clients').delete().eq('id',id)
-    showToast('Deleted');setDetail(null);load()
+  // Clients are archived, never permanently deleted — this hides them from
+  // the active roster but keeps every field, note, document, and payment intact.
+  async function archiveClient(id,name) {
+    if (!window.confirm(`Archive ${name}? This hides it from the active roster — nothing is deleted, and you can restore it anytime from the Archived view.`)) return
+    const { error } = await supabase.from('clients').update({ archived: true }).eq('id',id)
+    if (error) { showToast('Error: '+error.message); return }
+    showToast('Client archived');setDetail(null);load()
+  }
+
+  async function restoreClient(id) {
+    const { error } = await supabase.from('clients').update({ archived: false }).eq('id',id)
+    if (error) { showToast('Error: '+error.message); return }
+    showToast('Client restored');load()
   }
 
   async function handleSendFullPackage(c) {
     setPkgSending(true)
-    const res = await sendFullPackage({...c, address:c.street, business_name:c.entityName}, supabase)
+    const res = await sendFullPackage({...c, address:c.street, business_name:c.name}, supabase)
     setPkgSending(false)
     if (res.error) { showToast('Error: '+res.error); return }
     await navigator.clipboard.writeText(res.url).catch(()=>{})
@@ -1006,7 +1017,11 @@ export default function Clients() {
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,flexWrap:'wrap'}}>
           <button className="btn" style={{padding:'8px 16px',fontSize:13,fontWeight:600}} onClick={()=>{setDetail(null);navigate('/clients',{replace:true})}}>← Back to Clients</button>
           <button className="btn pri" style={{marginLeft:'auto',padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>openEdit(c)}>✏️ Edit</button>
-          <button className="btn del" style={{padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>deleteClient(c.id,c.name)}>🗑 Delete</button>
+          {c.archived ? (
+            <button className="btn" style={{padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>restoreClient(c.id)}>↩ Restore</button>
+          ) : (
+            <button className="btn del" style={{padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>archiveClient(c.id,c.name)}>🗑 Archive</button>
+          )}
         </div>
 
         {/* Header card */}
@@ -1119,7 +1134,7 @@ export default function Clients() {
             <ActionBtn color="#0369a1" icon="📋" label="Pre-Fill 8821/2848" sub="IRS PDF Forms" onClick={()=>{
               try {
                 if (!c) { showToast('Error: no client data found'); return }
-                setFillerClient({...c, address:c.street, business_name:c.entityName})
+                setFillerClient({...c, address:c.street, business_name:c.name})
               } catch (err) { showToast('Error opening form: ' + err.message) }
             }}/>
             <ActionBtn color="#6c5ce7" icon="🔐" label="POA Cover Letter" sub="Form 2848" onClick={()=>generatePOACoverLetter(c)}/>
@@ -1628,6 +1643,7 @@ export default function Clients() {
             {['All','Individual','Business'].map(f=>(
               <span key={f} className={`chip${filter===f?' on':''}`} onClick={()=>setFilter(f)}>{f}</span>
             ))}
+            <span className={`chip${showArchived?' on':''}`} onClick={()=>setShowArchived(a=>!a)}>🗄 Archived</span>
             <button className="btn pri" onClick={()=>{setForm(BLANK);setModal(true)}}>+ Add Client</button>
           </div>
         </div>
@@ -1651,7 +1667,9 @@ export default function Clients() {
                   <td><span className={`bdg ${c.status==='Active'?'bg':'bn'}`}>{c.status||'Active'}</span></td>
                   <td style={{color:'var(--t2)',fontSize:12}}>{c.clientSince||'—'}</td>
                   <td onClick={e=>e.stopPropagation()}>
-                    <button className="btn del" onClick={()=>deleteClient(c.id,c.name)}>Del</button>
+                    {c.archived
+                      ? <button className="btn" onClick={()=>restoreClient(c.id)}>↩</button>
+                      : <button className="btn del" onClick={()=>archiveClient(c.id,c.name)}>Del</button>}
                   </td>
                 </tr>
               ))}
