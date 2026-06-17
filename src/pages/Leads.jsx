@@ -374,6 +374,14 @@ export default function Leads() {
       if (found) setDetail(found)
     }
   }, [urlLeadId, leads])
+  // If the URL no longer points at the lead currently being shown (e.g.
+  // clicking "Leads" in the sidebar while a detail page is open), drop the
+  // stale detail state so the page actually reflects the URL again.
+  useEffect(() => {
+    if (detail && String(detail.id) !== String(urlLeadId || '')) {
+      setDetail(null)
+    }
+  }, [urlLeadId, detail])
 
   async function load() {
     const { data } = await supabase.from('leads').select('*').order('created_at', { ascending: false })

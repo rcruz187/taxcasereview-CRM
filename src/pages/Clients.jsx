@@ -817,6 +817,15 @@ export default function Clients() {
       if (found) openDetail(found, { preserveTab: true })
     }
   }, [urlId, clients])
+  // If the URL no longer points at the client currently being shown
+  // (e.g. clicking "Clients" in the sidebar while a detail page is open,
+  // or a link elsewhere jumping straight to a different client), drop the
+  // stale detail state so the page actually reflects the URL again.
+  useEffect(() => {
+    if (detail && String(detail.id) !== String(urlId || '')) {
+      setDetail(null)
+    }
+  }, [urlId, detail])
 
   async function load() {
     const [{ data:cl },{ data:em }] = await Promise.all([
