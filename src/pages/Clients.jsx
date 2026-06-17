@@ -719,12 +719,15 @@ export default function Clients() {
   const [loadingRel,  setLoadingRel]  = useState(false)
   const [detailTab,   setDetailTabRaw] = useState(() => searchParams.get('tab') || 'overview')
   function setDetailTab(tab) {
+    const el = document.querySelector('.page-content')
+    const y = el ? el.scrollTop : 0
     setDetailTabRaw(tab)
     setSearchParams(prev => {
       const next = new URLSearchParams(prev)
       next.set('tab', tab)
       return next
     }, { replace: true })
+    requestAnimationFrame(() => { if (el) el.scrollTop = y })
   }
   const [fillerClient, setFillerClient] = useState(null)
   const [pkgSending, setPkgSending] = useState(false)
@@ -752,11 +755,15 @@ export default function Clients() {
 
   useEffect(() => { load() }, [])
 
-  // Save scroll position before refresh/navigation away, restore after detail (+ related data) loads
+  // Save scroll position before refresh/navigation away, restore after detail (+ related data) loads.
+  // Note: this targets .page-content, the element with overflow-y:auto — the
+  // window itself never scrolls (.app-shell is height:100vh + overflow:hidden),
+  // so window.scrollY/scrollTo were always a no-op here.
   useEffect(() => {
     if (!detail) return
     const key = `clientScroll_${detail.id}`
-    const saveScroll = () => sessionStorage.setItem(key, String(window.scrollY))
+    const el = document.querySelector('.page-content')
+    const saveScroll = () => { if (el) sessionStorage.setItem(key, String(el.scrollTop)) }
     window.addEventListener('beforeunload', saveScroll)
     window.addEventListener('pagehide', saveScroll)
     return () => {
@@ -772,7 +779,8 @@ export default function Clients() {
     const key = `clientScroll_${detail.id}`
     const saved = sessionStorage.getItem(key)
     if (saved) {
-      requestAnimationFrame(() => window.scrollTo(0, parseInt(saved, 10) || 0))
+      const el = document.querySelector('.page-content')
+      requestAnimationFrame(() => { if (el) el.scrollTop = parseInt(saved, 10) || 0 })
     }
   }, [detail?.id, loadingRel])
   // Fast path: arriving directly at /clients/:id (e.g. clicking a record,

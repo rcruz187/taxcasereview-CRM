@@ -332,6 +332,24 @@ export default function Leads() {
   const [leadDocCount, setLeadDocCount] = useState(0)
 
   useEffect(() => { load() }, [])
+
+  // Save scroll position before refresh/navigation away, restore once the
+  // lead loads back in — keyed to .page-content, the element that actually scrolls.
+  useEffect(() => {
+    if (!detail) return
+    const key = `leadScroll_${detail.id}`
+    const el = document.querySelector('.page-content')
+    const saveScroll = () => { if (el) sessionStorage.setItem(key, String(el.scrollTop)) }
+    window.addEventListener('beforeunload', saveScroll)
+    window.addEventListener('pagehide', saveScroll)
+    const saved = sessionStorage.getItem(key)
+    if (saved) requestAnimationFrame(() => { if (el) el.scrollTop = parseInt(saved, 10) || 0 })
+    return () => {
+      saveScroll()
+      window.removeEventListener('beforeunload', saveScroll)
+      window.removeEventListener('pagehide', saveScroll)
+    }
+  }, [detail?.id])
   useEffect(() => {
     if (!detail) return
     supabase.from('documents').select('id', { count: 'exact', head: true }).eq('client', detail.name)
@@ -390,6 +408,15 @@ export default function Leads() {
 
   function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''),3000) }
   function fld(k,v) { setForm(f=>({...f,[k]:v})) }
+  // Tab buttons swap content of different heights, which lets the browser
+  // naturally clamp .page-content's scroll position toward the top. Capture
+  // it before the switch and put it back once the new tab has rendered.
+  function switchLeadTab(tab) {
+    const el = document.querySelector('.page-content')
+    const y = el ? el.scrollTop : 0
+    setLeadDetailTab(tab)
+    requestAnimationFrame(() => { if (el) el.scrollTop = y })
+  }
   function composeName(first,mi,last) { return [first, mi?mi+'.':'', last].filter(Boolean).join(' ').replace(/\s+/g,' ').trim() }
   // For Individual leads the Full Name is derived automatically from First/MI/Last
   // as the rep types, so there's no separate name to re-type. Business leads keep
@@ -807,7 +834,7 @@ export default function Leads() {
 
         {/* Top bar — matches clients page */}
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,flexWrap:'wrap'}}>
-          <button className="btn" style={{padding:'8px 16px',fontSize:13,fontWeight:600}} onClick={()=>{ setDetail(null); navigate('/leads',{replace:true}); window.scrollTo(0,0) }}>← Back</button>
+          <button className="btn" style={{padding:'8px 16px',fontSize:13,fontWeight:600}} onClick={()=>{ setDetail(null); navigate('/leads',{replace:true}); document.querySelector('.page-content')?.scrollTo(0,0) }}>← Back</button>
           {(l.status !== 'Converted to Client' || user?.role === 'Admin' || user?.role === 'Manager') ? (
             <button className="btn pri" style={{marginLeft:'auto',padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>{setForm({...BLANK,...l,taxYears:(() => {try{return JSON.parse(l.taxYears||'[]')}catch{return []}})(),filingRequirements:(() => {try{return JSON.parse(l.filingRequirements||'[]')}catch{return []}})()});setModal('edit')}}>✏️ Edit</button>
           ) : (
@@ -906,7 +933,7 @@ export default function Leads() {
               {key:'notes', label:`📝 Notes & Activity (${leadNotes.length})`},
               {key:'docs',  label:'📁 Documents'},
             ].map(t=>(
-              <button key={t.key} onClick={()=>setLeadDetailTab(t.key)}
+              <button key={t.key} onClick={()=>switchLeadTab(t.key)}
                 style={{padding:'10px 16px',border:'none',borderBottom:leadDetailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
                   background:'none',cursor:'pointer',fontSize:12,fontWeight:leadDetailTab===t.key?700:500,
                   color:leadDetailTab===t.key?'var(--blue)':'var(--t2)',whiteSpace:'nowrap',transition:'all .15s'}}>
