@@ -569,6 +569,7 @@ export default function Leads() {
       phone: l.phone, phone2: l.phone2, email: l.email,
       ssn: l.ssn, ein: l.ein, dob: l.dob,
       spouseName: l.spouseName, spouseSsn: l.spouseSsn, spouseDob: l.spouseDob, filingStatus: l.filingStatus,
+      stripe_customer_id: l.stripe_customer_id,
       street: l.street, city: l.city, state: l.state, zip: l.zip, county: l.county,
       source: l.source, assignedTo: l.assignedTo,
       irsBalance: l.irsBalance, issueType: l.issueType, irsOrState: l.irsOrState,

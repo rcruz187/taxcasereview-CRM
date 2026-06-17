@@ -19,6 +19,8 @@ export default function Payments() {
   const [suggestions, setSug]   = useState([])
   const [showSug,  setShowSug]  = useState(false)
   const [invSug,   setInvSug]   = useState([])
+  const [running,  setRunning]  = useState(false)
+  const [batchLog, setBatchLog] = useState([])
 
   useEffect(() => { load() }, [])
 
@@ -26,7 +28,7 @@ export default function Payments() {
     const [{ data:p },{ data:inv },{ data:cl }] = await Promise.all([
       supabase.from('payments').select('*').order('created_at',{ascending:false}),
       supabase.from('invoices').select('id,invNum,clientName,total,paid,status'),
-      supabase.from('clients').select('id,name'),
+      supabase.from('clients').select('id,name,autopay_enabled,autopay_amount,autopay_frequency,autopay_next_charge,autopay_last_result,autopay_last_charged_at,default_payment_method_id,payment_method_brand,payment_method_last4'),
     ])
     if (p)   setItems(p)
     if (inv) setInvoices(inv)
@@ -35,6 +37,51 @@ export default function Payments() {
 
   function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''),3000) }
   function fld(k,v) { setForm(f=>({...f,[k]:v})) }
+
+  function advanceDate(dateStr, frequency) {
+    const d = new Date(dateStr + 'T00:00:00')
+    if (frequency === 'weekly') d.setDate(d.getDate() + 7)
+    else if (frequency === 'biweekly') d.setDate(d.getDate() + 14)
+    else d.setMonth(d.getMonth() + 1) // monthly (and one-time just won't be picked up again since it's toggled off below)
+    return d.toISOString().slice(0, 10)
+  }
+
+  async function chargeClientNow(client) {
+    setRunning(true)
+    const { data, error } = await supabase.functions.invoke('stripe-charge', {
+      body: { clientId: client.id, amount: client.autopay_amount, source: 'manual' }
+    })
+    setRunning(false)
+    if (error || data?.error) { showToast('❌ ' + (data?.error || error.message)); return }
+    showToast(`✅ Charged ${client.name} $${client.autopay_amount}`)
+    load()
+  }
+
+  async function runAutopayBatch() {
+    const today = new Date().toISOString().slice(0, 10)
+    const due = clients.filter(c => c.autopay_enabled && c.autopay_amount && c.autopay_next_charge && c.autopay_next_charge <= today)
+    if (due.length === 0) { showToast('Nothing due today'); return }
+    if (!confirm(`Run autopay for ${due.length} client${due.length!==1?'s':''} totaling $${due.reduce((s,c)=>s+Number(c.autopay_amount||0),0).toFixed(2)}?`)) return
+
+    setRunning(true); setBatchLog([])
+    for (const c of due) {
+      const { data, error } = await supabase.functions.invoke('stripe-charge', {
+        body: { clientId: c.id, amount: c.autopay_amount, source: 'autopay' }
+      })
+      const ok = !error && !data?.error
+      setBatchLog(prev => [...prev, { name: c.name, amount: c.autopay_amount, ok, msg: ok ? 'Charged' : (data?.error || error.message) }])
+      if (ok) {
+        const nextDate = c.autopay_frequency === 'one-time' ? null : advanceDate(c.autopay_next_charge, c.autopay_frequency)
+        await supabase.from('clients').update({
+          autopay_next_charge: nextDate,
+          autopay_enabled: c.autopay_frequency === 'one-time' ? false : true,
+        }).eq('id', c.id)
+      }
+    }
+    setRunning(false)
+    showToast('Batch run complete')
+    load()
+  }
 
   function searchClient(val) {
     fld('clientName',val)
@@ -174,6 +221,47 @@ export default function Payments() {
             <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>{label}</div>
           </div>
         ))}
+      </div>
+
+      {/* Autopay */}
+      <div className="card" style={{marginBottom:14}}>
+        <div className="ch">
+          <span className="ct">🔁 Autopay</span>
+          <button className="btn pri" disabled={running} onClick={runAutopayBatch}>{running?'Running…':'Run Today\u2019s Batch'}</button>
+        </div>
+        {(() => {
+          const today = new Date().toISOString().slice(0,10)
+          const autopayClients = clients.filter(c=>c.autopay_enabled)
+          const due = autopayClients.filter(c=>c.autopay_next_charge && c.autopay_next_charge<=today)
+          return autopayClients.length === 0 ? (
+            <div style={{textAlign:'center',color:'var(--t3)',padding:'16px 0'}}>No clients on autopay yet. Enable it from a client's Overview tab.</div>
+          ) : (
+            <>
+              <div style={{fontSize:12,color:'var(--t3)',marginBottom:10}}>{due.length} due today/overdue out of {autopayClients.length} on autopay</div>
+              <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                {autopayClients.map(c=>(
+                  <div key={c.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 10px',background:'var(--s2)',borderRadius:8,flexWrap:'wrap',gap:6}}>
+                    <div>
+                      <span style={{fontWeight:600,fontSize:13}}>{c.name}</span>
+                      <span style={{fontSize:11,color:'var(--t3)',marginLeft:8}}>${c.autopay_amount} · {c.autopay_frequency} · next {c.autopay_next_charge||'—'}</span>
+                      {!c.default_payment_method_id && <span style={{fontSize:11,color:'var(--bad)',marginLeft:8}}>⚠️ no payment method on file</span>}
+                      {c.autopay_last_result && <span style={{fontSize:11,marginLeft:8,color:c.autopay_last_result==='succeeded'?'var(--ok)':'var(--bad)'}}>{c.autopay_last_result==='succeeded'?'✅':'❌'} last run</span>}
+                    </div>
+                    <button className="btn" style={{fontSize:11,padding:'4px 10px'}} disabled={running||!c.default_payment_method_id} onClick={()=>chargeClientNow(c)}>Charge Now</button>
+                  </div>
+                ))}
+              </div>
+              {batchLog.length>0 && (
+                <div style={{marginTop:12,paddingTop:10,borderTop:'1px solid var(--br)'}}>
+                  <div style={{fontSize:11,fontWeight:700,color:'var(--t3)',marginBottom:6}}>Last batch run:</div>
+                  {batchLog.map((r,i)=>(
+                    <div key={i} style={{fontSize:12,color:r.ok?'var(--ok)':'var(--bad)'}}>{r.ok?'✅':'❌'} {r.name} — ${r.amount} {!r.ok && `(${r.msg})`}</div>
+                  ))}
+                </div>
+              )}
+            </>
+          )
+        })()}
       </div>
 
       <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:12,marginBottom:12,alignItems:'start'}}>

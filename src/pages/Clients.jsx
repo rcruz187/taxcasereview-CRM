@@ -4,6 +4,7 @@ import IRSFormFiller from '../components/IRSFormFiller'
 import ErrorBoundary from '../components/ErrorBoundary'
 import InPlaceCaller from '../components/InPlaceCaller'
 import BookingWidget from '../components/BookingWidget'
+import StripePaymentMethodModal from '../components/StripePaymentMethodModal'
 import FinancialProfile from './FinancialProfile'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
@@ -37,7 +38,8 @@ const BLANK = {
   irsStatus:'', irsStatusOther:'', irsDeadline:'',
   stateStatus:'', stateStatusOther:'', stateDeadline:'',
   clientSince:'', status:'Active', notes:'', assignedTo:'',
-  pipelineStage:'investigation', dependents:[]
+  pipelineStage:'investigation', dependents:[],
+  autopay_enabled:false, autopay_amount:'', autopay_frequency:'monthly', autopay_next_charge:'',
 }
 
 function Bdg({s,c}) { return <span className={`bdg ${c||'bn'}`}>{s}</span> }
@@ -751,6 +753,7 @@ export default function Clients() {
   // Add payment modal
   const [payModal,    setPayModal]    = useState(false)
   const [faxModal,    setFaxModal]    = useState(false)
+  const [stripeModal, setStripeModal] = useState(false)
   const [faxClient,   setFaxClient]   = useState(null)
   const [esignModal,  setEsignModal]  = useState(false)
   const [esignClient, setEsignClient] = useState(null)
@@ -1435,6 +1438,18 @@ export default function Clients() {
               <DR label="Spouse SSN"    val={c.spouseSsn?'***-**-'+c.spouseSsn.replace(/-/g,'').slice(-4):null}/>
             </div>
 
+            {/* Payment & Autopay */}
+            <div className="card">
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>💳 Payment & Autopay</div>
+                <button className="btn" style={{padding:'4px 10px',fontSize:11}} onClick={()=>setStripeModal(true)}>{c.default_payment_method_id?'Update':'+ Add'} Payment Method</button>
+              </div>
+              <DR label="Payment Method" val={c.default_payment_method_id ? `${c.payment_method_brand||''} •••• ${c.payment_method_last4||''}` : 'None on file'}/>
+              <DR label="Autopay" val={c.autopay_enabled ? `✅ ${c.autopay_frequency||'monthly'} — $${c.autopay_amount||0}` : 'Off'}/>
+              {c.autopay_enabled && <DR label="Next Charge" val={c.autopay_next_charge}/>}
+              {c.autopay_last_result && <DR label="Last Charge" val={c.autopay_last_result==='succeeded' ? `✅ Succeeded ${c.autopay_last_charged_at?new Date(c.autopay_last_charged_at).toLocaleDateString():''}` : `❌ Failed ${c.autopay_last_charged_at?new Date(c.autopay_last_charged_at).toLocaleDateString():''}`}/>}
+            </div>
+
             {/* Dependents */}
             {deps.length>0&&(
               <div className="card">
@@ -1626,6 +1641,15 @@ export default function Clients() {
         </div>
       )}
 
+      {stripeModal && (
+        <StripePaymentMethodModal
+          client={c}
+          showToast={showToast}
+          onClose={()=>setStripeModal(false)}
+          onSaved={async()=>{ const {data}=await supabase.from('clients').select('*').eq('id',c.id).single(); if (data) setDetail(data) }}
+        />
+      )}
+
       {portalModal && portalClient && (
         <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setPortalModal(false)}>
           <div className="modal" style={{width:500}}>
@@ -1810,6 +1834,26 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
                 {['Single','Married Filing Jointly','Married Filing Separately','Head of Household','Qualifying Widow(er)'].map(o=><option key={o}>{o}</option>)}
               </select>
             </div>
+          </div>
+        </div>
+
+        {/* Autopay */}
+        <div style={{background:'var(--s3)',borderRadius:8,padding:12,marginBottom:10}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+            <div style={{fontWeight:700,fontSize:12}}>💳 Autopay</div>
+            <label style={{display:'flex',alignItems:'center',gap:6,fontSize:12,cursor:'pointer'}}>
+              <input type="checkbox" checked={!!form.autopay_enabled} onChange={e=>fld('autopay_enabled',e.target.checked)}/> Enabled
+            </label>
+          </div>
+          {!form.default_payment_method_id && <div style={{fontSize:11,color:'var(--warn)',marginBottom:8}}>No payment method on file yet — add one from the client's Overview tab before enabling autopay.</div>}
+          <div className="fg3">
+            <div className="field"><label>Amount ($)</label><input type="number" step="0.01" value={form.autopay_amount||''} onChange={e=>fld('autopay_amount',e.target.value)}/></div>
+            <div className="field"><label>Frequency</label>
+              <select value={form.autopay_frequency||'monthly'} onChange={e=>fld('autopay_frequency',e.target.value)}>
+                {['weekly','biweekly','monthly','one-time'].map(o=><option key={o} value={o}>{o[0].toUpperCase()+o.slice(1)}</option>)}
+              </select>
+            </div>
+            <div className="field"><label>Next Charge Date</label><input type="date" value={form.autopay_next_charge||''} onChange={e=>fld('autopay_next_charge',e.target.value)}/></div>
           </div>
         </div>
 

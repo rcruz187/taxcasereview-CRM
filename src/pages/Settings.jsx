@@ -108,6 +108,7 @@ export default function Settings() {
         sw_sip_username: firm.sw_sip_username,
         sw_sip_password: firm.sw_sip_password,
         sw_inbound_did: firm.sw_inbound_did,
+        stripe_publishable_key: firm.stripe_publishable_key,
         signalwire_backend: firm.signalwire_backend,
         qb_client_id: firm.qb_client_id,
         qb_client_secret: firm.qb_client_secret,
@@ -380,6 +381,26 @@ export default function Settings() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
                 <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save SignalWire'}</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Stripe Autopay */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">💳 Stripe (Autopay)</span></div>
+            <div style={{ padding: '0 20px 20px' }}>
+              <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.6 }}>
+                Powers saved cards/bank accounts and recurring autopay on the Clients page. Get your keys at <strong>dashboard.stripe.com/apikeys</strong>.
+              </div>
+              <div className="field"><label>Publishable Key</label>
+                <input value={firm.stripe_publishable_key || ''} onChange={set('stripe_publishable_key')} placeholder="pk_live_..." />
+                <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Safe to store here — Stripe designs this key to be public-facing.</div>
+              </div>
+              <div style={{ background:'var(--s2)', border:'1px solid var(--br)', borderRadius:8, padding:'10px 14px', fontSize:12, color:'var(--t3)', lineHeight:1.6, marginTop:10 }}>
+                <strong style={{color:'var(--t2)'}}>⚠️ Secret Key does NOT go here.</strong> Unlike the credentials above, the Stripe Secret Key can move money on its own, so it must never sit in this database. Set it as an Edge Function secret instead: Supabase Dashboard → Edge Functions → Secrets → add <code>STRIPE_SECRET_KEY</code>. Then deploy the <code>stripe-setup-intent</code> and <code>stripe-charge</code> functions from <code>supabase/functions/</code>.
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Stripe'}</button>
               </div>
             </div>
           </div>
