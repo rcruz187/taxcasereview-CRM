@@ -38,31 +38,43 @@ export default function Dialer() {
   useEffect(() => { elapsedRef.current = elapsed }, [elapsed])
 
   useEffect(() => {
-    let client
-    let audioEl
-    ;(async () => {
-      // Built with plain DOM APIs, appended directly to <body> — NOT
-      // rendered by React — so React never attaches its internal tracking
-      // data to this node. That tracking data is exactly what crashed the
-      // SDK mid-call every time before (circular JSON during ICE exchange).
-      audioEl = document.createElement('audio')
-      audioEl.id = 'sw-remote-audio'
-      audioEl.autoplay = true
-      document.body.appendChild(audioEl)
+    let disposed = false
+    let audioEl = document.createElement('audio')
+    audioEl.id = 'sw-remote-audio'
+    audioEl.autoplay = true
+    document.body.appendChild(audioEl)
+    // Built with plain DOM APIs, appended directly to <body> — NOT
+    // rendered by React — so React never attaches its internal tracking
+    // data to this node. That tracking data is exactly what crashed the
+    // SDK mid-call every time before (circular JSON during ICE exchange).
 
+    let reconnectTimer = null
+    function scheduleReconnect() {
+      if (disposed || reconnectTimer) return
+      reconnectTimer = setTimeout(() => { reconnectTimer = null; connect() }, 3000)
+    }
+
+    async function connect() {
+      if (disposed) return
+      setRelayStatus('connecting')
       const { data, error } = await supabase.functions.invoke('signalwire-relay-token')
+      if (disposed) return
       if (error || !data?.jwt_token) {
         setRelayStatus('error')
         showToast('Could not connect calling: ' + (data?.error || error?.message || 'unknown error'))
+        scheduleReconnect()
         return
       }
       callerNumberRef.current = data.caller_number
 
-      client = new Relay({ project: data.project_id, token: data.jwt_token })
+      const client = new Relay({ project: data.project_id, token: data.jwt_token })
       client.remoteElement = 'sw-remote-audio'
 
       client.on('signalwire.ready', () => setRelayStatus('ready'))
-      client.on('signalwire.error', (e) => { setRelayStatus('error'); console.error('RELAY error', e) })
+      client.on('signalwire.error', (e) => { setRelayStatus('error'); console.error('RELAY error', e); scheduleReconnect() })
+      client.on('signalwire.socket.close', () => { setRelayStatus('error'); console.warn('RELAY socket closed — reconnecting in 3s'); scheduleReconnect() })
+      client.on('signalwire.socket.error', (e) => { setRelayStatus('error'); console.error('RELAY socket error', e); scheduleReconnect() })
+      client.on('blade.disconnect', () => { setRelayStatus('error'); console.warn('RELAY disconnected — reconnecting in 3s'); scheduleReconnect() })
       client.on('signalwire.notification', (n) => {
         if (n.type !== 'callUpdate') return
         const call = n.call
@@ -97,9 +109,16 @@ export default function Dialer() {
 
       client.connect()
       relayRef.current = client
-    })()
+    }
 
-    return () => { client?.disconnect(); audioEl?.remove() }
+    connect()
+
+    return () => {
+      disposed = true
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      relayRef.current?.disconnect()
+      audioEl?.remove()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
