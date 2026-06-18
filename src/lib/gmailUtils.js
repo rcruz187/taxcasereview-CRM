@@ -102,13 +102,24 @@ function encodeHeaderValue(str) {
   return `=?UTF-8?B?${btoa(binary)}?=`
 }
 
+// Turns plain text (with \n line breaks, as typed in the Compose textarea)
+// into safe HTML — escapes anything that looks like a tag, then converts
+// newlines to <br>, so the body renders correctly without letting stray
+// "<" or "&" characters break the HTML structure.
+function textToHtml(text) {
+  const escaped = (text || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return escaped.replace(/\r\n|\r|\n/g, '<br>')
+}
+
 // Sends an email via the Gmail API. Returns the Gmail message id.
 // attachments (optional): [{ filename, mimeType, base64Data }] — base64Data
 // is the standard (non-url) base64 encoding of the raw file bytes.
 export async function sendGmailEmail(supabase, { to, subject, body, fromName, attachments = [] }) {
   const token = await getValidGmailToken(supabase)
 
-  const { data: settings } = await supabase.from('settings').select('email,name,email_signature').limit(1).maybeSingle()
+  const { data: settings } = await supabase.from('settings')
+    .select('email,name,email_signature,email_signature_logo_url').limit(1).maybeSingle()
   const fromDisplayName = fromName || settings?.name || 'Tax Case Review'
   // A bare display name with no email address is malformed per the email
   // spec, and can get a message silently spam-filtered even when Gmail's
@@ -117,7 +128,22 @@ export async function sendGmailEmail(supabase, { to, subject, body, fromName, at
   // account either way, but a well-formed header improves deliverability.
   const from = settings?.email ? `${encodeHeaderValue(fromDisplayName)} <${settings.email}>` : encodeHeaderValue(fromDisplayName)
   const encodedSubject = encodeHeaderValue(subject)
-  const finalBody = settings?.email_signature ? `${body}\n\n${settings.email_signature}` : body
+
+  // Build the signature block as real HTML so the logo can actually show.
+  // The logo is referenced by its public Supabase Storage URL — simpler
+  // and more broadly compatible across mail clients than inline cid:
+  // embedding, at the cost of the image needing internet access to load
+  // (true for basically every modern mail client anyway).
+  let signatureHtml = ''
+  if (settings?.email_signature_logo_url) {
+    signatureHtml += `<img src="${settings.email_signature_logo_url}" alt="" style="max-height:60px;max-width:240px;display:block;margin-bottom:8px;" />`
+  }
+  if (settings?.email_signature) {
+    signatureHtml += `<div style="font-size:13px;color:#444;white-space:pre-wrap;font-family:Arial,sans-serif;">${textToHtml(settings.email_signature)}</div>`
+  }
+
+  const bodyHtml = `<div style="font-size:14px;color:#222;font-family:Arial,sans-serif;line-height:1.6;">${textToHtml(body)}</div>` +
+    (signatureHtml ? `<div style="margin-top:18px;padding-top:12px;border-top:1px solid #e2e2e2;">${signatureHtml}</div>` : '')
 
   let message
   if (attachments.length === 0) {
@@ -126,19 +152,19 @@ export async function sendGmailEmail(supabase, { to, subject, body, fromName, at
       `From: ${from}`,
       `Subject: ${encodedSubject}`,
       `Date: ${new Date().toUTCString()}`,
-      'Content-Type: text/plain; charset="UTF-8"',
+      'Content-Type: text/html; charset="UTF-8"',
       'MIME-Version: 1.0',
     ].join('\r\n')
-    message = `${headers}\r\n\r\n${finalBody}`
+    message = `${headers}\r\n\r\n${bodyHtml}`
   } else {
     const boundary = `====tcr_${Date.now()}====`
     const parts = [
       [
         `--${boundary}`,
-        'Content-Type: text/plain; charset="UTF-8"',
+        'Content-Type: text/html; charset="UTF-8"',
         'Content-Transfer-Encoding: 7bit',
         '',
-        finalBody,
+        bodyHtml,
       ].join('\r\n'),
       ...attachments.map(att => [
         `--${boundary}`,
@@ -219,6 +245,23 @@ function stripHtml(html) {
   return html.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
+// Recursively collects attachment metadata (filename/mimeType/size/id) from
+// anywhere in a message's payload — only the pointers, never the file
+// bytes, so syncing never has to download or store large binary data.
+function findAttachments(payload, out = []) {
+  if (!payload) return out
+  if (payload.filename && payload.body?.attachmentId) {
+    out.push({
+      filename: payload.filename,
+      mimeType: payload.mimeType || 'application/octet-stream',
+      size: payload.body.size || 0,
+      attachmentId: payload.body.attachmentId,
+    })
+  }
+  for (const part of payload.parts || []) findAttachments(part, out)
+  return out
+}
+
 // List message ids matching a label (and optional date-bounded query for
 // backfill, e.g. "after:2025/06/18"), paginating with pageToken.
 // Returns { ids, nextPageToken }.
@@ -268,6 +311,7 @@ export async function getAndParseGmailMessage(supabase, id, clients = []) {
   const counterpartAddress = extractAddress(counterpartHeader)
   const counterpartName = extractDisplayName(counterpartHeader)
   const matchedClient = clients.find(c => c.email && c.email.toLowerCase() === counterpartAddress.toLowerCase())
+  const attachments = findAttachments(msg.payload)
 
   return {
     recipient: isSent ? counterpartAddress : extractAddress(fromHeader),
@@ -281,6 +325,35 @@ export async function getAndParseGmailMessage(supabase, id, clients = []) {
     from_address: extractAddress(fromHeader),
     received_at: receivedAt,
     created_at: receivedAt,
+    is_read: isSent, // sent mail is inherently "read" (you wrote it); inbox mail starts unread
+    attachments,
   }
+}
+
+// Downloads one attachment from Gmail and triggers a browser save-as —
+// fetched on demand so we never have to store attachment bytes ourselves.
+export async function downloadGmailAttachment(supabase, { gmailMessageId, attachmentId, filename, mimeType }) {
+  const token = await getValidGmailToken(supabase)
+  const res = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${gmailMessageId}/attachments/${attachmentId}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  )
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error?.message || 'Could not download attachment')
+
+  const b64 = data.data.replace(/-/g, '+').replace(/_/g, '/')
+  const binary = atob(b64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  const blob = new Blob([bytes], { type: mimeType || 'application/octet-stream' })
+
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename || 'attachment'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 5000)
 }
 

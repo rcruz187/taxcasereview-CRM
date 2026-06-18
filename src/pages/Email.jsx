@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { sendGmailEmail } from '../lib/gmailUtils'
+import { sendGmailEmail, downloadGmailAttachment } from '../lib/gmailUtils'
 import { useGmailSync } from '../context/GmailSyncContext'
 
 const TEMPLATES = [
@@ -25,7 +25,6 @@ const BLANK = { recipient:'', clientName:'', subject:'', body:'', triage:'Sent',
 
 export default function Email() {
   const [emails, setEmails]     = useState([])
-  const [confirmDel, setConfirmDel] = useState(null)
   const [clients, setClients]   = useState([])
   const [form, setForm]         = useState(BLANK)
   const [sug, setSug]           = useState([])
@@ -44,6 +43,15 @@ export default function Email() {
   const [gmailConnected, setGmailConnected] = useState(false)
   const [gmailClientId, setGmailClientId] = useState('')
   const { lastSyncAt, syncing, lastError, syncNow } = useGmailSync()
+
+  // Multi-select for bulk archive. checkedIds = the actual selection;
+  // focusIndex/anchorIndex track keyboard navigation within the currently
+  // filtered list so Shift+Arrow can extend a range from wherever
+  // selection started.
+  const [checkedIds, setCheckedIds] = useState(() => new Set())
+  const [focusIndex, setFocusIndex] = useState(-1)
+  const anchorIndexRef = useRef(-1)
+  const listRef = useRef(null)
 
   useEffect(() => {
     load(); loadGmailConfig()
@@ -146,11 +154,71 @@ export default function Email() {
     if (selected?.id === id) setSelected(prev => ({ ...prev, triage }))
   }
 
-  async function deleteEmail(id) {
-    if (confirmDel !== id) { setConfirmDel(id); return }
-    setConfirmDel(null)
-    await supabase.from('emails').delete().eq('id', id)
-    setSelected(null); load()
+  // The trash icon archives instead of permanently deleting. Two reasons:
+  // Romy asked for this directly, and it also fixes a real bug — actually
+  // deleting a synced email left its gmail_message_id gone from our table,
+  // so the very next Gmail sync saw it as "new" and pulled it right back
+  // in. Archiving keeps the row (with its gmail_message_id) so sync never
+  // re-imports it.
+  async function archiveEmail(id) {
+    await supabase.from('emails').update({ triage: 'Archive' }).eq('id', id)
+    if (selected?.id === id) setSelected(null)
+    setCheckedIds(s => { const n = new Set(s); n.delete(id); return n })
+    load()
+  }
+
+  async function archiveSelected() {
+    if (checkedIds.size === 0) return
+    const ids = [...checkedIds]
+    await supabase.from('emails').update({ triage: 'Archive' }).in('id', ids)
+    if (selected && ids.includes(selected.id)) setSelected(null)
+    setCheckedIds(new Set())
+    showToast(`Archived ${ids.length} email${ids.length === 1 ? '' : 's'}`)
+    load()
+  }
+
+  async function markRead(email) {
+    if (email.is_read) return
+    await supabase.from('emails').update({ is_read: true }).eq('id', email.id)
+    setEmails(es => es.map(e => e.id === email.id ? { ...e, is_read: true } : e))
+  }
+
+  function openEmail(email, index) {
+    setSelected(email)
+    setFocusIndex(index)
+    anchorIndexRef.current = index
+    setCheckedIds(new Set())
+    markRead(email)
+  }
+
+  function toggleChecked(id) {
+    setCheckedIds(s => {
+      const n = new Set(s)
+      n.has(id) ? n.delete(id) : n.add(id)
+      return n
+    })
+  }
+
+  // Shift+Up/Down extends a checked range from wherever the selection
+  // started (anchorIndexRef) to the new focus position — same convention
+  // as a file explorer. Plain Up/Down without Shift just moves which
+  // single email is open for reading, clearing any multi-select.
+  function onListKeyDown(e) {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+    if (filtered.length === 0) return
+    e.preventDefault()
+    const dir = e.key === 'ArrowDown' ? 1 : -1
+    const next = Math.min(filtered.length - 1, Math.max(0, focusIndex + dir))
+
+    if (e.shiftKey) {
+      if (anchorIndexRef.current === -1) anchorIndexRef.current = focusIndex === -1 ? 0 : focusIndex
+      const lo = Math.min(anchorIndexRef.current, next)
+      const hi = Math.max(anchorIndexRef.current, next)
+      setCheckedIds(new Set(filtered.slice(lo, hi + 1).map(e => e.id)))
+      setFocusIndex(next)
+    } else {
+      openEmail(filtered[next], next)
+    }
   }
 
   const filtered = emails.filter(e => {
@@ -160,8 +228,11 @@ export default function Email() {
     return true
   })
 
+  // Badge counts reflect UNREAD mail in each folder (standard inbox
+  // behavior) — this is what makes the Inbox number actually go down as
+  // things get read, instead of just showing a static total forever.
   const counts = {}
-  TRIAGE.forEach(t => { counts[t] = emails.filter(e => (e.triage || 'Inbox') === t).length })
+  TRIAGE.forEach(t => { counts[t] = emails.filter(e => (e.triage || 'Inbox') === t && !e.is_read).length })
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 52px)', margin: '-16px', overflow: 'hidden', background: 'var(--bg)' }}>
@@ -211,7 +282,7 @@ export default function Email() {
         <div style={{ padding: '4px 0' }}>
           <div style={{ padding: '6px 14px 4px', fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.07em' }}>Triage</div>
           {TRIAGE.map(t => (
-            <div key={t} onClick={() => { setTriageFilter(t); setView('inbox'); setSelected(null) }} style={{
+            <div key={t} onClick={() => { setTriageFilter(t); setView('inbox'); setSelected(null); setCheckedIds(new Set()); setFocusIndex(-1); anchorIndexRef.current = -1 }} style={{
               padding: '7px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               background: triageFilter === t && view === 'inbox' ? 'rgba(26,127,212,.18)' : 'transparent',
               borderLeft: triageFilter === t && view === 'inbox' ? '3px solid var(--blue)' : '3px solid transparent',
@@ -261,23 +332,56 @@ export default function Email() {
                   <button title="Top and bottom" onClick={() => setLayout('stacked')} style={{ padding: '6px 9px', background: readLayout === 'stacked' ? 'rgba(26,127,212,.18)' : 'transparent', color: readLayout === 'stacked' ? 'var(--blue)' : 'var(--t3)', border: 'none', cursor: 'pointer', fontSize: 13 }}>▤</button>
                 </div>
               </div>
-              <div style={{ flex: 1, overflow: 'auto' }}>
+
+              {/* Bulk action bar — appears once anything is checked (click a
+                  checkbox, or hold Shift and press Up/Down) */}
+              {checkedIds.size > 0 && (
+                <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--br)', background: 'rgba(26,127,212,.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--blue)' }}>{checkedIds.size} selected</span>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn sec" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => { setCheckedIds(new Set()); anchorIndexRef.current = -1 }}>Clear</button>
+                    <button className="btn pri" style={{ fontSize: 11, padding: '4px 10px' }} onClick={archiveSelected}>📦 Archive Selected</button>
+                  </div>
+                </div>
+              )}
+
+              <div
+                ref={listRef}
+                tabIndex={0}
+                onKeyDown={onListKeyDown}
+                style={{ flex: 1, overflow: 'auto', outline: 'none' }}>
                 {filtered.length === 0 ? (
                   <div style={{ padding: 30, textAlign: 'center', color: 'var(--t3)', fontSize: 13 }}>No emails in {triageFilter}</div>
-                ) : filtered.map(e => (
-                  <div key={e.id} onClick={() => setSelected(e)} style={{
+                ) : filtered.map((e, i) => (
+                  <div key={e.id} onClick={() => openEmail(e, i)} style={{
                     padding: '12px 14px', borderBottom: '1px solid var(--br)', cursor: 'pointer',
-                    background: selected?.id === e.id ? 'rgba(26,127,212,.14)' : 'transparent',
+                    display: 'flex', gap: 10, alignItems: 'flex-start',
+                    background: checkedIds.has(e.id) ? 'rgba(26,127,212,.10)' : selected?.id === e.id ? 'rgba(26,127,212,.14)' : 'transparent',
                     borderLeft: selected?.id === e.id ? '3px solid var(--blue)' : '3px solid transparent',
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 3 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--tx)' }}>{e.clientName || e.recipient || 'Unknown'}</div>
-                      <div style={{ fontSize: 10, color: 'var(--t3)', flexShrink: 0, marginLeft: 8 }}>
-                        {e.created_at ? new Date(e.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}
+                    <input
+                      type="checkbox"
+                      checked={checkedIds.has(e.id)}
+                      onClick={ev => ev.stopPropagation()}
+                      onChange={() => { toggleChecked(e.id); anchorIndexRef.current = i; setFocusIndex(i) }}
+                      style={{ marginTop: 3, flexShrink: 0, cursor: 'pointer' }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 3 }}>
+                        <div style={{ fontWeight: e.is_read ? 600 : 800, fontSize: 13, color: 'var(--tx)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {!e.is_read && <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--blue)', flexShrink: 0 }} />}
+                          {e.clientName || e.recipient || 'Unknown'}
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--t3)', flexShrink: 0, marginLeft: 8 }}>
+                          {e.created_at ? new Date(e.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}
+                        </div>
                       </div>
+                      <div style={{ fontSize: 12, fontWeight: e.is_read ? 600 : 800, color: 'var(--t2)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5 }}>
+                        {e.subject}
+                        {e.attachments?.length > 0 && <span title={`${e.attachments.length} attachment(s)`} style={{ flexShrink: 0 }}>📎</span>}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--t3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.body?.slice(0, 80)}</div>
                     </div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--t2)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.subject}</div>
-                    <div style={{ fontSize: 11, color: 'var(--t3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.body?.slice(0, 80)}</div>
                   </div>
                 ))}
               </div>
@@ -311,12 +415,29 @@ export default function Email() {
                         <button key={t} className="btn sec" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => moveTriage(selected.id, t)}>→ {t}</button>
                       ))}
                       <button className="btn" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => { setForm({ ...BLANK, clientName: selected.clientName, recipient: selected.recipient, subject: 'Re: ' + selected.subject }); setView('compose') }}>↩ Reply</button>
-                      <button className="btn del" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => deleteEmail(selected.id)}>🗑</button>
+                      <button className="btn del" title="Archive" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => archiveEmail(selected.id)}>🗑 Archive</button>
                     </div>
                   </div>
                   <div style={{ background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: 10, padding: 20, fontSize: 14, lineHeight: 1.8, color: 'var(--tx)', whiteSpace: 'pre-wrap' }}>
                     {selected.body}
                   </div>
+                  {selected.attachments?.length > 0 && (
+                    <div style={{ marginTop: 14, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {selected.attachments.map((att, i) => (
+                        <button key={i} className="btn sec" style={{ fontSize: 12, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 6 }}
+                          onClick={async () => {
+                            try {
+                              await downloadGmailAttachment(supabase, {
+                                gmailMessageId: selected.gmail_message_id, attachmentId: att.attachmentId,
+                                filename: att.filename, mimeType: att.mimeType,
+                              })
+                            } catch (e) { showToast('Could not download: ' + e.message) }
+                          }}>
+                          📎 {att.filename} {att.size ? `(${Math.round(att.size / 1024)}KB)` : ''}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--t3)' }}>
@@ -402,20 +523,6 @@ export default function Email() {
           </div>
         )}
       </div>
-
-      {confirmDel && (
-        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setConfirmDel(null)}>
-          <div className="modal" style={{maxWidth:360,textAlign:'center'}}>
-            <div style={{fontSize:36,marginBottom:12}}>🗑</div>
-            <div style={{fontWeight:700,fontSize:15,marginBottom:8}}>Delete this email?</div>
-            <div style={{fontSize:13,color:'var(--t3)',marginBottom:20}}>This cannot be undone.</div>
-            <div style={{display:'flex',gap:8}}>
-              <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={()=>setConfirmDel(null)}>Cancel</button>
-              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>deleteEmail(confirmDel)}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

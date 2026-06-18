@@ -10,7 +10,9 @@ export default function Settings() {
   const [saving, setSaving] = useState(false)
   const [logoUrl, setLogoUrl] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [sigLogoUploading, setSigLogoUploading] = useState(false)
   const fileRef = useRef()
+  const sigLogoFileRef = useRef()
 
   const [firm, setFirm] = useState({
     name: '', tagline: '', phone: '', email: '',
@@ -18,7 +20,7 @@ export default function Settings() {
     website: '', ein: '', primary_color: '#2563eb',
     preparer_name: '', ptin: '', caf_number: '', efin: '',
     gmail_client_id: '', gmail_client_secret: '', gmail_redirect_uri: '',
-    email_signature: ''
+    email_signature: '', email_signature_logo_url: ''
   })
 
   const [pw, setPw] = useState({ next: '', confirm: '' })
@@ -172,6 +174,28 @@ export default function Settings() {
       await loadLogo()
       showToast('Logo uploaded!')
     } catch (err) { showToast(err.message, 'err') } finally { setUploading(false) }
+  }
+
+  // Separate from the main firm logo above — this one is specifically for
+  // the email signature, since it might be a different (e.g. smaller,
+  // wordmark-only) image than the full logo shown elsewhere in the CRM.
+  async function uploadSignatureLogo(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    setSigLogoUploading(true)
+    try {
+      const ext = file.name.split('.').pop() || 'png'
+      const path = `signature-logo.${ext}`
+      const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true, contentType: file.type })
+      if (error) throw error
+      const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path)
+      // Cache-bust so the new logo shows immediately instead of a stale
+      // browser-cached copy of the old file at the same URL.
+      const bustedUrl = `${pub.publicUrl}?t=${Date.now()}`
+      setFirm(f => ({ ...f, email_signature_logo_url: bustedUrl }))
+      await supabase.from('settings').update({ email_signature_logo_url: bustedUrl }).eq('id', firm.id)
+      showToast('Signature logo uploaded!')
+    } catch (err) { showToast(err.message, 'err') } finally { setSigLogoUploading(false) }
   }
 
   async function changePassword() {
@@ -586,6 +610,38 @@ export default function Settings() {
               </div>
               <textarea value={firm.email_signature||''} onChange={set('email_signature')} rows={4}
                 placeholder={"Best regards,\nTax Case Review\n(305) 555-0000\nwww.taxcasereview.org"} />
+            </div>
+
+            <div className="field" style={{ maxWidth: 420 }}>
+              <label>Signature Logo (optional)</label>
+              <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 10, lineHeight: 1.6 }}>
+                Shows above the signature text on every email sent. PNG with a transparent background works best.
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{
+                  width: 120, height: 60, borderRadius: 8, border: '1px dashed var(--br)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--s2)', overflow: 'hidden', flexShrink: 0,
+                }}>
+                  {firm.email_signature_logo_url
+                    ? <img src={firm.email_signature_logo_url} alt="Signature logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                    : <span style={{ fontSize: 11, color: 'var(--t3)' }}>No logo</span>}
+                </div>
+                <button className="btn sec" onClick={() => sigLogoFileRef.current.click()} disabled={sigLogoUploading}>
+                  {sigLogoUploading ? 'Uploading…' : '📤 Upload Logo'}
+                </button>
+                <input ref={sigLogoFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={uploadSignatureLogo} />
+              </div>
+
+              {/* Live preview of exactly what gets appended to outgoing emails */}
+              {(firm.email_signature_logo_url || firm.email_signature) && (
+                <div style={{ marginTop: 14, padding: 14, borderRadius: 8, border: '1px solid var(--br)', background: 'var(--s1)' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>Preview</div>
+                  {firm.email_signature_logo_url && (
+                    <img src={firm.email_signature_logo_url} alt="" style={{ maxHeight: 60, maxWidth: 240, display: 'block', marginBottom: 8 }} />
+                  )}
+                  <div style={{ fontSize: 13, color: 'var(--t2)', whiteSpace: 'pre-wrap', fontFamily: 'Arial, sans-serif' }}>{firm.email_signature}</div>
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
               <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Branding'}</button>

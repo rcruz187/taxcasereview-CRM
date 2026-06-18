@@ -7,6 +7,9 @@ project_id = "mpxgxfqdbquzkrvvejkh"
 [functions.receive-call]
 verify_jwt = false
 
+[functions.call-recorded]
+verify_jwt = false
+
 [functions.receive-sms]
 verify_jwt = false
 

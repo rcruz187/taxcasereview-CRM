@@ -21,6 +21,7 @@ export default function Dialer() {
 
   const [clientQueue, setClientQueue] = useState([])
   const [voicemails, setVoicemails] = useState([])
+  const [recordings, setRecordings] = useState([])
   const prevLogModalRef = useRef(false)
 
   // Page-local wrapper around the shared connection's startCall.
@@ -40,7 +41,7 @@ export default function Dialer() {
   }, [logModal])
 
   useEffect(() => {
-    loadLeads(); loadCallLog(); loadVoicemails()
+    loadLeads(); loadCallLog(); loadVoicemails(); loadRecordings()
     // Pick up number passed from client phone link
     const pre = sessionStorage.getItem('dialerNumber')
     if (pre) {
@@ -82,6 +83,16 @@ export default function Dialer() {
       .limit(100)
     if (error) console.error('loadVoicemails error:', error)
     if (data) setVoicemails(data)
+  }
+
+  async function loadRecordings() {
+    const { data, error } = await supabase
+      .from('call_recordings')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100)
+    if (error) console.error('loadRecordings error:', error)
+    if (data) setRecordings(data)
   }
 
   async function markVoicemailRead(vm) {
@@ -249,6 +260,7 @@ export default function Dialer() {
             {[
               ['queue', `📋 Call Queue (${leads.length})`],
               ['voicemail', `🔵 Voicemails (${voicemails.filter(v => !v.is_read).length})`],
+              ['recordings', `🎙️ Recordings (${recordings.length})`],
               ['log', `📞 Call History (${callLog.length})`],
             ].map(([key, label]) => (
               <button key={key} onClick={() => setTab(key)}
@@ -295,6 +307,35 @@ export default function Dialer() {
                       onClick={() => deleteVoicemail(vm)}>
                       🗑️ Delete
                     </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Call Recordings */}
+          {tab === 'recordings' && (
+            <div className="card">
+              <div className="ovx">
+                {recordings.length === 0 ? (
+                  <div style={{ textAlign: 'center', color: 'var(--t3)', padding: 24 }}>No recorded calls yet</div>
+                ) : recordings.map(rec => (
+                  <div key={rec.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 14, padding: '12px 8px',
+                    borderBottom: '1px solid var(--br)',
+                  }}>
+                    <div style={{ minWidth: 140 }}>
+                      <div style={{ fontWeight: 700, fontFamily: 'monospace' }}>{rec.from_number || 'Unknown'}</div>
+                      <div style={{ fontSize: 11, color: 'var(--t3)' }}>
+                        {rec.created_at ? new Date(rec.created_at).toLocaleString() : '—'}
+                        {rec.duration_seconds ? ` · ${rec.duration_seconds}s` : ''}
+                      </div>
+                    </div>
+                    {rec.recording_url ? (
+                      <audio controls src={rec.recording_url} style={{ flex: 1, height: 32 }} />
+                    ) : (
+                      <span style={{ fontSize: 12, color: 'var(--t3)' }}>Recording unavailable</span>
+                    )}
                   </div>
                 ))}
               </div>

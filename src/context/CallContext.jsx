@@ -110,15 +110,18 @@ export function CallProvider({ children }) {
       const client = new Relay({ project: data.project_id, token: data.jwt_token })
       client.remoteElement = 'sw-remote-audio'
 
-      client.on('signalwire.ready', () => setRelayStatus('ready'))
-      client.on('signalwire.error', (e) => { setRelayStatus('error'); console.error('RELAY error', e); scheduleReconnect() })
-      client.on('signalwire.socket.close', () => { setRelayStatus('error'); console.warn('RELAY socket closed — reconnecting in 3s'); scheduleReconnect() })
-      client.on('signalwire.socket.error', (e) => { setRelayStatus('error'); console.error('RELAY socket error', e); scheduleReconnect() })
-      client.on('blade.disconnect', () => { setRelayStatus('error'); console.warn('RELAY disconnected — reconnecting in 3s'); scheduleReconnect() })
+      client.on('signalwire.ready', () => { console.log('%c[RELAY] ready — registered as "office"', 'color:lime'); setRelayStatus('ready') })
+      client.on('signalwire.error', (e) => { setRelayStatus('error'); console.error('[RELAY] error', e); scheduleReconnect() })
+      client.on('signalwire.socket.close', () => { setRelayStatus('error'); console.warn('[RELAY] socket closed — reconnecting in 3s'); scheduleReconnect() })
+      client.on('signalwire.socket.error', (e) => { setRelayStatus('error'); console.error('[RELAY] socket error', e); scheduleReconnect() })
+      client.on('blade.disconnect', () => { setRelayStatus('error'); console.warn('[RELAY] disconnected — reconnecting in 3s'); scheduleReconnect() })
       client.on('signalwire.notification', (n) => {
+        console.log('[RELAY] notification received:', n.type, n)
         if (n.type !== 'callUpdate') return
         const call = n.call
+        console.log('[RELAY] callUpdate — direction:', call.direction, '| state:', call.state, '| from:', call.options?.remoteCallerNumber)
         if (call.direction === 'inbound' && call.state === 'ringing') {
+          console.log('%c[RELAY] INCOMING CALL DETECTED — showing banner now', 'color:cyan;font-weight:bold')
           liveCallRef.current = call
           uiStartedRef.current = false
           setIncomingCall(call)
