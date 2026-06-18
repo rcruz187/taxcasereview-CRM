@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { Relay } from '@signalwire/js'
 import { supabase } from '../lib/supabase'
 
 const OUTCOMES = ['Connected', 'No Answer', 'Voicemail', 'Wrong Number', 'Callback Requested', 'Converted']
@@ -24,6 +25,84 @@ export default function Dialer() {
   const timerRef = useRef(null)
 
   const [clientQueue, setClientQueue] = useState([])
+
+  // ── Real calling (SignalWire RELAY) ──────────────────────────────────
+  const [relayStatus, setRelayStatus] = useState('connecting') // connecting | ready | error
+  const [incomingCall, setIncomingCall] = useState(null)        // Call object while it's ringing in
+  const relayRef = useRef(null)       // the Relay client instance
+  const liveCallRef = useRef(null)    // the Call object currently in progress (in or out)
+  const callerNumberRef = useRef(null)
+  const audioRef = useRef(null)
+  const uiStartedRef = useRef(false)  // guards against re-initializing the active-call UI twice for the same call
+  const elapsedRef = useRef(0)
+  useEffect(() => { elapsedRef.current = elapsed }, [elapsed])
+
+  useEffect(() => {
+    let client
+    ;(async () => {
+      const { data, error } = await supabase.functions.invoke('signalwire-relay-token')
+      if (error || !data?.jwt_token) {
+        setRelayStatus('error')
+        showToast('Could not connect calling: ' + (data?.error || error?.message || 'unknown error'))
+        return
+      }
+      callerNumberRef.current = data.caller_number
+
+      client = new Relay({ project: data.project_id, token: data.jwt_token })
+      client.remoteElement = audioRef.current
+
+      client.on('signalwire.ready', () => setRelayStatus('ready'))
+      client.on('signalwire.error', (e) => { setRelayStatus('error'); console.error('RELAY error', e) })
+      client.on('signalwire.notification', (n) => {
+        if (n.type !== 'callUpdate') return
+        const call = n.call
+        if (call.direction === 'inbound' && call.state === 'ringing') {
+          liveCallRef.current = call
+          uiStartedRef.current = false
+          setIncomingCall(call)
+        }
+        if (call.state === 'active' && !uiStartedRef.current) {
+          uiStartedRef.current = true
+          setIncomingCall(null)
+          setCalling(true)
+          setElapsed(0)
+          setLogForm(BLANK_LOG)
+          timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000)
+          setActive(prev => prev || { id: null, name: 'Incoming Call', first: 'Incoming', last: 'Call', phone: call.options?.remoteCallerNumber || '—', status: 'Manual' })
+        }
+        if (call.state === 'hangup' || call.state === 'destroy') {
+          setIncomingCall(null)
+          if (liveCallRef.current === call) {
+            liveCallRef.current = null
+            if (uiStartedRef.current) {
+              uiStartedRef.current = false
+              clearInterval(timerRef.current)
+              setCalling(false)
+              setLogForm(f => ({ ...f, duration: formatTime(elapsedRef.current) }))
+              setLogModal(true)
+            }
+          }
+        }
+      })
+
+      client.connect()
+      relayRef.current = client
+    })()
+
+    return () => { client?.disconnect() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function answerIncoming() {
+    incomingCall?.answer()
+    setIncomingCall(null)
+  }
+
+  function declineIncoming() {
+    incomingCall?.hangup()
+    setIncomingCall(null)
+    liveCallRef.current = null
+  }
 
   useEffect(() => {
     loadLeads(); loadCallLog()
@@ -62,16 +141,26 @@ export default function Dialer() {
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
   function startCall(lead) {
+    if (relayStatus !== 'ready') { showToast('Calling isn\'t connected yet — wait a moment and try again.'); return }
+    const digits = lead.phone?.replace(/\D/g, '')
+    if (!digits) { showToast('No phone number to call.'); return }
+    uiStartedRef.current = true
     setActive(lead)
     setCalling(true)
     setElapsed(0)
     setLogForm(BLANK_LOG)
     timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000)
-    // Open native dialer
-    window.location.href = `tel:${lead.phone?.replace(/\D/g, '')}`
+    relayRef.current?.newCall({
+      destinationNumber: digits.length === 10 ? `+1${digits}` : `+${digits}`,
+      callerNumber: callerNumberRef.current || undefined,
+    }).then(call => { liveCallRef.current = call })
+      .catch(err => { showToast('Call failed: ' + (err?.message || err)); cancelCall() })
   }
 
   function endCall() {
+    liveCallRef.current?.hangup()
+    liveCallRef.current = null
+    uiStartedRef.current = false
     clearInterval(timerRef.current)
     setCalling(false)
     setLogForm(f => ({ ...f, duration: formatTime(elapsed) }))
@@ -79,6 +168,9 @@ export default function Dialer() {
   }
 
   function cancelCall() {
+    liveCallRef.current?.hangup()
+    liveCallRef.current = null
+    uiStartedRef.current = false
     clearInterval(timerRef.current)
     setCalling(false)
     setActive(null)
@@ -168,6 +260,50 @@ export default function Dialer() {
   return (
     <div>
       {toast && <div className="toast show">{toast}</div>}
+      <audio ref={audioRef} autoPlay />
+
+      {/* ── Calling connection status ──────────────────────────────── */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+        <span style={{
+          fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 600,
+          background: relayStatus === 'ready' ? 'rgba(37,162,90,0.15)' : relayStatus === 'error' ? 'rgba(192,32,47,0.15)' : 'rgba(245,158,11,0.15)',
+          color: relayStatus === 'ready' ? '#25A25A' : relayStatus === 'error' ? '#C0202F' : '#f59e0b',
+        }}>
+          {relayStatus === 'ready' ? '🟢 Phone line connected' : relayStatus === 'error' ? '🔴 Phone line error' : '🟡 Connecting phone line…'}
+        </span>
+      </div>
+
+      {/* ── Incoming Call Banner ───────────────────────────────────── */}
+      {incomingCall && (
+        <div style={{
+          background: 'linear-gradient(135deg, #1d4ed8, #3b82f6)',
+          borderRadius: 10, padding: '16px 20px', marginBottom: 16,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{
+              width: 48, height: 48, borderRadius: '50%', background: 'rgba(255,255,255,0.2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20
+            }}>📞</div>
+            <div>
+              <div style={{ color: '#fff', fontWeight: 700, fontSize: 16 }}>Incoming Call</div>
+              <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13 }}>
+                {incomingCall.options?.remoteCallerNumber || incomingCall.options?.destinationNumber || 'Unknown number'}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={declineIncoming} className="btn"
+              style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none' }}>
+              Decline
+            </button>
+            <button onClick={answerIncoming}
+              style={{ background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+              ✅ Answer
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Active Call Banner ──────────────────────────────────────── */}
       {calling && active && (

@@ -4,8 +4,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 // Called BY SignalWire whenever someone calls the number. Configure as
 // the LaML Webhook under "Voice and Fax Settings" → "Handle Calls Using"
 // on the phone number (with "Accept Incoming Calls As" set to Voice).
-// Returns cXML telling SignalWire to ring a real phone — set which one
-// in Settings → SignalWire → Call Forwarding Number.
+// Returns cXML telling SignalWire to ring the CRM itself (the "office"
+// RELAY resource that the Dialer page connects as) and, if a Call
+// Forwarding Number is also set in Settings, ring that phone in parallel —
+// whichever picks up first wins, the other side just stops ringing.
+
+const RELAY_RESOURCE = 'office' // must match the resource used in signalwire-relay-token
 
 serve(async (req) => {
   try {
@@ -18,11 +22,7 @@ serve(async (req) => {
 
     const forwardTo = settings?.call_forward_number
 
-    const xml = forwardTo
-      ? `<?xml version="1.0" encoding="UTF-8"?><Response><Dial>${forwardTo}</Dial></Response>`
-      // No number configured yet — play a quick message instead of just
-      // ringing dead air, so a caller at least knows it's a real business.
-      : `<?xml version="1.0" encoding="UTF-8"?><Response><Say>Thank you for calling. No one is available to take your call right now. Please try again later.</Say></Response>`
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial timeout="25"><Client>${RELAY_RESOURCE}</Client>${forwardTo ? `<Number>${forwardTo}</Number>` : ''}</Dial><Say>Thank you for calling. No one is available to take your call right now. Please try again later.</Say></Response>`
 
     return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
 
