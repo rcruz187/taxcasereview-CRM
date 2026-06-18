@@ -14,6 +14,7 @@ import SignPage     from './pages/SignPage'
 import ClockIn       from './pages/ClockIn'
 import ClientPortal  from './pages/ClientPortal'
 import OrganizerPage from './pages/OrganizerPage'
+import FinancialIntakePage from './pages/FinancialIntakePage'
 import AuthCallback from './pages/AuthCallback'
 
 // Everything behind login is lazy-loaded — each page's code only downloads
@@ -175,6 +176,7 @@ function AuthRouter() {
       <Route path="/sign/:id" element={<SignPage />} />
       <Route path="/portal/:id" element={<ClientPortal />} />
       <Route path="/organizer/:id" element={<OrganizerPage />} />
+      <Route path="/financial-intake/:id" element={<FinancialIntakePage />} />
       <Route path="*" element={<RequireAuth><Shell /></RequireAuth>} />
     </Routes>
   )

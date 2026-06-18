@@ -625,9 +625,31 @@ export default function Leads() {
       { title: `Call IRS — ${l.name}`,             clientName: l.name, priority: 'High', dueDate: addDays(1), done: false, created_at: new Date().toISOString() },
       { title: `Schedule TaxCase Review call — ${l.name}`, clientName: l.name, priority: 'Normal', dueDate: addDays(3), done: false, created_at: new Date().toISOString() },
     ])
+    // Auto-create the financial intake record and email the client their link
+    let intakeSent = false
+    try {
+      const { data: intakeRec, error: intakeErr } = await supabase.from('financial_intake_responses').insert([{
+        client_name: l.name, client_email: l.email || '', status: 'Sent',
+        answers: {}, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      }]).select().single()
+      if (!intakeErr && intakeRec) {
+        const intakeUrl = window.location.origin + '/taxcasereview-CRM/financial-intake/' + intakeRec.id
+        if (l.email) {
+          const { error: emailErr } = await supabase.functions.invoke('send-email', {
+            body: {
+              to: l.email,
+              subject: `Your Financial Intake Form — Tax Case Review`,
+              html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${l.name}</strong>,</p><p>Welcome aboard! To get your case moving, please fill out this short financial intake form — it gives your advisor the full picture needed to put together your resolution plan. It takes about 10-15 minutes and your progress saves automatically.</p><p style="text-align:center;margin:24px 0"><a href="${intakeUrl}" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Financial Intake</a></p><p style="font-size:12px;color:#64748b">Link: ${intakeUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
+            }
+          })
+          if (!emailErr) intakeSent = true
+        }
+      }
+    } catch (e) { console.error('Financial intake auto-send error:', e) }
     setConverting(false)
     const { count } = await supabase.from('client_compliance_records').select('*', { count: 'exact', head: true }).eq('client_name', l.name)
-    showToast(count ? `✅ ${l.name} converted to Client! 3 onboarding tasks created, compliance data (${count} records) carried over.` : `✅ ${l.name} converted to Client! 3 onboarding tasks created.`)
+    const intakeMsg = intakeSent ? ', financial intake form emailed' : (l.email ? '' : ', financial intake created but no email on file to send it to')
+    showToast(count ? `✅ ${l.name} converted to Client! 3 onboarding tasks created${intakeMsg}, compliance data (${count} records) carried over.` : `✅ ${l.name} converted to Client! 3 onboarding tasks created${intakeMsg}.`)
     setDetail(null); load()
   }
 

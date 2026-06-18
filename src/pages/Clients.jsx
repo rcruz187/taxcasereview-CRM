@@ -744,6 +744,7 @@ export default function Clients() {
   }
   const [fillerClient, setFillerClient] = useState(null)
   const [pkgSending, setPkgSending] = useState(false)
+  const [intakeSending, setIntakeSending] = useState(false)
   const [bookingClient, setBookingClient] = useState(null)
   // Quick add task inline
   const [quickTask,   setQuickTask]   = useState('')
@@ -946,6 +947,35 @@ export default function Clients() {
     if (res.error) { showToast('Error: '+res.error); return }
     await navigator.clipboard.writeText(res.url).catch(()=>{})
     showToast('✅ Full package created — signing link copied to clipboard!')
+  }
+
+  async function resendFinancialIntake(c) {
+    if (!c.email) { showToast('No email on file for this client'); return }
+    setIntakeSending(true)
+    let intakeId
+    const { data: existing } = await supabase.from('financial_intake_responses')
+      .select('id').eq('client_name', c.name).order('created_at',{ascending:false}).limit(1).maybeSingle()
+    if (existing) {
+      intakeId = existing.id
+    } else {
+      const { data: created, error: createErr } = await supabase.from('financial_intake_responses').insert([{
+        client_name: c.name, client_email: c.email || '', status: 'Sent',
+        answers: {}, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      }]).select().single()
+      if (createErr) { setIntakeSending(false); showToast('Error: '+createErr.message); return }
+      intakeId = created.id
+    }
+    const intakeUrl = window.location.origin + '/taxcasereview-CRM/financial-intake/' + intakeId
+    const { error: emailErr } = await supabase.functions.invoke('send-email', {
+      body: {
+        to: c.email,
+        subject: `Your Financial Intake Form — Tax Case Review`,
+        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${c.name}</strong>,</p><p>Here's your link to fill out (or finish) your financial intake form — it takes about 10-15 minutes and your progress saves automatically.</p><p style="text-align:center;margin:24px 0"><a href="${intakeUrl}" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Financial Intake</a></p><p style="font-size:12px;color:#64748b">Link: ${intakeUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
+      }
+    })
+    setIntakeSending(false)
+    if (emailErr) { showToast('Error sending email: '+emailErr.message); return }
+    showToast('✅ Financial Intake link sent to '+c.email)
   }
 
   async function toggleTask(task) {
@@ -1180,6 +1210,7 @@ export default function Clients() {
             <ActionBtn color="#0f766e" icon="📊" label="P&amp;L" sub="Books &amp; Ledger" onClick={()=>navigate('/books?client='+encodeURIComponent(c.name))}/>
             <ActionBtn color="#0ea5e9" icon="🔓" label="Client Portal" sub="Compliance Access" onClick={()=>{setPortalClient(c);setPortalModal(true)}}/>
             <ActionBtn color="#9333ea" icon="🧾" label="Tax Organizer" sub="Send for Filing" onClick={()=>{setOrgClient(c);setOrgModal(true)}}/>
+            <ActionBtn color="#1d4ed8" icon="💰" label={intakeSending?'Sending…':'Financial Intake'} sub="Resend Link" onClick={()=>!intakeSending&&resendFinancialIntake(c)}/>
           </div>
         </div>
 
