@@ -37,7 +37,7 @@ export default function Email() {
     stacked: parseInt(localStorage.getItem('tcr_email_list_height')) || 260,
   }))
   const [resizing, setResizing] = useState(false)
-  const [triageFilter, setTriageFilter] = useState('Sent')
+  const [triageFilter, setTriageFilter] = useState('Inbox')
   const [selected, setSelected] = useState(null)
   const [search, setSearch]     = useState('')
   const [gmailConnected, setGmailConnected] = useState(false)
