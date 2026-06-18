@@ -73,7 +73,10 @@ serve(async (req) => {
     // record="record-from-answer" records both legs once the call connects —
     // this rides on the same call minutes already being paid for, no extra
     // SignalWire product to turn on. Recording posts to call-recorded once done.
-    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial timeout="25" record="record-from-answer" recordingStatusCallback="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/call-recorded">${vertoNoun}${forwardNoun}</Dial><Say>Thank you for calling Tax Case Review. No one is available right now. Please leave a message after the tone.</Say><Record action="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/voicemail-recorded" maxLength="120" playBeep="true"/></Response>`
+    // TEMP TEST: record/recordingStatusCallback removed from this Dial to
+    // rule out a Verto+recording incompatibility as the cause of the
+    // instant (0-second) DialCallStatus=failed we've been seeing all day.
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial timeout="25">${vertoNoun}${forwardNoun}</Dial><Say>Thank you for calling Tax Case Review. No one is available right now. Please leave a message after the tone.</Say><Record action="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/voicemail-recorded" maxLength="120" playBeep="true"/></Response>`
 
     console.log('returning cXML:', xml)
     return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
