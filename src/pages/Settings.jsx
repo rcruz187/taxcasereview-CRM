@@ -360,7 +360,7 @@ export default function Settings() {
             <div className="card-header"><span className="card-title">📞 SignalWire Dialer</span></div>
             <div style={{ padding: '0 20px 20px' }}>
               <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.6 }}>
-                Powers the built-in dialer, SMS, and fax. Get credentials at <strong>signalwire.com</strong>.
+                Powers SMS and fax directly (no separate backend needed for those), plus the built-in dialer if you deploy one later. Get credentials at <strong>signalwire.com</strong>.
               </div>
               <div className="fg2">
                 <div className="field"><label>Space URL</label>
@@ -393,9 +393,9 @@ export default function Settings() {
                   <input type="password" value={firm.sw_sip_password || ''} onChange={set('sw_sip_password')} placeholder="SIP endpoint password" />
                 </div>
               </div>
-              <div className="field"><label>Backend Server URL</label>
+              <div className="field"><label>Backend Server URL (optional)</label>
                 <input value={firm.signalwire_backend || ''} onChange={set('signalwire_backend')} placeholder="https://your-backend.onrender.com" />
-                <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>URL where signalwire-backend (server.js) is deployed. Powers SMS, fax, and dialer.</div>
+                <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Not needed for SMS or fax — those run through Supabase Edge Functions now. Only fill this in if you deploy a separate backend for real-time browser calling later.</div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
                 <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save SignalWire'}</button>
@@ -428,11 +428,11 @@ export default function Settings() {
             <div className="card-header"><span className="card-title">📠 Fax Integration</span></div>
             <div style={{ padding: '0 20px 20px' }}>
               <div style={{fontSize:12,color:'var(--t3)',marginBottom:16,lineHeight:1.7}}>
-                Fax is sent via your SignalWire backend's <code>/fax/send</code> endpoint, using the same SignalWire project as your dialer and SMS above.
+                Fax is sent via a Supabase Edge Function (<code>send-fax</code>), using the same SignalWire project as SMS above. No separate backend or hosting needed.
               </div>
               <div style={{background:'var(--s2)',borderRadius:8,padding:'12px 16px',marginBottom:16,fontSize:12,lineHeight:1.8}}>
                 <div style={{fontWeight:700,color:'var(--tx)',marginBottom:6}}>Setup:</div>
-                {[['1','Set up SignalWire credentials in the SignalWire Dialer card above'],['2','Deploy signalwire-backend (server.js) to a host like Render or Railway'],['3','Enter the deployed Backend Server URL in the SignalWire card'],['4','Fax sends from the Fax From Number above if set, otherwise the Inbound DID']].map(([step,text])=>(
+                {[['1','Set up SignalWire credentials in the SignalWire Dialer card above'],['2','Deploy the send-fax Edge Function from your Supabase dashboard (Edge Functions → send-fax)'],['3','Fax sends from the Fax From Number above if set, otherwise the Inbound DID']].map(([step,text])=>(
                   <div key={step} style={{display:'flex',gap:10,marginBottom:4,alignItems:'flex-start'}}>
                     <div style={{width:20,height:20,borderRadius:'50%',background:'var(--blue)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,flexShrink:0,marginTop:1}}>{step}</div>
                     <div style={{color:'var(--t2)'}}>{text}</div>
@@ -440,7 +440,7 @@ export default function Settings() {
                 ))}
               </div>
               <div style={{background:'rgba(26,127,212,.08)',border:'1px solid rgba(26,127,212,.2)',borderRadius:8,padding:'10px 14px',fontSize:12,color:'var(--t2)',lineHeight:1.6}}>
-                Backend URL: <strong>{firm.signalwire_backend || 'Not configured'}</strong><br/>
+                SignalWire Space: <strong>{firm.sw_space_url || 'Not configured'}</strong><br/>
                 Fax From Number: <strong>{firm.firm_fax_number || firm.sw_inbound_did || 'Not configured'}</strong>
               </div>
             </div>

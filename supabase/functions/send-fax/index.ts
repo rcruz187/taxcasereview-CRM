@@ -6,6 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Pure send — no DB writes here. The caller (Fax.jsx) already logs to
+// fax_logs itself with richer context (client_name, subject, notes, etc.)
+// than this function has access to, so logging here would double it up.
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -21,13 +24,18 @@ serve(async (req) => {
       .limit(1)
       .maybeSingle()
 
-    const { to, document_url, lead_id, client_id, user_id, notes } = await req.json()
+    const { to, from, document_url } = await req.json()
 
     if (!to || !document_url) {
       return new Response(JSON.stringify({ error: 'to and document_url are required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
+
+    // Explicit `from` from the caller wins (lets a specific fax go out from
+    // a different number than the default); otherwise fall back to the
+    // dedicated fax number, then the main inbound DID.
+    const fromNumber = from || settings?.firm_fax_number || settings?.sw_inbound_did || ''
 
     let faxResult: any = null
 
@@ -41,17 +49,24 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           connection_id: Deno.env.get('TELNYX_CONNECTION_ID') || '',
-          from: settings.firm_fax_number || '',
+          from: fromNumber,
           to,
           media_url: document_url,
         }),
       })
       faxResult = await res.json()
-      if (!res.ok) throw new Error(faxResult.errors?.[0]?.detail || 'Telnyx fax error')
+      if (!res.ok) {
+        return new Response(JSON.stringify({ error: faxResult.errors?.[0]?.detail || 'Telnyx fax error' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+      return new Response(JSON.stringify({ success: true, sid: faxResult.data?.id }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     } else if (settings?.sw_space_url) {
       const auth = btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
       const formData = new URLSearchParams({
-        From: settings.sw_inbound_did || '',
+        From: fromNumber,
         To: to,
         MediaUrl: document_url,
       })
@@ -67,29 +82,19 @@ serve(async (req) => {
         }
       )
       faxResult = await res.json()
-      if (!res.ok) throw new Error(faxResult.message || 'SignalWire fax error')
+      if (!res.ok) {
+        return new Response(JSON.stringify({ error: faxResult.message || 'SignalWire fax error' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+      return new Response(JSON.stringify({ success: true, sid: faxResult.sid }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     } else {
       return new Response(JSON.stringify({ error: 'No fax provider configured (Telnyx or SignalWire)' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
-
-    // Log to fax_logs
-    await supabase.from('fax_logs').insert({
-      direction: 'outbound',
-      from_number: settings?.firm_fax_number || settings?.sw_inbound_did || '',
-      to_number: to,
-      fax_url: document_url,
-      status: 'sent',
-      notes: notes || null,
-      lead_id: lead_id || null,
-      client_id: client_id || null,
-      user_id: user_id || null,
-    })
-
-    return new Response(JSON.stringify({ success: true, result: faxResult }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
 
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), {

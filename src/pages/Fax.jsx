@@ -40,7 +40,7 @@ export default function Fax() {
     const [{ data:f },{ data:c },{ data:s }] = await Promise.all([
       supabase.from('fax_logs').select('*').order('created_at',{ascending:false}),
       supabase.from('clients').select('id,name,phone'),
-      supabase.from('settings').select('signalwire_backend,sw_inbound_did,firm_fax_number').limit(1).maybeSingle(),
+      supabase.from('settings').select('sw_space_url,sw_inbound_did,firm_fax_number').limit(1).maybeSingle(),
     ])
     if (f) setLogs(f)
     if (c) setClients(c)
@@ -70,7 +70,6 @@ export default function Fax() {
   async function sendFax() {
     if (!form.to_number) { showToast('Recipient fax number required','err'); return }
     if (!file && !form.notes) { showToast('Attach a PDF or enter a message','err'); return }
-    if (!settings?.signalwire_backend) { showToast('Add your SignalWire backend URL in Settings → SignalWire','err'); return }
     setSending(true)
 
     try {
@@ -89,24 +88,21 @@ export default function Fax() {
       const toNum   = '+1' + form.to_number.replace(/\D/g,'').slice(-10)
       const fromNum = form.from_number
         ? '+1' + form.from_number.replace(/\D/g,'').slice(-10)
-        : (settings.sw_inbound_did || '')
+        : (settings.firm_fax_number || settings.sw_inbound_did || '')
 
-      // Call SignalWire backend /fax/send
-      const res = await fetch(settings.signalwire_backend + '/fax/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      // Call the send-fax Supabase Edge Function
+      const { data: resData, error: invokeErr } = await supabase.functions.invoke('send-fax', {
+        body: {
           to: toNum,
           from: fromNum,
-          ...(mediaUrl ? { media_url: mediaUrl } : {}),
-        })
+          ...(mediaUrl ? { document_url: mediaUrl } : {}),
+        }
       })
 
-      const resData = await res.json()
       const sw_id = resData?.sid || null
-      const status = res.ok && resData?.success ? 'Sent' : 'Failed'
+      const status = !invokeErr && resData?.success ? 'Sent' : 'Failed'
 
-      // Log to Supabase regardless of SignalWire result
+      // Log to Supabase regardless of result
       const { error: logErr } = await supabase.from('fax_logs').insert([{
         to_number: toNum, from_number: fromNum,
         client_name: form.client_name, subject: form.subject,
@@ -115,7 +111,7 @@ export default function Fax() {
         status, sent_by: user?.email || 'Unknown',
         sent_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
-        error_msg: status === 'Failed' ? JSON.stringify(resData?.error || resData).slice(0,200) : null,
+        error_msg: status === 'Failed' ? JSON.stringify(resData?.error || invokeErr?.message || 'Send failed').slice(0,200) : null,
       }])
 
       if (logErr) console.error('Log error:', logErr)
@@ -123,7 +119,7 @@ export default function Fax() {
         showToast('✅ Fax sent successfully!')
         setModal(false); setForm(BLANK); setFile(null); load()
       } else {
-        showToast('SignalWire error: ' + (resData?.error || 'Check backend URL and SignalWire credentials'), 'err')
+        showToast('Error: ' + (resData?.error || invokeErr?.message || 'Check SignalWire credentials in Settings'), 'err')
         load()
       }
     } catch(e) {
@@ -152,10 +148,10 @@ export default function Fax() {
     <div style={{maxWidth:1000}}>
       {toast && <div className={`toast show ${toast.type==='err'?'terr':''}`}>{toast.msg||toast}</div>}
 
-      {!settings?.signalwire_backend && (
+      {!settings?.sw_space_url && (
         <div style={{background:'rgba(245,158,11,.08)',border:'1px solid rgba(245,158,11,.3)',borderRadius:8,padding:'10px 16px',marginBottom:14,fontSize:12,color:'var(--warn)',display:'flex',alignItems:'center',gap:10}}>
           <span>⚠️</span>
-          <span>SignalWire backend not configured. <strong>Settings → 📞 SignalWire</strong> to set up. You can still log faxes manually.</span>
+          <span>SignalWire isn't configured yet. <strong>Settings → 📞 SignalWire</strong> to set up. You can still log faxes manually.</span>
         </div>
       )}
 

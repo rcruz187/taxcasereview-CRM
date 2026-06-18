@@ -30,7 +30,7 @@ export default function Sms() {
     const [{data:sms},{data:clients},{data:s}]=await Promise.all([
       supabase.from('sms_messages').select('*').order('created_at',{ascending:false}),
       supabase.from('clients').select('id,name,phone'),
-      supabase.from('settings').select('signalwire_backend,sw_inbound_did').limit(1).maybeSingle(),
+      supabase.from('settings').select('sw_space_url,sw_inbound_did').limit(1).maybeSingle(),
     ])
     if(sms)setSent(sms)
     if(clients)setClients(clients)
@@ -60,26 +60,23 @@ export default function Sms() {
     const toNum = '+1' + form.phone.replace(/\D/g,'').slice(-10)
     let status = 'Sent', sw_id = null, errMsg = null
 
-    if (settings?.signalwire_backend) {
+    if (settings?.sw_space_url) {
       try {
-        const res = await fetch(settings.signalwire_backend + '/sms/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: toNum, body: form.body, from: settings.sw_inbound_did || undefined })
+        const { data: resData, error: invokeErr } = await supabase.functions.invoke('send-sms', {
+          body: { to: toNum, body: form.body }
         })
-        const resData = await res.json()
-        if (res.ok && resData?.success) {
+        if (!invokeErr && resData?.success) {
           sw_id = resData.sid || null
         } else {
           status = 'Failed'
-          errMsg = resData?.error || 'SignalWire send failed'
+          errMsg = resData?.error || invokeErr?.message || 'SignalWire send failed'
         }
       } catch (e) {
         status = 'Failed'
         errMsg = e.message
       }
     } else {
-      // No backend configured yet — log only, same as before
+      // SignalWire not configured yet — log only, same as before
       status = 'Logged (not sent)'
     }
 
@@ -142,12 +139,12 @@ export default function Sms() {
               <textarea value={form.body} onChange={e=>fld('body',e.target.value)} style={{minHeight:120}} placeholder="Type your message..."/>
             </div>
             <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:10}} onClick={send} disabled={saving}>
-              {saving?'Sending…':(settings?.signalwire_backend?'📱 Send SMS':'📱 Log SMS as Sent')}
+              {saving?'Sending…':(settings?.sw_space_url?'📱 Send SMS':'📱 Log SMS as Sent')}
             </button>
             <div style={{marginTop:10,padding:10,background:'var(--s2)',borderRadius:7,fontSize:12,color:'var(--t3)'}}>
-              {settings?.signalwire_backend
+              {settings?.sw_space_url
                 ? '✅ SignalWire is connected — messages send for real and get logged here.'
-                : '💡 Add your SignalWire backend URL in Settings → SignalWire to enable actual sending. Until then, messages are only logged for records.'}
+                : '💡 Add your SignalWire credentials in Settings → SignalWire to enable actual sending. Until then, messages are only logged for records.'}
             </div>
           </div>
           <div className="card">
