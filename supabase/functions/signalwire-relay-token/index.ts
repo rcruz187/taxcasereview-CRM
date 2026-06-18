@@ -7,9 +7,16 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 // function. JWT verification stays ON here (default) since only logged-in
 // CRM users should ever be able to mint one of these.
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
 const RELAY_RESOURCE = 'office' // shared line name — all staff dial in/out as "office" for now
 
 serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -21,7 +28,7 @@ serve(async (req) => {
 
     if (sErr || !settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token) {
       return new Response(JSON.stringify({ error: 'SignalWire credentials are not fully set up in Settings yet.' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } })
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     const auth = 'Basic ' + btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
@@ -34,7 +41,7 @@ serve(async (req) => {
     if (!resp.ok) {
       const text = await resp.text()
       return new Response(JSON.stringify({ error: 'SignalWire rejected the JWT request: ' + text }),
-        { status: 502, headers: { 'Content-Type': 'application/json' } })
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     const { jwt_token } = await resp.json()
@@ -44,11 +51,11 @@ serve(async (req) => {
       project_id: settings.sw_project_id,
       caller_number: settings.sw_inbound_did || null,
       resource: RELAY_RESOURCE,
-    }), { headers: { 'Content-Type': 'application/json' } })
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
   } catch (err) {
     console.error('signalwire-relay-token error:', err)
     return new Response(JSON.stringify({ error: String(err) }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } })
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 })
