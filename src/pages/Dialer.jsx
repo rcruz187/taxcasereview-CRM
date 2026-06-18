@@ -50,7 +50,7 @@ export default function Dialer() {
       callerNumberRef.current = data.caller_number
 
       client = new Relay({ project: data.project_id, token: data.jwt_token })
-      client.remoteElement = audioRef.current
+      client.remoteElement = 'sw-remote-audio'
 
       client.on('signalwire.ready', () => setRelayStatus('ready'))
       client.on('signalwire.error', (e) => { setRelayStatus('error'); console.error('RELAY error', e) })
@@ -276,7 +276,7 @@ export default function Dialer() {
   return (
     <div>
       {toast && <div className="toast show">{toast}</div>}
-      <audio ref={audioRef} autoPlay />
+      <audio ref={audioRef} id="sw-remote-audio" autoPlay />
 
       {/* ── Calling connection status ──────────────────────────────── */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
