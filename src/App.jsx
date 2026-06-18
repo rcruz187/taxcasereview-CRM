@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Suspense, lazy } from 'react'
 import { AppProvider, useApp } from './context/AppContext'
 import { CallProvider } from './context/CallContext'
+import { GmailSyncProvider } from './context/GmailSyncContext'
 import ActiveCallBar from './components/calling/ActiveCallBar'
 import Sidebar  from './components/layout/Sidebar'
 import TopBar   from './components/layout/TopBar'
@@ -106,6 +107,7 @@ function Shell() {
 
   return (
     <CallProvider>
+    <GmailSyncProvider>
     <div className="app-shell">
       <ActiveCallBar />
       <Sidebar />
@@ -159,6 +161,7 @@ function Shell() {
       <Modal />
       <Toast />
     </div>
+    </GmailSyncProvider>
     </CallProvider>
   )
 }

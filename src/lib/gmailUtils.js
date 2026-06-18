@@ -4,6 +4,7 @@
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const SEND_URL  = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send'
+const LIST_URL  = 'https://gmail.googleapis.com/gmail/v1/users/me/messages'
 
 export function getRedirectUri() {
   return window.location.origin + '/taxcasereview-CRM/auth/callback'
@@ -175,3 +176,111 @@ export async function sendGmailEmail(supabase, { to, subject, body, fromName, at
   if (!res.ok) throw new Error(data.error?.message || 'Failed to send email')
   return data.id
 }
+
+// ─── Gmail Sync utilities ─────────────────────────────────────────────────
+// Pulls real Inbox + Sent mail into the `emails` table so the CRM actually
+// mirrors Gmail instead of only logging what's composed inside the CRM.
+
+function base64UrlDecodeToString(b64url) {
+  const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/')
+  const binary = atob(b64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return new TextDecoder('utf-8').decode(bytes)
+}
+
+function headerValue(headers, name) {
+  return headers?.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || ''
+}
+
+// Pulls a single email address out of a "Name <email@x.com>" style header.
+function extractAddress(headerVal) {
+  const m = headerVal.match(/<([^>]+)>/)
+  return (m ? m[1] : headerVal).trim()
+}
+function extractDisplayName(headerVal) {
+  const m = headerVal.match(/^"?([^"<]*)"?\s*<[^>]+>$/)
+  return m && m[1].trim() ? m[1].trim() : extractAddress(headerVal)
+}
+
+// Recursively finds a text/plain (preferred) or text/html part anywhere in
+// a Gmail message payload, which can be nested arbitrarily for multipart
+// messages (alternative/mixed/related all nest differently).
+function findBodyPart(payload, mimeType) {
+  if (!payload) return null
+  if (payload.mimeType === mimeType && payload.body?.data) return payload.body.data
+  for (const part of payload.parts || []) {
+    const found = findBodyPart(part, mimeType)
+    if (found) return found
+  }
+  return null
+}
+function stripHtml(html) {
+  return html.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+// List message ids matching a label (and optional date-bounded query for
+// backfill, e.g. "after:2025/06/18"), paginating with pageToken.
+// Returns { ids, nextPageToken }.
+export async function listGmailMessages(supabase, { labelIds, query, pageToken, maxResults = 25 } = {}) {
+  const token = await getValidGmailToken(supabase)
+  const params = new URLSearchParams({ maxResults: String(maxResults) })
+  if (labelIds) params.set('labelIds', labelIds)
+  if (query) params.set('q', query)
+  if (pageToken) params.set('pageToken', pageToken)
+  const res = await fetch(`${LIST_URL}?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error?.message || 'Gmail list failed')
+  return { ids: (data.messages || []).map(m => m.id), nextPageToken: data.nextPageToken || null }
+}
+
+// Fetches one message and parses it into the shape the `emails` table uses.
+// Returns null for label types we don't care about (drafts, spam, trash).
+export async function getAndParseGmailMessage(supabase, id, clients = []) {
+  const token = await getValidGmailToken(supabase)
+  const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  const msg = await res.json()
+  if (!res.ok) throw new Error(msg.error?.message || 'Gmail get failed')
+
+  const labels = msg.labelIds || []
+  const isSent = labels.includes('SENT')
+  const isInbox = labels.includes('INBOX')
+  if (!isSent && !isInbox) return null // draft / spam / trash / promo-only, skip
+
+  const headers = msg.payload?.headers || []
+  const fromHeader = headerValue(headers, 'From')
+  const toHeader = headerValue(headers, 'To')
+  const subject = headerValue(headers, 'Subject') || '(no subject)'
+  const dateHeader = headerValue(headers, 'Date')
+  const receivedAt = dateHeader ? new Date(dateHeader).toISOString() : new Date(Number(msg.internalDate || Date.now())).toISOString()
+
+  const plainData = findBodyPart(msg.payload, 'text/plain')
+  const htmlData = plainData ? null : findBodyPart(msg.payload, 'text/html')
+  let body = msg.snippet || ''
+  if (plainData) body = base64UrlDecodeToString(plainData)
+  else if (htmlData) body = stripHtml(base64UrlDecodeToString(htmlData))
+
+  const counterpartHeader = isSent ? toHeader : fromHeader
+  const counterpartAddress = extractAddress(counterpartHeader)
+  const counterpartName = extractDisplayName(counterpartHeader)
+  const matchedClient = clients.find(c => c.email && c.email.toLowerCase() === counterpartAddress.toLowerCase())
+
+  return {
+    recipient: isSent ? counterpartAddress : extractAddress(fromHeader),
+    clientName: matchedClient?.name || counterpartName || counterpartAddress,
+    subject,
+    body,
+    triage: isSent ? 'Sent' : 'Inbox',
+    status: isSent ? 'Sent' : 'Received',
+    gmail_message_id: msg.id,
+    gmail_thread_id: msg.threadId,
+    from_address: extractAddress(fromHeader),
+    received_at: receivedAt,
+    created_at: receivedAt,
+  }
+}
+

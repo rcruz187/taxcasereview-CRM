@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { sendGmailEmail } from '../lib/gmailUtils'
+import { useGmailSync } from '../context/GmailSyncContext'
 
 const TEMPLATES = [
   { label:'Welcome Letter',         subject:'Welcome to Tax Case Review', body:"Dear {name},\n\nWelcome to Tax Case Review — we're glad to have you on board. Your case has been assigned to a dedicated representative who will be reaching out shortly to walk you through the next steps and what to expect along the way.\n\nIn the meantime, if anything comes up or you have questions, don't hesitate to reach out. We're here to help." },
@@ -42,6 +43,7 @@ export default function Email() {
   const [search, setSearch]     = useState('')
   const [gmailConnected, setGmailConnected] = useState(false)
   const [gmailClientId, setGmailClientId] = useState('')
+  const { lastSyncAt, syncing, lastError, syncNow } = useGmailSync()
 
   useEffect(() => {
     load(); loadGmailConfig()
@@ -49,6 +51,10 @@ export default function Email() {
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
   }, [])
+
+  // Refresh the visible list whenever the background sync (running
+  // globally, not just on this page) picks up anything new.
+  useEffect(() => { if (lastSyncAt) load() }, [lastSyncAt])
 
   async function loadGmailConfig() {
     const { data } = await supabase.from('settings').select('gmail_client_id,gmail_refresh_token').limit(1).maybeSingle()
@@ -173,6 +179,13 @@ export default function Email() {
         {gmailConnected ? (
           <div style={{ margin: '0 10px 10px', padding: '8px 12px', background: 'rgba(34,197,94,.12)', borderRadius: 8, border: '1px solid rgba(34,197,94,.3)', fontSize: 11, fontWeight: 700, color: 'var(--ok)' }}>
             ✅ Gmail Connected
+            <div style={{ marginTop: 4, fontSize: 10, fontWeight: 400, color: 'var(--t3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+              <span>
+                {syncing ? '🔄 Syncing…' : lastSyncAt ? `Synced ${Math.max(0, Math.round((Date.now() - lastSyncAt.getTime()) / 1000))}s ago` : 'Starting sync…'}
+              </span>
+              <span onClick={syncNow} style={{ cursor: 'pointer', textDecoration: 'underline' }}>Sync now</span>
+            </div>
+            {lastError && <div style={{ marginTop: 4, fontSize: 10, color: 'var(--bad)' }}>⚠️ {lastError}</div>}
           </div>
         ) : !gmailConnected && (
           <div style={{ margin: '0 10px 10px', padding: '10px 12px', background: 'rgba(26,127,212,.12)', borderRadius: 8, border: '1px solid rgba(26,127,212,.3)' }}>
