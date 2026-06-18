@@ -6,6 +6,7 @@ import InPlaceCaller from '../components/InPlaceCaller'
 import BookingWidget from '../components/BookingWidget'
 import StripePaymentMethodModal from '../components/StripePaymentMethodModal'
 import FinancialProfile from './FinancialProfile'
+import FinancialIntakeView from '../components/FinancialIntakeView'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import { generateServiceAgreement, generateAddendum, generatePOACoverLetter, sendFullPackage, generateCreditCardAuthForm } from '../lib/docUtils'
@@ -1229,6 +1230,7 @@ export default function Clients() {
               {key:'payments', label:'💳 Payments'},
               {key:'cases',    label:'📁 Cases'},
               {key:'finprofile', label:'🧮 Financial Profile'},
+              {key:'intake', label:'💰 Financial Intake'},
             ].map(t=>(
               <button key={t.key} onClick={()=>setDetailTab(t.key)}
                 style={{padding:'10px 16px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
@@ -1279,6 +1281,13 @@ export default function Clients() {
                 <FinancialProfile clientName={c.name} client={c}/>
               </ErrorBoundary>
             </div>
+          )}
+
+          {/* Financial Intake Tab */}
+          {detailTab==='intake'&&(
+            <ErrorBoundary>
+              <FinancialIntakeView clientName={c.name}/>
+            </ErrorBoundary>
           )}
 
           {/* Docs Tab */}
