@@ -33,14 +33,23 @@ export default function Dialer() {
   const relayRef = useRef(null)       // the Relay client instance
   const liveCallRef = useRef(null)    // the Call object currently in progress (in or out)
   const callerNumberRef = useRef(null)
-  const audioRef = useRef(null)
   const uiStartedRef = useRef(false)  // guards against re-initializing the active-call UI twice for the same call
   const elapsedRef = useRef(0)
   useEffect(() => { elapsedRef.current = elapsed }, [elapsed])
 
   useEffect(() => {
     let client
+    let audioEl
     ;(async () => {
+      // Built with plain DOM APIs, appended directly to <body> — NOT
+      // rendered by React — so React never attaches its internal tracking
+      // data to this node. That tracking data is exactly what crashed the
+      // SDK mid-call every time before (circular JSON during ICE exchange).
+      audioEl = document.createElement('audio')
+      audioEl.id = 'sw-remote-audio'
+      audioEl.autoplay = true
+      document.body.appendChild(audioEl)
+
       const { data, error } = await supabase.functions.invoke('signalwire-relay-token')
       if (error || !data?.jwt_token) {
         setRelayStatus('error')
@@ -90,7 +99,7 @@ export default function Dialer() {
       relayRef.current = client
     })()
 
-    return () => { client?.disconnect() }
+    return () => { client?.disconnect(); audioEl?.remove() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -276,7 +285,6 @@ export default function Dialer() {
   return (
     <div>
       {toast && <div className="toast show">{toast}</div>}
-      <audio ref={audioRef} id="sw-remote-audio" autoPlay />
 
       {/* ── Calling connection status ──────────────────────────────── */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
