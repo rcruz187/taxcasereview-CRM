@@ -12,11 +12,36 @@ serve(async (req) => {
   const body = await req.text()
   console.log('receive-call invoked — raw body:', body)
 
+  const params = new URLSearchParams(body)
+  const callSid = params.get('CallSid')
+
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    // SignalWire has been hitting this URL more than once for the SAME call
+    // (same CallSid) a few seconds apart. Every hit used to unconditionally
+    // return a fresh <Dial><Verto> command, ringing the browser twice for
+    // one phone call — the two rings collided and both instantly hung up.
+    // This lock makes sure only the FIRST hit for a given CallSid dials;
+    // any repeat hit gets a harmless empty response instead.
+    if (callSid) {
+      const { error: lockErr } = await supabase
+        .from('call_dial_locks')
+        .insert({ callsid: callSid })
+
+      if (lockErr) {
+        if (lockErr.code === '23505') {
+          // 23505 = unique_violation — we already dialed this CallSid once.
+          console.log('duplicate receive-call hit for CallSid', callSid, '— skipping re-dial')
+          return new Response(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`, { headers: { 'Content-Type': 'text/xml' } })
+        }
+        console.error('call_dial_locks insert error:', lockErr)
+      }
+    }
+
     const { data: settings, error: sErr } = await supabase
       .from('settings')
       .select('call_forward_number,sw_space_url')
