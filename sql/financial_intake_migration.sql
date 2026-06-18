@@ -15,9 +15,12 @@ ALTER TABLE financial_intake_responses ENABLE ROW LEVEL SECURITY;
 
 -- Public can read/update their own row by id (the link itself is the auth —
 -- same trust model as tax_organizer_responses/sign tokens already in use).
-CREATE POLICY IF NOT EXISTS "financial_intake_public_select" ON financial_intake_responses
+DROP POLICY IF EXISTS "financial_intake_public_select" ON financial_intake_responses;
+CREATE POLICY "financial_intake_public_select" ON financial_intake_responses
   FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "financial_intake_public_update" ON financial_intake_responses
+DROP POLICY IF EXISTS "financial_intake_public_update" ON financial_intake_responses;
+CREATE POLICY "financial_intake_public_update" ON financial_intake_responses
   FOR UPDATE USING (true);
-CREATE POLICY IF NOT EXISTS "financial_intake_public_insert" ON financial_intake_responses
+DROP POLICY IF EXISTS "financial_intake_public_insert" ON financial_intake_responses;
+CREATE POLICY "financial_intake_public_insert" ON financial_intake_responses
   FOR INSERT WITH CHECK (true);
