@@ -1,0 +1,280 @@
+import { createContext, useContext, useState, useEffect, useRef } from 'react'
+import { Relay } from '@signalwire/js'
+import { supabase } from '../lib/supabase'
+
+// ──────────────────────────────────────────────────────────────────────
+// This used to live entirely inside Dialer.jsx. The problem: React
+// unmounts a page's component the instant you navigate away from it,
+// and the old code's cleanup function called relayRef.current?.disconnect()
+// on unmount — so clicking ANY other sidebar tab during a call killed the
+// call, and (just as bad) killed the "office" RELAY registration itself,
+// which is exactly why inbound calls had nothing to ring into unless the
+// Dialer tab happened to be the active page at that exact moment.
+//
+// Fix: the connection + live call state now live here, in a Provider
+// mounted once at the Shell level (outside <Routes>), so navigating
+// between pages no longer touches it. It only disconnects on a real
+// logout/app close.
+// ──────────────────────────────────────────────────────────────────────
+
+const CallContext = createContext(null)
+export function useCall() { return useContext(CallContext) }
+
+const OUTCOMES = ['Connected', 'No Answer', 'Voicemail', 'Wrong Number', 'Callback Requested', 'Converted']
+const BLANK_LOG = { outcome: 'Connected', notes: '', duration: '' }
+
+function formatTime(sec) {
+  const m = Math.floor(sec / 60).toString().padStart(2, '0')
+  const s = (sec % 60).toString().padStart(2, '0')
+  return `${m}:${s}`
+}
+
+// Matches an inbound caller's number against Clients and Leads by the
+// last 10 digits, so formatting differences ("+1 561...", "(561)...",
+// "561-310-2931") all still match. Small dataset (a tax firm's CRM), so
+// pulling both tables and comparing in JS is simple and fast enough —
+// worth revisiting with an indexed lookup only if the client list grows
+// into the thousands.
+async function matchCallerToRecord(rawNumber) {
+  const digits = (rawNumber || '').replace(/\D/g, '')
+  const last10 = digits.slice(-10)
+  if (last10.length < 7) return null
+
+  const [{ data: clients }, { data: leads }] = await Promise.all([
+    supabase.from('clients').select('id, name, phone, phone2').limit(3000),
+    supabase.from('leads').select('id, name, first, last, phone').limit(3000),
+  ])
+  const isMatch = (p) => !!p && p.replace(/\D/g, '').slice(-10) === last10
+
+  const client = clients?.find(c => isMatch(c.phone) || isMatch(c.phone2))
+  if (client) return { entityType: 'client', id: client.id, name: client.name }
+
+  const lead = leads?.find(l => isMatch(l.phone))
+  if (lead) return { entityType: 'lead', id: lead.id, name: lead.name || `${lead.first || ''} ${lead.last || ''}`.trim() }
+
+  return null
+}
+
+export function CallProvider({ children }) {
+  const [relayStatus, setRelayStatus] = useState('connecting')
+  const [incomingCall, setIncomingCall] = useState(null)
+  const [incomingMatch, setIncomingMatch] = useState(null) // {entityType,id,name} while ringing, or null
+  const [calling, setCalling] = useState(false)
+  const [active, setActive] = useState(null)
+  const [elapsed, setElapsed] = useState(0)
+  const [logForm, setLogForm] = useState(BLANK_LOG)
+  const [logModal, setLogModal] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [callToast, setCallToast] = useState('')
+
+  const relayRef = useRef(null)
+  const liveCallRef = useRef(null)
+  const callerNumberRef = useRef(null)
+  const uiStartedRef = useRef(false)
+  const elapsedRef = useRef(0)
+  const incomingMatchRef = useRef(null)
+  const timerRef = useRef(null)
+
+  useEffect(() => { elapsedRef.current = elapsed }, [elapsed])
+
+  function showCallToast(msg) { setCallToast(msg); setTimeout(() => setCallToast(''), 4000) }
+
+  useEffect(() => {
+    let disposed = false
+    let audioEl = document.createElement('audio')
+    audioEl.id = 'sw-remote-audio'
+    audioEl.autoplay = true
+    document.body.appendChild(audioEl)
+
+    let reconnectTimer = null
+    function scheduleReconnect() {
+      if (disposed || reconnectTimer) return
+      reconnectTimer = setTimeout(() => { reconnectTimer = null; connect() }, 3000)
+    }
+
+    async function connect() {
+      if (disposed) return
+      setRelayStatus('connecting')
+      const { data, error } = await supabase.functions.invoke('signalwire-relay-token')
+      if (disposed) return
+      if (error || !data?.jwt_token) {
+        setRelayStatus('error')
+        showCallToast('Could not connect calling: ' + (data?.error || error?.message || 'unknown error'))
+        scheduleReconnect()
+        return
+      }
+      callerNumberRef.current = data.caller_number
+
+      const client = new Relay({ project: data.project_id, token: data.jwt_token })
+      client.remoteElement = 'sw-remote-audio'
+
+      client.on('signalwire.ready', () => setRelayStatus('ready'))
+      client.on('signalwire.error', (e) => { setRelayStatus('error'); console.error('RELAY error', e); scheduleReconnect() })
+      client.on('signalwire.socket.close', () => { setRelayStatus('error'); console.warn('RELAY socket closed — reconnecting in 3s'); scheduleReconnect() })
+      client.on('signalwire.socket.error', (e) => { setRelayStatus('error'); console.error('RELAY socket error', e); scheduleReconnect() })
+      client.on('blade.disconnect', () => { setRelayStatus('error'); console.warn('RELAY disconnected — reconnecting in 3s'); scheduleReconnect() })
+      client.on('signalwire.notification', (n) => {
+        if (n.type !== 'callUpdate') return
+        const call = n.call
+        if (call.direction === 'inbound' && call.state === 'ringing') {
+          liveCallRef.current = call
+          uiStartedRef.current = false
+          setIncomingCall(call)
+          setIncomingMatch(null)
+          incomingMatchRef.current = null
+          const num = call.options?.remoteCallerNumber
+          matchCallerToRecord(num).then(m => { incomingMatchRef.current = m; setIncomingMatch(m) })
+        }
+        if (call.state === 'active' && !uiStartedRef.current) {
+          uiStartedRef.current = true
+          setIncomingCall(null)
+          setCalling(true)
+          setElapsed(0)
+          setLogForm(BLANK_LOG)
+          timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000)
+          const m = incomingMatchRef.current
+          setActive(prev => prev || {
+            id: m?.id ?? null,
+            name: m?.name || 'Incoming Call',
+            first: 'Incoming', last: 'Call',
+            phone: call.options?.remoteCallerNumber || '—',
+            status: 'Manual',
+            entityType: m?.entityType || null,
+          })
+        }
+        if (call.state === 'hangup' || call.state === 'destroy') {
+          setIncomingCall(null)
+          setIncomingMatch(null)
+          if (liveCallRef.current === call) {
+            liveCallRef.current = null
+            if (uiStartedRef.current) {
+              uiStartedRef.current = false
+              clearInterval(timerRef.current)
+              setCalling(false)
+              setLogForm(f => ({ ...f, duration: formatTime(elapsedRef.current) }))
+              setLogModal(true)
+            }
+          }
+        }
+      })
+
+      client.connect()
+      relayRef.current = client
+    }
+
+    connect()
+
+    return () => {
+      disposed = true
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      relayRef.current?.disconnect()
+      audioEl?.remove()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function answerIncoming() {
+    incomingCall?.answer()
+    setIncomingCall(null)
+  }
+
+  function declineIncoming() {
+    incomingCall?.hangup()
+    setIncomingCall(null)
+    liveCallRef.current = null
+  }
+
+  function startCall(lead) {
+    if (relayStatus !== 'ready') { showCallToast('Calling isn\'t connected yet — wait a moment and try again.'); return false }
+    const digits = lead.phone?.replace(/\D/g, '')
+    if (!digits) { showCallToast('No phone number to call.'); return false }
+    uiStartedRef.current = true
+    setActive(lead)
+    setCalling(true)
+    setElapsed(0)
+    setLogForm(BLANK_LOG)
+    timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000)
+    relayRef.current?.newCall({
+      destinationNumber: digits.length === 10 ? `+1${digits}` : `+${digits}`,
+      callerNumber: callerNumberRef.current || undefined,
+    }).then(call => { liveCallRef.current = call })
+      .catch(err => { showCallToast('Call failed: ' + (err?.message || err)); cancelCall() })
+    return true
+  }
+
+  function endCall() {
+    liveCallRef.current?.hangup()
+    liveCallRef.current = null
+    uiStartedRef.current = false
+    clearInterval(timerRef.current)
+    setCalling(false)
+    setLogForm(f => ({ ...f, duration: formatTime(elapsedRef.current) }))
+    setLogModal(true)
+  }
+
+  function cancelCall() {
+    liveCallRef.current?.hangup()
+    liveCallRef.current = null
+    uiStartedRef.current = false
+    clearInterval(timerRef.current)
+    setCalling(false)
+    setActive(null)
+    setElapsed(0)
+  }
+
+  async function saveCallLog(onSaved) {
+    if (!active) return
+    setSaving(true)
+    const record = {
+      leadId: active.id,
+      clientName: active.name || `${active.first || ''} ${active.last || ''}`.trim(),
+      phone: active.phone,
+      outcome: logForm.outcome,
+      notes: logForm.notes,
+      duration: logForm.duration || formatTime(elapsed),
+      created_at: new Date().toISOString()
+    }
+    const { error } = await supabase.from('calllog').insert([record])
+    setSaving(false)
+    if (error) { showCallToast('Error: ' + error.message); return }
+
+    if (active.entityType !== 'client') {
+      if (logForm.outcome === 'Converted') {
+        await supabase.from('leads').update({ status: 'Consultation' }).eq('id', active.id)
+      }
+      if (logForm.outcome === 'Callback Requested') {
+        await supabase.from('leads').update({ status: 'Contacted' }).eq('id', active.id)
+      }
+    }
+
+    showCallToast('Call logged!')
+    setLogModal(false)
+
+    if (active.status === 'Client Queue') {
+      try {
+        const q = JSON.parse(sessionStorage.getItem('dialerQueue') || '[]')
+        const next = q.filter(e => e.phone !== active.phone)
+        sessionStorage.setItem('dialerQueue', JSON.stringify(next))
+      } catch { /* no-op */ }
+    }
+
+    setActive(null)
+    setElapsed(0)
+    onSaved?.(record)
+  }
+
+  function closeLogModalWithoutSaving() {
+    setLogModal(false)
+    setActive(null)
+  }
+
+  const value = {
+    relayStatus, incomingCall, incomingMatch, calling, active, elapsed,
+    logForm, setLogForm, logModal, setLogModal, saving, callToast,
+    OUTCOMES, formatTime,
+    answerIncoming, declineIncoming, startCall, endCall, cancelCall,
+    saveCallLog, closeLogModalWithoutSaving,
+  }
+
+  return <CallContext.Provider value={value}>{children}</CallContext.Provider>
+}

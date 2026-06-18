@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Suspense, lazy } from 'react'
 import { AppProvider, useApp } from './context/AppContext'
+import { CallProvider } from './context/CallContext'
+import ActiveCallBar from './components/calling/ActiveCallBar'
 import Sidebar  from './components/layout/Sidebar'
 import TopBar   from './components/layout/TopBar'
 import { Modal, Toast } from './components/ui'
@@ -103,7 +105,9 @@ function Shell() {
   }
 
   return (
+    <CallProvider>
     <div className="app-shell">
+      <ActiveCallBar />
       <Sidebar />
       <div className="main-area">
         <TopBar onNew={handleNew} />
@@ -155,6 +159,7 @@ function Shell() {
       <Modal />
       <Toast />
     </div>
+    </CallProvider>
   )
 }
 
