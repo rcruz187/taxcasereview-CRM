@@ -1,0 +1,14 @@
+project_id = "mpxgxfqdbquzkrvvejkh"
+
+# These three are called directly BY SignalWire (not by your logged-in app),
+# so they can never carry a Supabase login token. JWT verification must stay
+# off for all three or SignalWire's webhooks get rejected before your code
+# even runs.
+[functions.receive-call]
+verify_jwt = false
+
+[functions.receive-sms]
+verify_jwt = false
+
+[functions.receive-fax]
+verify_jwt = false
