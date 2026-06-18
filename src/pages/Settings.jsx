@@ -376,6 +376,13 @@ export default function Settings() {
                 </div>
                 <div className="field"><label>Inbound DID (Phone Number)</label>
                   <input value={firm.sw_inbound_did || ''} onChange={set('sw_inbound_did')} placeholder="+15615551234" />
+                  <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Your main voice/SMS number — what clients see and call/text.</div>
+                </div>
+              </div>
+              <div className="fg2">
+                <div className="field"><label>Fax From Number (optional)</label>
+                  <input value={firm.firm_fax_number || ''} onChange={set('firm_fax_number')} placeholder="Leave blank to use Inbound DID above" />
+                  <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Only needed if you want fax to send from a different number than voice/SMS — e.g. if the area code you wanted wasn't available for fax.</div>
                 </div>
               </div>
               <div className="fg2">
@@ -425,7 +432,7 @@ export default function Settings() {
               </div>
               <div style={{background:'var(--s2)',borderRadius:8,padding:'12px 16px',marginBottom:16,fontSize:12,lineHeight:1.8}}>
                 <div style={{fontWeight:700,color:'var(--tx)',marginBottom:6}}>Setup:</div>
-                {[['1','Set up SignalWire credentials in the SignalWire Dialer card above'],['2','Deploy signalwire-backend (server.js) to a host like Render or Railway'],['3','Enter the deployed Backend Server URL in the SignalWire card'],['4','Your SignalWire phone number (Inbound DID) is used as the fax From number']].map(([step,text])=>(
+                {[['1','Set up SignalWire credentials in the SignalWire Dialer card above'],['2','Deploy signalwire-backend (server.js) to a host like Render or Railway'],['3','Enter the deployed Backend Server URL in the SignalWire card'],['4','Fax sends from the Fax From Number above if set, otherwise the Inbound DID']].map(([step,text])=>(
                   <div key={step} style={{display:'flex',gap:10,marginBottom:4,alignItems:'flex-start'}}>
                     <div style={{width:20,height:20,borderRadius:'50%',background:'var(--blue)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,flexShrink:0,marginTop:1}}>{step}</div>
                     <div style={{color:'var(--t2)'}}>{text}</div>
@@ -434,7 +441,7 @@ export default function Settings() {
               </div>
               <div style={{background:'rgba(26,127,212,.08)',border:'1px solid rgba(26,127,212,.2)',borderRadius:8,padding:'10px 14px',fontSize:12,color:'var(--t2)',lineHeight:1.6}}>
                 Backend URL: <strong>{firm.signalwire_backend || 'Not configured'}</strong><br/>
-                Fax From Number: <strong>{firm.sw_inbound_did || 'Not configured'}</strong>
+                Fax From Number: <strong>{firm.firm_fax_number || firm.sw_inbound_did || 'Not configured'}</strong>
               </div>
             </div>
           </div>

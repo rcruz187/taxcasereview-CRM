@@ -40,11 +40,15 @@ export default function Fax() {
     const [{ data:f },{ data:c },{ data:s }] = await Promise.all([
       supabase.from('fax_logs').select('*').order('created_at',{ascending:false}),
       supabase.from('clients').select('id,name,phone'),
-      supabase.from('settings').select('signalwire_backend,sw_inbound_did').limit(1).maybeSingle(),
+      supabase.from('settings').select('signalwire_backend,sw_inbound_did,firm_fax_number').limit(1).maybeSingle(),
     ])
     if (f) setLogs(f)
     if (c) setClients(c)
-    if (s) setSettings(s)
+    if (s) {
+      setSettings(s)
+      const defaultFrom = s.firm_fax_number || s.sw_inbound_did
+      if (defaultFrom) setForm(prev => prev.from_number ? prev : { ...prev, from_number: defaultFrom.replace(/\D/g,'') })
+    }
   }
 
   function showToast(msg,type='ok') { setToast({msg,type}); setTimeout(()=>setToast(''),4000) }
@@ -279,7 +283,7 @@ export default function Fax() {
                 <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>10 digits, no dashes</div>
               </div>
               <div className="field"><label>From Number (override)</label>
-                <input value={form.from_number} onChange={e=>fld('from_number',e.target.value.replace(/\D/g,''))} placeholder={settings.sw_inbound_did||'Uses SignalWire DID'}/>
+                <input value={form.from_number} onChange={e=>fld('from_number',e.target.value.replace(/\D/g,''))} placeholder={settings.firm_fax_number||settings.sw_inbound_did||'Uses SignalWire DID'}/>
               </div>
             </div>
 
