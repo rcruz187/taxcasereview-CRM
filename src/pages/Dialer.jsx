@@ -163,6 +163,17 @@ export default function Dialer() {
     setVoicemails(vs => vs.map(v => v.id === vm.id ? { ...v, is_read: true } : v))
   }
 
+  async function deleteVoicemail(vm) {
+    if (!window.confirm('Delete this voicemail? This cannot be undone.')) return
+    await supabase.from('voicemails').delete().eq('id', vm.id)
+    if (vm.recording_url?.includes('/storage/v1/object/public/voicemails/')) {
+      const fileName = vm.recording_url.split('/voicemails/').pop()
+      if (fileName) await supabase.storage.from('voicemails').remove([fileName]).catch(() => {})
+    }
+    setVoicemails(vs => vs.filter(v => v.id !== vm.id))
+    showToast('Voicemail deleted.')
+  }
+
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
   function startCall(lead) {
@@ -510,6 +521,10 @@ export default function Dialer() {
                         Mark Read
                       </button>
                     )}
+                    <button className="btn sec" style={{ padding: '5px 10px', fontSize: 11, color: '#dc2626' }}
+                      onClick={() => deleteVoicemail(vm)}>
+                      🗑️ Delete
+                    </button>
                   </div>
                 ))}
               </div>
