@@ -109,6 +109,7 @@ export default function Settings() {
         sw_sip_username: firm.sw_sip_username,
         sw_sip_password: firm.sw_sip_password,
         sw_inbound_did: firm.sw_inbound_did,
+        call_forward_number: firm.call_forward_number,
         stripe_publishable_key: firm.stripe_publishable_key,
         signalwire_backend: firm.signalwire_backend,
         qb_client_id: firm.qb_client_id,
@@ -391,6 +392,12 @@ export default function Settings() {
                 </div>
                 <div className="field"><label>SIP Password</label>
                   <input type="password" value={firm.sw_sip_password || ''} onChange={set('sw_sip_password')} placeholder="SIP endpoint password" />
+                </div>
+              </div>
+              <div className="fg2">
+                <div className="field"><label>Call Forwarding Number</label>
+                  <input value={firm.call_forward_number || ''} onChange={set('call_forward_number')} placeholder="+15615551234" />
+                  <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Where incoming calls to your SignalWire number actually ring — your cell, front desk, etc.</div>
                 </div>
               </div>
               <div className="field"><label>Backend Server URL (optional)</label>

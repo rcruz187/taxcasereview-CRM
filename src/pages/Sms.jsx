@@ -107,7 +107,7 @@ export default function Sms() {
       <div style={{display:'flex',gap:6,marginBottom:12}}>
         {['compose','sent','templates'].map(t=>(
           <span key={t} className={`chip${view===t?' on':''}`} onClick={()=>setView(t)} style={{textTransform:'capitalize'}}>
-            {t==='sent'?`Sent (${sent.length})`:t==='templates'?'Templates':'💬 Compose'}
+            {t==='sent'?`Messages (${sent.length})`:t==='templates'?'Templates':'💬 Compose'}
           </span>
         ))}
       </div>
@@ -162,15 +162,16 @@ export default function Sms() {
 
       {view==='sent'&&(
         <div className="card">
-          <div className="ch"><span className="ct">Sent Messages ({sent.length})</span></div>
+          <div className="ch"><span className="ct">Messages ({sent.length})</span></div>
           <div className="ovx">
             <table>
-              <thead><tr><th>Client</th><th>To</th><th>Message</th><th>Date</th><th>Status</th><th></th></tr></thead>
+              <thead><tr><th></th><th>Client</th><th>Phone</th><th>Message</th><th>Date</th><th>Status</th><th></th></tr></thead>
               <tbody>
                 {sent.length===0
-                  ?<tr><td colSpan={6} style={{textAlign:'center',color:'var(--t3)',padding:20}}>No messages logged yet</td></tr>
+                  ?<tr><td colSpan={7} style={{textAlign:'center',color:'var(--t3)',padding:20}}>No messages logged yet</td></tr>
                   :sent.map(s=>(
                     <tr key={s.id}>
+                      <td>{s.direction==='inbound'?<span title="Received" style={{color:'var(--blue)'}}>📥</span>:<span title="Sent" style={{color:'var(--t3)'}}>📤</span>}</td>
                       <td style={{fontWeight:600}}>{s.clientName}</td>
                       <td style={{fontSize:12,color:'var(--t2)'}}>{s.phone||'—'}</td>
                       <td style={{fontSize:12,maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.body}</td>

@@ -194,7 +194,7 @@ export default function Fax() {
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
             <thead>
               <tr style={{borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
-                {['Date & Time','Client','To Number','Subject','File','Status','Sent By',''].map(h=>(
+                {['','Date & Time','Client','To Number','Subject','File','Status','Sent By',''].map(h=>(
                   <th key={h} style={{padding:'9px 12px',textAlign:'left',fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.05em'}}>{h}</th>
                 ))}
               </tr>
@@ -204,9 +204,10 @@ export default function Fax() {
                 <tr key={l.id} style={{borderBottom:'1px solid var(--br)'}}
                   onMouseEnter={e=>e.currentTarget.style.background='var(--s2)'}
                   onMouseLeave={e=>e.currentTarget.style.background=''}>
+                  <td style={{padding:'9px 12px'}}>{l.direction==='inbound'?<span title="Received" style={{color:'var(--blue)'}}>📥</span>:<span title="Sent" style={{color:'var(--t3)'}}>📤</span>}</td>
                   <td style={{padding:'9px 12px',color:'var(--t2)',whiteSpace:'nowrap'}}>
-                    <div style={{fontWeight:600,fontSize:12}}>{l.sent_at ? new Date(l.sent_at).toLocaleDateString() : '—'}</div>
-                    <div style={{fontSize:10,color:'var(--t3)'}}>{l.sent_at ? new Date(l.sent_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : ''}</div>
+                    <div style={{fontWeight:600,fontSize:12}}>{(l.sent_at||l.created_at) ? new Date(l.sent_at||l.created_at).toLocaleDateString() : '—'}</div>
+                    <div style={{fontSize:10,color:'var(--t3)'}}>{(l.sent_at||l.created_at) ? new Date(l.sent_at||l.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : ''}</div>
                   </td>
                   <td style={{padding:'9px 12px',fontWeight:600}}>{l.client_name||'—'}</td>
                   <td style={{padding:'9px 12px',fontFamily:'monospace',fontSize:11}}>{l.to_number||'—'}</td>
