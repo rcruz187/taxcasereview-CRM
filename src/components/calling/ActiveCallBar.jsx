@@ -1,8 +1,11 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCall } from '../../context/CallContext'
+import { supabase } from '../../lib/supabase'
 
 export default function ActiveCallBar() {
   const navigate = useNavigate()
+  const [polishing, setPolishing] = useState(false)
   const {
     incomingCall, incomingMatch, calling, active, elapsed, formatTime,
     answerIncoming, declineIncoming, cancelCall, endCall,
@@ -13,6 +16,20 @@ export default function ActiveCallBar() {
   function openFile(entry) {
     if (!entry?.id) return
     navigate(entry.entityType === 'client' ? `/clients/${entry.id}` : `/leads/${entry.id}`)
+  }
+
+  async function polishNotes() {
+    if (!logForm.notes?.trim() || polishing) return
+    setPolishing(true)
+    const { data, error } = await supabase.functions.invoke('call-recap', {
+      body: { bullets: logForm.notes, contactName: active?.name, outcome: logForm.outcome }
+    })
+    setPolishing(false)
+    if (error || data?.error) {
+      alert(data?.error || error?.message || 'Could not polish notes — try again.')
+      return
+    }
+    if (data?.recap) setLogForm(f => ({ ...f, notes: data.recap }))
   }
 
   return (
@@ -159,6 +176,13 @@ export default function ActiveCallBar() {
                 placeholder="What was discussed? Follow-up needed?"
                 style={{ minHeight: 80 }}
               />
+              <button className="btn sec" style={{ marginTop: 8, fontSize: 12, padding: '6px 12px' }}
+                onClick={polishNotes} disabled={!logForm.notes?.trim() || polishing}>
+                {polishing ? 'Polishing…' : '✨ Polish Notes'}
+              </button>
+              <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 4 }}>
+                Type a couple quick bullet points, then click to turn them into a clean note. This also gets saved straight to the contact's file.
+              </div>
             </div>
 
             <button className="btn pri"

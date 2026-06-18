@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { Relay } from '@signalwire/js'
 import { supabase } from '../lib/supabase'
+import { useApp } from './AppContext'
 
 // ──────────────────────────────────────────────────────────────────────
 // This used to live entirely inside Dialer.jsx. The problem: React
@@ -56,6 +57,7 @@ async function matchCallerToRecord(rawNumber) {
 }
 
 export function CallProvider({ children }) {
+  const { user } = useApp()
   const [relayStatus, setRelayStatus] = useState('connecting')
   const [incomingCall, setIncomingCall] = useState(null)
   const [incomingMatch, setIncomingMatch] = useState(null) // {entityType,id,name} while ringing, or null
@@ -194,6 +196,16 @@ export function CallProvider({ children }) {
     setElapsed(0)
     setLogForm(BLANK_LOG)
     timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000)
+
+    // Manual dial-pad calls don't know who they're calling yet — check
+    // if the number matches an existing client/lead so the recap still
+    // attaches to the right record once the call ends.
+    if (!lead.entityType && lead.status === 'Manual') {
+      matchCallerToRecord(lead.phone).then(m => {
+        if (m) setActive(prev => (prev === lead ? { ...lead, name: m.name, id: m.id, entityType: m.entityType } : prev))
+      })
+    }
+
     relayRef.current?.newCall({
       destinationNumber: digits.length === 10 ? `+1${digits}` : `+${digits}`,
       callerNumber: callerNumberRef.current || undefined,
@@ -237,6 +249,25 @@ export function CallProvider({ children }) {
     const { error } = await supabase.from('calllog').insert([record])
     setSaving(false)
     if (error) { showCallToast('Error: ' + error.message); return }
+
+    // Also drop the note into the actual Client/Lead notes timeline (not
+    // just buried in the call log), so it shows up where Romy/Dana/Yesenia
+    // already look. client_notes keys off the name; lead_notes needs the
+    // real lead id, so only leads with a known id get one.
+    if (record.notes?.trim()) {
+      const author = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+      const noteLine = `[${record.outcome}, ${record.duration}] ${record.notes.trim()}`
+      if (active.entityType === 'client') {
+        await supabase.from('client_notes').insert({
+          client_name: record.clientName, content: noteLine, created_by: author,
+        }).then(({ error: e }) => e && console.error('client_notes insert error:', e))
+      } else if (active.entityType === 'lead' && active.id) {
+        await supabase.from('lead_notes').insert([{
+          lead_id: active.id, lead_name: record.clientName, text: noteLine,
+          type: 'Call', author, created_at: new Date().toISOString(),
+        }]).then(({ error: e }) => e && console.error('lead_notes insert error:', e))
+      }
+    }
 
     if (active.entityType !== 'client') {
       if (logForm.outcome === 'Converted') {

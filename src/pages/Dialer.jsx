@@ -113,7 +113,7 @@ export default function Dialer() {
   }
 
   function callQueueEntry(entry) {
-    const fakeLead = { id: null, name: entry.name || 'Client', first: entry.name||'', last: '', phone: entry.phone, status: 'Client Queue' }
+    const fakeLead = { id: null, name: entry.name || 'Client', first: entry.name||'', last: '', phone: entry.phone, status: 'Client Queue', entityType: 'client' }
     startCall(fakeLead)
   }
 
@@ -336,7 +336,7 @@ export default function Dialer() {
                           {lead.phone ? (
                             <button className="btn pri"
                               style={{ padding: '5px 12px', fontSize: 12, gap: 4 }}
-                              onClick={() => startCall(lead)}
+                              onClick={() => startCall({ ...lead, entityType: 'lead' })}
                               disabled={calling}>
                               📞 Call
                             </button>
