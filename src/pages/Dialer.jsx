@@ -25,6 +25,7 @@ export default function Dialer() {
   const timerRef = useRef(null)
 
   const [clientQueue, setClientQueue] = useState([])
+  const [voicemails, setVoicemails] = useState([])
 
   // ── Real calling (SignalWire RELAY) ──────────────────────────────────
   const [relayStatus, setRelayStatus] = useState('connecting') // connecting | ready | error
@@ -105,7 +106,7 @@ export default function Dialer() {
   }
 
   useEffect(() => {
-    loadLeads(); loadCallLog()
+    loadLeads(); loadCallLog(); loadVoicemails()
     // Pick up number passed from client phone link
     const pre = sessionStorage.getItem('dialerNumber')
     if (pre) {
@@ -136,6 +137,21 @@ export default function Dialer() {
       .order('created_at', { ascending: false })
       .limit(100)
     if (data) setCallLog(data)
+  }
+
+  async function loadVoicemails() {
+    const { data, error } = await supabase
+      .from('voicemails')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100)
+    if (error) console.error('loadVoicemails error:', error)
+    if (data) setVoicemails(data)
+  }
+
+  async function markVoicemailRead(vm) {
+    await supabase.from('voicemails').update({ is_read: true }).eq('id', vm.id)
+    setVoicemails(vs => vs.map(v => v.id === vm.id ? { ...v, is_read: true } : v))
   }
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3000) }
@@ -441,7 +457,11 @@ export default function Dialer() {
 
           {/* Tabs */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-            {[['queue', `📋 Call Queue (${leads.length})`], ['log', `📞 Call History (${callLog.length})`]].map(([key, label]) => (
+            {[
+              ['queue', `📋 Call Queue (${leads.length})`],
+              ['voicemail', `🔵 Voicemails (${voicemails.filter(v => !v.is_read).length})`],
+              ['log', `📞 Call History (${callLog.length})`],
+            ].map(([key, label]) => (
               <button key={key} onClick={() => setTab(key)}
                 className={tab === key ? 'btn pri' : 'btn sec'}
                 style={{ padding: '7px 16px', fontSize: 13 }}>
@@ -449,6 +469,44 @@ export default function Dialer() {
               </button>
             ))}
           </div>
+
+          {/* Voicemails */}
+          {tab === 'voicemail' && (
+            <div className="card">
+              <div className="ovx">
+                {voicemails.length === 0 ? (
+                  <div style={{ textAlign: 'center', color: 'var(--t3)', padding: 24 }}>No voicemails yet</div>
+                ) : voicemails.map(vm => (
+                  <div key={vm.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 14, padding: '12px 8px',
+                    borderBottom: '1px solid var(--br)',
+                    background: vm.is_read ? 'transparent' : 'rgba(37,99,235,0.06)'
+                  }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: vm.is_read ? 'transparent' : '#3b82f6', flexShrink: 0 }} />
+                    <div style={{ minWidth: 140 }}>
+                      <div style={{ fontWeight: 700, fontFamily: 'monospace' }}>{vm.from_number || 'Unknown'}</div>
+                      <div style={{ fontSize: 11, color: 'var(--t3)' }}>
+                        {vm.created_at ? new Date(vm.created_at).toLocaleString() : '—'}
+                        {vm.duration_seconds ? ` · ${vm.duration_seconds}s` : ''}
+                      </div>
+                    </div>
+                    {vm.recording_url ? (
+                      <audio controls src={vm.recording_url} style={{ flex: 1, height: 32 }}
+                        onPlay={() => !vm.is_read && markVoicemailRead(vm)} />
+                    ) : (
+                      <span style={{ fontSize: 12, color: 'var(--t3)' }}>Recording unavailable</span>
+                    )}
+                    {!vm.is_read && (
+                      <button className="btn sec" style={{ padding: '5px 10px', fontSize: 11 }}
+                        onClick={() => markVoicemailRead(vm)}>
+                        Mark Read
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Call Queue */}
           {tab === 'queue' && (

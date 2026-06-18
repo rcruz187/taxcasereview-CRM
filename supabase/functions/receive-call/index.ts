@@ -18,11 +18,13 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
     const { data: settings } = await supabase.from('settings')
-      .select('call_forward_number').limit(1).maybeSingle()
+      .select('call_forward_number,sw_space_url').limit(1).maybeSingle()
 
     const forwardTo = settings?.call_forward_number
+    const spaceDomain = (settings?.sw_space_url || '').replace(/\.signalwire\.com$/i, '')
+    const vertoNoun = spaceDomain ? `<Verto>${RELAY_RESOURCE}@${spaceDomain}.verto.signalwire.com</Verto>` : ''
 
-    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial timeout="25"><Client>${RELAY_RESOURCE}</Client>${forwardTo ? `<Number>${forwardTo}</Number>` : ''}</Dial><Say>Thank you for calling. No one is available to take your call right now. Please try again later.</Say></Response>`
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial timeout="25">${vertoNoun}${forwardTo ? `<Number>${forwardTo}</Number>` : ''}</Dial><Say>Thank you for calling. No one is available to take your call right now. Please leave a message after the tone.</Say><Record action="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/voicemail-recorded" maxLength="120" playBeep="true" /></Response>`
 
     return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
 
