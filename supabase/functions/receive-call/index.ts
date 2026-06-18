@@ -34,11 +34,15 @@ serve(async (req) => {
 
       if (lockErr) {
         if (lockErr.code === '23505') {
-          // 23505 = unique_violation — we already dialed this CallSid once.
-          console.log('duplicate receive-call hit for CallSid', callSid, '— skipping re-dial')
-          return new Response(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`, { headers: { 'Content-Type': 'text/xml' } })
+          // 23505 = unique_violation — SignalWire hit this URL again for a
+          // call it already hit before. Logged for visibility only — we
+          // still answer with the same real Dial command below rather than
+          // an empty response, in case SignalWire treats an empty reply as
+          // a reason to abandon the call setup entirely.
+          console.log('duplicate receive-call hit for CallSid', callSid, '— answering with same Dial command')
+        } else {
+          console.error('call_dial_locks insert error:', lockErr)
         }
-        console.error('call_dial_locks insert error:', lockErr)
       }
     }
 
