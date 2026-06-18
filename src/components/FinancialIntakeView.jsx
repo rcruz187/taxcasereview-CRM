@@ -42,7 +42,7 @@ export default function FinancialIntakeView({ clientName }) {
 
   if (!record) return (
     <div style={{padding:16, color:'var(--t3)', fontSize:13, textAlign:'center'}}>
-      No Financial Intake has been sent to this client yet. Use the "Financial Intake — Resend Link" quick action above to send one.
+      No Financial Intake has been sent yet. Use the "Financial Intake" quick action above to send one.
     </div>
   )
 

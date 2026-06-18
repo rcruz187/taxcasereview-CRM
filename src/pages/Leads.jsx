@@ -11,6 +11,7 @@ import ComplianceGrids from './ComplianceGrids'
 import { ClientDocs } from './Clients'
 import InPlaceCaller from '../components/InPlaceCaller'
 import ChargeResolutionFeeModal from '../components/ChargeResolutionFeeModal'
+import FinancialIntakeView from '../components/FinancialIntakeView'
 
 const STATUSES = ['New Lead','Contacted','Consultation Scheduled','Consultation Completed',
   'Tax Inv Agreement Sent','Tax Inv Agreement Signed','Tax Inv Fee Paid',
@@ -331,6 +332,7 @@ export default function Leads() {
   const [toast, setToast]   = useState('')
   const [converting, setConverting] = useState(false)
   const [pkgSending, setPkgSending] = useState(false)
+  const [intakeSending, setIntakeSending] = useState(false)
   const [inlineFaxLead, setInlineFaxLead] = useState(null)
   const [showFaxModal, setShowFaxModal] = useState(false)
   const [inlineEsignLead, setInlineEsignLead] = useState(null)
@@ -548,6 +550,35 @@ export default function Leads() {
     showToast(willArchive ? 'Status updated — lead archived' : willRestore ? 'Status updated — lead restored' : 'Status updated!')
     load()
     if (detail?.id === l.id) loadLeadNotes(l.id)
+  }
+
+  async function sendFinancialIntake(l) {
+    if (!l.email) { showToast('No email on file for this lead'); return }
+    setIntakeSending(true)
+    let intakeId
+    const { data: existing } = await supabase.from('financial_intake_responses')
+      .select('id').eq('client_name', l.name).order('created_at',{ascending:false}).limit(1).maybeSingle()
+    if (existing) {
+      intakeId = existing.id
+    } else {
+      const { data: created, error: createErr } = await supabase.from('financial_intake_responses').insert([{
+        client_name: l.name, client_email: l.email || '', status: 'Sent',
+        answers: {}, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      }]).select().single()
+      if (createErr) { setIntakeSending(false); showToast('Error: '+createErr.message); return }
+      intakeId = created.id
+    }
+    const intakeUrl = window.location.origin + '/taxcasereview-CRM/financial-intake/' + intakeId
+    const { error: emailErr } = await supabase.functions.invoke('send-email', {
+      body: {
+        to: l.email,
+        subject: `Your Financial Intake Form — Tax Case Review`,
+        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${l.name}</strong>,</p><p>Here's your link to fill out (or finish) your financial intake form — it takes about 10-15 minutes and your progress saves automatically.</p><p style="text-align:center;margin:24px 0"><a href="${intakeUrl}" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Financial Intake</a></p><p style="font-size:12px;color:#64748b">Link: ${intakeUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
+      }
+    })
+    setIntakeSending(false)
+    if (emailErr) { showToast('Error sending email: '+emailErr.message); return }
+    showToast('✅ Financial Intake link sent to '+l.email)
   }
 
   async function handleSendFullPackage(l) {
@@ -1000,6 +1031,7 @@ export default function Leads() {
             <ActionBtn color="#dc2626" icon="📠" label="Send Fax" sub="SignalWire Fax" onClick={()=>{setInlineFaxLead(l);setShowFaxModal(true)}}/>
             <ActionBtn color="#7c3aed" icon="✍️" label="E-Signature" sub="Request Sign" onClick={()=>{setInlineEsignLead(l);setShowEsignModal(true)}}/>
             <ActionBtn color="#0ea5e9" icon="🔓" label="Client Portal" sub="Compliance Access" onClick={()=>{setPortalLead(l);setShowPortalModal(true)}}/>
+            <ActionBtn color="#1d4ed8" icon="📊" label={intakeSending?'Sending…':'Financial Intake'} sub="Send / Resend Link" onClick={()=>!intakeSending&&sendFinancialIntake(l)}/>
           </div>
         </div>
 
@@ -1020,6 +1052,7 @@ export default function Leads() {
               {key:'overview', label:'📋 Overview'},
               {key:'notes', label:`📝 Notes & Activity (${leadNotes.length})`},
               {key:'docs',  label:'📁 Documents'},
+              {key:'finintake', label:'💰 Financial Intake'},
             ].map(t=>(
               <button key={t.key} onClick={()=>switchLeadTab(t.key)}
                 style={{padding:'10px 16px',border:'none',borderBottom:leadDetailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
@@ -1090,6 +1123,11 @@ export default function Leads() {
             <div style={{padding:0}}>
               <ClientDocs clientName={l.name} supabase={supabase} showToast={showToast}/>
             </div>
+          )}
+          {leadDetailTab==='finintake' && (
+            <ErrorBoundary>
+              <FinancialIntakeView clientName={l.name}/>
+            </ErrorBoundary>
           )}
         </div>
 
