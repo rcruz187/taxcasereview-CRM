@@ -415,7 +415,7 @@ export default function Leads() {
       lead_name: detail.name,
       text: newLeadNote.trim(),
       type: noteType,
-      author: 'Rep',
+      author: user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff',
       created_at: new Date().toISOString()
     }])
     setAddingLeadNote(false)
