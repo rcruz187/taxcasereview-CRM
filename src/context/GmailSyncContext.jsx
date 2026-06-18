@@ -52,7 +52,9 @@ export function GmailSyncProvider({ children }) {
       try {
         const parsed = await getAndParseGmailMessage(supabase, id, clients)
         if (parsed) {
-          await supabase.from('emails').upsert([parsed], { onConflict: 'gmail_message_id', ignoreDuplicates: true })
+          // filterUnknownIds already removed anything we have — plain insert is safe.
+          // If a race condition produces a duplicate the error is caught and skipped.
+          await supabase.from('emails').insert([parsed])
         }
       } catch (e) {
         console.error('Gmail import error for', id, e)
