@@ -59,7 +59,7 @@ serve(async (req) => {
 
   } catch (err) {
     console.error('ivr-route error:', err)
-    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Say>We are sorry, an error occurred. Please try again.</Say></Response>`
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">We are sorry, an error occurred. Please try again.</Say></Response>`
     return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
   }
 })
