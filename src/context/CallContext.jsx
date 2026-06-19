@@ -73,6 +73,7 @@ export function CallProvider({ children }) {
   const liveCallRef = useRef(null)
   const callerNumberRef = useRef(null)
   const activeConferenceRef = useRef(null)
+  const activeInboundCallsidRef = useRef(null)
   const uiStartedRef = useRef(false)
   const elapsedRef = useRef(0)
   const incomingMatchRef = useRef(null)
@@ -250,6 +251,7 @@ export function CallProvider({ children }) {
       .then(({ error }) => error && console.error('incoming_calls update error:', error))
 
     activeConferenceRef.current = row.conference_name || null
+    activeInboundCallsidRef.current = row.callsid || null
 
     // Bridge in using the exact same outbound-dial mechanism that's been
     // working reliably all day — the browser dials the business number
@@ -284,6 +286,7 @@ export function CallProvider({ children }) {
     const destinationNumber = digits.length === 10 ? `+1${digits}` : `+${digits}`
 
     uiStartedRef.current = true
+    activeInboundCallsidRef.current = null
     setActive(lead)
     setCalling(true)
     setElapsed(0)
@@ -331,6 +334,12 @@ export function CallProvider({ children }) {
       supabase.functions.invoke('end-conference', { body: { conferenceName: conf } })
         .then(({ error }) => error && console.error('end-conference error:', error))
     }
+    const inboundCallsid = activeInboundCallsidRef.current
+    activeInboundCallsidRef.current = null
+    if (inboundCallsid) {
+      supabase.from('incoming_calls').update({ status: 'completed' }).eq('callsid', inboundCallsid)
+        .then(({ error }) => error && console.error('incoming_calls completion update error:', error))
+    }
     uiStartedRef.current = false
     clearInterval(timerRef.current)
     setCalling(false)
@@ -346,6 +355,12 @@ export function CallProvider({ children }) {
     if (conf) {
       supabase.functions.invoke('end-conference', { body: { conferenceName: conf } })
         .then(({ error }) => error && console.error('end-conference error:', error))
+    }
+    const inboundCallsid = activeInboundCallsidRef.current
+    activeInboundCallsidRef.current = null
+    if (inboundCallsid) {
+      supabase.from('incoming_calls').update({ status: 'completed' }).eq('callsid', inboundCallsid)
+        .then(({ error }) => error && console.error('incoming_calls completion update error:', error))
     }
     uiStartedRef.current = false
     clearInterval(timerRef.current)
