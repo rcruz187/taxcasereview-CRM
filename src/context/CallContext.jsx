@@ -278,6 +278,8 @@ export function CallProvider({ children }) {
     if (relayStatus !== 'ready') { showCallToast('Calling isn\'t connected yet — wait a moment and try again.'); return false }
     const digits = lead.phone?.replace(/\D/g, '')
     if (!digits) { showCallToast('No phone number to call.'); return false }
+    const destinationNumber = digits.length === 10 ? `+1${digits}` : `+${digits}`
+
     uiStartedRef.current = true
     setActive(lead)
     setCalling(true)
@@ -294,11 +296,25 @@ export function CallProvider({ children }) {
       })
     }
 
-    relayRef.current?.newCall({
-      destinationNumber: digits.length === 10 ? `+1${digits}` : `+${digits}`,
-      callerNumber: callerNumberRef.current || undefined,
-    }).then(call => { liveCallRef.current = call })
-      .catch(err => { showCallToast('Call failed: ' + (err?.message || err)); cancelCall() })
+    // Recorded-outbound path: start-outbound-call originates the real leg
+    // to the destination (routed through outbound-leg into a recorded
+    // conference), then the browser self-dials the business number —
+    // same proven bridge mechanism answerIncoming() already uses —
+    // and receive-call's isAgentJoin branch bridges us into that same
+    // conference once it sees the pending outbound_calls row.
+    supabase.functions.invoke('start-outbound-call', { body: { destinationNumber } })
+      .then(({ data, error }) => {
+        if (error || !data?.ok) {
+          showCallToast('Call failed: ' + (data?.error || error?.message || 'unknown error'))
+          cancelCall()
+          return
+        }
+        relayRef.current?.newCall({
+          destinationNumber: callerNumberRef.current,
+          callerNumber: callerNumberRef.current,
+        }).then(call => { liveCallRef.current = call })
+          .catch(err => { showCallToast('Could not connect: ' + (err?.message || err)); cancelCall() })
+      })
     return true
   }
 
