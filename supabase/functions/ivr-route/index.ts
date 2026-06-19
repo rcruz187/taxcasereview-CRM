@@ -3,15 +3,15 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 // Called BY SignalWire after a caller presses a digit at the auto-attendant
 // menu played in receive-call (or after that <Gather> times out with no
-// input at all, via the <Redirect> fallback — same URL, just no Digits
+// input at all, via the <Redirect> fallback -- same URL, just no Digits
 // param that time).
 //
-//   Press 1 → "speak with a tax professional" → hold in conference, banner
+//   Press 1 -> "speak with a tax professional" -> hold in conference, banner
 //             shows in the CRM labeled "Tax Professional"
-//   Press 0 → "front desk" → same mechanism, labeled "Front Desk"
-//   Press 2 → "leave a voicemail" → straight to the recording prompt,
+//   Press 0 -> "front desk" -> same mechanism, labeled "Front Desk"
+//   Press 2 -> "leave a voicemail" -> straight to the recording prompt,
 //             nobody's phone rings at all
-//   anything else / no input → straight to voicemail (simplest safe
+//   anything else / no input -> straight to voicemail (simplest safe
 //             fallback rather than looping the menu indefinitely)
 
 const VOICEMAIL_PROMPT_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/voicemail-prompt'
@@ -19,7 +19,7 @@ const CALL_RECORDED_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1
 
 serve(async (req) => {
   const body = await req.text()
-  console.log('ivr-route invoked — raw body:', body)
+  console.log('ivr-route invoked -- raw body:', body)
   const params = new URLSearchParams(body)
   const digits = params.get('Digits') || ''
   const callSid = params.get('CallSid')
@@ -52,8 +52,8 @@ serve(async (req) => {
     }
 
     // Digits === '2', or empty (timed out with no input), or anything
-    // unrecognized — straight to voicemail, nobody's phone rings.
-    console.log('routing straight to voicemail — digits was:', JSON.stringify(digits))
+    // unrecognized -- straight to voicemail, nobody's phone rings.
+    console.log('routing straight to voicemail -- digits was:', JSON.stringify(digits))
     const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">${VOICEMAIL_PROMPT_URL}</Redirect></Response>`
     return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
 

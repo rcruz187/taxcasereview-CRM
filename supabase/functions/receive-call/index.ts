@@ -5,9 +5,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 // a second time whenever the browser (CallContext.jsx's answerIncoming())
 // dials the business number itself to "answer" a held inbound caller.
 //
-// BACKGROUND — why this isn't a simple <Dial><Verto> anymore: after a full
+// BACKGROUND -- why this isn't a simple <Dial><Verto> anymore: after a full
 // day of testing, dialing straight into the browser's Verto/RELAY
-// registration was confirmed dead — SignalWire's own call logs show
+// registration was confirmed dead -- SignalWire's own call logs show
 // DialCallStatus=failed / DialCallDuration=0 on every single attempt,
 // instantly, regardless of registration state, duplicate hits, or
 // recording attributes (all ruled out one at a time). Real root cause
@@ -17,10 +17,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 // outbound dialing from the browser.
 //
 // New flow:
-//   1. Real inbound call arrives → held in a fresh <Conference>, a row is
+//   1. Real inbound call arrives -> held in a fresh <Conference>, a row is
 //      written to incoming_calls so the CRM can show the incoming-call
 //      banner (CallContext.jsx polls for it).
-//   2. Staff clicks "Answer" → browser dials the BUSINESS NUMBER ITSELF.
+//   2. Staff clicks "Answer" -> browser dials the BUSINESS NUMBER ITSELF.
 //      That creates a second hit to this exact function, which recognizes
 //      "From and To are both our own number" as the agent joining, looks
 //      up the held caller's conference, and bridges in.
@@ -30,7 +30,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 serve(async (req) => {
   const body = await req.text()
-  console.log('receive-call invoked — raw body:', body)
+  console.log('receive-call invoked -- raw body:', body)
 
   const params = new URLSearchParams(body)
   const callSid = params.get('CallSid')
@@ -60,7 +60,7 @@ serve(async (req) => {
 
     if (isAgentJoin) {
       // The browser dialing itself to bridge into a held caller's
-      // conference — not a real customer call.
+      // conference -- not a real customer call.
       const { data: held, error: heldErr } = await supabase
         .from('incoming_calls')
         .select('conference_name, callsid')
@@ -72,7 +72,7 @@ serve(async (req) => {
       if (heldErr) console.error('incoming_calls lookup error:', heldErr)
 
       if (!held) {
-        console.log('agent join attempted but no held caller found — hanging up')
+        console.log('agent join attempted but no held caller found -- hanging up')
         const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`
         return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
       }
@@ -83,7 +83,7 @@ serve(async (req) => {
     }
 
     // A real inbound call. If a manual forwarding number is set, use the
-    // old simple behavior (ring that number directly) — bypasses the IVR
+    // old simple behavior (ring that number directly) -- bypasses the IVR
     // entirely since that's a manual override Romy can flip on/off.
     const forwardTo = settings?.call_forward_number
     if (forwardTo) {
@@ -93,7 +93,7 @@ serve(async (req) => {
 
     // Otherwise, play the auto-attendant menu. ivr-route handles whatever
     // digit (or no digit) comes back, including holding the caller in a
-    // conference for Option 1/0 — this function's job stops at presenting
+    // conference for Option 1/0 -- this function's job stops at presenting
     // the menu.
     const greeting = 'Thank you for calling Tax Case Review. To check your tax status instantly, please check your email or text messages for your personal client portal link. Otherwise, please choose from the following options. Press 1 to speak with a tax professional. Press 2 to leave a general voicemail for our team. Press 0 for the front desk or receptionist.'
     const ivrRouteUrl = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/ivr-route'

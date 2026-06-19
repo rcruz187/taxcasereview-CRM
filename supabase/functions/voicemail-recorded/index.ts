@@ -38,7 +38,7 @@ serve(async (req) => {
             const bytes = new Uint8Array(await audioResp.arrayBuffer())
             const fileName = `vm_${callSid || Date.now()}_${Math.random().toString(36).slice(2, 8)}.mp3`
 
-            // Make sure the bucket exists — harmless if it already does.
+            // Make sure the bucket exists -- harmless if it already does.
             await supabase.storage.createBucket('voicemails', { public: true }).catch(() => {})
 
             const { error: upErr } = await supabase.storage
