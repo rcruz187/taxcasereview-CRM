@@ -1,19 +1,41 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Called BY SignalWire whenever someone calls the number.
-// Configure as the LaML Webhook under "Voice and Fax Settings" on the number.
-// JWT verification MUST be off — SignalWire doesn't send a Supabase JWT.
-
-const RELAY_RESOURCE = 'office'
+// Called BY SignalWire whenever someone calls the number, AND ALSO called
+// a second time whenever the browser (CallContext.jsx's answerIncoming())
+// dials the business number itself to "answer" a held inbound caller.
+//
+// BACKGROUND — why this isn't a simple <Dial><Verto> anymore: after a full
+// day of testing, dialing straight into the browser's Verto/RELAY
+// registration was confirmed dead — SignalWire's own call logs show
+// DialCallStatus=failed / DialCallDuration=0 on every single attempt,
+// instantly, regardless of registration state, duplicate hits, or
+// recording attributes (all ruled out one at a time). Real root cause
+// unconfirmed (likely something in SignalWire's account-level routing we
+// can't see from outside), but rather than keep guessing, this routes
+// around it entirely using a mechanism that's been reliable all day:
+// outbound dialing from the browser.
+//
+// New flow:
+//   1. Real inbound call arrives → held in a fresh <Conference>, a row is
+//      written to incoming_calls so the CRM can show the incoming-call
+//      banner (CallContext.jsx polls for it).
+//   2. Staff clicks "Answer" → browser dials the BUSINESS NUMBER ITSELF.
+//      That creates a second hit to this exact function, which recognizes
+//      "From and To are both our own number" as the agent joining, looks
+//      up the held caller's conference, and bridges in.
+//   3. If nobody answers within 25s, CallContext.jsx calls
+//      redirect-to-voicemail, which uses the SignalWire REST API to pull
+//      the still-held caller out to the voicemail prompt.
 
 serve(async (req) => {
-  // Log every field SignalWire sends — visible in Supabase Dashboard → Edge Functions → receive-call → Logs
   const body = await req.text()
   console.log('receive-call invoked — raw body:', body)
 
   const params = new URLSearchParams(body)
   const callSid = params.get('CallSid')
+  const from = params.get('From') || ''
+  const to = params.get('To') || ''
 
   try {
     const supabase = createClient(
@@ -21,62 +43,72 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    // SignalWire has been hitting this URL more than once for the SAME call
-    // (same CallSid) a few seconds apart. Every hit used to unconditionally
-    // return a fresh <Dial><Verto> command, ringing the browser twice for
-    // one phone call — the two rings collided and both instantly hung up.
-    // This lock makes sure only the FIRST hit for a given CallSid dials;
-    // any repeat hit gets a harmless empty response instead.
-    if (callSid) {
-      const { error: lockErr } = await supabase
-        .from('call_dial_locks')
-        .insert({ callsid: callSid })
-
-      if (lockErr) {
-        if (lockErr.code === '23505') {
-          // 23505 = unique_violation — SignalWire hit this URL again for a
-          // call it already hit before. Logged for visibility only — we
-          // still answer with the same real Dial command below rather than
-          // an empty response, in case SignalWire treats an empty reply as
-          // a reason to abandon the call setup entirely.
-          console.log('duplicate receive-call hit for CallSid', callSid, '— answering with same Dial command')
-        } else {
-          console.error('call_dial_locks insert error:', lockErr)
-        }
-      }
-    }
-
     const { data: settings, error: sErr } = await supabase
       .from('settings')
-      .select('call_forward_number,sw_space_url')
+      .select('call_forward_number,sw_inbound_did')
       .limit(1)
       .maybeSingle()
 
     if (sErr) console.error('settings fetch error:', sErr)
-    console.log('settings:', JSON.stringify(settings))
 
-    const forwardTo = settings?.call_forward_number
-    const spaceDomain = (settings?.sw_space_url || '').replace(/\.signalwire\.com$/i, '').replace(/^https?:\/\//, '')
-    const vertoAddr = spaceDomain ? `${RELAY_RESOURCE}@${spaceDomain}.verto.signalwire.com` : null
+    const businessDigits = (settings?.sw_inbound_did || '').replace(/\D/g, '').slice(-10)
+    const fromDigits = from.replace(/\D/g, '').slice(-10)
+    const toDigits = to.replace(/\D/g, '').slice(-10)
+    const isAgentJoin = !!businessDigits && fromDigits === businessDigits && toDigits === businessDigits
 
-    console.log('spaceDomain:', spaceDomain, '| vertoAddr:', vertoAddr, '| forwardTo:', forwardTo)
+    console.log('isAgentJoin:', isAgentJoin, '| from:', from, '| to:', to, '| businessDID:', settings?.sw_inbound_did)
 
-    if (!vertoAddr) {
-      // No space URL — can't ring the browser. Just go straight to voicemail.
-      console.error('sw_space_url not set — cannot generate Verto address, going straight to voicemail')
-      const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Say>Please leave a message after the tone.</Say><Record action="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/voicemail-recorded" maxLength="120" playBeep="true"/></Response>`
+    if (isAgentJoin) {
+      // The browser dialing itself to bridge into a held caller's
+      // conference — not a real customer call.
+      const { data: held, error: heldErr } = await supabase
+        .from('incoming_calls')
+        .select('conference_name, callsid')
+        .in('status', ['ringing', 'answered'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (heldErr) console.error('incoming_calls lookup error:', heldErr)
+
+      if (!held) {
+        console.log('agent join attempted but no held caller found — hanging up')
+        const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`
+        return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
+      }
+
+      console.log('agent joining conference:', held.conference_name)
+      const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Conference endConferenceOnExit="true">${held.conference_name}</Conference></Dial></Response>`
       return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
     }
 
-    const vertoNoun = `<Verto>${vertoAddr}</Verto>`
-    const forwardNoun = forwardTo ? `<Number>${forwardTo}</Number>` : ''
-    // record="record-from-answer" records both legs once the call connects —
-    // this rides on the same call minutes already being paid for, no extra
-    // SignalWire product to turn on. Recording posts to call-recorded once done.
-    // TEMP TEST: record/recordingStatusCallback removed from this Dial to
-    // rule out a Verto+recording incompatibility as the cause of the
-    // instant (0-second) DialCallStatus=failed we've been seeing all day.
-    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial timeout="25">${vertoNoun}${forwardNoun}</Dial><Say>Thank you for calling Tax Case Review. No one is available right now. Please leave a message after the tone.</Say><Record action="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/voicemail-recorded" maxLength="120" playBeep="true"/></Response>`
+    // A real inbound call. If a manual forwarding number is set, use the
+    // old simple behavior (ring that number directly) since mixing a
+    // forwarding <Number> with a <Conference> in the same <Dial> doesn't
+    // make sense. Otherwise, hold the caller in a conference and let the
+    // CRM banner + answerIncoming() pull them in.
+    const forwardTo = settings?.call_forward_number
+    if (forwardTo) {
+      const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial timeout="25"><Number>${forwardTo}</Number></Dial><Say>Thank you for calling Tax Case Review. No one is available right now. Please leave a message after the tone.</Say><Record action="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/voicemail-recorded" maxLength="120" playBeep="true"/></Response>`
+      return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
+    }
+
+    const conferenceName = `office-${callSid || Date.now()}`
+
+    if (callSid) {
+      const { error: insErr } = await supabase.from('incoming_calls').insert({
+        callsid: callSid,
+        conference_name: conferenceName,
+        from_number: from,
+        status: 'ringing',
+      })
+      if (insErr) console.error('incoming_calls insert error:', insErr)
+    }
+
+    // Caller hears hold music/silence (SignalWire's default) until staff
+    // answers and gets bridged in via the agent-join branch above, or
+    // until redirect-to-voicemail pulls them out after 25s of no answer.
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Conference startConferenceOnEnter="true" endConferenceOnExit="true" record="record-from-start" recordingStatusCallback="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/call-recorded">${conferenceName}</Conference></Dial></Response>`
 
     console.log('returning cXML:', xml)
     return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })

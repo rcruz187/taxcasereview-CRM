@@ -76,6 +76,17 @@ export function CallProvider({ children }) {
   const elapsedRef = useRef(0)
   const incomingMatchRef = useRef(null)
   const timerRef = useRef(null)
+  // Inbound calls no longer arrive as a real RELAY call object (the
+  // inbound Verto dial was confirmed dead after a full day of testing —
+  // it fails in 0 seconds every time, regardless of registration state).
+  // Instead, receive-call holds the caller in a conference and writes a
+  // row to incoming_calls; we poll for it here and "answer" by having the
+  // browser dial itself (the same outbound mechanism that's reliable all
+  // day), which receive-call recognizes and bridges straight into that
+  // conference. These three refs track that flow.
+  const pendingInboundRef = useRef(null)
+  const lastHandledInboundRef = useRef(null)
+  const inboundTimeoutRef = useRef(null)
 
   useEffect(() => { elapsedRef.current = elapsed }, [elapsed])
 
@@ -120,16 +131,6 @@ export function CallProvider({ children }) {
         if (n.type !== 'callUpdate') return
         const call = n.call
         console.log('[RELAY] callUpdate — direction:', call.direction, '| state:', call.state, '| from:', call.options?.remoteCallerNumber)
-        if (call.direction === 'inbound' && call.state === 'ringing') {
-          console.log('%c[RELAY] INCOMING CALL DETECTED — showing banner now', 'color:cyan;font-weight:bold')
-          liveCallRef.current = call
-          uiStartedRef.current = false
-          setIncomingCall(call)
-          setIncomingMatch(null)
-          incomingMatchRef.current = null
-          const num = call.options?.remoteCallerNumber
-          matchCallerToRecord(num).then(m => { incomingMatchRef.current = m; setIncomingMatch(m) })
-        }
         if (call.state === 'active' && !uiStartedRef.current) {
           uiStartedRef.current = true
           setIncomingCall(null)
@@ -178,15 +179,95 @@ export function CallProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Polls for inbound calls being held by receive-call (see that function's
+  // comments for why — the direct Verto dial-in is dead). When a new
+  // 'ringing' row shows up, show the same banner UI as before and start a
+  // 25-second window; if nobody answers in time, redirect-to-voicemail
+  // pulls the caller out to the voicemail prompt automatically.
+  useEffect(() => {
+    if (relayStatus !== 'ready') return
+    let cancelled = false
+
+    const poll = setInterval(async () => {
+      if (cancelled || pendingInboundRef.current || calling) return
+      const { data, error } = await supabase
+        .from('incoming_calls')
+        .select('callsid, conference_name, from_number, created_at')
+        .eq('status', 'ringing')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (cancelled || error || !data) return
+      if (data.callsid === lastHandledInboundRef.current) return
+
+      lastHandledInboundRef.current = data.callsid
+      pendingInboundRef.current = data
+      setIncomingCall({ options: { remoteCallerNumber: data.from_number } })
+      setIncomingMatch(null)
+      incomingMatchRef.current = null
+      matchCallerToRecord(data.from_number).then(m => { incomingMatchRef.current = m; setIncomingMatch(m) })
+
+      inboundTimeoutRef.current = setTimeout(() => {
+        if (pendingInboundRef.current?.callsid !== data.callsid) return
+        supabase.functions.invoke('redirect-to-voicemail', { body: { callsid: data.callsid } })
+          .then(({ error: e }) => e && console.error('redirect-to-voicemail error:', e))
+        pendingInboundRef.current = null
+        setIncomingCall(null)
+        setIncomingMatch(null)
+      }, 25000)
+    }, 2000)
+
+    return () => { cancelled = true; clearInterval(poll) }
+  }, [relayStatus, calling])
+
   function answerIncoming() {
-    incomingCall?.answer()
+    const row = pendingInboundRef.current
+    if (!row) return
+    if (inboundTimeoutRef.current) { clearTimeout(inboundTimeoutRef.current); inboundTimeoutRef.current = null }
+
+    const m = incomingMatchRef.current
+    uiStartedRef.current = true
     setIncomingCall(null)
+    setCalling(true)
+    setElapsed(0)
+    setLogForm(BLANK_LOG)
+    timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000)
+    setActive({
+      id: m?.id ?? null,
+      name: m?.name || 'Incoming Call',
+      first: 'Incoming', last: 'Call',
+      phone: row.from_number || '—',
+      status: 'Manual',
+      entityType: m?.entityType || null,
+    })
+
+    supabase.from('incoming_calls').update({ status: 'answered' }).eq('callsid', row.callsid)
+      .then(({ error }) => error && console.error('incoming_calls update error:', error))
+
+    // Bridge in using the exact same outbound-dial mechanism that's been
+    // working reliably all day — the browser dials the business number
+    // itself, and receive-call recognizes that self-dial and connects it
+    // straight into this caller's hold conference instead of treating it
+    // as a new customer call.
+    relayRef.current?.newCall({
+      destinationNumber: callerNumberRef.current,
+      callerNumber: callerNumberRef.current,
+    }).then(call => { liveCallRef.current = call })
+      .catch(err => { showCallToast('Could not connect: ' + (err?.message || err)); cancelCall() })
+
+    pendingInboundRef.current = null
   }
 
   function declineIncoming() {
-    incomingCall?.hangup()
+    const row = pendingInboundRef.current
+    if (inboundTimeoutRef.current) { clearTimeout(inboundTimeoutRef.current); inboundTimeoutRef.current = null }
     setIncomingCall(null)
-    liveCallRef.current = null
+    setIncomingMatch(null)
+    pendingInboundRef.current = null
+    if (row?.callsid) {
+      supabase.functions.invoke('redirect-to-voicemail', { body: { callsid: row.callsid } })
+        .then(({ error }) => error && console.error('redirect-to-voicemail error:', error))
+    }
   }
 
   function startCall(lead) {
