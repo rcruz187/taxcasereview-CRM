@@ -316,11 +316,23 @@ export function CallProvider({ children }) {
           return
         }
         activeConferenceRef.current = data.conferenceName || null
-        relayRef.current?.newCall({
-          destinationNumber: callerNumberRef.current,
-          callerNumber: callerNumberRef.current,
-        }).then(call => { liveCallRef.current = call })
-          .catch(err => { showCallToast('Could not connect: ' + (err?.message || err)); cancelCall() })
+        // Deliberate pause before the browser self-dials the business number.
+        // This self-dial is itself a second outbound SignalWire origination
+        // on top of the start-outbound-call REST leg above. Firing them
+        // back-to-back was confirmed via SignalWire's own call history to
+        // self-collide and exceed the space-wide outbound rate limit on
+        // every single attempt, even fully isolated with nothing else
+        // running. Spacing them out clears the rate window. If the call
+        // gets cancelled during the wait, cancelCall() already tore down
+        // the conference via activeConferenceRef.current, so just bail.
+        setTimeout(() => {
+          if (!uiStartedRef.current) return
+          relayRef.current?.newCall({
+            destinationNumber: callerNumberRef.current,
+            callerNumber: callerNumberRef.current,
+          }).then(call => { liveCallRef.current = call })
+            .catch(err => { showCallToast('Could not connect: ' + (err?.message || err)); cancelCall() })
+        }, 1500)
       })
     return true
   }
