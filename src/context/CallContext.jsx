@@ -72,6 +72,7 @@ export function CallProvider({ children }) {
   const relayRef = useRef(null)
   const liveCallRef = useRef(null)
   const callerNumberRef = useRef(null)
+  const activeConferenceRef = useRef(null)
   const uiStartedRef = useRef(false)
   const elapsedRef = useRef(0)
   const incomingMatchRef = useRef(null)
@@ -248,6 +249,8 @@ export function CallProvider({ children }) {
     supabase.from('incoming_calls').update({ status: 'answered' }).eq('callsid', row.callsid)
       .then(({ error }) => error && console.error('incoming_calls update error:', error))
 
+    activeConferenceRef.current = row.conference_name || null
+
     // Bridge in using the exact same outbound-dial mechanism that's been
     // working reliably all day — the browser dials the business number
     // itself, and receive-call recognizes that self-dial and connects it
@@ -309,6 +312,7 @@ export function CallProvider({ children }) {
           cancelCall()
           return
         }
+        activeConferenceRef.current = data.conferenceName || null
         relayRef.current?.newCall({
           destinationNumber: callerNumberRef.current,
           callerNumber: callerNumberRef.current,
@@ -321,6 +325,12 @@ export function CallProvider({ children }) {
   function endCall() {
     liveCallRef.current?.hangup()
     liveCallRef.current = null
+    const conf = activeConferenceRef.current
+    activeConferenceRef.current = null
+    if (conf) {
+      supabase.functions.invoke('end-conference', { body: { conferenceName: conf } })
+        .then(({ error }) => error && console.error('end-conference error:', error))
+    }
     uiStartedRef.current = false
     clearInterval(timerRef.current)
     setCalling(false)
@@ -331,6 +341,12 @@ export function CallProvider({ children }) {
   function cancelCall() {
     liveCallRef.current?.hangup()
     liveCallRef.current = null
+    const conf = activeConferenceRef.current
+    activeConferenceRef.current = null
+    if (conf) {
+      supabase.functions.invoke('end-conference', { body: { conferenceName: conf } })
+        .then(({ error }) => error && console.error('end-conference error:', error))
+    }
     uiStartedRef.current = false
     clearInterval(timerRef.current)
     setCalling(false)
