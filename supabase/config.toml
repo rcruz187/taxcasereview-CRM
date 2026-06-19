@@ -15,3 +15,16 @@ verify_jwt = false
 
 [functions.receive-fax]
 verify_jwt = false
+
+# Same deal — these three are the IVR/conference-hold chain, all called
+# directly BY SignalWire (auto-attendant digit routing, voicemail prompt
+# playback, and the no-answer-redirect-to-voicemail timeout). None of these
+# can carry a Supabase login token either.
+[functions.ivr-route]
+verify_jwt = false
+
+[functions.voicemail-prompt]
+verify_jwt = false
+
+[functions.redirect-to-voicemail]
+verify_jwt = false
