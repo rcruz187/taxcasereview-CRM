@@ -6,7 +6,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 // SignalWire credentials (server-side only) and re-hosts it in Supabase
 // Storage so the CRM can just play it back with a normal <audio> tag.
 
-const emptyXml = '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">Thank you, your message has been recorded. Goodbye.</Say></Response>'
+const emptyXml = '<?xml version="1.0" encoding="UTF-8"?><Response><Say>Thank you, your message has been recorded. Goodbye.</Say></Response>'
 
 serve(async (req) => {
   try {
