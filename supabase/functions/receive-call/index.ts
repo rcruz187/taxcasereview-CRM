@@ -87,7 +87,7 @@ serve(async (req) => {
     // entirely since that's a manual override Romy can flip on/off.
     const forwardTo = settings?.call_forward_number
     if (forwardTo) {
-      const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial timeout="25"><Number>${forwardTo}</Number></Dial><Say>Thank you for calling Tax Case Review. No one is available right now. Please leave a message after the tone.</Say><Record action="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/voicemail-recorded" maxLength="120" playBeep="true"/></Response>`
+      const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial timeout="25"><Number>${forwardTo}</Number></Dial><Say voice="Polly.Joanna-Neural">Thank you for calling Tax Case Review. No one is available right now. Please leave a message after the tone.</Say><Record action="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/voicemail-recorded" maxLength="120" playBeep="true"/></Response>`
       return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
     }
 
@@ -97,14 +97,14 @@ serve(async (req) => {
     // the menu.
     const greeting = 'Thank you for calling Tax Case Review. To check your tax status instantly, please check your email or text messages for your personal client portal link. Otherwise, please choose from the following options. Press 1 to speak with a tax professional. Press 2 to leave a general voicemail for our team. Press 0 for the front desk or receptionist.'
     const ivrRouteUrl = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/ivr-route'
-    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Gather numDigits="1" timeout="8" action="${ivrRouteUrl}" method="POST"><Say>${greeting}</Say></Gather><Redirect method="POST">${ivrRouteUrl}</Redirect></Response>`
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Gather numDigits="1" timeout="8" action="${ivrRouteUrl}" method="POST"><Say voice="Polly.Joanna-Neural">${greeting}</Say></Gather><Redirect method="POST">${ivrRouteUrl}</Redirect></Response>`
 
     console.log('returning IVR cXML:', xml)
     return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
 
   } catch (err) {
     console.error('receive-call error:', err)
-    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Say>We are sorry, an error occurred. Please try again.</Say></Response>`
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">We are sorry, an error occurred. Please try again.</Say></Response>`
     return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
   }
 })
