@@ -83,34 +83,24 @@ serve(async (req) => {
     }
 
     // A real inbound call. If a manual forwarding number is set, use the
-    // old simple behavior (ring that number directly) since mixing a
-    // forwarding <Number> with a <Conference> in the same <Dial> doesn't
-    // make sense. Otherwise, hold the caller in a conference and let the
-    // CRM banner + answerIncoming() pull them in.
+    // old simple behavior (ring that number directly) — bypasses the IVR
+    // entirely since that's a manual override Romy can flip on/off.
     const forwardTo = settings?.call_forward_number
     if (forwardTo) {
       const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial timeout="25"><Number>${forwardTo}</Number></Dial><Say>Thank you for calling Tax Case Review. No one is available right now. Please leave a message after the tone.</Say><Record action="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/voicemail-recorded" maxLength="120" playBeep="true"/></Response>`
       return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
     }
 
-    const conferenceName = `office-${callSid || Date.now()}`
+    // Otherwise, play the auto-attendant menu. ivr-route handles whatever
+    // digit (or no digit) comes back, including holding the caller in a
+    // conference for Option 1/0 — this function's job stops at presenting
+    // the menu.
+    // NOTE: replace [YourWebsite.com] below with the real site URL.
+    const greeting = 'Thank you for calling Tax Case Review. To upload documents or check your tax status instantly, please visit our website at [YourWebsite.com]. Otherwise, please choose from the following options. Press 1 to speak with a tax professional. Press 2 to leave a general voicemail for our team. Press 0 for the front desk or receptionist.'
+    const ivrRouteUrl = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/ivr-route'
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Gather numDigits="1" timeout="8" action="${ivrRouteUrl}" method="POST"><Say>${greeting}</Say></Gather><Redirect method="POST">${ivrRouteUrl}</Redirect></Response>`
 
-    if (callSid) {
-      const { error: insErr } = await supabase.from('incoming_calls').insert({
-        callsid: callSid,
-        conference_name: conferenceName,
-        from_number: from,
-        status: 'ringing',
-      })
-      if (insErr) console.error('incoming_calls insert error:', insErr)
-    }
-
-    // Caller hears hold music/silence (SignalWire's default) until staff
-    // answers and gets bridged in via the agent-join branch above, or
-    // until redirect-to-voicemail pulls them out after 25s of no answer.
-    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Conference startConferenceOnEnter="true" endConferenceOnExit="true" record="record-from-start" recordingStatusCallback="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/call-recorded">${conferenceName}</Conference></Dial></Response>`
-
-    console.log('returning cXML:', xml)
+    console.log('returning IVR cXML:', xml)
     return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
 
   } catch (err) {

@@ -179,11 +179,12 @@ export function CallProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Polls for inbound calls being held by receive-call (see that function's
-  // comments for why — the direct Verto dial-in is dead). When a new
-  // 'ringing' row shows up, show the same banner UI as before and start a
-  // 25-second window; if nobody answers in time, redirect-to-voicemail
-  // pulls the caller out to the voicemail prompt automatically.
+  // Polls for inbound calls being held by receive-call/ivr-route (see
+  // those functions' comments for why — the direct Verto dial-in is
+  // dead). When a new 'ringing' row shows up, show the same banner UI as
+  // before and start a 15-second window (matches the auto-attendant's
+  // "ring ~3 times" spec); if nobody answers in time, redirect-to-
+  // voicemail pulls the caller out to the voicemail prompt automatically.
   useEffect(() => {
     if (relayStatus !== 'ready') return
     let cancelled = false
@@ -192,7 +193,7 @@ export function CallProvider({ children }) {
       if (cancelled || pendingInboundRef.current || calling) return
       const { data, error } = await supabase
         .from('incoming_calls')
-        .select('callsid, conference_name, from_number, created_at')
+        .select('callsid, conference_name, from_number, department, created_at')
         .eq('status', 'ringing')
         .order('created_at', { ascending: false })
         .limit(1)
@@ -203,9 +204,12 @@ export function CallProvider({ children }) {
       lastHandledInboundRef.current = data.callsid
       pendingInboundRef.current = data
       setIncomingCall({ options: { remoteCallerNumber: data.from_number } })
-      setIncomingMatch(null)
+      // Shows immediately as a fallback label ("Tax Professional" /
+      // "Front Desk" from the IVR choice) — overwritten the instant a real
+      // Client/Lead match comes back, same as before.
+      setIncomingMatch(data.department ? { name: data.department, isDepartment: true } : null)
       incomingMatchRef.current = null
-      matchCallerToRecord(data.from_number).then(m => { incomingMatchRef.current = m; setIncomingMatch(m) })
+      matchCallerToRecord(data.from_number).then(m => { incomingMatchRef.current = m; if (m) setIncomingMatch(m) })
 
       inboundTimeoutRef.current = setTimeout(() => {
         if (pendingInboundRef.current?.callsid !== data.callsid) return
@@ -214,7 +218,7 @@ export function CallProvider({ children }) {
         pendingInboundRef.current = null
         setIncomingCall(null)
         setIncomingMatch(null)
-      }, 25000)
+      }, 15000)
     }, 2000)
 
     return () => { cancelled = true; clearInterval(poll) }
@@ -234,11 +238,11 @@ export function CallProvider({ children }) {
     timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000)
     setActive({
       id: m?.id ?? null,
-      name: m?.name || 'Incoming Call',
+      name: (m && !m.isDepartment) ? m.name : (row.department ? `Incoming — ${row.department}` : 'Incoming Call'),
       first: 'Incoming', last: 'Call',
       phone: row.from_number || '—',
       status: 'Manual',
-      entityType: m?.entityType || null,
+      entityType: (m && !m.isDepartment) ? m.entityType : null,
     })
 
     supabase.from('incoming_calls').update({ status: 'answered' }).eq('callsid', row.callsid)

@@ -55,7 +55,7 @@ export default function ActiveCallBar() {
             <div>
               <div style={{ color: '#fff', fontWeight: 700, fontSize: 16 }}>
                 {incomingMatch ? incomingMatch.name : 'Incoming Call'}
-                {incomingMatch && (
+                {incomingMatch && !incomingMatch.isDepartment && (
                   <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, background: 'rgba(255,255,255,0.2)', borderRadius: 6, padding: '2px 8px' }}>
                     {incomingMatch.entityType === 'client' ? 'Client' : 'Lead'} on file
                   </span>
@@ -67,7 +67,7 @@ export default function ActiveCallBar() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            {incomingMatch && (
+            {incomingMatch && !incomingMatch.isDepartment && (
               <button onClick={() => openFile(incomingMatch)} className="btn"
                 style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none' }}>
                 📂 Open File
