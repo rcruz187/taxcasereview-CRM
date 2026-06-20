@@ -9,7 +9,7 @@ import FinancialProfile from './FinancialProfile'
 import FinancialIntakeView from '../components/FinancialIntakeView'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
-import { generateServiceAgreement, generateAddendum, generatePOACoverLetter, sendFullPackage, generateCreditCardAuthForm } from '../lib/docUtils'
+import { generateAddendum } from '../lib/docUtils'
 
 const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -744,8 +744,6 @@ export default function Clients() {
     setTimeout(restore, 700)
   }
   const [fillerClient, setFillerClient] = useState(null)
-  const [pkgSending, setPkgSending] = useState(false)
-  const [intakeSending, setIntakeSending] = useState(false)
   const [bookingClient, setBookingClient] = useState(null)
   // Quick add task inline
   const [quickTask,   setQuickTask]   = useState('')
@@ -939,44 +937,6 @@ export default function Clients() {
     const { error } = await supabase.from('clients').update({ archived: false }).eq('id',id)
     if (error) { showToast('Error: '+error.message); return }
     showToast('Client restored');load()
-  }
-
-  async function handleSendFullPackage(c) {
-    setPkgSending(true)
-    const res = await sendFullPackage({...c, address:c.street, business_name:c.name}, supabase)
-    setPkgSending(false)
-    if (res.error) { showToast('Error: '+res.error); return }
-    await navigator.clipboard.writeText(res.url).catch(()=>{})
-    showToast('✅ Full package created — signing link copied to clipboard!')
-  }
-
-  async function resendFinancialIntake(c) {
-    if (!c.email) { showToast('No email on file for this client'); return }
-    setIntakeSending(true)
-    let intakeId
-    const { data: existing } = await supabase.from('financial_intake_responses')
-      .select('id').eq('client_name', c.name).order('created_at',{ascending:false}).limit(1).maybeSingle()
-    if (existing) {
-      intakeId = existing.id
-    } else {
-      const { data: created, error: createErr } = await supabase.from('financial_intake_responses').insert([{
-        client_name: c.name, client_email: c.email || '', status: 'Sent',
-        answers: {}, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-      }]).select().single()
-      if (createErr) { setIntakeSending(false); showToast('Error: '+createErr.message); return }
-      intakeId = created.id
-    }
-    const intakeUrl = window.location.origin + '/taxcasereview-CRM/financial-intake/' + intakeId
-    const { error: emailErr } = await supabase.functions.invoke('send-email', {
-      body: {
-        to: c.email,
-        subject: `Your Financial Intake Form — Tax Case Review`,
-        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${c.name}</strong>,</p><p>Here's your link to fill out (or finish) your financial intake form — it takes about 10-15 minutes and your progress saves automatically.</p><p style="text-align:center;margin:24px 0"><a href="${intakeUrl}" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Financial Intake</a></p><p style="font-size:12px;color:#64748b">Link: ${intakeUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
-      }
-    })
-    setIntakeSending(false)
-    if (emailErr) { showToast('Error sending email: '+emailErr.message); return }
-    showToast('✅ Financial Intake link sent to '+c.email)
   }
 
   async function toggleTask(task) {
@@ -1192,17 +1152,12 @@ export default function Clients() {
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             <ActionBtn color="#0891b2" icon="📅" label="Schedule" sub="Book Appointment" onClick={()=>setBookingClient(c)}/>
             <ActionBtn color="#7c3aed" icon="✅" label="Add Task" sub="Assign Work" onClick={()=>{setTaskTitle('');setTaskPriority('Normal');setTaskDueDate('');setTaskModal(true)}}/>
-            <ActionBtn color="#0891b2" icon="📁" label="New Case" sub="Open Case" onClick={()=>navigate('/cases')}/>
             <ActionBtn color="#0369a1" icon="📋" label="Pre-Fill 8821/2848" sub="IRS PDF Forms" onClick={()=>{
               try {
                 if (!c) { showToast('Error: no client data found'); return }
                 setFillerClient({...c, address:c.street, business_name:c.name})
               } catch (err) { showToast('Error opening form: ' + err.message) }
             }}/>
-            <ActionBtn color="#6c5ce7" icon="🔐" label="POA Cover Letter" sub="Form 2848" onClick={()=>generatePOACoverLetter(c)}/>
-            <ActionBtn color="#16a34a" icon="📦" label={pkgSending?'Building…':'Full Package'} sub="2848/8821 + Agreement" onClick={()=>!pkgSending&&handleSendFullPackage(c)}/>
-            <ActionBtn color="#22863a" icon="📄" label="Service Agreement" sub="Print/Sign" onClick={()=>generateServiceAgreement(c)}/>
-            <ActionBtn color="#16a34a" icon="💳" label="Credit Card Auth" sub="Print" onClick={()=>generateCreditCardAuthForm(c)}/>
             <ActionBtn color="#d97706" icon="📋" label="Addendum" sub="Add Services" onClick={()=>{setAddForm({resolutionFee:'',paymentPlan:'',startDate:'',notes:''});setAddModal(true)}}/>
             <ActionBtn color="#dc2626" icon="📠" label="Send Fax" sub="SignalWire Fax" onClick={()=>{setFaxClient(c);setFaxModal(true)}}/>
             <ActionBtn color="#7c3aed" icon="✍️" label="E-Signature" sub="Request Sign" onClick={()=>{setEsignClient(c);setEsignModal(true)}}/>
@@ -1211,7 +1166,6 @@ export default function Clients() {
             <ActionBtn color="#0f766e" icon="📊" label="P&amp;L" sub="Books &amp; Ledger" onClick={()=>navigate('/books?client='+encodeURIComponent(c.name))}/>
             <ActionBtn color="#0ea5e9" icon="🔓" label="Client Portal" sub="Compliance Access" onClick={()=>{setPortalClient(c);setPortalModal(true)}}/>
             <ActionBtn color="#9333ea" icon="🧾" label="Tax Organizer" sub="Send for Filing" onClick={()=>{setOrgClient(c);setOrgModal(true)}}/>
-            <ActionBtn color="#1d4ed8" icon="💰" label={intakeSending?'Sending…':'Financial Intake'} sub="Resend Link" onClick={()=>!intakeSending&&resendFinancialIntake(c)}/>
           </div>
         </div>
 

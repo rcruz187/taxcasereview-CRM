@@ -656,30 +656,64 @@ export default function Leads() {
       { title: `Call IRS — ${l.name}`,             clientName: l.name, priority: 'High', dueDate: addDays(1), done: false, created_at: new Date().toISOString() },
       { title: `Schedule TaxCase Review call — ${l.name}`, clientName: l.name, priority: 'Normal', dueDate: addDays(3), done: false, created_at: new Date().toISOString() },
     ])
-    // Auto-create the financial intake record and email the client their link
+    // Carry over the lead's financial intake instead of always creating a
+    // fresh blank one. The client page shows whichever row is most recent
+    // for this name -- inserting a new empty row here unconditionally was
+    // burying any answers the lead had already submitted while still a
+    // lead, since the new blank row would always be "more recent" than
+    // their real submission. Now: if one already exists for this lead
+    // (sent or submitted), leave it alone and skip the email if they've
+    // already submitted it. Only create + send a fresh one if they never
+    // had one at all.
     let intakeSent = false
+    let intakeAlreadySubmitted = false
     try {
-      const { data: intakeRec, error: intakeErr } = await supabase.from('financial_intake_responses').insert([{
-        client_name: l.name, client_email: l.email || '', status: 'Sent',
-        answers: {}, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-      }]).select().single()
-      if (!intakeErr && intakeRec) {
-        const intakeUrl = window.location.origin + '/taxcasereview-CRM/financial-intake/' + intakeRec.id
-        if (l.email) {
+      const { data: existingIntake } = await supabase.from('financial_intake_responses')
+        .select('id, status').eq('client_name', l.name).order('created_at', { ascending: false }).limit(1).maybeSingle()
+
+      if (existingIntake) {
+        // Already has one (sent or submitted while a lead) -- leave it as
+        // the carried-over record. Don't re-send the email if they've
+        // already submitted; that would be a confusing "fill this out"
+        // nudge for something they already finished.
+        if (existingIntake.status === 'Submitted') {
+          intakeAlreadySubmitted = true
+        } else if (l.email) {
+          const intakeUrl = window.location.origin + '/taxcasereview-CRM/financial-intake/' + existingIntake.id
           const { error: emailErr } = await supabase.functions.invoke('send-email', {
             body: {
               to: l.email,
               subject: `Your Financial Intake Form — Tax Case Review`,
-              html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${l.name}</strong>,</p><p>Welcome aboard! To get your case moving, please fill out this short financial intake form — it gives your advisor the full picture needed to put together your resolution plan. It takes about 10-15 minutes and your progress saves automatically.</p><p style="text-align:center;margin:24px 0"><a href="${intakeUrl}" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Financial Intake</a></p><p style="font-size:12px;color:#64748b">Link: ${intakeUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
+              html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${l.name}</strong>,</p><p>Welcome aboard! To get your case moving, please finish your financial intake form — it gives your advisor the full picture needed to put together your resolution plan. Your progress is saved.</p><p style="text-align:center;margin:24px 0"><a href="${intakeUrl}" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Finish My Financial Intake</a></p><p style="font-size:12px;color:#64748b">Link: ${intakeUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
             }
           })
           if (!emailErr) intakeSent = true
         }
+      } else {
+        const { data: intakeRec, error: intakeErr } = await supabase.from('financial_intake_responses').insert([{
+          client_name: l.name, client_email: l.email || '', status: 'Sent',
+          answers: {}, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        }]).select().single()
+        if (!intakeErr && intakeRec) {
+          const intakeUrl = window.location.origin + '/taxcasereview-CRM/financial-intake/' + intakeRec.id
+          if (l.email) {
+            const { error: emailErr } = await supabase.functions.invoke('send-email', {
+              body: {
+                to: l.email,
+                subject: `Your Financial Intake Form — Tax Case Review`,
+                html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${l.name}</strong>,</p><p>Welcome aboard! To get your case moving, please fill out this short financial intake form — it gives your advisor the full picture needed to put together your resolution plan. It takes about 10-15 minutes and your progress saves automatically.</p><p style="text-align:center;margin:24px 0"><a href="${intakeUrl}" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Financial Intake</a></p><p style="font-size:12px;color:#64748b">Link: ${intakeUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
+              }
+            })
+            if (!emailErr) intakeSent = true
+          }
+        }
       }
-    } catch (e) { console.error('Financial intake auto-send error:', e) }
+    } catch (e) { console.error('Financial intake carry-over/auto-send error:', e) }
     setConverting(false)
     const { count } = await supabase.from('client_compliance_records').select('*', { count: 'exact', head: true }).eq('client_name', l.name)
-    const intakeMsg = intakeSent ? ', financial intake form emailed' : (l.email ? '' : ', financial intake created but no email on file to send it to')
+    const intakeMsg = intakeAlreadySubmitted ? ', financial intake already on file'
+      : intakeSent ? ', financial intake form emailed'
+      : (l.email ? '' : ', financial intake created but no email on file to send it to')
     showToast(count ? `✅ ${l.name} converted to Client! 3 onboarding tasks created${intakeMsg}, compliance data (${count} records) carried over.` : `✅ ${l.name} converted to Client! 3 onboarding tasks created${intakeMsg}.`)
     setDetail(null); load()
   }
