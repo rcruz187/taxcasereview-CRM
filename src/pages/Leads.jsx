@@ -256,6 +256,8 @@ export default function Leads() {
   const navigate = useNavigate()
   const [leads, setLeads]   = useState([])
   const [filter, setFilter] = useState('All')
+  const [repFilter, setRepFilter] = useState('All')
+  const [employees, setEmployees] = useState([])
   const [showArchived, setShowArchived] = useState(false)
   const [modal, setModal]   = useState(false)
   const [showScript, setShowScript] = useState(false)
@@ -269,6 +271,9 @@ export default function Leads() {
   const [leadSms, setLeadSms]         = useState([])
   const [leadSmsBody, setLeadSmsBody] = useState('')
   const [leadSmsSending, setLeadSmsSending] = useState(false)
+  const [leadTasks, setLeadTasks]     = useState([])
+  const [leadQuickTask, setLeadQuickTask] = useState('')
+  const [addingLeadTask, setAddingLeadTask] = useState(false)
   const [leadDetailTab, setLeadDetailTab] = useState('overview')
   const [newLeadNote, setNewLeadNote] = useState('')
   const [addingLeadNote, setAddingLeadNote] = useState(false)
@@ -337,7 +342,11 @@ export default function Leads() {
   }, [urlLeadId, detail])
 
   async function load() {
-    const { data } = await supabase.from('leads').select('*').order('created_at', { ascending: false })
+    const [{ data }, { data: emp }] = await Promise.all([
+      supabase.from('leads').select('*').order('created_at', { ascending: false }),
+      supabase.from('employees').select('id,name').order('name'),
+    ])
+    if (emp) setEmployees(emp)
     if (data) {
       setLeads(data)
       const badge = document.getElementById('badge-leads')
@@ -362,12 +371,41 @@ export default function Leads() {
     const { data } = await supabase.from('sms_messages').select('*').eq('clientName', leadName).order('created_at', { ascending: false })
     setLeadSms(data || [])
   }
+  // Same clientName key the tasks table already uses for clients, and that
+  // convertToClient() already writes the onboarding tasks under (using
+  // l.name, which becomes the new client's name unchanged). So a task
+  // added here while still a lead doesn't need any copy/transfer step at
+  // conversion time — it's the same row, same key, still there afterward.
+  async function loadLeadTasks(leadName) {
+    const { data } = await supabase.from('tasks').select('*').eq('clientName', leadName).order('created_at', { ascending: false })
+    setLeadTasks(data || [])
+  }
   // Covers every way the detail view can open — list click, direct URL/
   // refresh, the fast-path single-lead fetch — not just the row onClick.
   useEffect(() => {
     if (!detail) return
     loadLeadSms(detail.name)
+    loadLeadTasks(detail.name)
   }, [detail?.id])
+
+  async function toggleLeadTask(task) {
+    const { error } = await supabase.from('tasks').update({ done: !task.done }).eq('id', task.id)
+    if (!error && detail) loadLeadTasks(detail.name)
+  }
+
+  async function addQuickLeadTask() {
+    if (!leadQuickTask.trim() || !detail) return
+    setAddingLeadTask(true)
+    const { error } = await supabase.from('tasks').insert([{
+      title: leadQuickTask.trim(), clientName: detail.name, priority: 'Normal',
+      done: false, created_at: new Date().toISOString()
+    }])
+    setAddingLeadTask(false)
+    if (error) { showToast('Task error: ' + error.message); return }
+    setLeadQuickTask('')
+    loadLeadTasks(detail.name)
+    showToast('✅ Task added!')
+  }
 
   async function sendLeadSms(l) {
     if (!leadSmsBody.trim()) { showToast('Message required'); return }
@@ -469,6 +507,7 @@ export default function Leads() {
   const filtered = leads
     .filter(l => showArchived ? !!l.archived : !l.archived)
     .filter(l => filter === 'All' || l.status === filter)
+    .filter(l => repFilter === 'All' || (repFilter === 'Unassigned' ? !l.assignedTo : l.assignedTo === repFilter))
 
   async function save() {
     if (!form.name.trim()) { showToast('Name is required'); return }
@@ -1113,10 +1152,11 @@ export default function Leads() {
               {key:'overview', label:'📋 Overview'},
               {key:'sms', label:'💬 SMS'},
               {key:'notes', label:`📝 Notes & Activity (${leadNotes.length})`},
-              {key:'docs',  label:'📁 Documents'},
-              {key:'compliance', label:'📋 Compliance'},
-              {key:'finintake', label:'💰 Financial Intake'},
+              {key:'tasks', label:`✅ Tasks (${leadTasks.length})`},
               {key:'payments', label:'💳 Payments'},
+              {key:'finintake', label:'💰 Financial Intake'},
+              {key:'compliance', label:'📋 Compliance'},
+              {key:'docs',  label:'📁 Documents'},
             ].map(t=>(
               <button key={t.key} onClick={()=>switchLeadTab(t.key)}
                 style={{padding:'12px 14px',border:'none',borderBottom:leadDetailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
@@ -1217,6 +1257,45 @@ export default function Leads() {
                   <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>{n.author||'Staff'} · {n.created_at?new Date(n.created_at).toLocaleString():''}</div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {leadDetailTab==='tasks' && (
+            <div style={{padding:16}}>
+              <div style={{fontSize:12,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:12}}>
+                ✅ Tasks ({leadTasks.length})
+              </div>
+              {leadTasks.length===0&&(
+                <div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No tasks yet for this lead.</div>
+              )}
+              {leadTasks.map(t=>(
+                <div key={t.id} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'8px 0',borderBottom:'1px solid var(--br)'}}>
+                  <div
+                    onClick={()=>toggleLeadTask(t)}
+                    style={{width:18,height:18,borderRadius:4,border:'1.5px solid var(--b2c)',background:t.done?'var(--ok)':'var(--s2)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,marginTop:1,color:'#fff',fontSize:11}}
+                  >{t.done?'✓':''}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:t.done?400:600,textDecoration:t.done?'line-through':'none',color:t.done?'var(--t3)':'var(--tx)'}}>{t.title}</div>
+                    <div style={{fontSize:10,color:'var(--t3)',marginTop:2,display:'flex',gap:8}}>
+                      {t.priority&&<span className={`bdg ${t.priority==='High'?'br':t.priority==='Low'?'bn':'ba'}`} style={{fontSize:9}}>{t.priority}</span>}
+                      {t.dueDate&&<span>Due: {t.dueDate}</span>}
+                      {t.assignedTo&&<span>→ {t.assignedTo}</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div style={{display:'flex',gap:6,marginTop:12}}>
+                <input
+                  value={leadQuickTask}
+                  onChange={e=>setLeadQuickTask(e.target.value)}
+                  onKeyDown={e=>e.key==='Enter'&&addQuickLeadTask()}
+                  placeholder="Add a task…"
+                  style={{flex:1,padding:'8px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12}}
+                />
+                <button className="btn pri" style={{fontSize:11,padding:'7px 14px'}} onClick={addQuickLeadTask} disabled={addingLeadTask}>
+                  {addingLeadTask?'…':'+ Add'}
+                </button>
+              </div>
             </div>
           )}
 
@@ -1428,6 +1507,12 @@ export default function Leads() {
           <span key={s} className={`chip${filter===s?' on':''}`} onClick={()=>setFilter(s)}>{s}</span>
         ))}
         <span className={`chip${showArchived?' on':''}`} style={{marginLeft:8}} onClick={()=>setShowArchived(a=>!a)}>🗄 Archived</span>
+        <select value={repFilter} onChange={e=>setRepFilter(e.target.value)}
+          style={{marginLeft:8,padding:'6px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12}}>
+          <option value="All">All Reps</option>
+          <option value="Unassigned">Unassigned</option>
+          {employees.map(e=><option key={e.id} value={e.name}>{e.name}</option>)}
+        </select>
       </div>
 
       <div className="card">
