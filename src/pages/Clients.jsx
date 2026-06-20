@@ -725,6 +725,9 @@ export default function Clients() {
   const [relTasks,    setRelTasks]    = useState([])
   const [relInvoices, setRelInvoices] = useState([])
   const [relPayments, setRelPayments] = useState([])
+  const [relSms,      setRelSms]      = useState([])
+  const [smsBody,     setSmsBody]     = useState('')
+  const [smsSending,  setSmsSending]  = useState(false)
   const [loadingRel,  setLoadingRel]  = useState(false)
   const [detailTab,   setDetailTabRaw] = useState(() => searchParams.get('tab') || 'overview')
   function setDetailTab(tab) {
@@ -841,13 +844,14 @@ export default function Clients() {
 
   async function loadRelated(clientName) {
     setLoadingRel(true)
-    const [{ data:cases },{ data:tasks },{ data:invoices },{ data:docs },{ data:clientNotes },{ data:payments }] = await Promise.all([
+    const [{ data:cases },{ data:tasks },{ data:invoices },{ data:docs },{ data:clientNotes },{ data:payments },{ data:sms }] = await Promise.all([
       supabase.from('cases').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('tasks').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('invoices').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('documents').select('*').eq('client', clientName).order('created_at',{ascending:false}),
       supabase.from('client_notes').select('*').eq('client_name', clientName).order('created_at',{ascending:false}),
       supabase.from('payments').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
+      supabase.from('sms_messages').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
     ])
     setRelCases(cases||[])
     setRelTasks(tasks||[])
@@ -855,6 +859,7 @@ export default function Clients() {
     setRelDocs(docs||[])
     setRelNotes(clientNotes||[])
     setRelPayments(payments||[])
+    setRelSms(sms||[])
     setLoadingRel(false)
   }
 
@@ -940,6 +945,62 @@ export default function Clients() {
     const { error } = await supabase.from('clients').update({ archived: false }).eq('id',id)
     if (error) { showToast('Error: '+error.message); return }
     showToast('Client restored');load()
+  }
+
+  // Sends an SMS to this client right from their file -- same send-sms
+  // Edge Function and sms_messages table the global SMS page uses, so
+  // every message sent here also shows up there automatically (it's the
+  // same data, just filtered to one client). Also drops a matching
+  // client_notes entry, same auto-log pattern used for pipeline stage
+  // changes, so a quick glance at Notes shows texts alongside everything
+  // else without needing to switch tabs.
+  async function sendClientSms(c) {
+    if (!smsBody.trim()) { showToast('Message required'); return }
+    if (!c.phone) { showToast('No phone number on file for this client'); return }
+    setSmsSending(true)
+
+    const toNum = '+1' + c.phone.replace(/\D/g,'').slice(-10)
+    const { data: settings } = await supabase.from('settings').select('sw_space_url').limit(1).maybeSingle()
+    let status = 'Sent', swId = null, errMsg = null
+
+    if (settings?.sw_space_url) {
+      try {
+        const { data: resData, error: invokeErr } = await supabase.functions.invoke('send-sms', {
+          body: { to: toNum, body: smsBody, client_id: c.id || null, user_id: user?.id || null }
+        })
+        if (!invokeErr && resData?.success) {
+          swId = resData.sid || null
+        } else {
+          status = 'Failed'
+          errMsg = resData?.error || invokeErr?.message || 'SignalWire send failed'
+        }
+      } catch (e) {
+        status = 'Failed'
+        errMsg = e.message
+      }
+    } else {
+      status = 'Logged (not sent)'
+    }
+
+    const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    const { error } = await supabase.from('sms_messages').insert([{
+      clientName: c.name, phone: toNum, body: smsBody, status,
+      signalwire_sms_id: swId, sent_by: actor, error_msg: errMsg,
+      created_at: new Date().toISOString(),
+    }])
+    setSmsSending(false)
+    if (error) { showToast('Error: '+error.message); return }
+
+    if (status === 'Sent') showToast('✅ Text sent!')
+    else if (status === 'Failed') showToast('SignalWire error: ' + (errMsg||'send failed'))
+    else showToast('Logged — add SignalWire credentials in Settings to actually send')
+
+    // Auto-log to Notes, same pattern as pipeline stage changes.
+    const noteContent = `💬 Text sent: "${smsBody.length > 120 ? smsBody.slice(0,120)+'…' : smsBody}"`
+    await supabase.from('client_notes').insert({ client_name: c.name, content: noteContent, created_by: actor })
+
+    setSmsBody('')
+    loadRelated(c.name)
   }
 
   async function toggleTask(task) {
@@ -1177,6 +1238,7 @@ export default function Clients() {
           <div style={{display:'flex',borderBottom:'1px solid var(--br)',background:'var(--s2)',overflowX:'auto'}}>
             {[
               {key:'overview', label:'📋 Overview'},
+              {key:'sms',      label:'💬 SMS'},
               {key:'notes',    label:'📝 Notes'},
               {key:'tasks',    label:'✅ Tasks'},
               {key:'docs',     label:'📁 Docs'},
@@ -1225,6 +1287,44 @@ export default function Clients() {
                   <div style={{fontSize:22,fontWeight:800,color:'var(--ok)'}}>{relPayments.length}</div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* SMS Tab */}
+          {detailTab==='sms'&&(
+            <div style={{padding:16}}>
+              <div style={{display:'flex',gap:8,marginBottom:14}}>
+                <textarea
+                  value={smsBody} onChange={e=>setSmsBody(e.target.value)}
+                  placeholder={c.phone ? `Text ${c.name}…` : 'No phone number on file for this client'}
+                  disabled={!c.phone}
+                  style={{flex:1,padding:'8px 10px',borderRadius:8,border:'1px solid var(--br)',resize:'vertical',minHeight:60,fontSize:13,fontFamily:'inherit',background:'var(--s2)',color:'var(--tx)'}}
+                />
+                <div style={{display:'flex',flexDirection:'column',gap:6,alignItems:'flex-end',justifyContent:'space-between'}}>
+                  <span style={{fontSize:10,color:smsBody.length>160?'var(--warn)':'var(--t3)',whiteSpace:'nowrap'}}>{smsBody.length} chars</span>
+                  <button className="btn pri" style={{padding:'8px 14px',fontSize:12,whiteSpace:'nowrap'}}
+                    disabled={!smsBody.trim()||!c.phone||smsSending}
+                    onClick={()=>sendClientSms(c)}>
+                    {smsSending?'…':'Send'}
+                  </button>
+                </div>
+              </div>
+              {!c.phone && (
+                <div style={{fontSize:12,color:'var(--warn)',marginBottom:12}}>Add a phone number to this client to send texts.</div>
+              )}
+              {relSms.length===0&&<div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No texts yet.</div>}
+              {relSms.map(s=>(
+                <div key={s.id} style={{padding:'10px 0',borderBottom:'1px solid var(--br)'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3}}>
+                    {s.direction==='inbound'
+                      ? <span title="Received" style={{color:'var(--blue)',fontSize:11}}>📥 Received</span>
+                      : <span title="Sent" style={{color:'var(--t3)',fontSize:11}}>📤 Sent</span>}
+                    <span className={`bdg ${s.status==='Sent'?'bg':s.status==='Failed'?'br':'bn'}`} style={{fontSize:9}}>{s.status||'Sent'}</span>
+                  </div>
+                  <div style={{fontSize:13,lineHeight:1.6,color:'var(--tx)',whiteSpace:'pre-wrap'}}>{s.body}</div>
+                  <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>{s.sent_by||'Staff'} · {s.created_at?new Date(s.created_at).toLocaleString():''}</div>
+                </div>
+              ))}
             </div>
           )}
 
