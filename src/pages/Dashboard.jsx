@@ -146,10 +146,7 @@ export default function Dashboard() {
           <div style={{ fontSize: 13, color: 'var(--t3)', marginTop: 2 }}>{fmtDate(time)}</div>
         </div>
         <div style={{ background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: 10, padding: '12px 16px' }}>
-          <div style={{ fontFamily: 'monospace', fontSize: 20, fontWeight: 700, color: 'var(--blue)', textAlign: 'right' }}>
-            {fmtTime(time)}
-          </div>
-          <div style={{ display: 'flex', gap: 14, marginTop: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             {US_TIMEZONES.map(z => (
               <div key={z.zone} style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{z.label}</div>
