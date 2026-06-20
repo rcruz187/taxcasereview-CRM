@@ -12,6 +12,9 @@ import { ClientDocs } from './Clients'
 import InPlaceCaller from '../components/InPlaceCaller'
 import ChargeResolutionFeeModal from '../components/ChargeResolutionFeeModal'
 import FinancialIntakeView from '../components/FinancialIntakeView'
+import SendPaymentLinkModal from '../components/SendPaymentLinkModal'
+import SavedCardsPanel from '../components/SavedCardsPanel'
+import SplitPaymentModal from '../components/SplitPaymentModal'
 
 const STATUSES = ['New Lead','Contacted','Consultation Scheduled','Consultation Completed',
   'Tax Inv Agreement Sent','Tax Inv Agreement Signed','Tax Inv Fee Paid',
@@ -231,6 +234,8 @@ export default function Leads() {
   const [bookingLead, setBookingLead] = useState(null)
   const [resolutionFeeLead, setResolutionFeeLead] = useState(null)
   const [fillerLead, setFillerLead] = useState(null)
+  const [paymentLinkModal, setPaymentLinkModal] = useState(false)
+  const [splitPaymentModal, setSplitPaymentModal] = useState(false)
   const [detail, setDetail] = useState(null)
   const [leadNotes, setLeadNotes]     = useState([])
   const [leadDetailTab, setLeadDetailTab] = useState('overview')
@@ -537,6 +542,10 @@ export default function Leads() {
       ssn: l.ssn, ein: l.ein, dob: l.dob,
       spouseName: l.spouseName, spouseSsn: l.spouseSsn, spouseDob: l.spouseDob, filingStatus: l.filingStatus,
       stripe_customer_id: l.stripe_customer_id,
+      default_payment_method_id: l.default_payment_method_id,
+      payment_method_type: l.payment_method_type,
+      payment_method_brand: l.payment_method_brand,
+      payment_method_last4: l.payment_method_last4,
       street: l.street, city: l.city, state: l.state, zip: l.zip, county: l.county,
       source: l.source, assignedTo: l.assignedTo,
       irsBalance: l.irsBalance, stateBalance: l.stateBalance, issueType: l.issueType, irsOrState: l.irsOrState,
@@ -967,7 +976,6 @@ export default function Leads() {
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             <ActionBtn color="#16a34a" icon="📦" label={pkgSending?'Building…':'Full Package'} sub="2848/8821 + Agreement" onClick={()=>!pkgSending&&handleSendFullPackage(l)}/>
             <ActionBtn color="#22863a" icon="📄" label="Tax Engagement" sub="Service Agreement" onClick={()=>generateClientPackage(l)}/>
-            <ActionBtn color="#16a34a" icon="💳" label="Credit Card Auth" sub="Print" onClick={()=>generateCreditCardAuthForm(l)}/>
             <ActionBtn color="#0369a1" icon="🖋️" label="Pre-Fill 8821/2848" sub="IRS PDF Forms" onClick={()=>{
               try {
                 if (!l) { showToast('Error: no lead data found'); return }
@@ -1006,6 +1014,7 @@ export default function Leads() {
               {key:'docs',  label:'📁 Documents'},
               {key:'compliance', label:'📋 Compliance'},
               {key:'finintake', label:'💰 Financial Intake'},
+              {key:'payments', label:'💳 Payments'},
             ].map(t=>(
               <button key={t.key} onClick={()=>switchLeadTab(t.key)}
                 style={{padding:'10px 16px',border:'none',borderBottom:leadDetailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
@@ -1089,6 +1098,46 @@ export default function Leads() {
             <ErrorBoundary>
               <FinancialIntakeView clientName={l.name}/>
             </ErrorBoundary>
+          )}
+          {leadDetailTab==='payments' && (
+            <div style={{padding:16}}>
+              <div style={{fontSize:11,color:'var(--t3)',marginBottom:14,lineHeight:1.6}}>
+                Capture the client's card here during the call — it goes straight into Stripe's secure form, never our database, and carries over automatically when this lead converts to a client.
+              </div>
+
+              <SavedCardsPanel
+                record={l} recordType="lead" showToast={showToast}
+                onChanged={async()=>{ const {data}=await supabase.from('leads').select('*').eq('id',l.id).single(); if (data) setDetail(data) }}
+              />
+
+              <div className="card" style={{marginTop:12}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:4}}>💸 Split Payment</div>
+                    <div style={{fontSize:11,color:'var(--t3)'}}>Charge part on one saved card, the rest on another.</div>
+                  </div>
+                  <button className="btn pri" style={{padding:'4px 10px',fontSize:11}} onClick={()=>setSplitPaymentModal(true)}>Split Payment</button>
+                </div>
+              </div>
+
+              <div className="card" style={{marginTop:12}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                  <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>🔗 Send Payment Link</div>
+                  <button className="btn pri" style={{padding:'4px 10px',fontSize:11}} onClick={()=>setPaymentLinkModal(true)}>Send Link</button>
+                </div>
+                <div style={{fontSize:11,color:'var(--t3)'}}>
+                  {l.stripe_checkout_sent_at ? `Last link sent ${new Date(l.stripe_checkout_sent_at).toLocaleString()}` : 'No link sent yet — use this if they\'d rather enter their own card.'}
+                </div>
+              </div>
+
+              <div className="card" style={{marginTop:12}}>
+                <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>📄 Signed Authorization (Paper Trail)</div>
+                <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>Printable authorization form for the file — separate from the card on file above, this is the signed legal consent to charge.</div>
+                <div style={{display:'flex'}}>
+                  <ActionBtn color="#16a34a" icon="💳" label="Credit Card Auth" sub="Print" onClick={()=>generateCreditCardAuthForm(l)}/>
+                </div>
+              </div>
+            </div>
           )}
         </div>
 
@@ -1209,6 +1258,23 @@ export default function Leads() {
           <ErrorBoundary onClose={()=>setFillerLead(null)}>
             <IRSFormFiller client={fillerLead} onClose={()=>setFillerLead(null)}/>
           </ErrorBoundary>
+        )}
+        {paymentLinkModal && (
+          <SendPaymentLinkModal
+            record={l}
+            recordType="lead"
+            showToast={showToast}
+            onClose={async()=>{ setPaymentLinkModal(false); const {data}=await supabase.from('leads').select('*').eq('id',l.id).single(); if (data) setDetail(data) }}
+          />
+        )}
+        {splitPaymentModal && (
+          <SplitPaymentModal
+            record={l}
+            recordType="lead"
+            showToast={showToast}
+            onClose={()=>setSplitPaymentModal(false)}
+            onCharged={async()=>{ const {data}=await supabase.from('leads').select('*').eq('id',l.id).single(); if (data) setDetail(data) }}
+          />
         )}
       </div>
     )

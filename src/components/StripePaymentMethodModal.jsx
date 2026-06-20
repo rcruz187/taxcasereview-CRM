@@ -9,7 +9,7 @@ function getStripe(publishableKey) {
   return stripePromise
 }
 
-function InnerForm({ clientId, onSaved, onClose }) {
+function InnerForm({ clientId, recordType, onSaved, onClose }) {
   const stripe = useStripe()
   const elements = useElements()
   const [saving, setSaving] = useState(false)
@@ -23,7 +23,7 @@ function InnerForm({ clientId, onSaved, onClose }) {
 
     // Resolve the safe display info (brand/last4) server-side and save it
     const { data, error: fnErr } = await supabase.functions.invoke('stripe-save-payment-method', {
-      body: { clientId, setupIntentId: setupIntent.id }
+      body: { clientId, setupIntentId: setupIntent.id, recordType }
     })
     setSaving(false)
     if (fnErr || data?.error) { setErr(data?.error || fnErr.message); return }
@@ -42,7 +42,7 @@ function InnerForm({ clientId, onSaved, onClose }) {
   )
 }
 
-export default function StripePaymentMethodModal({ client, onClose, onSaved, showToast }) {
+export default function StripePaymentMethodModal({ client, recordType = 'client', onClose, onSaved, showToast }) {
   const [clientSecret, setClientSecret] = useState(null)
   const [publishableKey, setPublishableKey] = useState(null)
   const [err, setErr] = useState('')
@@ -54,7 +54,7 @@ export default function StripePaymentMethodModal({ client, onClose, onSaved, sho
       setPublishableKey(s.stripe_publishable_key)
 
       const { data, error } = await supabase.functions.invoke('stripe-setup-intent', {
-        body: { clientId: client.id, clientName: client.name, email: client.email }
+        body: { clientId: client.id, clientName: client.name, email: client.email, recordType }
       })
       if (error || data?.error) { setErr(data?.error || error.message); return }
       setClientSecret(data.client_secret)
@@ -78,7 +78,7 @@ export default function StripePaymentMethodModal({ client, onClose, onSaved, sho
 
         {clientSecret && publishableKey ? (
           <Elements stripe={getStripe(publishableKey)} options={{ clientSecret }}>
-            <InnerForm clientId={client.id} onClose={onClose} onSaved={(d) => { showToast?.('✅ Payment method saved'); onSaved?.(d); onClose() }} />
+            <InnerForm clientId={client.id} recordType={recordType} onClose={onClose} onSaved={(d) => { showToast?.('✅ Payment method saved'); onSaved?.(d); onClose() }} />
           </Elements>
         ) : !err ? (
           <div style={{ textAlign: 'center', color: 'var(--t3)', padding: 20 }}>Loading…</div>

@@ -1,5 +1,5 @@
 // stripe-setup-intent
-// Creates (or reuses) a Stripe Customer for a client, then creates a
+// Creates (or reuses) a Stripe Customer for a lead or client, then creates a
 // SetupIntent so the browser can securely collect a card or US bank account
 // via Stripe.js — the actual card/bank numbers never touch this server or
 // the Supabase database, only Stripe sees them.
@@ -42,30 +42,31 @@ serve(async (req) => {
       })
     }
 
-    const { clientId, clientName, email } = await req.json()
+    const { clientId, clientName, email, recordType } = await req.json()
     if (!clientId) {
       return new Response(JSON.stringify({ error: 'Missing clientId' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
+    const table = recordType === 'lead' ? 'leads' : 'clients'
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { data: client } = await supabase.from('clients').select('stripe_customer_id').eq('id', clientId).maybeSingle()
+    const { data: record } = await supabase.from(table).select('stripe_customer_id').eq('id', clientId).maybeSingle()
 
-    let customerId = client?.stripe_customer_id || null
+    let customerId = record?.stripe_customer_id || null
 
     if (!customerId) {
       const customer = await stripeRequest('customers', {
         name: clientName || '',
         ...(email ? { email } : {}),
-        'metadata[client_id]': String(clientId),
+        [`metadata[${recordType === 'lead' ? 'lead_id' : 'client_id'}]`]: String(clientId),
       })
       customerId = customer.id
-      await supabase.from('clients').update({ stripe_customer_id: customerId }).eq('id', clientId)
+      await supabase.from(table).update({ stripe_customer_id: customerId }).eq('id', clientId)
     }
 
     // payment_method_types[] supports both card and ACH bank debits in one SetupIntent

@@ -2,8 +2,11 @@
 // After the browser confirms a SetupIntent with Stripe.js (card or bank
 // account collected securely, never touching our server), this looks up the
 // resulting payment method server-side and saves only safe display info
-// (brand/last4, or bank name/last4) to the client record — never the actual
-// card or account number, which Stripe never even sends us.
+// (brand/last4/expiry/cardholder name — never the actual card or account
+// number, which Stripe never even sends us) as a new row in payment_methods.
+// A lead or client can have several saved cards; the first one saved (or
+// the one explicitly marked) becomes the default, mirrored onto the fast-
+// path columns on leads/clients that the autopay batch run reads directly.
 //
 // Needs the STRIPE_SECRET_KEY secret set in Supabase → Edge Functions → Secrets.
 // Deploy via: Supabase Dashboard → Edge Functions → Deploy new function
@@ -38,12 +41,14 @@ serve(async (req) => {
       })
     }
 
-    const { clientId, setupIntentId } = await req.json()
+    const { clientId, setupIntentId, recordType } = await req.json()
     if (!clientId || !setupIntentId) {
       return new Response(JSON.stringify({ error: 'Missing clientId or setupIntentId' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
+    const table = recordType === 'lead' ? 'leads' : 'clients'
+    const normalizedType = recordType === 'lead' ? 'lead' : 'client'
 
     const setupIntent = await stripeGet(`setup_intents/${setupIntentId}`)
     const pmId = setupIntent.payment_method
@@ -53,22 +58,44 @@ serve(async (req) => {
 
     const isCard = pm.type === 'card'
     const display = isCard
-      ? { type: 'card', brand: pm.card?.brand || 'card', last4: pm.card?.last4 || '' }
-      : { type: 'us_bank_account', brand: pm.us_bank_account?.bank_name || 'Bank account', last4: pm.us_bank_account?.last4 || '' }
+      ? {
+          type: 'card', brand: pm.card?.brand || 'card', last4: pm.card?.last4 || '',
+          exp_month: pm.card?.exp_month || null, exp_year: pm.card?.exp_year || null,
+        }
+      : { type: 'us_bank_account', brand: pm.us_bank_account?.bank_name || 'Bank account', last4: pm.us_bank_account?.last4 || '', exp_month: null, exp_year: null }
+    const cardholderName = pm.billing_details?.name || null
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    await supabase.from('clients').update({
-      default_payment_method_id: pmId,
-      payment_method_type: display.type,
-      payment_method_brand: display.brand,
-      payment_method_last4: display.last4,
-    }).eq('id', clientId)
+    // First saved card for this record becomes the default automatically.
+    const { count: existingCount } = await supabase.from('payment_methods')
+      .select('id', { count: 'exact', head: true })
+      .eq('record_type', normalizedType).eq('record_id', clientId)
+    const makeDefault = !existingCount || existingCount === 0
 
-    return new Response(JSON.stringify({ success: true, ...display }), {
+    const { data: inserted, error: insErr } = await supabase.from('payment_methods').insert([{
+      record_type: normalizedType, record_id: clientId,
+      stripe_payment_method_id: pmId,
+      type: display.type, brand: display.brand, last4: display.last4,
+      exp_month: display.exp_month, exp_year: display.exp_year,
+      cardholder_name: cardholderName,
+      is_default: makeDefault,
+    }]).select().single()
+    if (insErr) throw new Error(insErr.message)
+
+    if (makeDefault) {
+      await supabase.from(table).update({
+        default_payment_method_id: pmId,
+        payment_method_type: display.type,
+        payment_method_brand: display.brand,
+        payment_method_last4: display.last4,
+      }).eq('id', clientId)
+    }
+
+    return new Response(JSON.stringify({ success: true, ...display, id: inserted.id, is_default: makeDefault }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 

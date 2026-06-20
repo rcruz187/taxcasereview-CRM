@@ -5,6 +5,9 @@ import ErrorBoundary from '../components/ErrorBoundary'
 import InPlaceCaller from '../components/InPlaceCaller'
 import BookingWidget from '../components/BookingWidget'
 import StripePaymentMethodModal from '../components/StripePaymentMethodModal'
+import SendPaymentLinkModal from '../components/SendPaymentLinkModal'
+import SavedCardsPanel from '../components/SavedCardsPanel'
+import SplitPaymentModal from '../components/SplitPaymentModal'
 import FinancialProfile from './FinancialProfile'
 import FinancialIntakeView from '../components/FinancialIntakeView'
 import { supabase } from '../lib/supabase'
@@ -769,6 +772,8 @@ export default function Clients() {
   const [payModal,    setPayModal]    = useState(false)
   const [faxModal,    setFaxModal]    = useState(false)
   const [stripeModal, setStripeModal] = useState(false)
+  const [paymentLinkModal, setPaymentLinkModal] = useState(false)
+  const [splitPaymentModal, setSplitPaymentModal] = useState(false)
   const [faxClient,   setFaxClient]   = useState(null)
   const [esignModal,  setEsignModal]  = useState(false)
   const [esignClient, setEsignClient] = useState(null)
@@ -1400,6 +1405,31 @@ export default function Clients() {
           {/* Payments Tab */}
           {detailTab==='payments'&&(
             <div style={{padding:16}}>
+              <SavedCardsPanel
+                record={c} recordType="client" showToast={showToast}
+                onChanged={async()=>{ const {data}=await supabase.from('clients').select('*').eq('id',c.id).single(); if (data) setDetail(data) }}
+              />
+
+              <div className="card" style={{marginTop:12,marginBottom:12}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:4}}>💸 Split Payment</div>
+                    <div style={{fontSize:11,color:'var(--t3)'}}>Charge part on one saved card, the rest on another.</div>
+                  </div>
+                  <button className="btn pri" style={{padding:'4px 10px',fontSize:11}} onClick={()=>setSplitPaymentModal(true)}>Split Payment</button>
+                </div>
+              </div>
+
+              <div className="card" style={{marginBottom:12}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                  <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>🔗 Send Payment Link</div>
+                  <button className="btn pri" style={{padding:'4px 10px',fontSize:11}} onClick={()=>setPaymentLinkModal(true)}>Send Link</button>
+                </div>
+                <div style={{fontSize:11,color:'var(--t3)'}}>
+                  {c.stripe_checkout_sent_at ? `Last link sent ${new Date(c.stripe_checkout_sent_at).toLocaleString()}` : 'No link sent yet — use this if they\'d rather enter their own card.'}
+                </div>
+              </div>
+
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
                 <div style={{fontSize:12,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>
                   💳 Payments ({relPayments.length})
@@ -1771,6 +1801,23 @@ export default function Clients() {
           showToast={showToast}
           onClose={()=>setStripeModal(false)}
           onSaved={async()=>{ const {data}=await supabase.from('clients').select('*').eq('id',c.id).single(); if (data) setDetail(data) }}
+        />
+      )}
+      {paymentLinkModal && (
+        <SendPaymentLinkModal
+          record={c}
+          recordType="client"
+          showToast={showToast}
+          onClose={async()=>{ setPaymentLinkModal(false); const {data}=await supabase.from('clients').select('*').eq('id',c.id).single(); if (data) setDetail(data) }}
+        />
+      )}
+      {splitPaymentModal && (
+        <SplitPaymentModal
+          record={c}
+          recordType="client"
+          showToast={showToast}
+          onClose={()=>setSplitPaymentModal(false)}
+          onCharged={async()=>{ const {data}=await supabase.from('clients').select('*').eq('id',c.id).single(); if (data) setDetail(data) }}
         />
       )}
 
