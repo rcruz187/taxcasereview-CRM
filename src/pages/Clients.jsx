@@ -1235,7 +1235,7 @@ export default function Clients() {
                 {/* ── Tabbed Detail Section ─────────────────────────── */}
         <div className="card" style={{padding:0,overflow:'hidden'}}>
           {/* Tab Bar */}
-          <div style={{display:'flex',borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
+          <div style={{display:'flex',borderBottom:'1px solid var(--br)',background:'var(--s2)',overflowX:'auto'}}>
             {[
               {key:'overview', label:'📋 Overview'},
               {key:'sms',      label:'💬 SMS'},
@@ -1246,12 +1246,12 @@ export default function Clients() {
               {key:'payments', label:'💳 Payments'},
               {key:'cases',    label:'📁 Cases'},
               {key:'finprofile', label:'🧮 Financial Profile'},
-              {key:'intake', label:'💰 Financial Intake'},
+              {key:'intake', label:'💰 Worksheet'},
             ].map(t=>(
               <button key={t.key} onClick={()=>setDetailTab(t.key)}
-                style={{padding:'11px 10px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
+                style={{padding:'11px 12px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
                   background:'none',cursor:'pointer',fontSize:12,fontWeight:detailTab===t.key?700:500,
-                  color:detailTab===t.key?'var(--blue)':'var(--t2)',whiteSpace:'nowrap',transition:'all .15s',flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis'}}>
+                  color:detailTab===t.key?'var(--blue)':'var(--t2)',whiteSpace:'nowrap',transition:'all .15s',flexShrink:0}}>
                 {t.label}
               </button>
             ))}
