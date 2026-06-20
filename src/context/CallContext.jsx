@@ -154,7 +154,7 @@ export function CallProvider({ children }) {
           setIncomingCall(null)
           setIncomingMatch(null)
           if (liveCallRef.current === call) {
-            liveCallRef.current = null
+            finalizeCallEnd({ alreadyHungUp: true })
             if (uiStartedRef.current) {
               uiStartedRef.current = false
               clearInterval(timerRef.current)
@@ -337,8 +337,17 @@ export function CallProvider({ children }) {
     return true
   }
 
-  function endCall() {
-    liveCallRef.current?.hangup()
+  // Shared teardown for every path a call can end on: agent clicks End,
+  // agent clicks Cancel, or the far end hangs up on their own (caught by
+  // the signalwire.notification listener above). All three need to do the
+  // exact same cleanup -- hang up the live leg (unless it already ended
+  // itself), terminate the conference server-side as a backup to the
+  // browser SDK's known-unreliable .hangup(), and mark incoming_calls
+  // completed so a stale row can never hijack the next agent-join. Having
+  // one shared function means these three paths can't drift out of sync
+  // with each other again.
+  function finalizeCallEnd({ alreadyHungUp }) {
+    if (!alreadyHungUp) liveCallRef.current?.hangup()
     liveCallRef.current = null
     const conf = activeConferenceRef.current
     activeConferenceRef.current = null
@@ -352,6 +361,10 @@ export function CallProvider({ children }) {
       supabase.from('incoming_calls').update({ status: 'completed' }).eq('callsid', inboundCallsid)
         .then(({ error }) => error && console.error('incoming_calls completion update error:', error))
     }
+  }
+
+  function endCall() {
+    finalizeCallEnd({ alreadyHungUp: false })
     uiStartedRef.current = false
     clearInterval(timerRef.current)
     setCalling(false)
@@ -360,20 +373,7 @@ export function CallProvider({ children }) {
   }
 
   function cancelCall() {
-    liveCallRef.current?.hangup()
-    liveCallRef.current = null
-    const conf = activeConferenceRef.current
-    activeConferenceRef.current = null
-    if (conf) {
-      supabase.functions.invoke('end-conference', { body: { conferenceName: conf } })
-        .then(({ error }) => error && console.error('end-conference error:', error))
-    }
-    const inboundCallsid = activeInboundCallsidRef.current
-    activeInboundCallsidRef.current = null
-    if (inboundCallsid) {
-      supabase.from('incoming_calls').update({ status: 'completed' }).eq('callsid', inboundCallsid)
-        .then(({ error }) => error && console.error('incoming_calls completion update error:', error))
-    }
+    finalizeCallEnd({ alreadyHungUp: false })
     uiStartedRef.current = false
     clearInterval(timerRef.current)
     setCalling(false)
