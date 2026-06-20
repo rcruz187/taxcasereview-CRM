@@ -1235,26 +1235,33 @@ export default function Clients() {
                 {/* ── Tabbed Detail Section ─────────────────────────── */}
         <div className="card" style={{padding:0,overflow:'hidden'}}>
           {/* Tab Bar */}
-          <div style={{display:'flex',borderBottom:'1px solid var(--br)',background:'var(--s2)',overflowX:'auto'}}>
-            {[
-              {key:'overview', label:'📋 Overview'},
-              {key:'sms',      label:'💬 SMS'},
-              {key:'notes',    label:'📝 Notes'},
-              {key:'tasks',    label:'✅ Tasks'},
-              {key:'docs',     label:'📁 Docs'},
-              {key:'invoices', label:'🧾 Invoices'},
-              {key:'payments', label:'💳 Payments'},
-              {key:'cases',    label:'📁 Cases'},
-              {key:'finprofile', label:'🧮 Financial Profile'},
-              {key:'intake', label:'💰 Financial Intake'},
-            ].map(t=>(
-              <button key={t.key} onClick={()=>setDetailTab(t.key)}
-                style={{padding:'14px 20px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
-                  background:'none',cursor:'pointer',fontSize:14,fontWeight:detailTab===t.key?700:500,
-                  color:detailTab===t.key?'var(--blue)':'var(--t2)',whiteSpace:'nowrap',transition:'all .15s'}}>
-                {t.label}
-              </button>
-            ))}
+          <div style={{position:'relative'}}>
+            <div style={{display:'flex',borderBottom:'1px solid var(--br)',background:'var(--s2)',overflowX:'auto'}}>
+              {[
+                {key:'overview', label:'📋 Overview'},
+                {key:'sms',      label:'💬 SMS'},
+                {key:'notes',    label:'📝 Notes'},
+                {key:'tasks',    label:'✅ Tasks'},
+                {key:'docs',     label:'📁 Docs'},
+                {key:'invoices', label:'🧾 Invoices'},
+                {key:'payments', label:'💳 Payments'},
+                {key:'cases',    label:'📁 Cases'},
+                {key:'finprofile', label:'🧮 Financial Profile'},
+                {key:'intake', label:'💰 Financial Intake'},
+              ].map(t=>(
+                <button key={t.key} onClick={()=>setDetailTab(t.key)}
+                  style={{padding:'12px 14px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
+                    background:'none',cursor:'pointer',fontSize:13,fontWeight:detailTab===t.key?700:500,
+                    color:detailTab===t.key?'var(--blue)':'var(--t2)',whiteSpace:'nowrap',transition:'all .15s',flexShrink:0}}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            {/* Scrollbars are hidden globally in this app, so without a visual
+                hint a clipped tab bar just looks broken instead of scrollable.
+                This fade only ever shows on narrow viewports where the tabs
+                don't all fit -- harmless decoration the rest of the time. */}
+            <div style={{position:'absolute',top:0,right:0,bottom:0,width:28,background:'linear-gradient(to right, transparent, var(--s2))',pointerEvents:'none'}}/>
           </div>
 
           {/* Overview Tab */}
