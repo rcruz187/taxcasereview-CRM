@@ -34,7 +34,7 @@ const BLANK = {
   street:'', city:'', state:'', zip:'', county:'',
   ssn:'', ein:'', dobM:'', dobD:'', dobY:'',
   spouseName:'', spouseSsn:'', spouseDob:'', filingStatus:'Single',
-  irsBalance:'', issueType:'OIC', irsOrState:'IRS Federal', taxYears:'',
+  irsBalance:'', stateBalance:'', issueType:'OIC', irsOrState:'IRS Federal', taxYears:'',
   filingRequirements:[],
   irsStatus:'', irsStatusOther:'', irsDeadline:'',
   stateStatus:'', stateStatusOther:'', stateDeadline:'',
@@ -1589,6 +1589,9 @@ export default function Clients() {
             <div className="card">
               <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>IRS / Case Info</div>
               <DR label="IRS Balance"  val={formatBalance(c.irsBalance)}/>
+              {(c.irsOrState||'IRS Federal')!=='IRS Federal' && (
+                <DR label="State Balance" val={formatBalance(c.stateBalance)}/>
+              )}
               <DR label="Issue Type"   val={c.issueType}/>
               <DR label="IRS or State" val={c.irsOrState}/>
               <DR label="Tax Years"    val={c.taxYears}/>
@@ -2016,6 +2019,11 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
             </select>
           </div>
         </div>
+        {(form.irsOrState||'IRS Federal')!=='IRS Federal' && (
+          <div className="fg2">
+            <div className="field"><label>Est. State Balance</label><input type="text" value={form.stateBalance||''} onChange={e=>fld('stateBalance',e.target.value)} placeholder="e.g. 12000 or $10,000 - $20,000"/></div>
+          </div>
+        )}
         <div className="fg2">
           <div className="field"><label>IRS or State?</label>
             <select value={form.irsOrState||'IRS Federal'} onChange={e=>fld('irsOrState',e.target.value)}>

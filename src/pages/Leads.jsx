@@ -59,7 +59,7 @@ const BLANK = {
   ssn:'', ein:'', dob:'',
   spouseName:'', spouseSsn:'', spouseDob:'', filingStatus:'Single',
   street:'', city:'', state:'', zip:'', county:'', source:'Referral',
-  irsBalance:'', issueType:'OIC', irsOrState:'IRS Federal', taxYears:[],
+  irsBalance:'', stateBalance:'', issueType:'OIC', irsOrState:'IRS Federal', taxYears:[],
   filingRequirements:[],
   irsStatus:'', irsStatusOther:'', irsDeadline:'',
   stateStatus:'', stateStatusOther:'', stateDeadline:'',
@@ -539,7 +539,7 @@ export default function Leads() {
       stripe_customer_id: l.stripe_customer_id,
       street: l.street, city: l.city, state: l.state, zip: l.zip, county: l.county,
       source: l.source, assignedTo: l.assignedTo,
-      irsBalance: l.irsBalance, issueType: l.issueType, irsOrState: l.irsOrState,
+      irsBalance: l.irsBalance, stateBalance: l.stateBalance, issueType: l.issueType, irsOrState: l.irsOrState,
       irsStatus: l.irsStatus, irsStatusOther: l.irsStatusOther, irsDeadline: l.irsDeadline,
       stateStatus: l.stateStatus, stateStatusOther: l.stateStatusOther, stateDeadline: l.stateDeadline,
       filingRequirements: l.filingRequirements,
@@ -715,6 +715,14 @@ export default function Leads() {
                 </select>
               </div>
             </div>
+            {(form.irsOrState||'IRS Federal')!=='IRS Federal' && (
+              <div className="field"><label>Est. State Balance</label>
+                <select value={form.stateBalance||''} onChange={e=>fld('stateBalance',e.target.value)}>
+                  <option value="">Unknown</option>
+                  {['Under $10,000','$10,000 - $20,000','$20,000 - $30,000','$30,000 - $50,000','$50,000 - $100,000','$100,000 - $250,000','Over $250,000'].map(o=><option key={o}>{o}</option>)}
+                </select>
+              </div>
+            )}
             <div className="fg2">
               <div className="field"><label>Issue Type</label>
                 <select value={form.issueType} onChange={e=>fld('issueType',e.target.value)}>
@@ -1103,6 +1111,9 @@ export default function Leads() {
             <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>IRS / Case Info</div>
             {[
               ['Est. Balance', l.irsBalance ? <span style={{fontWeight:700,color:'var(--bad)'}}>~{l.irsBalance}</span> : '—'],
+              ...((l.irsOrState||'IRS Federal')!=='IRS Federal' ? [
+                ['Est. State Balance', l.stateBalance ? <span style={{fontWeight:700,color:'var(--bad)'}}>~{l.stateBalance}</span> : '—'],
+              ] : []),
               ['Issue Type',   <TypeBdg t={l.issueType||'—'}/>],
               ['IRS or State', l.irsOrState],
               ['Tax Years',    taxYearsList],
