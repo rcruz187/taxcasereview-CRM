@@ -29,17 +29,44 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const { destinationNumber } = await req.json()
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    )
+
+    // Only one outbound call can be "in flight" (pending, i.e. originated
+    // but not yet bridged to an agent's browser) at a time, system-wide.
+    // receive-call's isAgentJoin branch bridges into "the newest pending
+    // row" — with more than one agent now able to dial out, that lookup
+    // is only ever unambiguous if there's at most one pending row to find.
+    // The pending window is short (a couple seconds, until the agent's
+    // self-dial bridges in and this flips to 'connected'), so this is a
+    // brief, friendly "try again in a sec" rather than a real bottleneck.
+    // Only counts rows from the last minute -- a row stuck on 'pending'
+    // from a crashed/closed browser tab (no JS ever ran to clean it up)
+    // would otherwise block outbound calling permanently; receive-call
+    // applies the same cutoff so the two stay consistent.
+    const pendingLockCutoff = new Date(Date.now() - 1 * 60 * 1000).toISOString()
+    const { data: existingPending } = await supabase
+      .from('outbound_calls')
+      .select('id')
+      .eq('status', 'pending')
+      .gte('created_at', pendingLockCutoff)
+      .limit(1)
+      .maybeSingle()
+
+    if (existingPending) {
+      return new Response(JSON.stringify({ error: 'Another call is currently being placed — try again in a moment.' }), {
+        status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const { destinationNumber, agentName } = await req.json()
     if (!destinationNumber) {
       return new Response(JSON.stringify({ error: 'destinationNumber required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
 
     const { data: settings, error: sErr } = await supabase
       .from('settings')
@@ -60,6 +87,7 @@ serve(async (req) => {
       conference_name: conferenceName,
       destination_number: destinationNumber,
       status: 'pending',
+      agent_name: agentName || null,
     })
     if (insErr) {
       console.error('outbound_calls insert error:', insErr)

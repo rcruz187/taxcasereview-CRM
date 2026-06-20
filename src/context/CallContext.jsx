@@ -89,6 +89,14 @@ export function CallProvider({ children }) {
   const pendingInboundRef = useRef(null)
   const lastHandledInboundRef = useRef(null)
   const inboundTimeoutRef = useRef(null)
+  // Tracks an outbound call's conference_name from the moment
+  // start-outbound-call returns until the bridge-in self-dial completes
+  // (cleared once receive-call flips the row to 'connected'). If the call
+  // gets cancelled in that window, finalizeCallEnd uses this to mark the
+  // row 'failed' instead of leaving it stuck on 'pending' forever — which
+  // would otherwise permanently block every other agent's outbound calls,
+  // now that only one 'pending' row is allowed system-wide at a time.
+  const pendingOutboundConferenceRef = useRef(null)
 
   useEffect(() => { elapsedRef.current = elapsed }, [elapsed])
 
@@ -123,7 +131,7 @@ export function CallProvider({ children }) {
       const client = new Relay({ project: data.project_id, token: data.jwt_token })
       client.remoteElement = 'sw-remote-audio'
 
-      client.on('signalwire.ready', () => { console.log('%c[RELAY] ready — registered as "office"', 'color:lime'); setRelayStatus('ready') })
+      client.on('signalwire.ready', () => { console.log('%c[RELAY] ready — registered as', 'color:lime', data.resource); setRelayStatus('ready') })
       client.on('signalwire.error', (e) => { setRelayStatus('error'); console.error('[RELAY] error', e); scheduleReconnect() })
       client.on('signalwire.socket.close', () => { setRelayStatus('error'); console.warn('[RELAY] socket closed — reconnecting in 3s'); scheduleReconnect() })
       client.on('signalwire.socket.error', (e) => { setRelayStatus('error'); console.error('[RELAY] socket error', e); scheduleReconnect() })
@@ -192,7 +200,27 @@ export function CallProvider({ children }) {
     let cancelled = false
 
     const poll = setInterval(async () => {
-      if (cancelled || pendingInboundRef.current || calling) return
+      if (cancelled || calling) return
+
+      // If a banner is already showing for this agent, just check whether
+      // someone else claimed it in the meantime — don't go looking for a
+      // different call yet.
+      if (pendingInboundRef.current) {
+        const sid = pendingInboundRef.current.callsid
+        const { data: row } = await supabase
+          .from('incoming_calls').select('status, claimed_by').eq('callsid', sid).maybeSingle()
+        if (!cancelled && row && row.status !== 'ringing') {
+          if (inboundTimeoutRef.current) { clearTimeout(inboundTimeoutRef.current); inboundTimeoutRef.current = null }
+          pendingInboundRef.current = null
+          setIncomingCall(null)
+          setIncomingMatch(null)
+          if (row.status === 'answered' && row.claimed_by) {
+            showCallToast(`Already answered by ${row.claimed_by}`)
+          }
+        }
+        return
+      }
+
       const { data, error } = await supabase
         .from('incoming_calls')
         .select('callsid, conference_name, from_number, department, created_at')
@@ -226,14 +254,51 @@ export function CallProvider({ children }) {
     return () => { cancelled = true; clearInterval(poll) }
   }, [relayStatus, calling])
 
-  function answerIncoming() {
+  // Claims an incoming_calls row for THIS agent before dialing in at all —
+  // critical now that more than one person can be online at once. The
+  // update only succeeds (rows-affected > 0) if the row is still
+  // 'ringing'; if another agent's Answer click already claimed it a moment
+  // earlier, this update affects zero rows and we know immediately,
+  // without ever self-dialing. This is what actually prevents the
+  // cross-wiring risk — receive-call's bridge-in logic doesn't need to
+  // change, because only the winning agent's browser ever reaches it.
+  async function claimIncomingCall(row) {
+    const myName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    const { data, error } = await supabase
+      .from('incoming_calls')
+      .update({ status: 'answered', claimed_by: myName })
+      .eq('callsid', row.callsid)
+      .eq('status', 'ringing')
+      .select('callsid')
+    if (error) { console.error('incoming_calls claim error:', error); return { won: false } }
+    if (data && data.length > 0) return { won: true, claimedBy: myName }
+
+    // Lost the race — find out who actually got it, for a friendly toast.
+    const { data: current } = await supabase
+      .from('incoming_calls').select('claimed_by').eq('callsid', row.callsid).maybeSingle()
+    return { won: false, claimedBy: current?.claimed_by || null }
+  }
+
+  async function answerIncoming() {
     const row = pendingInboundRef.current
     if (!row) return
     if (inboundTimeoutRef.current) { clearTimeout(inboundTimeoutRef.current); inboundTimeoutRef.current = null }
 
+    // Hide the banner immediately so this agent can't double-click while
+    // the claim is in flight — the row is still 'ringing' for everyone
+    // else until the claim below resolves.
+    pendingInboundRef.current = null
+    setIncomingCall(null)
+
+    const { won, claimedBy } = await claimIncomingCall(row)
+    if (!won) {
+      setIncomingMatch(null)
+      showCallToast(claimedBy ? `Already answered by ${claimedBy}` : 'Already answered')
+      return
+    }
+
     const m = incomingMatchRef.current
     uiStartedRef.current = true
-    setIncomingCall(null)
     setCalling(true)
     setElapsed(0)
     setLogForm(BLANK_LOG)
@@ -247,9 +312,6 @@ export function CallProvider({ children }) {
       entityType: (m && !m.isDepartment) ? m.entityType : null,
     })
 
-    supabase.from('incoming_calls').update({ status: 'answered' }).eq('callsid', row.callsid)
-      .then(({ error }) => error && console.error('incoming_calls update error:', error))
-
     activeConferenceRef.current = row.conference_name || null
     activeInboundCallsidRef.current = row.callsid || null
 
@@ -257,26 +319,27 @@ export function CallProvider({ children }) {
     // working reliably all day — the browser dials the business number
     // itself, and receive-call recognizes that self-dial and connects it
     // straight into this caller's hold conference instead of treating it
-    // as a new customer call.
+    // as a new customer call. Safe to do now because the claim above
+    // already guarantees this is the only agent dialing in for this row.
     relayRef.current?.newCall({
       destinationNumber: callerNumberRef.current,
       callerNumber: callerNumberRef.current,
     }).then(call => { liveCallRef.current = call })
       .catch(err => { showCallToast('Could not connect: ' + (err?.message || err)); cancelCall() })
-
-    pendingInboundRef.current = null
   }
 
+  // Dismisses the banner for THIS agent only — does NOT redirect the
+  // caller to voicemail, since with multiple agents online a decline from
+  // one person shouldn't end the call for everyone else who might still
+  // pick up. The existing 15s no-answer timeout (in the poll effect above)
+  // already handles the case where nobody answers at all. lastHandledInboundRef
+  // is deliberately left set so this same call doesn't immediately re-pop
+  // the banner for this agent on the next poll tick.
   function declineIncoming() {
-    const row = pendingInboundRef.current
     if (inboundTimeoutRef.current) { clearTimeout(inboundTimeoutRef.current); inboundTimeoutRef.current = null }
     setIncomingCall(null)
     setIncomingMatch(null)
     pendingInboundRef.current = null
-    if (row?.callsid) {
-      supabase.functions.invoke('redirect-to-voicemail', { body: { callsid: row.callsid } })
-        .then(({ error }) => error && console.error('redirect-to-voicemail error:', error))
-    }
   }
 
   function startCall(lead) {
@@ -302,20 +365,31 @@ export function CallProvider({ children }) {
       })
     }
 
+    const myName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+
     // Recorded-outbound path: start-outbound-call originates the real leg
     // to the destination (routed through outbound-leg into a recorded
     // conference), then the browser self-dials the business number —
     // same proven bridge mechanism answerIncoming() already uses —
     // and receive-call's isAgentJoin branch bridges us into that same
     // conference once it sees the pending outbound_calls row.
-    supabase.functions.invoke('start-outbound-call', { body: { destinationNumber } })
-      .then(({ data, error }) => {
+    supabase.functions.invoke('start-outbound-call', { body: { destinationNumber, agentName: myName } })
+      .then(async ({ data, error }) => {
         if (error || !data?.ok) {
-          showCallToast('Call failed: ' + (data?.error || error?.message || 'unknown error'))
+          // supabase-js discards the response body on non-2xx responses,
+          // surfacing only a generic "non-2xx status code" message — parse
+          // the actual error text (e.g. the 409 "try again in a moment"
+          // message) off error.context so the agent sees something useful.
+          let msg = data?.error || error?.message || 'unknown error'
+          if (error?.context?.json) {
+            try { const body = await error.context.json(); if (body?.error) msg = body.error } catch { /* fall back to generic message */ }
+          }
+          showCallToast('Call failed: ' + msg)
           cancelCall()
           return
         }
         activeConferenceRef.current = data.conferenceName || null
+        pendingOutboundConferenceRef.current = data.conferenceName || null
         // Deliberate pause before the browser self-dials the business number.
         // This self-dial is itself a second outbound SignalWire origination
         // on top of the start-outbound-call REST leg above. Firing them
@@ -330,7 +404,10 @@ export function CallProvider({ children }) {
           relayRef.current?.newCall({
             destinationNumber: callerNumberRef.current,
             callerNumber: callerNumberRef.current,
-          }).then(call => { liveCallRef.current = call })
+          }).then(call => {
+            liveCallRef.current = call
+            pendingOutboundConferenceRef.current = null
+          })
             .catch(err => { showCallToast('Could not connect: ' + (err?.message || err)); cancelCall() })
         }, 1500)
       })
@@ -360,6 +437,17 @@ export function CallProvider({ children }) {
     if (inboundCallsid) {
       supabase.from('incoming_calls').update({ status: 'completed' }).eq('callsid', inboundCallsid)
         .then(({ error }) => error && console.error('incoming_calls completion update error:', error))
+    }
+    // If this call was cancelled before the outbound bridge-in finished,
+    // the outbound_calls row is still sitting on 'pending' — clear it so
+    // it doesn't permanently block every other agent's outbound calls
+    // (only one 'pending' row is allowed system-wide at a time; see
+    // start-outbound-call).
+    const pendingOutboundConf = pendingOutboundConferenceRef.current
+    pendingOutboundConferenceRef.current = null
+    if (pendingOutboundConf) {
+      supabase.from('outbound_calls').update({ status: 'failed' }).eq('conference_name', pendingOutboundConf).eq('status', 'pending')
+        .then(({ error }) => error && console.error('outbound_calls cleanup error:', error))
     }
   }
 
