@@ -101,6 +101,7 @@ html, body, #root {
 .page-content {
   flex: 1;
   overflow-y: auto;
+  overflow-anchor: none;
   padding: 16px;
   position: relative;
 }
