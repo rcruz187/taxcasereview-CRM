@@ -3,20 +3,22 @@ import { getPackageFormTypes, FORM_LABELS, FORM_USES_EIN, fillForm, generateCcAu
 
 const LOGO_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo'
 
-function printHeader(title) {
+const FIRM_PHONE = '(850) 459-9039'
+
+function printHeader(title, phone = FIRM_PHONE) {
   return `
     <div style="text-align:center;margin-bottom:28px;padding-bottom:18px;border-bottom:3px solid #1A7FD4">
       <img src="${LOGO_URL}" style="height:52px;margin-bottom:10px;display:block;margin-left:auto;margin-right:auto" onerror="this.style.display='none'"/>
       <div style="font-size:22px;font-weight:800;color:#1A7FD4;letter-spacing:-.3px">Tax Case Review</div>
-      <div style="font-size:11px;color:#666;margin-top:3px">631 US Highway One Ste 304, North Palm Beach, FL 33408 &nbsp;·&nbsp; info@taxcasereview.com &nbsp;·&nbsp; (850) 459-9039</div>
+      <div style="font-size:11px;color:#666;margin-top:3px">631 US Highway One Ste 304, North Palm Beach, FL 33408 &nbsp;·&nbsp; info@taxcasereview.com &nbsp;·&nbsp; ${phone}</div>
       <div style="font-size:15px;font-weight:700;margin-top:14px;color:#111;text-transform:uppercase;letter-spacing:.5px">${title}</div>
     </div>`
 }
 
-function footer() {
+function footer(phone = FIRM_PHONE) {
   return `
     <div style="margin-top:48px;padding-top:16px;border-top:1px solid #ddd;text-align:center;font-size:10px;color:#999;line-height:1.8">
-      Tax Case Review &nbsp;·&nbsp; 631 US Highway One Ste 304, North Palm Beach, FL 33408 &nbsp;·&nbsp; info@taxcasereview.com &nbsp;·&nbsp; (850) 459-9039<br/>
+      Tax Case Review &nbsp;·&nbsp; 631 US Highway One Ste 304, North Palm Beach, FL 33408 &nbsp;·&nbsp; info@taxcasereview.com &nbsp;·&nbsp; ${phone}<br/>
       <em>Tax Case Review is a tax resolution consulting firm and is not a law firm. No attorney-client relationship is created by this agreement.</em>
     </div>`
 }
@@ -43,7 +45,8 @@ function sigBlock(label1 = 'Client Signature', label2 = 'Authorized Representati
     </div>`
 }
 
-export function printBase(title, body) {
+export function printBase(title, body, opts = {}) {
+  const { phone = FIRM_PHONE } = opts
   const w = window.open('', '_blank', 'width=880,height=1100')
   w.document.write(`<!DOCTYPE html><html><head>
     <title>${title} — Tax Case Review</title>
@@ -68,9 +71,9 @@ export function printBase(title, body) {
       }
     </style>
   </head><body>
-    ${printHeader(title)}
+    ${printHeader(title, phone)}
     ${body}
-    ${footer()}
+    ${footer(phone)}
   </body></html>`)
   w.document.close()
   setTimeout(() => w.print(), 500)
@@ -318,7 +321,7 @@ export function generateAddendum(c = null, opts = {}) {
         <div style="font-size:11px;color:#555;margin-top:6px">Date: _______________________</div>
       </div>
     </div>
-  `)
+  `, { phone: '(888) 334-5052' })
 }
 
 // ─── Engagement Letter ────────────────────────────────────────────────────────

@@ -1148,7 +1148,7 @@ export async function generateAddendumPdf(c = null, opts = {}) {
   // ── Header ──
   page.drawText('Tax Case Review', { x: margin, y, size: 16, font: bold });
   y -= 16;
-  page.drawText('631 US Highway One Ste 304, North Palm Beach, FL 33408 · info@taxcasereview.com · (850) 459-9039', { x: margin, y, size: 8.5, font, color: rgb(0.4, 0.4, 0.4) });
+  page.drawText('631 US Highway One Ste 304, North Palm Beach, FL 33408 · info@taxcasereview.com · (888) 334-5052', { x: margin, y, size: 8.5, font, color: rgb(0.4, 0.4, 0.4) });
   y -= 22;
   page.drawText('SERVICE ADDENDUM — ADDITIONAL SERVICES AGREEMENT', { x: margin, y, size: 12.5, font: bold });
   y -= 20;
