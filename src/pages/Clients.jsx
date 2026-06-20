@@ -165,17 +165,17 @@ function parseDependents(raw) {
 function ActionBtn({color, icon, label, sub, onClick}) {
   return (
     <button onClick={onClick} style={{
-      background:color, color:'#fff', border:'none', borderRadius:10,
-      padding:'14px 14px', cursor:'pointer', display:'flex', flexDirection:'column',
-      alignItems:'center', gap:5, fontSize:13, fontWeight:700, textAlign:'center',
-      flex:1, minWidth:100, transition:'transform .1s,opacity .1s',
+      background:color, color:'#fff', border:'none', borderRadius:12,
+      padding:'20px 16px', cursor:'pointer', display:'flex', flexDirection:'column',
+      alignItems:'center', gap:7, fontSize:15, fontWeight:700, textAlign:'center',
+      flex:1, minWidth:130, transition:'transform .1s,opacity .1s',
     }}
       onMouseEnter={e=>{e.currentTarget.style.opacity='.85';e.currentTarget.style.transform='translateY(-2px)'}}
       onMouseLeave={e=>{e.currentTarget.style.opacity='1';e.currentTarget.style.transform=''}}
     >
-      <span style={{fontSize:22}}>{icon}</span>
+      <span style={{fontSize:30}}>{icon}</span>
       <span>{label}</span>
-      {sub && <span style={{fontSize:10,opacity:.8,fontWeight:400}}>{sub}</span>}
+      {sub && <span style={{fontSize:11.5,opacity:.8,fontWeight:400}}>{sub}</span>}
     </button>
   )
 }
