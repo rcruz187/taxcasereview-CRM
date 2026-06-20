@@ -1108,7 +1108,7 @@ export default function Leads() {
 
         {/* Overview / Notes / Documents — tabbed, matching the Clients detail page style */}
         <div className="card" style={{padding:0,overflow:'hidden',marginBottom:12}}>
-          <div style={{display:'flex',borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
+          <div style={{display:'flex',borderBottom:'1px solid var(--br)',background:'var(--s2)',overflowX:'auto'}}>
             {[
               {key:'overview', label:'📋 Overview'},
               {key:'sms', label:'💬 SMS'},
@@ -1119,9 +1119,9 @@ export default function Leads() {
               {key:'payments', label:'💳 Payments'},
             ].map(t=>(
               <button key={t.key} onClick={()=>switchLeadTab(t.key)}
-                style={{padding:'10px 16px',border:'none',borderBottom:leadDetailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
-                  background:'none',cursor:'pointer',fontSize:12,fontWeight:leadDetailTab===t.key?700:500,
-                  color:leadDetailTab===t.key?'var(--blue)':'var(--t2)',whiteSpace:'nowrap',transition:'all .15s'}}>
+                style={{padding:'12px 14px',border:'none',borderBottom:leadDetailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
+                  background:'none',cursor:'pointer',fontSize:13,fontWeight:leadDetailTab===t.key?700:500,
+                  color:leadDetailTab===t.key?'var(--blue)':'var(--t2)',whiteSpace:'nowrap',transition:'all .15s',flexShrink:0}}>
                 {t.label}
               </button>
             ))}

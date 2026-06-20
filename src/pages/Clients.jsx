@@ -1289,8 +1289,8 @@ export default function Clients() {
               {key:'intake', label:'💰 Financial Intake'},
             ].map(t=>(
               <button key={t.key} onClick={()=>setDetailTab(t.key)}
-                style={{padding:'11px 12px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
-                  background:'none',cursor:'pointer',fontSize:12,fontWeight:detailTab===t.key?700:500,
+                style={{padding:'12px 14px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
+                  background:'none',cursor:'pointer',fontSize:13,fontWeight:detailTab===t.key?700:500,
                   color:detailTab===t.key?'var(--blue)':'var(--t2)',whiteSpace:'nowrap',transition:'all .15s',flexShrink:0}}>
                 {t.label}
               </button>
