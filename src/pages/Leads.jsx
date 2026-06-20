@@ -97,7 +97,7 @@ function ActionBtn({color, icon, label, sub, onClick}) {
   )
 }
 
-function LeadInlineFax({ lead, onClose }) {
+function LeadInlineFax({ lead, onClose, onLogged }) {
   const [toNum,set0]=useState((lead?.phone||'').replace(/\D/g,''))
   const [subject,set1]=useState('')
   const [file,set2]=useState(null)
@@ -118,7 +118,15 @@ function LeadInlineFax({ lead, onClose }) {
       }catch(e){}
     }
     await supabase.from('fax_logs').insert([{to_number:toFull,from_number:fromNum,client_name:lead?.name,subject,file_url:fileUrl,file_name:file?.name||null,status:sent?'Sent':(s?.signalwire_backend?'Failed':'Logged'),sent_at:new Date().toISOString(),created_at:new Date().toISOString()}])
-    set3(false);onClose()
+
+    // Auto-log to Notes -- every outbound fax shows in the lead's activity
+    // timeline, same pattern as the SMS tab, including what was actually faxed.
+    const { data: { user } } = await supabase.auth.getUser()
+    const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    const noteContent = `📠 Fax ${sent?'sent':'logged'} to ${toFull}${subject?' — '+subject:''}${file?.name?' (' + file.name + ')':''}`
+    await supabase.from('lead_notes').insert([{ lead_id: lead.id, lead_name: lead?.name, text: noteContent, type:'System', author: actor, created_at: new Date().toISOString() }])
+
+    set3(false);onLogged?.();onClose()
   }
   return <div style={{padding:'0 4px 4px'}}>
     <div className="field"><label>To Fax Number</label><input value={toNum} onChange={e=>set0(e.target.value.replace(/\D/g,''))} placeholder="10 digits"/></div>
@@ -1232,7 +1240,7 @@ export default function Leads() {
           <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setShowFaxModal(false)}>
             <div className="modal" style={{width:520}}>
               <div className="mh"><span className="mt">📠 Send Fax — {inlineFaxLead.name}</span><button className="xbtn" onClick={()=>setShowFaxModal(false)}>&times;</button></div>
-              <LeadInlineFax lead={inlineFaxLead} onClose={()=>setShowFaxModal(false)}/>
+              <LeadInlineFax lead={inlineFaxLead} onClose={()=>setShowFaxModal(false)} onLogged={()=>loadLeadNotes(inlineFaxLead.id)}/>
             </div>
           </div>
         )}

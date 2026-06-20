@@ -141,8 +141,11 @@ export default function Fax() {
     return mq && ms
   })
 
-  const sent   = logs.filter(l=>l.status==='Sent').length
-  const failed = logs.filter(l=>l.status==='Failed').length
+  const outboundLogs = logs.filter(l=>l.direction!=='inbound')
+  const inboundLogs  = logs.filter(l=>l.direction==='inbound')
+  const sent     = outboundLogs.filter(l=>l.status==='Sent').length
+  const failed   = outboundLogs.filter(l=>l.status==='Failed').length
+  const received = inboundLogs.length
 
   return (
     <div style={{maxWidth:1000}}>
@@ -163,10 +166,11 @@ export default function Fax() {
       {/* Stats */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))',gap:8,marginBottom:14}}>
         {[
-          ['Total Sent', logs.length, 'var(--tx)'],
+          ['Total Sent', outboundLogs.length, 'var(--tx)'],
           ['Successful', sent, 'var(--ok)'],
           ['Failed', failed, 'var(--bad)'],
-          ['This Month', logs.filter(l=>l.sent_at?.slice(0,7)===new Date().toISOString().slice(0,7)).length, 'var(--b2)'],
+          ['Received', received, 'var(--blue)'],
+          ['This Month', logs.filter(l=>(l.sent_at||l.created_at)?.slice(0,7)===new Date().toISOString().slice(0,7)).length, 'var(--b2)'],
         ].map(([l,v,c])=>(
           <div key={l} className="card" style={{padding:'10px 14px',textAlign:'center'}}>
             <div style={{fontWeight:800,fontSize:20,color:c}}>{v}</div>

@@ -185,7 +185,7 @@ function ActionBtn({color, icon, label, sub, onClick}) {
 
 
 // ── Inline Fax Form ─────────────────────────────────────────────────────────
-function InlineFaxForm({ client, onClose, showToast }) {
+function InlineFaxForm({ client, onClose, showToast, onLogged }) {
   const [toNum,   setToNum]   = useState((client?.phone||'').replace(/\D/g,''))
   const [subject, setSubject] = useState('')
   const [notes,   setNotes]   = useState('')
@@ -223,8 +223,17 @@ function InlineFaxForm({ client, onClose, showToast }) {
       status: sent ? 'Sent' : (s?.signalwire_backend ? 'Failed' : 'Logged'),
       sent_by:'CRM', sent_at:new Date().toISOString(), created_at:new Date().toISOString()
     }])
+
+    // Auto-log to Notes -- every outbound fax shows in the client's activity
+    // timeline, same pattern as the SMS tab, including what was actually faxed.
+    const { data: { user } } = await supabase.auth.getUser()
+    const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    const noteContent = `📠 Fax ${sent?'sent':'logged'} to ${toFull}${subject?' — '+subject:''}${file?.name?' (' + file.name + ')':''}`
+    await supabase.from('client_notes').insert({ client_name: client?.name, content: noteContent, created_by: actor })
+
     setSending(false)
     showToast('📠 Fax '+(sent?'sent':'logged')+'!')
+    onLogged?.()
     onClose()
   }
 
@@ -1781,7 +1790,7 @@ export default function Clients() {
         <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setFaxModal(false)}>
           <div className="modal" style={{width:500}}>
             <div className="mh"><span className="mt">📠 Send Fax — {faxClient.name}</span><button className="xbtn" onClick={()=>setFaxModal(false)}>&times;</button></div>
-            <InlineFaxForm client={faxClient} onClose={()=>setFaxModal(false)} showToast={showToast}/>
+            <InlineFaxForm client={faxClient} onClose={()=>setFaxModal(false)} showToast={showToast} onLogged={()=>loadRelated(faxClient.name)}/>
           </div>
         </div>
       )}
@@ -1893,7 +1902,7 @@ export default function Clients() {
         <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setFaxModal(false)}>
           <div className="modal" style={{width:500}}>
             <div className="mh"><span className="mt">📠 Send Fax — {faxClient.name}</span><button className="xbtn" onClick={()=>setFaxModal(false)}>&times;</button></div>
-            <InlineFaxForm client={faxClient} onClose={()=>setFaxModal(false)} showToast={showToast}/>
+            <InlineFaxForm client={faxClient} onClose={()=>setFaxModal(false)} showToast={showToast} onLogged={()=>loadRelated(faxClient.name)}/>
           </div>
         </div>
       )}
