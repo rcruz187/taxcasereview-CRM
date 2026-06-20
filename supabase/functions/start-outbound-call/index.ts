@@ -29,17 +29,17 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
-
-    const { destinationNumber, agentName } = await req.json()
+    const { destinationNumber } = await req.json()
     if (!destinationNumber) {
       return new Response(JSON.stringify({ error: 'destinationNumber required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    )
 
     const { data: settings, error: sErr } = await supabase
       .from('settings')
@@ -60,7 +60,6 @@ serve(async (req) => {
       conference_name: conferenceName,
       destination_number: destinationNumber,
       status: 'pending',
-      agent_name: agentName || null,
     })
     if (insErr) {
       console.error('outbound_calls insert error:', insErr)
