@@ -80,6 +80,21 @@ export default function Dashboard() {
   const fmtDate = t => t.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
   const daysLeft = d => Math.ceil((new Date(d.dueDate) - new Date()) / 86400000)
 
+  // US time zones shown on the dashboard clock -- continental US plus
+  // Alaska and Hawaii. Each computed independently via Intl with an
+  // explicit IANA zone (not a manual UTC offset), so DST is handled
+  // automatically for the zones that observe it, same approach as the
+  // business-hours check in receive-call.
+  const US_TIMEZONES = [
+    { label: 'Eastern',  zone: 'America/New_York' },
+    { label: 'Central',  zone: 'America/Chicago' },
+    { label: 'Mountain', zone: 'America/Denver' },
+    { label: 'Pacific',  zone: 'America/Los_Angeles' },
+    { label: 'Alaska',   zone: 'America/Anchorage' },
+    { label: 'Hawaii',   zone: 'Pacific/Honolulu' },
+  ]
+  const fmtZoneTime = (t, zone) => t.toLocaleTimeString('en-US', { timeZone: zone, hour: 'numeric', minute: '2-digit', hour12: true })
+
   const CARD_COLORS = {
     'Active Cases':     '#f59e0b',
     'Open Leads':       '#a855f7',
@@ -130,8 +145,18 @@ export default function Dashboard() {
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--tx)' }}>{greeting()}</div>
           <div style={{ fontSize: 13, color: 'var(--t3)', marginTop: 2 }}>{fmtDate(time)}</div>
         </div>
-        <div style={{ fontFamily: 'monospace', fontSize: 20, fontWeight: 700, color: 'var(--blue)', background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: 10, padding: '8px 16px' }}>
-          {fmtTime(time)}
+        <div style={{ background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontFamily: 'monospace', fontSize: 20, fontWeight: 700, color: 'var(--blue)', textAlign: 'right' }}>
+            {fmtTime(time)}
+          </div>
+          <div style={{ display: 'flex', gap: 14, marginTop: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {US_TIMEZONES.map(z => (
+              <div key={z.zone} style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{z.label}</div>
+                <div style={{ fontFamily: 'monospace', fontSize: 12.5, fontWeight: 600, color: 'var(--t2)', marginTop: 2 }}>{fmtZoneTime(time, z.zone)}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
