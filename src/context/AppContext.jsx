@@ -167,6 +167,52 @@ export function AppProvider({ children }) {
     }
   }, [user])
 
+  // Appointment reminders — browser notification + sound ~30 min before a
+  // scheduled appointment, for whoever has the CRM open (same audience as
+  // the existing "new appointment booked online" toast above, not filtered
+  // by assignee). This is independent of the reminder_sent flag the
+  // send-appointment-reminders Edge Function uses for emails — that's a
+  // separate, server-side, once-only email; this is a client-side popup
+  // that re-checks every minute and just remembers what it's already shown
+  // this session so it doesn't repeat.
+  const REMINDER_MINUTES_BEFORE = 30
+  useEffect(() => {
+    if (!user) return
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+    const notifiedIds = new Set()
+
+    async function checkUpcoming() {
+      const now = new Date()
+      const windowEnd = new Date(now.getTime() + REMINDER_MINUTES_BEFORE * 60000)
+      const { data, error } = await supabase
+        .from('calevents')
+        .select('id, title, "clientName", date, time, "eventType"')
+        .eq('status', 'scheduled')
+        .eq('date', now.toISOString().slice(0, 10))
+      if (error || !data) return
+      for (const ev of data) {
+        if (!ev.time || notifiedIds.has(ev.id)) continue
+        const evTime = new Date(`${ev.date}T${ev.time}:00`)
+        if (evTime < now || evTime > windowEnd) continue
+        notifiedIds.add(ev.id)
+        playSound('reminder')
+        const who = ev.clientName || ev.title || 'Appointment'
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('📅 Upcoming Appointment', {
+            body: `${who} at ${ev.time}${ev.eventType ? ` — ${ev.eventType}` : ''} (in ~${REMINDER_MINUTES_BEFORE} min)`,
+            icon: '/taxcasereview-CRM/icon-192.png',
+          })
+        }
+      }
+    }
+
+    checkUpcoming()
+    const poll = setInterval(checkUpcoming, 60000)
+    return () => clearInterval(poll)
+  }, [user])
+
   async function loadRole(email) {
     if (!email) return
     if (email === 'romy@taxcasereview.org') {

@@ -30,6 +30,7 @@ const PATTERNS = {
   call:    [[523, 0, 0.15], [392, 0.18, 0.15], [523, 0.36, 0.15], [392, 0.54, 0.15]], // ring pattern
   sms:     [[660, 0, 0.09], [880, 0.11, 0.09], [1046, 0.22, 0.12]], // three-note quick up-chirp — new SMS
   fax:     [[392, 0, 0.14], [392, 0.22, 0.14], [392, 0.44, 0.14]],  // three flat low blips — new fax
+  reminder:[[587, 0, 0.16], [784, 0.18, 0.22]],                     // gentle two-note chime — upcoming appointment
 }
 
 // ─── Autoplay-policy fix ─────────────────────────────────────────────────────
