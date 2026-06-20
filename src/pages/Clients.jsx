@@ -1246,7 +1246,7 @@ export default function Clients() {
               {key:'payments', label:'💳 Payments'},
               {key:'cases',    label:'📁 Cases'},
               {key:'finprofile', label:'🧮 Financial Profile'},
-              {key:'intake', label:'💰 Worksheet'},
+              {key:'intake', label:'💰 Financial Intake'},
             ].map(t=>(
               <button key={t.key} onClick={()=>setDetailTab(t.key)}
                 style={{padding:'11px 12px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
