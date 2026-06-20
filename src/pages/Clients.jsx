@@ -9,7 +9,7 @@ import SendPaymentLinkModal from '../components/SendPaymentLinkModal'
 import SavedCardsPanel from '../components/SavedCardsPanel'
 import SplitPaymentModal from '../components/SplitPaymentModal'
 import FinancialProfile from './FinancialProfile'
-import FinancialIntakeView from '../components/FinancialIntakeView'
+import OrganizerView from '../components/OrganizerView'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import { generateAddendum, sendAddendumForSignature } from '../lib/docUtils'
@@ -1337,7 +1337,7 @@ export default function Clients() {
               {key:'payments', label:'💳 Payments'},
               {key:'cases',    label:'📁 Cases'},
               {key:'finprofile', label:'🧮 Financial Profile'},
-              {key:'intake', label:'💰 Financial Intake'},
+              {key:'organizer', label:'🧾 Tax Organizer'},
             ].map(t=>(
               <button key={t.key} onClick={()=>setDetailTab(t.key)}
                 style={{padding:'12px 14px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
@@ -1432,10 +1432,10 @@ export default function Clients() {
             </div>
           )}
 
-          {/* Financial Intake Tab */}
-          {detailTab==='intake'&&(
+          {/* Tax Organizer Tab */}
+          {detailTab==='organizer'&&(
             <ErrorBoundary>
-              <FinancialIntakeView clientName={c.name}/>
+              <OrganizerView clientName={c.name}/>
             </ErrorBoundary>
           )}
 

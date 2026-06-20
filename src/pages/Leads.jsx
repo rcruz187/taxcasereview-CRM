@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import { useFirm } from '../lib/useFirm'
 import { generateClientPackage, generateAddendum, generatePOACoverLetter, sendFullPackage, generateCreditCardAuthForm, sendAddendumForSignature } from '../lib/docUtils'
-import { generatePOACoverLetterPdf, RESOLUTION_SERVICES } from '../lib/irsFormUtils'
+import { generatePOACoverLetterPdf, RESOLUTION_SERVICES, generateFinancialIntakePdf } from '../lib/irsFormUtils'
 import BookingWidget from '../components/BookingWidget'
 import IRSFormFiller from '../components/IRSFormFiller'
 import ErrorBoundary from '../components/ErrorBoundary'
@@ -782,7 +782,7 @@ export default function Leads() {
     let intakeAlreadySubmitted = false
     try {
       const { data: existingIntake } = await supabase.from('financial_intake_responses')
-        .select('id, status').eq('client_name', l.name).order('created_at', { ascending: false }).limit(1).maybeSingle()
+        .select('id, status, answers, submitted_at').eq('client_name', l.name).order('created_at', { ascending: false }).limit(1).maybeSingle()
 
       if (existingIntake) {
         // Already has one (sent or submitted while a lead) -- leave it as
@@ -791,6 +791,26 @@ export default function Leads() {
         // nudge for something they already finished.
         if (existingIntake.status === 'Submitted') {
           intakeAlreadySubmitted = true
+          // Snapshot the submitted answers into a PDF and file it under the
+          // new client's Financial Statements folder — this is the resolution-
+          // case data captured at the lead stage; once they're a client the
+          // live wizard answers aren't needed anymore, just this record.
+          try {
+            const pdfBytes = await generateFinancialIntakePdf(l.name, existingIntake.answers || {}, existingIntake.submitted_at)
+            const safeName = l.name.replace(/[^a-zA-Z0-9]+/g, '-')
+            const path = `docs/${safeName}/financial-intake/financial-intake-${Date.now()}.pdf`
+            const { error: upErr } = await supabase.storage.from('documents')
+              .upload(path, new Blob([pdfBytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
+            if (!upErr) {
+              const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+              await supabase.from('documents').insert([{
+                client: l.name, name: 'Financial Intake', docType: 'Financial Statements',
+                file_url: urlData.publicUrl, file_name: 'Financial Intake.pdf',
+                notes: `Submitted ${existingIntake.submitted_at ? new Date(existingIntake.submitted_at).toLocaleDateString() : ''}`,
+                created_at: new Date().toISOString(),
+              }])
+            }
+          } catch (e) { console.error('Financial intake PDF snapshot error:', e) }
         } else if (l.email) {
           const intakeUrl = window.location.origin + '/taxcasereview-CRM/financial-intake/' + existingIntake.id
           const { error: emailErr } = await supabase.functions.invoke('send-email', {

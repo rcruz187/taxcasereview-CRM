@@ -130,6 +130,25 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
       answers, status: 'Submitted', submitted_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq('id', intakeId)
+    // Best-effort sync into the Lead's own record — only fields that are
+    // currently blank, so this never overwrites something a rep already
+    // verified and typed in manually. These three are the only Financial
+    // Intake answers that map 1:1 onto real Lead columns (the rest — income,
+    // assets, debts, expenses — don't have a corresponding structured field
+    // anywhere else in the CRM, so they stay in this record only).
+    try {
+      const { data: leadMatch } = await supabase.from('leads').select('id,dob,filingStatus,county').eq('name', record.client_name).maybeSingle()
+      if (leadMatch) {
+        const patch = {}
+        if (!leadMatch.dob && answers.dob) patch.dob = answers.dob
+        if (!leadMatch.filingStatus && answers.filing_status) {
+          // The wizard says "Widowed"; the Lead form's dropdown uses "Qualifying Widow(er)" — same option, different label.
+          patch.filingStatus = answers.filing_status === 'Widowed' ? 'Qualifying Widow(er)' : answers.filing_status
+        }
+        if (!leadMatch.county && answers.county) patch.county = answers.county
+        if (Object.keys(patch).length) await supabase.from('leads').update(patch).eq('id', leadMatch.id)
+      }
+    } catch (e) { console.error('Financial intake -> lead field sync error:', e) }
     // Email a full copy of the submitted answers to the client. Best-effort:
     // if this fails (no email on file, send-email hiccup, etc.) the
     // submission itself is already saved above and the client still sees

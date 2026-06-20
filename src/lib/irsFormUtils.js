@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, PDFName, PDFString, rgb } from 'pdf-lib';
+import { FINANCIAL_INTAKE_STEPS, shouldShow as intakeShouldShow } from './financialIntakeSchema';
 
 // ─── Field maps per form type ────────────────────────────────────────────────
 // Only the taxpayer section fields are filled — rep info, tax matters, etc.
@@ -1243,5 +1244,115 @@ export async function generateAddendumPdf(c = null, opts = {}) {
   // The client's e-sign stamp lands just above the Client Signature line —
   // SIGNATURE_POSITIONS['addendum'] uses page:'last' since this document's
   // total page count varies with how much content the checklist generates.
+  return pdfDoc.save();
+}
+
+// ─── Financial Intake — submitted-answers summary PDF ────────────────────────
+// Snapshots a submitted financial_intake_responses row into a readable PDF,
+// generated automatically at lead-to-client conversion and saved into the
+// new client's Documents > Financial Statements folder. Same flowing
+// multi-page approach as generateAddendumPdf — this can run long since the
+// intake covers income, assets, debts, and expenses in full.
+function fmtIntakeVal(v) {
+  if (v === undefined || v === null || v === '') return null;
+  return String(v);
+}
+
+export async function generateFinancialIntakePdf(clientName, answers = {}, submittedAt = null) {
+  const pdfDoc = await PDFDocument.create();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const margin = 56;
+  const [pageW, pageH] = [612, 792];
+
+  let page = pdfDoc.addPage([pageW, pageH]);
+  let y = pageH - 62;
+
+  function newPage() {
+    page = pdfDoc.addPage([pageW, pageH]);
+    y = pageH - 62;
+  }
+  function ensureSpace(needed) {
+    if (y - needed < margin + 24) newPage();
+  }
+  function wrap(text, size, maxWidth, useFont = font) {
+    const words = String(text).split(' ');
+    const lines = [];
+    let line = '';
+    for (const w of words) {
+      const test = line ? line + ' ' + w : w;
+      if (useFont.widthOfTextAtSize(test, size) > maxWidth && line) { lines.push(line); line = w; }
+      else line = test;
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+  function row(label, value) {
+    const labelLines = wrap(label, 9.5, 280);
+    const valueLines = wrap(value, 9.5, pageW - margin * 2 - 300, bold);
+    const lineCount = Math.max(labelLines.length, valueLines.length);
+    ensureSpace(lineCount * 13 + 4);
+    labelLines.forEach((l, i) => page.drawText(l, { x: margin, y: y - i * 13, size: 9.5, font, color: rgb(0.35, 0.35, 0.35) }));
+    valueLines.forEach((l, i) => page.drawText(l, { x: margin + 300, y: y - i * 13, size: 9.5, font: bold }));
+    y -= lineCount * 13 + 4;
+  }
+  function sectionTitle(text) {
+    ensureSpace(26);
+    y -= 6;
+    page.drawText(text.toUpperCase(), { x: margin, y, size: 10.5, font: bold, color: rgb(0.06, 0.4, 0.66) });
+    y -= 4;
+    page.drawLine({ start: { x: margin, y: y - 2 }, end: { x: pageW - margin, y: y - 2 }, thickness: 0.6, color: rgb(0.85, 0.85, 0.85) });
+    y -= 14;
+  }
+
+  page.drawText('Tax Case Review', { x: margin, y, size: 16, font: bold });
+  y -= 16;
+  page.drawText('631 US Highway One Ste 304, North Palm Beach, FL 33408 · info@taxcasereview.com · (850) 459-9039', { x: margin, y, size: 8.5, font, color: rgb(0.4, 0.4, 0.4) });
+  y -= 22;
+  page.drawText('FINANCIAL INTAKE — SUBMITTED SUMMARY', { x: margin, y, size: 12.5, font: bold });
+  y -= 18;
+  page.drawText(clientName || 'Client', { x: margin, y, size: 12, font: bold });
+  y -= 14;
+  const subDate = submittedAt ? new Date(submittedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '—';
+  page.drawText(`Submitted: ${subDate}`, { x: margin, y, size: 9.5, font, color: rgb(0.4, 0.4, 0.4) });
+  y -= 22;
+
+  for (const step of FINANCIAL_INTAKE_STEPS) {
+    if (step.id === 'intro' || step.id === 'done') continue;
+    const visibleQuestions = step.questions.filter(q => q.type !== 'info' && intakeShouldShow(q, answers));
+    const hasAnyAnswer = visibleQuestions.some(q => {
+      if (q.type === 'entries') return (answers[q.id] || []).length > 0;
+      return fmtIntakeVal(answers[q.id]) !== null;
+    });
+    if (!hasAnyAnswer) continue;
+
+    sectionTitle(step.title);
+    for (const q of visibleQuestions) {
+      if (q.type === 'entries') {
+        const entries = answers[q.id] || [];
+        if (!entries.length) continue;
+        ensureSpace(16);
+        page.drawText(q.label, { x: margin, y, size: 9.5, font, color: rgb(0.35, 0.35, 0.35) });
+        y -= 13;
+        entries.forEach((entry, i) => {
+          ensureSpace(14);
+          page.drawText(`#${i + 1}`, { x: margin, y, size: 9, font: bold, color: rgb(0.5, 0.5, 0.5) });
+          y -= 12;
+          for (const f of q.entryFields) {
+            const v = fmtIntakeVal(entry[f.id]);
+            if (v === null) continue;
+            row('   ' + f.label, v);
+          }
+          y -= 4;
+        });
+        continue;
+      }
+      const v = fmtIntakeVal(answers[q.id]);
+      if (v === null) continue;
+      row(q.label, v);
+    }
+    y -= 6;
+  }
+
   return pdfDoc.save();
 }
