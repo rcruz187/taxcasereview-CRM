@@ -266,6 +266,9 @@ export default function Leads() {
   const [splitPaymentModal, setSplitPaymentModal] = useState(false)
   const [detail, setDetail] = useState(null)
   const [leadNotes, setLeadNotes]     = useState([])
+  const [leadSms, setLeadSms]         = useState([])
+  const [leadSmsBody, setLeadSmsBody] = useState('')
+  const [leadSmsSending, setLeadSmsSending] = useState(false)
   const [leadDetailTab, setLeadDetailTab] = useState('overview')
   const [newLeadNote, setNewLeadNote] = useState('')
   const [addingLeadNote, setAddingLeadNote] = useState(false)
@@ -347,6 +350,71 @@ export default function Leads() {
   async function loadLeadNotes(leadId) {
     const { data } = await supabase.from('lead_notes').select('*').eq('lead_id', leadId).order('created_at', { ascending: false })
     setLeadNotes(data || [])
+  }
+
+  // Scoped strictly to this lead's name — sms_messages.clientName is the
+  // shared text key receive-sms already matches against both leads and
+  // clients by phone number, so a lead's inbound replies were already
+  // landing in the table correctly. There just wasn't a tab here to show
+  // them, so the only place to see a lead's texts was the global SMS page
+  // (every contact's messages, unfiltered).
+  async function loadLeadSms(leadName) {
+    const { data } = await supabase.from('sms_messages').select('*').eq('clientName', leadName).order('created_at', { ascending: false })
+    setLeadSms(data || [])
+  }
+  // Covers every way the detail view can open — list click, direct URL/
+  // refresh, the fast-path single-lead fetch — not just the row onClick.
+  useEffect(() => {
+    if (!detail) return
+    loadLeadSms(detail.name)
+  }, [detail?.id])
+
+  async function sendLeadSms(l) {
+    if (!leadSmsBody.trim()) { showToast('Message required'); return }
+    if (!l.phone) { showToast('No phone number on file for this lead'); return }
+    setLeadSmsSending(true)
+
+    const toNum = '+1' + l.phone.replace(/\D/g,'').slice(-10)
+    const { data: settings } = await supabase.from('settings').select('sw_space_url').limit(1).maybeSingle()
+    let status = 'Sent', swId = null, errMsg = null
+
+    if (settings?.sw_space_url) {
+      try {
+        const { data: resData, error: invokeErr } = await supabase.functions.invoke('send-sms', {
+          body: { to: toNum, body: leadSmsBody, lead_id: l.id || null, user_id: user?.id || null }
+        })
+        if (!invokeErr && resData?.success) {
+          swId = resData.sid || null
+        } else {
+          status = 'Failed'
+          errMsg = resData?.error || invokeErr?.message || 'SignalWire send failed'
+        }
+      } catch (e) {
+        status = 'Failed'
+        errMsg = e.message
+      }
+    } else {
+      status = 'Logged (not sent)'
+    }
+
+    const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    const { error } = await supabase.from('sms_messages').insert([{
+      clientName: l.name, phone: toNum, body: leadSmsBody, status,
+      signalwire_sms_id: swId, sent_by: actor, error_msg: errMsg,
+      created_at: new Date().toISOString(),
+    }])
+    setLeadSmsSending(false)
+    if (error) { showToast('Error: '+error.message); return }
+
+    if (status === 'Sent') showToast('✅ Text sent!')
+    else if (status === 'Failed') showToast('SignalWire error: ' + (errMsg||'send failed'))
+    else showToast('Logged — add SignalWire credentials in Settings to actually send')
+
+    const noteContent = `💬 Text sent: "${leadSmsBody.length > 120 ? leadSmsBody.slice(0,120)+'…' : leadSmsBody}"`
+    await supabase.from('lead_notes').insert({ lead_id: l.id, lead_name: l.name, text: noteContent, type: 'System', author: actor, created_at: new Date().toISOString() })
+
+    setLeadSmsBody('')
+    loadLeadSms(l.name)
   }
 
   async function addLeadNote() {
@@ -1044,6 +1112,7 @@ export default function Leads() {
           <div style={{display:'flex',borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
             {[
               {key:'overview', label:'📋 Overview'},
+              {key:'sms', label:'💬 SMS'},
               {key:'notes', label:`📝 Notes & Activity (${leadNotes.length})`},
               {key:'docs',  label:'📁 Documents'},
               {key:'compliance', label:'📋 Compliance'},
@@ -1058,6 +1127,43 @@ export default function Leads() {
               </button>
             ))}
           </div>
+
+          {leadDetailTab==='sms' && (
+            <div style={{padding:16}}>
+              <div style={{display:'flex',gap:8,marginBottom:14}}>
+                <textarea
+                  value={leadSmsBody} onChange={e=>setLeadSmsBody(e.target.value)}
+                  placeholder={l.phone ? `Text ${l.name}…` : 'No phone number on file for this lead'}
+                  disabled={!l.phone}
+                  style={{flex:1,padding:'8px 10px',borderRadius:8,border:'1px solid var(--br)',resize:'vertical',minHeight:60,fontSize:13,fontFamily:'inherit',background:'var(--s2)',color:'var(--tx)'}}
+                />
+                <div style={{display:'flex',flexDirection:'column',gap:6,alignItems:'flex-end',justifyContent:'space-between'}}>
+                  <span style={{fontSize:10,color:leadSmsBody.length>160?'var(--warn)':'var(--t3)',whiteSpace:'nowrap'}}>{leadSmsBody.length} chars</span>
+                  <button className="btn pri" style={{padding:'8px 14px',fontSize:12,whiteSpace:'nowrap'}}
+                    disabled={!leadSmsBody.trim()||!l.phone||leadSmsSending}
+                    onClick={()=>sendLeadSms(l)}>
+                    {leadSmsSending?'…':'Send'}
+                  </button>
+                </div>
+              </div>
+              {!l.phone && (
+                <div style={{fontSize:12,color:'var(--warn)',marginBottom:12}}>Add a phone number to this lead to send texts.</div>
+              )}
+              {leadSms.length===0&&<div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No texts yet.</div>}
+              {leadSms.map(s=>(
+                <div key={s.id} style={{padding:'10px 0',borderBottom:'1px solid var(--br)'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3}}>
+                    {s.direction==='inbound'
+                      ? <span title="Received" style={{color:'var(--blue)',fontSize:11}}>📥 Received</span>
+                      : <span title="Sent" style={{color:'var(--t3)',fontSize:11}}>📤 Sent</span>}
+                    <span className={`bdg ${s.status==='Sent'?'bg':s.status==='Failed'?'br':'bn'}`} style={{fontSize:9}}>{s.status||'Sent'}</span>
+                  </div>
+                  <div style={{fontSize:13,lineHeight:1.6,color:'var(--tx)',whiteSpace:'pre-wrap'}}>{s.body}</div>
+                  <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>{s.sent_by||'Staff'} · {s.created_at?new Date(s.created_at).toLocaleString():''}</div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {leadDetailTab==='overview' && (
             <div style={{padding:16}}>

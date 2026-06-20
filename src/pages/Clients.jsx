@@ -1120,7 +1120,7 @@ export default function Clients() {
   function openDetail(c, opts = {}) {
     if (!opts.preserveTab) setDetailTab('overview')
     setDetail(c)
-    setRelCases([]);setRelTasks([]);setRelInvoices([])
+    setRelCases([]);setRelTasks([]);setRelInvoices([]);setRelSms([])
     loadRelated(c.name)
     const qs = opts.preserveTab ? searchParams.toString() : ''
     navigate(`/clients/${c.id}${qs ? `?${qs}` : ''}`, { replace: true })
