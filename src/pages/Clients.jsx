@@ -1897,42 +1897,6 @@ export default function Clients() {
         </div>
       </div>
       {modal&&<ClientFormModal form={form} fld={fld} reps={reps} saving={saving} onSave={save} onClose={()=>setModal(false)} title="Add Client"/>}
-
-      {faxModal && faxClient && (
-        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setFaxModal(false)}>
-          <div className="modal" style={{width:500}}>
-            <div className="mh"><span className="mt">📠 Send Fax — {faxClient.name}</span><button className="xbtn" onClick={()=>setFaxModal(false)}>&times;</button></div>
-            <InlineFaxForm client={faxClient} onClose={()=>setFaxModal(false)} showToast={showToast} onLogged={()=>loadRelated(faxClient.name)}/>
-          </div>
-        </div>
-      )}
-
-      {esignModal && esignClient && (
-        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setEsignModal(false)}>
-          <div className="modal" style={{width:500}}>
-            <div className="mh"><span className="mt">✍️ E-Signature — {esignClient.name}</span><button className="xbtn" onClick={()=>setEsignModal(false)}>&times;</button></div>
-            <InlineEsignForm client={esignClient} onClose={()=>setEsignModal(false)} showToast={showToast}/>
-          </div>
-        </div>
-      )}
-
-      {portalModal && portalClient && (
-        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setPortalModal(false)}>
-          <div className="modal" style={{width:500}}>
-            <div className="mh"><span className="mt">🔓 Client Portal — {portalClient.name}</span><button className="xbtn" onClick={()=>setPortalModal(false)}>&times;</button></div>
-            <InlinePortalForm client={portalClient} onClose={()=>setPortalModal(false)} showToast={showToast}/>
-          </div>
-        </div>
-      )}
-
-      {orgModal && orgClient && (
-        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setOrgModal(false)}>
-          <div className="modal" style={{width:500}}>
-            <div className="mh"><span className="mt">🧾 Tax Organizer — {orgClient.name}</span><button className="xbtn" onClick={()=>setOrgModal(false)}>&times;</button></div>
-            <InlineOrganizerForm client={orgClient} onClose={()=>setOrgModal(false)} showToast={showToast}/>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
