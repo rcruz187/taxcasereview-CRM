@@ -535,7 +535,7 @@ export default function Leads() {
     if (!skipConfirm && !confirm(`Convert "${l.name}" to a full client?`)) return
     setConverting(true)
     const taxYearsStr = l.taxYearsCustom || (()=>{try{return JSON.parse(l.taxYears||'[]').join(', ')}catch{return l.taxYears||''}})()
-    const { error } = await supabase.from('clients').insert([{
+    const { data: newClient, error } = await supabase.from('clients').insert([{
       name: l.name, clientType: l.clientType || 'Individual',
       first: l.first, mi: l.mi, last: l.last,
       phone: l.phone, phone2: l.phone2, email: l.email,
@@ -556,8 +556,14 @@ export default function Leads() {
       notes: l.notes, status: 'Active',
       clientSince: new Date().toISOString().slice(0,10),
       created_at: new Date().toISOString()
-    }])
+    }]).select().single()
     if (error) { showToast('Error: '+error.message); setConverting(false); return }
+    // Re-point every saved card on the lead to the new client record — the
+    // multi-card list (and split payment) would otherwise show empty for a
+    // client that arrived with cards already on file as a lead.
+    await supabase.from('payment_methods').update({
+      record_type: 'client', record_id: newClient.id,
+    }).eq('record_type', 'lead').eq('record_id', l.id)
     // Update lead status
     await supabase.from('leads').update({ status: 'Converted to Client' }).eq('id', l.id)
     // Carry lead notes over to the new client record so case history isn't lost
