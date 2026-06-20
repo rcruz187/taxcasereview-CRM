@@ -50,10 +50,19 @@ const EMP_DOC_LABELS = ['W-4', 'I-9', 'Direct Deposit', 'SSN Card', 'Driver Lice
 // Map camelCase form state → snake_case DB columns
 function toDbPayload(form) {
   const { hourlyRate, payType, paymentMethod, hireDate, emergencyContact, emergencyPhone,
-          filingStatus, sorShortId, sorUsername, employeeId, ...rest } = form
+          filingStatus, sorShortId, sorUsername, employeeId,
+          pto_balance, sick_balance, vacation_balance, ...rest } = form
+  // Postgres numeric columns reject '' outright (the error this fixes:
+  // "invalid input syntax for type numeric: \"\""). An employee with no
+  // hourly rate set falls through fromDbRow's ?? chain to '', which used
+  // to go straight into the payload unconverted. Same risk for the three
+  // PTO/Sick/Vacation balance fields if a user manually clears one of
+  // those number inputs. Empty string -> null for all four; any real
+  // numeric string still passes through as-is for Postgres to parse.
+  const numOrNull = v => (v === '' || v === undefined || v === null) ? null : v
   return {
     ...rest,
-    hourly_rate:       hourlyRate,
+    hourly_rate:       numOrNull(hourlyRate),
     pay_type:          payType,
     payment_method:    paymentMethod,
     hire_date:         hireDate || null,
@@ -63,6 +72,9 @@ function toDbPayload(form) {
     sor_short_id:      sorShortId,
     sor_username:      sorUsername,
     employee_id:       employeeId,
+    pto_balance:       numOrNull(pto_balance),
+    sick_balance:      numOrNull(sick_balance),
+    vacation_balance:  numOrNull(vacation_balance),
   }
 }
 
