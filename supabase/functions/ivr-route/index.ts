@@ -6,16 +6,28 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 // input at all, via the <Redirect> fallback -- same URL, just no Digits
 // param that time).
 //
-//   Press 1 -> "speak with a tax professional" -> hold in conference, banner
-//             shows in the CRM labeled "Tax Professional"
-//   Press 0 -> "front desk" -> same mechanism, labeled "Front Desk"
-//   Press 2 -> "leave a voicemail" -> straight to the recording prompt,
-//             nobody's phone rings at all
+//   Press 1 -> "speak with a tax advisor" (sales) -> hold in conference,
+//             banner shows in the CRM labeled "Tax Advisor"
+//   Press 2 -> "speak with a tax account representative" -> hold in
+//             conference, banner labeled "Tax Account Representative"
+//   Press 0 -> "speak with the operator" -> hold in conference, banner
+//             labeled "Operator"
 //   anything else / no input -> straight to voicemail (simplest safe
 //             fallback rather than looping the menu indefinitely)
+//
+// All three menu options ring through the same way. If nobody answers,
+// CallContext.jsx's 25s no-answer timeout calls redirect-to-voicemail
+// regardless of department, so "queue full" falls through to voicemail
+// automatically -- no extra logic needed here for that.
 
 const VOICEMAIL_PROMPT_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/voicemail-prompt'
 const CALL_RECORDED_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/call-recorded'
+
+const DEPARTMENTS: Record<string, string> = {
+  '1': 'Tax Advisor',
+  '2': 'Tax Account Representative',
+  '0': 'Operator',
+}
 
 serve(async (req) => {
   const body = await req.text()
@@ -26,8 +38,8 @@ serve(async (req) => {
   const from = params.get('From') || ''
 
   try {
-    if (digits === '1' || digits === '0') {
-      const department = digits === '1' ? 'Tax Professional' : 'Front Desk'
+    const department = DEPARTMENTS[digits]
+    if (department) {
       const conferenceName = `office-${callSid || Date.now()}`
 
       const supabase = createClient(
@@ -51,8 +63,8 @@ serve(async (req) => {
       return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
     }
 
-    // Digits === '2', or empty (timed out with no input), or anything
-    // unrecognized -- straight to voicemail, nobody's phone rings.
+    // Unrecognized digit, or empty (timed out with no input) -- straight to
+    // voicemail, nobody's phone rings.
     console.log('routing straight to voicemail -- digits was:', JSON.stringify(digits))
     const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Redirect method="POST">${VOICEMAIL_PROMPT_URL}</Redirect></Response>`
     return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
