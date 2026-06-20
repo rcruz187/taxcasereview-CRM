@@ -421,7 +421,7 @@ export default function Tasks() {
             <div style={{fontSize:13,color:'var(--t3)',marginBottom:20}}>This cannot be undone.</div>
             <div style={{display:'flex',gap:8}}>
               <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={()=>setConfirmDelId(null)}>Cancel</button>
-              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>{window._confirmDel=true;permanentDelete(confirmDelId);setConfirmDelId(null)}}>Delete</button>
+              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>{window._confirmDel=true;permDelete(confirmDelId);setConfirmDelId(null)}}>Delete</button>
             </div>
           </div>
         </div>
