@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+
 // Called BY SignalWire whenever someone calls the number, AND ALSO called
 // a second time whenever the browser (CallContext.jsx's answerIncoming())
 // dials the business number itself to "answer" a held inbound caller.
@@ -27,6 +28,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 //   3. If nobody answers within 25s, CallContext.jsx calls
 //      redirect-to-voicemail, which uses the SignalWire REST API to pull
 //      the still-held caller out to the voicemail prompt.
+
+const HELD_ROW_MAX_AGE_MINUTES = 10
 
 serve(async (req) => {
   const body = await req.text()
@@ -60,25 +63,64 @@ serve(async (req) => {
 
     if (isAgentJoin) {
       // The browser dialing itself to bridge into a held caller's
-      // conference -- not a real customer call.
+      // conference -- not a real customer call. Could be answering a real
+      // inbound caller (incoming_calls) OR bridging into a new outbound
+      // call this same agent just originated (outbound_calls).
+      //
+      // Safety net: only consider incoming_calls rows from the last
+      // HELD_ROW_MAX_AGE_MINUTES, regardless of status. This is a backstop
+      // in case some future code path ever leaves a row open without
+      // marking it completed/missed again (as happened before) -- a stale
+      // row older than this can no longer hijack a fresh agent-join.
+      const cutoff = new Date(Date.now() - HELD_ROW_MAX_AGE_MINUTES * 60 * 1000).toISOString()
+
       const { data: held, error: heldErr } = await supabase
         .from('incoming_calls')
         .select('conference_name, callsid')
         .in('status', ['ringing', 'answered'])
+        .gte('created_at', cutoff)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
 
       if (heldErr) console.error('incoming_calls lookup error:', heldErr)
 
-      if (!held) {
-        console.log('agent join attempted but no held caller found -- hanging up')
-        const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`
+      if (held) {
+        console.log('agent joining inbound conference:', held.conference_name)
+        const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Conference endConferenceOnExit="true">${held.conference_name}</Conference></Dial></Response>`
         return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
       }
 
-      console.log('agent joining conference:', held.conference_name)
-      const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Conference endConferenceOnExit="true">${held.conference_name}</Conference></Dial></Response>`
+      // No held inbound caller -- check for a pending outbound call this
+      // agent just started (see start-outbound-call).
+      const { data: outbound, error: outErr } = await supabase
+        .from('outbound_calls')
+        .select('id, conference_name')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (outErr) console.error('outbound_calls lookup error:', outErr)
+
+      if (outbound) {
+        await supabase.from('outbound_calls').update({ status: 'connected' }).eq('id', outbound.id)
+        console.log('agent joining outbound conference:', outbound.conference_name)
+        // Deliberately bare -- matching the inbound bridge above exactly.
+        // This used to also carry record="record-from-start" +
+        // recordingStatusCallback, duplicating what's already on
+        // outbound-leg's noun for the same conference. Two legs both
+        // declaring record-from-start on the same conference is most
+        // likely what was making SignalWire choke on this leg entirely
+        // (never connecting, and not cleanly hanging up either since it
+        // never properly connected). Recording still happens via
+        // outbound-leg's noun -- only one leg needs to declare it.
+        const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Conference endConferenceOnExit="true">${outbound.conference_name}</Conference></Dial></Response>`
+        return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
+      }
+
+      console.log('agent join attempted but no held caller or pending outbound call found -- hanging up')
+      const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`
       return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
     }
 
@@ -93,8 +135,8 @@ serve(async (req) => {
 
     // Otherwise, play the auto-attendant menu. ivr-route handles whatever
     // digit (or no digit) comes back, including holding the caller in a
-    // conference for Option 1/0 -- this function's job stops at presenting
-    // the menu.
+    // conference for Option 1/2/0 -- this function's job stops at
+    // presenting the menu.
     const greeting = 'Thank you for calling Tax Case Review. To check your tax status instantly, please check your email or text messages for your personal client portal link. Otherwise, please choose from the following options. Press 1 to speak with a tax advisor. Press 2 to speak with a tax account representative. Press 0 to speak with the operator.'
     const ivrRouteUrl = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/ivr-route'
     const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Gather numDigits="1" timeout="8" action="${ivrRouteUrl}" method="POST"><Say voice="Polly.Joanna-Neural">${greeting}</Say></Gather><Redirect method="POST">${ivrRouteUrl}</Redirect></Response>`
