@@ -1323,6 +1323,10 @@ export default function Clients() {
                   <div style={{fontSize:22,fontWeight:800,color:'var(--blue)'}}>{relNotes.length}</div>
                 </div>
                 <div>
+                  <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Tasks</div>
+                  <div style={{fontSize:22,fontWeight:800,color:'var(--ok)'}}>{relTasks.filter(t=>t.done).length}/{relTasks.length}</div>
+                </div>
+                <div>
                   <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Payments</div>
                   <div style={{fontSize:22,fontWeight:800,color:'var(--ok)'}}>{relPayments.length}</div>
                 </div>

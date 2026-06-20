@@ -940,7 +940,7 @@ export default function Leads() {
               <div className="field"><label>Assigned Rep</label>
                 <select value={form.assignedTo} onChange={e=>fld('assignedTo',e.target.value)}>
                   <option value="">Unassigned</option>
-                  <option>Romy Cruz</option><option>Dana Richard</option><option>Yesenia Gonzalez</option>
+                  {(employees.length>0?employees.map(e=>e.name):['Romy Cruz','Dana Richard','Yesenia Gonzalez']).map(n=><option key={n}>{n}</option>)}
                 </select>
               </div>
               <div className="field"><label>Lead Status</label>
@@ -1227,6 +1227,10 @@ export default function Leads() {
                 <div>
                   <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Notes</div>
                   <div style={{fontSize:22,fontWeight:800,color:'var(--blue)'}}>{leadNotes.length}</div>
+                </div>
+                <div>
+                  <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Tasks</div>
+                  <div style={{fontSize:22,fontWeight:800,color:'var(--ok)'}}>{leadTasks.filter(t=>t.done).length}/{leadTasks.length}</div>
                 </div>
               </div>
             </div>
