@@ -108,19 +108,11 @@ serve(async (req) => {
       }
 
       // No held inbound caller -- check for a pending outbound call this
-      // agent just started (see start-outbound-call). Same safety net as
-      // the inbound branch above: only consider a 'pending' row recent
-      // enough to plausibly still be this self-dial's match. Without this,
-      // a row stuck on 'pending' from a crashed/closed browser tab (no JS
-      // ever ran to clean it up) would silently block every future
-      // outbound call from anyone, since start-outbound-call now only
-      // allows one 'pending' row system-wide at a time.
-      const outboundCutoff = new Date(Date.now() - 1 * 60 * 1000).toISOString()
+      // agent just started (see start-outbound-call).
       const { data: outbound, error: outErr } = await supabase
         .from('outbound_calls')
         .select('id, conference_name')
         .eq('status', 'pending')
-        .gte('created_at', outboundCutoff)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
