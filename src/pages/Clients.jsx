@@ -12,7 +12,8 @@ import FinancialProfile from './FinancialProfile'
 import FinancialIntakeView from '../components/FinancialIntakeView'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
-import { generateAddendum } from '../lib/docUtils'
+import { generateAddendum, sendAddendumForSignature } from '../lib/docUtils'
+import { RESOLUTION_SERVICES } from '../lib/irsFormUtils'
 import { generatePOACoverLetterPdf } from '../lib/irsFormUtils'
 
 const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']
@@ -743,7 +744,8 @@ export default function Clients() {
   const [detail,    setDetail]    = useState(null)
   // Addendum modal
   const [addModal,    setAddModal]    = useState(false)
-  const [addForm,     setAddForm]     = useState({ resolutionFee:'', paymentPlan:'', startDate:'', notes:'' })
+  const [addForm,     setAddForm]     = useState({ resolutionFee:'', paymentPlan:'', startDate:'', notes:'', services:[], sendVia:'email' })
+  const [addendumSending, setAddendumSending] = useState(false)
   // Related data for detail view
   const [relCases,    setRelCases]    = useState([])
   const [relDocs,     setRelDocs]     = useState([])
@@ -1092,6 +1094,55 @@ export default function Clients() {
     showToast('✅ Task added!')
   }
 
+  // Sends the Service Addendum for e-signature (vs. the print-only path,
+  // which stays available as a separate button in the same modal). Mirrors
+  // handleSendFullPackage's email/SMS pattern in Leads.jsx.
+  async function sendAddendum() {
+    if (!addForm.resolutionFee) { showToast('Enter the resolution fee first'); return }
+    const via = addForm.sendVia || 'email'
+    if (via !== 'sms' && !c.email) { showToast('Client has no email on file'); return }
+    if (via !== 'email' && !c.phone) { showToast('Client has no phone on file'); return }
+    setAddendumSending(true)
+    const res = await sendAddendumForSignature(c, addForm, supabase)
+    if (res.error) { setAddendumSending(false); showToast('Error: '+res.error); return }
+
+    const url = res.url
+    await navigator.clipboard.writeText(url).catch(()=>{})
+    let emailSent=false, smsSent=false
+    const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+
+    if ((via==='email'||via==='both') && c.email) {
+      const { error: eErr } = await supabase.functions.invoke('send-email', { body: {
+        to: c.email,
+        subject: `Action Required: Sign Your Service Addendum — Tax Case Review`,
+        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:24px"><div style="font-size:20px;font-weight:800;color:#1d4ed8">Tax Case Review</div></div><p>Dear <strong>${c.name}</strong>,</p><p>Your Service Addendum is ready for review and signature. This authorizes Tax Case Review to proceed with the resolution services discussed and the associated fee.</p><p style="text-align:center;margin:28px 0"><a href="${url}" style="background:#16a34a;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Review &amp; Sign Addendum</a></p><p style="font-size:12px;color:#64748b">Or copy this link: ${url}</p><hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"/><p style="font-size:11px;color:#94a3b8;text-align:center">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
+      }})
+      emailSent = !eErr
+    }
+    if ((via==='sms'||via==='both') && c.phone) {
+      const { data: cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
+      if (cfg?.signalwire_backend) {
+        try {
+          await fetch(cfg.signalwire_backend + '/sms/send', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: c.phone, body: `Tax Case Review: please review and sign your Service Addendum here: ${url}` })
+          })
+          smsSent = true
+        } catch (_) {}
+      }
+    }
+
+    const feeText = `$${Number(addForm.resolutionFee).toLocaleString()}`
+    const channels = [emailSent&&'email', smsSent&&'sms'].filter(Boolean).join(' + ')
+    const noteContent = `📋 Service Addendum sent for e-signature — Resolution Fee ${feeText}${channels?` (${channels})`:''}`
+    await supabase.from('client_notes').insert({ client_name: c.name, content: noteContent, created_by: actor })
+
+    setAddendumSending(false)
+    setAddModal(false)
+    loadRelated(c.name)
+    showToast(emailSent||smsSent ? '✅ Addendum sent for signature!' : '⚠️ Link copied — configure email/SMS to send automatically')
+  }
+
   async function addPaymentForClient() {
     if (!payForm.amount||!detail) return
     setSavingPay(true)
@@ -1264,7 +1315,7 @@ export default function Clients() {
                 setFillerClient({...c, address:c.street, business_name:c.name})
               } catch (err) { showToast('Error opening form: ' + err.message) }
             }}/>
-            <ActionBtn color="#d97706" icon="📋" label="Addendum" sub="Add Services" onClick={()=>{setAddForm({resolutionFee:'',paymentPlan:'',startDate:'',notes:''});setAddModal(true)}}/>
+            <ActionBtn color="#d97706" icon="📋" label="Addendum" sub="Add Services" onClick={()=>{setAddForm({resolutionFee:'',paymentPlan:'',startDate:'',notes:'',services:[],sendVia:'email'});setAddModal(true)}}/>
             <ActionBtn color="#0ea5e9" icon="🔓" label="Client Portal" sub="Compliance Access" onClick={()=>{setPortalClient(c);setPortalModal(true)}}/>
             <ActionBtn color="#9333ea" icon="🧾" label="Tax Organizer" sub="Send for Filing" onClick={()=>{setOrgClient(c);setOrgModal(true)}}/>
           </div>
@@ -1774,13 +1825,13 @@ export default function Clients() {
 
         {addModal&&(
           <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setAddModal(false)}>
-            <div className="modal" style={{width:560}}>
+            <div className="modal" style={{width:600,maxHeight:'88vh',overflowY:'auto'}}>
               <div className="mh">
                 <span className="mt">📋 Generate Addendum — {c.name}</span>
                 <button className="xbtn" onClick={()=>setAddModal(false)}>&times;</button>
               </div>
               <div style={{fontSize:12,color:'var(--t3)',marginBottom:14}}>
-                Fill in the resolution fee and scope details before generating. These will print directly on the document for the client to sign.
+                Fill in the resolution fee and scope details, check off the services that apply based on the investigation results, then print a hard copy or send it straight to the client for e-signature.
               </div>
               <div className="fg2">
                 <div className="field"><label>Resolution Service Fee ($) *</label>
@@ -1793,19 +1844,43 @@ export default function Clients() {
               <div className="field"><label>Payments Start Date</label>
                 <input type="date" value={addForm.startDate} onChange={e=>setAddForm(f=>({...f,startDate:e.target.value}))}/>
               </div>
+
+              <div className="field"><label>Resolution Services Authorized — based on investigation results</label>
+                <div style={{background:'var(--s2)',border:'1px solid var(--br)',borderRadius:7,padding:'8px 12px',maxHeight:180,overflowY:'auto'}}>
+                  {RESOLUTION_SERVICES.map(s=>(
+                    <label key={s.key} style={{display:'flex',alignItems:'center',gap:8,padding:'5px 0',fontSize:12.5,cursor:'pointer'}}>
+                      <input type="checkbox" style={{width:'auto'}}
+                        checked={addForm.services.includes(s.key)}
+                        onChange={()=>setAddForm(f=>({...f,services:f.services.includes(s.key)?f.services.filter(k=>k!==s.key):[...f.services,s.key]}))}/>
+                      {s.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               <div className="field"><label>Additional Scope / Work Notes</label>
-                <textarea value={addForm.notes} onChange={e=>setAddForm(f=>({...f,notes:e.target.value}))} style={{minHeight:80}} placeholder="e.g. Includes filing 3 years of unfiled returns, OIC preparation, lien subordination..."/>
+                <textarea value={addForm.notes} onChange={e=>setAddForm(f=>({...f,notes:e.target.value}))} style={{minHeight:60}} placeholder="e.g. Includes filing 3 years of unfiled returns..."/>
               </div>
-              <div style={{background:'var(--s3)',borderRadius:6,padding:10,fontSize:11,color:'var(--t3)',marginBottom:12}}>
-                The standard resolution services (IRS representation, POA, negotiation, case management) are always included. Use the notes field to add anything specific to this client's case.
+
+              <div className="field"><label>Send Via</label>
+                <select value={addForm.sendVia} onChange={e=>setAddForm(f=>({...f,sendVia:e.target.value}))}>
+                  <option value="email">Email</option>
+                  <option value="sms">Text Message</option>
+                  <option value="both">Email + Text</option>
+                </select>
               </div>
-              <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:11}} onClick={()=>{
-                if(!addForm.resolutionFee){showToast('Enter the resolution fee first');return}
-                generateAddendum(c, addForm)
-                setAddModal(false)
-              }}>
-                🖨️ Generate &amp; Print Addendum
-              </button>
+
+              <div style={{display:'flex',gap:8,marginTop:6}}>
+                <button className="btn sec" style={{flex:1,justifyContent:'center',padding:11}} onClick={()=>{
+                  if(!addForm.resolutionFee){showToast('Enter the resolution fee first');return}
+                  generateAddendum(c, addForm)
+                }}>
+                  🖨️ Print
+                </button>
+                <button className="btn pri" style={{flex:2,justifyContent:'center',padding:11}} disabled={addendumSending} onClick={sendAddendum}>
+                  {addendumSending ? 'Sending…' : '✍️ Send for E-Signature'}
+                </button>
+              </div>
             </div>
           </div>
         )}

@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, PDFName, PDFString } from 'pdf-lib';
+import { PDFDocument, StandardFonts, PDFName, PDFString, rgb } from 'pdf-lib';
 
 // ─── Field maps per form type ────────────────────────────────────────────────
 // Only the taxpayer section fields are filled — rep info, tax matters, etc.
@@ -87,6 +87,7 @@ export const SIGNATURE_POSITIONS = {
   '8821_personal': { page: 0, sigX: 60,  sigY: 138, dateX: 438, dateY: 138, size: 12 },
   '8821_business': { page: 0, sigX: 60,  sigY: 138, dateX: 438, dateY: 138, size: 12 },
   'cc_auth':       { page: 0, sigX: 56,  sigY: 192, dateX: 100, dateY: 142, size: 12 },
+  'addendum':      { page: 'last', sigX: 56, sigY: 698, dateX: 90, dateY: 654, size: 12 },
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -196,7 +197,7 @@ export async function stampSignature(pdfBytes, formType, signatureText, dateText
 
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
   const pages = pdfDoc.getPages();
-  const page = pages[pos.page] || pages[0];
+  const page = pos.page === 'last' ? pages[pages.length - 1] : (pages[pos.page] || pages[0]);
 
   const dateFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -1032,4 +1033,215 @@ export async function fillForm433AOIC(client, profile) {
 
   const filledBytes = await pdfDoc.save();
   return filledBytes;
+}
+
+// ─── Service Addendum — resolution-services checklist ────────────────────────
+// Pulled from the firm's existing paper addendum (the version with checkbox
+// items per service) so the rep can select exactly which services apply to
+// THIS client's case, based on what came back from the tax investigation,
+// rather than a one-size-fits-all bullet list. Shown on both the rep-facing
+// checkbox UI in the Addendum modal and the generated document itself
+// (every item prints, checked or not — matching the original paper form's
+// "selected with an x or check mark" style, which also documents what was
+// NOT authorized).
+export const RESOLUTION_SERVICES = [
+  { key: 'oic', label: 'Offer in Compromise (OIC)',
+    legal: `Company will prepare and analyze an Offer in Compromise ("OIC"). Upon completion of the OIC analysis, Company will submit and negotiate the OIC with the Internal Revenue Service ("IRS"). In the event Client's OIC is rejected, Company will review Client's options and assist, at Client's direction, with preparing and submitting an appeal on Client's behalf. No Offer in Compromise shall be submitted unless Company determines its feasibility in advance.` },
+  { key: 'ia', label: 'Installment Agreement (IA)',
+    legal: `Company will prepare, submit, and negotiate an Installment Agreement ("IA") with the IRS. Company will notify Client of the proposed installment payment prior to Client being committed to such amount. The IRS requires a $105.00 set-up fee for any IA, payable as set forth in the annexed payment schedule. Client understands that establishment of an IA does not stop the accrual of penalties and interest.` },
+  { key: 'masterfile', label: 'IRS Master File Request & Analysis',
+    legal: `Company will request a copy of Client's IRS master file and conduct an analysis to determine the status of Client's IRS account.` },
+  { key: 'lien_sub', label: 'Lien Subordination Request',
+    legal: `Company will prepare, submit, and negotiate Client's Lien Subordination Request application for a Certificate of Subordination of Federal Tax Lien.` },
+  { key: 'lien_release', label: 'Lien Release Request',
+    legal: `Company will prepare, submit, and negotiate Client's Lien Release Request application for a Certificate of Release of Federal Tax Lien.` },
+  { key: 'cnc', label: 'Currently Non-Collectible (Status 53)',
+    legal: `Company will prepare, submit, and negotiate a Status 53 request to place Client's IRS tax account in Currently Non-Collectible status.` },
+  { key: 'levy_release', label: 'Levy Release (IRS or State)',
+    legal: `Company will prepare, submit, and negotiate a levy release of an IRS or State tax levy.` },
+  { key: 'abatement', label: 'Penalty Abatement Request',
+    legal: `Company will prepare, submit, and negotiate an abatement of penalty request.` },
+  { key: 'eic', label: 'Earned Income Credit Reinstatement',
+    legal: `Company will prepare, submit, and negotiate an earned income credit reinstatement request for reinstatement of a disallowed earned income credit.` },
+  { key: 'innocent_spouse', label: 'Innocent Spouse Relief',
+    legal: `Company will prepare and negotiate an innocent spouse relief request application for innocent spouse relief.` },
+  { key: 'injured_spouse', label: 'Injured Spouse Relief',
+    legal: `Company will prepare and negotiate an injured spouse relief request application for injured spouse relief.` },
+  { key: 'earnings', label: 'Earnings & Withholding Information Request',
+    legal: `Company will request a copy of Client's earnings and withholding information that has been reported to the IRS.` },
+];
+
+// ─── Service Addendum — fax-ready / e-sign-ready PDF ─────────────────────────
+// Built from scratch via pdf-lib (same approach as generateCcAuthPdf) rather
+// than the printBase()/window.print() HTML version in docUtils.js, because
+// this one needs to be uploaded and attached to an esigns row for the client
+// to actually e-sign — a print window has no file to attach. Multi-page:
+// the checklist alone usually pushes this past one page, so everything
+// flows through ensureSpace()/newPage() rather than fixed Y coordinates.
+const ADDENDUM_MARGIN = 56;
+const ADDENDUM_PAGE = [612, 792]; // US Letter
+
+export async function generateAddendumPdf(c = null, opts = {}) {
+  const {
+    resolutionFee = '', paymentPlan = '', startDate = '', notes = '',
+    services = [],
+  } = opts;
+
+  const pdfDoc = await PDFDocument.create();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const margin = ADDENDUM_MARGIN;
+  const [pageW, pageH] = ADDENDUM_PAGE;
+
+  let page = pdfDoc.addPage(ADDENDUM_PAGE);
+  let y = pageH - 62;
+
+  function newPage() {
+    page = pdfDoc.addPage(ADDENDUM_PAGE);
+    y = pageH - 62;
+  }
+  function ensureSpace(needed) {
+    if (y - needed < margin + 24) newPage();
+  }
+  function wrap(text, size, maxWidth, useFont = font) {
+    const words = text.split(' ');
+    const lines = [];
+    let line = '';
+    for (const w of words) {
+      const test = line ? line + ' ' + w : w;
+      if (useFont.widthOfTextAtSize(test, size) > maxWidth && line) { lines.push(line); line = w; }
+      else line = test;
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+  function drawWrapped(text, size, useFont = font, lineGap = 14, indent = 0) {
+    const lines = wrap(text, size, pageW - margin * 2 - indent, useFont);
+    for (const line of lines) {
+      ensureSpace(lineGap);
+      page.drawText(line, { x: margin + indent, y, size, font: useFont });
+      y -= lineGap;
+    }
+  }
+  function heading(text) {
+    ensureSpace(28);
+    y -= 4;
+    page.drawText(text, { x: margin, y, size: 12.5, font: bold });
+    y -= 16;
+  }
+  function checklistItem(label, legal, checked) {
+    const boxSize = 9;
+    const lines = wrap(legal, 9.5, pageW - margin * 2 - 22);
+    ensureSpace(13 + lines.length * 12 + 6);
+    page.drawRectangle({ x: margin, y: y - boxSize + 1, width: boxSize, height: boxSize, borderWidth: 1, borderColor: rgb(0.2, 0.2, 0.2) });
+    if (checked) page.drawText('X', { x: margin + 1.2, y: y - boxSize + 1.5, size: 9, font: bold });
+    page.drawText(label, { x: margin + 18, y, size: 10.5, font: bold });
+    y -= 13;
+    for (const line of lines) {
+      page.drawText(line, { x: margin + 18, y, size: 9.5, font, color: rgb(0.25, 0.25, 0.25) });
+      y -= 12;
+    }
+    y -= 6;
+  }
+
+  // ── Header ──
+  page.drawText('Tax Case Review', { x: margin, y, size: 16, font: bold });
+  y -= 16;
+  page.drawText('631 US Highway One Ste 304, North Palm Beach, FL 33408 · info@taxcasereview.com · (850) 459-9039', { x: margin, y, size: 8.5, font, color: rgb(0.4, 0.4, 0.4) });
+  y -= 22;
+  page.drawText('SERVICE ADDENDUM — ADDITIONAL SERVICES AGREEMENT', { x: margin, y, size: 12.5, font: bold });
+  y -= 20;
+
+  const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  page.drawText(`Date: ${date}`, { x: margin, y, size: 9.5, font, color: rgb(0.4, 0.4, 0.4) });
+  y -= 20;
+
+  // ── Client block ──
+  const name = c?.name || `${c?.first || ''} ${c?.last || ''}`.trim() || '___________________';
+  const phone = c?.phone || '___________________';
+  const email = c?.email || '___________________';
+  const address = [c?.street, c?.city, c?.state, c?.zip].filter(Boolean).join(', ') || '___________________';
+  page.drawText(name, { x: margin, y, size: 12, font: bold });
+  y -= 14;
+  page.drawText(`${phone}   ·   ${email}`, { x: margin, y, size: 9.5, font });
+  y -= 13;
+  page.drawText(address, { x: margin, y, size: 9.5, font });
+  y -= 20;
+
+  drawWrapped(`This Addendum ("Addendum") supplements the Tax Investigation Service Agreement previously executed between Tax Case Review ("Company") and the undersigned client ("Client") and is incorporated therein by reference. The Additional Services below are described in the paragraphs that have been selected with an "X."`, 10.5);
+  y -= 6;
+
+  // ── Checklist ──
+  heading('1. Additional Services Authorized');
+  for (const svc of RESOLUTION_SERVICES) {
+    checklistItem(svc.label, svc.legal, services.includes(svc.key));
+  }
+  if (notes) {
+    ensureSpace(28);
+    page.drawText('Additional Scope / Work Notes:', { x: margin, y, size: 10, font: bold });
+    y -= 13;
+    drawWrapped(notes, 10);
+    y -= 4;
+  }
+  drawWrapped(`Additional Services shall not in any event include audit reconsideration representation, collection appeal representation, fraud assertions or defense, future tax return preparation, or any other service not explicitly provided for in one of the checked paragraphs above.`, 9.5, font, 12);
+  y -= 8;
+
+  // ── Fee box ──
+  heading('2. Resolution Service Fee');
+  const feeDisplay = resolutionFee ? `$${Number(resolutionFee).toLocaleString()}` : '$___________';
+  const planDisplay = paymentPlan ? `$${Number(paymentPlan).toLocaleString()} /month` : '$___________ /month';
+  const startDisp = startDate || '___________';
+  ensureSpace(70);
+  const boxTop = y;
+  const boxH = 62;
+  page.drawRectangle({ x: margin, y: boxTop - boxH, width: pageW - margin * 2, height: boxH, borderWidth: 1.4, borderColor: rgb(0.10, 0.50, 0.83) });
+  page.drawText(`Resolution Service Fee: ${feeDisplay}`, { x: margin + 12, y: boxTop - 18, size: 13, font: bold, color: rgb(0.10, 0.50, 0.83) });
+  page.drawText(`Payment Plan: ${planDisplay} · Starting: ${startDisp}`, { x: margin + 12, y: boxTop - 34, size: 9.5, font, color: rgb(0.3, 0.3, 0.3) });
+  page.drawText('Fees for resolution services are separate from and in addition to the investigation fee.', { x: margin + 12, y: boxTop - 47, size: 8.5, font, color: rgb(0.3, 0.3, 0.3) });
+  page.drawText('Payments are due on the agreed start date and monthly thereafter until paid in full.', { x: margin + 12, y: boxTop - 58, size: 8.5, font, color: rgb(0.3, 0.3, 0.3) });
+  y = boxTop - boxH - 16;
+
+  // ── Conditions / autopay / incorporation ──
+  heading('3. Conditions');
+  drawWrapped(`Services under this Addendum are contingent upon: (a) Client remaining current on any required tax filings; (b) Client maintaining compliance with any IRS or state payment agreements during representation; (c) timely payment of fees as agreed upon above. Client authorizes automatic withdrawals via the payment method on file in the amounts and at the times set forth above; unless otherwise agreed, Company bills based on time spent and difficulty of services performed.`, 10.5);
+  y -= 4;
+
+  heading('4. Incorporation & Entire Agreement');
+  drawWrapped(`All terms of the original Tax Investigation Service Agreement remain in full force and effect and are incorporated herein. In the event of conflict between this Addendum and the original Agreement, this Addendum controls.`, 10.5);
+  y -= 4;
+
+  heading('5. Right to Cancel');
+  drawWrapped(`Client may cancel the transactions set forth in this Addendum at any time prior to midnight of the third (3rd) business day after the date of execution of this Addendum. Any payments made will be returned within three (3) days of Company's receipt of a cancellation notice, prorated at $250/hour for work already performed. To cancel, mail a signed cancellation notice to Tax Case Review, 631 US Highway One Ste 304, North Palm Beach, FL 33408, before midnight of the third business day after signing.`, 10.5);
+  y -= 4;
+
+  heading('6. Client Acknowledgment');
+  drawWrapped(`By signing below, Client confirms they have read, understand, and agree to the terms of this Addendum and authorize Tax Case Review to proceed with the resolution services checked above. Except as modified by this Addendum, the existing Tax Service Agreement remains unmodified and in full force and effect and is reaffirmed by Client.`, 10.5);
+
+  // ── Signatures — always on their own page so the e-sign stamp position is
+  // predictable, with real blank space ABOVE each line (not just a caption)
+  // since that's where the typed/drawn signature actually gets stamped later.
+  newPage();
+  y -= 10;
+  const clientLineY = y - 28;
+  page.drawLine({ start: { x: margin, y: clientLineY }, end: { x: margin + 260, y: clientLineY }, thickness: 0.8 });
+  page.drawText('Client Signature', { x: margin, y: clientLineY - 12, size: 10, font: bold });
+  page.drawText('Print Name: ___________________________________', { x: margin, y: clientLineY - 26, size: 9.5, font });
+  page.drawText('Date: _______________________', { x: margin, y: clientLineY - 40, size: 9.5, font });
+
+  const coClientLineY = clientLineY - 70;
+  page.drawLine({ start: { x: margin, y: coClientLineY }, end: { x: margin + 260, y: coClientLineY }, thickness: 0.8 });
+  page.drawText('Co-Client Signature (if applicable)', { x: margin, y: coClientLineY - 12, size: 10, font: bold });
+  page.drawText('Print Name: ___________________________________', { x: margin, y: coClientLineY - 26, size: 9.5, font });
+  page.drawText('Date: _______________________', { x: margin, y: coClientLineY - 40, size: 9.5, font });
+
+  const repLineY = coClientLineY - 70;
+  page.drawLine({ start: { x: margin, y: repLineY }, end: { x: margin + 260, y: repLineY }, thickness: 0.8 });
+  page.drawText('Authorized Representative — Tax Case Review', { x: margin, y: repLineY - 12, size: 10, font: bold });
+  page.drawText('Name: ___________________________________', { x: margin, y: repLineY - 26, size: 9.5, font });
+  page.drawText('Date: _______________________', { x: margin, y: repLineY - 40, size: 9.5, font });
+
+  // The client's e-sign stamp lands just above the Client Signature line —
+  // SIGNATURE_POSITIONS['addendum'] uses page:'last' since this document's
+  // total page count varies with how much content the checklist generates.
+  return pdfDoc.save();
 }

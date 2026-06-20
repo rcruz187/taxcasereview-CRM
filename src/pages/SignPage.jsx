@@ -146,11 +146,16 @@ export default function SignPage() {
 
     if (error) { setSigning(false); setError('Error saving signature: ' + error.message); return }
 
+    // Service Addendum is a contract — files under the Agreements folder
+    // like the rest of the firm's signed agreements. Other doc types keep
+    // their existing generic 'E-Signature' tag, unchanged.
+    const savedDocType = doc.doc_type === 'Service Addendum' ? 'Agreements' : 'E-Signature'
+
     // Save to documents table so it appears in client file
     await supabase.from('documents').insert([{
       client:     doc.client_name,
       name:       'SIGNED — ' + doc.doc_type + ' — ' + signedDate,
-      docType:    'E-Signature',
+      docType:    savedDocType,
       notes:      `Signed by: ${fullname}\nIP: ${ip}\nDate: ${signedAt}`,
       created_at: signedAt,
     }]).catch(() => {})
@@ -179,7 +184,7 @@ export default function SignPage() {
         await supabase.from('documents').insert([{
           client:     doc.client_name,
           name:       'SIGNED — ' + att.label,
-          docType:    'E-Signature',
+          docType:    savedDocType,
           file_url:   urlData.publicUrl,
           file_name:  `${att.formType}_signed.pdf`,
           notes:      `Signed by: ${fullname}\nIP: ${ip}\nDate: ${signedAt}`,

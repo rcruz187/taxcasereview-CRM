@@ -1,5 +1,5 @@
 // ─── Shared document utilities — Tax Case Review CRM ─────────────────────────
-import { getPackageFormTypes, FORM_LABELS, FORM_USES_EIN, fillForm, generateCcAuthPdf } from './irsFormUtils'
+import { getPackageFormTypes, FORM_LABELS, FORM_USES_EIN, fillForm, generateCcAuthPdf, RESOLUTION_SERVICES, generateAddendumPdf } from './irsFormUtils'
 
 const LOGO_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo'
 
@@ -258,7 +258,7 @@ export function generateAddendum(c = null, opts = {}) {
     resolutionFee   = '',
     paymentPlan     = '',
     startDate       = '',
-    workScope       = [],
+    services        = [],
     notes           = '',
   } = opts
 
@@ -266,29 +266,27 @@ export function generateAddendum(c = null, opts = {}) {
   const planDisplay = paymentPlan   ? `$${Number(paymentPlan).toLocaleString()} /month` : '$___________ /month'
   const startDisp   = startDate     || '___________'
 
-  const defaultScope = [
-    'Full IRS / State representation and negotiation',
-    'Preparation and submission of resolution application (OIC, IA, CNC, Abatement, or applicable program)',
-    'Power of Attorney representation before the IRS and/or state tax authorities',
-    'Filing of any delinquent returns required for resolution eligibility',
-    'Ongoing case management through resolution acceptance or closure',
-  ]
-  const scopeItems = workScope.length > 0 ? workScope : defaultScope
-
   const date = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})
 
   printBase('Service Addendum — Additional Services Agreement', `
     <p style="text-align:right;font-size:11px;color:#666;margin-bottom:4px">Date: ${date}</p>
     ${clientBlock(c)}
 
-    <p>This Addendum (<b>"Addendum"</b>) supplements the Tax Investigation Service Agreement previously executed between <b>Tax Case Review</b> ("Company") and the undersigned client ("Client") and is incorporated therein by reference.</p>
+    <p>This Addendum (<b>"Addendum"</b>) supplements the Tax Investigation Service Agreement previously executed between <b>Tax Case Review</b> ("Company") and the undersigned client ("Client") and is incorporated therein by reference. The Additional Services below are described in the paragraphs that have been selected with an "X."</p>
 
     <h3>1. Additional Services Authorized</h3>
-    <p>Client authorizes the Company to proceed with the following resolution services beyond the initial tax investigation:</p>
-    <ul>
-      ${scopeItems.map(s=>`<li>${s}</li>`).join('\n      ')}
-    </ul>
-    ${notes ? `<p><b>Additional Scope Notes:</b> ${notes}</p>` : ''}
+    <div style="margin:10px 0">
+      ${RESOLUTION_SERVICES.map(s => `
+        <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start">
+          <div style="width:14px;height:14px;border:1.3px solid #333;flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;line-height:1">${services.includes(s.key) ? 'X' : ''}</div>
+          <div>
+            <div style="font-weight:700;font-size:12px;margin-bottom:2px">${s.label}</div>
+            <div style="font-size:11px;color:#444;line-height:1.6">${s.legal}</div>
+          </div>
+        </div>`).join('\n')}
+    </div>
+    ${notes ? `<p><b>Additional Scope / Work Notes:</b> ${notes}</p>` : ''}
+    <p style="font-size:11px;color:#555">Additional Services shall not in any event include audit reconsideration representation, collection appeal representation, fraud assertions or defense, future tax return preparation, or any other service not explicitly provided for in one of the checked paragraphs above.</p>
 
     <h3>2. Resolution Service Fee</h3>
     <div class="fee-box">
@@ -301,15 +299,25 @@ export function generateAddendum(c = null, opts = {}) {
     </div>
 
     <h3>3. Conditions</h3>
-    <p>Services under this Addendum are contingent upon: (a) Client remaining current on any required tax filings; (b) Client maintaining compliance with any IRS or state payment agreements during representation; (c) Timely payment of fees as agreed upon above.</p>
+    <p>Services under this Addendum are contingent upon: (a) Client remaining current on any required tax filings; (b) Client maintaining compliance with any IRS or state payment agreements during representation; (c) Timely payment of fees as agreed upon above. Client authorizes automatic withdrawals via the payment method on file in the amounts and at the times set forth above; unless otherwise agreed, Company bills based on time spent and difficulty of services performed.</p>
 
     <h3>4. Incorporation &amp; Entire Agreement</h3>
     <p>All terms of the original Tax Investigation Service Agreement remain in full force and effect and are incorporated herein. In the event of conflict between this Addendum and the original Agreement, this Addendum controls.</p>
 
-    <h3>5. Client Acknowledgment</h3>
-    <p>By signing below, Client confirms they have read, understand, and agree to the terms of this Addendum and authorize Tax Case Review to proceed with the resolution services described herein.</p>
+    <h3>5. Right to Cancel</h3>
+    <p>Client may cancel the transactions set forth in this Addendum at any time prior to midnight of the third (3rd) business day after the date of execution of this Addendum. Any payments made will be returned within three (3) days of Company's receipt of a cancellation notice, prorated at $250/hour for work already performed. To cancel, mail a signed cancellation notice to Tax Case Review, 631 US Highway One Ste 304, North Palm Beach, FL 33408, before midnight of the third business day after signing.</p>
+
+    <h3>6. Client Acknowledgment</h3>
+    <p>By signing below, Client confirms they have read, understand, and agree to the terms of this Addendum and authorize Tax Case Review to proceed with the resolution services checked above. Except as modified by this Addendum, the existing Tax Service Agreement remains unmodified and in full force and effect and is reaffirmed by Client.</p>
 
     ${sigBlock('Client Signature', 'Authorized Representative')}
+    <div style="margin-top:24px;padding-top:0">
+      <div style="border-top:1.5px solid #333;padding-top:8px;max-width:48%">
+        <div style="font-size:12px;font-weight:700;color:#222;margin-bottom:4px">Co-Client Signature (if applicable)</div>
+        <div style="font-size:11px;color:#555">Print Name: ___________________________________</div>
+        <div style="font-size:11px;color:#555;margin-top:6px">Date: _______________________</div>
+      </div>
+    </div>
   `)
 }
 
@@ -1052,6 +1060,48 @@ export async function sendFullPackage(client, supabase) {
     client_name: client?.name || '',
     client_email: client?.email || '',
     message: getAgreementMessageText(client),
+    pdf_attachments: pdfAttachments,
+    priority: 'Normal',
+    status: 'Awaiting',
+    sent_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+  }]).select().single()
+
+  if (error) return { error: error.message }
+
+  const url = `${window.location.origin}/taxcasereview-CRM/sign/${data.id}`
+  return { id: data.id, url, pdfAttachments }
+}
+
+// ─── Service Addendum — send for e-signature ─────────────────────────────────
+// Same shape as sendFullPackage: build the PDF, upload it, create an esigns
+// row with it attached, hand back the signing link. The caller (Leads.jsx /
+// Clients.jsx) sends the link via email/SMS and logs a note — this function
+// doesn't touch notifications itself, matching how sendFullPackage is split.
+// Timestamped storage path (not a fixed one like the package forms) since an
+// addendum can legitimately be re-sent later with different fee terms.
+export async function sendAddendumForSignature(record, opts, supabase) {
+  const safeName = (record?.name || 'client').replace(/[^a-zA-Z0-9]+/g, '-')
+  let bytes
+  try {
+    bytes = await generateAddendumPdf(record, opts)
+  } catch (e) {
+    return { error: `Failed to build addendum PDF: ${e.message}` }
+  }
+
+  const path = `docs/${safeName}/addendum/addendum_${Date.now()}.pdf`
+  const { error: upErr } = await supabase.storage.from('documents')
+    .upload(path, new Blob([bytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
+  if (upErr) return { error: upErr.message }
+  const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+  const pdfAttachments = [{ formType: 'addendum', label: 'Service Addendum', url: urlData.publicUrl }]
+
+  const { data, error } = await supabase.from('esigns').insert([{
+    doc_type: 'Service Addendum',
+    client_name: record?.name || '',
+    client_email: record?.email || '',
+    client_phone: record?.phone || '',
+    message: 'Please review the attached Service Addendum, which authorizes Tax Case Review to proceed with the resolution services listed and the associated fee. Sign below to confirm.',
     pdf_attachments: pdfAttachments,
     priority: 'Normal',
     status: 'Awaiting',
