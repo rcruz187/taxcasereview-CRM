@@ -1174,7 +1174,7 @@ export default function Clients() {
                 {/* ── Tabbed Detail Section ─────────────────────────── */}
         <div className="card" style={{padding:0,overflow:'hidden'}}>
           {/* Tab Bar */}
-          <div style={{display:'flex',borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
+          <div style={{display:'flex',borderBottom:'1px solid var(--br)',background:'var(--s2)',overflowX:'auto'}}>
             {[
               {key:'overview', label:'📋 Overview'},
               {key:'notes',    label:'📝 Notes'},
@@ -1187,8 +1187,8 @@ export default function Clients() {
               {key:'intake', label:'💰 Financial Intake'},
             ].map(t=>(
               <button key={t.key} onClick={()=>setDetailTab(t.key)}
-                style={{padding:'10px 16px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
-                  background:'none',cursor:'pointer',fontSize:12,fontWeight:detailTab===t.key?700:500,
+                style={{padding:'14px 20px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
+                  background:'none',cursor:'pointer',fontSize:14,fontWeight:detailTab===t.key?700:500,
                   color:detailTab===t.key?'var(--blue)':'var(--t2)',whiteSpace:'nowrap',transition:'all .15s'}}>
                 {t.label}
               </button>
