@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import { useFirm } from '../lib/useFirm'
 import { generateClientPackage, generateAddendum, generatePOACoverLetter, sendFullPackage, generateCreditCardAuthForm } from '../lib/docUtils'
+import { generatePOACoverLetterPdf } from '../lib/irsFormUtils'
 import BookingWidget from '../components/BookingWidget'
 import IRSFormFiller from '../components/IRSFormFiller'
 import ErrorBoundary from '../components/ErrorBoundary'
@@ -102,6 +103,20 @@ function LeadInlineFax({ lead, onClose, onLogged }) {
   const [subject,set1]=useState('')
   const [file,set2]=useState(null)
   const [sending,set3]=useState(false)
+  const [poaBusy,setPoaBusy]=useState(false)
+  async function usePOATemplate() {
+    setPoaBusy(true)
+    try {
+      const bytes = await generatePOACoverLetterPdf(lead)
+      const fname = `POA-Cover-Letter-${(lead?.name||'lead').replace(/[^a-zA-Z0-9]+/g,'-')}.pdf`
+      set2(new File([bytes], fname, { type: 'application/pdf' }))
+      if (!subject) set1('Power of Attorney Cover Letter — Form 2848')
+    } catch (e) {
+      alert('Error generating POA Cover Letter: ' + e.message)
+    } finally {
+      setPoaBusy(false)
+    }
+  }
   async function send() {
     set3(true)
     const {data:s}=await supabase.from('settings').select('signalwire_backend,sw_inbound_did').limit(1).maybeSingle()
@@ -131,7 +146,12 @@ function LeadInlineFax({ lead, onClose, onLogged }) {
   return <div style={{padding:'0 4px 4px'}}>
     <div className="field"><label>To Fax Number</label><input value={toNum} onChange={e=>set0(e.target.value.replace(/\D/g,''))} placeholder="10 digits"/></div>
     <div className="field"><label>Subject</label><input value={subject} onChange={e=>set1(e.target.value)} placeholder="Document subject"/></div>
-    <div className="field"><label>Attach PDF</label><input type="file" accept=".pdf,.tiff,.jpg,.png" onChange={e=>set2(e.target.files[0])} style={{padding:'6px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',width:'100%',fontSize:12}}/></div>
+    <button type="button" onClick={usePOATemplate} disabled={poaBusy} className="btn sec" style={{fontSize:11,padding:'5px 10px',marginBottom:10}}>
+      {poaBusy?'Generating…':'📋 Use POA Cover Letter Template'}
+    </button>
+    <div className="field"><label>Attach PDF</label><input type="file" accept=".pdf,.tiff,.jpg,.png" onChange={e=>set2(e.target.files[0])} style={{padding:'6px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',width:'100%',fontSize:12}}/>
+      {file && <div style={{fontSize:11,color:'var(--ok)',marginTop:4}}>📄 {file.name}</div>}
+    </div>
     <div style={{display:'flex',gap:8}}>
       <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={onClose}>Cancel</button>
       <button className="btn sm" style={{flex:1,justifyContent:'center',background:'#dc2626',color:'#fff',borderColor:'#dc2626'}} onClick={send} disabled={sending}>{sending?'Sending…':'📠 Send'}</button>

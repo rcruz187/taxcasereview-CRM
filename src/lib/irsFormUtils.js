@@ -297,6 +297,96 @@ export async function generateCcAuthPdf(client) {
   return pdfDoc.save();
 }
 
+// ─── POA Cover Letter (Form 2848) — fax-ready PDF ────────────────────────────
+// The print-only version of this letter lives in docUtils.js (generatePOACoverLetter)
+// but only opens a browser print dialog — there's no file to attach to a fax.
+// This rebuilds the same content via pdf-lib so it can be uploaded to storage
+// and attached directly from the Send Fax forms, same pattern as generateCcAuthPdf.
+export async function generatePOACoverLetterPdf(c = null) {
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([612, 792]); // US Letter
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+  const margin = 56;
+  let y = 730;
+  const wrap = (text, size, maxWidth, useFont = font) => {
+    const words = text.split(' ');
+    const lines = [];
+    let line = '';
+    for (const w of words) {
+      const test = line ? line + ' ' + w : w;
+      if (useFont.widthOfTextAtSize(test, size) > maxWidth && line) { lines.push(line); line = w; }
+      else line = test;
+    }
+    if (line) lines.push(line);
+    return lines;
+  };
+  const drawWrapped = (text, size, useFont = font, lineGap = 15) => {
+    for (const line of wrap(text, size, 612 - margin * 2, useFont)) {
+      page.drawText(line, { x: margin, y, size, font: useFont });
+      y -= lineGap;
+    }
+  };
+
+  const name  = c?.name || `${c?.first || ''} ${c?.last || ''}`.trim() || '___________________';
+  const ssn   = c?.ssn ? `***-**-${c.ssn.replace(/-/g, '').slice(-4)}` : '___-__-____';
+  const years = c?.taxYearsCustom || c?.taxYears || '___________________';
+  const date  = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+  page.drawText(date, { x: margin, y, size: 10, font });
+  y -= 30;
+
+  page.drawText('Internal Revenue Service', { x: margin, y, size: 11, font });
+  y -= 14;
+  page.drawText('[IRS Campus — See Form 2848 Instructions for Applicable Address]', { x: margin, y, size: 11, font });
+  y -= 28;
+
+  page.drawText('Re: Power of Attorney — Form 2848', { x: margin, y, size: 11, font: bold });
+  y -= 16;
+  page.drawText(`Taxpayer: ${name}`, { x: margin, y, size: 11, font });
+  y -= 14;
+  page.drawText(`SSN/EIN: ${ssn}`, { x: margin, y, size: 11, font });
+  y -= 14;
+  page.drawText(`Tax Periods: ${years}`, { x: margin, y, size: 11, font });
+  y -= 28;
+
+  page.drawText('To Whom It May Concern,', { x: margin, y, size: 11, font });
+  y -= 24;
+
+  drawWrapped(
+    `Enclosed please find a completed Form 2848 (Power of Attorney and Declaration of Representative) authorizing Tax Case Review to represent the above-named taxpayer in connection with the tax matters and periods specified therein.`,
+    11
+  );
+  y -= 8;
+  drawWrapped(
+    `Please update your records to reflect this authorization and direct all future correspondence regarding the above-referenced matter to our office at the address below. We respectfully request that all notices, letters, and communications be sent to our office rather than directly to the taxpayer.`,
+    11
+  );
+  y -= 8;
+  drawWrapped(
+    `If you have any questions or require additional information, please do not hesitate to contact our office.`,
+    11
+  );
+
+  y -= 24;
+  page.drawText('Respectfully submitted,', { x: margin, y, size: 11, font });
+
+  y -= 50;
+  page.drawLine({ start: { x: margin, y: y + 14 }, end: { x: margin + 260, y: y + 14 }, thickness: 0.5 });
+  page.drawText('Authorized Representative', { x: margin, y, size: 11, font: bold });
+  y -= 14;
+  page.drawText('Tax Case Review', { x: margin, y, size: 10.5, font });
+  y -= 13;
+  page.drawText('631 US Highway One Ste 304, North Palm Beach, FL 33408', { x: margin, y, size: 10, font });
+  y -= 13;
+  page.drawText('info@taxcasereview.com  ·  (850) 459-9039', { x: margin, y, size: 10, font });
+  y -= 16;
+  page.drawText('Date: _______________________', { x: margin, y, size: 10, font });
+
+  return pdfDoc.save();
+}
+
 // ─── 433-F / 433-A Collection Information Statement filling ──────────────────
 // These pull from the client record + Financial Profile (profile object as
 // stored in financial_profiles table) rather than just the client row.

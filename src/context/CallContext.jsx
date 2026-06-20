@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { Relay } from '@signalwire/js'
 import { supabase } from '../lib/supabase'
 import { useApp } from './AppContext'
+import { playSound } from '../lib/notifySound'
 
 // ──────────────────────────────────────────────────────────────────────
 // This used to live entirely inside Dialer.jsx. The problem: React
@@ -89,6 +90,11 @@ export function CallProvider({ children }) {
   const pendingInboundRef = useRef(null)
   const lastHandledInboundRef = useRef(null)
   const inboundTimeoutRef = useRef(null)
+  const ringIntervalRef = useRef(null)
+
+  function stopRing() {
+    if (ringIntervalRef.current) { clearInterval(ringIntervalRef.current); ringIntervalRef.current = null }
+  }
 
   useEffect(() => { elapsedRef.current = elapsed }, [elapsed])
 
@@ -136,6 +142,7 @@ export function CallProvider({ children }) {
         if (call.state === 'active' && !uiStartedRef.current) {
           uiStartedRef.current = true
           setIncomingCall(null)
+          stopRing()
           setCalling(true)
           setElapsed(0)
           setLogForm(BLANK_LOG)
@@ -153,6 +160,7 @@ export function CallProvider({ children }) {
         if (call.state === 'hangup' || call.state === 'destroy') {
           setIncomingCall(null)
           setIncomingMatch(null)
+          stopRing()
           if (liveCallRef.current === call) {
             finalizeCallEnd({ alreadyHungUp: true })
             if (uiStartedRef.current) {
@@ -206,6 +214,9 @@ export function CallProvider({ children }) {
       lastHandledInboundRef.current = data.callsid
       pendingInboundRef.current = data
       setIncomingCall({ options: { remoteCallerNumber: data.from_number } })
+      playSound('call')
+      stopRing()
+      ringIntervalRef.current = setInterval(() => playSound('call'), 3000) // re-ring every 3s, matches the IVR's "ring ~3 times" cadence
       // Shows immediately as a fallback label ("Tax Professional" /
       // "Front Desk" from the IVR choice) — overwritten the instant a real
       // Client/Lead match comes back, same as before.
@@ -220,16 +231,18 @@ export function CallProvider({ children }) {
         pendingInboundRef.current = null
         setIncomingCall(null)
         setIncomingMatch(null)
+        stopRing()
       }, 15000)
     }, 2000)
 
-    return () => { cancelled = true; clearInterval(poll) }
+    return () => { cancelled = true; clearInterval(poll); stopRing() }
   }, [relayStatus, calling])
 
   function answerIncoming() {
     const row = pendingInboundRef.current
     if (!row) return
     if (inboundTimeoutRef.current) { clearTimeout(inboundTimeoutRef.current); inboundTimeoutRef.current = null }
+    stopRing()
 
     const m = incomingMatchRef.current
     uiStartedRef.current = true
@@ -270,6 +283,7 @@ export function CallProvider({ children }) {
   function declineIncoming() {
     const row = pendingInboundRef.current
     if (inboundTimeoutRef.current) { clearTimeout(inboundTimeoutRef.current); inboundTimeoutRef.current = null }
+    stopRing()
     setIncomingCall(null)
     setIncomingMatch(null)
     pendingInboundRef.current = null

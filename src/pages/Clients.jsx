@@ -13,6 +13,7 @@ import FinancialIntakeView from '../components/FinancialIntakeView'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import { generateAddendum } from '../lib/docUtils'
+import { generatePOACoverLetterPdf } from '../lib/irsFormUtils'
 
 const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -191,6 +192,21 @@ function InlineFaxForm({ client, onClose, showToast, onLogged }) {
   const [notes,   setNotes]   = useState('')
   const [file,    setFile]    = useState(null)
   const [sending, setSending] = useState(false)
+  const [poaBusy, setPoaBusy] = useState(false)
+
+  async function usePOATemplate() {
+    setPoaBusy(true)
+    try {
+      const bytes = await generatePOACoverLetterPdf(client)
+      const fname = `POA-Cover-Letter-${(client?.name||'client').replace(/[^a-zA-Z0-9]+/g,'-')}.pdf`
+      setFile(new File([bytes], fname, { type: 'application/pdf' }))
+      if (!subject) setSubject('Power of Attorney Cover Letter — Form 2848')
+    } catch (e) {
+      showToast('Error generating POA Cover Letter: ' + e.message, 'err')
+    } finally {
+      setPoaBusy(false)
+    }
+  }
 
   async function send() {
     if (!toNum) { showToast('Fax number required','err'); return }
@@ -245,9 +261,13 @@ function InlineFaxForm({ client, onClose, showToast, onLogged }) {
       <div className="field"><label>Subject</label>
         <input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="e.g. Form 2848"/>
       </div>
+      <button type="button" onClick={usePOATemplate} disabled={poaBusy} className="btn sec" style={{fontSize:11,padding:'5px 10px',marginBottom:10}}>
+        {poaBusy?'Generating…':'📋 Use POA Cover Letter Template'}
+      </button>
       <div className="field"><label>Attach PDF</label>
         <input type="file" accept=".pdf,.tiff,.jpg,.png" onChange={e=>setFile(e.target.files[0])}
           style={{padding:'6px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',width:'100%',fontSize:12}}/>
+        {file && <div style={{fontSize:11,color:'var(--ok)',marginTop:4}}>📄 {file.name}</div>}
       </div>
       <div className="field"><label>Notes</label>
         <input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Internal notes"/>

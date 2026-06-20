@@ -124,7 +124,11 @@ export function AppProvider({ children }) {
   }, [])
 
   // Global notification sounds — chat messages, leads/appointments via API,
-  // new emails, huddle invites, and incoming calls. Active whenever logged in.
+  // new emails, huddle invites, inbound SMS, and inbound faxes. Active
+  // whenever logged in. (Inbound-call ringing is handled in CallContext,
+  // right where the ring is actually detected via incoming_calls polling —
+  // calllog only ever gets a row written after a call ends, so listening
+  // for it here never caught the ring in time.)
   useEffect(() => {
     if (!user) return
     const myName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'You'
@@ -145,15 +149,21 @@ export function AppProvider({ children }) {
       if ((row.triage || 'Inbox') === 'Inbox' && row.status !== 'Sent') playSound('email')
     }).subscribe()
 
-    const callCh = supabase.channel('global-call-notify')
-    callCh.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'calllog' }, ({ new: row }) => {
-      if (row.direction === 'Inbound' || row.direction === 'inbound') playSound('call')
+    const smsCh = supabase.channel('global-sms-notify')
+    smsCh.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sms_messages' }, ({ new: row }) => {
+      if (row.direction === 'inbound') playSound('sms')
+    }).subscribe()
+
+    const faxCh = supabase.channel('global-fax-notify')
+    faxCh.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'fax_logs' }, ({ new: row }) => {
+      if (row.direction === 'inbound') playSound('fax')
     }).subscribe()
 
     return () => {
       supabase.removeChannel(chCh)
       supabase.removeChannel(emailCh)
-      supabase.removeChannel(callCh)
+      supabase.removeChannel(smsCh)
+      supabase.removeChannel(faxCh)
     }
   }, [user])
 
