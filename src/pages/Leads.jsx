@@ -338,21 +338,22 @@ export default function Leads() {
   function fld(k,v) { setForm(f=>({...f,[k]:v})) }
   // Tab buttons swap content of different heights, which lets the browser
   // naturally clamp .page-content's scroll position toward the top. Capture
-  // it before the switch and put it back once the new tab has rendered.
+  // it before the switch and lock it back using a MutationObserver, which
+  // reapplies on every DOM change rather than guessing fixed delays --
+  // a fixed-timing reapply schedule wasn't reliably catching whatever
+  // resets scroll (browser scroll anchoring, async content settling, or
+  // both), so this reacts to actual content changes instead.
   function switchLeadTab(tab) {
     const el = document.querySelector('.page-content')
     const y = el ? el.scrollTop : 0
     setLeadDetailTab(tab)
-    // One restore isn't enough — the Documents tab loads its data async
-    // *after* mount, which changes page height after the first restore and
-    // lets the browser re-clamp scrollTop right back down. Keep reapplying
-    // for a short window to catch that late content settling in.
-    const restore = () => { if (el) el.scrollTop = y }
-    requestAnimationFrame(restore)
-    setTimeout(restore, 50)
-    setTimeout(restore, 150)
-    setTimeout(restore, 350)
-    setTimeout(restore, 700)
+    if (!el) return
+    let active = true
+    const reapply = () => { if (active) el.scrollTop = y }
+    reapply()
+    const observer = new MutationObserver(reapply)
+    observer.observe(el, { childList: true, subtree: true, attributes: true })
+    setTimeout(() => { active = false; observer.disconnect() }, 1000)
   }
   function composeName(first,mi,last) { return [first, mi?mi+'.':'', last].filter(Boolean).join(' ').replace(/\s+/g,' ').trim() }
   // For Individual leads the Full Name is derived automatically from First/MI/Last

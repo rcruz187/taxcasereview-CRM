@@ -739,15 +739,21 @@ export default function Clients() {
       next.set('tab', tab)
       return next
     }, { replace: true })
-    // Same fix as Leads: the Documents tab loads data async after mount,
-    // which changes page height after the first restore. Keep reapplying
-    // for a short window to catch that late content settling in.
-    const restore = () => { if (el) el.scrollTop = y }
-    requestAnimationFrame(restore)
-    setTimeout(restore, 50)
-    setTimeout(restore, 150)
-    setTimeout(restore, 350)
-    setTimeout(restore, 700)
+    if (!el) return
+    // Fixed-delay reapply wasn't enough -- whatever resets scroll (browser
+    // scroll anchoring, async content settling, or both) can still happen
+    // after the last timed reapply ended. Instead, lock scrollTop to y
+    // using a MutationObserver that reapplies it on every DOM change for a
+    // full second, catching anything content-driven immediately rather
+    // than on a guessed delay. Deliberately NOT also listening for scroll
+    // events here -- that would fight genuine user scrolling during the
+    // lock window, which is worse than the original bug.
+    let active = true
+    const reapply = () => { if (active) el.scrollTop = y }
+    reapply()
+    const observer = new MutationObserver(reapply)
+    observer.observe(el, { childList: true, subtree: true, attributes: true })
+    setTimeout(() => { active = false; observer.disconnect() }, 1000)
   }
   const [fillerClient, setFillerClient] = useState(null)
   const [bookingClient, setBookingClient] = useState(null)
