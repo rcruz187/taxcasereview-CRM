@@ -4,6 +4,61 @@ import { FINANCIAL_INTAKE_STEPS, shouldShow } from '../lib/financialIntakeSchema
 
 const LOGO_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo'
 
+// Renders the submitted answers into an email-safe HTML block, mirroring
+// the same step/question iteration FinancialIntakeView.jsx uses in the CRM
+// (so what the client receives matches what staff sees) -- just as inline
+// HTML strings instead of React, since this needs to go through send-email.
+function fmtAnswerVal(v) {
+  if (v === undefined || v === null || v === '') return null
+  return v
+}
+function renderAnswersHtml(answers) {
+  const sections = FINANCIAL_INTAKE_STEPS.filter(s => s.id !== 'intro' && s.id !== 'done').map(step => {
+    const visibleQuestions = step.questions.filter(q => q.type !== 'info' && shouldShow(q, answers))
+    const rows = []
+
+    visibleQuestions.forEach(q => {
+      if (q.type === 'entries') {
+        const entries = answers[q.id] || []
+        if (!entries.length) return
+        entries.forEach((entry, i) => {
+          const fieldRows = q.entryFields.map(f => {
+            const v = fmtAnswerVal(entry[f.id])
+            if (v === null) return ''
+            return `<tr><td style="padding:3px 0;color:#64748b;font-size:12.5px;">${f.label}</td><td style="padding:3px 0;text-align:right;font-weight:600;font-size:12.5px;">${v}</td></tr>`
+          }).filter(Boolean).join('')
+          if (fieldRows) {
+            rows.push(`<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:8px;"><div style="font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;margin-bottom:6px;">${q.label} — Entry ${i+1}</div><table style="width:100%;border-collapse:collapse;">${fieldRows}</table></div>`)
+          }
+        })
+      } else {
+        const v = fmtAnswerVal(answers[q.id])
+        if (v === null) return
+        rows.push(`<tr><td style="padding:5px 0;color:#64748b;font-size:13px;border-bottom:1px solid #f1f5f9;">${q.label}</td><td style="padding:5px 0;text-align:right;font-weight:600;font-size:13px;border-bottom:1px solid #f1f5f9;">${v}</td></tr>`)
+      }
+    })
+
+    if (!rows.length) return ''
+    const isEntryStyle = rows.some(r => r.startsWith('<div'))
+    const body = isEntryStyle ? rows.join('') : `<table style="width:100%;border-collapse:collapse;">${rows.join('')}</table>`
+    return `<div style="margin-bottom:20px;"><div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;margin-bottom:8px;padding-top:12px;border-top:1px solid #e2e8f0;">${step.title}</div>${body}</div>`
+  }).filter(Boolean).join('')
+
+  return sections
+}
+
+async function sendIntakeCopyEmail(record, answers) {
+  if (!record?.client_email) return
+  const answersHtml = renderAnswersHtml(answers)
+  await supabase.functions.invoke('send-email', {
+    body: {
+      to: record.client_email,
+      subject: `Your Financial Intake Submission — Tax Case Review`,
+      html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${record.client_name||'Client'}</strong>,</p><p>Thank you for completing your financial intake form. Here's a copy of everything you submitted for your records:</p>${answersHtml}<p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
+    }
+  })
+}
+
 // Shared wizard engine for the Financial Intake — separate from OrganizerWizard
 // (Tax Organizer is for return-prep, sent during filing season; this is the
 // resolution-case financial breakdown, sent once when a lead becomes a client).
@@ -75,6 +130,12 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
       answers, status: 'Submitted', submitted_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq('id', intakeId)
+    // Email a full copy of the submitted answers to the client. Best-effort:
+    // if this fails (no email on file, send-email hiccup, etc.) the
+    // submission itself is already saved above and the client still sees
+    // the Submitted confirmation screen -- losing the email shouldn't
+    // block or appear to undo a successful submission.
+    try { await sendIntakeCopyEmail(record, answers) } catch (e) { console.error('Financial intake copy email error:', e) }
     setSaving(false)
     setSubmitted(true)
     if (onComplete) onComplete()
