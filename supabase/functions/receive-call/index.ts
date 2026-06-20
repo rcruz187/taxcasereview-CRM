@@ -31,6 +31,22 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const HELD_ROW_MAX_AGE_MINUTES = 10
 
+// Office hours: Monday-Friday, 9 AM-6 PM Eastern. Computed via Intl with an
+// explicit timeZone rather than raw UTC offset math, so this stays correct
+// across DST changes without needing a manual fix twice a year.
+function isWithinBusinessHours(date) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    weekday: 'short',
+    hour: 'numeric',
+    hour12: false,
+  }).formatToParts(date)
+  const weekday = parts.find(p => p.type === 'weekday')?.value
+  const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10)
+  const isWeekday = weekday !== 'Sat' && weekday !== 'Sun'
+  return isWeekday && hour >= 9 && hour < 18
+}
+
 serve(async (req) => {
   const body = await req.text()
   console.log('receive-call invoked -- raw body:', body)
@@ -130,6 +146,14 @@ serve(async (req) => {
     const forwardTo = settings?.call_forward_number
     if (forwardTo) {
       const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial timeout="25"><Number>${forwardTo}</Number></Dial><Say voice="Polly.Joanna-Neural">Thank you for calling Tax Case Review. No one is available right now. Please leave a message after the tone.</Say><Record action="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/voicemail-recorded" maxLength="120" playBeep="true"/></Response>`
+      return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
+    }
+
+    // Outside office hours -- skip the menu entirely, straight to
+    // voicemail with a message that sets the right expectation instead of
+    // the generic "no one is available" line.
+    if (!isWithinBusinessHours(new Date())) {
+      const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">Thank you for calling Tax Case Review. Our office hours are Monday through Friday, 9 AM to 6 PM Eastern. Please leave a message after the tone and we will return your call as soon as possible.</Say><Record action="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/voicemail-recorded" maxLength="120" playBeep="true"/></Response>`
       return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
     }
 
