@@ -3,14 +3,15 @@ import { getPackageFormTypes, FORM_LABELS, FORM_USES_EIN, fillForm, generateCcAu
 
 const LOGO_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo'
 
-const FIRM_PHONE = '(850) 459-9039'
+const FIRM_PHONE = '(888) 334-5052'
+const FIRM_FAX = '(239) 526-2666'
 
 function printHeader(title, phone = FIRM_PHONE) {
   return `
     <div style="text-align:center;margin-bottom:28px;padding-bottom:18px;border-bottom:3px solid #1A7FD4">
       <img src="${LOGO_URL}" style="height:52px;margin-bottom:10px;display:block;margin-left:auto;margin-right:auto" onerror="this.style.display='none'"/>
       <div style="font-size:22px;font-weight:800;color:#1A7FD4;letter-spacing:-.3px">Tax Case Review</div>
-      <div style="font-size:11px;color:#666;margin-top:3px">631 US Highway One Ste 304, North Palm Beach, FL 33408 &nbsp;·&nbsp; info@taxcasereview.com &nbsp;·&nbsp; ${phone}</div>
+      <div style="font-size:11px;color:#666;margin-top:3px">631 US Highway One Ste 304, North Palm Beach, FL 33408 &nbsp;·&nbsp; info@taxcasereview.com &nbsp;·&nbsp; ${phone} &nbsp;·&nbsp; Fax ${FIRM_FAX}</div>
       <div style="font-size:15px;font-weight:700;margin-top:14px;color:#111;text-transform:uppercase;letter-spacing:.5px">${title}</div>
     </div>`
 }
@@ -18,7 +19,7 @@ function printHeader(title, phone = FIRM_PHONE) {
 function footer(phone = FIRM_PHONE) {
   return `
     <div style="margin-top:48px;padding-top:16px;border-top:1px solid #ddd;text-align:center;font-size:10px;color:#999;line-height:1.8">
-      Tax Case Review &nbsp;·&nbsp; 631 US Highway One Ste 304, North Palm Beach, FL 33408 &nbsp;·&nbsp; info@taxcasereview.com &nbsp;·&nbsp; ${phone}<br/>
+      Tax Case Review &nbsp;·&nbsp; 631 US Highway One Ste 304, North Palm Beach, FL 33408 &nbsp;·&nbsp; info@taxcasereview.com &nbsp;·&nbsp; ${phone} &nbsp;·&nbsp; Fax ${FIRM_FAX}<br/>
       <em>Tax Case Review is a tax resolution consulting firm and is not a law firm. No attorney-client relationship is created by this agreement.</em>
     </div>`
 }
@@ -229,7 +230,7 @@ export function generateCreditCardAuthForm(c = null) {
   const fee = c?.taxFee ? `$${Number(c.taxFee).toLocaleString()}` : (c?.investigationFee ? `$${c.investigationFee}` : '$___________')
   printBase('Credit Card Authorization Form', `
     ${clientBlock(c)}
-    <p>Complete the following form to authorize <b>Tax Case Review</b> to charge fees to the credit or debit card listed below. If you need assistance completing this form, please contact a Tax Case Review representative at (850) 459-9039.</p>
+    <p>Complete the following form to authorize <b>Tax Case Review</b> to charge fees to the credit or debit card listed below. If you need assistance completing this form, please contact a Tax Case Review representative at (888) 334-5052.</p>
 
     <h3>Cardholder Information</h3>
     <p>Client Name(s): <span style="display:inline-block;min-width:340px;border-bottom:1px solid #333">&nbsp;${c?.name ? `<b>${c.name}</b>` : ''}</span></p>
@@ -321,7 +322,7 @@ export function generateAddendum(c = null, opts = {}) {
         <div style="font-size:11px;color:#555;margin-top:6px">Date: _______________________</div>
       </div>
     </div>
-  `, { phone: '(888) 334-5052' })
+  `)
 }
 
 // ─── Engagement Letter ────────────────────────────────────────────────────────
@@ -408,7 +409,7 @@ export function generatePOACoverLetter(c = null) {
       <div style="font-size:12px;font-weight:700">Authorized Representative</div>
       <div style="font-size:11.5px;margin-top:4px">Tax Case Review</div>
       <div style="font-size:11px;color:#555;margin-top:2px">631 US Highway One Ste 304, North Palm Beach, FL 33408</div>
-      <div style="font-size:11px;color:#555">info@taxcasereview.com &nbsp;·&nbsp; (850) 459-9039</div>
+      <div style="font-size:11px;color:#555">info@taxcasereview.com &nbsp;·&nbsp; (888) 334-5052 &nbsp;·&nbsp; Fax (239) 526-2666</div>
       <div style="font-size:11px;color:#888;margin-top:6px">Date: _______________________</div>
     </div>
   `)
