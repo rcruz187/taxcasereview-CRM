@@ -57,13 +57,14 @@ export const FORM_LABELS = {
   '2848_business': 'Form 2848 — Power of Attorney (Business)',
   '8821_personal': 'Form 8821 — Tax Information Authorization (Personal)',
   '8821_business': 'Form 8821 — Tax Information Authorization (Business)',
+  'cc_auth':       'Credit Card / Payment Method Authorization',
 };
 
 // Which forms go in the "Full Package" based on client type
 export const PACKAGE_FORMS_BY_TYPE = {
-  'Individual':       ['2848_personal', '8821_personal'],
-  'Business':         ['2848_business', '8821_business'],
-  'Individual & Biz': ['2848_personal', '8821_personal', '2848_business', '8821_business'],
+  'Individual':       ['2848_personal', '8821_personal', 'cc_auth'],
+  'Business':         ['2848_business', '8821_business', 'cc_auth'],
+  'Individual & Biz': ['2848_personal', '8821_personal', '2848_business', '8821_business', 'cc_auth'],
 };
 
 // Whether a form type uses the EIN (vs SSN) as the taxpayer ID
@@ -85,6 +86,7 @@ export const SIGNATURE_POSITIONS = {
   '2848_business': { page: 1, sigX: 40,  sigY: 555, dateX: 305, dateY: 555, size: 12 },
   '8821_personal': { page: 0, sigX: 60,  sigY: 138, dateX: 438, dateY: 138, size: 12 },
   '8821_business': { page: 0, sigX: 60,  sigY: 138, dateX: 438, dateY: 138, size: 12 },
+  'cc_auth':       { page: 0, sigX: 56,  sigY: 192, dateX: 100, dateY: 142, size: 12 },
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -233,6 +235,66 @@ export async function stampSignature(pdfBytes, formType, signatureText, dateText
 // for a given client, based on their client type.
 export function getPackageFormTypes(clientType) {
   return PACKAGE_FORMS_BY_TYPE[clientType] || PACKAGE_FORMS_BY_TYPE['Individual'];
+}
+
+// ─── Credit Card Authorization — built from scratch for the e-sign package ───
+// Deliberately has NO card number/expiry/CVV fields. Once this PDF is signed
+// it gets stored in Supabase and emailed around, so writing a real card
+// number onto it would be the exact PCI problem the digital Stripe capture
+// in the Payments tab exists to avoid. This is just the signed legal
+// authorization to charge whatever payment method is on file there.
+const CC_AUTH_SIG_Y = 168;
+
+export async function generateCcAuthPdf(client) {
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([612, 792]); // US Letter
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+  const margin = 56;
+  let y = 730;
+  const wrap = (text, size, maxWidth, useFont = font) => {
+    const words = text.split(' ');
+    const lines = [];
+    let line = '';
+    for (const w of words) {
+      const test = line ? line + ' ' + w : w;
+      if (useFont.widthOfTextAtSize(test, size) > maxWidth && line) { lines.push(line); line = w; }
+      else line = test;
+    }
+    if (line) lines.push(line);
+    return lines;
+  };
+  const drawWrapped = (text, size, useFont = font, lineGap = 15) => {
+    for (const line of wrap(text, size, 612 - margin * 2, useFont)) {
+      page.drawText(line, { x: margin, y, size, font: useFont });
+      y -= lineGap;
+    }
+  };
+
+  page.drawText('Credit Card / Payment Method Authorization', { x: margin, y, size: 16, font: bold });
+  y -= 28;
+
+  const name = client?.name || '';
+  page.drawText(`Client: ${name}`, { x: margin, y, size: 11, font });
+  y -= 28;
+
+  drawWrapped(
+    `Client authorizes Tax Case Review to charge the payment method on file for ${name || 'this client'} for amounts owed under the Tax Service Agreement, and any Addendums, including the investigation fee, resolution fee, and any agreed installment or autopay charges. The payment method (card or bank account) is collected and stored securely directly by Stripe, our payment processor — Tax Case Review does not see or store the actual card or account number.`,
+    11
+  );
+  y -= 10;
+  drawWrapped(
+    `Fees charged by Tax Case Review are non-refundable except as set forth in the Tax Service Agreement. This authorization remains in effect until the client's case is closed or the client requests in writing that it be revoked.`,
+    11
+  );
+
+  page.drawLine({ start: { x: margin, y: CC_AUTH_SIG_Y + 18 }, end: { x: 612 - margin, y: CC_AUTH_SIG_Y + 18 }, thickness: 0.5 });
+  page.drawText('Client Signature', { x: margin, y: CC_AUTH_SIG_Y, size: 10, font });
+  page.drawText('Authorized Representative — Tax Case Review', { x: 612 - margin - 220, y: CC_AUTH_SIG_Y, size: 10, font });
+  page.drawText('Date: _______________', { x: margin, y: CC_AUTH_SIG_Y - 26, size: 10, font });
+
+  return pdfDoc.save();
 }
 
 // ─── 433-F / 433-A Collection Information Statement filling ──────────────────

@@ -410,7 +410,7 @@ To cancel, complete and sign this notice, then mail or deliver it to: Tax Case R
         {/* Attached IRS forms (pre-filled, signature pending) */}
         {Array.isArray(doc.pdf_attachments) && doc.pdf_attachments.length > 0 && (
           <div style={{ marginBottom: 20 }}>
-            <div style={styles.label}>Included IRS Forms</div>
+            <div style={styles.label}>Included Documents</div>
             <div style={{ fontSize:12, color:'#64748b', marginBottom:10, lineHeight:1.6 }}>
               Please review the form(s) below. Your signature and today's date will be added to each one in the signature line when you sign below.
             </div>

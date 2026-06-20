@@ -1,5 +1,5 @@
 // ─── Shared document utilities — Tax Case Review CRM ─────────────────────────
-import { getPackageFormTypes, FORM_LABELS, FORM_USES_EIN, fillForm } from './irsFormUtils'
+import { getPackageFormTypes, FORM_LABELS, FORM_USES_EIN, fillForm, generateCcAuthPdf } from './irsFormUtils'
 
 const LOGO_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo'
 
@@ -1033,7 +1033,9 @@ export async function sendFullPackage(client, supabase) {
   const pdfAttachments = []
   for (const formType of formTypes) {
     try {
-      const bytes = await fillForm(formType, client, FORM_USES_EIN[formType])
+      const bytes = formType === 'cc_auth'
+        ? await generateCcAuthPdf(client)
+        : await fillForm(formType, client, FORM_USES_EIN[formType])
       const path = `docs/${safeName}/package/${formType}.pdf`
       const { error: upErr } = await supabase.storage.from('documents')
         .upload(path, new Blob([bytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })

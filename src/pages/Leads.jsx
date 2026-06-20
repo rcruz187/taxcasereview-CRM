@@ -1138,7 +1138,7 @@ export default function Leads() {
 
               <div className="card" style={{marginTop:12}}>
                 <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>📄 Signed Authorization (Paper Trail)</div>
-                <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>Printable authorization form for the file — separate from the card on file above, this is the signed legal consent to charge.</div>
+                <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>This is now included automatically in the "Full Package" e-sign bundle (Quick Actions above) — no card number on it, just the signed consent to charge whatever's on file above. Use the print button only if you need a standalone paper copy.</div>
                 <div style={{display:'flex'}}>
                   <ActionBtn color="#16a34a" icon="💳" label="Credit Card Auth" sub="Print" onClick={()=>generateCreditCardAuthForm(l)}/>
                 </div>
