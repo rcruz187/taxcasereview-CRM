@@ -320,7 +320,6 @@ export default function Leads() {
   const [resolutionFeeLead, setResolutionFeeLead] = useState(null)
   const [fillerLead, setFillerLead] = useState(null)
   const [detail, setDetail] = useState(null)
-  const [showCompliance, setShowCompliance] = useState(false)
   const [leadNotes, setLeadNotes]     = useState([])
   const [leadDetailTab, setLeadDetailTab] = useState('overview')
   const [newLeadNote, setNewLeadNote] = useState('')
@@ -1086,6 +1085,7 @@ export default function Leads() {
               {key:'overview', label:'📋 Overview'},
               {key:'notes', label:`📝 Notes & Activity (${leadNotes.length})`},
               {key:'docs',  label:'📁 Documents'},
+              {key:'compliance', label:'📋 Compliance'},
               {key:'finintake', label:'💰 Financial Intake'},
             ].map(t=>(
               <button key={t.key} onClick={()=>switchLeadTab(t.key)}
@@ -1158,6 +1158,14 @@ export default function Leads() {
               <ClientDocs clientName={l.name} supabase={supabase} showToast={showToast}/>
             </div>
           )}
+          {leadDetailTab==='compliance' && (
+            <div style={{padding:16}}>
+              <div style={{fontSize:11,color:'var(--t3)',marginBottom:10,lineHeight:1.6}}>
+                Enter what the tax investigation finds (filed status, balances, liens, assessment dates) for each year/form. This is the data you use to convert the lead — and it automatically stays attached once they become a client.
+              </div>
+              <ComplianceGrids clientName={l.name}/>
+            </div>
+          )}
           {leadDetailTab==='finintake' && (
             <ErrorBoundary>
               <FinancialIntakeView clientName={l.name}/>
@@ -1204,27 +1212,6 @@ export default function Leads() {
           </div>
         </div>
         )}
-
-        {/* Compliance — filing/balance data gathered during the tax investigation.
-            Stored against the lead's name in client_compliance_records, so it
-            carries forward automatically once this lead converts to a client
-            (clients keep the same name, so the records stay attached). */}
-        <div className="card" style={{marginBottom:12}}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer'}} onClick={()=>setShowCompliance(s=>!s)}>
-            <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>
-              📋 Compliance — Tax Investigation Findings
-            </div>
-            <span style={{fontSize:11,color:'var(--blue)',fontWeight:600}}>{showCompliance?'Hide ▲':'Show ▼'}</span>
-          </div>
-          {showCompliance && (
-            <div style={{marginTop:14}}>
-              <div style={{fontSize:11,color:'var(--t3)',marginBottom:10,lineHeight:1.6}}>
-                Enter what the tax investigation finds (filed status, balances, liens, assessment dates) for each year/form. This is the data you use to convert the lead — and it automatically stays attached once they become a client.
-              </div>
-              <ComplianceGrids clientName={l.name}/>
-            </div>
-          )}
-        </div>
 
         {/* Initial Notes */}
         {l.notes && (
