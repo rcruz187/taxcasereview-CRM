@@ -168,8 +168,11 @@ function ActionBtn({color, icon, label, sub, onClick}) {
       background:color, color:'#fff', border:'none', borderRadius:10,
       padding:'14px 14px', cursor:'pointer', display:'flex', flexDirection:'column',
       alignItems:'center', gap:5, fontSize:13, fontWeight:700, textAlign:'center',
-      flex:1, minWidth:100
-    }}>
+      flex:1, minWidth:100, transition:'transform .1s,opacity .1s',
+    }}
+      onMouseEnter={e=>{e.currentTarget.style.opacity='.85';e.currentTarget.style.transform='translateY(-2px)'}}
+      onMouseLeave={e=>{e.currentTarget.style.opacity='1';e.currentTarget.style.transform=''}}
+    >
       <span style={{fontSize:22}}>{icon}</span>
       <span>{label}</span>
       {sub && <span style={{fontSize:10,opacity:.8,fontWeight:400}}>{sub}</span>}
