@@ -38,16 +38,19 @@ const blankEmp = {
   hourlyRate: '', payType: 'Hourly', paymentMethod: 'Direct Deposit',
   hireDate: '', emergencyContact: '', emergencyPhone: '',
   address: '', filingStatus: 'Single',
+  employeeId: '', ssn: '',
   caf: '', ptin: '', sorShortId: '', sorUsername: '',
   bank_name: '', bank_account_type: 'Checking', routing_number: '', account_number: '',
   pto_balance: 0, sick_balance: 0, vacation_balance: 0,
   ...ROLE_PERM_DEFAULTS['Staff']
 }
 
+const EMP_DOC_LABELS = ['W-4', 'I-9', 'Direct Deposit', 'SSN Card', 'Driver License', 'Contract', 'Background Check', 'Other']
+
 // Map camelCase form state → snake_case DB columns
 function toDbPayload(form) {
   const { hourlyRate, payType, paymentMethod, hireDate, emergencyContact, emergencyPhone,
-          filingStatus, sorShortId, sorUsername, ...rest } = form
+          filingStatus, sorShortId, sorUsername, employeeId, ...rest } = form
   return {
     ...rest,
     hourly_rate:       hourlyRate,
@@ -59,6 +62,7 @@ function toDbPayload(form) {
     filing_status:     filingStatus,
     sor_short_id:      sorShortId,
     sor_username:      sorUsername,
+    employee_id:       employeeId,
   }
 }
 
@@ -78,6 +82,8 @@ function fromDbRow(emp) {
     emergencyPhone:   emp.emergency_phone ?? emp.emergencyPhone ?? '',
     address:          emp.address ?? '',
     filingStatus:     emp.filing_status || emp.filingStatus || 'Single',
+    employeeId:       emp.employee_id ?? '',
+    ssn:              emp.ssn ?? '',
     caf:              emp.caf ?? '',
     ptin:             emp.ptin ?? '',
     sorShortId:       emp.sor_short_id ?? emp.sorShortId ?? '',
@@ -115,8 +121,20 @@ export default function Employees() {
   const [showReset, setShowReset]   = useState(false)
   const [resetSending, setResetSending] = useState(false)
   const [search, setSearch]       = useState('')
+  const [empDocs, setEmpDocs]     = useState([])
+  const [docUploading, setDocUploading] = useState(false)
+  const [nextDocLabel, setNextDocLabel] = useState('W-4')
 
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    if (showForm && editing && form.name) {
+      supabase.from('documents').select('*').eq('employee', form.name).order('created_at', { ascending: false })
+        .then(({ data }) => setEmpDocs(data || []))
+    } else {
+      setEmpDocs([])
+    }
+  }, [showForm, editing])
 
   async function load() {
     setLoading(true)
@@ -166,6 +184,38 @@ export default function Employees() {
     await supabase.from('employees').delete().eq('id', id)
     showToast('Employee removed')
     load()
+  }
+
+  async function handleDocFiles(files) {
+    if (!editing || !form.name) return
+    for (const file of files) {
+      if (file.size > 10 * 1024 * 1024) { showToast(`"${file.name}" is over the 10MB limit and was skipped.`, 'err'); continue }
+      setDocUploading(true)
+      const path = `docs/${form.name.replace(/\s+/g,'-')}/${Date.now()}_${file.name}`
+      const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
+      if (!upErr) {
+        const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+        const { data: inserted, error: insErr } = await supabase.from('documents').insert([{
+          name: file.name, employee: form.name, docType: nextDocLabel,
+          file_url: urlData.publicUrl, file_name: file.name, file_size: file.size,
+          created_at: new Date().toISOString()
+        }]).select().single()
+        if (!insErr && inserted) setEmpDocs(prev => [inserted, ...prev])
+        else if (insErr) showToast('Save failed: ' + insErr.message, 'err')
+      } else {
+        showToast('Upload failed: ' + upErr.message, 'err')
+      }
+      setDocUploading(false)
+    }
+  }
+
+  async function removeDoc(doc) {
+    if (doc.file_name) {
+      const path = doc.file_url?.split('/documents/')[1]
+      if (path) await supabase.storage.from('documents').remove([path]).catch(()=>{})
+    }
+    await supabase.from('documents').delete().eq('id', doc.id)
+    setEmpDocs(prev => prev.filter(d => d.id !== doc.id))
   }
 
   async function sendReset() {
@@ -311,7 +361,7 @@ export default function Employees() {
 
             {/* Tabs */}
             <div style={{ display: 'flex', gap: 4, padding: '12px 24px 0', borderBottom: '1px solid var(--br)' }}>
-              {['info', ...(can('edit','employees') || form.email === user?.email ? ['irs'] : []), 'pay', 'permissions'].map(t => (
+              {['info', ...(can('edit','employees') || form.email === user?.email ? ['irs'] : []), 'pay', ...(editing ? ['documents'] : []), 'permissions'].map(t => (
                 <button key={t} onClick={() => setTab(t)} style={{
                   padding: '8px 18px', borderRadius: '8px 8px 0 0',
                   border: '1px solid var(--br)', borderBottom: tab === t ? '1px solid var(--sf)' : '1px solid var(--br)',
@@ -320,7 +370,7 @@ export default function Employees() {
                   fontWeight: tab === t ? 700 : 400,
                   cursor: 'pointer', fontSize: 13, marginBottom: -1
                 }}>
-                  {t === 'info' ? '👤 Info' : t === 'pay' ? '💵 Pay & HR' : t === 'irs' ? '🏛️ IRS Info' : '🔐 Permissions'}
+                  {t === 'info' ? '👤 Info' : t === 'pay' ? '💵 Pay & HR' : t === 'irs' ? '🏛️ IRS Info' : t === 'documents' ? '📁 Documents' : '🔐 Permissions'}
                 </button>
               ))}
             </div>
@@ -485,6 +535,16 @@ export default function Employees() {
                       <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Tax Analyst" />
                     </div>
                   </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                    <div className="field">
+                      <label>Employee ID</label>
+                      <input value={form.employeeId} onChange={e => setForm(f => ({ ...f, employeeId: e.target.value }))} placeholder="e.g. EMP-001" />
+                    </div>
+                    <div className="field">
+                      <label>Social Security # <span style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 400 }}>(stored securely)</span></label>
+                      <input value={form.ssn} onChange={e => setForm(f => ({ ...f, ssn: e.target.value }))} placeholder="XXX-XX-XXXX" maxLength={11} />
+                    </div>
+                  </div>
 
                   {/* Role selector */}
                   <div className="field">
@@ -507,6 +567,80 @@ export default function Employees() {
                       Selecting a role applies default permissions — you can customize them in the Permissions tab.
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Documents tab */}
+              {tab === 'documents' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--t3)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                      📁 Employee Paperwork &amp; Documents
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--t3)' }}>
+                      Upload W4, I-9, direct deposit forms, contracts, or any other employee documents. Files are stored securely and only visible to admins.
+                    </div>
+                  </div>
+
+                  <div
+                    style={{ border: '2px dashed var(--br)', borderRadius: 10, padding: '1.25rem', textAlign: 'center', background: 'var(--s2)' }}
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={e => { e.preventDefault(); handleDocFiles(Array.from(e.dataTransfer.files)) }}
+                  >
+                    <label style={{ cursor: 'pointer', display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontSize: 24 }}>📎</span>
+                      <span style={{ fontSize: 13, color: 'var(--b2)', fontWeight: 700 }}>
+                        {docUploading ? 'Uploading…' : 'Click to upload or drag files here'}
+                      </span>
+                      <span style={{ fontSize: 11, color: 'var(--t3)' }}>PDF, Word, images accepted · Max 10MB per file</span>
+                      <input type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style={{ display: 'none' }}
+                        onChange={e => handleDocFiles(Array.from(e.target.files || []))} />
+                    </label>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>
+                      Quick label for next upload
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {EMP_DOC_LABELS.map(t => (
+                        <button key={t} onClick={() => setNextDocLabel(t)} style={{
+                          padding: '5px 12px', borderRadius: 20, cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                          border: '1px solid ' + (nextDocLabel === t ? 'var(--b2)' : 'var(--br)'),
+                          background: nextDocLabel === t ? 'var(--b2)22' : 'var(--s2)',
+                          color: nextDocLabel === t ? 'var(--b2)' : 'var(--t3)',
+                        }}>
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {empDocs.length === 0 ? (
+                    <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--t3)', padding: '12px 0' }}>
+                      No documents yet. Upload W4, I-9, and other paperwork above.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {empDocs.map(d => (
+                        <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 8, padding: '8px 12px' }}>
+                          <span style={{ fontSize: 14 }}>
+                            {d.file_name?.toLowerCase().endsWith('.pdf') ? '📄' : /\.(jpg|jpeg|png)$/i.test(d.file_name || '') ? '🖼️' : '📁'}
+                          </span>
+                          <span style={{ fontSize: 12, color: 'var(--tx)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {d.name}
+                          </span>
+                          {d.docType && (
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'var(--b2)22', color: 'var(--b2)', flexShrink: 0 }}>
+                              {d.docType}
+                            </span>
+                          )}
+                          {d.file_url && <a href={d.file_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: 'var(--b2)', flexShrink: 0 }}>View</a>}
+                          <button onClick={() => removeDoc(d)} style={{ background: 'none', border: 'none', color: 'var(--bad)', cursor: 'pointer', fontSize: 16, flexShrink: 0 }}>×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
