@@ -168,7 +168,7 @@ function ActionBtn({color, icon, label, sub, onClick}) {
       background:color, color:'#fff', border:'none', borderRadius:12,
       padding:'20px 16px', cursor:'pointer', display:'flex', flexDirection:'column',
       alignItems:'center', gap:7, fontSize:15, fontWeight:700, textAlign:'center',
-      width:160, flexShrink:0, transition:'transform .1s,opacity .1s',
+      width:'100%', transition:'transform .1s,opacity .1s',
     }}
       onMouseEnter={e=>{e.currentTarget.style.opacity='.85';e.currentTarget.style.transform='translateY(-2px)'}}
       onMouseLeave={e=>{e.currentTarget.style.opacity='1';e.currentTarget.style.transform=''}}
@@ -1213,7 +1213,7 @@ export default function Clients() {
         {/* Action Buttons */}
         <div className="card" style={{marginBottom:12}}>
           <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Quick Actions</div>
-          <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))',gap:10}}>
             <ActionBtn color="#0891b2" icon="📅" label="Schedule" sub="Book Appointment" onClick={()=>setBookingClient(c)}/>
             <ActionBtn color="#7c3aed" icon="✅" label="Add Task" sub="Assign Work" onClick={()=>{setTaskTitle('');setTaskPriority('Normal');setTaskDueDate('');setTaskModal(true)}}/>
             <ActionBtn color="#0369a1" icon="📋" label="Pre-Fill 8821/2848" sub="IRS PDF Forms" onClick={()=>{
