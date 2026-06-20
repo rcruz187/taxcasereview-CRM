@@ -461,20 +461,14 @@ export default function Employees() {
                       <input value={form.emergencyPhone||''} onChange={e => setForm(f => ({ ...f, emergencyPhone: e.target.value }))} placeholder="(305) 555-0000"/>
                     </div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                    <div className="field">
-                      <label>Home Address</label>
-                      <input value={form.address||''} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="123 Main St, Lake Park, FL 33403"/>
-                    </div>
-                    <div className="field">
-                      <label>Filing Status</label>
-                      <select value={form.filingStatus||'Single'} onChange={e => setForm(f => ({ ...f, filingStatus: e.target.value }))}>
-                        <option>Single</option>
-                        <option>Married Filing Jointly</option>
-                        <option>Married Filing Separately</option>
-                        <option>Head of Household</option>
-                      </select>
-                    </div>
+                  <div className="field">
+                    <label>Filing Status</label>
+                    <select value={form.filingStatus||'Single'} onChange={e => setForm(f => ({ ...f, filingStatus: e.target.value }))}>
+                      <option>Single</option>
+                      <option>Married Filing Jointly</option>
+                      <option>Married Filing Separately</option>
+                      <option>Head of Household</option>
+                    </select>
                   </div>
                   <div style={{ background:'var(--s2)', border:'1px solid var(--br)', borderRadius:8, padding:'10px 14px', fontSize:12, color:'var(--t3)', lineHeight:1.6 }}>
                     <strong style={{color:'var(--t2)'}}>ℹ️ Payroll note:</strong> Hourly Rate feeds directly into the Payroll page calculations. Overtime (1.5x) is applied automatically after 40 hours/week. 1099 contractors are exempt from federal/SS/Medicare withholding.
@@ -544,6 +538,10 @@ export default function Employees() {
                       <label>Social Security # <span style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 400 }}>(stored securely)</span></label>
                       <input value={form.ssn} onChange={e => setForm(f => ({ ...f, ssn: e.target.value }))} placeholder="XXX-XX-XXXX" maxLength={11} />
                     </div>
+                  </div>
+                  <div className="field">
+                    <label>Home Address</label>
+                    <input value={form.address || ''} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="123 Main St, Lake Park, FL 33403" />
                   </div>
 
                   {/* Role selector */}
