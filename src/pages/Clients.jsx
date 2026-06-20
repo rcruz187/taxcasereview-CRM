@@ -165,14 +165,14 @@ function parseDependents(raw) {
 function ActionBtn({color, icon, label, sub, onClick}) {
   return (
     <button onClick={onClick} style={{
-      background:color, color:'#fff', border:'none', borderRadius:8,
-      padding:'10px 12px', cursor:'pointer', display:'flex', flexDirection:'column',
-      alignItems:'center', gap:3, fontSize:11, fontWeight:700, textAlign:'center',
-      flex:1, minWidth:90
+      background:color, color:'#fff', border:'none', borderRadius:10,
+      padding:'14px 14px', cursor:'pointer', display:'flex', flexDirection:'column',
+      alignItems:'center', gap:5, fontSize:13, fontWeight:700, textAlign:'center',
+      flex:1, minWidth:100
     }}>
-      <span style={{fontSize:18}}>{icon}</span>
+      <span style={{fontSize:22}}>{icon}</span>
       <span>{label}</span>
-      {sub && <span style={{fontSize:9,opacity:.8,fontWeight:400}}>{sub}</span>}
+      {sub && <span style={{fontSize:10,opacity:.8,fontWeight:400}}>{sub}</span>}
     </button>
   )
 }
@@ -1149,7 +1149,7 @@ export default function Clients() {
         {/* Action Buttons */}
         <div className="card" style={{marginBottom:12}}>
           <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Quick Actions</div>
-          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
             <ActionBtn color="#0891b2" icon="📅" label="Schedule" sub="Book Appointment" onClick={()=>setBookingClient(c)}/>
             <ActionBtn color="#7c3aed" icon="✅" label="Add Task" sub="Assign Work" onClick={()=>{setTaskTitle('');setTaskPriority('Normal');setTaskDueDate('');setTaskModal(true)}}/>
             <ActionBtn color="#0369a1" icon="📋" label="Pre-Fill 8821/2848" sub="IRS PDF Forms" onClick={()=>{
@@ -1161,9 +1161,6 @@ export default function Clients() {
             <ActionBtn color="#d97706" icon="📋" label="Addendum" sub="Add Services" onClick={()=>{setAddForm({resolutionFee:'',paymentPlan:'',startDate:'',notes:''});setAddModal(true)}}/>
             <ActionBtn color="#dc2626" icon="📠" label="Send Fax" sub="SignalWire Fax" onClick={()=>{setFaxClient(c);setFaxModal(true)}}/>
             <ActionBtn color="#7c3aed" icon="✍️" label="E-Signature" sub="Request Sign" onClick={()=>{setEsignClient(c);setEsignModal(true)}}/>
-            <ActionBtn color="#059669" icon="💳" label="Add Payment" sub="Record Payment" onClick={()=>{setPayForm({amount:'',method:'Credit Card',date:'',notes:''});setPayModal(true)}}/>
-            <ActionBtn color="#be185d" icon="🧾" label="New Invoice" sub="Bill Client" onClick={()=>navigate('/invoices')}/>
-            <ActionBtn color="#0f766e" icon="📊" label="P&amp;L" sub="Books &amp; Ledger" onClick={()=>navigate('/books?client='+encodeURIComponent(c.name))}/>
             <ActionBtn color="#0ea5e9" icon="🔓" label="Client Portal" sub="Compliance Access" onClick={()=>{setPortalClient(c);setPortalModal(true)}}/>
             <ActionBtn color="#9333ea" icon="🧾" label="Tax Organizer" sub="Send for Filing" onClick={()=>{setOrgClient(c);setOrgModal(true)}}/>
           </div>
@@ -1398,8 +1395,11 @@ export default function Clients() {
           {/* Invoices Tab */}
           {detailTab==='invoices'&&(
             <div style={{padding:16}}>
-              <div style={{fontSize:12,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:12}}>
-                🧾 Invoices ({relInvoices.length})
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+                <div style={{fontSize:12,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>
+                  🧾 Invoices ({relInvoices.length})
+                </div>
+                <button className="btn pri" style={{fontSize:11,padding:'5px 12px'}} onClick={()=>navigate('/invoices')}>+ New Invoice</button>
               </div>
               {loadingRel&&<div style={{color:'var(--t3)',fontSize:12}}>Loading…</div>}
               {!loadingRel&&relInvoices.length===0&&(
