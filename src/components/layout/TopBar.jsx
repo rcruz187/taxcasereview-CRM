@@ -40,6 +40,7 @@ export default function TopBar({ onNew }) {
   const navigate = useNavigate()
   const { searchQ, setSearchQ } = useApp()
   const [clock, setClock] = useState('')
+  const [dateStr, setDateStr] = useState('')
   const [open, setOpen] = useState(false)
   const [soundOn, setSoundOnState] = useState(isSoundEnabled())
   const panelRef = useRef(null)
@@ -51,6 +52,7 @@ export default function TopBar({ onNew }) {
     const tick = () => {
       const d = new Date()
       setClock(d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }))
+      setDateStr(d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }))
     }
     tick()
     const t = setInterval(tick, 1000)
@@ -97,6 +99,7 @@ export default function TopBar({ onNew }) {
       >
         {soundOn ? '🔔' : '🔇'}
       </button>
+      <span style={{ fontSize: 12, color: 'var(--t3)', whiteSpace: 'nowrap' }}>{dateStr}</span>
       <span className="topbar-clock">{clock}</span>
 
       {/* Jobber-style + New button */}
