@@ -302,10 +302,15 @@ export async function getAndParseGmailMessage(supabase, id, clients = []) {
   const receivedAt = dateHeader ? new Date(dateHeader).toISOString() : new Date(Number(msg.internalDate || Date.now())).toISOString()
 
   const plainData = findBodyPart(msg.payload, 'text/plain')
-  const htmlData = plainData ? null : findBodyPart(msg.payload, 'text/html')
+  const htmlData = findBodyPart(msg.payload, 'text/html')
   let body = msg.snippet || ''
   if (plainData) body = base64UrlDecodeToString(plainData)
   else if (htmlData) body = stripHtml(base64UrlDecodeToString(htmlData))
+  // Many automated/report emails ship a short plain-text stub ("view in
+  // HTML for the full report") alongside a rich HTML part — if we only ever
+  // stored `body`, that stub is all anyone would ever see. Keep the raw
+  // HTML separately so the reading pane can render the real content.
+  const bodyHtmlRaw = htmlData ? base64UrlDecodeToString(htmlData) : null
 
   const counterpartHeader = isSent ? toHeader : fromHeader
   const counterpartAddress = extractAddress(counterpartHeader)
@@ -318,6 +323,7 @@ export async function getAndParseGmailMessage(supabase, id, clients = []) {
     clientName: matchedClient?.name || counterpartName || counterpartAddress,
     subject,
     body,
+    body_html: bodyHtmlRaw,
     triage: isSent ? 'Sent' : 'Inbox',
     status: isSent ? 'Sent' : 'Received',
     gmail_message_id: msg.id,

@@ -42,6 +42,7 @@ export default function Email() {
   const [search, setSearch]     = useState('')
   const [gmailConnected, setGmailConnected] = useState(false)
   const [gmailClientId, setGmailClientId] = useState('')
+  const [signature, setSignature] = useState({ text: '', logoUrl: '' })
   const { lastSyncAt, syncing, lastError, syncNow } = useGmailSync()
 
   // Multi-select for bulk archive. checkedIds = the actual selection;
@@ -65,9 +66,10 @@ export default function Email() {
   useEffect(() => { if (lastSyncAt) load() }, [lastSyncAt])
 
   async function loadGmailConfig() {
-    const { data } = await supabase.from('settings').select('gmail_client_id,gmail_refresh_token').limit(1).maybeSingle()
+    const { data } = await supabase.from('settings').select('gmail_client_id,gmail_refresh_token,email_signature,email_signature_logo_url').limit(1).maybeSingle()
     if (data?.gmail_client_id) setGmailClientId(data.gmail_client_id)
     if (data?.gmail_refresh_token) setGmailConnected(true)
+    setSignature({ text: data?.email_signature || '', logoUrl: data?.email_signature_logo_url || '' })
   }
 
   async function load() {
@@ -418,9 +420,13 @@ export default function Email() {
                       <button className="btn del" title="Archive" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => archiveEmail(selected.id)}>🗑 Archive</button>
                     </div>
                   </div>
-                  <div style={{ background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: 10, padding: 20, fontSize: 14, lineHeight: 1.8, color: 'var(--tx)', whiteSpace: 'pre-wrap' }}>
-                    {selected.body}
-                  </div>
+                  {selected.body_html ? (
+                    <SafeHtmlEmail html={selected.body_html} />
+                  ) : (
+                    <div style={{ background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: 10, padding: 20, fontSize: 14, lineHeight: 1.8, color: 'var(--tx)', whiteSpace: 'pre-wrap' }}>
+                      {selected.body}
+                    </div>
+                  )}
                   {selected.attachments?.length > 0 && (
                     <div style={{ marginTop: 14, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                       {selected.attachments.map((att, i) => (
@@ -487,6 +493,25 @@ export default function Email() {
             <div className="field"><label>Body *</label>
               <textarea value={form.body} onChange={e => fld('body', e.target.value)} rows={14} style={{ minHeight: 280, fontFamily: 'inherit', lineHeight: 1.7 }} placeholder="Email body…" />
             </div>
+
+            {/* Signature preview — not part of the editable body, appended automatically on send */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ margin: 0 }}>Signature</label>
+                <a href="/taxcasereview-CRM/settings" style={{ fontSize: 11, color: 'var(--blue)' }}>Edit in Settings →</a>
+              </div>
+              {signature.text || signature.logoUrl ? (
+                <div style={{ background: 'var(--s2)', border: '1px dashed var(--br)', borderRadius: 8, padding: '12px 14px' }}>
+                  <div style={{ fontSize: 10, color: 'var(--t3)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.05em' }}>Automatically added when sent</div>
+                  {signature.logoUrl && <img src={signature.logoUrl} alt="" style={{ maxHeight: 50, maxWidth: 220, display: 'block', marginBottom: 8 }} />}
+                  {signature.text && <div style={{ fontSize: 13, color: 'var(--t2)', whiteSpace: 'pre-wrap', fontFamily: 'Arial, sans-serif' }}>{signature.text}</div>}
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: 'var(--t3)', padding: '10px 14px', background: 'var(--s2)', borderRadius: 8 }}>
+                  No signature set yet — <a href="/taxcasereview-CRM/settings" style={{ color: 'var(--blue)' }}>add one in Settings</a> and it'll be appended to every email sent through Gmail.
+                </div>
+              )}
+            </div>
             <div className="field"><label>Triage</label>
               <select value={form.triage} onChange={e => fld('triage', e.target.value)}>
                 {TRIAGE.map(t => <option key={t}>{t}</option>)}
@@ -523,6 +548,36 @@ export default function Email() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// Renders a full HTML email body inside a sandboxed iframe. sandbox=
+// "allow-same-origin" (deliberately WITHOUT "allow-scripts") means no
+// <script> tag or inline event handler in the email can ever execute —
+// that's what actually blocks XSS — while still letting this component
+// read the iframe's rendered height to auto-size it. allow-same-origin
+// alone is inert without allow-scripts; there's no script context to
+// exploit it with. Safe even for HTML from senders we don't control.
+function SafeHtmlEmail({ html }) {
+  const ref = useRef(null)
+  const [height, setHeight] = useState(200)
+
+  function resize() {
+    const doc = ref.current?.contentDocument
+    if (doc?.body) setHeight(doc.body.scrollHeight + 24)
+  }
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid var(--br)', borderRadius: 10, overflow: 'hidden' }}>
+      <iframe
+        ref={ref}
+        srcDoc={html}
+        sandbox="allow-same-origin"
+        onLoad={resize}
+        title="Email content"
+        style={{ width: '100%', height, border: 'none', display: 'block' }}
+      />
     </div>
   )
 }
