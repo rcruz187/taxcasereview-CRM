@@ -1,10 +1,19 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useCall } from '../context/CallContext'
+import { useApp } from '../context/AppContext'
 
 const OUTCOME_C = {
   'Connected': 'bg', 'No Answer': 'bn', 'Voicemail': 'ba',
-  'Wrong Number': 'br', 'Callback Requested': 'bb', 'Converted': 'bg'
+  'Wrong Number': 'br', 'Callback Requested': 'bb', 'Converted': 'bg',
+  // Raw call statuses (incoming_calls / outbound_calls) shown when staff
+  // never filled out the Log This Call modal for that call — see loadCallLog.
+  'Ringing': 'ba', 'Answered': 'bb', 'Completed': 'bg', 'Missed': 'br',
+  'Dialing…': 'ba', 'Failed': 'br',
+}
+const RAW_STATUS_LABEL = {
+  ringing: 'Ringing', answered: 'Answered', completed: 'Completed', missed: 'Missed',
+  pending: 'Dialing…', connected: 'Connected', failed: 'Failed',
 }
 
 export default function Dialer() {
@@ -12,6 +21,8 @@ export default function Dialer() {
     relayStatus, calling, active,
     startCall: startCallShared, logModal,
   } = useCall()
+  const { role } = useApp()
+  const canDeleteRecordings = role === 'Super Admin' || role === 'Admin'
 
   const [leads, setLeads]       = useState([])
   const [callLog, setCallLog]   = useState([])
@@ -22,6 +33,10 @@ export default function Dialer() {
   const [clientQueue, setClientQueue] = useState([])
   const [voicemails, setVoicemails] = useState([])
   const [recordings, setRecordings] = useState([])
+  const [attachRec, setAttachRec]   = useState(null)   // recording being attached to a client
+  const [attachSearch, setAttachSearch] = useState('')
+  const [attachResults, setAttachResults] = useState([])
+  const [attaching, setAttaching]   = useState(false)
   const prevLogModalRef = useRef(false)
 
   // Page-local wrapper around the shared connection's startCall.
@@ -67,12 +82,55 @@ export default function Dialer() {
   }
 
   async function loadCallLog() {
-    const { data } = await supabase
-      .from('calllog')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(100)
-    if (data) setCallLog(data)
+    // calllog only has a row when staff actually saved the "Log This Call"
+    // modal — skip/close it (or the modal never even fires, e.g. a call
+    // that rang and went to voicemail with nobody at a desk) and that call
+    // never showed up in History at all. incoming_calls/outbound_calls get
+    // a row for every real call attempt regardless, so pull from those and
+    // use calllog only to enrich with outcome/notes/duration when present.
+    const [{ data: inbound }, { data: outbound }, { data: logged }] = await Promise.all([
+      supabase.from('incoming_calls').select('*').order('created_at', { ascending: false }).limit(150),
+      supabase.from('outbound_calls').select('*').order('created_at', { ascending: false }).limit(150),
+      supabase.from('calllog').select('*').order('created_at', { ascending: false }).limit(300),
+    ])
+
+    // Best-effort match to a manually-logged outcome — same phone number,
+    // logged within 15 min of the raw call (the log modal saves moments
+    // after hangup). There's no shared call id between these tables, so
+    // this is approximate, not exact.
+    function findLogged(phone, createdAt) {
+      if (!phone || !createdAt) return null
+      const t = new Date(createdAt).getTime()
+      return (logged || []).find(l => l.phone === phone && l.created_at && Math.abs(new Date(l.created_at).getTime() - t) < 15 * 60 * 1000) || null
+    }
+
+    const inRows = (inbound || []).map(c => {
+      const match = findLogged(c.from_number, c.created_at)
+      return {
+        id: 'in-' + c.id, direction: 'Inbound', phone: c.from_number,
+        clientName: match?.clientName || null,
+        outcome: match?.outcome || RAW_STATUS_LABEL[c.status] || c.status || '—',
+        duration: match?.duration || null,
+        notes: match?.notes || null,
+        created_at: c.created_at,
+      }
+    })
+    const outRows = (outbound || []).map(c => {
+      const match = findLogged(c.destination_number, c.created_at)
+      return {
+        id: 'out-' + c.id, direction: 'Outbound', phone: c.destination_number,
+        clientName: match?.clientName || null,
+        outcome: match?.outcome || RAW_STATUS_LABEL[c.status] || c.status || '—',
+        duration: match?.duration || null,
+        notes: match?.notes || null,
+        created_at: c.created_at,
+      }
+    })
+
+    const merged = [...inRows, ...outRows]
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .slice(0, 150)
+    setCallLog(merged)
   }
 
   async function loadVoicemails() {
@@ -109,6 +167,50 @@ export default function Dialer() {
     }
     setVoicemails(vs => vs.filter(v => v.id !== vm.id))
     showToast('Voicemail deleted.')
+  }
+
+  async function deleteRecording(rec) {
+    if (!canDeleteRecordings) return
+    if (!window.confirm('Delete this recording? This cannot be undone.')) return
+    if (rec.recording_url?.includes('/documents/')) {
+      const path = rec.recording_url.split('/documents/')[1]
+      if (path) await supabase.storage.from('documents').remove([path]).catch(() => {})
+    }
+    await supabase.from('call_recordings').delete().eq('id', rec.id)
+    setRecordings(rs => rs.filter(r => r.id !== rec.id))
+    showToast('Recording deleted.')
+  }
+
+  // Attach to Client — drops a row into that client's Documents pointing at
+  // the recording's existing file (already hosted in the documents storage
+  // bucket by call-recorded), so it shows up in their file without needing
+  // to re-upload the audio anywhere.
+  async function searchClientsToAttach(q) {
+    setAttachSearch(q)
+    if (!q.trim()) { setAttachResults([]); return }
+    const { data } = await supabase.from('clients').select('id,name,phone')
+      .ilike('name', `%${q.trim()}%`).limit(8)
+    setAttachResults(data || [])
+  }
+
+  async function attachToClient(client) {
+    if (!attachRec) return
+    setAttaching(true)
+    const when = attachRec.created_at ? new Date(attachRec.created_at).toLocaleString() : ''
+    const { error } = await supabase.from('documents').insert([{
+      name: `Call Recording — ${when}`,
+      client: client.name,
+      docType: 'Call Recording',
+      notes: `From ${attachRec.from_number || 'unknown'}${attachRec.duration_seconds ? ` · ${attachRec.duration_seconds}s` : ''}`,
+      file_url: attachRec.recording_url,
+      file_name: `call-recording-${attachRec.id}.mp3`,
+      file_size: null,
+      created_at: new Date().toISOString(),
+    }])
+    setAttaching(false)
+    if (error) { showToast('Error: ' + error.message); return }
+    showToast(`✅ Attached to ${client.name}'s file`)
+    setAttachRec(null); setAttachSearch(''); setAttachResults([])
   }
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3000) }
@@ -167,10 +269,10 @@ export default function Dialer() {
            globally (see ActiveCallBar in App.jsx) so they're visible no
            matter which page you're on, not just here. ───────────────── */}
 
-      <div className="g2" style={{ alignItems: 'start' }}>
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
 
         {/* ── Left: Dialpad ──────────────────────────────────────────── */}
-        <div className="card" style={{ maxWidth: 320 }}>
+        <div className="card" style={{ width: 320, flexShrink: 0 }}>
           <div className="ch"><span className="ct">Dialpad</span></div>
 
           {/* Number display */}
@@ -334,7 +436,17 @@ export default function Dialer() {
                     {rec.recording_url ? (
                       <audio controls src={rec.recording_url} style={{ flex: 1, height: 32 }} />
                     ) : (
-                      <span style={{ fontSize: 12, color: 'var(--t3)' }}>Recording unavailable</span>
+                      <span style={{ fontSize: 12, color: 'var(--t3)', flex: 1 }}>Recording unavailable</span>
+                    )}
+                    <button className="btn sec" style={{ padding: '5px 10px', fontSize: 11, flexShrink: 0 }}
+                      onClick={() => { setAttachRec(rec); setAttachSearch(''); setAttachResults([]) }}>
+                      📎 Attach to Client
+                    </button>
+                    {canDeleteRecordings && (
+                      <button className="btn sec" style={{ padding: '5px 10px', fontSize: 11, color: '#dc2626', flexShrink: 0 }}
+                        onClick={() => deleteRecording(rec)}>
+                        🗑️ Delete
+                      </button>
                     )}
                   </div>
                 ))}
@@ -402,6 +514,7 @@ export default function Dialer() {
                     <tr>
                       <th>Name</th>
                       <th>Phone</th>
+                      <th>Direction</th>
                       <th>Outcome</th>
                       <th>Duration</th>
                       <th>Notes</th>
@@ -410,18 +523,19 @@ export default function Dialer() {
                   </thead>
                   <tbody>
                     {callLog.length === 0 ? (
-                      <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--t3)', padding: 24 }}>
+                      <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--t3)', padding: 24 }}>
                         No calls logged yet
                       </td></tr>
                     ) : callLog.map(c => (
                       <tr key={c.id}>
                         <td style={{ fontWeight: 600 }}>{c.clientName || '—'}</td>
                         <td style={{ fontFamily: 'monospace', color: 'var(--t2)', fontSize: 12 }}>{c.phone || '—'}</td>
+                        <td><span className={`bdg ${c.direction === 'Inbound' ? 'bb' : 'bn'}`} style={{ fontSize: 11 }}>{c.direction === 'Inbound' ? '↘ In' : '↗ Out'}</span></td>
                         <td><span className={`bdg ${OUTCOME_C[c.outcome] || 'bn'}`} style={{ fontSize: 11 }}>{c.outcome}</span></td>
                         <td style={{ fontFamily: 'monospace', color: 'var(--t2)', fontSize: 12 }}>{c.duration || '—'}</td>
                         <td style={{ color: 'var(--t2)', fontSize: 12, maxWidth: 200 }}>{c.notes || '—'}</td>
                         <td style={{ color: 'var(--t3)', fontSize: 11 }}>
-                          {c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}
+                          {c.created_at ? new Date(c.created_at).toLocaleString() : '—'}
                         </td>
                       </tr>
                     ))}
@@ -432,6 +546,42 @@ export default function Dialer() {
           )}
         </div>
       </div>
+
+      {/* Attach Recording to Client */}
+      {attachRec && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}
+          onClick={e => e.target === e.currentTarget && setAttachRec(null)}>
+          <div className="modal" style={{ width: 420, maxWidth: '95vw', padding: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 16 }}>📎 Attach Recording to Client</div>
+              <button className="xbtn" onClick={() => setAttachRec(null)}>&times;</button>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 12 }}>
+              {attachRec.from_number || 'Unknown'} · {attachRec.created_at ? new Date(attachRec.created_at).toLocaleString() : ''}
+            </div>
+            <div className="field"><label>Search client by name</label>
+              <input autoFocus value={attachSearch} onChange={e => searchClientsToAttach(e.target.value)} placeholder="Start typing a name…" />
+            </div>
+            <div style={{ maxHeight: 220, overflowY: 'auto', marginTop: 8 }}>
+              {attachSearch.trim() && attachResults.length === 0 && (
+                <div style={{ color: 'var(--t3)', fontSize: 12, padding: '10px 0', textAlign: 'center' }}>No clients found</div>
+              )}
+              {attachResults.map(cl => (
+                <div key={cl.id} onClick={() => !attaching && attachToClient(cl)}
+                  style={{ padding: '10px 8px', borderBottom: '1px solid var(--br)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--s2)'}
+                  onMouseLeave={e => e.currentTarget.style.background = ''}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{cl.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--t3)', fontFamily: 'monospace' }}>{cl.phone || '—'}</div>
+                  </div>
+                  <span style={{ fontSize: 12, color: 'var(--blue)', fontWeight: 600 }}>{attaching ? 'Attaching…' : 'Attach →'}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Log Call Modal now renders globally too (see ActiveCallBar
            in App.jsx), so it pops up correctly even if the call ended
