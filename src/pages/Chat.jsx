@@ -71,6 +71,8 @@ export default function Chat() {
   const huddleMembers = webrtc.members
   const micOn = webrtc.micOn
   const cameraOn = webrtc.cameraOn
+  const [chatToast, setChatToast] = useState('')
+  function showToast(msg) { setChatToast(msg); setTimeout(() => setChatToast(''), 4000) }
   const [showEmoji, setShowEmoji]   = useState(false)
   const [showAllEmoji, setShowAllEmoji] = useState(false)
   const [hoverMsg, setHoverMsg]   = useState(null)
@@ -178,9 +180,10 @@ export default function Chat() {
   // room id, posting the "someone started a huddle" nudge into chat.
   async function startHuddle() {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2,7)}`
-    setHuddleId(id)
     setShowHuddleInvite(false)
-    await webrtc.join(id, myName, true)
+    const result = await webrtc.join(id, myName, true)
+    if (!result.ok) { showToast(result.reason || 'Could not start huddle'); return }
+    setHuddleId(id)
     await supabase.from('chat_messages').insert([{
       channel: 'general', sender: '🔔 System',
       text: `📞 ${myName} started a Huddle! Click "Join Huddle" to join the call.`,
@@ -189,9 +192,10 @@ export default function Chat() {
   }
 
   async function joinHuddle(id) {
-    setHuddleId(id)
     setIncomingHuddle(null)
-    await webrtc.join(id, myName, true)
+    const result = await webrtc.join(id, myName, true)
+    if (!result.ok) { showToast(result.reason || 'Could not join huddle'); return }
+    setHuddleId(id)
   }
 
   async function inviteToHuddle(name) {
@@ -257,6 +261,10 @@ export default function Chat() {
 
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', background: '#0a0f1a', overflow: 'hidden', flexDirection: 'column' }}>
+
+      {chatToast && (
+        <div style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', background: '#1e293b', border: '1px solid #f87171', color: '#fca5a5', padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, zIndex: 1100, boxShadow: '0 8px 24px rgba(0,0,0,.4)' }}>{chatToast}</div>
+      )}
 
       {/* ── Incoming Huddle Alert ── */}
       {incomingHuddle && !huddle && (

@@ -23,9 +23,9 @@ export default function MeetingRoom() {
   async function handleJoin() {
     if (!name.trim()) return
     setJoining(true)
-    const ok = await webrtc.join(id, name.trim(), true)
+    const result = await webrtc.join(id, name.trim(), true)
     setJoining(false)
-    if (ok) setEntered(true)
+    if (result.ok) setEntered(true)
   }
 
   async function handleLeave() {

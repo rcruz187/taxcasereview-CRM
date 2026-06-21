@@ -19,6 +19,13 @@ import { supabase } from './supabase'
 
 const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
 
+// Peer-to-peer mesh has a real practical ceiling -- every extra person
+// means everyone else's device has to upload its camera feed one more
+// time, with no server to share that load. 6 is comfortably inside what
+// most connections/devices can handle; past that, quality degrades for
+// everyone in the call, not just the person joining late.
+const MAX_PARTICIPANTS = 6
+
 export function useWebRTCRoom(channelPrefix) {
   const [members, setMembers] = useState([])
   const [remoteStreams, setRemoteStreams] = useState({}) // { name: MediaStream }
@@ -91,6 +98,46 @@ export function useWebRTCRoom(channelPrefix) {
   const join = useCallback(async (roomId, myName, withVideo = true) => {
     myNameRef.current = myName
     setError('')
+
+    // presence is used purely as a headcount gate here -- the actual
+    // membership list and offer/answer flow below is the exact same
+    // broadcast-based mechanism that was already working, untouched.
+    // Presence is the right tool specifically for "how many people are
+    // already here before I even join", including staying accurate if
+    // someone's browser crashed instead of leaving cleanly (broadcast
+    // alone has no way to answer that question for someone not yet in
+    // the room).
+    const ch = supabase.channel(`${channelPrefix}:${roomId}`, {
+      config: { broadcast: { self: false }, presence: { key: myName } }
+    })
+    channelRef.current = ch
+
+    ch.on('broadcast', { event: 'signal' }, ({ payload }) => handleSignal(payload))
+    ch.on('broadcast', { event: 'joined' }, ({ payload }) => {
+      setMembers(m => m.includes(payload.name) ? m : [...m, payload.name])
+      createOffer(payload.name)
+    })
+    ch.on('broadcast', { event: 'left' }, ({ payload }) => {
+      setMembers(m => m.filter(n => n !== payload.name))
+      closePeer(payload.name)
+    })
+
+    let resolveSync
+    const firstSync = new Promise(res => { resolveSync = res })
+    ch.on('presence', { event: 'sync' }, () => resolveSync())
+
+    await new Promise(resolve => { ch.subscribe(status => { if (status === 'SUBSCRIBED') resolve() }) })
+    await firstSync
+
+    const currentCount = Object.keys(ch.presenceState()).length
+    if (currentCount >= MAX_PARTICIPANTS) {
+      await supabase.removeChannel(ch)
+      channelRef.current = null
+      const msg = `This call is full — ${MAX_PARTICIPANTS} people max right now`
+      setError(msg)
+      return { ok: false, reason: msg }
+    }
+
     let stream = null
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: withVideo })
@@ -103,37 +150,33 @@ export function useWebRTCRoom(channelPrefix) {
           setCameraOn(false)
           setError('Camera unavailable — joined with audio only')
         } catch {
-          setError('Microphone access denied — check your browser permissions')
-          return false
+          await supabase.removeChannel(ch)
+          channelRef.current = null
+          const msg = 'Microphone access denied — check your browser permissions'
+          setError(msg)
+          return { ok: false, reason: msg }
         }
       } else {
-        setError('Microphone access denied — check your browser permissions')
-        return false
+        await supabase.removeChannel(ch)
+        channelRef.current = null
+        const msg = 'Microphone access denied — check your browser permissions'
+        setError(msg)
+        return { ok: false, reason: msg }
       }
     }
     localStreamRef.current = stream
 
-    const ch = supabase.channel(`${channelPrefix}:${roomId}`, { config: { broadcast: { self: false } } })
-    channelRef.current = ch
-    ch.on('broadcast', { event: 'signal' }, ({ payload }) => handleSignal(payload))
-    ch.on('broadcast', { event: 'joined' }, ({ payload }) => {
-      setMembers(m => m.includes(payload.name) ? m : [...m, payload.name])
-      createOffer(payload.name)
-    })
-    ch.on('broadcast', { event: 'left' }, ({ payload }) => {
-      setMembers(m => m.filter(n => n !== payload.name))
-      closePeer(payload.name)
-    })
-    await ch.subscribe()
+    await ch.track({ name: myName }) // headcount only, see comment above
     await ch.send({ type: 'broadcast', event: 'joined', payload: { name: myName } })
     setMembers(m => m.includes(myName) ? m : [...m, myName])
     setJoined(true)
-    return true
+    return { ok: true }
   }, [channelPrefix])
 
   const leave = useCallback(async () => {
     if (channelRef.current) {
       await channelRef.current.send({ type: 'broadcast', event: 'left', payload: { name: myNameRef.current } })
+      await channelRef.current.untrack().catch(() => {})
       await supabase.removeChannel(channelRef.current)
       channelRef.current = null
     }
