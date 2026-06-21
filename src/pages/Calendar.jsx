@@ -126,7 +126,11 @@ export default function Calendar() {
   // link itself (tied to this event's id) is the only access control,
   // same pattern as the e-sign and client portal links.
   function meetingLinkFor(ev) {
-    return `${window.location.origin}/meet/${ev.id}`
+    // window.location.origin alone is missing the GitHub Pages project
+    // path (this app deploys under /taxcasereview-CRM/, not the bare
+    // domain root) -- import.meta.env.BASE_URL is Vite's own resolved
+    // base path, so this stays correct even if that ever changes.
+    return `${window.location.origin}${import.meta.env.BASE_URL}meet/${ev.id}`
   }
 
   async function copyMeetingLink(ev) {
