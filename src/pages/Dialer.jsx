@@ -287,15 +287,23 @@ export default function Dialer() {
         <div className="card" style={{ width: 320, flexShrink: 0 }}>
           <div className="ch"><span className="ct">Dialpad</span></div>
 
-          {/* Number display */}
-          <div style={{
-            background: 'var(--bg)', borderRadius: 8, padding: '10px 14px',
-            textAlign: 'center', fontSize: 22, fontWeight: 700, letterSpacing: 4,
-            color: 'var(--tx)', marginBottom: 12, minHeight: 48,
-            border: '1px solid var(--br)', fontFamily: 'monospace'
-          }}>
-            {dialpad || <span style={{ color: 'var(--t3)', fontSize: 14, fontWeight: 400, letterSpacing: 0 }}>Enter number</span>}
-          </div>
+          {/* Number display — a real input now, not just a click-built display.
+              You can type, paste, or select-all+delete like any normal text
+              field; the on-screen keypad below still appends digits the same
+              way it always did. */}
+          <input
+            type="tel"
+            value={dialpad}
+            onChange={e => setDialpad(e.target.value.replace(/[^\d#*+]/g, ''))}
+            placeholder="Enter number"
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              background: 'var(--bg)', borderRadius: 8, padding: '10px 14px',
+              textAlign: 'center', fontSize: 22, fontWeight: 700, letterSpacing: 4,
+              color: 'var(--tx)', marginBottom: 12, minHeight: 48,
+              border: '1px solid var(--br)', fontFamily: 'monospace'
+            }}
+          />
 
           {/* Dialpad grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>

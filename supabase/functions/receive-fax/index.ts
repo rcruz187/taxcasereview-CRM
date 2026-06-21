@@ -30,6 +30,7 @@ const swmlReceive = {
   version: '1.0.0',
   sections: {
     main: [
+      { answer: {} },
       { receive_fax: {} },
       { execute: { dest: SELF_URL } },
     ],
