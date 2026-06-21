@@ -32,22 +32,36 @@ export default function Dashboard() {
       supabase.from('cases').select('*').order('created_at', { ascending: false }),
       supabase.from('tasks').select('*').order('created_at', { ascending: false }),
       supabase.from('invoices').select('id,total,status,clientName'),
-      supabase.from('payments').select('id,amount,status,created_at'),
+      supabase.from('payments').select('id,amount,status,created_at,source'),
       supabase.from('deadlines').select('*').order('dueDate', { ascending: true }),
     ])
 
     const now = new Date()
     const thisMonth = now.toISOString().slice(0, 7)
-    const revMtd = (payments || [])
-      .filter(p => p.created_at?.startsWith(thisMonth))
+
+    // 1st trade = the Tax Investigation Fee. This is collected externally via
+    // LeadFlow before a lead ever reaches the CRM, so it's never written to
+    // the payments table — leads.taxFee (set when the lead is qualified) is
+    // the only record of it we have. MTD = leads created this month.
+    // 2nd trade = the Resolution Fee, charged in-app once IRS results are
+    // back and the addendum is signed — these DO hit payments, tagged
+    // source:'resolution_fee' by stripe-resolution-fee-confirm.
+    const mtd1stTrades   = (leads || [])
+      .filter(l => l.created_at?.startsWith(thisMonth))
+      .reduce((s, l) => s + parseFloat(l.taxFee || 0), 0)
+    const total1stTrades = (leads || []).reduce((s, l) => s + parseFloat(l.taxFee || 0), 0)
+    const mtd2ndTrades   = (payments || [])
+      .filter(p => p.source === 'resolution_fee' && p.created_at?.startsWith(thisMonth))
       .reduce((s, p) => s + parseFloat(p.amount || 0), 0)
-    const revTotal = (payments || []).reduce((s, p) => s + parseFloat(p.amount || 0), 0)
+    const total2ndTrades = (payments || [])
+      .filter(p => p.source === 'resolution_fee')
+      .reduce((s, p) => s + parseFloat(p.amount || 0), 0)
 
     setMetrics({
       activeCases: (cases || []).filter(c => ['Open', 'Pending IRS', 'Active Plan', 'Under Review'].includes(c.status)).length,
       openLeads: (leads || []).filter(l => !['Converted to Client', 'Dead', 'Do Not Contact'].includes(l.status)).length,
       totalClients: (clients || []).length,
-      revMtd, revTotal,
+      mtd1stTrades, total1stTrades, mtd2ndTrades, total2ndTrades,
       unpaidInvoices: (invoices || []).filter(i => i.status === 'Unpaid' || i.status === 'Overdue').length,
       unpaidAmt: (invoices || []).filter(i => i.status === 'Unpaid' || i.status === 'Overdue').reduce((s, i) => s + parseFloat(i.total || 0), 0),
       openTasks: (tasks || []).filter(t => !t.done).length,
@@ -163,7 +177,8 @@ export default function Dashboard() {
         <StatCard label="Active Cases"    val={metrics.activeCases}   color="var(--blue)"  to="/cases"     icon="📁" />
         <StatCard label="Open Leads"      val={metrics.openLeads}     color="var(--warn)"  to="/leads"     icon="👤" />
         <StatCard label="Clients"         val={metrics.totalClients}  color="var(--ok)"    to="/clients"   icon="🏢" />
-        <StatCard label="Revenue MTD"     val={'$' + Math.round(metrics.revMtd).toLocaleString()} color="var(--ok)" icon="💰" sub={'Total: $' + Math.round(metrics.revTotal).toLocaleString()} />
+        <StatCard label="MTD 1st Trades"  val={'$' + Math.round(metrics.mtd1stTrades).toLocaleString()} color="var(--ok)" icon="💰" sub={'Total: $' + Math.round(metrics.total1stTrades).toLocaleString()} />
+        <StatCard label="MTD 2nd Trades"  val={'$' + Math.round(metrics.mtd2ndTrades).toLocaleString()} color="var(--ok)" icon="💵" sub={'Total: $' + Math.round(metrics.total2ndTrades).toLocaleString()} />
         <StatCard label="Unpaid Invoices" val={metrics.unpaidInvoices} color={metrics.unpaidInvoices > 0 ? 'var(--bad)' : 'var(--ok)'} to="/invoices" icon="🧾" sub={metrics.unpaidAmt > 0 ? '$' + Math.round(metrics.unpaidAmt).toLocaleString() + ' outstanding' : 'All paid'} />
         <StatCard label="Open Tasks"      val={metrics.openTasks}     color="var(--blue)"  to="/tasks"     icon="✅" sub={metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track'} />
         <StatCard label="Upcoming DL"     val={metrics.upcomingDl}    color="var(--warn)"  to="/deadlines" icon="⏰" />
