@@ -345,17 +345,17 @@ export default function Dialer() {
               </div>
               <div className="ovx">
                 {clientQueue.map((entry, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '11px 10px', borderBottom: i < clientQueue.length - 1 ? '1px solid var(--br)' : 'none' }}>
-                    <div className={`av ${avColor(entry.name || '?')}`}>{initialsFor(entry.name)}</div>
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderBottom: i < clientQueue.length - 1 ? '1px solid var(--br)' : 'none' }}>
+                    <div className={`av ${avColor(entry.name || '?')}`} style={{ width: 24, height: 24, fontSize: 9.5 }}>{initialsFor(entry.name)}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--tx)' }}>{entry.name || 'Unknown'}</div>
-                      <div style={{ fontSize: 12, color: 'var(--t3)', fontFamily: 'monospace', marginTop: 1 }}>{entry.phone}</div>
+                      <div style={{ fontWeight: 700, fontSize: 12.5, color: 'var(--tx)' }}>{entry.name || 'Unknown'}</div>
+                      <div style={{ fontSize: 11, color: 'var(--t3)', fontFamily: 'monospace', marginTop: 1 }}>{entry.phone}</div>
                     </div>
-                    <button className="btn pri" style={{ padding: '6px 14px', fontSize: 12, gap: 5 }}
+                    <button className="btn pri" style={{ padding: '5px 11px', fontSize: 11, gap: 4 }}
                       onClick={() => callQueueEntry(entry)} disabled={calling}>
                       📞 Call
                     </button>
-                    <button className="btn sec" style={{ padding: '6px 10px', fontSize: 12 }}
+                    <button className="btn sec" style={{ padding: '5px 9px', fontSize: 11 }}
                       onClick={() => removeFromQueue(i)}>
                       ✕
                     </button>
@@ -366,7 +366,7 @@ export default function Dialer() {
           )}
 
           {/* Tabs */}
-          <div style={{ display: 'inline-flex', gap: 2, marginBottom: 16, background: 'var(--s2)', padding: 4, borderRadius: 11, border: '1px solid var(--br)' }}>
+          <div style={{ display: 'inline-flex', gap: 2, marginBottom: 12, background: 'var(--s2)', padding: 3, borderRadius: 9, border: '1px solid var(--br)' }}>
             {[
               ['queue', '📋', 'Call Queue', leads.length],
               ['voicemail', '🔵', 'Voicemails', voicemails.filter(v => !v.is_read).length],
@@ -375,16 +375,16 @@ export default function Dialer() {
             ].map(([key, icon, label, count]) => (
               <button key={key} onClick={() => setTab(key)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', fontSize: 12.5, fontWeight: 700,
-                  borderRadius: 8, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+                  display: 'flex', alignItems: 'center', gap: 5, padding: '6px 11px', fontSize: 11.5, fontWeight: 700,
+                  borderRadius: 6, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
                   background: tab === key ? 'var(--blue)' : 'transparent',
                   color: tab === key ? '#fff' : 'var(--t2)',
                   transition: 'background .15s, color .15s',
                 }}>
-                <span>{icon}</span>{label}
+                <span style={{ fontSize: 12 }}>{icon}</span>{label}
                 {count > 0 && (
                   <span style={{
-                    fontSize: 11, fontWeight: 700, padding: '1px 7px', borderRadius: 20, minWidth: 18, textAlign: 'center',
+                    fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 20, minWidth: 16, textAlign: 'center',
                     background: tab === key ? 'rgba(255,255,255,.25)' : 'var(--s3)',
                     color: tab === key ? '#fff' : 'var(--t2)',
                   }}>{count}</span>
@@ -401,34 +401,34 @@ export default function Dialer() {
                   <div style={{ textAlign: 'center', color: 'var(--t3)', padding: 32 }}>No voicemails yet</div>
                 ) : voicemails.map(vm => (
                   <div key={vm.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 14, padding: '13px 10px',
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
                     borderBottom: '1px solid var(--br)',
                     background: vm.is_read ? 'transparent' : 'rgba(37,99,235,0.06)'
                   }}>
-                    <div className={`av ${avColor(vm.from_number || '?')}`} style={{ position: 'relative' }}>
+                    <div className={`av ${avColor(vm.from_number || '?')}`} style={{ position: 'relative', width: 24, height: 24, fontSize: 11 }}>
                       📵
-                      {!vm.is_read && <span style={{ position: 'absolute', top: -2, right: -2, width: 9, height: 9, borderRadius: '50%', background: '#3b82f6', border: '2px solid var(--card-bg, #0f172a)' }} />}
+                      {!vm.is_read && <span style={{ position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', border: '2px solid var(--card-bg, #0f172a)' }} />}
                     </div>
-                    <div style={{ minWidth: 150 }}>
-                      <div style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: 13.5, color: 'var(--tx)' }}>{vm.from_number || 'Unknown'}</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--t3)', marginTop: 2 }}>
+                    <div style={{ minWidth: 135 }}>
+                      <div style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: 12.5, color: 'var(--tx)' }}>{vm.from_number || 'Unknown'}</div>
+                      <div style={{ fontSize: 10.5, color: 'var(--t3)', marginTop: 1 }}>
                         {vm.created_at ? new Date(vm.created_at).toLocaleString() : '—'}
                         {vm.duration_seconds ? ` · ${vm.duration_seconds}s` : ''}
                       </div>
                     </div>
                     {vm.recording_url ? (
-                      <audio controls src={vm.recording_url} style={{ flex: 1, height: 32 }}
+                      <audio controls src={vm.recording_url} style={{ flex: 1, height: 28 }}
                         onPlay={() => !vm.is_read && markVoicemailRead(vm)} />
                     ) : (
-                      <span style={{ fontSize: 12, color: 'var(--t3)', flex: 1 }}>Recording unavailable</span>
+                      <span style={{ fontSize: 11, color: 'var(--t3)', flex: 1 }}>Recording unavailable</span>
                     )}
                     {!vm.is_read && (
-                      <button className="btn sec" style={{ padding: '6px 12px', fontSize: 11, flexShrink: 0 }}
+                      <button className="btn sec" style={{ padding: '5px 10px', fontSize: 10.5, flexShrink: 0 }}
                         onClick={() => markVoicemailRead(vm)}>
                         Mark Read
                       </button>
                     )}
-                    <button className="btn sec" style={{ padding: '6px 12px', fontSize: 11, color: '#dc2626', flexShrink: 0 }}
+                    <button className="btn sec" style={{ padding: '5px 10px', fontSize: 10.5, color: '#dc2626', flexShrink: 0 }}
                       onClick={() => deleteVoicemail(vm)}>
                       🗑️ Delete
                     </button>
@@ -446,28 +446,28 @@ export default function Dialer() {
                   <div style={{ textAlign: 'center', color: 'var(--t3)', padding: 32 }}>No recorded calls yet</div>
                 ) : recordings.map(rec => (
                   <div key={rec.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 14, padding: '13px 10px',
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
                     borderBottom: '1px solid var(--br)',
                   }}>
-                    <div className={`av ${avColor(rec.from_number || '?')}`}>🎙️</div>
-                    <div style={{ minWidth: 150 }}>
-                      <div style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: 13.5, color: 'var(--tx)' }}>{rec.from_number || 'Unknown'}</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--t3)', marginTop: 2 }}>
+                    <div className={`av ${avColor(rec.from_number || '?')}`} style={{ width: 24, height: 24, fontSize: 11 }}>🎙️</div>
+                    <div style={{ minWidth: 135 }}>
+                      <div style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: 12.5, color: 'var(--tx)' }}>{rec.from_number || 'Unknown'}</div>
+                      <div style={{ fontSize: 10.5, color: 'var(--t3)', marginTop: 1 }}>
                         {rec.created_at ? new Date(rec.created_at).toLocaleString() : '—'}
                         {rec.duration_seconds ? ` · ${rec.duration_seconds}s` : ''}
                       </div>
                     </div>
                     {rec.recording_url ? (
-                      <audio controls src={rec.recording_url} style={{ flex: 1, height: 32 }} />
+                      <audio controls src={rec.recording_url} style={{ flex: 1, height: 28 }} />
                     ) : (
-                      <span style={{ fontSize: 12, color: 'var(--t3)', flex: 1 }}>Recording unavailable</span>
+                      <span style={{ fontSize: 11, color: 'var(--t3)', flex: 1 }}>Recording unavailable</span>
                     )}
-                    <button className="btn sec" style={{ padding: '6px 12px', fontSize: 11, flexShrink: 0 }}
+                    <button className="btn sec" style={{ padding: '5px 10px', fontSize: 10.5, flexShrink: 0 }}
                       onClick={() => { setAttachRec(rec); setAttachSearch(''); setAttachResults([]) }}>
                       📎 Attach to Client
                     </button>
                     {canDeleteRecordings && (
-                      <button className="btn sec" style={{ padding: '6px 12px', fontSize: 11, color: '#dc2626', flexShrink: 0 }}
+                      <button className="btn sec" style={{ padding: '5px 10px', fontSize: 10.5, color: '#dc2626', flexShrink: 0 }}
                         onClick={() => deleteRecording(rec)}>
                         🗑️ Delete
                       </button>
@@ -488,28 +488,28 @@ export default function Dialer() {
                   const name = lead.name || `${lead.first || ''} ${lead.last || ''}`.trim() || 'Unknown'
                   return (
                     <div key={lead.id} style={{
-                      display: 'flex', alignItems: 'center', gap: 14, padding: '13px 10px',
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
                       borderBottom: '1px solid var(--br)',
                       background: active?.id === lead.id ? 'rgba(37,162,90,0.08)' : 'transparent',
                     }}>
-                      <div className={`av ${avColor(name)}`}>{initialsFor(name)}</div>
+                      <div className={`av ${avColor(name)}`} style={{ width: 24, height: 24, fontSize: 9.5 }}>{initialsFor(name)}</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--tx)' }}>{name}</div>
-                        <div style={{ fontSize: 12, color: 'var(--t3)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                        <div style={{ fontWeight: 700, fontSize: 12.5, color: 'var(--tx)' }}>{name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--t3)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
                           <span style={{ fontFamily: 'monospace' }}>{lead.phone || '—'}</span>
                           {lead.source && <><span>·</span><span>{lead.source}</span></>}
                         </div>
                       </div>
-                      <span className="bdg bb" style={{ fontSize: 11, flexShrink: 0 }}>{lead.status}</span>
+                      <span className="bdg bb" style={{ fontSize: 10, flexShrink: 0 }}>{lead.status}</span>
                       {lead.phone ? (
                         <button className="btn pri"
-                          style={{ padding: '7px 16px', fontSize: 12, gap: 5, flexShrink: 0 }}
+                          style={{ padding: '5px 11px', fontSize: 11, gap: 4, flexShrink: 0 }}
                           onClick={() => startCall({ ...lead, entityType: 'lead' })}
                           disabled={calling}>
                           📞 Call
                         </button>
                       ) : (
-                        <span style={{ fontSize: 11, color: 'var(--t3)', flexShrink: 0, width: 76, textAlign: 'center' }}>No phone</span>
+                        <span style={{ fontSize: 10.5, color: 'var(--t3)', flexShrink: 0, width: 64, textAlign: 'center' }}>No phone</span>
                       )}
                     </div>
                   )
@@ -525,21 +525,21 @@ export default function Dialer() {
                 {callLog.length === 0 ? (
                   <div style={{ textAlign: 'center', color: 'var(--t3)', padding: 32 }}>No calls logged yet</div>
                 ) : callLog.map(c => (
-                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 10px', borderBottom: '1px solid var(--br)' }}>
-                    <div className={`av ${avColor(c.clientName || c.phone || '?')}`}>{initialsFor(c.clientName) !== '?' ? initialsFor(c.clientName) : (c.direction === 'Inbound' ? '↘' : '↗')}</div>
+                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderBottom: '1px solid var(--br)' }}>
+                    <div className={`av ${avColor(c.clientName || c.phone || '?')}`} style={{ width: 24, height: 24, fontSize: 9.5 }}>{initialsFor(c.clientName) !== '?' ? initialsFor(c.clientName) : (c.direction === 'Inbound' ? '↘' : '↗')}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--tx)' }}>{c.clientName || 'Unknown caller'}</span>
-                        <span className={`bdg ${c.direction === 'Inbound' ? 'bb' : 'bn'}`} style={{ fontSize: 10 }}>{c.direction === 'Inbound' ? '↘ In' : '↗ Out'}</span>
-                        <span className={`bdg ${OUTCOME_C[c.outcome] || 'bn'}`} style={{ fontSize: 10 }}>{c.outcome}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 700, fontSize: 12.5, color: 'var(--tx)' }}>{c.clientName || 'Unknown caller'}</span>
+                        <span className={`bdg ${c.direction === 'Inbound' ? 'bb' : 'bn'}`} style={{ fontSize: 9.5 }}>{c.direction === 'Inbound' ? '↘ In' : '↗ Out'}</span>
+                        <span className={`bdg ${OUTCOME_C[c.outcome] || 'bn'}`} style={{ fontSize: 9.5 }}>{c.outcome}</span>
                       </div>
-                      <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
                         <span style={{ fontFamily: 'monospace' }}>{c.phone || '—'}</span>
                         {c.duration && <><span>·</span><span style={{ fontFamily: 'monospace' }}>{c.duration}</span></>}
                         {c.notes && <><span>·</span><span style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.notes}</span></>}
                       </div>
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--t3)', flexShrink: 0, textAlign: 'right' }}>
+                    <div style={{ fontSize: 10.5, color: 'var(--t3)', flexShrink: 0, textAlign: 'right' }}>
                       {c.created_at ? new Date(c.created_at).toLocaleString() : '—'}
                     </div>
                   </div>
