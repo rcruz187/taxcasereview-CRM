@@ -34,8 +34,6 @@ export default function TimeOff() {
     ])
     setRequests(reqs || [])
     setEmployees(emps || [])
-    const badge = document.getElementById('badge-timeoff')
-    if (badge) badge.textContent = (reqs || []).filter(r => r.status === 'pending').length || ''
   }
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3500) }

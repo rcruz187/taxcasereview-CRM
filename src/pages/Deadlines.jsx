@@ -26,11 +26,6 @@ export default function Deadlines() {
     ])
     if (data) setItems(data)
     if (cl)   setClients(cl)
-    const badge = document.getElementById('badge-deadlines')
-    if (badge && data) {
-      const n = data.filter(d=>{const dy=daysLeft(d);return dy<=7&&dy>=-1&&getStatus(d)!=='Completed'}).length
-      badge.textContent = n || ''
-    }
   }
 
   function showToast(msg){setToast(msg);setTimeout(()=>setToast(''),4000)}

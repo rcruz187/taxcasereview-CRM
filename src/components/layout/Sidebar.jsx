@@ -24,7 +24,7 @@ const SECTIONS = [
     label: 'Client Work',
     items: [
       { path: '/leads',     icon: LeadIcon,    label: 'Leads',         badge: 'leads',     section: 'leads' },
-      { path: '/clients',   icon: ClientIcon,  label: 'Clients',       section: 'clients' },
+      { path: '/clients',   icon: ClientIcon,  label: 'Clients',       badge: 'clients',   section: 'clients' },
       { path: '/cases',     icon: CaseIcon,    label: 'Cases',         badge: 'cases',     section: 'cases' },
       { path: '/deadlines', icon: ClockIcon,   label: 'Deadlines',     badge: 'deadlines', badgeWarn: true, section: 'deadlines' },
     ]
@@ -107,6 +107,10 @@ export default function Sidebar() {
 
   const [firmName, setFirmName] = useState('Tax Case Review')
   const [pendingTimeOff, setPendingTimeOff] = useState(0)
+  const [newLeads, setNewLeads] = useState(0)
+  const [newClients, setNewClients] = useState(0)
+  const [openCases, setOpenCases] = useState(0)
+  const [dueSoonDeadlines, setDueSoonDeadlines] = useState(0)
 
   useEffect(() => {
     async function loadPendingTimeOff() {
@@ -119,6 +123,45 @@ export default function Sidebar() {
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [])
+
+  // Leads/Clients/Cases/Deadlines badges used to be hardcoded to "0" here,
+  // with other pages (Leads.jsx, Cases.jsx, Deadlines.jsx) trying to patch
+  // the number in via document.getElementById — which only worked while
+  // that specific page happened to be mounted, and got wiped back to "0"
+  // the moment Sidebar re-rendered for any other reason. Computing the
+  // real counts here, the same way pendingTimeOff already does, fixes that
+  // for good regardless of which page you're on.
+  useEffect(() => {
+    async function loadCounts() {
+      const [leadsRes, clientsRes, casesRes, deadlinesRes] = await Promise.all([
+        supabase.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'New Lead'),
+        supabase.from('clients').select('id', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString()),
+        supabase.from('cases').select('id', { count: 'exact', head: true }).in('status', ['Open', 'Pending IRS']),
+        supabase.from('deadlines').select('dueDate,status'),
+      ])
+      setNewLeads(leadsRes.count || 0)
+      setNewClients(clientsRes.count || 0)
+      setOpenCases(casesRes.count || 0)
+      const today = new Date()
+      const dueSoon = (deadlinesRes.data || []).filter(d => {
+        if ((d.status || 'Tracking') === 'Completed') return false
+        if (!d.dueDate) return false
+        const dy = Math.ceil((new Date(d.dueDate) - today) / 86400000)
+        return dy <= 7 && dy >= -1
+      }).length
+      setDueSoonDeadlines(dueSoon)
+    }
+    loadCounts()
+    const ch = supabase.channel('sidebar-counts-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, loadCounts)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, loadCounts)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cases' }, loadCounts)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deadlines' }, loadCounts)
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [])
+
+  const BADGE_COUNTS = { leads: newLeads, clients: newClients, cases: openCases, deadlines: dueSoonDeadlines }
   const [tagline,  setTagline]  = useState('IRS Resolution Services')
 
   useEffect(() => {
@@ -203,8 +246,8 @@ export default function Sidebar() {
                   {item.label}
                   {item.badge && (
                     item.badge === 'timeoff'
-                      ? (pendingTimeOff > 0 && <span className="nav-badge" id="badge-timeoff">{pendingTimeOff}</span>)
-                      : <span className={`nav-badge${item.badgeWarn ? ' warn' : ''}`} id={`badge-${item.badge}`}>0</span>
+                      ? (pendingTimeOff > 0 && <span className="nav-badge">{pendingTimeOff}</span>)
+                      : (BADGE_COUNTS[item.badge] > 0 && <span className={`nav-badge${item.badgeWarn ? ' warn' : ''}`}>{BADGE_COUNTS[item.badge]}</span>)
                   )}
                 </NavLink>
               )

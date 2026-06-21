@@ -68,8 +68,6 @@ export default function Cases() {
     if (cs) setCases(cs)
     if (cl) setClients(cl)
     if (em) setEmployees(em)
-    const badge = document.getElementById('badge-cases')
-    if (badge && cs) badge.textContent = cs.filter(c=>c.status==='Open'||c.status==='Pending IRS').length || ''
   }
 
   async function loadCaseNotes(caseId) {

@@ -355,8 +355,6 @@ export default function Leads() {
     if (emp) setEmployees(emp)
     if (data) {
       setLeads(data)
-      const badge = document.getElementById('badge-leads')
-      if (badge) badge.textContent = data.filter(l => l.status === 'New Lead').length || 0
       // refresh detail if open
       if (detail) setDetail(data.find(l => l.id === detail.id) || null)
     }
