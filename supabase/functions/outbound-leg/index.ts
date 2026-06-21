@@ -7,7 +7,6 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 // JWT verification must be OFF -- SignalWire calls this directly.
 
 const CALL_RECORDED_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/call-recorded'
-const CONFERENCE_ENDED_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/conference-ended'
 
 serve(async (req) => {
   const url = new URL(req.url)
@@ -18,6 +17,6 @@ serve(async (req) => {
     return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
   }
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Conference startConferenceOnEnter="true" endConferenceOnExit="true" record="record-from-start" recordingStatusCallback="${CALL_RECORDED_URL}" statusCallback="${CONFERENCE_ENDED_URL}" statusCallbackEvent="end">${conf}</Conference></Dial></Response>`
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Conference startConferenceOnEnter="true" endConferenceOnExit="true" record="record-from-start" recordingStatusCallback="${CALL_RECORDED_URL}">${conf}</Conference></Dial></Response>`
   return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
 })

@@ -163,7 +163,13 @@ export function CallProvider({ children }) {
           stopRing()
           if (liveCallRef.current === call) {
             finalizeCallEnd({ alreadyHungUp: true })
-            handleRemoteHangup()
+            if (uiStartedRef.current) {
+              uiStartedRef.current = false
+              clearInterval(timerRef.current)
+              setCalling(false)
+              setLogForm(f => ({ ...f, duration: formatTime(elapsedRef.current) }))
+              setLogModal(true)
+            }
           }
         }
       })
@@ -286,41 +292,6 @@ export function CallProvider({ children }) {
         .then(({ error }) => error && console.error('redirect-to-voicemail error:', error))
     }
   }
-
-  function handleRemoteHangup() {
-    if (uiStartedRef.current) {
-      uiStartedRef.current = false
-      clearInterval(timerRef.current)
-      setCalling(false)
-      setLogForm(f => ({ ...f, duration: formatTime(elapsedRef.current) }))
-      setLogModal(true)
-    }
-  }
-
-  // Backup confirmation that an outbound call has actually ended, for
-  // when the RELAY SDK's own call.state hangup/destroy notification
-  // doesn't fire reliably (the SDK's .hangup() is already documented
-  // below as flaky -- the events that report the OTHER side hanging up
-  // are evidently no more trustworthy, per a real case where the agent
-  // hung up on their own end and the CRM never noticed).
-  // conference-ended is a server-side webhook SignalWire calls when the
-  // conference itself actually closes, totally independent of whatever
-  // the browser SDK thinks happened. Polling it is a second, reliable way
-  // to notice "the call is over" instead of trusting the flaky one alone.
-  useEffect(() => {
-    if (!calling || !activeConferenceRef.current) return
-    const conf = activeConferenceRef.current
-    const poll = setInterval(async () => {
-      const { data } = await supabase.from('outbound_calls')
-        .select('status').eq('conference_name', conf).maybeSingle()
-      if (data?.status === 'completed') {
-        finalizeCallEnd({ alreadyHungUp: true })
-        handleRemoteHangup()
-      }
-    }, 3000)
-    return () => clearInterval(poll)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calling])
 
   function startCall(lead) {
     if (relayStatus !== 'ready') { showCallToast('Calling isn\'t connected yet — wait a moment and try again.'); return false }
