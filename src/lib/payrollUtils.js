@@ -60,7 +60,15 @@ export function buildLineItems(employees, timeEntries, periodStart, periodEnd) {
     })
     const hrs = regularHrs + otHrs
 
-    const isHourly = (emp.pay_type || emp.payType) === 'Hourly'
+    // Employees.jsx's edit form always *displays* "Hourly" as selected
+    // whenever pay_type is unset in the database (a friendly UI default —
+    // see fromDbRow in Employees.jsx) — but until that form is explicitly
+    // re-saved, the underlying database value can still be null. Matching
+    // that same default here means a missing pay_type is treated as
+    // Hourly for pay calculations too, the same way it already looks in
+    // the UI, instead of silently falling through to a $0 salary calc.
+    const payType = emp.pay_type || emp.payType || 'Hourly'
+    const isHourly = payType === 'Hourly'
     const rate = parseFloat(emp.hourly_rate || emp.hourlyRate || 0)
     const salary = parseFloat(emp.salary || 0)
     const regularPay = isHourly ? rate * regularHrs : (salary / 24) || 0
@@ -78,7 +86,7 @@ export function buildLineItems(employees, timeEntries, periodStart, periodEnd) {
     const employerTaxes = ss + medicare
 
     return {
-      name: emp.name, payType: emp.pay_type || emp.payType || 'Salary', rate,
+      name: emp.name, payType, rate,
       hours: hrs.toFixed(2),
       regularHours: regularHrs.toFixed(2), otHours: otHrs.toFixed(2),
       gross: gross.toFixed(2), fedTax: fedTax.toFixed(2),
