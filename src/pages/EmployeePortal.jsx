@@ -195,6 +195,30 @@ export default function EmployeePortal() {
     setTasks(prev => prev.filter(x => x.id !== t.id))
   }
 
+  // Best-effort notification to Super Admin/Admin users — never blocks the
+  // request from going through. If send-email isn't configured, this
+  // silently no-ops; the request itself is still saved and visible in the
+  // admin Time Off page either way.
+  async function notifyTimeOffSubmitted(e, type, start, end, days) {
+    try {
+      const { data: admins } = await supabase.from('employees')
+        .select('email').in('access', ['Super Admin', 'Admin']).not('email', 'is', null)
+      const recipients = [...new Set((admins || []).map(a => a.email).filter(Boolean))]
+      if (recipients.length === 0) return
+      const subject = `Time off request — ${e.name}`
+      const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">` +
+        `<div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div>` +
+        `<p><strong>${e.name}</strong> (${e.employee_id}) requested ${type.toUpperCase()} time off.</p>` +
+        `<p>${start} to ${end} (${days} day${days === 1 ? '' : 's'})</p>` +
+        `<p style="font-size:12px;color:#64748b">Review and approve/deny in the CRM under Time Off.</p></div>`
+      await Promise.all(recipients.map(to =>
+        supabase.functions.invoke('send-email', { body: { to, subject, html } }).catch(() => {})
+      ))
+    } catch {
+      // Never let a notification failure block the employee's request.
+    }
+  }
+
   async function handleSubmitRequest() {
     if (!emp || !reqStart || !reqEnd) { setReqMsg('Please pick start and end dates.'); return }
     const start = new Date(reqStart + 'T00:00:00'), end = new Date(reqEnd + 'T00:00:00')
@@ -209,6 +233,7 @@ export default function EmployeePortal() {
       setReqMsg('❌ ' + error.message)
     } else {
       setReqMsg('✅ Request submitted — waiting on approval.')
+      notifyTimeOffSubmitted(emp, reqType, reqStart, reqEnd, days)
       setReqStart(''); setReqEnd(''); setReqReason(''); setShowRequestForm(false)
       await loadTimeOff(emp)
     }
@@ -238,7 +263,7 @@ export default function EmployeePortal() {
         <input
           value={empId} onChange={e => setEmpId(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleLogin()}
-          placeholder="e.g. TCR-0001"
+          placeholder="e.g. TCR-100"
           style={{ width: '100%', padding: '14px 16px', background: '#0f172a', border: '1px solid #334155', borderRadius: 12, color: '#f1f5f9', fontSize: 16, outline: 'none', boxSizing: 'border-box', marginBottom: 12, fontFamily: 'inherit' }}
           autoFocus
         />
