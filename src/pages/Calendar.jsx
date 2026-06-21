@@ -157,11 +157,7 @@ export default function Calendar() {
       await sendGmailEmail(supabase, {
         to: email,
         subject: `Video meeting link — ${when}${ev.time ? ' at ' + fmtTime(ev.time) : ''}`,
-        body: `<p>Hi ${ev.clientName.split(' ')[0]},</p>` +
-          `<p>Here's the link for your upcoming video meeting${when ? ' on ' + when : ''}${ev.time ? ' at ' + fmtTime(ev.time) : ''}:</p>` +
-          `<p style="margin:18px 0"><a href="${link}" style="background:#3b82f6;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:700">Join Meeting</a></p>` +
-          `<p style="font-size:12px;color:#64748b">Or copy this link into your browser: ${link}</p>` +
-          `<p>No download or account needed — just click the link a few minutes before your appointment, allow camera/microphone access, and you're in.</p>`,
+        body: `Hi ${ev.clientName.split(' ')[0]},\n\nHere's the link for your upcoming video meeting${when ? ' on ' + when : ''}${ev.time ? ' at ' + fmtTime(ev.time) : ''}:\n\n${link}\n\nNo download or account needed — just click the link a few minutes before your appointment, allow camera/microphone access, and you're in.`,
       })
       showToast('✅ Meeting link emailed to ' + ev.clientName)
     } catch (err) {
