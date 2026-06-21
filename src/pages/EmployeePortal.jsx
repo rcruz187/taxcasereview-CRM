@@ -108,6 +108,10 @@ export default function EmployeePortal() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => loadTasks(emp))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'calevents' }, () => loadEvents(emp))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'time_off_requests' }, () => loadTimeOff(emp))
+      // Pay rate/type, balances, etc. — previously only ever loaded once at
+      // login, so an admin changing your rate while you're already logged
+      // in (e.g. testing in another tab) silently never showed up.
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'employees', filter: `id=eq.${emp.id}` }, payload => setEmp(e => e ? { ...e, ...payload.new } : e))
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [emp?.id])
