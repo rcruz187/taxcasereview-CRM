@@ -91,6 +91,13 @@ export function CallProvider({ children }) {
   const lastHandledInboundRef = useRef(null)
   const inboundTimeoutRef = useRef(null)
   const ringIntervalRef = useRef(null)
+  // Backup confirmation that an outbound call has actually ended, started
+  // explicitly inside startCall() once the conference name is known
+  // (rather than a useEffect keyed on `calling` -- that state flips true
+  // synchronously, before activeConferenceRef is populated a moment
+  // later, so an effect watching `calling` would check the ref before it
+  // was ever set). Cleared in finalizeCallEnd alongside everything else.
+  const outboundPollRef = useRef(null)
 
   function stopRing() {
     if (ringIntervalRef.current) { clearInterval(ringIntervalRef.current); ringIntervalRef.current = null }
@@ -163,13 +170,7 @@ export function CallProvider({ children }) {
           stopRing()
           if (liveCallRef.current === call) {
             finalizeCallEnd({ alreadyHungUp: true })
-            if (uiStartedRef.current) {
-              uiStartedRef.current = false
-              clearInterval(timerRef.current)
-              setCalling(false)
-              setLogForm(f => ({ ...f, duration: formatTime(elapsedRef.current) }))
-              setLogModal(true)
-            }
+            handleRemoteHangup()
           }
         }
       })
@@ -293,6 +294,16 @@ export function CallProvider({ children }) {
     }
   }
 
+  function handleRemoteHangup() {
+    if (uiStartedRef.current) {
+      uiStartedRef.current = false
+      clearInterval(timerRef.current)
+      setCalling(false)
+      setLogForm(f => ({ ...f, duration: formatTime(elapsedRef.current) }))
+      setLogModal(true)
+    }
+  }
+
   function startCall(lead) {
     if (relayStatus !== 'ready') { showCallToast('Calling isn\'t connected yet — wait a moment and try again.'); return false }
     const digits = lead.phone?.replace(/\D/g, '')
@@ -330,6 +341,22 @@ export function CallProvider({ children }) {
           return
         }
         activeConferenceRef.current = data.conferenceName || null
+        // Server-confirmed backup for noticing this call has truly ended,
+        // independent of the RELAY SDK's own (sometimes unreliable)
+        // call.state events. outbound-call-status writes 'completed' here
+        // once SignalWire reports the destination leg as done, whatever
+        // the reason. Cleared in finalizeCallEnd.
+        if (activeConferenceRef.current) {
+          const conf = activeConferenceRef.current
+          outboundPollRef.current = setInterval(async () => {
+            const { data: row } = await supabase.from('outbound_calls')
+              .select('status').eq('conference_name', conf).maybeSingle()
+            if (row?.status === 'completed') {
+              finalizeCallEnd({ alreadyHungUp: true })
+              handleRemoteHangup()
+            }
+          }, 3000)
+        }
         // Deliberate pause before the browser self-dials the business number.
         // This self-dial is itself a second outbound SignalWire origination
         // on top of the start-outbound-call REST leg above. Firing them
@@ -361,6 +388,7 @@ export function CallProvider({ children }) {
   // one shared function means these three paths can't drift out of sync
   // with each other again.
   function finalizeCallEnd({ alreadyHungUp }) {
+    if (outboundPollRef.current) { clearInterval(outboundPollRef.current); outboundPollRef.current = null }
     if (!alreadyHungUp) liveCallRef.current?.hangup()
     liveCallRef.current = null
     const conf = activeConferenceRef.current

@@ -71,6 +71,15 @@ serve(async (req) => {
     const spaceDomain = settings.sw_space_url.replace(/^https?:\/\//, '')
     const auth = 'Basic ' + btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
     const outboundLegUrl = `https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/outbound-leg?conf=${encodeURIComponent(conferenceName)}`
+    // Separate from outboundLegUrl on purpose -- this is a pure status
+    // REPORT (fires a background POST when the call ends, doesn't control
+    // anything about how the call behaves), not part of the call-control
+    // response. Keeping it as its own param rather than folding it into
+    // the Conference noun's own statusCallback (tried that, broke live
+    // call connection/audio -- reverted) means there's nothing here that
+    // can affect routing if SignalWire handles it any differently than
+    // expected.
+    const statusCallbackUrl = `https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/outbound-call-status?conf=${encodeURIComponent(conferenceName)}`
 
     const resp = await fetch(
       `https://${spaceDomain}/api/laml/2010-04-01/Accounts/${settings.sw_project_id}/Calls.json`,
@@ -82,6 +91,9 @@ serve(async (req) => {
           From: settings.sw_inbound_did,
           Url: outboundLegUrl,
           Method: 'POST',
+          StatusCallback: statusCallbackUrl,
+          StatusCallbackEvent: 'completed',
+          StatusCallbackMethod: 'POST',
         }),
       }
     )
