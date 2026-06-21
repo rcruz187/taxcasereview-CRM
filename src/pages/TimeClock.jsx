@@ -68,7 +68,10 @@ export default function TimeClock() {
   useEffect(() => {
     load()
     timerRef.current = setInterval(() => setNow(new Date()), 1000)
-    return () => clearInterval(timerRef.current)
+    const ch = supabase.channel('timeclock-admin-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'timeentries' }, load)
+      .subscribe()
+    return () => { clearInterval(timerRef.current); supabase.removeChannel(ch) }
   }, [])
 
   async function load() {
@@ -326,7 +329,7 @@ export default function TimeClock() {
                   <td style={{ padding:'9px 12px', fontWeight:600 }}>{e.employee}</td>
                   <td style={{ padding:'9px 12px', color:'var(--ok)', fontWeight:600 }}>{fmt12(e.inTime)||'—'}</td>
                   <td style={{ padding:'9px 12px', color:e.outTime?'var(--bad)':'var(--t3)' }}>{e.outTime?fmt12(e.outTime):'—'}</td>
-                  <td style={{ padding:'9px 12px', fontWeight:700, color:'var(--b2c)' }}>{e.hours?e.hours+'h':'—'}</td>
+                  <td style={{ padding:'9px 12px', fontWeight:700, color:'#38BDF8' }}>{e.hours?e.hours+'h':'—'}</td>
                   <td style={{ padding:'9px 12px', color:'var(--t2)', fontSize:11 }}>{e.notes||'—'}</td>
                   <td style={{ padding:'9px 12px' }}>{e.outTime ? <span className="bdg bg">Clocked Out</span> : <span className="bdg ba">Active</span>}</td>
                   <td style={{ padding:'9px 8px' }}>
@@ -400,7 +403,7 @@ export default function TimeClock() {
                   <td style={{ padding:'9px 12px', color:e.outTime?'var(--bad)':'var(--t3)' }}>
                     {e.outTime || <span className="bdg ba">Active</span>}
                   </td>
-                  <td style={{ padding:'9px 12px', fontWeight:700, color:'var(--b2c)' }}>{e.hours ? e.hours+'h' : '—'}</td>
+                  <td style={{ padding:'9px 12px', fontWeight:700, color:'#38BDF8' }}>{e.hours ? e.hours+'h' : '—'}</td>
                   <td style={{ padding:'9px 12px', color:'var(--t2)', fontSize:11, maxWidth:140, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.notes||'—'}</td>
                   <td style={{ padding:'9px 12px' }}>
                     <div style={{ display:'flex', gap:5 }}>
