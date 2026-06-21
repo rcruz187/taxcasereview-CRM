@@ -57,8 +57,15 @@ export default function ChargeResolutionFeeModal({ lead, onClose, onPaid, showTo
     if (!s?.stripe_publishable_key) { setErr('Stripe Publishable Key is not set in Settings → Stripe (Autopay).'); setLoading(false); return }
     setPublishableKey(s.stripe_publishable_key)
 
+    // Commission for the 2nd trade goes to whoever actually sent the
+    // addendum, not whoever happens to click Charge — so look that up from
+    // the most recent Service Addendum esign for this client.
+    const { data: addendum } = await supabase.from('esigns')
+      .select('sent_by').eq('client_name', lead.name).eq('doc_type', 'Service Addendum')
+      .order('sent_at', { ascending: false }).limit(1).maybeSingle()
+
     const { data, error } = await supabase.functions.invoke('stripe-resolution-fee-intent', {
-      body: { leadId: lead.id, leadName: lead.name, email: lead.email, amount, description: `Resolution fee — ${lead.name}` }
+      body: { leadId: lead.id, leadName: lead.name, email: lead.email, amount, description: `Resolution fee — ${lead.name}`, enrolledBy: addendum?.sent_by || null }
     })
     setLoading(false)
     if (error || data?.error) { setErr(data?.error || error.message); return }

@@ -1084,7 +1084,7 @@ export async function sendFullPackage(client, supabase) {
 // doesn't touch notifications itself, matching how sendFullPackage is split.
 // Timestamped storage path (not a fixed one like the package forms) since an
 // addendum can legitimately be re-sent later with different fee terms.
-export async function sendAddendumForSignature(record, opts, supabase) {
+export async function sendAddendumForSignature(record, opts, supabase, sentBy) {
   const safeName = (record?.name || 'client').replace(/[^a-zA-Z0-9]+/g, '-')
   let bytes
   try {
@@ -1111,6 +1111,7 @@ export async function sendAddendumForSignature(record, opts, supabase) {
     status: 'Awaiting',
     sent_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
+    sent_by: sentBy || null,
   }]).select().single()
 
   if (error) return { error: error.message }

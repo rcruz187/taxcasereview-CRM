@@ -70,6 +70,7 @@ serve(async (req) => {
       notes: 'Resolution fee',
       stripe_payment_intent_id: intent.id,
       source: 'resolution_fee',
+      enrolled_by: intent.metadata?.enrolled_by || null,
       created_at: new Date().toISOString(),
     }])
 

@@ -72,11 +72,11 @@ const BLANK = {
 
 const IRS_STATUS_OPTIONS = ['ACS','Notice Status','Queue for ACS','Currently Not Collectible','Installment Agreement','Garnishment','Levy Issued','Levied','Lien Filed','Appeals','Litigation','Released','Other']
 
-function Bdg({s}) { return <span className={`bdg ${STATUS_C[s]||'bn'}`}>{s}</span> }
+function Bdg({s,style}) { return <span className={`bdg ${STATUS_C[s]||'bn'}`} style={style}>{s}</span> }
 
-function TypeBdg({t}) {
+function TypeBdg({t,style}) {
   const m = {'OIC':'bb','Installment Agreement':'bg','CNC':'bn','Penalty Abatement':'bb','Appeals':'bn','Payroll Tax':'br','Audit':'br','Liens/Levies':'br'}
-  return <span className={`bdg ${m[t]||'bn'}`}>{t}</span>
+  return <span className={`bdg ${m[t]||'bn'}`} style={style}>{t}</span>
 }
 
 
@@ -426,13 +426,13 @@ export default function Leads() {
     if (via !== 'sms' && !l.email) { showToast('Lead has no email on file'); return }
     if (via !== 'email' && !l.phone) { showToast('Lead has no phone on file'); return }
     setAddendumSending(true)
-    const res = await sendAddendumForSignature(l, addForm, supabase)
+    const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    const res = await sendAddendumForSignature(l, addForm, supabase, actor)
     if (res.error) { setAddendumSending(false); showToast('Error: '+res.error); return }
 
     const url = res.url
     await navigator.clipboard.writeText(url).catch(()=>{})
     let emailSent=false, smsSent=false
-    const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
 
     if ((via==='email'||via==='both') && l.email) {
       const { error: eErr } = await supabase.functions.invoke('send-email', { body: {
@@ -1155,11 +1155,11 @@ export default function Leads() {
             <div style={{flex:1}}>
               <div style={{fontSize:22,fontWeight:800}}>{l.name}</div>
               <div style={{display:'flex',gap:6,marginTop:5,flexWrap:'wrap'}}>
-                <span className="bdg bb">{l.clientType||'Individual'}</span>
-                <Bdg s={l.status||'New Lead'}/>
-                {l.irsOrState && <span className="bdg ba">{l.irsOrState}</span>}
-                {l.issueType  && <TypeBdg t={l.issueType}/>}
-                {l.taxFee     && <span className="bdg bg">Tax Inv Fee: ${l.taxFee}</span>}
+                <span className="bdg bb" style={{fontSize:13,padding:'4px 10px'}}>{l.clientType||'Individual'}</span>
+                <Bdg s={l.status||'New Lead'} style={{fontSize:13,padding:'4px 10px'}}/>
+                {l.irsOrState && <span className="bdg ba" style={{fontSize:13,padding:'4px 10px'}}>{l.irsOrState}</span>}
+                {l.issueType  && <TypeBdg t={l.issueType} style={{fontSize:13,padding:'4px 10px'}}/>}
+                {l.taxFee     && <span className="bdg bg" style={{fontSize:13,padding:'4px 10px'}}>Tax Inv Fee: ${l.taxFee}</span>}
               </div>
             </div>
           </div>

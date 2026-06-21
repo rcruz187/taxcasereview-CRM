@@ -45,7 +45,7 @@ serve(async (req) => {
       })
     }
 
-    const { leadId, leadName, email, amount, description } = await req.json()
+    const { leadId, leadName, email, amount, description, enrolledBy } = await req.json()
     if (!leadId || !amount) {
       return new Response(JSON.stringify({ error: 'Missing leadId or amount' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -78,6 +78,7 @@ serve(async (req) => {
       'payment_method_types[1]': 'us_bank_account',
       description: description || `Resolution fee — ${leadName || ''}`,
       'metadata[lead_id]': String(leadId),
+      ...(enrolledBy ? { 'metadata[enrolled_by]': String(enrolledBy) } : {}),
     })
 
     return new Response(JSON.stringify({

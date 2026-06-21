@@ -48,7 +48,7 @@ const BLANK = {
   autopay_enabled:false, autopay_amount:'', autopay_frequency:'monthly', autopay_next_charge:'',
 }
 
-function Bdg({s,c}) { return <span className={`bdg ${c||'bn'}`}>{s}</span> }
+function Bdg({s,c,style}) { return <span className={`bdg ${c||'bn'}`} style={style}>{s}</span> }
 function PhoneLink({val, name}) {
   const nav = useNavigate()
   const [open, setOpen] = useState(false)
@@ -1106,13 +1106,13 @@ export default function Clients() {
     if (via !== 'sms' && !c.email) { showToast('Client has no email on file'); return }
     if (via !== 'email' && !c.phone) { showToast('Client has no phone on file'); return }
     setAddendumSending(true)
-    const res = await sendAddendumForSignature(c, addForm, supabase)
+    const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    const res = await sendAddendumForSignature(c, addForm, supabase, actor)
     if (res.error) { setAddendumSending(false); showToast('Error: '+res.error); return }
 
     const url = res.url
     await navigator.clipboard.writeText(url).catch(()=>{})
     let emailSent=false, smsSent=false
-    const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
 
     if ((via==='email'||via==='both') && c.email) {
       const { error: eErr } = await supabase.functions.invoke('send-email', { body: {
@@ -1213,11 +1213,11 @@ export default function Clients() {
             <div style={{flex:1}}>
               <div style={{fontSize:22,fontWeight:800}}>{c.name}</div>
               <div style={{display:'flex',gap:6,marginTop:5,flexWrap:'wrap'}}>
-                <Bdg s={c.clientType||'Individual'} c="bb"/>
-                <Bdg s={c.status||'Active'} c={c.status==='Active'?'bg':'bn'}/>
-                {c.irsOrState&&<Bdg s={c.irsOrState} c="ba"/>}
-                {c.issueType&&<Bdg s={c.issueType} c="bb"/>}
-                {c.assignedTo&&<Bdg s={'👤 '+c.assignedTo} c="bn"/>}
+                <Bdg s={c.clientType||'Individual'} c="bb" style={{fontSize:13,padding:'4px 10px'}}/>
+                <Bdg s={c.status||'Active'} c={c.status==='Active'?'bg':'bn'} style={{fontSize:13,padding:'4px 10px'}}/>
+                {c.irsOrState&&<Bdg s={c.irsOrState} c="ba" style={{fontSize:13,padding:'4px 10px'}}/>}
+                {c.issueType&&<Bdg s={c.issueType} c="bb" style={{fontSize:13,padding:'4px 10px'}}/>}
+                {c.assignedTo&&<Bdg s={'👤 '+c.assignedTo} c="bn" style={{fontSize:13,padding:'4px 10px'}}/>}
               </div>
             </div>
             {c.internal_note && (

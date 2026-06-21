@@ -5,7 +5,7 @@ import { useApp } from '../context/AppContext'
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { user } = useApp()
+  const { user, role, employeeName, can } = useApp()
   const [metrics, setMetrics] = useState({})
   const [recentCases, setRecentCases] = useState([])
   const [tasks, setTasks] = useState([])
@@ -32,7 +32,7 @@ export default function Dashboard() {
       supabase.from('cases').select('*').order('created_at', { ascending: false }),
       supabase.from('tasks').select('*').order('created_at', { ascending: false }),
       supabase.from('invoices').select('id,total,status,clientName'),
-      supabase.from('payments').select('id,amount,status,created_at,source'),
+      supabase.from('payments').select('id,amount,status,created_at,source,enrolled_by'),
       supabase.from('deadlines').select('*').order('dueDate', { ascending: true }),
     ])
 
@@ -57,11 +57,29 @@ export default function Dashboard() {
       .filter(p => p.source === 'resolution_fee')
       .reduce((s, p) => s + parseFloat(p.amount || 0), 0)
 
+    // Role-scoped numbers — Tax Advisor (sales rep) only sees their own
+    // leads/1st-trade, Tax Associate/Manager only sees their own 2nd-trade
+    // (commission credit, via enrolled_by — see ChargeResolutionFeeModal /
+    // stripe-resolution-fee-confirm). "Closed" = no longer open, matching
+    // Open Leads' own status list, just inverted.
+    const CLOSED_STATUSES = ['Converted to Client', 'Dead', 'Do Not Contact']
+    const myLeads = (leads || []).filter(l => l.assignedTo === employeeName)
+    const myOpenLeads   = myLeads.filter(l => !CLOSED_STATUSES.includes(l.status)).length
+    const myClosedLeads = myLeads.filter(l => CLOSED_STATUSES.includes(l.status)).length
+    const closedLeads   = (leads || []).filter(l => CLOSED_STATUSES.includes(l.status)).length
+    const my1stTradeMtd = myLeads
+      .filter(l => l.created_at?.startsWith(thisMonth))
+      .reduce((s, l) => s + parseFloat(l.taxFee || 0), 0)
+    const my2ndTradeMtd = (payments || [])
+      .filter(p => p.source === 'resolution_fee' && p.enrolled_by === employeeName && p.created_at?.startsWith(thisMonth))
+      .reduce((s, p) => s + parseFloat(p.amount || 0), 0)
+
     setMetrics({
       activeCases: (cases || []).filter(c => ['Open', 'Pending IRS', 'Active Plan', 'Under Review'].includes(c.status)).length,
       openLeads: (leads || []).filter(l => !['Converted to Client', 'Dead', 'Do Not Contact'].includes(l.status)).length,
       totalClients: (clients || []).length,
       mtd1stTrades, total1stTrades, mtd2ndTrades, total2ndTrades,
+      closedLeads, myOpenLeads, myClosedLeads, my1stTradeMtd, my2ndTradeMtd,
       unpaidInvoices: (invoices || []).filter(i => i.status === 'Unpaid' || i.status === 'Overdue').length,
       unpaidAmt: (invoices || []).filter(i => i.status === 'Unpaid' || i.status === 'Overdue').reduce((s, i) => s + parseFloat(i.total || 0), 0),
       openTasks: (tasks || []).filter(t => !t.done).length,
@@ -110,15 +128,25 @@ export default function Dashboard() {
   ]
   const fmtZoneTime = (t, zone) => t.toLocaleTimeString('en-US', { timeZone: zone, hour: 'numeric', minute: '2-digit', hour12: true })
 
+  const isTaxAdvisor  = role === 'Tax Advisor'
+  const isTaxAssociate = role === 'Tax Associate'
+  const isManager     = role === 'Manager'
+  // Tax Associate/Manager work client files day-to-day, so "recent" should
+  // surface clients, not leads. Tax Advisor never sees Clients at all.
+  const showRecentClients = isTaxAssociate || isManager
+
   const CARD_COLORS = {
     'Active Cases':     '#f59e0b',
     'Open Leads':       '#a855f7',
     'Clients':          '#3b82f6',
-    'Revenue MTD':      '#22c55e',
-    'Unpaid Invoices':  '#ef4444',
+    'MTD 1st Trades':   '#22c55e',
+    'MTD 2nd Trades':   '#22c55e',
+    'Unpaid Invoices':  '#a855f7',
     'Open Tasks':       '#22c55e',
     'Upcoming DL':      '#f59e0b',
     'Overdue DL':       '#ef4444',
+    'Closed Leads':     '#a855f7',
+    'Team MTD 1st Trades': '#3b82f6',
   }
 
   const StatCard = ({ label, val, sub, color, to, icon }) => {
@@ -135,7 +163,7 @@ export default function Dashboard() {
       position: 'relative',
       overflow: 'hidden',
     }}
-      onMouseEnter={e => { if (to) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 6px 24px ${borderColor}40` }}}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 6px 24px ${borderColor}40` }}
       onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}
     >
       {/* Thick colored top bar — Jobber style */}
@@ -174,20 +202,57 @@ export default function Dashboard() {
 
       {/* Stat cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
-        <StatCard label="Active Cases"    val={metrics.activeCases}   color="var(--blue)"  to="/cases"     icon="📁" />
-        <StatCard label="Open Leads"      val={metrics.openLeads}     color="var(--warn)"  to="/leads"     icon="👤" />
-        <StatCard label="Clients"         val={metrics.totalClients}  color="var(--ok)"    to="/clients"   icon="🏢" />
-        <StatCard label="MTD 1st Trades"  val={'$' + Math.round(metrics.mtd1stTrades).toLocaleString()} color="var(--ok)" icon="💰" sub={'Total: $' + Math.round(metrics.total1stTrades).toLocaleString()} />
-        <StatCard label="MTD 2nd Trades"  val={'$' + Math.round(metrics.mtd2ndTrades).toLocaleString()} color="var(--ok)" icon="💵" sub={'Total: $' + Math.round(metrics.total2ndTrades).toLocaleString()} />
-        <StatCard label="Unpaid Invoices" val={metrics.unpaidInvoices} color={metrics.unpaidInvoices > 0 ? 'var(--bad)' : 'var(--ok)'} to="/invoices" icon="🧾" sub={metrics.unpaidAmt > 0 ? '$' + Math.round(metrics.unpaidAmt).toLocaleString() + ' outstanding' : 'All paid'} />
-        <StatCard label="Open Tasks"      val={metrics.openTasks}     color="var(--blue)"  to="/tasks"     icon="✅" sub={metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track'} />
-        <StatCard label="Upcoming DL"     val={metrics.upcomingDl}    color="var(--warn)"  to="/deadlines" icon="⏰" />
-        <StatCard label="Overdue DL"      val={metrics.overdueDl}     color={metrics.overdueDl > 0 ? 'var(--bad)' : 'var(--ok)'} to="/deadlines" icon="🚨" />
+        {isTaxAdvisor ? (
+          <>
+            <StatCard label="Open Leads"      val={metrics.myOpenLeads}   color="var(--warn)"  to="/leads"     icon="👤" sub="Assigned to you" />
+            <StatCard label="Closed Leads"     val={metrics.myClosedLeads} color="var(--ok)"    to="/leads"     icon="🏁" sub="Assigned to you" />
+            <StatCard label="MTD 1st Trades"  val={'$' + Math.round(metrics.my1stTradeMtd).toLocaleString()} color="var(--ok)" icon="💰" sub="Your enrollments" />
+            <StatCard label="Team MTD 1st Trades" val={'$' + Math.round(metrics.mtd1stTrades).toLocaleString()} color="var(--blue)" icon="👥" sub="Whole sales team" />
+          </>
+        ) : isTaxAssociate ? (
+          <>
+            <StatCard label="Active Cases"    val={metrics.activeCases}   color="var(--blue)"  to="/cases"     icon="📁" />
+            <StatCard label="Open Leads"      val={metrics.openLeads}     color="var(--warn)"  to="/leads"     icon="👤" />
+            <StatCard label="Clients"         val={metrics.totalClients}  color="var(--ok)"    to="/clients"   icon="🏢" />
+            <StatCard label="MTD 2nd Trades"  val={'$' + Math.round(metrics.my2ndTradeMtd).toLocaleString()} color="var(--ok)" icon="💵" sub="Your enrollments" />
+            <StatCard label="Unpaid Invoices" val={metrics.unpaidInvoices} color="#a855f7" to="/invoices" icon="🧾" sub={metrics.unpaidAmt > 0 ? '$' + Math.round(metrics.unpaidAmt).toLocaleString() + ' outstanding' : 'All paid'} />
+            <StatCard label="Open Tasks"      val={metrics.openTasks}     color="var(--blue)"  to="/tasks"     icon="✅" sub={metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track'} />
+            <StatCard label="Upcoming DL"     val={metrics.upcomingDl}    color="var(--warn)"  to="/deadlines" icon="⏰" />
+            <StatCard label="Overdue DL"      val={metrics.overdueDl}     color={metrics.overdueDl > 0 ? 'var(--bad)' : 'var(--ok)'} to="/deadlines" icon="🚨" />
+          </>
+        ) : isManager ? (
+          <>
+            <StatCard label="Active Cases"    val={metrics.activeCases}   color="var(--blue)"  to="/cases"     icon="📁" />
+            <StatCard label="Open Leads"      val={metrics.openLeads}     color="var(--warn)"  to="/leads"     icon="👤" />
+            <StatCard label="Closed Leads"     val={metrics.closedLeads}   color="var(--ok)"    to="/leads"     icon="🏁" />
+            <StatCard label="Clients"         val={metrics.totalClients}  color="var(--ok)"    to="/clients"   icon="🏢" />
+            <StatCard label="MTD 1st Trades"  val={'$' + Math.round(metrics.my1stTradeMtd).toLocaleString()} color="var(--ok)" icon="💰" sub={'Team: $' + Math.round(metrics.mtd1stTrades).toLocaleString()} />
+            <StatCard label="MTD 2nd Trades"  val={'$' + Math.round(metrics.my2ndTradeMtd).toLocaleString()} color="var(--ok)" icon="💵" sub={'Team: $' + Math.round(metrics.mtd2ndTrades).toLocaleString()} />
+            <StatCard label="Unpaid Invoices" val={metrics.unpaidInvoices} color="#a855f7" to="/invoices" icon="🧾" sub={metrics.unpaidAmt > 0 ? '$' + Math.round(metrics.unpaidAmt).toLocaleString() + ' outstanding' : 'All paid'} />
+            <StatCard label="Open Tasks"      val={metrics.openTasks}     color="var(--blue)"  to="/tasks"     icon="✅" sub={metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track'} />
+            <StatCard label="Upcoming DL"     val={metrics.upcomingDl}    color="var(--warn)"  to="/deadlines" icon="⏰" />
+            <StatCard label="Overdue DL"      val={metrics.overdueDl}     color={metrics.overdueDl > 0 ? 'var(--bad)' : 'var(--ok)'} to="/deadlines" icon="🚨" />
+          </>
+        ) : (
+          <>
+            <StatCard label="Active Cases"    val={metrics.activeCases}   color="var(--blue)"  to="/cases"     icon="📁" />
+            <StatCard label="Open Leads"      val={metrics.openLeads}     color="var(--warn)"  to="/leads"     icon="👤" />
+            <StatCard label="Clients"         val={metrics.totalClients}  color="var(--ok)"    to="/clients"   icon="🏢" />
+            <StatCard label="MTD 1st Trades"  val={'$' + Math.round(metrics.mtd1stTrades).toLocaleString()} color="var(--ok)" icon="💰" sub={'Total: $' + Math.round(metrics.total1stTrades).toLocaleString()} />
+            <StatCard label="MTD 2nd Trades"  val={'$' + Math.round(metrics.mtd2ndTrades).toLocaleString()} color="var(--ok)" icon="💵" sub={'Total: $' + Math.round(metrics.total2ndTrades).toLocaleString()} />
+            <StatCard label="Unpaid Invoices" val={metrics.unpaidInvoices} color="#a855f7" to="/invoices" icon="🧾" sub={metrics.unpaidAmt > 0 ? '$' + Math.round(metrics.unpaidAmt).toLocaleString() + ' outstanding' : 'All paid'} />
+            <StatCard label="Open Tasks"      val={metrics.openTasks}     color="var(--blue)"  to="/tasks"     icon="✅" sub={metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track'} />
+            <StatCard label="Upcoming DL"     val={metrics.upcomingDl}    color="var(--warn)"  to="/deadlines" icon="⏰" />
+            <StatCard label="Overdue DL"      val={metrics.overdueDl}     color={metrics.overdueDl > 0 ? 'var(--bad)' : 'var(--ok)'} to="/deadlines" icon="🚨" />
+          </>
+        )}
       </div>
 
       {/* Main grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isTaxAdvisor ? '1fr' : '1fr 1fr', gap: 14 }}>
 
+        {!isTaxAdvisor && (
+        <>
         {/* Active Cases */}
         <div className="card">
           <div className="ch">
@@ -261,29 +326,55 @@ export default function Dashboard() {
             })
           }
         </div>
+        </>
+        )}
 
-        {/* Recent Leads */}
-        <div className="card">
-          <div className="ch">
-            <span className="ct">👤 Recent Leads</span>
-            <button className="btn sm" onClick={() => navigate('/leads')}>All Leads →</button>
+        {showRecentClients ? (
+          /* Recent Clients — Tax Associate / Manager work client files day-to-day */
+          <div className="card">
+            <div className="ch">
+              <span className="ct">🏢 Recent Clients</span>
+              <button className="btn sm" onClick={() => navigate('/clients')}>All Clients →</button>
+            </div>
+            {recentClients.length === 0
+              ? <div style={{ color: 'var(--t3)', fontSize: 13, padding: '8px 0' }}>No clients yet</div>
+              : recentClients.map(c => (
+                <div key={c.id} onClick={() => navigate('/clients')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--br)', cursor: 'pointer' }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--ok)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#fff', flexShrink: 0 }}>
+                    {(c.name || '?')[0].toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>{c.issueType || ''} {c.irsBalance ? '· $' + Number(c.irsBalance).toLocaleString() : ''}</div>
+                  </div>
+                </div>
+              ))
+            }
           </div>
-          {recentLeads.length === 0
-            ? <div style={{ color: 'var(--t3)', fontSize: 13, padding: '8px 0' }}>No leads yet</div>
-            : recentLeads.map(l => (
-              <div key={l.id} onClick={() => navigate('/leads')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--br)', cursor: 'pointer' }}>
-                <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#fff', flexShrink: 0 }}>
-                  {(l.name || '?')[0].toUpperCase()}
+        ) : (
+          /* Recent Leads — Tax Advisor sees only their own assigned leads */
+          <div className="card">
+            <div className="ch">
+              <span className="ct">👤 Recent Leads{isTaxAdvisor ? ' — Yours' : ''}</span>
+              <button className="btn sm" onClick={() => navigate('/leads')}>All Leads →</button>
+            </div>
+            {(isTaxAdvisor ? recentLeads.filter(l => l.assignedTo === employeeName) : recentLeads).length === 0
+              ? <div style={{ color: 'var(--t3)', fontSize: 13, padding: '8px 0' }}>No leads yet</div>
+              : (isTaxAdvisor ? recentLeads.filter(l => l.assignedTo === employeeName) : recentLeads).map(l => (
+                <div key={l.id} onClick={() => navigate('/leads')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--br)', cursor: 'pointer' }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#fff', flexShrink: 0 }}>
+                    {(l.name || '?')[0].toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>{l.issueType || l.source || ''} {l.irsBalance ? '· ~' + l.irsBalance : ''}</div>
+                  </div>
+                  <span className="bdg bb" style={{ fontSize: 10, flexShrink: 0 }}>{l.status}</span>
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--t3)' }}>{l.issueType || l.source || ''} {l.irsBalance ? '· ~' + l.irsBalance : ''}</div>
-                </div>
-                <span className="bdg bb" style={{ fontSize: 10, flexShrink: 0 }}>{l.status}</span>
-              </div>
-            ))
-          }
-        </div>
+              ))
+            }
+          </div>
+        )}
       </div>
 
       {/* Quick Actions */}
@@ -291,11 +382,11 @@ export default function Dashboard() {
         <div className="ch"><span className="ct">⚡ Quick Actions</span></div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
           {[
-            ['👤 New Lead', '/leads'], ['🏢 New Client', '/clients'],
-            ['📁 New Case', '/cases'], ['✅ New Task', '/tasks'],
-            ['🧾 New Invoice', '/invoices'], ['⏰ Add Deadline', '/deadlines'],
-            ['📅 Schedule', '/calendar'], ['💬 Team Chat', '/chat'],
-          ].map(([label, to]) => (
+            ['👤 New Lead', '/leads', 'leads'], ['🏢 New Client', '/clients', 'clients'],
+            ['📁 New Case', '/cases', 'cases'], ['✅ New Task', '/tasks', 'tasks'],
+            ['🧾 New Invoice', '/invoices', 'invoices'], ['⏰ Add Deadline', '/deadlines', 'deadlines'],
+            ['📅 Schedule', '/calendar', 'calendar'], ['💬 Team Chat', '/chat', 'chat'],
+          ].filter(([, , section]) => can('edit', section)).map(([label, to]) => (
             <button key={label} className="btn" style={{ justifyContent: 'flex-start', fontSize: 13, padding: '9px 12px' }} onClick={() => navigate(to)}>
               {label}
             </button>
