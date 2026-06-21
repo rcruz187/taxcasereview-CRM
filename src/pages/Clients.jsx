@@ -1328,22 +1328,23 @@ export default function Clients() {
           {/* Tab Bar */}
           <div style={{display:'flex',flexWrap:'wrap',borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
             {[
-              {key:'overview', label:'📋 Overview'},
-              {key:'sms',      label:'💬 SMS'},
-              {key:'notes',    label:'📝 Notes'},
-              {key:'tasks',    label:'✅ Tasks'},
-              {key:'docs',     label:'📁 Docs'},
-              {key:'invoices', label:'🧾 Invoices'},
-              {key:'payments', label:'💳 Payments'},
-              {key:'cases',    label:'📁 Cases'},
-              {key:'finprofile', label:'🧮 Financial Profile'},
-              {key:'organizer', label:'🧾 Tax-Org'},
+              {key:'overview', icon:'📋', text:'Overview'},
+              {key:'sms',      icon:'💬', text:'SMS'},
+              {key:'notes',    icon:'📝', text:'Notes'},
+              {key:'tasks',    icon:'✅', text:'Tasks'},
+              {key:'docs',     icon:'📁', text:'Docs'},
+              {key:'invoices', icon:'🧾', text:'Invoices'},
+              {key:'payments', icon:'💳', text:'Payments'},
+              {key:'cases',    icon:'📁', text:'Cases'},
+              {key:'finprofile', icon:'🧮', text:'Financial Profile'},
+              {key:'organizer', icon:'🧾', text:'Tax-Org'},
             ].map(t=>(
               <button key={t.key} onClick={()=>setDetailTab(t.key)}
-                style={{padding:'12px 8px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
-                  background:'none',cursor:'pointer',fontSize:12,fontWeight:detailTab===t.key?700:500,
+                style={{display:'inline-flex',alignItems:'center',gap:5,padding:'12px 7px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
+                  background:'none',cursor:'pointer',fontWeight:detailTab===t.key?700:500,
                   color:detailTab===t.key?'var(--blue)':'var(--t2)',whiteSpace:'nowrap',transition:'all .15s',flexShrink:0}}>
-                {t.label}
+                <span style={{fontSize:22,lineHeight:1}}>{t.icon}</span>
+                <span style={{fontSize:11}}>{t.text}</span>
               </button>
             ))}
           </div>
