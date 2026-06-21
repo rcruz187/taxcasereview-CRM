@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 
-const ROLES = ['Super Admin', 'Admin', 'Staff', 'View Only', 'Tax Advisor']
-const ROLE_COLORS = { 'Super Admin': '#ef4444', 'Admin': '#f59e0b', 'Staff': '#3b82f6', 'View Only': '#64748b', 'Tax Advisor': '#10b981' }
+const ROLES = ['Super Admin', 'Admin', 'Tax Associate', 'View Only', 'Tax Advisor', 'Manager']
+const ROLE_COLORS = { 'Super Admin': '#ef4444', 'Admin': '#f59e0b', 'Tax Associate': '#3b82f6', 'View Only': '#64748b', 'Tax Advisor': '#10b981', 'Manager': '#06b6d4' }
 
 // perm levels: 0=No Access, 1=View Only, 2=Edit, 3=Full Admin
 const PERM_SECTIONS = [
@@ -30,7 +30,7 @@ const LEVEL_OPTIONS = [
 const ROLE_PERM_DEFAULTS = {
   'Super Admin': { perm_leads:3, perm_clients:3, perm_billing:3, perm_schedule:3, perm_documents:3, perm_irs:3, perm_comms:3, perm_reports:3, perm_hr:3, perm_settings:3 },
   'Admin':       { perm_leads:2, perm_clients:2, perm_billing:2, perm_schedule:2, perm_documents:2, perm_irs:2, perm_comms:2, perm_reports:2, perm_hr:1, perm_settings:1 },
-  'Staff':       { perm_leads:1, perm_clients:1, perm_billing:0, perm_schedule:1, perm_documents:1, perm_irs:1, perm_comms:2, perm_reports:0, perm_hr:0, perm_settings:0 },
+  'Tax Associate':       { perm_leads:1, perm_clients:1, perm_billing:0, perm_schedule:1, perm_documents:1, perm_irs:1, perm_comms:2, perm_reports:0, perm_hr:0, perm_settings:0 },
   'View Only':   { perm_leads:1, perm_clients:1, perm_billing:0, perm_schedule:1, perm_documents:1, perm_irs:1, perm_comms:1, perm_reports:0, perm_hr:0, perm_settings:0 },
   // Sales rep — leads only (no Clients/Cases, no Billing/IRS/HR/Reports/Settings).
   // Calendar/Comms/Documents are Edit so a rep can book appointments, call/
@@ -38,10 +38,14 @@ const ROLE_PERM_DEFAULTS = {
   // scoped to "my assigned leads only" in Leads.jsx — that scoping is NOT a
   // perm level, it applies regardless of what perm_leads is set to here.
   'Tax Advisor': { perm_leads:2, perm_clients:0, perm_billing:0, perm_schedule:2, perm_documents:2, perm_irs:0, perm_comms:2, perm_reports:0, perm_hr:0, perm_settings:0 },
+  // Sales manager — oversees Tax Advisors. Full Admin on Leads (sees every
+  // rep's leads, unscoped — only 'Tax Advisor' gets the my-leads-only lock
+  // in Leads.jsx) plus Reports visibility for team performance.
+  'Manager':     { perm_leads:3, perm_clients:0, perm_billing:0, perm_schedule:2, perm_documents:2, perm_irs:0, perm_comms:2, perm_reports:1, perm_hr:0, perm_settings:0 },
 }
 
 const blankEmp = {
-  name: '', email: '', phone: '', title: '', access: 'Staff',
+  name: '', email: '', phone: '', title: '', access: 'Tax Associate',
   hourlyRate: '', payType: 'Hourly', paymentMethod: 'Direct Deposit',
   hireDate: '', emergencyContact: '', emergencyPhone: '',
   address: '', filingStatus: 'Single',
@@ -49,7 +53,7 @@ const blankEmp = {
   caf: '', ptin: '', sorShortId: '', sorUsername: '',
   bank_name: '', bank_account_type: 'Checking', routing_number: '', account_number: '',
   pto_balance: 0, sick_balance: 0, vacation_balance: 0,
-  ...ROLE_PERM_DEFAULTS['Staff']
+  ...ROLE_PERM_DEFAULTS['Tax Associate']
 }
 
 const EMP_DOC_LABELS = ['W-4', 'I-9', 'Direct Deposit', 'SSN Card', 'Driver License', 'Contract', 'Background Check', 'Other']
@@ -92,7 +96,7 @@ function fromDbRow(emp) {
     email:            emp.email || '',
     phone:            emp.phone || '',
     title:            emp.title ?? '',
-    access:           emp.access || 'Staff',
+    access:           emp.access || 'Tax Associate',
     hourlyRate:       emp.hourly_rate ?? emp.hourlyRate ?? '',
     payType:          emp.pay_type || emp.payType || 'Hourly',
     paymentMethod:    emp.payment_method || emp.paymentMethod || 'Direct Deposit',
@@ -114,16 +118,16 @@ function fromDbRow(emp) {
     pto_balance:      emp.pto_balance ?? 0,
     sick_balance:     emp.sick_balance ?? 0,
     vacation_balance: emp.vacation_balance ?? 0,
-    perm_leads:       emp.perm_leads    ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_leads,
-    perm_clients:     emp.perm_clients  ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_clients,
-    perm_billing:     emp.perm_billing  ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_billing,
-    perm_schedule:    emp.perm_schedule ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_schedule,
-    perm_documents:   emp.perm_documents?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_documents,
-    perm_irs:         emp.perm_irs      ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_irs,
-    perm_comms:       emp.perm_comms    ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_comms,
-    perm_reports:     emp.perm_reports  ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_reports,
-    perm_hr:          emp.perm_hr       ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_hr,
-    perm_settings:    emp.perm_settings ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_settings,
+    perm_leads:       emp.perm_leads    ?? ROLE_PERM_DEFAULTS[emp.access || 'Tax Associate'].perm_leads,
+    perm_clients:     emp.perm_clients  ?? ROLE_PERM_DEFAULTS[emp.access || 'Tax Associate'].perm_clients,
+    perm_billing:     emp.perm_billing  ?? ROLE_PERM_DEFAULTS[emp.access || 'Tax Associate'].perm_billing,
+    perm_schedule:    emp.perm_schedule ?? ROLE_PERM_DEFAULTS[emp.access || 'Tax Associate'].perm_schedule,
+    perm_documents:   emp.perm_documents?? ROLE_PERM_DEFAULTS[emp.access || 'Tax Associate'].perm_documents,
+    perm_irs:         emp.perm_irs      ?? ROLE_PERM_DEFAULTS[emp.access || 'Tax Associate'].perm_irs,
+    perm_comms:       emp.perm_comms    ?? ROLE_PERM_DEFAULTS[emp.access || 'Tax Associate'].perm_comms,
+    perm_reports:     emp.perm_reports  ?? ROLE_PERM_DEFAULTS[emp.access || 'Tax Associate'].perm_reports,
+    perm_hr:          emp.perm_hr       ?? ROLE_PERM_DEFAULTS[emp.access || 'Tax Associate'].perm_hr,
+    perm_settings:    emp.perm_settings ?? ROLE_PERM_DEFAULTS[emp.access || 'Tax Associate'].perm_settings,
   }
 }
 
@@ -315,7 +319,7 @@ export default function Employees() {
                       background: (ROLE_COLORS[emp.access] || '#64748b') + '22',
                       color: ROLE_COLORS[emp.access] || '#64748b',
                       border: '1px solid ' + (ROLE_COLORS[emp.access] || '#64748b') + '44'
-                    }}>{emp.access || 'Staff'}</span>
+                    }}>{emp.access || 'Tax Associate'}</span>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
@@ -333,7 +337,7 @@ export default function Employees() {
               {/* Permission chips */}
               <div style={{ marginTop: 14, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 {PERM_SECTIONS.map(s => {
-                  const level = emp[s.key] ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff']?.[s.key] ?? 0
+                  const level = emp[s.key] ?? ROLE_PERM_DEFAULTS[emp.access || 'Tax Associate']?.[s.key] ?? 0
                   if (level === 0) return null
                   const opt = LEVEL_OPTIONS[level]
                   return (

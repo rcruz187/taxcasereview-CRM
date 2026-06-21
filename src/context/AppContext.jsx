@@ -42,9 +42,10 @@ export const SECTION_COLS = {
 export const ACCESS_LEVELS = {
   'Super Admin': { label: 'Super Admin', color: '#ef4444' },
   'Admin':       { label: 'Admin',       color: '#f59e0b' },
-  'Staff':       { label: 'Staff',       color: '#3b82f6' },
+  'Tax Associate': { label: 'Tax Associate', color: '#3b82f6' },
   'View Only':   { label: 'View Only',   color: '#64748b' },
   'Tax Advisor': { label: 'Tax Advisor', color: '#10b981' },
+  'Manager':     { label: 'Manager',     color: '#06b6d4' },
 }
 
 // Role-based defaults (used when no per-section perms exist)
@@ -56,7 +57,7 @@ const ROLE_DEFAULTS = {
               'irsforms','irsreference','taxreturns','estimates','invoices','payments','sms','email',
               'documents','esign','timeclock','reports','dialer','chat','books','irs'],
   },
-  'Staff': {
+  'Tax Associate': {
     canView: ['dashboard','leads','clients','cases','tasks','calendar','deadlines','documents','chat','irsforms','irsreference'],
     canEdit: ['tasks','chat'],
   },
@@ -69,6 +70,13 @@ const ROLE_DEFAULTS = {
   // scoping to "my own assigned leads" is handled in Leads.jsx, not here.
   'Tax Advisor': {
     canView: ['dashboard','leads','calendar','sms','email','dialer','documents','esign','chat'],
+    canEdit: ['leads','calendar','sms','email','dialer','documents','esign','chat'],
+  },
+  // Sales manager — oversees Tax Advisors, sees every rep's leads (no
+  // my-leads-only lock, that only applies to the 'Tax Advisor' role),
+  // plus Reports for team performance.
+  'Manager': {
+    canView: ['dashboard','leads','calendar','sms','email','dialer','documents','esign','chat','reports'],
     canEdit: ['leads','calendar','sms','email','dialer','documents','esign','chat'],
   },
 }
@@ -127,7 +135,7 @@ export function AppProvider({ children }) {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
       if (session?.user) { loadRole(session.user.email); loadBrandColor() }
-      else { setRole('Staff'); setPerms(null); setEmployeeName('') }
+      else { setRole('Tax Associate'); setPerms(null); setEmployeeName('') }
     })
     return () => listener.subscription.unsubscribe()
   }, [])
@@ -237,7 +245,7 @@ export function AppProvider({ children }) {
       .maybeSingle()
 
     if (data) {
-      setRole(data.access || 'Staff')
+      setRole(data.access || 'Tax Associate')
       setEmployeeName(data.name || '')
       // Store per-section perms if they exist
       const hasCustomPerms = Object.keys(data).some(k => k.startsWith('perm_') && data[k] !== null)
@@ -268,7 +276,7 @@ export function AppProvider({ children }) {
     }
 
     // Fall back to role-based defaults
-    const defaults = ROLE_DEFAULTS[role] || ROLE_DEFAULTS['Staff']
+    const defaults = ROLE_DEFAULTS[role] || ROLE_DEFAULTS['Tax Associate']
     if (action === 'view') return defaults.canView.includes('*') || defaults.canView.includes(section)
     if (action === 'edit') return defaults.canEdit.includes('*') || defaults.canEdit.includes(section)
     return false
@@ -286,7 +294,7 @@ export function AppProvider({ children }) {
   const logout = useCallback(async () => {
     await supabase.auth.signOut()
     setUser(null)
-    setRole('Staff')
+    setRole('Tax Associate')
     setPerms(null)
     setEmployeeName('')
   }, [])
