@@ -103,6 +103,34 @@ export function CallProvider({ children }) {
     if (ringIntervalRef.current) { clearInterval(ringIntervalRef.current); ringIntervalRef.current = null }
   }
 
+  // Diagnostic logging -- open the browser console (F12) during a test
+  // call and these lines show exactly what happened when ending a call,
+  // instead of guessing from symptoms alone.
+  function log(...args) { console.log('%c[call]', 'color:#f97316', ...args) }
+
+  // Ending a call needs to be CONFIRMED, not fire-and-forget -- a call
+  // that silently fails to disconnect on SignalWire's side leaves the
+  // other party's phone connected indefinitely with no indication
+  // anything went wrong. Retries a couple of times before giving up and
+  // warning staff to check manually, rather than trusting a single
+  // attempt that could fail for an ordinary transient reason (network
+  // blip, SignalWire API hiccup).
+  async function endConferenceWithRetry(conferenceName, attempt = 1) {
+    log('ending conference', conferenceName, '(attempt', attempt + ')')
+    const { data, error } = await supabase.functions.invoke('end-conference', { body: { conferenceName } })
+    if (error || data?.error) {
+      log('end-conference FAILED:', error || data?.error)
+      if (attempt < 3) {
+        setTimeout(() => endConferenceWithRetry(conferenceName, attempt + 1), 2000)
+      } else {
+        log('end-conference gave up after', attempt, 'attempts -- the other party may still be connected')
+        showCallToast('⚠️ Could not confirm the call actually ended — check your phone, it may still be connected.')
+      }
+    } else {
+      log('end-conference confirmed:', data)
+    }
+  }
+
   useEffect(() => { elapsedRef.current = elapsed }, [elapsed])
 
   function showCallToast(msg) { setCallToast(msg); setTimeout(() => setCallToast(''), 4000) }
@@ -393,10 +421,7 @@ export function CallProvider({ children }) {
     liveCallRef.current = null
     const conf = activeConferenceRef.current
     activeConferenceRef.current = null
-    if (conf) {
-      supabase.functions.invoke('end-conference', { body: { conferenceName: conf } })
-        .then(({ error }) => error && console.error('end-conference error:', error))
-    }
+    if (conf) endConferenceWithRetry(conf)
     const inboundCallsid = activeInboundCallsidRef.current
     activeInboundCallsidRef.current = null
     if (inboundCallsid) {

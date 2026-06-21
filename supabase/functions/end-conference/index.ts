@@ -56,6 +56,7 @@ serve(async (req) => {
     )
     const confData = await confResp.json()
     const conferenceSid = confData?.conferences?.[0]?.sid
+    console.log('end-conference: lookup for', conferenceName, '-> found', confData?.conferences?.length ?? 0, 'in-progress, sid:', conferenceSid)
 
     if (!conferenceSid) {
       // Already ended on SignalWire's side -- nothing to do, not an error.
@@ -78,6 +79,7 @@ serve(async (req) => {
       })
     }
 
+    console.log('end-conference: terminate request accepted for sid', conferenceSid)
     return new Response(JSON.stringify({ ok: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
