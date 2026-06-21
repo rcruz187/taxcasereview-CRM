@@ -1163,30 +1163,30 @@ export default function Leads() {
 
           {/* Pipeline — full status flow, left to right, current status highlighted */}
           <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid var(--br)'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
               <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Pipeline</div>
               <button className="btn sec" style={{padding:'2px 8px',fontSize:10}} onClick={()=>setShowFlow(true)}>📊 View Flow</button>
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))',gap:8}}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(118px,1fr))',gap:6}}>
               {STATUS_FLOW.map(item => (
                 <div key={item.s} onClick={()=>updateStatus(l, item.s)} style={{
-                  background:item.c,color:'#fff',borderRadius:8,padding:'8px 12px',fontSize:12.5,fontWeight:700,
-                  textAlign:'center',lineHeight:1.25,cursor:'pointer',
-                  display:'flex',alignItems:'center',justifyContent:'center',minHeight:48,
-                  outline:l.status===item.s?'3px solid #fff':'none',outlineOffset:-3,
-                  boxShadow:l.status===item.s?'0 3px 10px rgba(0,0,0,.35)':'none',
+                  background:item.c,color:'#fff',borderRadius:6,padding:'6px 9px',fontSize:11,fontWeight:700,
+                  textAlign:'center',lineHeight:1.2,cursor:'pointer',
+                  display:'flex',alignItems:'center',justifyContent:'center',minHeight:30,
+                  outline:l.status===item.s?'2px solid #fff':'none',outlineOffset:-2,
+                  boxShadow:l.status===item.s?'0 2px 6px rgba(0,0,0,.35)':'none',
                   opacity:l.status===item.s?1:0.5,transition:'opacity .15s, box-shadow .15s'
                 }}>{item.s}</div>
               ))}
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))',gap:8,marginTop:10,paddingTop:10,borderTop:'1px solid var(--br)'}}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(118px,1fr))',gap:6,marginTop:8,paddingTop:8,borderTop:'1px solid var(--br)'}}>
               {EXIT_FLOW.map(item => (
                 <div key={item.s} onClick={()=>updateStatus(l, item.s)} style={{
-                  background:item.c,color:'#fff',borderRadius:8,padding:'8px 12px',fontSize:12.5,fontWeight:700,
-                  textAlign:'center',lineHeight:1.25,cursor:'pointer',
-                  display:'flex',alignItems:'center',justifyContent:'center',minHeight:48,
-                  outline:l.status===item.s?'3px solid #fff':'none',outlineOffset:-3,
-                  boxShadow:l.status===item.s?'0 3px 10px rgba(0,0,0,.35)':'none',
+                  background:item.c,color:'#fff',borderRadius:6,padding:'6px 9px',fontSize:11,fontWeight:700,
+                  textAlign:'center',lineHeight:1.2,cursor:'pointer',
+                  display:'flex',alignItems:'center',justifyContent:'center',minHeight:30,
+                  outline:l.status===item.s?'2px solid #fff':'none',outlineOffset:-2,
+                  boxShadow:l.status===item.s?'0 2px 6px rgba(0,0,0,.35)':'none',
                   opacity:l.status===item.s?1:0.5,transition:'opacity .15s, box-shadow .15s'
                 }}>{item.s}</div>
               ))}
@@ -1497,19 +1497,19 @@ export default function Leads() {
                 <button className="xbtn" onClick={()=>setShowFlow(false)}>&times;</button>
               </div>
               <div style={{overflowX:'auto',padding:'8px 0'}}>
-                <div style={{display:'flex',alignItems:'center',gap:0,minWidth:700,flexWrap:'wrap',rowGap:16}}>
+                <div style={{display:'flex',alignItems:'center',gap:0,minWidth:620,flexWrap:'wrap',rowGap:12}}>
                   {STATUS_FLOW.map((item,i,arr) => (
                     <div key={item.s} style={{display:'flex',alignItems:'center',gap:0}}>
-                      <div onClick={()=>{updateStatus(detail, item.s);setShowFlow(false)}} style={{background:item.c,color:'#fff',borderRadius:8,padding:'9px 12px',fontSize:13,fontWeight:700,textAlign:'center',width:140,lineHeight:1.3,cursor:'pointer',outline:detail?.status===item.s?'3px solid #fff':'none',outlineOffset:-3}}>{item.s}</div>
-                      {i < arr.length-1 && <div style={{color:'var(--t3)',fontSize:16,margin:'0 4px'}}>→</div>}
+                      <div onClick={()=>{updateStatus(detail, item.s);setShowFlow(false)}} style={{background:item.c,color:'#fff',borderRadius:6,padding:'7px 9px',fontSize:11,fontWeight:700,textAlign:'center',width:112,lineHeight:1.2,cursor:'pointer',outline:detail?.status===item.s?'2px solid #fff':'none',outlineOffset:-2}}>{item.s}</div>
+                      {i < arr.length-1 && <div style={{color:'var(--t3)',fontSize:13,margin:'0 3px'}}>→</div>}
                     </div>
                   ))}
                 </div>
-                <div style={{marginTop:20,paddingTop:16,borderTop:'1px solid var(--br)'}}>
-                  <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Exit statuses — can be set from any stage above</div>
-                  <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+                <div style={{marginTop:16,paddingTop:12,borderTop:'1px solid var(--br)'}}>
+                  <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>Exit statuses — can be set from any stage above</div>
+                  <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                     {EXIT_FLOW.map(item => (
-                      <div key={item.s} onClick={()=>{updateStatus(detail, item.s);setShowFlow(false)}} style={{background:item.c,color:'#fff',borderRadius:8,padding:'9px 12px',fontSize:13,fontWeight:700,textAlign:'center',width:140,lineHeight:1.3,cursor:'pointer',outline:detail?.status===item.s?'3px solid #fff':'none',outlineOffset:-3}}>{item.s}</div>
+                      <div key={item.s} onClick={()=>{updateStatus(detail, item.s);setShowFlow(false)}} style={{background:item.c,color:'#fff',borderRadius:6,padding:'7px 9px',fontSize:11,fontWeight:700,textAlign:'center',width:112,lineHeight:1.2,cursor:'pointer',outline:detail?.status===item.s?'2px solid #fff':'none',outlineOffset:-2}}>{item.s}</div>
                     ))}
                   </div>
                 </div>
