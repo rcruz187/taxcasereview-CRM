@@ -295,6 +295,7 @@ export default function Dialer() {
             type="tel"
             value={dialpad}
             onChange={e => setDialpad(e.target.value.replace(/[^\d#*+]/g, ''))}
+            onKeyDown={e => { if (e.key === 'Enter' && dialpad && !calling) callDialpad() }}
             placeholder="Enter number"
             style={{
               width: '100%', boxSizing: 'border-box',
