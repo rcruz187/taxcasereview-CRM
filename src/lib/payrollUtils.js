@@ -31,6 +31,30 @@ export function hoursFromEntry(e) {
 // Default tax rates — keep in one place
 export const TAX_RATES = { fed: 0.22, state: 0.06, ss: 0.062, medicare: 0.0145 }
 
+// Counts how many semi-monthly pay periods (1st–15th, 16th–end, 24/year)
+// overlap a date range. A salaried employee's pay is a fixed amount per
+// period, not per day — this lets buildLineItems scale that correctly
+// whether it's being asked for exactly one period (Pay Stubs) or a much
+// wider range like year-to-date, instead of always returning just one
+// period's worth regardless of how wide the requested range actually is.
+function periodsInRange(startStr, endStr) {
+  if (!startStr || !endStr) return 1
+  const start = new Date(startStr + 'T00:00:00')
+  const end = new Date(endStr + 'T00:00:00')
+  if (end < start) return 0
+  let count = 0
+  let cursor = new Date(start.getFullYear(), start.getMonth(), 1)
+  while (cursor <= end) {
+    const y = cursor.getFullYear(), m = cursor.getMonth()
+    const firstHalf  = [new Date(y, m, 1),  new Date(y, m, 15)]
+    const secondHalf = [new Date(y, m, 16), new Date(y, m + 1, 0)]
+    if (firstHalf[1] >= start && firstHalf[0] <= end) count++
+    if (secondHalf[1] >= start && secondHalf[0] <= end) count++
+    cursor = new Date(y, m + 1, 1)
+  }
+  return Math.max(count, 1)
+}
+
 // Build per-employee payroll line items for a date range, including
 // regular vs overtime split (>40h/week = OT at 1.5x)
 export function buildLineItems(employees, timeEntries, periodStart, periodEnd) {
@@ -70,17 +94,27 @@ export function buildLineItems(employees, timeEntries, periodStart, periodEnd) {
     // Matching that same normalization here means pay calculations agree
     // with what the dropdown already visually shows.
     const payType = ['Hourly','Salary','1099 Contractor'].includes(emp.pay_type || emp.payType) ? (emp.pay_type || emp.payType) : 'Hourly'
-    const isHourly = payType === 'Hourly'
+    // 1099 Contractors are rate-based too — Employees.jsx labels their rate
+    // field "Hourly Rate ($/hr)", same as Hourly, not "Annual Salary". Only
+    // "Salary" actually uses the fixed-amount-per-pay-period math below.
+    const isRateBased = payType === 'Hourly' || payType === '1099 Contractor'
+    const is1099 = payType === '1099 Contractor'
     const rate = parseFloat(emp.hourly_rate || emp.hourlyRate || 0)
     const salary = parseFloat(emp.salary || 0)
-    const regularPay = isHourly ? rate * regularHrs : (salary / 24) || 0
-    const otPay = isHourly ? rate * 1.5 * otHrs : 0
+    // Salary is a fixed amount per semi-monthly pay period (24/year), not
+    // per day — periodsInRange() scales it correctly whether this call
+    // covers one pay period (Pay Stubs) or a whole year-to-date range
+    // (YTD), instead of always returning just one period's worth.
+    const regularPay = isRateBased ? rate * regularHrs : (salary / 24) * periodsInRange(periodStart, periodEnd)
+    const otPay = isRateBased ? rate * 1.5 * otHrs : 0
     const gross = regularPay + otPay
 
-    const fedTax = gross * TAX_RATES.fed
-    const stateTax = gross * TAX_RATES.state
-    const ss = gross * TAX_RATES.ss
-    const medicare = gross * TAX_RATES.medicare
+    // 1099 Contractors are exempt from federal/SS/Medicare withholding —
+    // matches the payroll note already shown in the Employees.jsx UI.
+    const fedTax = is1099 ? 0 : gross * TAX_RATES.fed
+    const stateTax = is1099 ? 0 : gross * TAX_RATES.state
+    const ss = is1099 ? 0 : gross * TAX_RATES.ss
+    const medicare = is1099 ? 0 : gross * TAX_RATES.medicare
     const totalTaxes = fedTax + stateTax + ss + medicare
     const net = Math.max(0, gross - totalTaxes)
 
