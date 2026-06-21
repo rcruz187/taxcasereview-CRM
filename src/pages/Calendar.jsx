@@ -414,13 +414,13 @@ export default function Calendar() {
           {loading ? (
             <div style={{ padding: '4rem', textAlign: 'center', color: '#475569', fontSize: 14 }}>Loading…</div>
           ) : view === 'month' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', background: '#0d1526', borderBottom: '1px solid #1e293b', flexShrink: 0 }}>
+            <div className="cal-grid-scroll" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowX: 'auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', minWidth: 700, background: '#0d1526', borderBottom: '1px solid #1e293b', flexShrink: 0 }}>
                 {DAYS.map((d, i) => (
                   <div key={d} style={{ padding: '10px 0', textAlign: 'center', fontSize: 11, fontWeight: 700, color: i===0||i===6 ? '#ef4444' : '#475569', letterSpacing: '.06em' }}>{d}</div>
                 ))}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gridAutoRows: 'minmax(110px,1fr)', flex: 1 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', minWidth: 700, gridAutoRows: 'minmax(110px,1fr)', flex: 1 }}>
                 {getMonthDays().map((date, i) => {
                   const dayEvs = date ? eventsForDay(date) : []
                   const today = date && isToday(date)
@@ -445,8 +445,8 @@ export default function Calendar() {
               </div>
             </div>
           ) : view === 'week' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '56px repeat(7,1fr)', background: '#0d1526', borderBottom: '1px solid #1e293b', flexShrink: 0 }}>
+            <div className="cal-grid-scroll" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowX: 'auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '56px repeat(7,1fr)', minWidth: 760, background: '#0d1526', borderBottom: '1px solid #1e293b', flexShrink: 0 }}>
                 <div style={{ borderRight: '1px solid #1e293b' }} />
                 {getWeekDays().map((date, i) => (
                   <div key={i} onClick={e => openDayMenu(date, e)} style={{ padding: '10px 8px', textAlign: 'center', borderLeft: i > 0 ? '1px solid #1e293b' : 'none', cursor: 'pointer' }}>
@@ -455,7 +455,7 @@ export default function Calendar() {
                   </div>
                 ))}
               </div>
-              <div style={{ flex: 1, overflowY: 'auto' }}>
+              <div style={{ flex: 1, overflowY: 'auto', minWidth: 760 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '56px repeat(7,1fr)' }}>
                   {Array.from({ length: 15 }, (_, h) => h + 6).map(hour => (
                     <div key={hour} style={{ display: 'contents' }}>
@@ -515,7 +515,7 @@ export default function Calendar() {
 
       {/* ── UPCOMING DEADLINES SIDEBAR ── */}
       {showUnscheduled && (
-        <div style={{ width: 270, background: '#0d1526', borderLeft: '1px solid #1e293b', display: 'flex', flexDirection: 'column', flexShrink: 0, overflow: 'hidden' }}>
+        <div className="cal-unscheduled-panel" style={{ width: 270, background: '#0d1526', borderLeft: '1px solid #1e293b', display: 'flex', flexDirection: 'column', flexShrink: 0, overflow: 'hidden' }}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid #1e293b', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#f1f5f9' }}>Upcoming Deadlines</h3>
@@ -621,7 +621,7 @@ export default function Calendar() {
                 <input style={inp} value={form.clientName} onChange={e => fld('clientName', e.target.value)} list="cal-clients" placeholder="Search client..." />
                 <datalist id="cal-clients">{clients.map(c => <option key={c.id} value={c.name} />)}</datalist>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="cal-form-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div><label style={lbl}>Date *</label>
                   <input type="date" style={inp} value={form.date} onChange={e => fld('date', e.target.value)} />
                 </div>
@@ -629,7 +629,7 @@ export default function Calendar() {
                   <input type="time" style={inp} value={form.time} onChange={e => fld('time', e.target.value)} />
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="cal-form-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div><label style={lbl}>End Time</label>
                   <input type="time" style={inp} value={form.endTime} onChange={e => fld('endTime', e.target.value)} />
                 </div>
@@ -640,7 +640,7 @@ export default function Calendar() {
                   </select>
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="cal-form-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div><label style={lbl}>Event Type</label>
                   <select style={inp} value={form.eventType} onChange={e => fld('eventType', e.target.value)}>
                     {['Consultation Call','Client Meeting','IRS Call','IRS Appointment','Court Date','Hearing','Deadline','Follow-up Call','Document Due','Payment Due','Team Meeting','Other'].map(t => <option key={t}>{t}</option>)}

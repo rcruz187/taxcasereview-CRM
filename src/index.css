@@ -621,6 +621,26 @@ tbody tr:hover td { background: var(--s2); cursor: pointer; }
   .g3c { grid-template-columns: 1fr; }
 }
 
+/* Calendar: 7-column grids can't compress to phone width without
+   becoming illegible, so they scroll horizontally instead (same
+   approach real calendar apps use) rather than squishing every column
+   unreadably small. */
+@media (max-width: 640px) {
+  .cal-grid-scroll { -webkit-overflow-scrolling: touch; }
+
+  /* The "Upcoming Deadlines" panel sits beside the calendar on desktop
+     -- at phone width that would crush the calendar into a sliver, so
+     it becomes a full-screen overlay instead. */
+  .cal-unscheduled-panel {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    z-index: 600;
+  }
+
+  .cal-form-grid2 { grid-template-columns: 1fr !important; }
+}
+
 
 /* ── Aliases so all pages work ── */
 .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 200; align-items: center; justify-content: center; }
