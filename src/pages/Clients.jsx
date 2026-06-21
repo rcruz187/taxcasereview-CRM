@@ -1258,7 +1258,7 @@ export default function Clients() {
                       }
                     }}
                     style={{
-                      padding:'5px 10px',borderRadius:20,fontSize:11,fontWeight:600,cursor:'pointer',
+                      padding:'8px 16px',borderRadius:24,fontSize:14,fontWeight:600,cursor:'pointer',
                       whiteSpace:'nowrap',
                       background:i<=si?'var(--blue)':'var(--s3)',
                       color:i<=si?'#fff':'var(--t3)',
@@ -1266,7 +1266,7 @@ export default function Clients() {
                       transform:i===si?'scale(1.05)':'scale(1)',
                       transition:'all .15s'
                     }}>{s.label}</div>
-                  {i<PIPELINE_STAGES.length-1&&<div style={{width:16,height:2,background:i<si?'var(--blue)':'var(--br)',flexShrink:0}}/>}
+                  {i<PIPELINE_STAGES.length-1&&<div style={{width:20,height:2,background:i<si?'var(--blue)':'var(--br)',flexShrink:0}}/>}
                 </div>
               ))}
             </div>

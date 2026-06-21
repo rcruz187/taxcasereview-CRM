@@ -1174,7 +1174,7 @@ export default function Leads() {
               {PIPELINE_STAGES.map((stage,i) => (
                 <div key={stage.key} style={{display:'flex',alignItems:'center'}}>
                   <div style={{
-                    padding:'5px 10px',borderRadius:20,fontSize:11,fontWeight:600,cursor:'pointer',
+                    padding:'8px 16px',borderRadius:24,fontSize:14,fontWeight:600,cursor:'pointer',
                     whiteSpace:'nowrap',
                     background:done[i]?'var(--ok)':'var(--s3)',
                     color:done[i]?'#fff':'var(--t3)',
@@ -1183,7 +1183,7 @@ export default function Leads() {
                   }} onClick={()=>updateStatus(l, stage.statusMap || stage.label)}>
                     {stage.label}
                   </div>
-                  {i < PIPELINE_STAGES.length-1 && <div style={{width:16,height:2,background:done[i]?'var(--ok)':'var(--br)',flexShrink:0}}/>}
+                  {i < PIPELINE_STAGES.length-1 && <div style={{width:20,height:2,background:done[i]?'var(--ok)':'var(--br)',flexShrink:0}}/>}
                 </div>
               ))}
             </div>
