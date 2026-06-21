@@ -1228,20 +1228,21 @@ export default function Leads() {
         <div className="card" style={{padding:0,overflow:'hidden',marginBottom:12}}>
           <div style={{display:'flex',flexWrap:'wrap',borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
             {[
-              {key:'overview', label:'📋 Overview'},
-              {key:'sms', label:'💬 SMS'},
-              {key:'notes', label:`📝 Notes & Activity (${leadNotes.length})`},
-              {key:'tasks', label:`✅ Tasks (${leadTasks.length})`},
-              {key:'payments', label:'💳 Payments'},
-              {key:'finintake', label:'💰 Financial Intake'},
-              {key:'compliance', label:'📋 Compliance'},
-              {key:'docs',  label:'📁 Documents'},
+              {key:'overview', icon:'📋', text:'Overview'},
+              {key:'sms', icon:'💬', text:'SMS'},
+              {key:'notes', icon:'📝', text:`Notes & Activity (${leadNotes.length})`},
+              {key:'tasks', icon:'✅', text:`Tasks (${leadTasks.length})`},
+              {key:'payments', icon:'💳', text:'Payments'},
+              {key:'finintake', icon:'💰', text:'Financial Intake'},
+              {key:'compliance', icon:'📋', text:'Compliance'},
+              {key:'docs',  icon:'📁', text:'Documents'},
             ].map(t=>(
               <button key={t.key} onClick={()=>switchLeadTab(t.key)}
-                style={{padding:'12px 14px',border:'none',borderBottom:leadDetailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
-                  background:'none',cursor:'pointer',fontSize:13,fontWeight:leadDetailTab===t.key?700:500,
+                style={{display:'inline-flex',alignItems:'center',gap:5,padding:'12px 7px',border:'none',borderBottom:leadDetailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
+                  background:'none',cursor:'pointer',fontWeight:leadDetailTab===t.key?700:500,
                   color:leadDetailTab===t.key?'var(--blue)':'var(--t2)',whiteSpace:'nowrap',transition:'all .15s',flexShrink:0}}>
-                {t.label}
+                <span style={{fontSize:22,lineHeight:1}}>{t.icon}</span>
+                <span style={{fontSize:11}}>{t.text}</span>
               </button>
             ))}
           </div>
