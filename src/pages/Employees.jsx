@@ -556,13 +556,22 @@ export default function Employees() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                     <div className="field">
                       <label>Employee ID</label>
-                      <input value={form.employeeId} onChange={e => setForm(f => ({ ...f, employeeId: e.target.value }))} placeholder="e.g. EMP-001" />
+                      <input value={form.employeeId} onChange={e => setForm(f => ({ ...f, employeeId: e.target.value }))} placeholder="e.g. TCR-100" />
                     </div>
                     <div className="field">
                       <label>Social Security # <span style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 400 }}>(stored securely)</span></label>
                       <input value={form.ssn} onChange={e => setForm(f => ({ ...f, ssn: e.target.value }))} placeholder="XXX-XX-XXXX" maxLength={11} />
                     </div>
                   </div>
+                  {form.employeeId && (
+                    <div style={{ background: 'var(--s3)', border: '1px solid var(--br)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--t2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                      <span>🪪 Logs into the <strong>Employee Portal</strong> at <code style={{ background: 'var(--s2)', padding: '2px 6px', borderRadius: 4 }}>/employee</code> using this ID — no separate password, same as the clock-in kiosk.</span>
+                      <button type="button" className="btn sec" style={{ fontSize: 11, padding: '4px 10px', flexShrink: 0 }}
+                        onClick={() => { navigator.clipboard.writeText(window.location.origin + '/taxcasereview-CRM/employee'); }}>
+                        📋 Copy Portal Link
+                      </button>
+                    </div>
+                  )}
                   <div className="field">
                     <label>Home Address</label>
                     <input value={form.address || ''} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="123 Main St, Lake Park, FL 33403" />
