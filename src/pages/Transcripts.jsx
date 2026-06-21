@@ -269,14 +269,14 @@ export default function Transcripts() {
               <div style={{background:'var(--s2)',border:'1px solid var(--br)',borderRadius:7,padding:'8px 10px',maxHeight:90,overflowY:'auto',display:'flex',flexWrap:'wrap',gap:'4px 14px'}}>
                 {YEARS.map(y=>(
                   <label key={y} style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:12,cursor:'pointer',whiteSpace:'nowrap',
-                    color:form.taxYears.includes(String(y))?'var(--b2c)':'var(--t2)',fontWeight:form.taxYears.includes(String(y))?700:400}}>
+                    color:form.taxYears.includes(String(y))?'var(--blue)':'var(--t2)',fontWeight:form.taxYears.includes(String(y))?700:400}}>
                     <input type="checkbox" checked={form.taxYears.includes(String(y))} onChange={()=>toggleYear(y)} style={{width:'auto'}}/>
                     {y}
                   </label>
                 ))}
               </div>
               {form.taxYears.length>0&&(
-                <div style={{fontSize:11,color:'var(--b2c)',marginTop:4,fontWeight:600}}>Selected: {form.taxYears.join(', ')}</div>
+                <div style={{fontSize:11,color:'var(--blue)',marginTop:4,fontWeight:600}}>Selected: {form.taxYears.join(', ')}</div>
               )}
               <input value={form.taxYearsCustom} onChange={e=>fld('taxYearsCustom',e.target.value)}
                 placeholder="Or type custom years: 2018, 2017…" style={{marginTop:6}}/>

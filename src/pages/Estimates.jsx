@@ -124,7 +124,7 @@ export default function Estimates() {
       {/* Stats */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))',gap:8,marginBottom:14}}>
         {[
-          ['Total Pipeline','$'+Math.round(totalValue).toLocaleString(),'var(--b2c)'],
+          ['Total Pipeline','$'+Math.round(totalValue).toLocaleString(),'var(--blue)'],
           ['Accepted','$'+Math.round(accepted).toLocaleString(),'var(--ok)'],
           ['Sent',items.filter(e=>e.status==='Sent'||e.status==='In Review').length,'var(--warn)'],
           ['Rejected',items.filter(e=>e.status==='Rejected').length,'var(--bad)'],
@@ -169,7 +169,7 @@ export default function Estimates() {
                   <tr key={est.id} style={{borderBottom:'1px solid var(--br)'}}
                     onMouseEnter={e=>e.currentTarget.style.background='var(--s2)'}
                     onMouseLeave={e=>e.currentTarget.style.background=''}>
-                    <td style={{padding:'9px 12px',fontWeight:700,color:'var(--b2c)',fontSize:11}}>{est.estNum||'—'}</td>
+                    <td style={{padding:'9px 12px',fontWeight:700,color:'var(--blue)',fontSize:11}}>{est.estNum||'—'}</td>
                     <td style={{padding:'9px 12px',fontWeight:600}}>{est.clientName}</td>
                     <td style={{padding:'9px 12px',color:'var(--t2)',maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{est.service||'—'}</td>
                     <td style={{padding:'9px 12px',fontWeight:700,fontSize:13}}>${parseFloat(est.amount||0).toLocaleString()}</td>

@@ -149,7 +149,7 @@ export default function Reports() {
     </div>
   )
 
-  const BarRow = ({label,value,max,color='var(--b2c)',format,sub}) => {
+  const BarRow = ({label,value,max,color='var(--blue)',format,sub}) => {
     const pct = Math.round((value/Math.max(max,1))*100)
     return (
       <div style={{marginBottom:10}}>
@@ -207,12 +207,12 @@ export default function Reports() {
         <div>
           <SectionTitle title="Key Metrics"/>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:10,marginBottom:20}}>
-            <StatCard icon="👥" label="Total Clients"    value={clients.length}   sub={`+${fClients.length} in range`} color="var(--b2c)"/>
+            <StatCard icon="👥" label="Total Clients"    value={clients.length}   sub={`+${fClients.length} in range`} color="var(--blue)"/>
             <StatCard icon="📋" label="Total Leads"      value={leads.length}     sub={`${conversionRate}% conversion`} color="var(--warn)"/>
             <StatCard icon="📁" label="Active Cases"     value={openCases}        sub={`of ${cases.length} total`} color={openCases>0?'var(--warn)':'var(--ok)'}/>
             <StatCard icon="💰" label="Revenue Collected" value={'$'+Math.round(totalRevenue).toLocaleString()} color="var(--ok)"/>
             <StatCard icon="⏳" label="Pending Billing"  value={'$'+Math.round(pendingRevenue).toLocaleString()} color="var(--warn)" small/>
-            <StatCard icon="🧾" label="Tax Returns"      value={taxReturns.length} color="var(--b2c)" small/>
+            <StatCard icon="🧾" label="Tax Returns"      value={taxReturns.length} color="var(--blue)" small/>
             <StatCard icon="✍️" label="E-Sign Awaiting"  value={esigns.filter(e=>e.status==='Awaiting').length} color="var(--warn)" small/>
             <StatCard icon="⚠️" label="Overdue Deadlines" value={overdueDl} color={overdueDl>0?'var(--bad)':'var(--ok)'} small/>
           </div>
@@ -228,7 +228,7 @@ export default function Reports() {
               <SectionTitle title="Case Status"/>
               {Object.entries(countBy(cases,'status')).sort((a,b)=>b[1]-a[1]).map(([l,v])=>(
                 <BarRow key={l} label={l} value={v} max={cases.length}
-                  color={l==='Closed'?'var(--ok)':l==='Open'?'var(--b2c)':'var(--warn)'}/>
+                  color={l==='Closed'?'var(--ok)':l==='Open'?'var(--blue)':'var(--warn)'}/>
               ))}
               {cases.length===0&&<Empty/>}
             </div>
@@ -331,7 +331,7 @@ export default function Reports() {
                     <div style={{fontSize:9,color:'var(--t3)',fontWeight:700,display:val>0?'block':'none'}}>
                       ${val>=1000?Math.round(val/1000)+'k':Math.round(val)}
                     </div>
-                    <div style={{width:'100%',height:Math.max(h,val>0?6:2)+'px',background:val>0?'var(--b2c)':'var(--s3)',borderRadius:'3px 3px 0 0',opacity:val>0?0.85:0.3}}/>
+                    <div style={{width:'100%',height:Math.max(h,val>0?6:2)+'px',background:val>0?'var(--blue)':'var(--s3)',borderRadius:'3px 3px 0 0',opacity:val>0?0.85:0.3}}/>
                     <div style={{fontSize:9,color:'var(--t3)',textAlign:'center'}}>{m}</div>
                   </div>
                 )
@@ -364,7 +364,7 @@ export default function Reports() {
         <div>
           {topRep?.name&&(
             <div className="card" style={{marginBottom:12,border:'1px solid var(--b2c)33'}}>
-              <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'.07em',color:'var(--b2c)',marginBottom:6}}>⭐ Top Performer</div>
+              <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'.07em',color:'var(--blue)',marginBottom:6}}>⭐ Top Performer</div>
               <div style={{fontSize:17,fontWeight:800,color:'var(--tx)',marginBottom:4}}>{topRep.name}</div>
               <div style={{fontSize:12,color:'var(--t2)',display:'flex',gap:16,flexWrap:'wrap'}}>
                 <span>💰 ${Math.round(topRep.revenue).toLocaleString()} revenue</span>
@@ -391,7 +391,7 @@ export default function Reports() {
               </div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
                 {[
-                  ['Clients',rep.clients,clients.length,'var(--b2c)'],
+                  ['Clients',rep.clients,clients.length,'var(--blue)'],
                   ['Cases',rep.cases,Math.max(cases.length,1),'var(--warn)'],
                   ['Task Completion',rep.taskCompletion,100,rep.taskCompletion>75?'var(--ok)':rep.taskCompletion>40?'var(--warn)':'var(--bad)'],
                 ].map(([label,val,max,color])=>(
@@ -414,7 +414,7 @@ export default function Reports() {
       {tab==='leads'&&(
         <div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:10,marginBottom:16}}>
-            <StatCard icon="📋" label="Total Leads"     value={leads.length} color="var(--b2c)"/>
+            <StatCard icon="📋" label="Total Leads"     value={leads.length} color="var(--blue)"/>
             <StatCard icon="🆕" label="New Leads"       value={leads.filter(l=>l.status==='New Lead').length} color="var(--warn)" small/>
             <StatCard icon="🔄" label="Conversion Rate" value={conversionRate+'%'} color={conversionRate>30?'var(--ok)':'var(--warn)'} small/>
             <StatCard icon="👥" label="Became Clients"  value={clients.length} color="var(--ok)" small/>
@@ -425,7 +425,7 @@ export default function Reports() {
                 action={<ExportBtn name="Leads_Status" rows={[['Status','Count'],...Object.entries(countBy(leads,'status'))]}/>}/>
               {Object.entries(countBy(leads,'status')).sort((a,b)=>b[1]-a[1]).map(([l,v])=>(
                 <BarRow key={l} label={l} value={v} max={leads.length}
-                  color={l==='Converted to Client'?'var(--ok)':l==='New Lead'?'var(--b2c)':'var(--warn)'}/>
+                  color={l==='Converted to Client'?'var(--ok)':l==='New Lead'?'var(--blue)':'var(--warn)'}/>
               ))}
               {leads.length===0&&<Empty/>}
             </div>
@@ -441,7 +441,7 @@ export default function Reports() {
             <div className="card">
               <SectionTitle title="Issue Type"/>
               {Object.entries(countBy(leads,'issueType')).sort((a,b)=>b[1]-a[1]).map(([l,v])=>(
-                <BarRow key={l} label={l} value={v} max={leads.length} color="var(--b2c)"/>
+                <BarRow key={l} label={l} value={v} max={leads.length} color="var(--blue)"/>
               ))}
               {leads.length===0&&<Empty/>}
             </div>
@@ -460,7 +460,7 @@ export default function Reports() {
       {tab==='cases'&&(
         <div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:10,marginBottom:16}}>
-            <StatCard icon="📁" label="Total Cases"  value={cases.length} color="var(--b2c)"/>
+            <StatCard icon="📁" label="Total Cases"  value={cases.length} color="var(--blue)"/>
             <StatCard icon="🔓" label="Open"         value={cases.filter(c=>c.status==='Open').length} color="var(--warn)" small/>
             <StatCard icon="⏳" label="Pending IRS"  value={cases.filter(c=>c.status==='Pending IRS').length} color="var(--warn)" small/>
             <StatCard icon="✅" label="Closed"        value={cases.filter(c=>c.status==='Closed').length} color="var(--ok)" small/>
@@ -471,14 +471,14 @@ export default function Reports() {
                 action={<ExportBtn name="Cases_Status" rows={[['Status','Count'],...Object.entries(countBy(cases,'status'))]}/>}/>
               {Object.entries(countBy(cases,'status')).sort((a,b)=>b[1]-a[1]).map(([l,v])=>(
                 <BarRow key={l} label={l} value={v} max={cases.length}
-                  color={l==='Closed'?'var(--ok)':l==='Open'?'var(--b2c)':'var(--warn)'}/>
+                  color={l==='Closed'?'var(--ok)':l==='Open'?'var(--blue)':'var(--warn)'}/>
               ))}
               {cases.length===0&&<Empty/>}
             </div>
             <div className="card">
               <SectionTitle title="Cases by Type"/>
               {Object.entries(countBy(cases,'caseType')).sort((a,b)=>b[1]-a[1]).map(([l,v])=>(
-                <BarRow key={l} label={l} value={v} max={cases.length} color="var(--b2c)"/>
+                <BarRow key={l} label={l} value={v} max={cases.length} color="var(--blue)"/>
               ))}
               {cases.length===0&&<Empty/>}
             </div>
@@ -506,7 +506,7 @@ export default function Reports() {
       {tab==='tasks'&&(
         <div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:10,marginBottom:16}}>
-            <StatCard icon="✅" label="Total Tasks"   value={tasks.length} color="var(--b2c)"/>
+            <StatCard icon="✅" label="Total Tasks"   value={tasks.length} color="var(--blue)"/>
             <StatCard icon="📌" label="Open"          value={tasks.filter(t=>!t.done).length} color="var(--warn)" small/>
             <StatCard icon="🎯" label="Completed"     value={tasks.filter(t=>t.done).length} color="var(--ok)" small/>
             <StatCard icon="📈" label="Completion %"  value={tasks.length?Math.round((tasks.filter(t=>t.done).length/tasks.length)*100)+'%':'0%'} color="var(--ok)" small/>
@@ -532,7 +532,7 @@ export default function Reports() {
               <SectionTitle title="Tasks by Priority"/>
               {Object.entries(countBy(tasks,'priority')).sort((a,b)=>b[1]-a[1]).map(([l,v])=>(
                 <BarRow key={l} label={l} value={v} max={tasks.length}
-                  color={l==='High'?'var(--bad)':l==='Medium'?'var(--warn)':'var(--b2c)'}/>
+                  color={l==='High'?'var(--bad)':l==='Medium'?'var(--warn)':'var(--blue)'}/>
               ))}
               {tasks.length===0&&<Empty/>}
             </div>
@@ -574,7 +574,7 @@ export default function Reports() {
       {tab==='taxreturns'&&(
         <div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:10,marginBottom:16}}>
-            <StatCard icon="🧾" label="Total Returns"  value={taxReturns.length} color="var(--b2c)"/>
+            <StatCard icon="🧾" label="Total Returns"  value={taxReturns.length} color="var(--blue)"/>
             <StatCard icon="✅" label="Filed"          value={taxReturns.filter(r=>r.status==='Filed').length} color="var(--ok)" small/>
             <StatCard icon="⏳" label="In Progress"    value={taxReturns.filter(r=>r.status==='In Progress'||r.status==='Preparing').length} color="var(--warn)" small/>
             <StatCard icon="🔍" label="Under Review"   value={taxReturns.filter(r=>r.status==='Review').length} color="var(--warn)" small/>
@@ -592,7 +592,7 @@ export default function Reports() {
             <div className="card">
               <SectionTitle title="Returns by Type"/>
               {Object.entries(countBy(taxReturns,'returnType')).sort((a,b)=>b[1]-a[1]).map(([l,v])=>(
-                <BarRow key={l} label={l} value={v} max={taxReturns.length} color="var(--b2c)"/>
+                <BarRow key={l} label={l} value={v} max={taxReturns.length} color="var(--blue)"/>
               ))}
               {taxReturns.length===0&&<Empty/>}
             </div>
@@ -601,7 +601,7 @@ export default function Reports() {
             <div className="card">
               <SectionTitle title="Returns by Tax Year"/>
               {Object.entries(countBy(taxReturns,'taxYear')).sort((a,b)=>Number(b[0])-Number(a[0])).map(([l,v])=>(
-                <BarRow key={l} label={l} value={v} max={taxReturns.length} color="var(--b2c)"/>
+                <BarRow key={l} label={l} value={v} max={taxReturns.length} color="var(--blue)"/>
               ))}
               {taxReturns.length===0&&<Empty/>}
             </div>
@@ -652,7 +652,7 @@ export default function Reports() {
       {tab==='esign'&&(
         <div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:10,marginBottom:16}}>
-            <StatCard icon="✍️" label="Total Sent"   value={esigns.length} color="var(--b2c)"/>
+            <StatCard icon="✍️" label="Total Sent"   value={esigns.length} color="var(--blue)"/>
             <StatCard icon="⏳" label="Awaiting"     value={esigns.filter(e=>e.status==='Awaiting').length} color="var(--warn)" small/>
             <StatCard icon="✅" label="Signed"        value={esigns.filter(e=>e.status==='Signed').length} color="var(--ok)" small/>
             <StatCard icon="📈" label="Sign Rate"    value={esigns.length?Math.round((esigns.filter(e=>e.status==='Signed').length/esigns.length)*100)+'%':'0%'} color="var(--ok)" small/>
@@ -669,7 +669,7 @@ export default function Reports() {
             <div className="card">
               <SectionTitle title="By Document Type"/>
               {Object.entries(countBy(esigns,'doc_type')).sort((a,b)=>b[1]-a[1]).map(([l,v])=>(
-                <BarRow key={l} label={l} value={v} max={esigns.length} color="var(--b2c)"/>
+                <BarRow key={l} label={l} value={v} max={esigns.length} color="var(--blue)"/>
               ))}
               {esigns.length===0&&<Empty/>}
             </div>
@@ -710,7 +710,7 @@ export default function Reports() {
       {tab==='formacorp'&&(
         <div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:10,marginBottom:16}}>
-            <StatCard icon="🏢" label="Total Filings" value={formacorp.length} color="var(--b2c)"/>
+            <StatCard icon="🏢" label="Total Filings" value={formacorp.length} color="var(--blue)"/>
             <StatCard icon="✅" label="Active"        value={formacorp.filter(f=>f.stage==='Active'||f.status==='Active').length} color="var(--ok)" small/>
             <StatCard icon="⏳" label="Pending"       value={formacorp.filter(f=>f.stage==='Pending'||f.status==='Pending').length} color="var(--warn)" small/>
           </div>
@@ -727,7 +727,7 @@ export default function Reports() {
             <div className="card">
               <SectionTitle title="By Entity Type"/>
               {Object.entries(countBy(formacorp,'entityType')).sort((a,b)=>b[1]-a[1]).map(([l,v])=>(
-                <BarRow key={l} label={l} value={v} max={formacorp.length} color="var(--b2c)"/>
+                <BarRow key={l} label={l} value={v} max={formacorp.length} color="var(--blue)"/>
               ))}
               {formacorp.length===0&&<Empty/>}
             </div>
@@ -778,7 +778,7 @@ export default function Reports() {
             return (
               <>
                 <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:10,marginBottom:16}}>
-                  <StatCard icon="📒" label="Total Entries" value={bookkeeping.length} color="var(--b2c)"/>
+                  <StatCard icon="📒" label="Total Entries" value={bookkeeping.length} color="var(--blue)"/>
                   <StatCard icon="⬆️" label="Total Income"  value={'$'+Math.round(totalIn).toLocaleString()} color="var(--ok)" small/>
                   <StatCard icon="⬇️" label="Total Expenses" value={'$'+Math.round(totalOut).toLocaleString()} color="var(--bad)" small/>
                   <StatCard icon="💵" label="Net"           value={'$'+Math.round(net).toLocaleString()} color={net>=0?'var(--ok)':'var(--bad)'} small/>
@@ -796,7 +796,7 @@ export default function Reports() {
                     },{})).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([l,v])=>(
                       <BarRow key={l} label={l} value={v} max={Math.max(...Object.values(
                         bookkeeping.reduce((a,e)=>{ const c=e.category||'Unc'; a[c]=(a[c]||0)+Math.abs(parseFloat(e.amount||0)); return a},{})
-                      ),1)} format={v=>'$'+Math.round(v).toLocaleString()} color="var(--b2c)"/>
+                      ),1)} format={v=>'$'+Math.round(v).toLocaleString()} color="var(--blue)"/>
                     ))}
                     {bookkeeping.length===0&&<Empty/>}
                   </div>

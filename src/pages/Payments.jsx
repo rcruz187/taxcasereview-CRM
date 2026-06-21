@@ -213,7 +213,7 @@ export default function Payments() {
         {[
           ['Total Collected','$'+Math.round(cleared).toLocaleString(),'var(--ok)'],
           ['Pending','$'+Math.round(pending).toLocaleString(),'var(--warn)'],
-          ['Payments',items.length,'var(--b2c)'],
+          ['Payments',items.length,'var(--blue)'],
           ['Failed',items.filter(p=>p.status==='Failed').length,'var(--bad)'],
         ].map(([label,val,color])=>(
           <div key={label} className="card" style={{padding:'10px 12px',textAlign:'center'}}>
@@ -317,7 +317,7 @@ export default function Payments() {
                   onMouseEnter={e=>e.currentTarget.style.background='var(--s2)'}
                   onMouseLeave={e=>e.currentTarget.style.background=''}>
                   <td style={{padding:'9px 12px',fontWeight:600}}>{p.clientName}</td>
-                  <td style={{padding:'9px 12px',color:'var(--b2c)',fontSize:11,fontWeight:600}}>{p.invNum||'—'}</td>
+                  <td style={{padding:'9px 12px',color:'var(--blue)',fontSize:11,fontWeight:600}}>{p.invNum||'—'}</td>
                   <td style={{padding:'9px 12px',fontWeight:700,color:'var(--ok)',fontSize:13}}>${parseFloat(p.amount||0).toLocaleString()}</td>
                   <td style={{padding:'9px 12px'}}><span className="bdg bn" style={{fontSize:10}}>{p.method}</span></td>
                   <td style={{padding:'9px 12px',color:'var(--t3)',fontSize:11}}>{p.checkNum||'—'}</td>

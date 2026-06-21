@@ -353,7 +353,7 @@ export default function Invoices() {
                   <tr key={inv.id} style={{borderBottom:'1px solid var(--br)'}}
                     onMouseEnter={e=>e.currentTarget.style.background='var(--s2)'}
                     onMouseLeave={e=>e.currentTarget.style.background=''}>
-                    <td style={{padding:'9px 12px',fontWeight:700,color:'var(--b2c)',fontSize:11}}>{inv.invNum}</td>
+                    <td style={{padding:'9px 12px',fontWeight:700,color:'var(--blue)',fontSize:11}}>{inv.invNum}</td>
                     <td style={{padding:'9px 12px',fontWeight:600}}>{inv.clientName}</td>
                     <td style={{padding:'9px 12px',fontWeight:600}}>${t.toLocaleString()}</td>
                     <td style={{padding:'9px 12px',color:'var(--ok)'}}>${p.toLocaleString()}</td>

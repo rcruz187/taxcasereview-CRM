@@ -246,10 +246,10 @@ export default function TaxReturns() {
       {/* Stats bar */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(110px,1fr))', gap: 8, marginBottom: 14 }}>
         {[
-          ['Total', returns.length, 'var(--b2c)'],
+          ['Total', returns.length, 'var(--blue)'],
           ['Draft', returns.filter(r => r.status === 'Draft').length, 'var(--t3)'],
           ['In Review', returns.filter(r => r.status === 'In Review' || r.status === 'Client Review').length, 'var(--warn)'],
-          ['Ready', returns.filter(r => r.status === 'Ready to File').length, 'var(--b2c)'],
+          ['Ready', returns.filter(r => r.status === 'Ready to File').length, 'var(--blue)'],
           ['Filed', returns.filter(r => r.status === 'Filed' || r.status === 'Accepted').length, 'var(--ok)'],
           ['Rejected', returns.filter(r => r.status === 'Rejected').length, 'var(--bad)'],
         ].map(([label, val, color]) => (
@@ -297,7 +297,7 @@ export default function TaxReturns() {
                 <tr key={ret.id} style={{ borderBottom: '1px solid var(--br)' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--s2)'}
                   onMouseLeave={e => e.currentTarget.style.background = ''}>
-                  <td style={{ padding: '9px 12px', fontWeight: 700, color: 'var(--b2c)' }}>{ret.returnNum || '—'}</td>
+                  <td style={{ padding: '9px 12px', fontWeight: 700, color: 'var(--blue)' }}>{ret.returnNum || '—'}</td>
                   <td style={{ padding: '9px 12px', fontWeight: 600 }}>{ret.clientName}</td>
                   <td style={{ padding: '9px 12px', color: 'var(--t2)' }}>{ret.taxYear}</td>
                   <td style={{ padding: '9px 12px', color: 'var(--t2)' }}>{ret.returnType}</td>
@@ -398,8 +398,8 @@ export default function TaxReturns() {
           <button key={t.key} onClick={() => setTab(t.key)}
             style={{ padding: '7px 14px', fontSize: 11, fontWeight: tab === t.key ? 700 : 400,
               background: 'none', border: 'none',
-              borderBottom: tab === t.key ? '2px solid var(--b2c)' : '2px solid transparent',
-              color: tab === t.key ? 'var(--b2c)' : 'var(--t2)', cursor: 'pointer',
+              borderBottom: tab === t.key ? '2px solid var(--blue)' : '2px solid transparent',
+              color: tab === t.key ? 'var(--blue)' : 'var(--t2)', cursor: 'pointer',
               whiteSpace: 'nowrap', paddingBottom: 8 }}>
             {t.label}
           </button>
@@ -423,7 +423,7 @@ export default function TaxReturns() {
           </div>
           <div style={{ marginTop: 12, padding: '10px 14px', background: 'var(--s3)', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--t2)' }}>Gross Income</span>
-            <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--b2c)' }}>{fmt(totals.grossIncome)}</span>
+            <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--blue)' }}>{fmt(totals.grossIncome)}</span>
           </div>
         </div>
       )}
@@ -447,7 +447,7 @@ export default function TaxReturns() {
             </div>
             <div style={{ padding: '10px 14px', background: 'var(--s3)', borderRadius: 6 }}>
               <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 2 }}>Adjusted Gross Income (AGI)</div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--b2c)' }}>{fmt(totals.agi)}</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--blue)' }}>{fmt(totals.agi)}</div>
             </div>
           </div>
         </div>
@@ -476,7 +476,7 @@ export default function TaxReturns() {
                 ['Single', 14600], ['Married Filing Jointly', 29200], ['Married Filing Separately', 14600],
                 ['Head of Household', 21900], ['Qualifying Surviving Spouse', 29200]
               ].map(([s, amt]) => (
-                <div key={s} style={{ display: 'flex', justifyContent: 'space-between', fontWeight: s === form.filingStatus ? 700 : 400, color: s === form.filingStatus ? 'var(--b2c)' : 'var(--t3)' }}>
+                <div key={s} style={{ display: 'flex', justifyContent: 'space-between', fontWeight: s === form.filingStatus ? 700 : 400, color: s === form.filingStatus ? 'var(--blue)' : 'var(--t3)' }}>
                   <span>{s}</span><span>{fmt(amt)}</span>
                 </div>
               ))}
@@ -501,7 +501,7 @@ export default function TaxReturns() {
             </div>
             <div style={{ padding: '10px 14px', background: 'var(--s3)', borderRadius: 6 }}>
               <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 2 }}>Taxable Income</div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--b2c)' }}>{fmt(totals.taxableIncome)}</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--blue)' }}>{fmt(totals.taxableIncome)}</div>
             </div>
           </div>
         </div>
@@ -525,7 +525,7 @@ export default function TaxReturns() {
             </div>
             <div style={{ padding: '10px 14px', background: 'var(--s3)', borderRadius: 6 }}>
               <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 2 }}>Tax After Credits</div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--b2c)' }}>{fmt(totals.taxAfterCredits)}</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--blue)' }}>{fmt(totals.taxAfterCredits)}</div>
             </div>
           </div>
         </div>
@@ -583,9 +583,9 @@ export default function TaxReturns() {
             {[
               ['Gross Income', totals.grossIncome, 'var(--tx)', false],
               ['Adjustments', -totals.adjustments, 'var(--bad)', false],
-              ['Adjusted Gross Income (AGI)', totals.agi, 'var(--b2c)', true],
+              ['Adjusted Gross Income (AGI)', totals.agi, 'var(--blue)', true],
               [`${form.deductionType} Deduction`, -totals.deductions, 'var(--bad)', false],
-              ['Taxable Income', totals.taxableIncome, 'var(--b2c)', true],
+              ['Taxable Income', totals.taxableIncome, 'var(--blue)', true],
               ['Estimated Tax (calculated)', totals.tax, 'var(--warn)', false],
               ['Tax Credits', -totals.credits, 'var(--ok)', false],
               ['Tax After Credits', totals.taxAfterCredits, 'var(--warn)', true],
