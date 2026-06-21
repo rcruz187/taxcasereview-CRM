@@ -187,16 +187,17 @@ export default function Payroll() {
   let detailLines  = []
   if (detail?.lineItems) { try { detailLines = JSON.parse(detail.lineItems) } catch {} }
 
-  // YTD per employee across all runs
+  // YTD per employee — estimated directly from actual logged hours (same
+  // math as the Pay Stubs tab), not just from officially processed payroll
+  // runs. Runs-only showed $0 for everyone whenever payroll hadn't been
+  // formally processed yet, even when real punches existed — buildLineItems
+  // already buckets by ISO week internally so OT still comes out correct
+  // across a wide Jan-1-to-today range.
+  const jan1 = `${today.getFullYear()}-01-01`
+  const todayStr = today.toISOString().slice(0,10)
+  const ytdLines = buildLineItems(employees, timeEntries, jan1, todayStr)
   const ytdByEmp = {}
-  runs.forEach(r => {
-    let lines = []; try { lines = JSON.parse(r.lineItems||'[]') } catch {}
-    lines.forEach(l => {
-      if (!ytdByEmp[l.name]) ytdByEmp[l.name] = {gross:0,net:0}
-      ytdByEmp[l.name].gross += parseFloat(l.gross||0)
-      ytdByEmp[l.name].net   += parseFloat(l.net||0)
-    })
-  })
+  ytdLines.forEach(l => { ytdByEmp[l.name] = { gross: parseFloat(l.gross||0), net: parseFloat(l.net||0) } })
 
   const empNames = employees.length>0 ? employees.map(e=>e.name) : ['Romy Cruz','Dana Richard','Yesenia Gonzalez']
 
@@ -269,7 +270,7 @@ export default function Payroll() {
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:8, marginBottom:14 }}>
         {[
           ['Total Net Paid', '$'+Math.round(totalNet).toLocaleString(), 'var(--ok)'],
-          ['Total Gross',    '$'+Math.round(totalGross).toLocaleString(), 'var(--b2c)'],
+          ['Total Gross',    '$'+Math.round(totalGross).toLocaleString(), '#A78BFA'],
           ['YTD Gross',      '$'+Math.round(ytdGross).toLocaleString(), 'var(--warn)'],
           ['Payroll Runs',   runs.length, 'var(--tx)'],
         ].map(([l,v,c]) => (
@@ -282,7 +283,7 @@ export default function Payroll() {
 
       {/* YTD per employee */}
       <div className="card" style={{ marginBottom:14, padding:'12px 16px' }}>
-        <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'.06em', color:'var(--t3)', marginBottom:10 }}>YTD by Employee</div>
+        <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'.06em', color:'var(--t3)', marginBottom:10 }}>YTD by Employee <span style={{ textTransform:'none', fontWeight:400, letterSpacing:0 }}>— estimated from logged hours</span></div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))', gap:10 }}>
           {empNames.map(name => {
             const y = ytdByEmp[name] || {gross:0,net:0}
@@ -292,7 +293,7 @@ export default function Payroll() {
               <div key={name} style={{ background:'var(--s2)', borderRadius:8, padding:'10px 12px', border:'1px solid var(--br)' }}>
                 <div style={{ fontWeight:700, fontSize:13, marginBottom:6 }}>{name}</div>
                 <div style={{ display:'flex', gap:12, fontSize:12 }}>
-                  <span style={{ color:'var(--t3)' }}>Gross: <span style={{ color:'var(--b2c)', fontWeight:700 }}>${Math.round(y.gross).toLocaleString()}</span></span>
+                  <span style={{ color:'var(--t3)' }}>Gross: <span style={{ color:'#A78BFA', fontWeight:700 }}>${Math.round(y.gross).toLocaleString()}</span></span>
                   <span style={{ color:'var(--t3)' }}>Net: <span style={{ color:'var(--ok)', fontWeight:700 }}>${Math.round(y.net).toLocaleString()}</span></span>
                 </div>
                 <div style={{ fontSize:11, color:'var(--t3)', marginTop:4 }}>
@@ -462,7 +463,7 @@ export default function Payroll() {
                     <td style={{ padding:'9px 12px', color:'var(--t2)' }}>{e.date}</td>
                     <td style={{ padding:'9px 12px', color:'var(--ok)', fontWeight:600 }}>{fmt12Local(e.inTime)}</td>
                     <td style={{ padding:'9px 12px', color:e.outTime?'var(--bad)':'var(--t3)' }}>{e.outTime?fmt12Local(e.outTime):<span className="bdg ba">Active</span>}</td>
-                    <td style={{ padding:'9px 12px', fontWeight:700, color:'var(--b2c)' }}>{e.hours?e.hours+'h':'—'}</td>
+                    <td style={{ padding:'9px 12px', fontWeight:700, color:'#38BDF8' }}>{e.hours?e.hours+'h':'—'}</td>
                     <td style={{ padding:'9px 12px', color:'var(--t2)', fontSize:11, maxWidth:140, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.notes||'—'}</td>
                     <td style={{ padding:'9px 8px' }}>
                       <div style={{ display:'flex', gap:5 }}>
