@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { stampSignature } from '../lib/irsFormUtils'
 import { useFirm } from '../lib/useFirm'
+import { advanceLeadStatus } from '../lib/leadStatus'
 
 // IRS forms never get an IP/timestamp stamp — only firm documents (the
 // Tax Service Agreement, addenda, etc.) do.
@@ -145,6 +146,15 @@ export default function SignPage() {
     }).eq('id', id)
 
     if (error) { setSigning(false); setError('Error saving signature: ' + error.message); return }
+
+    // Client just signed — advance the matching lead's pipeline status.
+    // Forward-only, so this is a safe no-op once the lead has already
+    // converted to a client (no lead row left to match by name).
+    if (doc.doc_type === 'Full Investigation Package') {
+      await advanceLeadStatus(supabase, doc.client_name, 'Tax Inv Agreement Signed')
+    } else if (doc.doc_type === 'Service Addendum') {
+      await advanceLeadStatus(supabase, doc.client_name, 'Addendum Signed')
+    }
 
     // Service Addendum is a contract — files under the Agreements folder
     // like the rest of the firm's signed agreements. Other doc types keep

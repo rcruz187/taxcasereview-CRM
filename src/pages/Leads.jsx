@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext'
 import { useFirm } from '../lib/useFirm'
 import { generateClientPackage, generateAddendum, generatePOACoverLetter, sendFullPackage, generateCreditCardAuthForm, sendAddendumForSignature } from '../lib/docUtils'
 import { generatePOACoverLetterPdf, RESOLUTION_SERVICES, generateFinancialIntakePdf } from '../lib/irsFormUtils'
+import { advanceLeadStatus } from '../lib/leadStatus'
 import BookingWidget from '../components/BookingWidget'
 import IRSFormFiller from '../components/IRSFormFiller'
 import ErrorBoundary from '../components/ErrorBoundary'
@@ -455,6 +456,7 @@ export default function Leads() {
     const channels = [emailSent&&'email', smsSent&&'sms'].filter(Boolean).join(' + ')
     const noteContent = `📋 Service Addendum sent for e-signature — Resolution Fee ${feeText}${channels?` (${channels})`:''}`
     await supabase.from('lead_notes').insert({ lead_id: l.id, lead_name: l.name, text: noteContent, type: 'System', author: actor, created_at: new Date().toISOString() })
+    await advanceLeadStatus(supabase, l.name, 'Addendum Sent')
 
     setAddendumSending(false)
     setAddModal(false)
@@ -717,7 +719,7 @@ export default function Leads() {
     setPkgSending(false)
     const sent=[emailSent&&`email to ${l.email}`,smsSent&&`SMS to ${l.phone}`].filter(Boolean)
     showToast(sent.length?`Package sent via ${sent.join(' & ')}!`:'Package created — link copied (configure email/SMS in Settings to auto-send).')
-    await supabase.from('leads').update({status:'Tax Inv Agreement Sent'}).eq('id',l.id)
+    await advanceLeadStatus(supabase, l.name, 'Tax Inv Agreement Sent')
     load()
   }
 
@@ -1161,27 +1163,31 @@ export default function Leads() {
 
           {/* Pipeline — full status flow, left to right, current status highlighted */}
           <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid var(--br)'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
               <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Pipeline</div>
               <button className="btn sec" style={{padding:'2px 8px',fontSize:10}} onClick={()=>setShowFlow(true)}>📊 View Flow</button>
             </div>
-            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',rowGap:10,paddingBottom:4}}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))',gap:8}}>
               {STATUS_FLOW.map(item => (
                 <div key={item.s} onClick={()=>updateStatus(l, item.s)} style={{
-                  background:item.c,color:'#fff',borderRadius:8,padding:'9px 12px',fontSize:13,fontWeight:700,
-                  textAlign:'center',lineHeight:1.3,cursor:'pointer',
+                  background:item.c,color:'#fff',borderRadius:8,padding:'8px 12px',fontSize:12.5,fontWeight:700,
+                  textAlign:'center',lineHeight:1.25,cursor:'pointer',
+                  display:'flex',alignItems:'center',justifyContent:'center',minHeight:48,
                   outline:l.status===item.s?'3px solid #fff':'none',outlineOffset:-3,
-                  opacity:l.status===item.s?1:0.55,transition:'all .15s'
+                  boxShadow:l.status===item.s?'0 3px 10px rgba(0,0,0,.35)':'none',
+                  opacity:l.status===item.s?1:0.5,transition:'opacity .15s, box-shadow .15s'
                 }}>{item.s}</div>
               ))}
             </div>
-            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:10,paddingTop:10,borderTop:'1px solid var(--br)'}}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))',gap:8,marginTop:10,paddingTop:10,borderTop:'1px solid var(--br)'}}>
               {EXIT_FLOW.map(item => (
                 <div key={item.s} onClick={()=>updateStatus(l, item.s)} style={{
-                  background:item.c,color:'#fff',borderRadius:8,padding:'9px 12px',fontSize:13,fontWeight:700,
-                  textAlign:'center',lineHeight:1.3,cursor:'pointer',
+                  background:item.c,color:'#fff',borderRadius:8,padding:'8px 12px',fontSize:12.5,fontWeight:700,
+                  textAlign:'center',lineHeight:1.25,cursor:'pointer',
+                  display:'flex',alignItems:'center',justifyContent:'center',minHeight:48,
                   outline:l.status===item.s?'3px solid #fff':'none',outlineOffset:-3,
-                  opacity:l.status===item.s?1:0.55,transition:'all .15s'
+                  boxShadow:l.status===item.s?'0 3px 10px rgba(0,0,0,.35)':'none',
+                  opacity:l.status===item.s?1:0.5,transition:'opacity .15s, box-shadow .15s'
                 }}>{item.s}</div>
               ))}
             </div>
@@ -1603,7 +1609,7 @@ export default function Leads() {
             lead={resolutionFeeLead}
             showToast={showToast}
             onClose={()=>setResolutionFeeLead(null)}
-            onPaid={()=>{ setResolutionFeeLead(null); convertToClient(l, true) }}
+            onPaid={async ()=>{ setResolutionFeeLead(null); await advanceLeadStatus(supabase, l.name, 'Resolution Fee Paid'); convertToClient(l, true) }}
           />
         )}
         {fillerLead && (

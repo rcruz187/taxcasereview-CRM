@@ -255,7 +255,7 @@ export default function EmployeePortal() {
 
   if (screen === 'login') return (
     <div style={{ minHeight: '100vh', background: '#060d18', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
-      <img src={LOGO} alt="Tax Case Review" style={{ width: 80, height: 80, borderRadius: 16, objectFit: 'cover', marginBottom: 20 }} onError={e => { e.currentTarget.style.display = 'none' }} />
+      <img src={LOGO} alt="Tax Case Review" style={{ width: '100%', maxWidth: 280, height: 'auto', objectFit: 'contain', marginBottom: 20 }} onError={e => { e.currentTarget.style.display = 'none' }} />
       <h1 style={{ fontSize: 22, fontWeight: 800, color: '#f1f5f9', margin: '0 0 6px' }}>Tax Case Review</h1>
       <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 32px' }}>Employee Portal</p>
       <div style={{ width: '100%', maxWidth: 360 }}>
@@ -644,7 +644,7 @@ export default function EmployeePortal() {
             .div{font-size:13px;color:#16a34a;font-weight:600;margin-top:6px;}
             @media print{button{display:none!important}}</style></head><body>
             <div class="badge">
-              <img src="https://taxresolutioncrm.github.io/taxcasereview-CRM/logo.png" style="width:60px;height:60px;border-radius:10px;object-fit:cover;margin-bottom:8px;" />
+              <img src="https://taxresolutioncrm.github.io/taxcasereview-CRM/logo.png" style="width:100%;max-width:220px;height:auto;object-fit:contain;margin-bottom:8px;" />
               <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(emp.employee_id)}&color=0a2540&bgcolor=ffffff&margin=2" style="width:200px;height:200px;border-radius:8px;" />
               <div class="name">${emp.name}</div>
               <div class="id">${emp.employee_id}</div>

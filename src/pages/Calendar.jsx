@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { advanceLeadStatus } from '../lib/leadStatus'
 
 const STATUS_COLORS = {
   scheduled:   { bg: '#1e3a5f', border: '#3b82f6', text: '#93c5fd' },
@@ -146,6 +147,12 @@ export default function Calendar() {
   async function quickStatus(ev, status) {
     await supabase.from('calevents').update({ status, updated_at: new Date().toISOString() }).eq('id', ev.id)
     setSelectedEvent({ ...ev, status }); load()
+    // Marking an appointment complete is how a lead's consultation actually
+    // wraps up — forward-only, so this no-ops for client appointments
+    // (no matching lead row) or leads already past this stage.
+    if (status === 'completed' && ev.clientName) {
+      await advanceLeadStatus(supabase, ev.clientName, 'Consultation Completed')
+    }
   }
 
   const goToday = () => setCurrentDate(new Date())

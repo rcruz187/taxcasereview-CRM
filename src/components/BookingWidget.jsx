@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { advanceLeadStatus } from '../lib/leadStatus'
 
 const CLIENT_EVENT_TYPES = [
   { type: 'Case Discussion',          icon: '💬' },
@@ -77,6 +78,9 @@ export default function BookingWidget({ contact, onClose, mode = 'lead' }) {
         content: `📅 Appointment scheduled (${form.eventType}, ${form.date} ${form.time}).\n\n${notesLines.slice(2).filter(Boolean).join('\n')}`,
         created_at: new Date().toISOString(),
       }])
+      // Booking a call with a lead is the consultation being scheduled —
+      // forward-only, so this is a no-op if the lead is already past this stage.
+      await advanceLeadStatus(supabase, contact?.name, 'Consultation Scheduled')
     }
 
     // Team notification
