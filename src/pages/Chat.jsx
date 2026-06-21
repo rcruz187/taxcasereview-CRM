@@ -445,10 +445,14 @@ export default function Chat() {
           {webrtc.error && (
             <div style={{ background: '#451a03', color: '#fdba74', fontSize: 12, padding: '6px 20px', borderBottom: '1px solid #92400e' }}>{webrtc.error}</div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(huddleMembers.length || 1, 4)}, minmax(140px, 1fr))`, gap: 10, padding: 14, background: '#0a0f1a', borderBottom: '1px solid #1e293b' }}>
-            <VideoTile stream={webrtc.localStreamRef.current} name={myName} label={`${myName} (you)`} muted mirror videoEnabled={cameraOn} />
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, padding: 14, background: '#0a0f1a', borderBottom: '1px solid #1e293b', maxHeight: 260, overflowY: 'auto', flexShrink: 0 }}>
+            <div style={{ width: 200, flexShrink: 0 }}>
+              <VideoTile stream={webrtc.localStreamRef.current} name={myName} label={`${myName} (you)`} muted mirror videoEnabled={cameraOn} />
+            </div>
             {huddleMembers.filter(n => n !== myName).map(n => (
-              <VideoTile key={n} stream={webrtc.remoteStreams[n]} name={n} />
+              <div key={n} style={{ width: 200, flexShrink: 0 }}>
+                <VideoTile stream={webrtc.remoteStreams[n]} name={n} />
+              </div>
             ))}
           </div>
           </div>

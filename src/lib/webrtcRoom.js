@@ -17,7 +17,14 @@ import { supabase } from './supabase'
 // initiates offers themselves, only answers. Keeping it one-directional
 // like this avoids two sides racing to offer each other at once.
 
-const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
+// STUN-only fallback, used immediately while the real (possibly
+// TURN-inclusive) servers are being fetched, and if that fetch fails.
+// STUN alone only gets you a direct connection -- fine when both people's
+// networks allow it, but a real share of real-world pairings (different
+// ISPs, corporate firewalls, some cellular/CGNAT setups) can't connect
+// directly and silently fail with STUN alone, even though signaling
+// (offer/answer) completes successfully. See turn-credentials function.
+const FALLBACK_ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
 
 // Peer-to-peer mesh has a real practical ceiling -- every extra person
 // means everyone else's device has to upload its camera feed one more
@@ -38,10 +45,11 @@ export function useWebRTCRoom(channelPrefix) {
   const peerConnsRef = useRef({})
   const channelRef = useRef(null)
   const myNameRef = useRef('')
+  const iceServersRef = useRef(FALLBACK_ICE) // refreshed in join() from turn-credentials
 
   function createPC(peerName) {
     if (peerConnsRef.current[peerName]) peerConnsRef.current[peerName].close()
-    const pc = new RTCPeerConnection(ICE)
+    const pc = new RTCPeerConnection(iceServersRef.current)
     peerConnsRef.current[peerName] = pc
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(t => pc.addTrack(t, localStreamRef.current))
@@ -98,6 +106,17 @@ export function useWebRTCRoom(channelPrefix) {
   const join = useCallback(async (roomId, myName, withVideo = true) => {
     myNameRef.current = myName
     setError('')
+
+    // Kick off fetching real (TURN-inclusive) ICE servers in parallel with
+    // subscribing below -- by the time anyone actually creates a peer
+    // connection (after media + capacity checks), this will have resolved.
+    // Never lets a slow/failed fetch block joining -- falls back to the
+    // STUN-only default already in iceServersRef.
+    const iceServersPromise = supabase.functions.invoke('turn-credentials')
+      .then(({ data, error: fnErr }) => {
+        if (!fnErr && Array.isArray(data) && data.length) iceServersRef.current = { iceServers: data }
+      })
+      .catch(() => {})
 
     // presence is used purely as a headcount gate here -- the actual
     // membership list and offer/answer flow below is the exact same
@@ -165,6 +184,7 @@ export function useWebRTCRoom(channelPrefix) {
       }
     }
     localStreamRef.current = stream
+    await iceServersPromise // guarantee real ICE servers are set before anyone can offer to us
 
     await ch.track({ name: myName }) // headcount only, see comment above
     await ch.send({ type: 'broadcast', event: 'joined', payload: { name: myName } })

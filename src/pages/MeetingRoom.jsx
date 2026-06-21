@@ -69,14 +69,14 @@ export default function MeetingRoom() {
       {webrtc.error && (
         <div style={{ background: '#451a03', color: '#fdba74', fontSize: 12, padding: '8px 20px' }}>{webrtc.error}</div>
       )}
-      <div style={{
-        flex: 1, display: 'grid', gap: 12, padding: 20,
-        gridTemplateColumns: `repeat(${Math.min(Math.max(webrtc.members.length, 1), 3)}, minmax(220px, 1fr))`,
-        alignContent: 'start',
-      }}>
-        <VideoTile stream={webrtc.localStreamRef.current} name={name} label={`${name} (you)`} muted mirror videoEnabled={webrtc.cameraOn} />
+      <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', alignContent: 'flex-start', gap: 14, padding: 20, overflowY: 'auto' }}>
+        <div style={{ width: 280, flexShrink: 0 }}>
+          <VideoTile stream={webrtc.localStreamRef.current} name={name} label={`${name} (you)`} muted mirror videoEnabled={webrtc.cameraOn} />
+        </div>
         {webrtc.members.filter(n => n !== name).map(n => (
-          <VideoTile key={n} stream={webrtc.remoteStreams[n]} name={n} />
+          <div key={n} style={{ width: 280, flexShrink: 0 }}>
+            <VideoTile stream={webrtc.remoteStreams[n]} name={n} />
+          </div>
         ))}
       </div>
       <div style={{ padding: 18, display: 'flex', justifyContent: 'center', gap: 10, borderTop: '1px solid #1e293b' }}>

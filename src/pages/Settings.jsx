@@ -117,6 +117,8 @@ export default function Settings() {
         qb_client_id: firm.qb_client_id,
         qb_client_secret: firm.qb_client_secret,
         email_signature: firm.email_signature,
+        metered_app_name: firm.metered_app_name,
+        metered_api_key: firm.metered_api_key,
       }
       // Empty-string values blow up non-text columns (date, numeric) with
       // "invalid input syntax" — Postgres wants null for "no value", not ''.
@@ -430,6 +432,30 @@ export default function Settings() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
                 <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save SignalWire'}</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Video Calling (TURN server) */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">🎥 Video Calling (Huddle + Client Meetings)</span></div>
+            <div style={{ padding: '0 20px 20px' }}>
+              <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.6 }}>
+                Powers the team Huddle and client meeting links — free, browser-to-browser video. Without this, calls only connect when both people's networks happen to allow a direct connection; this fills in the gap for everyone else (different ISPs, office firewalls, etc).
+                <br/><br/>
+                Sign up free (no card needed, 20GB/month relay) at <strong>dashboard.metered.ca/signup?tool=turnserver</strong>, then copy your app name and API key from the dashboard.
+              </div>
+              <div className="fg2">
+                <div className="field"><label>Metered App Name</label>
+                  <input value={firm.metered_app_name || ''} onChange={set('metered_app_name')} placeholder="yourappname" />
+                  <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>The subdomain shown in your dashboard — just the name, not the full URL.</div>
+                </div>
+                <div className="field"><label>API Key</label>
+                  <input type="password" value={firm.metered_api_key || ''} onChange={set('metered_api_key')} placeholder="API key from your dashboard" />
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Video Calling'}</button>
               </div>
             </div>
           </div>
