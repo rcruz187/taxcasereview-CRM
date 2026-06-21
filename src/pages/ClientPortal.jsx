@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import OrganizerWizard from '../components/OrganizerWizard'
 import StripeInvoicePayModal from '../components/StripeInvoicePayModal'
+import PortalAutopaySetup from '../components/PortalAutopaySetup'
 
 const FORM_TABS = [
   { key: '1040',  label: 'Personal Federal (1040)', quarterly: false },
@@ -62,6 +63,8 @@ export default function ClientPortal() {
   const [payments, setPayments] = useState([])
   const [openInvoices, setOpenInvoices] = useState([])
   const [payModalInv, setPayModalInv] = useState(null)
+  const [showAutopaySetup, setShowAutopaySetup] = useState(false)
+  const [toast, setToast] = useState('')
   // Notes (client-visible only)
   const [notes, setNotes] = useState([])
 
@@ -69,7 +72,7 @@ export default function ClientPortal() {
 
   async function load() {
     setLoading(true)
-    let { data: c } = await supabase.from('clients').select('id,name,ssn,email').eq('id', id).maybeSingle()
+    let { data: c } = await supabase.from('clients').select('id,name,ssn,email,autopay_enabled,autopay_amount,autopay_frequency,autopay_next_charge,default_payment_method_id,payment_method_brand,payment_method_last4').eq('id', id).maybeSingle()
     let isLead = false
     if (!c) {
       const { data: l } = await supabase.from('leads').select('id,name,ssn,email').eq('id', id).maybeSingle()
@@ -121,6 +124,25 @@ export default function ClientPortal() {
     setPayments(pays || [])
     setNotes(notesData || [])
     setOpenInvoices(invs || [])
+  }
+
+  function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3000) }
+
+  async function refreshClientAutopay() {
+    const { data: c } = await supabase.from('clients')
+      .select('id,name,ssn,email,autopay_enabled,autopay_amount,autopay_frequency,autopay_next_charge,default_payment_method_id,payment_method_brand,payment_method_last4')
+      .eq('id', client.id).maybeSingle()
+    if (c) setClient(prev => ({ ...prev, ...c }))
+  }
+
+  async function cancelAutopay() {
+    if (!confirm('Turn off monthly payments?')) return
+    const { data, error } = await supabase.functions.invoke('stripe-set-autopay', {
+      body: { clientId: client.id, enabled: false }
+    })
+    if (error || data?.error) { showToast('❌ ' + (data?.error || error.message)); return }
+    showToast('Monthly payments turned off')
+    refreshClientAutopay()
   }
 
   async function createOrganizer() {
@@ -238,9 +260,14 @@ export default function ClientPortal() {
   docs.forEach(d => { const f = d.docType || 'Other'; if (!docsByFolder[f]) docsByFolder[f] = []; docsByFolder[f].push(d) })
   const totalIn = bookEntries.filter(e => parseFloat(e.amount || 0) > 0).reduce((s, e) => s + parseFloat(e.amount || 0), 0)
   const totalOut = Math.abs(bookEntries.filter(e => parseFloat(e.amount || 0) < 0).reduce((s, e) => s + parseFloat(e.amount || 0), 0))
+  const totalBalance = openInvoices.reduce((s, inv) => {
+    const subtotal = parseFloat(inv.total || 0), tax = subtotal * (parseFloat(inv.taxRate || 0) / 100), paidAmt = parseFloat(inv.paid || 0)
+    return s + ((subtotal + tax) - paidAmt)
+  }, 0)
 
   return (
     <div style={styles.page}>
+      {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#0f172a', border: '1px solid rgba(255,255,255,.15)', borderRadius: 8, padding: '10px 18px', color: '#f1f5f9', fontSize: 13, fontWeight: 600, zIndex: 1100, boxShadow: '0 8px 24px rgba(0,0,0,.4)' }}>{toast}</div>}
       <div style={{ ...styles.card, maxWidth: 880 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
           <div>
@@ -423,6 +450,36 @@ export default function ClientPortal() {
         {section === 'payments' && (
           <div>
             {openInvoices.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(59,130,246,.1)', border: '1px solid rgba(59,130,246,.25)', borderRadius: 8, padding: '14px 16px', marginBottom: 18 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '.05em' }}>Total Balance Due</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: '#fff' }}>${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+              </div>
+            )}
+            {!client.isLead && (
+              <div style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 8, padding: '14px 16px', marginBottom: 24 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 10 }}>Monthly Payment Plan</div>
+                {client.autopay_enabled ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 13.5, color: '#f1f5f9', fontWeight: 700 }}>
+                        ${parseFloat(client.autopay_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} / month
+                      </div>
+                      <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>
+                        Next charge {client.autopay_next_charge || '—'}
+                        {client.payment_method_brand ? ` · ${client.payment_method_brand} ····${client.payment_method_last4 || ''}` : ''}
+                      </div>
+                    </div>
+                    <button onClick={cancelAutopay} style={{ padding: '7px 14px', background: 'transparent', border: '1px solid rgba(248,113,113,.4)', borderRadius: 6, color: '#f87171', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>Turn Off</button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+                    <div style={{ fontSize: 12, color: '#94a3b8' }}>Set up automatic monthly payments toward your balance.</div>
+                    <button onClick={() => setShowAutopaySetup(true)} style={{ padding: '8px 16px', background: '#1A7FD4', border: 'none', borderRadius: 6, color: '#fff', fontWeight: 600, fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap' }}>Set Up Monthly Payments</button>
+                  </div>
+                )}
+              </div>
+            )}
+            {openInvoices.length > 0 && (
               <div style={{ marginBottom: 24 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 10 }}>Open Balance</div>
                 {openInvoices.map(inv => {
@@ -463,8 +520,13 @@ export default function ClientPortal() {
               <StripeInvoicePayModal invoice={payModalInv} onClose={() => setPayModalInv(null)}
                 onPaid={() => refreshPaymentsAndInvoices()} />
             )}
+            {showAutopaySetup && (
+              <PortalAutopaySetup client={client} suggestedAmount={totalBalance} showToast={showToast}
+                onClose={() => setShowAutopaySetup(false)} onSaved={() => refreshClientAutopay()} />
+            )}
           </div>
         )}
+
 
         {/* ── NOTES ── */}
         {section === 'notes' && (
