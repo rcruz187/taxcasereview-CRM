@@ -267,7 +267,7 @@ export default function Leads() {
   const [bookingLead, setBookingLead] = useState(null)
   const [resolutionFeeLead, setResolutionFeeLead] = useState(null)
   const [fillerLead, setFillerLead] = useState(null)
-  const [paymentLinkModal, setPaymentLinkModal] = useState(false)
+  const [paymentLinkModal, setPaymentLinkModal] = useState(null)
   const [splitPaymentModal, setSplitPaymentModal] = useState(false)
   const [detail, setDetail] = useState(null)
   const [leadNotes, setLeadNotes]     = useState([])
@@ -1208,6 +1208,7 @@ export default function Leads() {
               } catch (err) { showToast('Error opening form: ' + err.message) }
             }}/>
             <ActionBtn color="#1d4ed8" icon="📊" label={intakeSending?'Sending…':'Financial Intake'} sub="Send / Resend Link" onClick={()=>!intakeSending&&sendFinancialIntake(l)}/>
+            <ActionBtn color="#0d9488" icon="💵" label="Charge Investigation Fee" sub={l.taxFee?`Quoted: $${l.taxFee}`:'Send Payment Link'} onClick={()=>setPaymentLinkModal({purpose:'investigation_fee', defaultAmount:l.taxFee||'', defaultDescription:'Tax Investigation Fee'})}/>
             <ActionBtn color="#d97706" icon="📝" label="Addendum" sub="After IRS facts" onClick={()=>{setAddForm({resolutionFee:'',paymentPlan:'',startDate:'',notes:'',services:[],sendVia:'email'});setAddModal(true)}}/>
             {l.status==='Addendum Signed' && (
               <ActionBtn color="#059669" icon="💰" label="Charge Resolution Fee" sub="& Convert to Client" onClick={()=>setResolutionFeeLead(l)}/>
@@ -1419,7 +1420,7 @@ export default function Leads() {
               <div className="card" style={{marginTop:12}}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
                   <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>🔗 Send Payment Link</div>
-                  <button className="btn pri" style={{padding:'4px 10px',fontSize:11}} onClick={()=>setPaymentLinkModal(true)}>Send Link</button>
+                  <button className="btn pri" style={{padding:'4px 10px',fontSize:11}} onClick={()=>setPaymentLinkModal({})}>Send Link</button>
                 </div>
                 <div style={{fontSize:11,color:'var(--t3)'}}>
                   {l.stripe_checkout_sent_at ? `Last link sent ${new Date(l.stripe_checkout_sent_at).toLocaleString()}` : 'No link sent yet — use this if they\'d rather enter their own card.'}
@@ -1622,7 +1623,10 @@ export default function Leads() {
             record={l}
             recordType="lead"
             showToast={showToast}
-            onClose={async()=>{ setPaymentLinkModal(false); const {data}=await supabase.from('leads').select('*').eq('id',l.id).single(); if (data) setDetail(data) }}
+            purpose={paymentLinkModal.purpose}
+            defaultAmount={paymentLinkModal.defaultAmount}
+            defaultDescription={paymentLinkModal.defaultDescription}
+            onClose={async()=>{ setPaymentLinkModal(null); const {data}=await supabase.from('leads').select('*').eq('id',l.id).single(); if (data) setDetail(data) }}
           />
         )}
         {splitPaymentModal && (

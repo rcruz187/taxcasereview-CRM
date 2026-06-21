@@ -75,12 +75,32 @@ serve(async (req) => {
     const session = event.data.object as any
     const recordType = session.metadata?.record_type
     const recordId = session.metadata?.record_id
+    const purpose = session.metadata?.purpose
     const table = recordType === 'lead' ? 'leads' : 'clients'
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+
+    // Forward-only pipeline advance — mirrors src/lib/leadStatus.js. Kept as
+    // a separate inline copy since this runs in Deno, not the React app.
+    const STATUS_ORDER = [
+      'New Lead', 'Contacted', 'Consultation Scheduled', 'Consultation Completed',
+      'Tax Inv Agreement Sent', 'Tax Inv Agreement Signed', 'Tax Inv Fee Paid',
+      'Tax Investigation Active', 'IRS Facts Received', 'Addendum Sent', 'Addendum Signed',
+      'Resolution Fee Paid', 'Converted to Client',
+    ]
+    if (recordType === 'lead' && purpose === 'investigation_fee' && recordId) {
+      const { data: lead } = await supabase.from('leads').select('status').eq('id', recordId).maybeSingle()
+      if (lead) {
+        const curIdx = STATUS_ORDER.indexOf(lead.status)
+        const targetIdx = STATUS_ORDER.indexOf('Tax Inv Fee Paid')
+        if (curIdx < targetIdx) {
+          await supabase.from('leads').update({ status: 'Tax Inv Fee Paid' }).eq('id', recordId)
+        }
+      }
+    }
 
     if (recordId) {
       const amount = (session.amount_total || 0) / 100

@@ -15,6 +15,18 @@ const RAW_STATUS_LABEL = {
   ringing: 'Ringing', answered: 'Answered', completed: 'Completed', missed: 'Missed',
   pending: 'Dialing…', connected: 'Connected', failed: 'Failed',
 }
+function initialsFor(name) {
+  if (!name) return '?'
+  const p = name.trim().split(' ')
+  return p.length >= 2 ? p[0][0] + p[p.length-1][0] : name[0].toUpperCase()
+}
+const AV_COLORS = ['blue','green','amber','red','gray']
+function avColor(name) {
+  if (!name) return 'gray'
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % AV_COLORS.length
+  return AV_COLORS[h]
+}
 
 export default function Dialer() {
   const {
@@ -332,43 +344,51 @@ export default function Dialer() {
                 </div>
               </div>
               <div className="ovx">
-                <table>
-                  <thead><tr><th>Name</th><th>Phone</th><th></th></tr></thead>
-                  <tbody>
-                    {clientQueue.map((entry, i) => (
-                      <tr key={i}>
-                        <td style={{ fontWeight: 600 }}>{entry.name || 'Unknown'}</td>
-                        <td style={{ fontFamily: 'monospace', color: 'var(--t2)' }}>{entry.phone}</td>
-                        <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                          <button className="btn pri" style={{ padding: '5px 12px', fontSize: 12 }}
-                            onClick={() => callQueueEntry(entry)} disabled={calling}>
-                            📞 Call
-                          </button>
-                          <button className="btn sec" style={{ padding: '5px 8px', fontSize: 12 }}
-                            onClick={() => removeFromQueue(i)}>
-                            ✕
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                {clientQueue.map((entry, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '11px 10px', borderBottom: i < clientQueue.length - 1 ? '1px solid var(--br)' : 'none' }}>
+                    <div className={`av ${avColor(entry.name || '?')}`}>{initialsFor(entry.name)}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--tx)' }}>{entry.name || 'Unknown'}</div>
+                      <div style={{ fontSize: 12, color: 'var(--t3)', fontFamily: 'monospace', marginTop: 1 }}>{entry.phone}</div>
+                    </div>
+                    <button className="btn pri" style={{ padding: '6px 14px', fontSize: 12, gap: 5 }}
+                      onClick={() => callQueueEntry(entry)} disabled={calling}>
+                      📞 Call
+                    </button>
+                    <button className="btn sec" style={{ padding: '6px 10px', fontSize: 12 }}
+                      onClick={() => removeFromQueue(i)}>
+                      ✕
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
           {/* Tabs */}
-          <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+          <div style={{ display: 'inline-flex', gap: 2, marginBottom: 16, background: 'var(--s2)', padding: 4, borderRadius: 11, border: '1px solid var(--br)' }}>
             {[
-              ['queue', `📋 Call Queue (${leads.length})`],
-              ['voicemail', `🔵 Voicemails (${voicemails.filter(v => !v.is_read).length})`],
-              ['recordings', `🎙️ Recordings (${recordings.length})`],
-              ['log', `📞 Call History (${callLog.length})`],
-            ].map(([key, label]) => (
+              ['queue', '📋', 'Call Queue', leads.length],
+              ['voicemail', '🔵', 'Voicemails', voicemails.filter(v => !v.is_read).length],
+              ['recordings', '🎙️', 'Recordings', recordings.length],
+              ['log', '📞', 'Call History', callLog.length],
+            ].map(([key, icon, label, count]) => (
               <button key={key} onClick={() => setTab(key)}
-                className={tab === key ? 'btn pri' : 'btn sec'}
-                style={{ padding: '7px 16px', fontSize: 13 }}>
-                {label}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', fontSize: 12.5, fontWeight: 700,
+                  borderRadius: 8, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+                  background: tab === key ? 'var(--blue)' : 'transparent',
+                  color: tab === key ? '#fff' : 'var(--t2)',
+                  transition: 'background .15s, color .15s',
+                }}>
+                <span>{icon}</span>{label}
+                {count > 0 && (
+                  <span style={{
+                    fontSize: 11, fontWeight: 700, padding: '1px 7px', borderRadius: 20, minWidth: 18, textAlign: 'center',
+                    background: tab === key ? 'rgba(255,255,255,.25)' : 'var(--s3)',
+                    color: tab === key ? '#fff' : 'var(--t2)',
+                  }}>{count}</span>
+                )}
               </button>
             ))}
           </div>
@@ -378,17 +398,20 @@ export default function Dialer() {
             <div className="card">
               <div className="ovx">
                 {voicemails.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: 'var(--t3)', padding: 24 }}>No voicemails yet</div>
+                  <div style={{ textAlign: 'center', color: 'var(--t3)', padding: 32 }}>No voicemails yet</div>
                 ) : voicemails.map(vm => (
                   <div key={vm.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 14, padding: '12px 8px',
+                    display: 'flex', alignItems: 'center', gap: 14, padding: '13px 10px',
                     borderBottom: '1px solid var(--br)',
                     background: vm.is_read ? 'transparent' : 'rgba(37,99,235,0.06)'
                   }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: vm.is_read ? 'transparent' : '#3b82f6', flexShrink: 0 }} />
-                    <div style={{ minWidth: 140 }}>
-                      <div style={{ fontWeight: 700, fontFamily: 'monospace' }}>{vm.from_number || 'Unknown'}</div>
-                      <div style={{ fontSize: 11, color: 'var(--t3)' }}>
+                    <div className={`av ${avColor(vm.from_number || '?')}`} style={{ position: 'relative' }}>
+                      📵
+                      {!vm.is_read && <span style={{ position: 'absolute', top: -2, right: -2, width: 9, height: 9, borderRadius: '50%', background: '#3b82f6', border: '2px solid var(--card-bg, #0f172a)' }} />}
+                    </div>
+                    <div style={{ minWidth: 150 }}>
+                      <div style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: 13.5, color: 'var(--tx)' }}>{vm.from_number || 'Unknown'}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--t3)', marginTop: 2 }}>
                         {vm.created_at ? new Date(vm.created_at).toLocaleString() : '—'}
                         {vm.duration_seconds ? ` · ${vm.duration_seconds}s` : ''}
                       </div>
@@ -397,15 +420,15 @@ export default function Dialer() {
                       <audio controls src={vm.recording_url} style={{ flex: 1, height: 32 }}
                         onPlay={() => !vm.is_read && markVoicemailRead(vm)} />
                     ) : (
-                      <span style={{ fontSize: 12, color: 'var(--t3)' }}>Recording unavailable</span>
+                      <span style={{ fontSize: 12, color: 'var(--t3)', flex: 1 }}>Recording unavailable</span>
                     )}
                     {!vm.is_read && (
-                      <button className="btn sec" style={{ padding: '5px 10px', fontSize: 11 }}
+                      <button className="btn sec" style={{ padding: '6px 12px', fontSize: 11, flexShrink: 0 }}
                         onClick={() => markVoicemailRead(vm)}>
                         Mark Read
                       </button>
                     )}
-                    <button className="btn sec" style={{ padding: '5px 10px', fontSize: 11, color: '#dc2626' }}
+                    <button className="btn sec" style={{ padding: '6px 12px', fontSize: 11, color: '#dc2626', flexShrink: 0 }}
                       onClick={() => deleteVoicemail(vm)}>
                       🗑️ Delete
                     </button>
@@ -420,15 +443,16 @@ export default function Dialer() {
             <div className="card">
               <div className="ovx">
                 {recordings.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: 'var(--t3)', padding: 24 }}>No recorded calls yet</div>
+                  <div style={{ textAlign: 'center', color: 'var(--t3)', padding: 32 }}>No recorded calls yet</div>
                 ) : recordings.map(rec => (
                   <div key={rec.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 14, padding: '12px 8px',
+                    display: 'flex', alignItems: 'center', gap: 14, padding: '13px 10px',
                     borderBottom: '1px solid var(--br)',
                   }}>
-                    <div style={{ minWidth: 140 }}>
-                      <div style={{ fontWeight: 700, fontFamily: 'monospace' }}>{rec.from_number || 'Unknown'}</div>
-                      <div style={{ fontSize: 11, color: 'var(--t3)' }}>
+                    <div className={`av ${avColor(rec.from_number || '?')}`}>🎙️</div>
+                    <div style={{ minWidth: 150 }}>
+                      <div style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: 13.5, color: 'var(--tx)' }}>{rec.from_number || 'Unknown'}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--t3)', marginTop: 2 }}>
                         {rec.created_at ? new Date(rec.created_at).toLocaleString() : '—'}
                         {rec.duration_seconds ? ` · ${rec.duration_seconds}s` : ''}
                       </div>
@@ -438,12 +462,12 @@ export default function Dialer() {
                     ) : (
                       <span style={{ fontSize: 12, color: 'var(--t3)', flex: 1 }}>Recording unavailable</span>
                     )}
-                    <button className="btn sec" style={{ padding: '5px 10px', fontSize: 11, flexShrink: 0 }}
+                    <button className="btn sec" style={{ padding: '6px 12px', fontSize: 11, flexShrink: 0 }}
                       onClick={() => { setAttachRec(rec); setAttachSearch(''); setAttachResults([]) }}>
                       📎 Attach to Client
                     </button>
                     {canDeleteRecordings && (
-                      <button className="btn sec" style={{ padding: '5px 10px', fontSize: 11, color: '#dc2626', flexShrink: 0 }}
+                      <button className="btn sec" style={{ padding: '6px 12px', fontSize: 11, color: '#dc2626', flexShrink: 0 }}
                         onClick={() => deleteRecording(rec)}>
                         🗑️ Delete
                       </button>
@@ -458,49 +482,38 @@ export default function Dialer() {
           {tab === 'queue' && (
             <div className="card">
               <div className="ovx">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Phone</th>
-                      <th>Status</th>
-                      <th>Source</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {leads.length === 0 ? (
-                      <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--t3)', padding: 24 }}>
-                        No leads in queue
-                      </td></tr>
-                    ) : leads.map(lead => (
-                      <tr key={lead.id} style={active?.id === lead.id ? { background: 'rgba(37,162,90,0.08)' } : {}}>
-                        <td style={{ fontWeight: 600 }}>
-                          {lead.name || `${lead.first || ''} ${lead.last || ''}`.trim()}
-                        </td>
-                        <td style={{ fontFamily: 'monospace', color: 'var(--t2)' }}>
-                          {lead.phone || '—'}
-                        </td>
-                        <td>
-                          <span className="bdg bb" style={{ fontSize: 11 }}>{lead.status}</span>
-                        </td>
-                        <td style={{ color: 'var(--t2)', fontSize: 12 }}>{lead.source || '—'}</td>
-                        <td>
-                          {lead.phone ? (
-                            <button className="btn pri"
-                              style={{ padding: '5px 12px', fontSize: 12, gap: 4 }}
-                              onClick={() => startCall({ ...lead, entityType: 'lead' })}
-                              disabled={calling}>
-                              📞 Call
-                            </button>
-                          ) : (
-                            <span style={{ fontSize: 11, color: 'var(--t3)' }}>No phone</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                {leads.length === 0 ? (
+                  <div style={{ textAlign: 'center', color: 'var(--t3)', padding: 32 }}>No leads in queue</div>
+                ) : leads.map(lead => {
+                  const name = lead.name || `${lead.first || ''} ${lead.last || ''}`.trim() || 'Unknown'
+                  return (
+                    <div key={lead.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 14, padding: '13px 10px',
+                      borderBottom: '1px solid var(--br)',
+                      background: active?.id === lead.id ? 'rgba(37,162,90,0.08)' : 'transparent',
+                    }}>
+                      <div className={`av ${avColor(name)}`}>{initialsFor(name)}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--tx)' }}>{name}</div>
+                        <div style={{ fontSize: 12, color: 'var(--t3)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                          <span style={{ fontFamily: 'monospace' }}>{lead.phone || '—'}</span>
+                          {lead.source && <><span>·</span><span>{lead.source}</span></>}
+                        </div>
+                      </div>
+                      <span className="bdg bb" style={{ fontSize: 11, flexShrink: 0 }}>{lead.status}</span>
+                      {lead.phone ? (
+                        <button className="btn pri"
+                          style={{ padding: '7px 16px', fontSize: 12, gap: 5, flexShrink: 0 }}
+                          onClick={() => startCall({ ...lead, entityType: 'lead' })}
+                          disabled={calling}>
+                          📞 Call
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: 11, color: 'var(--t3)', flexShrink: 0, width: 76, textAlign: 'center' }}>No phone</span>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -509,38 +522,28 @@ export default function Dialer() {
           {tab === 'log' && (
             <div className="card">
               <div className="ovx">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Phone</th>
-                      <th>Direction</th>
-                      <th>Outcome</th>
-                      <th>Duration</th>
-                      <th>Notes</th>
-                      <th>Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {callLog.length === 0 ? (
-                      <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--t3)', padding: 24 }}>
-                        No calls logged yet
-                      </td></tr>
-                    ) : callLog.map(c => (
-                      <tr key={c.id}>
-                        <td style={{ fontWeight: 600 }}>{c.clientName || '—'}</td>
-                        <td style={{ fontFamily: 'monospace', color: 'var(--t2)', fontSize: 12 }}>{c.phone || '—'}</td>
-                        <td><span className={`bdg ${c.direction === 'Inbound' ? 'bb' : 'bn'}`} style={{ fontSize: 11 }}>{c.direction === 'Inbound' ? '↘ In' : '↗ Out'}</span></td>
-                        <td><span className={`bdg ${OUTCOME_C[c.outcome] || 'bn'}`} style={{ fontSize: 11 }}>{c.outcome}</span></td>
-                        <td style={{ fontFamily: 'monospace', color: 'var(--t2)', fontSize: 12 }}>{c.duration || '—'}</td>
-                        <td style={{ color: 'var(--t2)', fontSize: 12, maxWidth: 200 }}>{c.notes || '—'}</td>
-                        <td style={{ color: 'var(--t3)', fontSize: 11 }}>
-                          {c.created_at ? new Date(c.created_at).toLocaleString() : '—'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                {callLog.length === 0 ? (
+                  <div style={{ textAlign: 'center', color: 'var(--t3)', padding: 32 }}>No calls logged yet</div>
+                ) : callLog.map(c => (
+                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 10px', borderBottom: '1px solid var(--br)' }}>
+                    <div className={`av ${avColor(c.clientName || c.phone || '?')}`}>{initialsFor(c.clientName) !== '?' ? initialsFor(c.clientName) : (c.direction === 'Inbound' ? '↘' : '↗')}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--tx)' }}>{c.clientName || 'Unknown caller'}</span>
+                        <span className={`bdg ${c.direction === 'Inbound' ? 'bb' : 'bn'}`} style={{ fontSize: 10 }}>{c.direction === 'Inbound' ? '↘ In' : '↗ Out'}</span>
+                        <span className={`bdg ${OUTCOME_C[c.outcome] || 'bn'}`} style={{ fontSize: 10 }}>{c.outcome}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span style={{ fontFamily: 'monospace' }}>{c.phone || '—'}</span>
+                        {c.duration && <><span>·</span><span style={{ fontFamily: 'monospace' }}>{c.duration}</span></>}
+                        {c.notes && <><span>·</span><span style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.notes}</span></>}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--t3)', flexShrink: 0, textAlign: 'right' }}>
+                      {c.created_at ? new Date(c.created_at).toLocaleString() : '—'}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}

@@ -6,9 +6,9 @@ import { supabase } from '../lib/supabase'
 // their own card on Stripe's page — none of it touches our servers. Once
 // paid, stripe-checkout-webhook logs the payment and saves the card on file
 // for future use, the same as the embedded card-on-file flow does.
-export default function SendPaymentLinkModal({ record, recordType, onClose, showToast }) {
-  const [amount, setAmount] = useState('')
-  const [description, setDescription] = useState('')
+export default function SendPaymentLinkModal({ record, recordType, onClose, showToast, purpose, defaultAmount, defaultDescription }) {
+  const [amount, setAmount] = useState(defaultAmount ? String(defaultAmount) : '')
+  const [description, setDescription] = useState(defaultDescription || '')
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [err, setErr] = useState('')
@@ -21,7 +21,7 @@ export default function SendPaymentLinkModal({ record, recordType, onClose, show
     const { data, error } = await supabase.functions.invoke('stripe-create-checkout-session', {
       body: {
         recordType, recordId: record.id, name: record.name, email: record.email,
-        amount, description: description || undefined,
+        amount, description: description || undefined, purpose: purpose || undefined,
       }
     })
     setLoading(false)
@@ -53,7 +53,7 @@ export default function SendPaymentLinkModal({ record, recordType, onClose, show
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal" style={{ width: 440, maxWidth: '95vw', padding: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <div style={{ fontWeight: 700, fontSize: 16 }}>🔗 Send Payment Link — {record.name}</div>
+          <div style={{ fontWeight: 700, fontSize: 16 }}>🔗 {defaultDescription || 'Send Payment Link'} — {record.name}</div>
           <button className="xbtn" onClick={onClose}>&times;</button>
         </div>
 

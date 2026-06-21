@@ -56,7 +56,7 @@ serve(async (req) => {
       })
     }
 
-    const { recordType, recordId, name, email, amount, description } = await req.json()
+    const { recordType, recordId, name, email, amount, description, purpose } = await req.json()
     if (!recordId || !recordType || !amount) {
       return new Response(JSON.stringify({ error: 'Missing recordId, recordType, or amount' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -101,6 +101,7 @@ serve(async (req) => {
       'payment_intent_data[setup_future_usage]': 'off_session',
       [`metadata[record_type]`]: recordType,
       [`metadata[record_id]`]: String(recordId),
+      ...(purpose ? { [`metadata[purpose]`]: String(purpose) } : {}),
       success_url: STRIPE_SUCCESS_URL,
       cancel_url: STRIPE_CANCEL_URL,
     })
