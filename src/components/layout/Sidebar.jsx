@@ -83,7 +83,7 @@ const SECTIONS = [
 ]
 
 export default function Sidebar() {
-  const { user, logout, can, role } = useApp()
+  const { user, logout, can, role, mobileNavOpen, setMobileNavOpen } = useApp()
   const location = useLocation()
   const navigate = useNavigate()
   const [logoUrl, setLogoUrl] = useState(LOGO)
@@ -104,6 +104,12 @@ export default function Sidebar() {
     const active = activeSection()
     if (active) setOpenKey(active)
   }, [location.pathname])
+
+  // On mobile the sidebar renders as a slide-in drawer (toggled by the
+  // hamburger button in TopBar) instead of always-visible -- close it
+  // automatically once a destination is picked, same as any standard
+  // mobile nav drawer.
+  useEffect(() => { setMobileNavOpen(false) }, [location.pathname])
 
   const [firmName, setFirmName] = useState('Tax Case Review')
   const [pendingTimeOff, setPendingTimeOff] = useState(0)
@@ -184,8 +190,15 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="sidebar">
-      <div className="brand" onClick={() => navigate('/')} style={{flexDirection:'column',alignItems:'center',padding:'16px 12px 12px',gap:8}}>
+    <>
+      {mobileNavOpen && <div className="sidebar-backdrop" onClick={() => setMobileNavOpen(false)} />}
+      <aside className={`sidebar${mobileNavOpen ? ' mobile-open' : ''}`}>
+      <div className="brand" onClick={() => navigate('/')} style={{flexDirection:'column',alignItems:'center',padding:'16px 12px 12px',gap:8, position:'relative'}}>
+        <button
+          className="sidebar-close-btn"
+          onClick={(e) => { e.stopPropagation(); setMobileNavOpen(false) }}
+          aria-label="Close menu"
+        >×</button>
         {logoUrl
           ? <img src={logoUrl} alt={firmName} style={{width:'100%',maxWidth:140,height:56,objectFit:'contain'}}/>
           : <div style={{fontWeight:900,fontSize:18,color:'var(--blue)',textAlign:'center',lineHeight:1.2}}>{firmName}</div>
@@ -267,6 +280,7 @@ export default function Sidebar() {
         </div>
       )}
     </aside>
+    </>
   )
 }
 

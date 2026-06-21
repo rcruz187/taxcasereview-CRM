@@ -565,9 +565,59 @@ tbody tr:hover td { background: var(--s2); cursor: pointer; }
   .g3c { grid-template-columns: 1fr 1fr; }
   .sidebar { width: 180px; }
 }
+
+/* Hamburger button: hidden on desktop, shown only when the sidebar
+   becomes an overlay drawer below */
+.hamburger-btn {
+  display: none;
+  background: none; border: none; color: var(--tx); cursor: pointer;
+  padding: 6px; margin-right: 4px; flex-shrink: 0; align-items: center; justify-content: center;
+}
+.sidebar-close-btn { display: none; }
+
 @media (max-width: 640px) {
   :root { --nav-w: 0px; }
-  .sidebar { display: none; }
+
+  /* Sidebar becomes a slide-in drawer instead of vanishing with no way
+     back in -- it used to be display:none here with nothing replacing
+     it, so on a phone there was simply no way to navigate at all once
+     you loaded any page. */
+  .sidebar {
+    display: flex;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: min(82vw, 300px);
+    z-index: 999;
+    transform: translateX(-100%);
+    transition: transform .22s ease;
+    box-shadow: 8px 0 32px rgba(0,0,0,.4);
+  }
+  .sidebar.mobile-open { transform: translateX(0); }
+
+  .sidebar-backdrop {
+    position: fixed; inset: 0; z-index: 998;
+    background: rgba(0,0,0,.5);
+  }
+
+  .sidebar-close-btn {
+    display: flex; align-items: center; justify-content: center;
+    position: absolute; top: 8px; right: 8px;
+    width: 28px; height: 28px; border-radius: 6px;
+    background: var(--s2); border: 1px solid var(--br);
+    color: var(--t2); font-size: 18px; line-height: 1; cursor: pointer;
+  }
+
+  .hamburger-btn { display: flex; }
+
+  /* The topbar gets crowded fast on a phone -- keep the essentials
+     (menu, page title, + New) and drop the rest rather than letting it
+     overflow or wrap awkwardly. */
+  .topbar { padding: 0 10px; gap: 8px; }
+  .topbar .search-input { display: none; }
+  .topbar .topbar-clock { display: none; }
+  .topbar .topbar-datestr { display: none; }
+  .page-title { font-size: 14px; }
+
   .g3c { grid-template-columns: 1fr; }
 }
 

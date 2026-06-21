@@ -90,6 +90,7 @@ export function AppProvider({ children }) {
   const [toast, setToast]       = useState({ msg: '', type: 'ok', show: false })
   const [modal, setModal]       = useState({ open: false, title: '', body: null })
   const [searchQ, setSearchQ]   = useState('')
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const toastTimer = useRef(null)
 
   function applyBrandColor(hex) {
@@ -306,6 +307,7 @@ export function AppProvider({ children }) {
       toast, showToast,
       modal, openModal, closeModal,
       searchQ, setSearchQ,
+      mobileNavOpen, setMobileNavOpen,
     }}>
       {children}
     </AppContext.Provider>

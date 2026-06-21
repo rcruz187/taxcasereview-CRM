@@ -38,7 +38,7 @@ const NEW_ITEMS = [
 export default function TopBar({ onNew }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const { searchQ, setSearchQ } = useApp()
+  const { searchQ, setSearchQ, mobileNavOpen, setMobileNavOpen } = useApp()
   const [clock, setClock] = useState('')
   const [dateStr, setDateStr] = useState('')
   const [open, setOpen] = useState(false)
@@ -80,6 +80,13 @@ export default function TopBar({ onNew }) {
 
   return (
     <div className="topbar" style={{ position: 'relative' }}>
+      <button
+        className="hamburger-btn"
+        onClick={() => setMobileNavOpen(o => !o)}
+        aria-label="Open menu"
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
       <span className="page-title">{title}</span>
       <input
         className="search-input"
@@ -99,7 +106,7 @@ export default function TopBar({ onNew }) {
       >
         {soundOn ? '🔔' : '🔇'}
       </button>
-      <span style={{ fontSize: 12, color: 'var(--t3)', whiteSpace: 'nowrap' }}>{dateStr}</span>
+      <span className="topbar-datestr" style={{ fontSize: 12, color: 'var(--t3)', whiteSpace: 'nowrap' }}>{dateStr}</span>
       <span className="topbar-clock">{clock}</span>
 
       {/* Jobber-style + New button */}
@@ -120,7 +127,7 @@ export default function TopBar({ onNew }) {
           {/* panel */}
           <div ref={panelRef} style={{
             position: 'fixed', top: 52, right: 0, bottom: 0,
-            width: 280, background: 'var(--sf)', borderLeft: '1px solid var(--br)',
+            width: 'min(85vw, 280px)', background: 'var(--sf)', borderLeft: '1px solid var(--br)',
             zIndex: 999, display: 'flex', flexDirection: 'column',
             boxShadow: '-8px 0 32px rgba(0,0,0,.35)',
             animation: 'slideInRight .18s ease-out',
