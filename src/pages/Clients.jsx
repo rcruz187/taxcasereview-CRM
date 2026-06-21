@@ -1340,8 +1340,8 @@ export default function Clients() {
               {key:'organizer', label:'🧾 Tax-Org'},
             ].map(t=>(
               <button key={t.key} onClick={()=>setDetailTab(t.key)}
-                style={{padding:'12px 14px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
-                  background:'none',cursor:'pointer',fontSize:13,fontWeight:detailTab===t.key?700:500,
+                style={{padding:'12px 8px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
+                  background:'none',cursor:'pointer',fontSize:12,fontWeight:detailTab===t.key?700:500,
                   color:detailTab===t.key?'var(--blue)':'var(--t2)',whiteSpace:'nowrap',transition:'all .15s',flexShrink:0}}>
                 {t.label}
               </button>
