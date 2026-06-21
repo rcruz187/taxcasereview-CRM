@@ -748,6 +748,7 @@ export default function Clients() {
   const [addendumSending, setAddendumSending] = useState(false)
   // Related data for detail view
   const [relCases,    setRelCases]    = useState([])
+  const [relDeadlines,setRelDeadlines]= useState([])
   const [relDocs,     setRelDocs]     = useState([])
   const [uploadingDoc,setUploadingDoc]= useState(false)
   const [docForm,     setDocForm]     = useState({ name:'', docType:'IRS Notice', notes:'' })
@@ -886,7 +887,7 @@ export default function Clients() {
 
   async function loadRelated(clientName) {
     setLoadingRel(true)
-    const [{ data:cases },{ data:tasks },{ data:invoices },{ data:docs },{ data:clientNotes },{ data:payments },{ data:sms }] = await Promise.all([
+    const [{ data:cases },{ data:tasks },{ data:invoices },{ data:docs },{ data:clientNotes },{ data:payments },{ data:sms },{ data:deadlines }] = await Promise.all([
       supabase.from('cases').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('tasks').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('invoices').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
@@ -894,6 +895,7 @@ export default function Clients() {
       supabase.from('client_notes').select('*').eq('client_name', clientName).order('created_at',{ascending:false}),
       supabase.from('payments').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('sms_messages').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
+      supabase.from('deadlines').select('*').eq('clientName', clientName).order('dueDate',{ascending:true}),
     ])
     setRelCases(cases||[])
     setRelTasks(tasks||[])
@@ -902,6 +904,7 @@ export default function Clients() {
     setRelNotes(clientNotes||[])
     setRelPayments(payments||[])
     setRelSms(sms||[])
+    setRelDeadlines(deadlines||[])
     setLoadingRel(false)
   }
 
@@ -1171,7 +1174,7 @@ export default function Clients() {
   function openDetail(c, opts = {}) {
     if (!opts.preserveTab) setDetailTab('overview')
     setDetail(c)
-    setRelCases([]);setRelTasks([]);setRelInvoices([]);setRelSms([])
+    setRelCases([]);setRelTasks([]);setRelInvoices([]);setRelSms([]);setRelDeadlines([])
     loadRelated(c.name)
     const qs = opts.preserveTab ? searchParams.toString() : ''
     navigate(`/clients/${c.id}${qs ? `?${qs}` : ''}`, { replace: true })
@@ -1727,6 +1730,49 @@ export default function Clients() {
               )}
               <DR label="Assigned Rep" val={c.assignedTo}/>
               <DR label="Client Since" val={c.clientSince}/>
+            </div>
+
+            {/* Deadlines */}
+            <div className="card">
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)'}}>⏰ Deadlines ({relDeadlines.length})</div>
+                <span onClick={()=>navigate('/deadlines')} style={{fontSize:11,color:'var(--blue)',cursor:'pointer',fontWeight:600}}>Manage all →</span>
+              </div>
+              {relDeadlines.length===0
+                ? <div style={{color:'var(--t3)',fontSize:12,textAlign:'center',padding:'8px 0'}}>No deadlines for this client.</div>
+                : relDeadlines.map(d=>{
+                  const due = d.dueDate||d.due_date
+                  const dy = due ? Math.ceil((new Date(due)-new Date())/86400000) : 999
+                  const status = d.status||'Tracking'
+                  const dColor = dy<0?'var(--bad)':dy<=3?'var(--bad)':dy<=7?'var(--warn)':'var(--t2)'
+                  const dBdg   = dy<0?'br':dy<=3?'br':dy<=7?'ba':'bg'
+                  const dText  = status==='Completed'?'Done':dy<0?'OVERDUE':dy===0?'TODAY':dy+'d left'
+                  return (
+                    <div key={d.id} style={{borderBottom:'1px solid var(--br)',padding:'8px 0'}}>
+                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,flexWrap:'wrap'}}>
+                        <div style={{minWidth:0}}>
+                          <div style={{fontWeight:600,fontSize:13,color:status==='Completed'?'var(--t2)':'var(--tx)'}}>{d.name||d.title||'—'}</div>
+                          <div style={{fontSize:11,color:'var(--t3)',marginTop:2,display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+                            <span className="bdg bb" style={{fontSize:10}}>{d.type}</span>
+                            <span style={{color:dColor}}>{due||'—'}</span>
+                            <span className={`bdg ${status==='Completed'?'bg':dBdg}`}>{dText}</span>
+                          </div>
+                        </div>
+                        <select
+                          value={status}
+                          onChange={async e=>{
+                            await supabase.from('deadlines').update({status:e.target.value}).eq('id',d.id)
+                            loadRelated(c.name)
+                          }}
+                          style={{background:'var(--s2)',border:'1px solid var(--br)',borderRadius:5,color:'var(--tx)',fontSize:11,padding:'3px 6px',cursor:'pointer',flexShrink:0}}
+                        >
+                          {['Tracking','Action Required','Scheduled','Completed'].map(s=><option key={s}>{s}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  )
+                })
+              }
             </div>
 
             {/* Payment & Autopay */}

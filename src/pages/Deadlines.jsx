@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { sendGmailEmail } from '../lib/gmailUtils'
 
-const TYPES    = ['OIC','Installment Agreement','CDP','CSED','Penalty Abatement','Appeals','Return Filing','IRS Notice','General']
+const TYPES    = ['ACS','Appeals','CDP','CSED','General','Installment Agreement','IRS Notice','Levy Release','OIC','Penalty Abatement','Return Filing']
 const STATUSES = ['Tracking','Action Required','Scheduled','Completed']
 
 const BLANK = { name:'', title:'', client:'', clientName:'', type:'General', dueDate:'', status:'Tracking', notes:'' }
@@ -122,13 +122,38 @@ export default function Deadlines() {
   const filtered = filter==='All' ? items : filter==='Upcoming' ? items.filter(d=>daysLeft(d)>=0&&getStatus(d)!=='Completed') : filter==='Overdue' ? items.filter(d=>daysLeft(d)<0&&getStatus(d)!=='Completed') : items.filter(d=>getStatus(d)===filter)
   const urgent   = items.filter(d=>{ const dy=daysLeft(d); return dy<=7&&getStatus(d)!=='Completed' })
 
+  const overdueCount   = items.filter(d=>daysLeft(d)<0&&getStatus(d)!=='Completed').length
+  const dueSoonCount   = items.filter(d=>{const dy=daysLeft(d);return dy>=0&&dy<=7&&getStatus(d)!=='Completed'}).length
+  const completedCount = items.filter(d=>getStatus(d)==='Completed').length
+
+  function StatCard({label,val,color,icon,onClick,active}) {
+    return (
+      <div onClick={onClick} style={{
+        background:'var(--sf)',border:'1px solid '+(active?color:'var(--br)'),borderRadius:10,
+        padding:'12px 14px',cursor:onClick?'pointer':'default',position:'relative',overflow:'hidden',
+        transition:'transform .15s, border-color .15s',
+      }}
+        onMouseEnter={e=>{ if(onClick){ e.currentTarget.style.transform='translateY(-2px)' }}}
+        onMouseLeave={e=>{ e.currentTarget.style.transform='' }}>
+        <div style={{position:'absolute',top:0,left:0,right:0,height:3,background:color}}/>
+        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',paddingTop:4}}>
+          <div>
+            <div style={{fontSize:10,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:5}}>{label}</div>
+            <div style={{fontSize:24,fontWeight:800,color,lineHeight:1}}>{val}</div>
+          </div>
+          <div style={{fontSize:20,opacity:.25}}>{icon}</div>
+        </div>
+      </div>
+    )
+  }
+
   function Row({d}) {
     const dy = daysLeft(d)
     return (
       <tr>
         <td style={{fontWeight:600,color:urgencyColor(dy)}}>{getName(d)}</td>
         <td style={{fontSize:12,color:'var(--t2)'}}>{getClient(d)}</td>
-        <td><span className="bdg bn" style={{fontSize:10}}>{d.type}</span></td>
+        <td><span className="bdg bb" style={{fontSize:10}}>{d.type}</span></td>
         <td style={{color:urgencyColor(dy),fontSize:12}}>{d.dueDate||d.due_date||'—'}</td>
         <td><span className={`bdg ${urgencyBdg(dy)}`}>{daysText(dy)}</span></td>
         <td>
@@ -153,6 +178,14 @@ export default function Deadlines() {
   return (
     <div style={{maxWidth:1000}}>
       {toast&&<div className="toast show">{toast}</div>}
+
+      {/* Stat cards — double as quick filters */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:10,marginBottom:14}}>
+        <StatCard label="Total" val={items.length} color="var(--blue)" icon="📋" active={filter==='All'} onClick={()=>setFilter('All')}/>
+        <StatCard label="Overdue" val={overdueCount} color="var(--bad)" icon="🚨" active={filter==='Overdue'} onClick={()=>setFilter('Overdue')}/>
+        <StatCard label="Due Soon (7d)" val={dueSoonCount} color="var(--warn)" icon="⏰" active={filter==='Upcoming'} onClick={()=>setFilter('Upcoming')}/>
+        <StatCard label="Completed" val={completedCount} color="var(--ok)" icon="✅" active={filter==='Completed'} onClick={()=>setFilter('Completed')}/>
+      </div>
 
       {/* Urgent banner */}
       {urgent.length>0&&(
