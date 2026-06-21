@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useLocation } from 'react-router-dom'
+import { DOC_FOLDERS as ROOT_FOLDERS } from './Clients'
 
-const ROOT_FOLDERS = ['IRS Docs','Tax Returns','Agreements','POA & Forms','Correspondence','Financial Statements','Other']
 const FILE_ICONS = { pdf:'📄', doc:'📝', docx:'📝', xls:'📊', xlsx:'📊', jpg:'🖼️', jpeg:'🖼️', png:'🖼️', default:'📎' }
 function fileIcon(name='') { const ext=(name.split('.').pop()||'').toLowerCase(); return FILE_ICONS[ext]||FILE_ICONS.default }
 function fmtSize(b) { if(!b)return ''; if(b<1024)return b+'B'; if(b<1048576)return (b/1024).toFixed(1)+'KB'; return (b/1048576).toFixed(1)+'MB' }

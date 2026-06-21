@@ -157,14 +157,17 @@ export default function SignPage() {
     }
 
     // Service Addendum is a contract — files under the Agreements folder
-    // like the rest of the firm's signed agreements. Other doc types keep
-    // their existing generic 'E-Signature' tag, unchanged.
-    const savedDocType = doc.doc_type === 'Service Addendum' ? 'Agreements' : 'E-Signature'
+    // like the rest of the firm's signed agreements. Everything else (the
+    // Full Investigation Package — 2848/8821/CC Auth/Service Agreement)
+    // goes in E-Signatures. Must match DOC_FOLDERS in Clients.jsx exactly
+    // ('E-Signatures', plural) or it silently won't show under that folder.
+    const savedDocType = doc.doc_type === 'Service Addendum' ? 'Agreements' : 'E-Signatures'
 
-    // Save to documents table so it appears in client file
+    // Save to documents table so it appears in client file — this record is
+    // the signature certificate: who signed, from what IP, and when.
     await supabase.from('documents').insert([{
       client:     doc.client_name,
-      name:       'SIGNED — ' + doc.doc_type + ' — ' + signedDate,
+      name:       `Signed ${doc.doc_type} — ${doc.client_name}`,
       docType:    savedDocType,
       notes:      `Signed by: ${fullname}\nIP: ${ip}\nDate: ${signedAt}`,
       created_at: signedAt,
@@ -193,7 +196,7 @@ export default function SignPage() {
         signedAttachments.push({ formType: att.formType, label: att.label, url: urlData.publicUrl })
         await supabase.from('documents').insert([{
           client:     doc.client_name,
-          name:       'SIGNED — ' + att.label,
+          name:       `Signed ${att.label.split(' — ')[0]} — ${doc.client_name}`,
           docType:    savedDocType,
           file_url:   urlData.publicUrl,
           file_name:  `${att.formType}_signed.pdf`,
