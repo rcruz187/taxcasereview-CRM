@@ -1518,6 +1518,14 @@ export default function Leads() {
                     </div>
                   ))}
                 </div>
+                <div style={{marginTop:20,paddingTop:16,borderTop:'1px solid var(--br)'}}>
+                  <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Exit statuses — can be set from any stage above</div>
+                  <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+                    {[{s:'Dead',c:'#E84B5A'},{s:'Do Not Contact',c:'#E84B5A'}].map(item => (
+                      <div key={item.s} style={{background:item.c,color:'#fff',borderRadius:8,padding:'9px 12px',fontSize:13,fontWeight:700,textAlign:'center',width:140,lineHeight:1.3}}>{item.s}</div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
