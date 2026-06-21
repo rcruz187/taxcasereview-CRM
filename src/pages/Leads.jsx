@@ -1170,11 +1170,11 @@ export default function Leads() {
               <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Pipeline</div>
               <button className="btn sec" style={{padding:'2px 8px',fontSize:10}} onClick={()=>setShowFlow(true)}>📊 View Flow</button>
             </div>
-            <div style={{display:'flex',alignItems:'center',gap:0,overflowX:'auto',paddingBottom:4}}>
+            <div style={{display:'flex',alignItems:'center',gap:0,flexWrap:'wrap',rowGap:10,paddingBottom:4}}>
               {PIPELINE_STAGES.map((stage,i) => (
                 <div key={stage.key} style={{display:'flex',alignItems:'center'}}>
                   <div style={{
-                    padding:'8px 16px',borderRadius:24,fontSize:14,fontWeight:600,cursor:'pointer',
+                    padding:'10px 20px',borderRadius:24,fontSize:18,fontWeight:600,cursor:'pointer',
                     whiteSpace:'nowrap',
                     background:done[i]?'var(--ok)':'var(--s3)',
                     color:done[i]?'#fff':'var(--t3)',
