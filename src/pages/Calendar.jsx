@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { advanceLeadStatus } from '../lib/leadStatus'
+import { sendGmailEmail } from '../lib/gmailUtils'
 
 const STATUS_COLORS = {
   scheduled:   { bg: '#1e3a5f', border: '#3b82f6', text: '#93c5fd' },
@@ -118,6 +119,51 @@ export default function Calendar() {
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3000) }
   function fld(k, v) { setForm(f => ({ ...f, [k]: v })) }
+
+  // Free video meeting link, one per appointment -- same browser-to-
+  // browser WebRTC room the team Huddle uses, just a public unauthenticated
+  // entry point. No Google/Zoom account or paid service involved; the
+  // link itself (tied to this event's id) is the only access control,
+  // same pattern as the e-sign and client portal links.
+  function meetingLinkFor(ev) {
+    return `${window.location.origin}/meet/${ev.id}`
+  }
+
+  async function copyMeetingLink(ev) {
+    try {
+      await navigator.clipboard.writeText(meetingLinkFor(ev))
+      showToast('Meeting link copied!')
+    } catch {
+      showToast('Could not copy — copy it manually: ' + meetingLinkFor(ev))
+    }
+  }
+
+  async function emailMeetingLink(ev) {
+    if (!ev.clientName) { showToast('No client on this appointment to email'); return }
+    const [{ data: c }, { data: l }] = await Promise.all([
+      supabase.from('clients').select('email').eq('name', ev.clientName).maybeSingle(),
+      supabase.from('leads').select('email').eq('name', ev.clientName).maybeSingle(),
+    ])
+    const email = c?.email || l?.email
+    if (!email) { showToast('No email on file for ' + ev.clientName); return }
+
+    const when = ev.date ? new Date(ev.date + 'T12:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : ''
+    const link = meetingLinkFor(ev)
+    try {
+      await sendGmailEmail(supabase, {
+        to: email,
+        subject: `Video meeting link — ${when}${ev.time ? ' at ' + fmtTime(ev.time) : ''}`,
+        body: `<p>Hi ${ev.clientName.split(' ')[0]},</p>` +
+          `<p>Here's the link for your upcoming video meeting${when ? ' on ' + when : ''}${ev.time ? ' at ' + fmtTime(ev.time) : ''}:</p>` +
+          `<p style="margin:18px 0"><a href="${link}" style="background:#3b82f6;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:700">Join Meeting</a></p>` +
+          `<p style="font-size:12px;color:#64748b">Or copy this link into your browser: ${link}</p>` +
+          `<p>No download or account needed — just click the link a few minutes before your appointment, allow camera/microphone access, and you're in.</p>`,
+      })
+      showToast('✅ Meeting link emailed to ' + ev.clientName)
+    } catch (err) {
+      showToast('Email failed: ' + (err?.message || 'unknown error'))
+    }
+  }
 
   async function saveEvent() {
     if (!form.title || !form.date) { showToast('Title and date required'); return }
@@ -263,6 +309,22 @@ export default function Calendar() {
             </div>
           )}
         </div>
+
+        {!selectedEvent._isDl && (
+          <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: '14px 16px', marginBottom: 14 }}>
+            <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '.05em' }}>Video Meeting</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <code style={{ flex: 1, minWidth: 200, fontSize: 12, color: '#93c5fd', background: '#0a1628', padding: '8px 10px', borderRadius: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {meetingLinkFor(selectedEvent)}
+              </code>
+              <button onClick={() => copyMeetingLink(selectedEvent)} style={{ padding: '7px 12px', borderRadius: 6, background: '#1e293b', border: '1px solid #334155', color: '#e2e8f0', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Copy</button>
+              <button onClick={() => window.open(meetingLinkFor(selectedEvent), '_blank')} style={{ padding: '7px 12px', borderRadius: 6, background: '#1e293b', border: '1px solid #334155', color: '#e2e8f0', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Join Now</button>
+              {selectedEvent.clientName && (
+                <button onClick={() => emailMeetingLink(selectedEvent)} style={{ padding: '7px 12px', borderRadius: 6, background: '#16a34a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📧 Email to {selectedEvent.clientName.split(' ')[0]}</button>
+              )}
+            </div>
+          </div>
+        )}
 
         {!selectedEvent._isDl && (
           <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: '14px 16px', marginBottom: 14 }}>
