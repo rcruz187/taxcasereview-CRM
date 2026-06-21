@@ -1513,7 +1513,7 @@ export default function Leads() {
                     {s:'Converted to Client',c:'#25A25A'},
                   ].map((item,i,arr) => (
                     <div key={item.s} style={{display:'flex',alignItems:'center',gap:0}}>
-                      <div style={{background:item.c,color:'#fff',borderRadius:8,padding:'6px 10px',fontSize:11,fontWeight:700,textAlign:'center',whiteSpace:'nowrap',maxWidth:110,lineHeight:1.3}}>{item.s}</div>
+                      <div style={{background:item.c,color:'#fff',borderRadius:8,padding:'9px 12px',fontSize:13,fontWeight:700,textAlign:'center',width:140,lineHeight:1.3}}>{item.s}</div>
                       {i < arr.length-1 && <div style={{color:'var(--t3)',fontSize:16,margin:'0 4px'}}>→</div>}
                     </div>
                   ))}
