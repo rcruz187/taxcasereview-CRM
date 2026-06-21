@@ -1599,7 +1599,10 @@ export default function Clients() {
                 <div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No cases linked to this client.</div>
               )}
               {relCases.map(cas=>(
-                <div key={cas.id} style={{borderBottom:'1px solid var(--br)',padding:'10px 0'}}>
+                <div key={cas.id} onClick={()=>navigate('/cases/'+cas.id)}
+                  style={{borderBottom:'1px solid var(--br)',padding:'10px 0',cursor:'pointer',transition:'background .12s'}}
+                  onMouseEnter={e=>e.currentTarget.style.background='var(--s2)'}
+                  onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
                     <div>
                       <div style={{fontWeight:600,fontSize:13}}>{cas.caseType||'Case'}</div>

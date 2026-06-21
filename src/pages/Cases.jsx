@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useApp } from '../context/AppContext'
 
 const STATUSES = ['Open','Pending IRS','Active Plan','Docs Needed','POA Sent','Under Review','Resolved','Completed','Closed']
 const STATUS_C = {'Open':'bb','Pending IRS':'ba','Active Plan':'bg','Docs Needed':'ba','POA Sent':'bb','Under Review':'bn','Resolved':'bg','Completed':'bg','Closed':'bn'}
@@ -8,11 +10,15 @@ const CASE_TYPES = ['OIC','Installment Agreement','CNC','Penalty Abatement','Lie
 const BLANK = { clientName:'', caseType:'OIC', irsBalance:'', status:'Open', assignedTo:'', deadline:'', taxYears:'', resolutionAmount:'', notes:'' }
 
 export default function Cases() {
+  const { id: urlCaseId } = useParams()
+  const navigate = useNavigate()
+  const { user } = useApp()
   const [cases,     setCases]     = useState([])
   const [confirmDel, setConfirmDel] = useState(null)
   const [clients,   setClients]   = useState([])
   const [employees, setEmployees] = useState([])
   const [filter,    setFilter]    = useState('All')
+  const [repFilter, setRepFilter] = useState('All')
   const [modal,     setModal]     = useState(false)
   const [editCase,  setEditCase]  = useState(null)
   const [form,      setForm]      = useState(BLANK)
@@ -26,6 +32,32 @@ export default function Cases() {
   const [showAllCaseNotes, setShowAllCaseNotes] = useState(false)
 
   useEffect(() => { load() }, [])
+
+  // Deep-link support for /cases/:id (e.g. clicking a case from a client's
+  // Cases tab) — same fast-path pattern as Leads.jsx: fetch the single case
+  // directly so opening one doesn't wait on the whole cases table loading.
+  useEffect(() => {
+    if (!urlCaseId || detail) return
+    let cancelled = false
+    supabase.from('cases').select('*').eq('id', urlCaseId).single().then(({ data }) => {
+      if (!cancelled && data) { setDetail(data); loadCaseNotes(data.id) }
+    })
+    return () => { cancelled = true }
+  }, [urlCaseId])
+  useEffect(() => {
+    if (urlCaseId && cases.length > 0 && !detail) {
+      const found = cases.find(c => String(c.id) === String(urlCaseId))
+      if (found) { setDetail(found); loadCaseNotes(found.id) }
+    }
+  }, [urlCaseId, cases])
+  // If the URL no longer points at the case currently shown (e.g. clicking
+  // "Cases" in the sidebar while a detail page is open), drop the stale
+  // detail state so the page reflects the URL again.
+  useEffect(() => {
+    if (detail && String(detail.id) !== String(urlCaseId || '')) {
+      setDetail(null)
+    }
+  }, [urlCaseId, detail])
 
   async function load() {
     const [{ data:cs },{ data:cl },{ data:em }] = await Promise.all([
@@ -67,7 +99,9 @@ export default function Cases() {
     setSug([])
   }
 
-  const filtered = filter==='All' ? cases : cases.filter(c=>c.status===filter)
+  const filtered = cases
+    .filter(c => filter==='All' || c.status===filter)
+    .filter(c => repFilter==='All' || (repFilter==='Unassigned' ? !c.assignedTo : c.assignedTo===repFilter))
   const reps = employees.length>0 ? employees.map(e=>e.name) : ['Romy Cruz','Dana Richard','Yesenia Gonzalez']
 
   async function save() {
@@ -103,10 +137,10 @@ export default function Cases() {
     if (confirmDel !== id) { setConfirmDel(id); return }
     setConfirmDel(null)
     await supabase.from('cases').delete().eq('id',id)
-    showToast('Deleted'); setDetail(null); load()
+    showToast('Deleted'); setDetail(null); navigate('/cases',{replace:true}); load()
   }
 
-  function openDetail(c) { setDetail(c); loadCaseNotes(c.id) }
+  function openDetail(c) { setDetail(c); loadCaseNotes(c.id); navigate('/cases/'+c.id, {replace:true}) }
   function openEdit(c) { setForm({...BLANK,...c}); setEditCase(c) }
 
   // ── Detail view ──────────────────────────────────────────────────────────────
@@ -116,7 +150,7 @@ export default function Cases() {
       <div style={{maxWidth:760,margin:'0 auto'}}>
         {toast&&<div className="toast show">{toast}</div>}
         <div style={{display:'flex',gap:8,marginBottom:16,alignItems:'center'}}>
-          <button className="btn" onClick={()=>setDetail(null)}>← Back to Cases</button>
+          <button className="btn" onClick={()=>{ setDetail(null); navigate('/cases',{replace:true}) }}>← Back to Cases</button>
           <button className="btn pri" style={{marginLeft:'auto'}} onClick={()=>openEdit(c)}>✏️ Edit</button>
           <button className="btn del" onClick={()=>deleteCase(c.id)}>🗑 Delete</button>
         </div>
@@ -166,8 +200,17 @@ export default function Cases() {
                 className={`btn ${c.status===s?'pri':'sec'}`}
                 style={{fontSize:11,padding:'4px 10px'}}
                 onClick={async()=>{
+                  if (s === c.status) return
+                  const prevStatus = c.status
                   const {error}=await supabase.from('cases').update({status:s}).eq('id',c.id)
                   if(error){showToast('❌ '+error.message);return}
+                  const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+                  await supabase.from('client_notes').insert({
+                    client_name: c.clientName,
+                    content: `📁 Case status changed: ${prevStatus} → ${s} (${c.caseType}, ${c.caseNum})`,
+                    created_by: actor,
+                    visible_to_client: false,
+                  })
                   const {data}=await supabase.from('cases').select('*').eq('id',c.id).single()
                   if(data)setDetail(data)
                   load()
@@ -238,7 +281,7 @@ export default function Cases() {
           <span key={s} className={`chip${filter===s?' on':''}`} onClick={()=>setFilter(s)}>{s}</span>
         ))}
       </div>
-      {/* Cases by Rep breakdown */}
+      {/* Cases by Rep breakdown — doubles as a filter, same pattern as the status chips above */}
       {(() => {
         const reps = {}
         cases.forEach(c => { const r = c.assignedTo || 'Unassigned'; reps[r] = (reps[r]||0)+1 })
@@ -246,12 +289,20 @@ export default function Cases() {
         if (!repList.length) return null
         return (
           <div className="card" style={{padding:'10px 16px',marginBottom:10}}>
-            <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>Cases by Rep</div>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+              <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Cases by Rep</div>
+              {repFilter!=='All' && <span onClick={()=>setRepFilter('All')} style={{fontSize:11,color:'var(--blue)',cursor:'pointer',fontWeight:600}}>Clear</span>}
+            </div>
             <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
               {repList.map(([rep,count]) => (
-                <div key={rep} style={{display:'flex',alignItems:'center',gap:6,background:'var(--s2)',borderRadius:6,padding:'4px 12px',fontSize:12}}>
+                <div key={rep} onClick={()=>setRepFilter(f=>f===rep?'All':rep)}
+                  style={{display:'flex',alignItems:'center',gap:6,borderRadius:20,padding:'4px 6px 4px 12px',fontSize:12,
+                    cursor:'pointer',userSelect:'none',transition:'all .1s',border:'1px solid',
+                    background:repFilter===rep?'var(--blt)':'var(--s2)',
+                    borderColor:repFilter===rep?'var(--blue)':'var(--br)',
+                    color:repFilter===rep?'var(--b2)':'var(--tx)'}}>
                   <span style={{fontWeight:700}}>{rep}</span>
-                  <span style={{background:'var(--blue)',color:'#fff',borderRadius:20,padding:'1px 8px',fontSize:11,fontWeight:800}}>{count}</span>
+                  <span style={{background:repFilter===rep?'var(--blue)':'var(--b2c)',color:repFilter===rep?'#fff':'var(--b2)',borderRadius:20,padding:'1px 8px',fontSize:11,fontWeight:800}}>{count}</span>
                 </div>
               ))}
             </div>
@@ -261,7 +312,7 @@ export default function Cases() {
 
       <div className="card">
         <div className="ch">
-          <span className="ct">All Cases ({filtered.length})</span>
+          <span className="ct">{repFilter==='All' ? 'All Cases' : (repFilter==='Unassigned'?'Unassigned Cases':repFilter+'\u2019s Cases')} ({filtered.length})</span>
           <button className="btn pri" onClick={()=>{setForm(BLANK);setModal(true)}}>+ New Case</button>
         </div>
         <div className="ovx">
