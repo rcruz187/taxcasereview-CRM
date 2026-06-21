@@ -8,7 +8,7 @@ const AppContext = createContext(null)
 // Each route/section maps to a perm_* column on the employees table.
 // 0 = No Access, 1 = View Only, 2 = Edit, 3 = Full Admin
 export const SECTION_COLS = {
-  leads:       'perm_clients',
+  leads:       'perm_leads',
   clients:     'perm_clients',
   cases:       'perm_clients',
   tasks:       'perm_clients',
@@ -44,6 +44,7 @@ export const ACCESS_LEVELS = {
   'Admin':       { label: 'Admin',       color: '#f59e0b' },
   'Staff':       { label: 'Staff',       color: '#3b82f6' },
   'View Only':   { label: 'View Only',   color: '#64748b' },
+  'Tax Advisor': { label: 'Tax Advisor', color: '#10b981' },
 }
 
 // Role-based defaults (used when no per-section perms exist)
@@ -63,12 +64,20 @@ const ROLE_DEFAULTS = {
     canView: ['dashboard','leads','clients','cases','tasks','calendar','deadlines','documents','irsforms','irsreference'],
     canEdit: [],
   },
+  // Sales rep / Tax Advisor — lead pipeline only. No Clients/Cases (that's
+  // post-conversion work), no Billing/IRS/HR/Reports/Settings. Row-level
+  // scoping to "my own assigned leads" is handled in Leads.jsx, not here.
+  'Tax Advisor': {
+    canView: ['dashboard','leads','calendar','sms','email','dialer','documents','esign','chat'],
+    canEdit: ['leads','calendar','sms','email','dialer','documents','esign','chat'],
+  },
 }
 
 export function AppProvider({ children }) {
   const [user, setUser]         = useState(null)
   const [role, setRole]         = useState('Admin')
   const [perms, setPerms]       = useState(null)   // per-section perm object from DB
+  const [employeeName, setEmployeeName] = useState('')   // employees.name for the logged-in user — used to scope "my own leads" for Tax Advisor
   const [checking, setChecking] = useState(true)
   const [toast, setToast]       = useState({ msg: '', type: 'ok', show: false })
   const [modal, setModal]       = useState({ open: false, title: '', body: null })
@@ -118,7 +127,7 @@ export function AppProvider({ children }) {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
       if (session?.user) { loadRole(session.user.email); loadBrandColor() }
-      else { setRole('Staff'); setPerms(null) }
+      else { setRole('Staff'); setPerms(null); setEmployeeName('') }
     })
     return () => listener.subscription.unsubscribe()
   }, [])
@@ -218,21 +227,24 @@ export function AppProvider({ children }) {
     if (email === 'romy@taxcasereview.org') {
       setRole('Super Admin')
       setPerms(null)
+      setEmployeeName('')
       return
     }
     const { data } = await supabase
       .from('employees')
-      .select('access, perm_clients, perm_billing, perm_schedule, perm_documents, perm_reports, perm_hr, perm_settings, perm_comms, perm_irs')
+      .select('name, access, perm_leads, perm_clients, perm_billing, perm_schedule, perm_documents, perm_reports, perm_hr, perm_settings, perm_comms, perm_irs')
       .eq('email', email)
       .maybeSingle()
 
     if (data) {
       setRole(data.access || 'Staff')
+      setEmployeeName(data.name || '')
       // Store per-section perms if they exist
       const hasCustomPerms = Object.keys(data).some(k => k.startsWith('perm_') && data[k] !== null)
       setPerms(hasCustomPerms ? data : null)
     } else {
       setRole('Admin')
+      setEmployeeName('')
       setPerms(null)
     }
   }
@@ -276,12 +288,13 @@ export function AppProvider({ children }) {
     setUser(null)
     setRole('Staff')
     setPerms(null)
+    setEmployeeName('')
   }, [])
 
   return (
     <AppContext.Provider value={{
       user, login, logout, checking,
-      role, perms, can,
+      role, perms, can, employeeName,
       toast, showToast,
       modal, openModal, closeModal,
       searchQ, setSearchQ,

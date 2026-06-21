@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 
-const ROLES = ['Super Admin', 'Admin', 'Staff', 'View Only']
-const ROLE_COLORS = { 'Super Admin': '#ef4444', 'Admin': '#f59e0b', 'Staff': '#3b82f6', 'View Only': '#64748b' }
+const ROLES = ['Super Admin', 'Admin', 'Staff', 'View Only', 'Tax Advisor']
+const ROLE_COLORS = { 'Super Admin': '#ef4444', 'Admin': '#f59e0b', 'Staff': '#3b82f6', 'View Only': '#64748b', 'Tax Advisor': '#10b981' }
 
 // perm levels: 0=No Access, 1=View Only, 2=Edit, 3=Full Admin
 const PERM_SECTIONS = [
-  { key: 'perm_clients',   label: 'Client Work',         desc: 'Leads, Clients, Cases, Tasks, Deadlines', icon: '👥' },
+  { key: 'perm_leads',     label: 'Lead Work',           desc: 'Sales pipeline — Leads only',             icon: '🎯' },
+  { key: 'perm_clients',   label: 'Client Work',         desc: 'Clients, Cases, Tasks, Deadlines',        icon: '👥' },
   { key: 'perm_billing',   label: 'Billing',             desc: 'Estimates, Invoices, Payments, Books',    icon: '💳' },
   { key: 'perm_schedule',  label: 'Calendar & Schedule', desc: 'View and manage appointments',            icon: '📅' },
   { key: 'perm_documents', label: 'Documents & E-Sign',  desc: 'Upload, view, and request signatures',   icon: '📄' },
@@ -27,10 +28,16 @@ const LEVEL_OPTIONS = [
 
 // Default perm sets per role
 const ROLE_PERM_DEFAULTS = {
-  'Super Admin': { perm_clients:3, perm_billing:3, perm_schedule:3, perm_documents:3, perm_irs:3, perm_comms:3, perm_reports:3, perm_hr:3, perm_settings:3 },
-  'Admin':       { perm_clients:2, perm_billing:2, perm_schedule:2, perm_documents:2, perm_irs:2, perm_comms:2, perm_reports:2, perm_hr:1, perm_settings:1 },
-  'Staff':       { perm_clients:1, perm_billing:0, perm_schedule:1, perm_documents:1, perm_irs:1, perm_comms:2, perm_reports:0, perm_hr:0, perm_settings:0 },
-  'View Only':   { perm_clients:1, perm_billing:0, perm_schedule:1, perm_documents:1, perm_irs:1, perm_comms:1, perm_reports:0, perm_hr:0, perm_settings:0 },
+  'Super Admin': { perm_leads:3, perm_clients:3, perm_billing:3, perm_schedule:3, perm_documents:3, perm_irs:3, perm_comms:3, perm_reports:3, perm_hr:3, perm_settings:3 },
+  'Admin':       { perm_leads:2, perm_clients:2, perm_billing:2, perm_schedule:2, perm_documents:2, perm_irs:2, perm_comms:2, perm_reports:2, perm_hr:1, perm_settings:1 },
+  'Staff':       { perm_leads:1, perm_clients:1, perm_billing:0, perm_schedule:1, perm_documents:1, perm_irs:1, perm_comms:2, perm_reports:0, perm_hr:0, perm_settings:0 },
+  'View Only':   { perm_leads:1, perm_clients:1, perm_billing:0, perm_schedule:1, perm_documents:1, perm_irs:1, perm_comms:1, perm_reports:0, perm_hr:0, perm_settings:0 },
+  // Sales rep — leads only (no Clients/Cases, no Billing/IRS/HR/Reports/Settings).
+  // Calendar/Comms/Documents are Edit so a rep can book appointments, call/
+  // text/email leads, and send docs for e-signature. Leads list is further
+  // scoped to "my assigned leads only" in Leads.jsx — that scoping is NOT a
+  // perm level, it applies regardless of what perm_leads is set to here.
+  'Tax Advisor': { perm_leads:2, perm_clients:0, perm_billing:0, perm_schedule:2, perm_documents:2, perm_irs:0, perm_comms:2, perm_reports:0, perm_hr:0, perm_settings:0 },
 }
 
 const blankEmp = {
@@ -107,6 +114,7 @@ function fromDbRow(emp) {
     pto_balance:      emp.pto_balance ?? 0,
     sick_balance:     emp.sick_balance ?? 0,
     vacation_balance: emp.vacation_balance ?? 0,
+    perm_leads:       emp.perm_leads    ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_leads,
     perm_clients:     emp.perm_clients  ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_clients,
     perm_billing:     emp.perm_billing  ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_billing,
     perm_schedule:    emp.perm_schedule ?? ROLE_PERM_DEFAULTS[emp.access || 'Staff'].perm_schedule,

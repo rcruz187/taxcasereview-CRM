@@ -241,14 +241,15 @@ function LeadInlineEsign({ lead, onClose }) {
 }
 
 export default function Leads() {
-  const { user } = useApp()
+  const { user, role, employeeName } = useApp()
   const { id: urlLeadId } = useParams()
   const [searchParams] = useSearchParams()
+  const isTaxAdvisor = role === 'Tax Advisor'
 
   // Auto-open Add Lead modal when navigated here with ?new=1
   useEffect(() => {
     if (searchParams.get('new') === '1') {
-      setForm(BLANK)
+      setForm(isTaxAdvisor && employeeName ? { ...BLANK, assignedTo: employeeName } : BLANK)
       setModal(true)
       setShowScript(true)
     }
@@ -257,6 +258,11 @@ export default function Leads() {
   const [leads, setLeads]   = useState([])
   const [filter, setFilter] = useState('All')
   const [repFilter, setRepFilter] = useState('All')
+  // Tax Advisors only ever see their own leads — lock the existing rep
+  // filter to their name instead of building a separate filter path.
+  useEffect(() => {
+    if (isTaxAdvisor && employeeName) setRepFilter(employeeName)
+  }, [isTaxAdvisor, employeeName])
   const [employees, setEmployees] = useState([])
   const [showArchived, setShowArchived] = useState(false)
   const [modal, setModal]   = useState(false)
@@ -1646,18 +1652,22 @@ export default function Leads() {
           <span key={s} className={`chip${filter===s?' on':''}`} onClick={()=>setFilter(s)}>{s}</span>
         ))}
         <span className={`chip${showArchived?' on':''}`} style={{marginLeft:8}} onClick={()=>setShowArchived(a=>!a)}>🗄 Archived</span>
-        <select value={repFilter} onChange={e=>setRepFilter(e.target.value)}
-          style={{marginLeft:8,padding:'6px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12}}>
-          <option value="All">All Reps</option>
-          <option value="Unassigned">Unassigned</option>
-          {employees.map(e=><option key={e.id} value={e.name}>{e.name}</option>)}
-        </select>
+        {isTaxAdvisor ? (
+          <span className="chip on" style={{marginLeft:8}}>🎯 My Leads</span>
+        ) : (
+          <select value={repFilter} onChange={e=>setRepFilter(e.target.value)}
+            style={{marginLeft:8,padding:'6px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12}}>
+            <option value="All">All Reps</option>
+            <option value="Unassigned">Unassigned</option>
+            {employees.map(e=><option key={e.id} value={e.name}>{e.name}</option>)}
+          </select>
+        )}
       </div>
 
       <div className="card">
         <div className="ch">
           <span className="ct">All Leads ({filtered.length})</span>
-          <button className="btn pri" onClick={()=>{ setForm(BLANK); setModal(true) }}>+ Add Lead</button>
+          <button className="btn pri" onClick={()=>{ setForm(isTaxAdvisor && employeeName ? { ...BLANK, assignedTo: employeeName } : BLANK); setModal(true) }}>+ Add Lead</button>
         </div>
         <div className="ovx">
           <table>
