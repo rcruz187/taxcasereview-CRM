@@ -36,24 +36,20 @@ const STATUS_C = {
 // click Archive separately. Still fully reversible via Restore.
 const AUTO_ARCHIVE_STATUSES = ['Dead', 'Do Not Contact']
 
-const PIPELINE_STAGES = [
-  { label:'Contacted',    key:'contacted', statusMap:'Contacted' },
-  { label:'Consultation', key:'consult',   statusMap:'Consultation Completed' },
-  { label:'Agr Signed',   key:'agreement', statusMap:'Tax Inv Agreement Signed' },
-  { label:'Fee Paid',     key:'paid',      statusMap:'Tax Inv Fee Paid' },
-  { label:'Tax Inv',      key:'taxinv',    statusMap:'Tax Investigation Active' },
-  { label:'Addendum',     key:'addendum',  statusMap:'Addendum Signed' },
-  { label:'Converted',    key:'client',    statusMap:'Converted to Client' },
+// Full status flow, in order, left to right — shared by the inline Pipeline
+// widget on the lead card and the "View Flow" reference modal, so both
+// always show the exact same 13 forward statuses with matching colors.
+const STATUS_FLOW = [
+  {s:'New Lead',c:'#3b82f6'},{s:'Contacted',c:'#6366f1'},
+  {s:'Consultation Scheduled',c:'#8b5cf6'},{s:'Consultation Completed',c:'#a855f7'},
+  {s:'Tax Inv Agreement Sent',c:'#f59e0b'},{s:'Tax Inv Agreement Signed',c:'#f97316'},
+  {s:'Tax Inv Fee Paid',c:'#10b981'},{s:'Tax Investigation Active',c:'#059669'},
+  {s:'IRS Facts Received',c:'#0ea5e9'},{s:'Addendum Sent',c:'#f59e0b'},
+  {s:'Addendum Signed',c:'#f97316'},{s:'Resolution Fee Paid',c:'#10b981'},
+  {s:'Converted to Client',c:'#25A25A'},
 ]
-
-function stagesDone(status) {
-  const order = ['Contacted','Consultation Scheduled','Consultation Completed',
-    'Tax Inv Agreement Sent','Tax Inv Agreement Signed','Tax Inv Fee Paid',
-    'Tax Investigation Active','IRS Facts Received','Addendum Sent','Addendum Signed',
-    'Resolution Fee Paid','Converted to Client']
-  const idx = order.indexOf(status)
-  return [idx>=0, idx>=2, idx>=4, idx>=5, idx>=6, idx>=9, idx>=11]
-}
+// Exit statuses — can be set from any stage above, not part of the linear sequence.
+const EXIT_FLOW = [{s:'Dead',c:'#E84B5A'},{s:'Do Not Contact',c:'#E84B5A'}]
 
 const YEARS  = Array.from({length:21},(_,i)=>2027-i)
 const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']
@@ -1123,7 +1119,6 @@ export default function Leads() {
 
   if (detail) {
     const l = detail
-    const done = stagesDone(l.status)
     const taxYearsList = (() => { try { return JSON.parse(l.taxYears||'[]').join(', ') } catch { return l.taxYearsCustom||'—' } })()
 
     return (
@@ -1164,27 +1159,30 @@ export default function Leads() {
             </div>
           </div>
 
-          {/* Pipeline — clickable chips like clients */}
+          {/* Pipeline — full status flow, left to right, current status highlighted */}
           <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid var(--br)'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
               <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Pipeline</div>
               <button className="btn sec" style={{padding:'2px 8px',fontSize:10}} onClick={()=>setShowFlow(true)}>📊 View Flow</button>
             </div>
-            <div style={{display:'flex',alignItems:'center',gap:0,flexWrap:'wrap',rowGap:10,paddingBottom:4}}>
-              {PIPELINE_STAGES.map((stage,i) => (
-                <div key={stage.key} style={{display:'flex',alignItems:'center'}}>
-                  <div style={{
-                    padding:'10px 20px',borderRadius:24,fontSize:18,fontWeight:600,cursor:'pointer',
-                    whiteSpace:'nowrap',
-                    background:done[i]?'var(--ok)':'var(--s3)',
-                    color:done[i]?'#fff':'var(--t3)',
-                    border:done[i]&&i===done.lastIndexOf(true)?'2px solid var(--ok)':'2px solid transparent',
-                    transition:'all .15s'
-                  }} onClick={()=>updateStatus(l, stage.statusMap || stage.label)}>
-                    {stage.label}
-                  </div>
-                  {i < PIPELINE_STAGES.length-1 && <div style={{width:20,height:2,background:done[i]?'var(--ok)':'var(--br)',flexShrink:0}}/>}
-                </div>
+            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',rowGap:10,paddingBottom:4}}>
+              {STATUS_FLOW.map(item => (
+                <div key={item.s} onClick={()=>updateStatus(l, item.s)} style={{
+                  background:item.c,color:'#fff',borderRadius:8,padding:'9px 12px',fontSize:13,fontWeight:700,
+                  textAlign:'center',lineHeight:1.3,cursor:'pointer',
+                  outline:l.status===item.s?'3px solid #fff':'none',outlineOffset:-3,
+                  opacity:l.status===item.s?1:0.55,transition:'all .15s'
+                }}>{item.s}</div>
+              ))}
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:10,paddingTop:10,borderTop:'1px solid var(--br)'}}>
+              {EXIT_FLOW.map(item => (
+                <div key={item.s} onClick={()=>updateStatus(l, item.s)} style={{
+                  background:item.c,color:'#fff',borderRadius:8,padding:'9px 12px',fontSize:13,fontWeight:700,
+                  textAlign:'center',lineHeight:1.3,cursor:'pointer',
+                  outline:l.status===item.s?'3px solid #fff':'none',outlineOffset:-3,
+                  opacity:l.status===item.s?1:0.55,transition:'all .15s'
+                }}>{item.s}</div>
               ))}
             </div>
           </div>
@@ -1211,16 +1209,6 @@ export default function Leads() {
 
             <ActionBtn color="#dc2626" icon="📠" label="Send Fax" sub="SignalWire Fax" onClick={()=>{setInlineFaxLead(l);setShowFaxModal(true)}}/>
             <ActionBtn color="#7c3aed" icon="✍️" label="E-Signature" sub="Request Sign" onClick={()=>{setInlineEsignLead(l);setShowEsignModal(true)}}/>
-          </div>
-        </div>
-
-        {/* Update Status */}
-        <div className="card" style={{marginBottom:12}}>
-          <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Update Status</div>
-          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-            {STATUSES.map(st => (
-              <span key={st} className={`chip${l.status===st?' on':''}`} onClick={()=>updateStatus(l, st)} style={{fontSize:11}}>{st}</span>
-            ))}
           </div>
         </div>
 
@@ -1503,17 +1491,9 @@ export default function Leads() {
               </div>
               <div style={{overflowX:'auto',padding:'8px 0'}}>
                 <div style={{display:'flex',alignItems:'center',gap:0,minWidth:700,flexWrap:'wrap',rowGap:16}}>
-                  {[
-                    {s:'New Lead',c:'#3b82f6'},{s:'Contacted',c:'#6366f1'},
-                    {s:'Consultation Scheduled',c:'#8b5cf6'},{s:'Consultation Completed',c:'#a855f7'},
-                    {s:'Tax Inv Agreement Sent',c:'#f59e0b'},{s:'Tax Inv Agreement Signed',c:'#f97316'},
-                    {s:'Tax Inv Fee Paid',c:'#10b981'},{s:'Tax Investigation Active',c:'#059669'},
-                    {s:'IRS Facts Received',c:'#0ea5e9'},{s:'Addendum Sent',c:'#f59e0b'},
-                    {s:'Addendum Signed',c:'#f97316'},{s:'Resolution Fee Paid',c:'#10b981'},
-                    {s:'Converted to Client',c:'#25A25A'},
-                  ].map((item,i,arr) => (
+                  {STATUS_FLOW.map((item,i,arr) => (
                     <div key={item.s} style={{display:'flex',alignItems:'center',gap:0}}>
-                      <div style={{background:item.c,color:'#fff',borderRadius:8,padding:'9px 12px',fontSize:13,fontWeight:700,textAlign:'center',width:140,lineHeight:1.3}}>{item.s}</div>
+                      <div onClick={()=>{updateStatus(detail, item.s);setShowFlow(false)}} style={{background:item.c,color:'#fff',borderRadius:8,padding:'9px 12px',fontSize:13,fontWeight:700,textAlign:'center',width:140,lineHeight:1.3,cursor:'pointer',outline:detail?.status===item.s?'3px solid #fff':'none',outlineOffset:-3}}>{item.s}</div>
                       {i < arr.length-1 && <div style={{color:'var(--t3)',fontSize:16,margin:'0 4px'}}>→</div>}
                     </div>
                   ))}
@@ -1521,8 +1501,8 @@ export default function Leads() {
                 <div style={{marginTop:20,paddingTop:16,borderTop:'1px solid var(--br)'}}>
                   <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Exit statuses — can be set from any stage above</div>
                   <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-                    {[{s:'Dead',c:'#E84B5A'},{s:'Do Not Contact',c:'#E84B5A'}].map(item => (
-                      <div key={item.s} style={{background:item.c,color:'#fff',borderRadius:8,padding:'9px 12px',fontSize:13,fontWeight:700,textAlign:'center',width:140,lineHeight:1.3}}>{item.s}</div>
+                    {EXIT_FLOW.map(item => (
+                      <div key={item.s} onClick={()=>{updateStatus(detail, item.s);setShowFlow(false)}} style={{background:item.c,color:'#fff',borderRadius:8,padding:'9px 12px',fontSize:13,fontWeight:700,textAlign:'center',width:140,lineHeight:1.3,cursor:'pointer',outline:detail?.status===item.s?'3px solid #fff':'none',outlineOffset:-3}}>{item.s}</div>
                     ))}
                   </div>
                 </div>
