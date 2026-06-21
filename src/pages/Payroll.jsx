@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import PayrollStatCards from '../components/PayrollStatCards'
 import { hoursFromEntry, buildLineItems, currentPeriod } from '../lib/payrollUtils'
+import { useApp } from '../context/AppContext'
 
 const PAY_METHODS = ['Direct Deposit','Check','Cash']
 
@@ -16,6 +17,9 @@ function Stat({ label, value, color, bold, big }) {
 }
 
 export default function Payroll() {
+  const { role, employeeName } = useApp()
+  const isPrivileged = ['Super Admin','Admin','Manager'].includes(role)
+
   const [runs,       setRuns]       = useState([])
   const [employees,  setEmployees]  = useState([])
   const [timeEntries,setTimeEntries]= useState([])
@@ -237,6 +241,91 @@ export default function Payroll() {
     `)
     w.document.close()
     w.print()
+  }
+
+  // Anyone below Manager/Admin/Super Admin only ever sees their own pay —
+  // never the full company payroll, run history, or other employees' data.
+  if (!isPrivileged) {
+    const me = employees.find(e => (e.name||'').trim().toLowerCase() === (employeeName||'').trim().toLowerCase())
+    const myEntries = timeEntries.filter(t => (t.employee||'').trim().toLowerCase() === (employeeName||'').trim().toLowerCase())
+    const { start: curStart2, end: curEnd2, label: curLabel2 } = currentPeriod(today)
+    const myLine = me ? buildLineItems([me], myEntries, curStart2, curEnd2)[0] : null
+    const jan1b = `${today.getFullYear()}-01-01`
+    const todayStr2 = today.toISOString().slice(0,10)
+    const myYtd = me ? buildLineItems([me], myEntries, jan1b, todayStr2)[0] : null
+    const recentEntries = myEntries.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,20)
+
+    return (
+      <div>
+        {toast && <div className="toast show">{toast}</div>}
+        <h2 style={{ fontSize:15, fontWeight:700, margin:'0 0 14px' }}>💼 My Pay</h2>
+
+        {!me ? (
+          <div className="card" style={{ padding:24, textAlign:'center', color:'var(--t3)' }}>
+            No employee record found matching your account. Contact an admin to get linked up.
+          </div>
+        ) : (<>
+          <div style={{ fontSize:12, color:'var(--t3)', marginBottom:10 }}>
+            Current pay period: <strong style={{color:'var(--tx)'}}>{curLabel2}</strong>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:8, marginBottom:14 }}>
+            {[
+              ['Regular Hrs', myLine?.regularHours+'h', '#22c55e'],
+              ['Overtime Hrs', myLine?.otHours+'h', '#f59e0b'],
+              ['Gross Pay', '$'+(myLine?parseFloat(myLine.gross).toLocaleString():'0'), '#A78BFA'],
+              ['Net Pay', '$'+(myLine?parseFloat(myLine.net).toLocaleString():'0'), '#22c55e'],
+              ['YTD Gross', '$'+(myYtd?Math.round(parseFloat(myYtd.gross)).toLocaleString():'0'), 'var(--warn)'],
+            ].map(([l,v,c])=>(
+              <div key={l} className="card" style={{ padding:'12px 14px' }}>
+                <div style={{ fontWeight:800, fontSize:18, color:c }}>{v}</div>
+                <div style={{ fontSize:10, color:'var(--t3)', marginTop:3, textTransform:'uppercase', letterSpacing:'.05em' }}>{l}</div>
+              </div>
+            ))}
+          </div>
+
+          {myLine && (
+            <div className="card" style={{ marginBottom:14, padding:'14px 16px' }}>
+              <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'.06em', color:'var(--t3)', marginBottom:10 }}>This Period — Breakdown</div>
+              <div style={{ display:'flex', gap:22, flexWrap:'wrap' }}>
+                <Stat label="Fed Tax" value={'-$'+myLine.fedTax} color="var(--bad)" />
+                <Stat label="State Tax" value={'-$'+myLine.stateTax} color="var(--bad)" />
+                <Stat label="SS" value={'-$'+myLine.ss} color="var(--bad)" />
+                <Stat label="Medicare" value={'-$'+myLine.medicare} color="var(--bad)" />
+                <Stat label="Net Pay" value={'$'+parseFloat(myLine.net).toLocaleString()} color="var(--ok)" bold big />
+                <button className="btn sec" style={{ fontSize:11, padding:'6px 14px' }} onClick={()=>printStub(myLine)}>🖨️ Stub</button>
+              </div>
+            </div>
+          )}
+
+          <div className="card">
+            <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'.06em', color:'var(--t3)', marginBottom:10 }}>My Punch History</div>
+            {recentEntries.length===0 ? (
+              <div style={{ padding:20, textAlign:'center', color:'var(--t3)', fontSize:13 }}>No punches on file yet.</div>
+            ) : (
+              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                <thead>
+                  <tr style={{ borderBottom:'1px solid var(--br)' }}>
+                    {['Date','Clock In','Clock Out','Hours'].map(h=>(
+                      <th key={h} style={{ padding:'8px 10px', textAlign:'left', fontSize:10, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentEntries.map(e=>(
+                    <tr key={e.id} style={{ borderBottom:'1px solid var(--br)' }}>
+                      <td style={{ padding:'8px 10px', color:'var(--t2)' }}>{e.date}</td>
+                      <td style={{ padding:'8px 10px', color:'var(--ok)', fontWeight:600 }}>{e.inTime||'—'}</td>
+                      <td style={{ padding:'8px 10px', color:'var(--t2)' }}>{e.outTime||'—'}</td>
+                      <td style={{ padding:'8px 10px', fontWeight:700, color:'#38BDF8' }}>{e.hours?e.hours+'h':'—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>)}
+      </div>
+    )
   }
 
   return (
