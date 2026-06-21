@@ -15,6 +15,7 @@ import Login      from './pages/Login'
 import Kiosk      from './pages/Kiosk'
 import SignPage     from './pages/SignPage'
 import ClockIn       from './pages/ClockIn'
+import EmployeePortal from './pages/EmployeePortal'
 import ClientPortal  from './pages/ClientPortal'
 import OrganizerPage from './pages/OrganizerPage'
 import FinancialIntakePage from './pages/FinancialIntakePage'
@@ -181,6 +182,7 @@ function AuthRouter() {
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/kiosk" element={<Kiosk />} />
       <Route path="/clockin" element={<ClockIn />} />
+      <Route path="/employee" element={<EmployeePortal />} />
       <Route path="/sign/:id" element={<SignPage />} />
       <Route path="/portal/:id" element={<ClientPortal />} />
       <Route path="/organizer/:id" element={<OrganizerPage />} />
