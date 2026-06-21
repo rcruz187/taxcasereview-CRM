@@ -1665,7 +1665,7 @@ export default function Clients() {
               <DR label="County"  val={c.county}/>
             </div>
 
-            {/* Taxpayer Info */}
+            {/* Taxpayer Info (+ Dependents, merged into one card) */}
             <div className="card">
               <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>🔒 Taxpayer Info</div>
               <DR label="SSN"           val={c.ssn?'***-**-'+c.ssn.replace(/-/g,'').slice(-4):null}/>
@@ -1675,27 +1675,26 @@ export default function Clients() {
               <DR label="Spouse Name"   val={c.spouseName}/>
               <DR label="Spouse DOB"    val={c.spouseDob}/>
               <DR label="Spouse SSN"    val={c.spouseSsn?'***-**-'+c.spouseSsn.replace(/-/g,'').slice(-4):null}/>
-            </div>
 
-            {/* Dependents */}
-            {deps.length>0&&(
-              <div className="card">
-                <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>👨‍👩‍👧 Dependents ({deps.length})</div>
-                {deps.map((d,i)=>(
-                  <div key={i} style={{borderBottom:'1px solid var(--br)',padding:'8px 0',display:'flex',gap:10}}>
-                    <div style={{width:26,height:26,borderRadius:'50%',background:'var(--s3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'var(--t2)',flexShrink:0}}>{i+1}</div>
-                    <div>
-                      <div style={{fontWeight:600,fontSize:13}}>{d.name||'Unnamed'}</div>
-                      <div style={{fontSize:11,color:'var(--t3)',marginTop:2,display:'flex',gap:10,flexWrap:'wrap'}}>
-                        <span>{d.relationship||'—'}</span>
-                        {d.dob&&<span>DOB: {d.dob}</span>}
-                        {d.ssn&&<span>SSN: ***-**-{d.ssn.replace(/-/g,'').slice(-4)}</span>}
+              {deps.length>0&&(
+                <div style={{marginTop:16,paddingTop:16,borderTop:'1px solid var(--br)'}}>
+                  <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>👨‍👩‍👧 Dependents ({deps.length})</div>
+                  {deps.map((d,i)=>(
+                    <div key={i} style={{borderBottom:'1px solid var(--br)',padding:'8px 0',display:'flex',gap:10}}>
+                      <div style={{width:26,height:26,borderRadius:'50%',background:'var(--s3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'var(--t2)',flexShrink:0}}>{i+1}</div>
+                      <div>
+                        <div style={{fontWeight:600,fontSize:13}}>{d.name||'Unnamed'}</div>
+                        <div style={{fontSize:11,color:'var(--t3)',marginTop:2,display:'flex',gap:10,flexWrap:'wrap'}}>
+                          <span>{d.relationship||'—'}</span>
+                          {d.dob&&<span>DOB: {d.dob}</span>}
+                          {d.ssn&&<span>SSN: ***-**-{d.ssn.replace(/-/g,'').slice(-4)}</span>}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
 
 
           </div>
