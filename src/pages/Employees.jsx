@@ -98,7 +98,7 @@ function fromDbRow(emp) {
     title:            emp.title ?? '',
     access:           emp.access || 'Tax Associate',
     hourlyRate:       emp.hourly_rate ?? emp.hourlyRate ?? '',
-    payType:          emp.pay_type || emp.payType || 'Hourly',
+    payType:          ['Hourly','Salary','1099 Contractor'].includes(emp.pay_type || emp.payType) ? (emp.pay_type || emp.payType) : 'Hourly',
     paymentMethod:    emp.payment_method || emp.paymentMethod || 'Direct Deposit',
     hireDate:         emp.hire_date ?? emp.hireDate ?? '',
     emergencyContact: emp.emergency_contact ?? emp.emergencyContact ?? '',

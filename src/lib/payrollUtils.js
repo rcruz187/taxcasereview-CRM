@@ -61,13 +61,15 @@ export function buildLineItems(employees, timeEntries, periodStart, periodEnd) {
     const hrs = regularHrs + otHrs
 
     // Employees.jsx's edit form always *displays* "Hourly" as selected
-    // whenever pay_type is unset in the database (a friendly UI default —
-    // see fromDbRow in Employees.jsx) — but until that form is explicitly
-    // re-saved, the underlying database value can still be null. Matching
-    // that same default here means a missing pay_type is treated as
-    // Hourly for pay calculations too, the same way it already looks in
-    // the UI, instead of silently falling through to a $0 salary calc.
-    const payType = emp.pay_type || emp.payType || 'Hourly'
+    // whenever pay_type is unset OR isn't one of the three real dropdown
+    // options — see fromDbRow in Employees.jsx — but until that form is
+    // explicitly re-saved, the underlying database value can still be
+    // null or a legacy/invalid string (e.g. "Owner Draw", which predates
+    // the current 3-option dropdown and silently falls through the old
+    // isHourly check to a $0 salary calc with no salary ever set).
+    // Matching that same normalization here means pay calculations agree
+    // with what the dropdown already visually shows.
+    const payType = ['Hourly','Salary','1099 Contractor'].includes(emp.pay_type || emp.payType) ? (emp.pay_type || emp.payType) : 'Hourly'
     const isHourly = payType === 'Hourly'
     const rate = parseFloat(emp.hourly_rate || emp.hourlyRate || 0)
     const salary = parseFloat(emp.salary || 0)

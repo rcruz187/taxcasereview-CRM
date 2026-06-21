@@ -400,7 +400,7 @@ export default function Payroll() {
                   <div style={{ fontWeight:700, fontSize:14 }}>{l.name}</div>
                   <div style={{ display:'flex', gap:6, alignItems:'center', marginTop:3 }}>
                     <span className="bdg bn" style={{ fontSize:9 }}>{l.payType}</span>
-                    <span style={{ fontSize:11, color:'var(--t3)' }}>{l.payType==='Hourly' ? `$${l.rate}/hr` : 'Salary'}</span>
+                    <span style={{ fontSize:11, color:'var(--t3)' }}>{l.payType==='Hourly' ? `$${l.rate}/hr` : l.payType}</span>
                   </div>
                 </div>
                 <div style={{ display:'flex', gap:22, flex:1, flexWrap:'wrap', justifyContent:'flex-end', alignItems:'center' }}>
