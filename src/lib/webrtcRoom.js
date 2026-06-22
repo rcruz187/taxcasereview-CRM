@@ -62,6 +62,7 @@ export function useWebRTCRoom(channelPrefix) {
   const iceServersRef = useRef(FALLBACK_ICE) // refreshed in join() from turn-credentials
   const fullyJoinedRef = useRef(false) // true only after this client has tracked its own presence
 
+
   function createPC(peerName) {
     if (peerConnsRef.current[peerName]) peerConnsRef.current[peerName].close()
     const pc = new RTCPeerConnection(iceServersRef.current)
@@ -81,7 +82,9 @@ export function useWebRTCRoom(channelPrefix) {
         })
       }
     }
-    pc.onconnectionstatechange = () =>    pc.oniceconnectionstatechange = () =>    return pc
+    pc.onconnectionstatechange = () => {}
+    pc.oniceconnectionstatechange = () => {}
+    return pc
   }
 
   async function createOffer(peerName) {
@@ -136,7 +139,8 @@ export function useWebRTCRoom(channelPrefix) {
         } else {
         }
       })
-      .catch((e) =>
+      .catch(() => {})
+
     // Presence handles three jobs at once here: the capacity headcount
     // check below, the live "who's in this room" member list (correct
     // even for people who joined before me, unlike a broadcast message),
@@ -168,7 +172,8 @@ export function useWebRTCRoom(channelPrefix) {
       closePeer(key)
     })
 
-    await new Promise(resolve => { ch.subscribe(status => {    await firstSync
+    await new Promise(resolve => { ch.subscribe(status => { if (status === 'SUBSCRIBED') resolve() }) })
+    await firstSync
 
     const currentCount = Object.keys(ch.presenceState()).length
     if (currentCount >= MAX_PARTICIPANTS) {
@@ -244,4 +249,3 @@ export function useWebRTCRoom(channelPrefix) {
     localStreamRef, join, leave, toggleMic, toggleCamera,
   }
 }
-
