@@ -22,7 +22,7 @@ const SQL_SETUP = `create table if not exists tax_returns (
 alter table tax_returns enable row level security;
 create policy "anon_all" on tax_returns for all using (true) with check (true);`
 
-const TAX_YEARS = ['2024','2023','2022','2021','2020','2019','2018']
+const TAX_YEARS = ['2026','2025','2024','2023','2022','2021','2020','2019','2018','2017','2016','2015']
 const FILING_STATUSES = ['Single','Married Filing Jointly','Married Filing Separately','Head of Household','Qualifying Surviving Spouse']
 const RETURN_TYPES = [
   // Personal
@@ -187,8 +187,17 @@ export default function TaxReturns() {
   }
 
   function handleDocsParsed(parsedDocs) {
+    // Auto-detect return type from uploaded docs
+    const docTypes = parsedDocs.map(p => p.docType)
+    let autoReturnType = null
+    if (docTypes.some(d => d === 'K-1 (1065)'))       autoReturnType = '1065 Partnership'
+    else if (docTypes.some(d => d === 'K-1 (1120-S)')) autoReturnType = '1120S S-Corp'
+    else if (docTypes.some(d => d === 'Schedule C (prior)')) autoReturnType = 'Federal 1040'
+    else if (docTypes.some(d => ['W-2','1099-NEC','1099-INT','1099-DIV','1099-R','1099-G'].includes(d))) autoReturnType = 'Federal 1040'
+
     // Map parsed doc data into the return form fields
     const updates = {}
+    if (autoReturnType) updates.returnType = autoReturnType
     parsedDocs.forEach(({ docType, data }) => {
       if (!data) return
       if (docType === 'W-2') {
@@ -372,7 +381,7 @@ export default function TaxReturns() {
           <div className="field" style={{ margin: 0 }}>
             <label>Tax Year</label>
             <select value={form.taxYear} onChange={e => setForm(f => ({ ...f, taxYear: e.target.value }))}>
-              {['2024','2023','2022','2021','2020','2019','2018'].map(y => <option key={y}>{y}</option>)}
+              {TAX_YEARS.map(y => <option key={y}>{y}</option>)}
             </select>
           </div>
         </div>
