@@ -50,14 +50,6 @@ const SECTIONS = [
     ]
   },
   {
-    key: 'taxreturns',
-    label: 'Tax Returns & Entities',
-    items: [
-      { path: '/taxreturns',  icon: ReturnIcon, label: 'Tax Returns',   section: 'taxreturns' },
-      { path: '/formacorp',   icon: CorpIcon,   label: 'FormaCorp',     section: 'formacorp' },
-    ]
-  },
-  {
     key: 'irs',
     label: 'IRS & State Resolution',
     items: [
@@ -65,6 +57,14 @@ const SECTIONS = [
       { path: '/stateforms',  icon: FormIcon,      label: 'State Forms & Docs',    section: 'stateforms' },
       { path: '/irsreference', icon: PhoneBookIcon, label: 'IRS & State Reference', section: 'irsreference' },
       { path: '/transcripts', icon: DocIcon,       label: 'Transcripts',           section: 'transcripts' },
+    ]
+  },
+  {
+    key: 'taxreturns',
+    label: 'Tax Returns & Entities',
+    items: [
+      { path: '/taxreturns',  icon: ReturnIcon, label: 'Tax Returns',   section: 'taxreturns' },
+      { path: '/formacorp',   icon: CorpIcon,   label: 'FormaCorp',     section: 'formacorp' },
     ]
   },
   {

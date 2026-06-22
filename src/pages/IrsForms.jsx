@@ -239,9 +239,11 @@ export default function IrsForms() {
   const [form, setForm]     = useState(BLANK)
   const [saving, setSaving] = useState(false)
   const [toast, setToast]   = useState('')
-  const [clients, setClients]       = useState([])
+  const [clients, setClients]           = useState([])
   const [fillerClient, setFillerClient] = useState(null)
   const [selectedClientId, setSelectedClientId] = useState('')
+  const [clientSearch, setClientSearch] = useState('')
+  const [showClientDrop, setShowClientDrop] = useState(false)
 
   useEffect(() => { load(); loadClients() }, [])
 
@@ -331,19 +333,39 @@ export default function IrsForms() {
           <span className="ct">✏️ Pre-fill IRS Forms</span>
           <span style={{ fontSize: 12, color: 'var(--t2)' }}>Fills your exact templates with client taxpayer info only</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0' }}>
-          <select
-            value={selectedClientId}
-            onChange={e => setSelectedClientId(e.target.value)}
-            style={{ flex: 1, maxWidth: 320, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--bd)', fontSize: 13 }}
-          >
-            <option value="">— Select a client —</option>
-            {clients.map(c => (
-              <option key={c.id} value={c.id}>
-                {c.entityName || c.name}
-              </option>
-            ))}
-          </select>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: 1, maxWidth: 320 }}>
+            <input
+              value={clientSearch}
+              onChange={e => { setClientSearch(e.target.value); setSelectedClientId(''); setShowClientDrop(true) }}
+              onFocus={() => setShowClientDrop(true)}
+              onBlur={() => setTimeout(() => setShowClientDrop(false), 150)}
+              placeholder="Search client name…"
+              style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--bd)', fontSize: 13, background: 'var(--s2)', color: 'var(--tx)', boxSizing: 'border-box' }}
+            />
+            {showClientDrop && clientSearch && (() => {
+              const q = clientSearch.toLowerCase()
+              const matches = clients.filter(c => (c.name||'').toLowerCase().includes(q) || (c.entityName||'').toLowerCase().includes(q)).slice(0, 10)
+              return matches.length > 0 ? (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: 8, zIndex: 50, maxHeight: 220, overflowY: 'auto', boxShadow: '0 4px 16px rgba(0,0,0,.25)' }}>
+                  {matches.map(c => (
+                    <div key={c.id}
+                      onMouseDown={() => { setSelectedClientId(c.id); setClientSearch(c.entityName || c.name); setShowClientDrop(false) }}
+                      style={{ padding: '9px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--tx)', borderBottom: '1px solid var(--br)' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--s2)'}
+                      onMouseLeave={e => e.currentTarget.style.background = ''}
+                    >
+                      {c.entityName || c.name}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: 8, zIndex: 50, padding: '10px 14px', fontSize: 13, color: 'var(--t3)' }}>
+                  No clients found
+                </div>
+              )
+            })()}
+          </div>
           <button
             className="btn pri"
             disabled={!selectedClientId}
