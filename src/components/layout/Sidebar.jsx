@@ -13,10 +13,10 @@ const SECTIONS = [
     always: true,
     items: [
       { path: '/',          icon: GridIcon,    label: 'Home',     section: null },
-      { path: '/email',     icon: EmailIcon,   label: 'Email',         section: 'email' },
+      { path: '/email',     icon: EmailIcon,   label: 'Email',         badge: 'email',    section: 'email' },
       { path: '/chat',      icon: ChatIcon,    label: 'Team Chat',     section: 'chat' },
       { path: '/calendar',  icon: CalIcon,     label: 'Calendar',      section: 'calendar' },
-      { path: '/tasks',     icon: TaskIcon,    label: 'Tasks',         section: 'tasks' },
+      { path: '/tasks',     icon: TaskIcon,    label: 'Tasks',         badge: 'tasks',    section: 'tasks' },
     ]
   },
   {
@@ -122,6 +122,9 @@ export default function Sidebar() {
   const [unreadSms, setUnreadSms] = useState(0)
   const [unreadVoicemails, setUnreadVoicemails] = useState(0)
   const [pendingEsign, setPendingEsign] = useState(0)
+  const [emailActionNeeded, setEmailActionNeeded] = useState(0)
+  const [emailWaiting, setEmailWaiting] = useState(0)
+  const [openTasks, setOpenTasks] = useState(0)
 
   useEffect(() => {
     async function loadPendingTimeOff() {
@@ -172,7 +175,7 @@ export default function Sidebar() {
     return () => { supabase.removeChannel(ch) }
   }, [])
 
-  const BADGE_COUNTS = { leads: newLeads, clients: newClients, cases: openCases, deadlines: dueSoonDeadlines, fax: unreadFax, sms: unreadSms, voicemails: unreadVoicemails, esign: pendingEsign }
+  const BADGE_COUNTS = { leads: newLeads, clients: newClients, cases: openCases, deadlines: dueSoonDeadlines, fax: unreadFax, sms: unreadSms, voicemails: unreadVoicemails, esign: pendingEsign, email: emailActionNeeded + emailWaiting, tasks: openTasks }
 
   useEffect(() => {
     async function loadCommsCounts() {
@@ -196,6 +199,26 @@ export default function Sidebar() {
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [])
+
+  useEffect(() => {
+    async function loadEmailTaskCounts() {
+      const [actionRes, waitingRes, tasksRes] = await Promise.all([
+        supabase.from('emails').select('id', { count: 'exact', head: true }).eq('triage', 'Action Needed').eq('is_read', false),
+        supabase.from('emails').select('id', { count: 'exact', head: true }).eq('triage', 'Waiting').eq('is_read', false),
+        supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('done', false).eq('deleted', false),
+      ])
+      setEmailActionNeeded(actionRes.count || 0)
+      setEmailWaiting(waitingRes.count || 0)
+      setOpenTasks(tasksRes.count || 0)
+    }
+    loadEmailTaskCounts()
+    const ch = supabase.channel('sidebar-email-tasks-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'emails' }, loadEmailTaskCounts)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, loadEmailTaskCounts)
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [])
+
   const [tagline,  setTagline]  = useState('IRS Resolution Services')
 
   useEffect(() => {
@@ -285,7 +308,22 @@ export default function Sidebar() {
                 >
                   <Icon />
                   {item.label}
-                  {item.badge && (
+                  {item.badge === 'email' ? (
+                    <span style={{ marginLeft: 'auto', display: 'flex', gap: 4, alignItems: 'center' }}>
+                      {emailActionNeeded > 0 && (
+                        <span title={`${emailActionNeeded} Action Needed`} style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(239,68,68,.15)', borderRadius: 10, padding: '1px 6px' }}>
+                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--bad)', flexShrink: 0 }} />
+                          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--bad)' }}>{emailActionNeeded}</span>
+                        </span>
+                      )}
+                      {emailWaiting > 0 && (
+                        <span title={`${emailWaiting} Waiting`} style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(234,179,8,.15)', borderRadius: 10, padding: '1px 6px' }}>
+                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--warn)', flexShrink: 0 }} />
+                          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--warn)' }}>{emailWaiting}</span>
+                        </span>
+                      )}
+                    </span>
+                  ) : item.badge && (
                     item.badge === 'timeoff'
                       ? (pendingTimeOff > 0 && <span className="nav-badge">{pendingTimeOff}</span>)
                       : (BADGE_COUNTS[item.badge] > 0 && <span className={`nav-badge${item.badgeWarn ? ' warn' : ''}`}>{BADGE_COUNTS[item.badge]}</span>)
