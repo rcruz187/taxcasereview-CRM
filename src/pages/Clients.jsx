@@ -368,8 +368,114 @@ function InlinePortalForm({ client, onClose, showToast }) {
         const { error } = await supabase.functions.invoke('send-email', {
           body: {
             to: client.email,
-            subject: `Welcome to Your Tax Case Review Client Portal`,
-            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#111"><div style="font-size:20px;font-weight:800;color:#1d4ed8;margin-bottom:4px">Tax Case Review</div><div style="font-size:12px;color:#64748b;margin-bottom:24px;border-bottom:1px solid #e2e8f0;padding-bottom:16px">631 US Highway One Ste 304, North Palm Beach, FL 33408</div><p style="font-size:15px">Dear <strong>${client.name}</strong>,</p><p style="font-size:14px;line-height:1.7;color:#334155">Welcome to Tax Case Review! Your personal Client Portal is now ready. You can log in anytime to stay up to date on your case and manage your account — all in one place.</p><p style="font-size:13px;font-weight:700;color:#1d4ed8;margin-bottom:6px">Here's what you can do in your portal:</p><ul style="font-size:13px;line-height:2;color:#334155;padding-left:20px;margin:0 0 20px"><li>📋 <strong>Compliance</strong> — View your IRS filing status, balances, liens, and key dates for each tax year</li><li>🧾 <strong>Tax Organizer</strong> — Fill out your tax organizer online for any year that needs to be filed</li><li>📁 <strong>Documents</strong> — Access and upload documents to your file</li><li>💳 <strong>Payments</strong> — Set up or manage your monthly payment plan and view payment history</li><li>🧾 <strong>Invoices</strong> — View and pay any outstanding invoices</li><li>📊 <strong>Income &amp; Expenses</strong> — Update your monthly income and expense information</li><li>💬 <strong>Messages</strong> — View your text message history with your advisor</li><li>📝 <strong>Notes</strong> — Read updates posted by your representative</li></ul><p style="text-align:center;margin:28px 0"><a href="${url}" style="background:#1d4ed8;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Access My Client Portal</a></p><p style="font-size:12px;color:#64748b;text-align:center">You'll be asked to confirm your email address and the last 4 digits of your SSN to log in.</p><p style="font-size:13px;line-height:1.7;color:#334155;margin-top:20px">If you have any questions at any time, please don't hesitate to reach out to your Tax Case Review representative — we're here to help every step of the way.</p><p style="font-size:13px;color:#334155">Warm regards,<br/><strong>Tax Case Review Team</strong></p><div style="font-size:11px;color:#94a3b8;margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408 · Direct link: ${url}</div></div>`
+            subject: `Your Tax Case Review Client Portal Is Ready — Welcome, ${client.name}!`,
+            html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+
+  <!-- Header banner -->
+  <tr><td style="background:linear-gradient(135deg,#0f2d5c 0%,#1a4080 50%,#0e3060 100%);border-radius:16px 16px 0 0;padding:36px 40px;text-align:center">
+    <div style="font-size:11px;font-weight:800;color:#93c5fd;letter-spacing:.15em;text-transform:uppercase;margin-bottom:12px">Tax Case Review</div>
+    <div style="font-size:28px;font-weight:800;color:#ffffff;margin-bottom:6px">Welcome, ${client.name}!</div>
+    <div style="font-size:15px;color:#bfdbfe;margin-bottom:0">Your Client Portal is ready and waiting for you.</div>
+  </td></tr>
+
+  <!-- Body -->
+  <tr><td style="background:#ffffff;padding:36px 40px">
+
+    <p style="font-size:15px;color:#1e293b;line-height:1.7;margin:0 0 20px">
+      We're thrilled to have you as a client at <strong>Tax Case Review</strong>. Your dedicated team is already working hard on your case, and your personal Client Portal gives you a front-row seat to everything that's happening — 24 hours a day, 7 days a week.
+    </p>
+
+    <p style="font-size:15px;color:#1e293b;line-height:1.7;margin:0 0 24px">
+      You've made a smart decision investing in your financial future, and we take that trust seriously. Here's everything you can access right now in your portal:
+    </p>
+
+    <!-- Feature list -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px">
+      <tr><td style="padding:10px 0;border-bottom:1px solid #f1f5f9">
+        <table><tr>
+          <td style="font-size:20px;padding-right:14px;vertical-align:top">📋</td>
+          <td><div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:2px">Compliance Dashboard</div>
+          <div style="font-size:13px;color:#64748b;line-height:1.5">See exactly where you stand with the IRS — filing status, balances owed, liens, and key deadlines for every tax year in your case.</div></td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid #f1f5f9">
+        <table><tr>
+          <td style="font-size:20px;padding-right:14px;vertical-align:top">📁</td>
+          <td><div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:2px">Your Documents</div>
+          <div style="font-size:13px;color:#64748b;line-height:1.5">Access all your signed agreements, IRS forms, correspondence, and case documents. Upload new documents directly to your file anytime.</div></td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid #f1f5f9">
+        <table><tr>
+          <td style="font-size:20px;padding-right:14px;vertical-align:top">💳</td>
+          <td><div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:2px">Payments & Payment Plan</div>
+          <div style="font-size:13px;color:#64748b;line-height:1.5">Choose your own monthly payment amount with our flexible 1–10 month payment plan slider. Lock in your plan and manage autopay — all without calling us.</div></td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid #f1f5f9">
+        <table><tr>
+          <td style="font-size:20px;padding-right:14px;vertical-align:top">🧾</td>
+          <td><div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:2px">Invoices</div>
+          <div style="font-size:13px;color:#64748b;line-height:1.5">View and pay outstanding invoices securely at any time.</div></td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid #f1f5f9">
+        <table><tr>
+          <td style="font-size:20px;padding-right:14px;vertical-align:top">📊</td>
+          <td><div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:2px">Income & Expenses</div>
+          <div style="font-size:13px;color:#64748b;line-height:1.5">Keep your financial information up to date. Your advisor uses this to build the strongest possible resolution strategy for your case.</div></td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="padding:10px 0">
+        <table><tr>
+          <td style="font-size:20px;padding-right:14px;vertical-align:top">💬</td>
+          <td><div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:2px">Messages & Notes</div>
+          <div style="font-size:13px;color:#64748b;line-height:1.5">View your full text message history with your advisor and read updates posted directly to your account.</div></td>
+        </tr></table>
+      </td></tr>
+    </table>
+
+    <!-- CTA button -->
+    <div style="text-align:center;margin:32px 0">
+      <a href="${url}" style="display:inline-block;background:linear-gradient(135deg,#1d4ed8,#2563eb);color:#ffffff;text-decoration:none;font-size:16px;font-weight:800;padding:16px 40px;border-radius:10px;letter-spacing:.02em">
+        Access My Client Portal →
+      </a>
+      <div style="font-size:12px;color:#94a3b8;margin-top:12px">You'll verify with your email + last 4 digits of your SSN</div>
+    </div>
+
+    <!-- Trust bar -->
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px 24px;margin-bottom:24px;text-align:center">
+      <div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:6px">Have questions? We're here for you.</div>
+      <div style="font-size:13px;color:#475569;line-height:1.7">
+        Call us toll-free: <strong style="color:#1d4ed8">(888) 334-5052</strong><br/>
+        Or reply to this email and your representative will get back to you promptly.
+      </div>
+    </div>
+
+    <p style="font-size:13px;color:#64748b;line-height:1.7;margin:0">
+      Thank you for choosing Tax Case Review. We are committed to delivering the best possible outcome for your case and will be with you every step of the way.
+    </p>
+    <p style="font-size:14px;color:#1e293b;margin:16px 0 0"><strong>The Tax Case Review Team</strong></p>
+
+  </td></tr>
+
+  <!-- Footer -->
+  <tr><td style="background:#0f172a;border-radius:0 0 16px 16px;padding:24px 40px;text-align:center">
+    <div style="font-size:12px;color:#60a5fa;font-weight:700;margin-bottom:6px">Tax Case Review & Resolution Services</div>
+    <div style="font-size:11px;color:#475569;line-height:1.7">
+      631 US Highway One Ste 304, North Palm Beach, FL 33408<br/>
+      Toll-Free: (888) 334-5052<br/>
+      <a href="${url}" style="color:#3b82f6;text-decoration:none">Access Your Portal</a>
+    </div>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body></html>`
           }
         })
         if (!error) emailSent = true
