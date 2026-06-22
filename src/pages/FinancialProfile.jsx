@@ -245,10 +245,8 @@ export default function FinancialProfile({ clientName, client, isLead = false })
       {/* Sub-tabs */}
       <div style={{display:'flex',gap:4,marginBottom:16,borderBottom:'1px solid var(--br)',flexWrap:'wrap'}}>
         {[
-          // Compliance: only show here when on a Client page -- on Leads the
-          // lead's own tab bar already has a Compliance tab, so this would
-          // be a duplicate if we showed it again inside Financial Profile.
-          !isLead && {key:'compliance', label:'📑 Compliance'},
+          // Compliance: visible to Tax Associates + Admins (not Tax Advisors)
+          !isTaxAdvisor && {key:'compliance', label:'📑 Compliance'},
           {key:'intake', label:'📋 TO Intake'},
           {key:'ie',     label:'💰 I&E'},
           {key:'assets', label:'🏦 Assets & Equity'},
@@ -995,4 +993,5 @@ function OICTab({ profile, totalHousehold }) {
     </div>
   )
 }
+
 
