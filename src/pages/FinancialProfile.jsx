@@ -61,10 +61,20 @@ function SectionHeader({ children }) {
 
 export default function FinancialProfile({ clientName, client, isLead = false }) {
   const { showToast, role } = useApp()
-  const isTaxAdvisor = role === 'Tax Advisor'
+  const isTaxAdvisor = (role || '').trim().toLowerCase() === 'tax advisor'
+  const ADVISOR_RESTRICTED = ['oic', 'pnl', 'f433f', 'compliance']
   const [searchParams, setSearchParams] = useSearchParams()
   const [tab, setTabRaw] = useState(() => searchParams.get('fptab') || 'intake')
+  // If a Tax Advisor somehow lands on a restricted tab (e.g. cached URL param),
+  // immediately redirect them to the intake tab.
+  useEffect(() => {
+    if (isTaxAdvisor && ADVISOR_RESTRICTED.includes(tab)) {
+      setTabRaw('intake')
+    }
+  }, [isTaxAdvisor, tab])
+
   function setTab(t) {
+    if (isTaxAdvisor && ADVISOR_RESTRICTED.includes(t)) return
     setTabRaw(t)
     setSearchParams(prev => {
       const next = new URLSearchParams(prev)
@@ -279,10 +289,10 @@ export default function FinancialProfile({ clientName, client, isLead = false })
       {tab === 'intake' && <IntakeTab profile={profile} set={set} setArr={setArr} addArrRow={addArrRow} removeArrRow={removeArrRow} totalHousehold={totalHousehold} />}
       {tab === 'ie'     && <IETab profile={profile} set={set} totalHousehold={totalHousehold} />}
       {tab === 'assets' && <AssetsTab profile={profile} set={set} setArr={setArr} addArrRow={addArrRow} removeArrRow={removeArrRow} />}
-      {tab === 'oic'    && <OICTab profile={profile} totalHousehold={totalHousehold} />}
-      {tab === 'pnl'    && <PnLTab profile={profile} set={set} />}
-      {tab === 'compliance' && <ComplianceGrids clientName={clientName} />}
-      {tab === 'f433f'  && <F433FTab profile={profile} set={set} client={client} totalHousehold={totalHousehold}
+      {tab === 'oic'    && !isTaxAdvisor && <OICTab profile={profile} totalHousehold={totalHousehold} />}
+      {tab === 'pnl'    && !isTaxAdvisor && <PnLTab profile={profile} set={set} />}
+      {tab === 'compliance' && !isTaxAdvisor && <ComplianceGrids clientName={clientName} />}
+      {tab === 'f433f'  && !isTaxAdvisor && <F433FTab profile={profile} set={set} client={client} totalHousehold={totalHousehold}
                               income={calcIncome(profile)} exp={calcExpenses(profile, totalHousehold)} assets={calcAssets(profile)} />}
     </div>
   )
@@ -993,5 +1003,6 @@ function OICTab({ profile, totalHousehold }) {
     </div>
   )
 }
+
 
 
