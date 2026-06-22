@@ -62,23 +62,15 @@ export function useWebRTCRoom(channelPrefix) {
   const iceServersRef = useRef(FALLBACK_ICE) // refreshed in join() from turn-credentials
   const fullyJoinedRef = useRef(false) // true only after this client has tracked its own presence
 
-  // Diagnostic logging -- open the browser console (F12) on both sides
-  // during a test and these lines show exactly where things stop working,
-  // instead of guessing from symptoms alone.
-  function log(...args) { console.log(`%c[huddle:${myNameRef.current || '?'}]`, 'color:#22c55e', ...args) }
-
   function createPC(peerName) {
     if (peerConnsRef.current[peerName]) peerConnsRef.current[peerName].close()
     const pc = new RTCPeerConnection(iceServersRef.current)
     peerConnsRef.current[peerName] = pc
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(t => pc.addTrack(t, localStreamRef.current))
-      log('createPC for', peerName, '-- added', localStreamRef.current.getTracks().length, 'local tracks')
     } else {
-      log('createPC for', peerName, '-- WARNING: no local stream yet, connection will have no media to send')
     }
     pc.ontrack = (e) => {
-      log('ontrack fired -- received media FROM', peerName, e.streams[0]?.getTracks().map(t => t.kind))
       setRemoteStreams(prev => ({ ...prev, [peerName]: e.streams[0] }))
     }
     pc.onicecandidate = (e) => {
@@ -89,13 +81,10 @@ export function useWebRTCRoom(channelPrefix) {
         })
       }
     }
-    pc.onconnectionstatechange = () => log('connection state with', peerName, '->', pc.connectionState)
-    pc.oniceconnectionstatechange = () => log('ICE connection state with', peerName, '->', pc.iceConnectionState)
-    return pc
+    pc.onconnectionstatechange = () =>    pc.oniceconnectionstatechange = () =>    return pc
   }
 
   async function createOffer(peerName) {
-    log('creating offer for newly-joined', peerName)
     const pc = createPC(peerName)
     const offer = await pc.createOffer()
     await pc.setLocalDescription(offer)
@@ -103,12 +92,10 @@ export function useWebRTCRoom(channelPrefix) {
       type: 'broadcast', event: 'signal',
       payload: { from: myNameRef.current, to: peerName, type: 'offer', sdp: offer.sdp }
     })
-    log('offer sent to', peerName)
   }
 
   async function handleSignal({ from, to, type, sdp, candidate }) {
     if (to !== myNameRef.current) return
-    log('received signal:', type, 'from', from)
     if (type === 'offer') {
       const pc = createPC(from)
       await pc.setRemoteDescription({ type: 'offer', sdp })
@@ -118,7 +105,6 @@ export function useWebRTCRoom(channelPrefix) {
         type: 'broadcast', event: 'signal',
         payload: { from: myNameRef.current, to: from, type: 'answer', sdp: answer.sdp }
       })
-      log('answer sent to', from)
     } else if (type === 'answer') {
       const pc = peerConnsRef.current[from]
       if (pc) await pc.setRemoteDescription({ type: 'answer', sdp })
@@ -136,7 +122,6 @@ export function useWebRTCRoom(channelPrefix) {
   const join = useCallback(async (roomId, myName, withVideo = true) => {
     myNameRef.current = myName
     setError('')
-    log('=== JOIN START === room:', roomId)
 
     // Kick off fetching real (TURN-inclusive) ICE servers in parallel with
     // subscribing below -- by the time anyone actually creates a peer
@@ -148,13 +133,10 @@ export function useWebRTCRoom(channelPrefix) {
         if (!fnErr && Array.isArray(data) && data.length) {
           iceServersRef.current = { iceServers: data }
           const hasTurn = data.some(s => (Array.isArray(s.urls) ? s.urls : [s.urls]).some(u => u?.startsWith('turn')))
-          log('ICE servers loaded --', data.length, 'servers, TURN included:', hasTurn)
         } else {
-          log('turn-credentials fetch failed or empty, staying on STUN-only fallback', fnErr)
         }
       })
-      .catch((e) => log('turn-credentials fetch threw, staying on STUN-only fallback', e))
-
+      .catch((e) =>
     // Presence handles three jobs at once here: the capacity headcount
     // check below, the live "who's in this room" member list (correct
     // even for people who joined before me, unlike a broadcast message),
@@ -170,13 +152,11 @@ export function useWebRTCRoom(channelPrefix) {
     const firstSync = new Promise(res => { resolveSync = res })
     ch.on('presence', { event: 'sync' }, () => {
       const names = Object.keys(ch.presenceState())
-      log('presence sync -- current room:', names)
       setMembers(names)
       resolveSync()
     })
     ch.on('presence', { event: 'join' }, ({ key }) => {
       if (key === myNameRef.current) return // that's just my own track() reflecting back
-      log('presence join -- new arrival:', key)
       setMembers(m => m.includes(key) ? m : [...m, key])
       // Only offer if I've actually completed my own join -- a presence
       // diff for someone else could in theory arrive while I'm still
@@ -184,13 +164,11 @@ export function useWebRTCRoom(channelPrefix) {
       if (fullyJoinedRef.current) createOffer(key)
     })
     ch.on('presence', { event: 'leave' }, ({ key }) => {
-      log('presence leave:', key)
       setMembers(m => m.filter(n => n !== key))
       closePeer(key)
     })
 
-    await new Promise(resolve => { ch.subscribe(status => { log('channel status:', status); if (status === 'SUBSCRIBED') resolve() }) })
-    await firstSync
+    await new Promise(resolve => { ch.subscribe(status => {    await firstSync
 
     const currentCount = Object.keys(ch.presenceState()).length
     if (currentCount >= MAX_PARTICIPANTS) {
@@ -198,16 +176,13 @@ export function useWebRTCRoom(channelPrefix) {
       channelRef.current = null
       const msg = `This call is full — ${MAX_PARTICIPANTS} people max right now`
       setError(msg)
-      log('REJECTED -- room full')
       return { ok: false, reason: msg }
     }
 
     let stream = null
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: withVideo })
-      log('got local media --', stream.getTracks().map(t => t.kind))
     } catch (e) {
-      log('getUserMedia(audio+video) failed:', e.name, e.message)
       if (withVideo) {
         // Camera blocked/unavailable -- still join with audio rather than
         // failing the whole call over it.
@@ -215,13 +190,11 @@ export function useWebRTCRoom(channelPrefix) {
           stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
           setCameraOn(false)
           setError('Camera unavailable — joined with audio only')
-          log('fell back to audio-only media')
         } catch {
           await supabase.removeChannel(ch)
           channelRef.current = null
           const msg = 'Microphone access denied — check your browser permissions'
           setError(msg)
-          log('REJECTED -- no mic access at all')
           return { ok: false, reason: msg }
         }
       } else {
@@ -229,7 +202,6 @@ export function useWebRTCRoom(channelPrefix) {
         channelRef.current = null
         const msg = 'Microphone access denied — check your browser permissions'
         setError(msg)
-        log('REJECTED -- no mic access at all')
         return { ok: false, reason: msg }
       }
     }
@@ -240,12 +212,10 @@ export function useWebRTCRoom(channelPrefix) {
     setMembers(m => m.includes(myName) ? m : [...m, myName])
     fullyJoinedRef.current = true
     setJoined(true)
-    log('=== JOIN COMPLETE === presence tracked, waiting for offers from existing members (if any)')
     return { ok: true }
   }, [channelPrefix])
 
   const leave = useCallback(async () => {
-    log('=== LEAVE ===')
     fullyJoinedRef.current = false
     if (channelRef.current) {
       await channelRef.current.untrack().catch(() => {})
@@ -274,3 +244,4 @@ export function useWebRTCRoom(channelPrefix) {
     localStreamRef, join, leave, toggleMic, toggleCamera,
   }
 }
+
