@@ -62,7 +62,7 @@ function SectionHeader({ children }) {
 export default function FinancialProfile({ clientName, client, isLead = false }) {
   const { showToast, role } = useApp()
   const isTaxAdvisor = (role || '').trim().toLowerCase() === 'tax advisor'
-  const ADVISOR_RESTRICTED = ['oic', 'pnl', 'f433f', 'compliance']
+  const ADVISOR_RESTRICTED = ['oic', 'pnl', 'f433f']
   const [searchParams, setSearchParams] = useSearchParams()
   const [tab, setTabRaw] = useState(() => searchParams.get('fptab') || 'intake')
   // If a Tax Advisor somehow lands on a restricted tab (e.g. cached URL param),
@@ -256,7 +256,7 @@ export default function FinancialProfile({ clientName, client, isLead = false })
       <div style={{display:'flex',gap:4,marginBottom:16,borderBottom:'1px solid var(--br)',flexWrap:'wrap'}}>
         {[
           // Compliance: visible to Tax Associates + Admins (not Tax Advisors)
-          !isTaxAdvisor && {key:'compliance', label:'📑 Compliance'},
+          {key:'compliance', label:'📑 Compliance'},
           {key:'intake', label:'📋 TO Intake'},
           {key:'ie',     label:'💰 I&E'},
           {key:'assets', label:'🏦 Assets & Equity'},
@@ -291,7 +291,7 @@ export default function FinancialProfile({ clientName, client, isLead = false })
       {tab === 'assets' && <AssetsTab profile={profile} set={set} setArr={setArr} addArrRow={addArrRow} removeArrRow={removeArrRow} />}
       {tab === 'oic'    && !isTaxAdvisor && <OICTab profile={profile} totalHousehold={totalHousehold} />}
       {tab === 'pnl'    && !isTaxAdvisor && <PnLTab profile={profile} set={set} />}
-      {tab === 'compliance' && !isTaxAdvisor && <ComplianceGrids clientName={clientName} />}
+      {tab === 'compliance' && <ComplianceGrids clientName={clientName} />}
       {tab === 'f433f'  && !isTaxAdvisor && <F433FTab profile={profile} set={set} client={client} totalHousehold={totalHousehold}
                               income={calcIncome(profile)} exp={calcExpenses(profile, totalHousehold)} assets={calcAssets(profile)} />}
     </div>
