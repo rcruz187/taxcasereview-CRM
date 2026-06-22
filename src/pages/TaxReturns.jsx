@@ -429,6 +429,46 @@ export default function TaxReturns() {
         ))}
       </div>
 
+      {/* Filing Requirement Reference Chart */}
+      <div className="card" style={{ marginBottom: 14, overflow: 'hidden' }}>
+        <div style={{ background: 'linear-gradient(135deg,#1e3a8a,#1d4ed8)', padding: '12px 16px', textAlign: 'center' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 2 }}>📋 Filing Requirement Reference — When Must a Client File?</div>
+          <div style={{ fontSize: 11, color: '#93c5fd', lineHeight: 1.5 }}>Not everyone is required to file a tax return. Use this chart to determine if filing is required based on gross income.</div>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: '#1e40af' }}>
+                <th style={{ padding: '8px 12px', color: '#fff', textAlign: 'left', fontWeight: 700, borderRight: '1px solid #2563eb' }}>Filing Status</th>
+                <th style={{ padding: '8px 12px', color: '#fff', textAlign: 'left', fontWeight: 700, borderRight: '1px solid #2563eb' }}>Age at End of Year</th>
+                <th style={{ padding: '8px 12px', color: '#fff', textAlign: 'left', fontWeight: 700 }}>Gross Income Threshold</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                ['Single',                    'Under 65',                   '$14,600'],
+                ['',                          '65 or older',                '$16,550'],
+                ['Married Filing Jointly',    'Under 65 (both spouses)',    '$29,200'],
+                ['',                          '65 or older (one spouse)',   '$30,750'],
+                ['',                          '65 or older (both spouses)', '$32,300'],
+                ['Married Filing Separately', 'Any age',                    '$5'],
+                ['Head of Household',         'Under 65',                   '$21,900'],
+                ['',                          '65 or older',                '$23,850'],
+                ['Qualifying Widow(er)',       'Under 65',                   '$29,200'],
+                ['',                          '65 or older',                '$30,750'],
+              ].map(([status, age, threshold], i) => (
+                <tr key={i} style={{ background: i % 2 === 0 ? 'var(--s2)' : 'var(--sf)', borderBottom: '1px solid var(--br)' }}>
+                  <td style={{ padding: '7px 12px', color: 'var(--tx)', fontWeight: status ? 600 : 400, borderRight: '1px solid var(--br)' }}>{status}</td>
+                  <td style={{ padding: '7px 12px', color: 'var(--t2)', borderRight: '1px solid var(--br)' }}>{age}</td>
+                  <td style={{ padding: '7px 12px', color: 'var(--ok)', fontWeight: 700 }}>{threshold}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{ padding: '8px 12px', fontSize: 10, color: 'var(--t3)', borderTop: '1px solid var(--br)' }}>* 2024 tax year thresholds. Updated annually by the IRS. Self-employment income ≥ $400 always requires filing regardless of gross income.</div>
+      </div>
+
       {/* Filters */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <input value={search} onChange={e => setSearch(e.target.value)}
