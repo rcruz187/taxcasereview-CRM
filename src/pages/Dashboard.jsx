@@ -142,7 +142,7 @@ export default function Dashboard() {
     'MTD 1st Trades':   '#22c55e',
     'MTD 2nd Trades':   '#22c55e',
     'Unpaid Invoices':  '#a855f7',
-    'Open Tasks':       '#22c55e',
+    'Open Tasks':       'var(--blue)',
     'Upcoming DL':      '#f59e0b',
     'Overdue DL':       '#ef4444',
     'Closed Leads':     '#a855f7',

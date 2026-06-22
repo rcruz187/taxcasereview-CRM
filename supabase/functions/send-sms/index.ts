@@ -18,7 +18,7 @@ serve(async (req) => {
     // Get SignalWire credentials from settings
     const { data: settings } = await supabase
       .from('settings')
-      .select('sw_space_url, sw_project_id, sw_api_token, sw_inbound_did')
+      .select('sw_space_url, sw_project_id, sw_api_token, sw_inbound_did, sw_outbound_did')
       .limit(1)
       .maybeSingle()
 
@@ -36,10 +36,13 @@ serve(async (req) => {
       })
     }
 
+    // Always send outbound SMS from toll-free number, never the fax/inbound line
+    const fromNumber = settings.sw_outbound_did || settings.sw_inbound_did
+
     // Send SMS via SignalWire REST API
     const auth = btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
     const formData = new URLSearchParams({
-      From: settings.sw_inbound_did,
+      From: fromNumber,
       To: to,
       Body: body,
     })
@@ -67,7 +70,7 @@ serve(async (req) => {
     // Log to sms_logs
     await supabase.from('sms_logs').insert({
       direction: 'outbound',
-      from_number: settings.sw_inbound_did,
+      from_number: fromNumber,
       to_number: to,
       body,
       status: swData.status || 'sent',

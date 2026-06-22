@@ -111,6 +111,7 @@ export default function Settings() {
         sw_sip_username: firm.sw_sip_username,
         sw_sip_password: firm.sw_sip_password,
         sw_inbound_did: firm.sw_inbound_did,
+        sw_outbound_did: firm.sw_outbound_did,
         call_forward_number: firm.call_forward_number,
         stripe_publishable_key: firm.stripe_publishable_key,
         signalwire_backend: firm.signalwire_backend,
@@ -402,9 +403,13 @@ export default function Settings() {
                 <div className="field"><label>API Token</label>
                   <input type="password" value={firm.sw_api_token || ''} onChange={set('sw_api_token')} placeholder="PT..." />
                 </div>
-                <div className="field"><label>Inbound DID (Phone Number)</label>
-                  <input value={firm.sw_inbound_did || ''} onChange={set('sw_inbound_did')} placeholder="+15615551234" />
-                  <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Your main voice/SMS number — what clients see and call/text.</div>
+                <div className="field"><label>Inbound DID (Fax / Inbound-only Number)</label>
+                  <input value={firm.sw_inbound_did || ''} onChange={set('sw_inbound_did')} placeholder="+12395262666" />
+                  <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Used for fax reception and inbound-only numbers. Do not use for outbound SMS.</div>
+                </div>
+                <div className="field"><label>Outbound SMS Number (Toll-Free)</label>
+                  <input value={firm.sw_outbound_did || ''} onChange={set('sw_outbound_did')} placeholder="+18883345052" />
+                  <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>All outbound text messages send from this number. Use your toll-free line.</div>
                 </div>
               </div>
               <div className="fg2">
