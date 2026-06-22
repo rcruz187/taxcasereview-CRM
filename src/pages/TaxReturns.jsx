@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import TaxDocParser from '../components/TaxDocParser'
+import { generateTaxReturnPdf, downloadTaxReturnPdf } from '../lib/taxReturnPdf'
 
 const SQL_SETUP = `create table if not exists tax_returns (
   id uuid default gen_random_uuid() primary key,
@@ -98,6 +99,7 @@ export default function TaxReturns() {
   const [current, setCurrent]   = useState(null)
   const [form, setForm]         = useState(BLANK_RETURN)
   const [saving, setSaving]     = useState(false)
+  const [genPdf, setGenPdf]     = useState(false)
   const [toast, setToast]       = useState('')
   const [search, setSearch]     = useState('')
   const [filterYear, setFilterYear] = useState('All')
@@ -230,6 +232,21 @@ export default function TaxReturns() {
     showToast('✅ Return saved!')
     load()
     setView('list')
+  }
+
+  async function generatePdf() {
+    setGenPdf(true)
+    try {
+      const { generateTaxReturnPdf: gen, downloadTaxReturnPdf: dl } = await import('../lib/taxReturnPdf')
+      const bytes = await gen(form, totals, preparer)
+      dl(bytes, form)
+      showToast('✅ PDF downloaded!')
+    } catch(e) {
+      showToast('PDF error: ' + e.message)
+      console.error(e)
+    } finally {
+      setGenPdf(false)
+    }
   }
 
   async function deleteReturn(id) {
@@ -890,6 +907,20 @@ export default function TaxReturns() {
       )}
 
       {/* ── SUBMIT / EXPORT TAB ── */}
+      {/* PDF Download Banner */}
+      {(tab === 'submit' || tab === 'summary') && (
+        <div style={{ marginBottom: 12, padding: '14px 18px', background: 'rgba(59,130,246,.08)', border: '1px solid rgba(59,130,246,.25)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 2 }}>📄 Download Return Summary PDF</div>
+            <div style={{ fontSize: 12, color: 'var(--t3)' }}>Professional preparer worksheet with all income, deductions, and summary — ready to print or share with client.</div>
+          </div>
+          <button className="btn pri" style={{ whiteSpace: 'nowrap', padding: '10px 20px', fontWeight: 700, fontSize: 14 }}
+            onClick={generatePdf} disabled={genPdf}>
+            {genPdf ? '⏳ Generating…' : '⬇️ Download PDF'}
+          </button>
+        </div>
+      )}
+
       {tab === 'submit' && (() => {
         const t = calcTotals(form)
         function downloadFile(content, filename, type='text/plain') {
