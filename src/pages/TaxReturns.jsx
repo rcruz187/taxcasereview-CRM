@@ -257,6 +257,12 @@ export default function TaxReturns() {
   const totals = calcTotals(form)
   const stdDed = { 'Single': 14600, 'Married Filing Jointly': 29200, 'Married Filing Separately': 14600, 'Head of Household': 21900, 'Qualifying Surviving Spouse': 29200 }
 
+  const is1040   = form.returnType?.includes('1040') || form.returnType === 'Federal 1040'
+  const is1120S   = form.returnType === '1120S S-Corp'
+  const is1065    = form.returnType === '1065 Partnership'
+  const isSchedC  = form.returnType === 'Federal 1040'
+  const isBusiness = is1120S || is1065
+
   const statusColors = { Draft:'bn', 'In Review':'ba', 'Client Review':'ba', 'Ready to File':'bb', Filed:'bg', Accepted:'bg', Rejected:'br', Amended:'bw' }
 
   const MoneyField = ({ label, field, help }) => (
@@ -414,14 +420,23 @@ export default function TaxReturns() {
   )
 
   // ── EDIT VIEW ──
-  const TABS = [
-    { key: 'income', label: '💰 Income' },
-    { key: 'adjustments', label: '📉 Adjustments' },
-    { key: 'deductions', label: '🏠 Deductions' },
-    { key: 'credits', label: '⭐ Credits' },
+  const TABS = isBusiness ? [
+    { key: 'income',   label: '💰 Revenue' },
+    { key: 'expenses', label: '📋 Expenses' },
+    ...(is1120S ? [{ key: 'officers', label: '👔 Officers' }] : []),
+    ...(is1065  ? [{ key: 'partners', label: '🤝 Partners' }] : []),
     { key: 'payments', label: '💳 Payments' },
-    { key: 'summary', label: '📊 Summary' },
-    { key: 'submit',  label: '📤 Submit / Export' },
+    { key: 'summary',  label: '📊 Summary' },
+    { key: 'submit',   label: '📤 Submit / Export' },
+  ] : [
+    { key: 'income',      label: '💰 Income' },
+    { key: 'schedC',      label: '🏢 Schedule C', show: isSchedC },
+    { key: 'adjustments', label: '📉 Adjustments' },
+    { key: 'deductions',  label: '🏠 Deductions' },
+    { key: 'credits',     label: '⭐ Credits' },
+    { key: 'payments',    label: '💳 Payments' },
+    { key: 'summary',     label: '📊 Summary' },
+    { key: 'submit',      label: '📤 Submit / Export' },
   ]
 
   return (
@@ -482,7 +497,7 @@ export default function TaxReturns() {
 
       {/* Tab bar */}
       <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--br)', marginBottom: 12, overflowX: 'auto' }}>
-        {TABS.map(t => (
+        {TABS.filter(t => t.show !== false).map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
             style={{ padding: '7px 14px', fontSize: 11, fontWeight: tab === t.key ? 700 : 400,
               background: 'none', border: 'none',
@@ -644,7 +659,181 @@ export default function TaxReturns() {
         </div>
       )}
 
-      {/* ── SUMMARY TAB ── */}
+      {/* ── SCHEDULE C TAB (1040 with self-employment) ── */}
+      {tab === 'schedC' && (
+        <div className="card">
+          <div style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 12 }}>Schedule C — Profit or Loss from Business</div>
+          <div className="field" style={{ marginBottom: 12 }}>
+            <label>Business Name</label>
+            <input value={form.schedC_businessName || ''} onChange={e => fld('schedC_businessName', e.target.value)} placeholder="Business or DBA name"/>
+          </div>
+          <div className="fg2">
+            <div className="field"><label>Business EIN (if any)</label><input value={form.schedC_ein || ''} onChange={e => fld('schedC_ein', e.target.value)} placeholder="XX-XXXXXXX"/></div>
+            <div className="field"><label>Business Code (6-digit NAICS)</label><input value={form.schedC_naics || ''} onChange={e => fld('schedC_naics', e.target.value)} placeholder="e.g. 541213"/></div>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', margin: '14px 0 10px' }}>Revenue</div>
+          <div className="fg2">
+            <MoneyField label="Gross Receipts / Sales" field="schedC_grossReceipts" help="Line 1"/>
+            <MoneyField label="Returns & Allowances" field="schedC_returns" help="Line 2"/>
+            <MoneyField label="Cost of Goods Sold" field="schedC_cogs" help="Line 4"/>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', margin: '14px 0 10px' }}>Expenses</div>
+          <div className="fg2">
+            <MoneyField label="Advertising" field="schedC_advertising"/>
+            <MoneyField label="Car & Truck" field="schedC_carTruck"/>
+            <MoneyField label="Commissions & Fees" field="schedC_commissions"/>
+            <MoneyField label="Contract Labor" field="schedC_contractLabor"/>
+            <MoneyField label="Depreciation (Form 4562)" field="schedC_depreciation"/>
+            <MoneyField label="Employee Benefits" field="schedC_empBenefits"/>
+            <MoneyField label="Insurance (not health)" field="schedC_insurance"/>
+            <MoneyField label="Mortgage Interest" field="schedC_mortgageInterest"/>
+            <MoneyField label="Other Interest" field="schedC_otherInterest"/>
+            <MoneyField label="Legal & Professional" field="schedC_legal"/>
+            <MoneyField label="Office Expenses" field="schedC_office"/>
+            <MoneyField label="Rent — Vehicles/Equipment" field="schedC_rentVehicles"/>
+            <MoneyField label="Rent — Other Business Property" field="schedC_rentOther"/>
+            <MoneyField label="Repairs & Maintenance" field="schedC_repairs"/>
+            <MoneyField label="Supplies" field="schedC_supplies"/>
+            <MoneyField label="Taxes & Licenses" field="schedC_taxes"/>
+            <MoneyField label="Travel" field="schedC_travel"/>
+            <MoneyField label="Meals (50% deductible)" field="schedC_meals"/>
+            <MoneyField label="Utilities" field="schedC_utilities"/>
+            <MoneyField label="Wages (W-2 employees)" field="schedC_wages"/>
+            <MoneyField label="Other Expenses" field="schedC_otherExp"/>
+          </div>
+          {(() => {
+            const n = f => parseFloat(form[f] || 0)
+            const gross = n('schedC_grossReceipts') - n('schedC_returns') - n('schedC_cogs')
+            const totalExp = ['advertising','carTruck','commissions','contractLabor','depreciation','empBenefits','insurance','mortgageInterest','otherInterest','legal','office','rentVehicles','rentOther','repairs','supplies','taxes','travel','meals','utilities','wages','otherExp'].reduce((sum, k) => sum + n('schedC_' + k), 0)
+            const netProfit = gross - totalExp
+            return (
+              <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                {[['Gross Profit', gross, 'var(--blue)'], ['Total Expenses', totalExp, 'var(--bad)'], ['Net Profit / Loss', netProfit, netProfit >= 0 ? 'var(--ok)' : 'var(--bad)']].map(([label, val, color]) => (
+                  <div key={label} style={{ padding: '10px 14px', background: 'var(--s3)', borderRadius: 6 }}>
+                    <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 2 }}>{label}</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color }}>{val < 0 ? '-' : ''}{fmt(Math.abs(val))}</div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+        </div>
+      )}
+
+      {/* ── BUSINESS REVENUE TAB (1120-S / 1065) ── */}
+      {tab === 'income' && isBusiness && (
+        <div className="card">
+          <div style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 12 }}>
+            {is1120S ? 'S-Corporation Revenue' : 'Partnership Revenue'}
+          </div>
+          <div className="fg2">
+            <MoneyField label="Gross Receipts / Sales" field="biz_grossReceipts"/>
+            <MoneyField label="Returns & Allowances" field="biz_returns"/>
+            <MoneyField label="Cost of Goods Sold" field="biz_cogs"/>
+            <MoneyField label="Other Income" field="biz_otherIncome"/>
+          </div>
+          <div style={{ marginTop: 12, padding: '10px 14px', background: 'var(--s3)', borderRadius: 6, display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 12, fontWeight: 700 }}>Gross Income</span>
+            <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--blue)' }}>
+              {fmt(parseFloat(form.biz_grossReceipts||0) - parseFloat(form.biz_returns||0) - parseFloat(form.biz_cogs||0) + parseFloat(form.biz_otherIncome||0))}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ── BUSINESS EXPENSES TAB (1120-S / 1065) ── */}
+      {tab === 'expenses' && isBusiness && (
+        <div className="card">
+          <div style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 12 }}>Business Deductions</div>
+          <div className="fg2">
+            <MoneyField label="Compensation of Officers" field="biz_officerComp" help="1120-S Line 7"/>
+            <MoneyField label="Salaries & Wages (other)" field="biz_wages"/>
+            <MoneyField label="Repairs & Maintenance" field="biz_repairs"/>
+            <MoneyField label="Bad Debts" field="biz_badDebts"/>
+            <MoneyField label="Rents" field="biz_rents"/>
+            <MoneyField label="Taxes & Licenses" field="biz_taxes"/>
+            <MoneyField label="Interest" field="biz_interest"/>
+            <MoneyField label="Depreciation" field="biz_depreciation"/>
+            <MoneyField label="Depletion" field="biz_depletion"/>
+            <MoneyField label="Advertising" field="biz_advertising"/>
+            <MoneyField label="Pension & Profit Sharing" field="biz_pension"/>
+            <MoneyField label="Employee Benefits" field="biz_empBenefits"/>
+            <MoneyField label="Other Deductions" field="biz_otherDed"/>
+          </div>
+          {(() => {
+            const n = f => parseFloat(form[f] || 0)
+            const totalDed = ['officerComp','wages','repairs','badDebts','rents','taxes','interest','depreciation','depletion','advertising','pension','empBenefits','otherDed'].reduce((sum,k) => sum + n('biz_'+k), 0)
+            const grossInc = n('biz_grossReceipts') - n('biz_returns') - n('biz_cogs') + n('biz_otherIncome')
+            const netInc = grossInc - totalDed
+            return (
+              <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {[['Total Deductions', totalDed, 'var(--bad)'], ['Net Income', netInc, netInc >= 0 ? 'var(--ok)' : 'var(--bad)']].map(([label, val, color]) => (
+                  <div key={label} style={{ padding: '10px 14px', background: 'var(--s3)', borderRadius: 6 }}>
+                    <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 2 }}>{label}</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color }}>{val < 0 ? '-' : ''}{fmt(Math.abs(val))}</div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+        </div>
+      )}
+
+      {/* ── OFFICERS TAB (1120-S) ── */}
+      {tab === 'officers' && is1120S && (
+        <div className="card">
+          <div style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 14 }}>Officers & Shareholders</div>
+          <div className="fg2">
+            <MoneyField label="Total Officer Compensation" field="biz_officerComp"/>
+            <MoneyField label="Shareholder Distributions" field="biz_distributions"/>
+            <MoneyField label="Retained Earnings / E&P" field="biz_retainedEarnings"/>
+            <MoneyField label="Net Income per S-Corp" field="biz_netIncomeSCorp"/>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', margin: '14px 0 10px' }}>K-1 Pass-Through (per Shareholder)</div>
+          <div className="fg2">
+            <MoneyField label="Ordinary Business Income (Box 1)" field="k1_ordinaryIncome"/>
+            <MoneyField label="Net Rental Income (Box 2)" field="k1_rentalIncome"/>
+            <MoneyField label="Interest Income (Box 5)" field="k1_interest"/>
+            <MoneyField label="Dividends (Box 6)" field="k1_dividends"/>
+            <MoneyField label="Capital Gains (Box 9)" field="k1_capitalGain"/>
+            <MoneyField label="Section 179 Deduction (Box 11)" field="k1_sec179"/>
+          </div>
+        </div>
+      )}
+
+      {/* ── PARTNERS TAB (1065) ── */}
+      {tab === 'partners' && is1065 && (
+        <div className="card">
+          <div style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 14 }}>Partnership Information</div>
+          <div className="fg2">
+            <MoneyField label="Total Partnership Income" field="biz_partnershipIncome"/>
+            <MoneyField label="Guaranteed Payments to Partners" field="biz_guaranteedPayments"/>
+            <MoneyField label="Net Income / Loss" field="biz_netIncome"/>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', margin: '14px 0 10px' }}>K-1 Allocations (per Partner)</div>
+          <div className="fg2">
+            <MoneyField label="Ordinary Business Income (Box 1)" field="k1_ordinaryIncome"/>
+            <MoneyField label="Net Rental Income (Box 2)" field="k1_rentalIncome"/>
+            <MoneyField label="Guaranteed Payments (Box 4)" field="k1_guaranteedPayments"/>
+            <MoneyField label="Interest Income (Box 5)" field="k1_interest"/>
+            <MoneyField label="Dividends (Box 6)" field="k1_dividends"/>
+            <MoneyField label="Net Capital Gain (Box 9)" field="k1_capitalGain"/>
+            <MoneyField label="Section 179 (Box 12)" field="k1_sec179"/>
+            <MoneyField label="Self-Employment Income (Box 14)" field="k1_selfEmpIncome"/>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>Partner Details</div>
+            <div className="fg2">
+              <div className="field"><label>Partner 1 Name</label><input value={form.partner1_name||''} onChange={e=>fld('partner1_name',e.target.value)} placeholder="Full name"/></div>
+              <div className="field"><label>Partner 1 Ownership %</label><input type="number" value={form.partner1_pct||''} onChange={e=>fld('partner1_pct',e.target.value)} placeholder="e.g. 50"/></div>
+              <div className="field"><label>Partner 2 Name</label><input value={form.partner2_name||''} onChange={e=>fld('partner2_name',e.target.value)} placeholder="Full name"/></div>
+              <div className="field"><label>Partner 2 Ownership %</label><input type="number" value={form.partner2_pct||''} onChange={e=>fld('partner2_pct',e.target.value)} placeholder="e.g. 50"/></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── SUMMARY TAB ── */}}
       {tab === 'summary' && (
         <div>
           {/* Refund / Owed Banner */}
