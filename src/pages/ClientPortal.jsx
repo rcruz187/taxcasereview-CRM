@@ -298,14 +298,26 @@ export default function ClientPortal() {
 
   if (!unlocked) return (
     <div style={styles.page}>
-      <div style={styles.card}>
-        <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style={{ height: 52, marginBottom: 14, objectFit: 'contain' }} onError={e=>{e.currentTarget.style.display="none"}}/>
-          <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 4 }}>Client Portal</div>
-          <div style={{ width: 40, height: 2, background: 'linear-gradient(90deg,transparent,#3b82f6,transparent)', margin: '0 auto' }}></div>
+      {/* Background effects */}
+      <div style={{position:'fixed',inset:0,pointerEvents:'none',zIndex:0}}>
+        <div style={{position:'absolute',top:'-20%',left:'-10%',width:700,height:700,borderRadius:'50%',background:'radial-gradient(circle,rgba(29,78,216,.15) 0%,transparent 65%)'}}/>
+        <div style={{position:'absolute',bottom:'-20%',right:'-10%',width:800,height:800,borderRadius:'50%',background:'radial-gradient(circle,rgba(14,165,233,.1) 0%,transparent 65%)'}}/>
+        <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:1,height:'80%',background:'linear-gradient(180deg,transparent,rgba(59,130,246,.08),transparent)'}}/>
+      </div>
+      <div style={{...styles.card, position:'relative', zIndex:1}}>
+        {/* Logo + branding */}
+        <div style={{textAlign:'center',marginBottom:28}}>
+          <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style={{height:60,marginBottom:16,objectFit:'contain'}} onError={e=>{e.currentTarget.style.display="none"}}/>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,marginBottom:8}}>
+            <div style={{flex:1,height:'1px',background:'linear-gradient(90deg,transparent,rgba(59,130,246,.4))'}}/>
+            <div style={{fontSize:10,fontWeight:800,color:'#3b82f6',letterSpacing:'.15em',textTransform:'uppercase',whiteSpace:'nowrap'}}>Client Portal</div>
+            <div style={{flex:1,height:'1px',background:'linear-gradient(90deg,rgba(59,130,246,.4),transparent)'}}/>
+          </div>
         </div>
-        <div style={{ fontSize: 13, color: '#cbd5e1', textAlign: 'center', marginBottom: 18, lineHeight: 1.6 }}>
-          Hi {client?.name}, please verify your identity to view your information.
+        {/* Welcome message */}
+        <div style={{background:'rgba(59,130,246,.08)',border:'1px solid rgba(59,130,246,.2)',borderRadius:12,padding:'14px 16px',marginBottom:20,textAlign:'center'}}>
+          <div style={{fontSize:15,fontWeight:700,color:'#f1f5f9',marginBottom:4}}>Welcome back, {client?.name}</div>
+          <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.5}}>Please verify your identity to securely access your account.</div>
         </div>
         <div style={{ marginBottom: 12 }}>
           <label style={styles.label}>Email Address</label>
@@ -346,22 +358,27 @@ export default function ClientPortal() {
 
   return (
     <div style={styles.page}>
-      {/* Background glow orbs */}
-      <div style={{ position:'fixed', inset:0, pointerEvents:'none', zIndex:0, overflow:'hidden' }}>
-        <div style={{ position:'absolute', top:'-10%', left:'-5%', width:500, height:500, borderRadius:'50%', background:'radial-gradient(circle,rgba(29,78,216,.18) 0%,transparent 70%)' }}/>
-        <div style={{ position:'absolute', bottom:'-15%', right:'-10%', width:600, height:600, borderRadius:'50%', background:'radial-gradient(circle,rgba(14,165,233,.12) 0%,transparent 70%)' }}/>
-        <div style={{ position:'absolute', top:'40%', right:'20%', width:300, height:300, borderRadius:'50%', background:'radial-gradient(circle,rgba(99,102,241,.08) 0%,transparent 70%)' }}/>
+      {/* Background effects */}
+      <div style={{position:'fixed',inset:0,pointerEvents:'none',zIndex:0}}>
+        <div style={{position:'absolute',top:'-15%',left:'-8%',width:700,height:700,borderRadius:'50%',background:'radial-gradient(circle,rgba(29,78,216,.14) 0%,transparent 65%)'}}/>
+        <div style={{position:'absolute',bottom:'-20%',right:'-10%',width:800,height:800,borderRadius:'50%',background:'radial-gradient(circle,rgba(14,165,233,.1) 0%,transparent 65%)'}}/>
+        <div style={{position:'absolute',top:'30%',right:'25%',width:400,height:400,borderRadius:'50%',background:'radial-gradient(circle,rgba(99,102,241,.07) 0%,transparent 70%)'}}/>
+        <div style={{position:'absolute',inset:0,backgroundImage:'radial-gradient(rgba(255,255,255,.015) 1px,transparent 1px)',backgroundSize:'40px 40px'}}/>
       </div>
-      <div style={{ position:'relative', zIndex:1, width:'100%', display:'flex', alignItems:'center', justifyContent:'center' }}>
+      <div style={{position:'relative',zIndex:1,width:'100%',display:'flex',alignItems:'flex-start',justifyContent:'center',minHeight:'100vh',paddingTop:32,paddingBottom:32}}>
       {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#0f172a', border: '1px solid rgba(255,255,255,.15)', borderRadius: 8, padding: '10px 18px', color: '#f1f5f9', fontSize: 13, fontWeight: 600, zIndex: 1100, boxShadow: '0 8px 24px rgba(0,0,0,.4)' }}>{toast}</div>}
-      <div style={{ ...styles.card, maxWidth: 880 }}>
+      <div style={{...styles.card,maxWidth:920,background:'linear-gradient(145deg,rgba(15,25,50,.95) 0%,rgba(10,18,38,.98) 100%)',border:'1px solid rgba(255,255,255,.09)',boxShadow:'0 40px 100px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06)'}}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style={{ height: 44, objectFit: 'contain' }} onError={e=>{e.currentTarget.style.display="none"}}/>
+          <div style={{display:'flex',alignItems:'center',gap:14}}>
+            <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style={{height:48,objectFit:'contain'}} onError={e=>{e.currentTarget.style.display="none"}}/>
             <div>
-              <div style={{ fontSize: 19, fontWeight: 800, color: '#fff' }}>{client?.name}</div>
-              <div style={{ fontSize: 12, color: '#60a5fa', marginTop: 2, fontWeight: 600 }}>Client Portal</div>
+              <div style={{fontSize:20,fontWeight:800,color:'#fff',letterSpacing:'-.02em'}}>{client?.name}</div>
+              <div style={{fontSize:11,color:'#60a5fa',marginTop:2,fontWeight:600,letterSpacing:'.04em',textTransform:'uppercase'}}>Client Portal</div>
             </div>
+          </div>
+          <div style={{textAlign:'right',display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4}}>
+            <div style={{fontSize:11,color:'#64748b'}}>Questions? Call us</div>
+            <div style={{fontSize:14,fontWeight:700,color:'#f1f5f9'}}>(888) 334-5052</div>
           </div>
         </div>
 
@@ -369,9 +386,10 @@ export default function ClientPortal() {
           {SECTIONS.map(s => (
             <button key={s.key} onClick={() => setSection(s.key)} style={{
               padding: '7px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
-              border: '1px solid ' + (section === s.key ? '#3b82f6' : 'rgba(255,255,255,.15)'),
-              background: section === s.key ? 'rgba(59,130,246,.2)' : 'rgba(255,255,255,.05)',
-              color: section === s.key ? '#93c5fd' : '#94a3b8',
+              border: '1px solid ' + (section === s.key ? '#3b82f6' : 'rgba(255,255,255,.1)'),
+              background: section === s.key ? 'linear-gradient(135deg,rgba(59,130,246,.3),rgba(37,99,235,.2))' : 'rgba(255,255,255,.04)',
+              color: section === s.key ? '#bfdbfe' : '#64748b',
+              boxShadow: section === s.key ? '0 2px 12px rgba(59,130,246,.25)' : 'none',
             }}>{s.label}</button>
           ))}
         </div>
@@ -769,7 +787,7 @@ export default function ClientPortal() {
         )}
 
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', textAlign: 'center', marginTop: 28 }}>
-          Questions about this information? Contact your Tax Case Review representative.
+          Questions? Call us at (888) 334-5052 or contact your Tax Case Review representative.
         </div>
       </div>
       </div>
@@ -793,7 +811,7 @@ function StatBox({ label, value, color }) {
 const styles = {
   page: {
     minHeight: '100vh',
-    background: 'linear-gradient(160deg,#040e1c 0%,#071a30 40%,#0a2a48 70%,#0a3558 100%)',
+    background: '#050d1a',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     padding: '32px 16px',
     fontFamily: '"DM Sans", system-ui, sans-serif',
@@ -801,12 +819,14 @@ const styles = {
     overflow: 'hidden',
   },
   card: {
-    background: 'rgba(255,255,255,.06)',
-    border: '1px solid rgba(255,255,255,.12)',
-    borderRadius: 18,
-    padding: '28px 26px',
+    background: 'linear-gradient(145deg,rgba(255,255,255,.07) 0%,rgba(255,255,255,.03) 100%)',
+    border: '1px solid rgba(255,255,255,.1)',
+    borderRadius: 20,
+    padding: '32px 28px',
     width: '100%',
     maxWidth: 420,
+    backdropFilter: 'blur(12px)',
+    boxShadow: '0 32px 80px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.08)',
   },
   label: { fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6, display: 'block' },
   textInput: {
@@ -815,9 +835,10 @@ const styles = {
     color: '#f1f5f9', outline: 'none', boxSizing: 'border-box',
   },
   bigBtn: {
-    marginTop: 16, width: '100%', padding: 13,
-    background: '#3b82f6', border: 'none',
-    borderRadius: 10, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+    marginTop: 16, width: '100%', padding: 14,
+    background: 'linear-gradient(135deg,#1d4ed8,#2563eb)',
+    border: 'none', borderRadius: 10, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+    boxShadow: '0 4px 20px rgba(37,99,235,.4)',
   },
   downloadBtn: {
     padding: '7px 14px', fontSize: 12, fontWeight: 700, borderRadius: 8, cursor: 'pointer',
@@ -833,3 +854,4 @@ const styles = {
   th: { padding: '7px 8px', textAlign: 'left', color: '#64748b', fontSize: 10, textTransform: 'uppercase', fontWeight: 700 },
   td: { padding: '8px 8px', color: '#cbd5e1' },
 }
+
