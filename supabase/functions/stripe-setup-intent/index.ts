@@ -66,7 +66,8 @@ serve(async (req) => {
     if (!customerId) {
       const customer = await stripeRequest('customers', {
         name: clientName || '',
-        ...(emailValid ? { email: email.trim() } : {}),
+        // Skip email — Stripe rejects some valid-looking addresses and we
+        // don't need it for charging; the customer is matched by ID.
         [`metadata[${recordType === 'lead' ? 'lead_id' : 'client_id'}]`]: String(clientId),
       })
       customerId = customer.id
