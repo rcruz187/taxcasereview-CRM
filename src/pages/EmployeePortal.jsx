@@ -65,7 +65,7 @@ const PRIORITY_COLOR = { High: '#f87171', Normal: '#60a5fa', Low: '#64748b' }
 
 export default function EmployeePortal() {
   const [screen, setScreen] = useState('login')
-  const [empId, setEmpId] = useState('TCR-')
+  const [loginEmail, setLoginEmail] = useState('')
   const [pin, setPin] = useState('')
   const [changingPin, setChangingPin] = useState(false)
   const [newPin, setNewPin] = useState('')
@@ -132,11 +132,11 @@ export default function EmployeePortal() {
   }
 
   async function handleLogin() {
-    if (!empId.trim() || empId.trim() === 'TCR-') return
+    if (!loginEmail.trim()) return
     if (!pin.trim()) { setLoginErr('Please enter your PIN.'); return }
     setLogging(true); setLoginErr('')
-    const { data } = await supabase.from('employees').select('*').ilike('employee_id', empId.trim()).maybeSingle()
-    if (!data) { setLoginErr('Employee ID not found. Check with your manager.'); setLogging(false); return }
+    const { data } = await supabase.from('employees').select('*').ilike('email', loginEmail.trim()).maybeSingle()
+    if (!data) { setLoginErr('Email not found. Check with your manager.'); setLogging(false); return }
     if (data.portal_pin && data.portal_pin !== pin.trim()) {
       setLoginErr('Incorrect PIN. Please try again.'); setLogging(false); return
     }
@@ -282,34 +282,34 @@ export default function EmployeePortal() {
       <h1 style={{ fontSize: 22, fontWeight: 800, color: '#f1f5f9', margin: '0 0 6px' }}>Tax Case Review</h1>
       <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 32px' }}>Employee Portal</p>
       <div style={{ width: '100%', maxWidth: 360 }}>
-        <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 6 }}>EMPLOYEE ID</label>
-        <div style={{ display: 'flex', alignItems: 'center', background: '#0f172a', border: '1px solid #334155', borderRadius: 12, marginBottom: 12, overflow: 'hidden' }}>
-          <span style={{ padding: '14px 0 14px 16px', color: '#3b82f6', fontSize: 16, fontWeight: 700, fontFamily: 'inherit', userSelect: 'none' }}>TCR-</span>
-          <input
-            value={empId.replace(/^TCR-/i, '')}
-            onChange={e => setEmpId('TCR-' + e.target.value.replace(/^TCR-/i, ''))}
-            onKeyDown={e => e.key === 'Enter' && handleLogin()}
-            placeholder="100"
-            style={{ flex: 1, padding: '14px 16px 14px 4px', background: 'transparent', border: 'none', color: '#f1f5f9', fontSize: 16, outline: 'none', fontFamily: 'inherit' }}
-            autoFocus
-          />
-        </div>
-        <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 6, marginTop: 4 }}>PIN</label>
+        <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 6 }}>WORK EMAIL</label>
+        <input
+          type="email"
+          value={loginEmail}
+          onChange={e => { setLoginEmail(e.target.value); setLoginErr('') }}
+          onKeyDown={e => e.key === 'Enter' && handleLogin()}
+          placeholder="you@taxcasereview.org"
+          autoComplete="off"
+          style={{ width: '100%', padding: '14px 16px', background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 12, color: '#f1f5f9', fontSize: 15, outline: 'none', boxSizing: 'border-box', marginBottom: 14, fontFamily: 'inherit', WebkitBoxShadow: '0 0 0 1000px #0f172a inset', WebkitTextFillColor: '#f1f5f9' }}
+          autoFocus
+        />
+        <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 6 }}>PIN</label>
         <input
           type="password"
           value={pin}
-          onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          onChange={e => { setPin(e.target.value.replace(/[^0-9]/g, '').slice(0, 6)); setLoginErr('') }}
           onKeyDown={e => e.key === 'Enter' && handleLogin()}
           placeholder="••••"
           inputMode="numeric"
-          style={{ width: '100%', padding: '14px 16px', background: '#0f172a', border: '1px solid #334155', borderRadius: 12, color: '#f1f5f9', fontSize: 20, letterSpacing: 8, outline: 'none', boxSizing: 'border-box', marginBottom: 12, fontFamily: 'inherit', textAlign: 'center' }}
+          autoComplete="off"
+          style={{ width: '100%', padding: '14px 16px', background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 12, color: '#f1f5f9', fontSize: 24, letterSpacing: 10, outline: 'none', boxSizing: 'border-box', marginBottom: 14, fontFamily: 'inherit', textAlign: 'center', WebkitBoxShadow: '0 0 0 1000px #0f172a inset', WebkitTextFillColor: '#f1f5f9' }}
         />
-        {loginErr && <p style={{ color: '#f87171', fontSize: 13, margin: '0 0 12px' }}>{loginErr}</p>}
-        <button onClick={handleLogin} disabled={logging || empId.trim() === 'TCR-' || !pin.trim()}
-          style={{ width: '100%', padding: 14, background: (empId.trim() !== 'TCR-' && pin.trim()) ? '#16a34a' : '#1e293b', border: 'none', borderRadius: 12, color: '#fff', fontSize: 16, fontWeight: 700, cursor: (empId.trim() !== 'TCR-' && pin.trim()) ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}>
+        {loginErr && <p style={{ color: '#f87171', fontSize: 13, margin: '0 0 12px', textAlign: 'center' }}>{loginErr}</p>}
+        <button onClick={handleLogin} disabled={logging || !loginEmail.trim() || !pin.trim()}
+          style={{ width: '100%', padding: 15, background: (loginEmail.trim() && pin.trim()) ? '#16a34a' : '#1a2744', border: 'none', borderRadius: 12, color: '#fff', fontSize: 16, fontWeight: 700, cursor: (loginEmail.trim() && pin.trim()) ? 'pointer' : 'not-allowed', fontFamily: 'inherit', transition: 'background .2s' }}>
           {logging ? 'Signing in…' : 'Sign In'}
         </button>
-        <p style={{ fontSize: 12, color: '#475569', textAlign: 'center', marginTop: 16 }}>Don't know your Employee ID or PIN? Ask your manager.</p>
+        <p style={{ fontSize: 12, color: '#475569', textAlign: 'center', marginTop: 16 }}>Don't know your PIN? Ask your manager.</p>
       </div>
     </div>
   )
@@ -337,7 +337,7 @@ export default function EmployeePortal() {
             <div style={{ fontSize: 11, color: '#64748b' }}>{emp.employee_id}{emp.title ? ' · ' + emp.title : ''}</div>
           </div>
         </div>
-        <button onClick={() => { setEmp(null); setScreen('login'); setEmpId('') }}
+        <button onClick={() => { setEmp(null); setScreen('login'); setLoginEmail('') }}
           style={{ background: 'none', border: '1px solid #334155', borderRadius: 8, color: '#64748b', padding: '5px 10px', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}>
           Sign Out
         </button>
