@@ -950,20 +950,50 @@ export default function Leads() {
 
   async function handleSendFullPackage(l) {
     if (!l.email && !l.phone) { showToast('Lead needs an email or phone to send the package.'); return }
+    const taxFeeAmt = parseFloat(l.taxFee)
+    if (!taxFeeAmt || taxFeeAmt <= 0) {
+      showToast('Set the Tax Investigation Fee on this lead before sending the package.')
+      return
+    }
     setPkgSending(true)
     const res = await sendFullPackage({...l, address:l.street, business_name:l.name}, supabase)
     if (res.error) { setPkgSending(false); showToast('Error: '+res.error); return }
 
     const url = res.url
     await navigator.clipboard.writeText(url).catch(()=>{})
+
+    // Generate Stripe Checkout link for the 1st Trade investigation fee
+    let stripePayUrl = null
+    try {
+      const { data: stripeData, error: stripeErr } = await supabase.functions.invoke('stripe-create-checkout-session', {
+        body: {
+          recordType: 'lead',
+          recordId: l.id,
+          name: l.name,
+          email: l.email,
+          amount: String(taxFeeAmt),
+          description: 'Tax Investigation Fee — 1st Trade',
+          purpose: 'investigation_fee',
+        }
+      })
+      if (!stripeErr && stripeData?.url) stripePayUrl = stripeData.url
+    } catch(e) { console.error('Stripe link error:', e) }
     let smsSent=false,emailSent=false
     const{data:cfg}=await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
 
     if(l.email){
       try{
+        const paymentSection = stripePayUrl ? `
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:20px 24px;margin:0 0 24px">
+      <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.06em">💳 Step 2 — Pay Your Investigation Fee</p>
+      <p style="margin:0 0 14px;font-size:14px;color:#15803d;line-height:1.6">Your Tax Investigation Fee of <strong>$${Number(taxFeeAmt).toLocaleString()}</strong> is due to begin your case. Pay securely below — your card will be saved on file for future billing.</p>
+      <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+        <a href="${stripePayUrl}" style="display:inline-block;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#ffffff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;letter-spacing:-.01em;box-shadow:0 4px 14px rgba(14,165,233,.35)">Pay $${Number(taxFeeAmt).toLocaleString()} Now →</a>
+      </td></tr></table>
+    </div>` : ''
         const{error:eErr}=await supabase.functions.invoke('send-email',{body:{
           to:l.email,
-          subject:`Action Required: Sign Your Tax Investigation Package — Tax Case Review`,
+          subject:`Action Required: Sign & Pay — Tax Case Review Investigation Package`,
           html:`<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px">
 <tr><td align="center">
@@ -975,18 +1005,22 @@ export default function Leads() {
   </td></tr>
   <tr><td style="padding:40px 40px 32px">
     <p style="margin:0 0 16px;font-size:16px;color:#0f172a">Dear <strong>${l.name}</strong>,</p>
-    <p style="margin:0 0 20px;font-size:15px;color:#334155;line-height:1.7">Great news — your <strong>Tax Investigation Package</strong> is ready for your review and signature. This package contains everything we need to get started working on your behalf with the IRS, including:</p>
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px">
-      <tr><td style="padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:14px;color:#334155">📋 &nbsp;<strong>Tax Service Agreement</strong> — outlines the scope of our representation</td></tr>
-      <tr><td style="padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:14px;color:#334155">📄 &nbsp;<strong>Form 2848 — Power of Attorney</strong> — authorizes us to speak with the IRS on your behalf</td></tr>
-      <tr><td style="padding:8px 0;font-size:14px;color:#334155">📄 &nbsp;<strong>Form 8821 — Tax Information Authorization</strong> — allows us to access your IRS transcripts</td></tr>
-    </table>
-    <p style="margin:0 0 28px;font-size:14px;color:#64748b;line-height:1.7">Please take a moment to review each document and sign electronically. The entire process takes about 2–3 minutes. Once signed, we'll immediately begin your investigation.</p>
-    <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 28px">
-      <a href="${url}" style="display:inline-block;background:linear-gradient(135deg,#16a34a,#15803d);color:#ffffff;padding:16px 40px;border-radius:10px;text-decoration:none;font-weight:700;font-size:17px;letter-spacing:-.01em;box-shadow:0 4px 14px rgba(22,163,74,.35)">Review &amp; Sign Package →</a>
-    </td></tr></table>
-    <p style="margin:0 0 8px;font-size:12px;color:#94a3b8;text-align:center">Or copy this link into your browser:</p>
-    <p style="margin:0 0 32px;font-size:12px;color:#3b82f6;text-align:center;word-break:break-all"><a href="${url}" style="color:#3b82f6">${url}</a></p>
+    <p style="margin:0 0 20px;font-size:15px;color:#334155;line-height:1.7">Your <strong>Tax Investigation Package</strong> is ready. Please complete both steps below to get started — it only takes a few minutes.</p>
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:20px 24px;margin:0 0 20px">
+      <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.06em">📋 Step 1 — Review &amp; Sign Your Documents</p>
+      <p style="margin:0 0 10px;font-size:14px;color:#334155;line-height:1.6">This package includes:</p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px">
+        <tr><td style="padding:5px 0;border-bottom:1px solid #dbeafe;font-size:14px;color:#334155">📋 &nbsp;<strong>Tax Service Agreement</strong> — outlines the scope of our representation</td></tr>
+        <tr><td style="padding:5px 0;border-bottom:1px solid #dbeafe;font-size:14px;color:#334155">📄 &nbsp;<strong>Form 2848 — Power of Attorney</strong> — authorizes us to speak with the IRS on your behalf</td></tr>
+        <tr><td style="padding:5px 0;font-size:14px;color:#334155">📄 &nbsp;<strong>Form 8821 — Tax Information Authorization</strong> — allows us to access your IRS transcripts</td></tr>
+      </table>
+      <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+        <a href="${url}" style="display:inline-block;background:linear-gradient(135deg,#16a34a,#15803d);color:#ffffff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;letter-spacing:-.01em;box-shadow:0 4px 14px rgba(22,163,74,.35)">Review &amp; Sign Package →</a>
+      </td></tr></table>
+    </div>
+    ${paymentSection}
+    <p style="margin:0 0 4px;font-size:11px;color:#94a3b8;text-align:center">Sign link: <a href="${url}" style="color:#3b82f6">${url}</a></p>
+    ${stripePayUrl?`<p style="margin:0 0 28px;font-size:11px;color:#94a3b8;text-align:center">Payment link: <a href="${stripePayUrl}" style="color:#0ea5e9">${stripePayUrl}</a></p>`:'<div style="margin-bottom:28px"></div>'}
     <div style="background:#f8fafc;border-radius:8px;padding:16px 20px;border-left:4px solid #3b82f6;margin-bottom:8px">
       <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> Don't hesitate to reach out. We're here every step of the way.<br>📞 <strong>(888) 334-5052</strong> &nbsp;·&nbsp; ✉️ <strong>info@taxcasereview.org</strong></p>
     </div>
@@ -1003,7 +1037,10 @@ export default function Leads() {
     }
     if(l.phone&&cfg?.signalwire_backend){
       try{
-        const r=await fetch(cfg.signalwire_backend+'/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:l.phone,body:`Hi ${l.name}, Tax Case Review sent you a Tax Investigation Package to review and sign: ${url}`})})
+        const smsBody = stripePayUrl
+          ? `Hi ${l.name}, Tax Case Review sent your Investigation Package. Step 1 – Sign: ${url}  |  Step 2 – Pay $${Number(taxFeeAmt).toLocaleString()}: ${stripePayUrl}`
+          : `Hi ${l.name}, Tax Case Review sent you a Tax Investigation Package to review and sign: ${url}`
+        const r=await fetch(cfg.signalwire_backend+'/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:l.phone,body:smsBody})})
         const d=await r.json();if(d.success)smsSent=true
       }catch(e){console.error('SMS error:',e)}
     }
