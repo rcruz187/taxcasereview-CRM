@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import TaxDocParser from '../components/TaxDocParser'
 
 const SQL_SETUP = `create table if not exists tax_returns (
   id uuid default gen_random_uuid() primary key,
@@ -93,7 +94,7 @@ export default function TaxReturns() {
   const [clients, setClients]   = useState([])
   const [employees, setEmployees] = useState([])
   const [loading, setLoading]   = useState(true)
-  const [view, setView]         = useState('list') // list | edit
+  const [view, setView]         = useState('list') // list | upload | edit
   const [current, setCurrent]   = useState(null)
   const [form, setForm]         = useState(BLANK_RETURN)
   const [saving, setSaving]     = useState(false)
@@ -136,7 +137,53 @@ export default function TaxReturns() {
     setForm({ ...BLANK_RETURN })
     setCurrent(null)
     setTab('income')
+    setView('upload')
+  }
+
+  function handleDocsParsed(parsedDocs) {
+    // Map parsed doc data into the return form fields
+    const updates = {}
+    parsedDocs.forEach(({ docType, data }) => {
+      if (!data) return
+      if (docType === 'W-2') {
+        updates.wages = (parseFloat(updates.wages || 0) + parseFloat(data.box1_wages || 0)).toFixed(2)
+        updates.withholding = (parseFloat(updates.withholding || 0) + parseFloat(data.box2_federal_withheld || 0)).toFixed(2)
+      }
+      if (docType === '1099-NEC') {
+        updates.businessIncome = (parseFloat(updates.businessIncome || 0) + parseFloat(data.box1_nonemployee_comp || 0)).toFixed(2)
+        updates.withholding = (parseFloat(updates.withholding || 0) + parseFloat(data.box4_federal_withheld || 0)).toFixed(2)
+      }
+      if (docType === '1099-INT') {
+        updates.interest = (parseFloat(updates.interest || 0) + parseFloat(data.box1_interest_income || 0)).toFixed(2)
+      }
+      if (docType === '1099-DIV') {
+        updates.dividends = (parseFloat(updates.dividends || 0) + parseFloat(data.box1a_total_dividends || 0)).toFixed(2)
+        updates.capitalGains = (parseFloat(updates.capitalGains || 0) + parseFloat(data.box2a_capital_gain_distrib || 0)).toFixed(2)
+      }
+      if (docType === '1099-R') {
+        updates.retirementIncome = (parseFloat(updates.retirementIncome || 0) + parseFloat(data.box2a_taxable_amount || 0)).toFixed(2)
+        updates.withholding = (parseFloat(updates.withholding || 0) + parseFloat(data.box4_federal_withheld || 0)).toFixed(2)
+      }
+      if (docType === '1099-G') {
+        updates.otherIncome = (parseFloat(updates.otherIncome || 0) + parseFloat(data.box1_unemployment_comp || 0)).toFixed(2)
+      }
+      if (docType === 'K-1 (1065)' || docType === 'K-1 (1120-S)') {
+        updates.businessIncome = (parseFloat(updates.businessIncome || 0) + parseFloat(data.box1_ordinary_income || 0)).toFixed(2)
+        updates.interest = (parseFloat(updates.interest || 0) + parseFloat(data.box5_interest || 0)).toFixed(2)
+        updates.dividends = (parseFloat(updates.dividends || 0) + parseFloat(data.box6a_dividends || 0)).toFixed(2)
+        updates.capitalGains = (parseFloat(updates.capitalGains || 0) + parseFloat(data.box9a_capital_gain || data.box9_capital_gain || 0)).toFixed(2)
+      }
+      if (docType === 'Schedule C (prior)') {
+        updates.businessIncome = (parseFloat(updates.businessIncome || 0) + parseFloat(data.net_profit || 0)).toFixed(2)
+      }
+      // Try to grab client name from first doc if not set
+      if (!updates.clientName && (data.employee_name || data.recipient_name)) {
+        updates.clientName = data.employee_name || data.recipient_name
+      }
+    })
+    setForm(f => ({ ...f, ...updates }))
     setView('edit')
+    showToast(`✅ ${parsedDocs.length} document${parsedDocs.length > 1 ? 's' : ''} parsed — fields pre-filled!`)
   }
 
   function openEdit(ret) {
@@ -234,6 +281,47 @@ export default function TaxReturns() {
   if (loading) return <div style={{ color: 'var(--t3)', padding: 20 }}>Loading…</div>
 
   // ── LIST VIEW ──
+  if (view === 'upload') return (
+    <div style={{ maxWidth: 700 }}>
+      {toast && <div className="toast show">{toast}</div>}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <button className="btn sec" style={{ fontSize: 12 }} onClick={() => setView('list')}>← Back</button>
+        <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>New Tax Return</h2>
+      </div>
+
+      {/* Client + year selector at top */}
+      <div className="card" style={{ padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: 'var(--t2)' }}>Step 1 — Select Client & Tax Year</div>
+        <div className="fg2">
+          <div className="field" style={{ margin: 0 }}>
+            <label>Client Name</label>
+            <input value={form.clientName} onChange={e => setForm(f => ({ ...f, clientName: e.target.value }))} placeholder="Client name…" />
+          </div>
+          <div className="field" style={{ margin: 0 }}>
+            <label>Tax Year</label>
+            <select value={form.taxYear} onChange={e => setForm(f => ({ ...f, taxYear: e.target.value }))}>
+              {['2024','2023','2022','2021','2020','2019','2018'].map(y => <option key={y}>{y}</option>)}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: 'var(--t2)' }}>Step 2 — Upload Documents (Optional)</div>
+        <TaxDocParser
+          clientName={form.clientName}
+          taxYear={form.taxYear}
+          onParsed={handleDocsParsed}
+        />
+      </div>
+
+      <button className="btn sec" style={{ width: '100%', justifyContent: 'center', padding: 11, fontSize: 14 }}
+        onClick={() => { setTab('income'); setView('edit') }}>
+        Skip Upload — Fill Return Manually →
+      </button>
+    </div>
+  )
+
   if (view === 'list') return (
     <div>
       {toast && <div className="toast show">{toast}</div>}
@@ -961,4 +1049,5 @@ Submit to the IRS via IRS-approved e-file software (Drake,
 ProSeries, Lacerte, etc.) using your EFIN after review.
 ===============================================================`
 }
+
 
