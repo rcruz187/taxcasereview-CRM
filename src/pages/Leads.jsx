@@ -1430,7 +1430,7 @@ export default function Leads() {
 
         {/* Overview / Notes / Documents — tabbed, matching the Clients detail page style */}
         <div className="card" style={{padding:0,overflow:'hidden',marginBottom:12}}>
-          <div style={{display:'flex',flexWrap:'wrap',borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
+          <div style={{display:'flex',flexWrap:'nowrap',overflowX:'auto',borderBottom:'1px solid var(--br)',background:'var(--s2)',scrollbarWidth:'none'}}>
             {[
               {key:'overview', icon:'📋', text:'Overview'},
               {key:'sms', icon:'💬', text:'SMS'},
@@ -1439,9 +1439,9 @@ export default function Leads() {
               {key:'payments', icon:'💳', text:'Payments'},
               {key:'finintake', icon:'💰', text:'Financial Intake'},
               {key:'finprofile', icon:'🧮', text:'Financial Profile'},
-              {key:'compliance', icon:'📋', text:'Compliance'},
+              !isTaxAdvisor && {key:'compliance', icon:'📋', text:'Compliance'},
               {key:'docs',  icon:'📁', text:'Documents'},
-            ].map(t=>(
+            ].filter(Boolean).map(t=>(
               <button key={t.key} onClick={()=>switchLeadTab(t.key)}
                 style={{display:'inline-flex',alignItems:'center',gap:5,padding:'12px 7px',border:'none',borderBottom:leadDetailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
                   background:'none',cursor:'pointer',fontWeight:leadDetailTab===t.key?700:500,
