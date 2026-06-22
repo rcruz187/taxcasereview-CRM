@@ -119,6 +119,7 @@ export default function Settings() {
         email_signature: firm.email_signature,
         metered_app_name: firm.metered_app_name,
         metered_api_key: firm.metered_api_key,
+        otter_api_key: firm.otter_api_key,
       }
       // Empty-string values blow up non-text columns (date, numeric) with
       // "invalid input syntax" — Postgres wants null for "no value", not ''.
@@ -460,6 +461,44 @@ export default function Settings() {
             </div>
           </div>
 
+          {/* AI Transcription — Otter + Fathom */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">🎙️ AI Transcription (Otter & Fathom)</span></div>
+            <div className="card-body">
+              <div style={{fontSize:13,color:'var(--t3)',marginBottom:16,lineHeight:1.6}}>
+                <strong>Otter.ai</strong> automatically transcribes your phone call recordings. Once your API key is entered below, a "Transcribe with Otter" button will appear on every recorded call.
+                <br/><br/>
+                <strong>Fathom</strong> auto-records and summarizes your Zoom and video meetings. It works as a Chrome extension — no key needed here, just install it and connect your Zoom account.
+              </div>
+
+              <div style={{background:'var(--s2)',border:'1px solid var(--br)',borderRadius:8,padding:'12px 14px',marginBottom:16}}>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>🦦 Otter.ai — Phone Call Transcription</div>
+                <div className="field" style={{marginBottom:8}}>
+                  <label>Otter API Key</label>
+                  <input type="password" value={firm.otter_api_key||''} onChange={set('otter_api_key')} placeholder="Get from otter.ai → Settings → API"/>
+                </div>
+                <div style={{fontSize:11,color:'var(--t3)',lineHeight:1.6}}>
+                  Free at <strong>otter.ai</strong> (300 min/month). Get your API key under <strong>Settings → Account → Integrations → API</strong>. Requires Otter Pro or Business for the import API — free plan can be used manually by uploading recordings directly at otter.ai/import.
+                </div>
+              </div>
+
+              <div style={{background:'var(--s2)',border:'1px solid var(--br)',borderRadius:8,padding:'12px 14px',marginBottom:16}}>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:6}}>🌟 Fathom — Video Meeting Recording</div>
+                <div style={{fontSize:12,color:'var(--t3)',lineHeight:1.7}}>
+                  Fathom requires no API key — it runs as a Chrome extension.<br/>
+                  <strong>Step 1:</strong> Go to <strong>fathom.video</strong> and sign up free (no credit card).<br/>
+                  <strong>Step 2:</strong> Install the Fathom Chrome extension when prompted.<br/>
+                  <strong>Step 3:</strong> Connect your Zoom account inside Fathom.<br/>
+                  Every Zoom meeting you host will now be automatically recorded and summarized by AI after it ends.
+                </div>
+              </div>
+
+              <div style={{display:'flex',justifyContent:'flex-end'}}>
+                <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving?'Saving…':'Save Transcription Settings'}</button>
+              </div>
+            </div>
+          </div>
+
           {/* Stripe Autopay */}
           <div className="card">
             <div className="card-header"><span className="card-title">💳 Stripe (Autopay)</span></div>
@@ -721,3 +760,4 @@ export default function Settings() {
     </div>
   )
 }
+
