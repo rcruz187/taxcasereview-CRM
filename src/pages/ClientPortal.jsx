@@ -300,7 +300,7 @@ export default function ClientPortal() {
     <div style={styles.page}>
       <div style={styles.card}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style={{ height: 52, marginBottom: 14, objectFit: 'contain' }} onError={{e=>e.currentTarget.style.display='none'}}/>
+          <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style={{ height: 52, marginBottom: 14, objectFit: 'contain' }} onError={e=>e.currentTarget.style.display='none'}/>
           <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 4 }}>Client Portal</div>
           <div style={{ width: 40, height: 2, background: 'linear-gradient(90deg,transparent,#3b82f6,transparent)', margin: '0 auto' }}></div>
         </div>
@@ -357,7 +357,7 @@ export default function ClientPortal() {
       <div style={{ ...styles.card, maxWidth: 880 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style={{ height: 44, objectFit: 'contain' }} onError={{e=>e.currentTarget.style.display='none'}}/>
+            <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style={{ height: 44, objectFit: 'contain' }} onError={e=>e.currentTarget.style.display='none'}/>
             <div>
               <div style={{ fontSize: 19, fontWeight: 800, color: '#fff' }}>{{client?.name}}</div>
               <div style={{ fontSize: 12, color: '#60a5fa', marginTop: 2, fontWeight: 600 }}>Client Portal</div>
