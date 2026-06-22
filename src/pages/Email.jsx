@@ -63,6 +63,20 @@ export default function Email() {
     return () => window.removeEventListener('focus', onFocus)
   }, [])
 
+  // Global Delete/Backspace key — archive selected email from anywhere on the page
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return
+      const tag = document.activeElement?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return
+      if (!selected) return
+      e.preventDefault()
+      archiveEmail(selected.id)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selected])
+
   // Refresh the visible list whenever the background sync (running
   // globally, not just on this page) picks up anything new.
   useEffect(() => { if (lastSyncAt) load() }, [lastSyncAt])
@@ -221,6 +235,12 @@ export default function Email() {
   // as a file explorer. Plain Up/Down without Shift just moves which
   // single email is open for reading, clearing any multi-select.
   function onListKeyDown(e) {
+    // Delete or Backspace archives the selected email
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selected && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+      e.preventDefault()
+      archiveEmail(selected.id)
+      return
+    }
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
     if (filtered.length === 0) return
     e.preventDefault()

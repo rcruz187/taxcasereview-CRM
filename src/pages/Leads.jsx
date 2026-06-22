@@ -247,7 +247,33 @@ function LeadInlineEsign({ lead, onClose }) {
         const{error:eErr}=await supabase.functions.invoke('send-email',{body:{
           to:lead.email,
           subject:`Please Sign: ${docType} — Tax Case Review`,
-          html:`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${lead.name}</strong>,</p><p>Please review and sign your <strong>${docType}</strong>.</p><p style="text-align:center;margin:24px 0"><a href="${url}" style="background:#16a34a;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Sign Document</a></p><p style="font-size:12px;color:#64748b">Link: ${url}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
+          html:`<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
+  <tr><td style="background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 100%);padding:32px 40px;text-align:center">
+    <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style="max-height:60px;max-width:240px;object-fit:contain" onerror="this.style.display='none'"/>
+    <div style="font-size:22px;font-weight:800;color:#ffffff;margin-top:12px">Tax Case Review</div>
+    <div style="font-size:12px;color:#93c5fd;margin-top:4px;letter-spacing:.08em;text-transform:uppercase">IRS Resolution Services</div>
+  </td></tr>
+  <tr><td style="padding:40px 40px 32px">
+    <p style="margin:0 0 16px;font-size:16px;color:#0f172a">Dear <strong>${lead.name}</strong>,</p>
+    <p style="margin:0 0 24px;font-size:15px;color:#334155;line-height:1.7">Your <strong>${docType}</strong> is ready for your review and electronic signature. Please click the button below to open the document — it only takes a moment.</p>
+    <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 28px">
+      <a href="${url}" style="display:inline-block;background:linear-gradient(135deg,#16a34a,#15803d);color:#ffffff;padding:16px 40px;border-radius:10px;text-decoration:none;font-weight:700;font-size:17px;box-shadow:0 4px 14px rgba(22,163,74,.35)">Review &amp; Sign Document →</a>
+    </td></tr></table>
+    <p style="margin:0 0 8px;font-size:12px;color:#94a3b8;text-align:center">Or copy this link:</p>
+    <p style="margin:0 0 32px;font-size:12px;color:#3b82f6;text-align:center;word-break:break-all"><a href="${url}" style="color:#3b82f6">${url}</a></p>
+    <div style="background:#f8fafc;border-radius:8px;padding:16px 20px;border-left:4px solid #3b82f6">
+      <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> We're here to help.<br>📞 <strong>(888) 334-5052</strong> &nbsp;·&nbsp; ✉️ <strong>info@taxcasereview.org</strong></p>
+    </div>
+  </td></tr>
+  <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center">
+    <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.8">Tax Case Review &nbsp;·&nbsp; 631 US Highway One Ste 304, North Palm Beach, FL 33408</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`
         }})
         if(!eErr)emailSent=true
       }catch(e){console.error('Email error:',e)}
@@ -496,7 +522,34 @@ export default function Leads() {
       const { error: eErr } = await supabase.functions.invoke('send-email', { body: {
         to: l.email,
         subject: `Action Required: Sign Your Service Addendum — Tax Case Review`,
-        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:24px"><div style="font-size:20px;font-weight:800;color:#1d4ed8">Tax Case Review</div></div><p>Dear <strong>${l.name}</strong>,</p><p>Your Service Addendum is ready for review and signature. This authorizes Tax Case Review to proceed with the resolution services discussed and the associated fee.</p><p style="text-align:center;margin:28px 0"><a href="${url}" style="background:#16a34a;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Review &amp; Sign Addendum</a></p><p style="font-size:12px;color:#64748b">Or copy this link: ${url}</p><hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"/><p style="font-size:11px;color:#94a3b8;text-align:center">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
+        html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
+  <tr><td style="background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 100%);padding:32px 40px;text-align:center">
+    <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style="max-height:60px;max-width:240px;object-fit:contain" onerror="this.style.display='none'"/>
+    <div style="font-size:22px;font-weight:800;color:#ffffff;margin-top:12px">Tax Case Review</div>
+    <div style="font-size:12px;color:#93c5fd;margin-top:4px;letter-spacing:.08em;text-transform:uppercase">IRS Resolution Services</div>
+  </td></tr>
+  <tr><td style="padding:40px 40px 32px">
+    <p style="margin:0 0 16px;font-size:16px;color:#0f172a">Dear <strong>${l.name}</strong>,</p>
+    <p style="margin:0 0 20px;font-size:15px;color:#334155;line-height:1.7">Your <strong>Service Addendum</strong> is ready for your review and signature. This document authorizes Tax Case Review to proceed with the resolution services we've outlined for your case and confirms the associated service fee.</p>
+    <p style="margin:0 0 24px;font-size:14px;color:#64748b;line-height:1.7">Please review the details carefully, then sign electronically. If you have any questions before signing, don't hesitate to call us.</p>
+    <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 28px">
+      <a href="${url}" style="display:inline-block;background:linear-gradient(135deg,#16a34a,#15803d);color:#ffffff;padding:16px 40px;border-radius:10px;text-decoration:none;font-weight:700;font-size:17px;box-shadow:0 4px 14px rgba(22,163,74,.35)">Review &amp; Sign Addendum →</a>
+    </td></tr></table>
+    <p style="margin:0 0 8px;font-size:12px;color:#94a3b8;text-align:center">Or copy this link:</p>
+    <p style="margin:0 0 32px;font-size:12px;color:#3b82f6;text-align:center;word-break:break-all"><a href="${url}" style="color:#3b82f6">${url}</a></p>
+    <div style="background:#f8fafc;border-radius:8px;padding:16px 20px;border-left:4px solid #3b82f6">
+      <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> We're here to help.<br>📞 <strong>(888) 334-5052</strong> &nbsp;·&nbsp; ✉️ <strong>info@taxcasereview.org</strong></p>
+    </div>
+  </td></tr>
+  <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center">
+    <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.8">Tax Case Review &nbsp;·&nbsp; 631 US Highway One Ste 304, North Palm Beach, FL 33408</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`
       }})
       emailSent = !eErr
     }
@@ -911,7 +964,39 @@ export default function Leads() {
         const{error:eErr}=await supabase.functions.invoke('send-email',{body:{
           to:l.email,
           subject:`Action Required: Sign Your Tax Investigation Package — Tax Case Review`,
-          html:`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:24px"><div style="font-size:20px;font-weight:800;color:#1d4ed8">Tax Case Review</div></div><p>Dear <strong>${l.name}</strong>,</p><p>Your Tax Investigation Package is ready for review and signature. This package includes your Tax Service Agreement and IRS authorization forms (Form 2848 / Form 8821).</p><p style="text-align:center;margin:28px 0"><a href="${url}" style="background:#16a34a;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Review &amp; Sign Package</a></p><p style="font-size:12px;color:#64748b">Or copy this link: ${url}</p><hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"/><p style="font-size:11px;color:#94a3b8;text-align:center">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
+          html:`<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
+  <tr><td style="background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 100%);padding:32px 40px;text-align:center">
+    <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style="max-height:60px;max-width:240px;object-fit:contain" onerror="this.style.display='none'"/>
+    <div style="font-size:22px;font-weight:800;color:#ffffff;margin-top:12px;letter-spacing:-.02em">Tax Case Review</div>
+    <div style="font-size:12px;color:#93c5fd;margin-top:4px;letter-spacing:.08em;text-transform:uppercase">IRS Resolution Services</div>
+  </td></tr>
+  <tr><td style="padding:40px 40px 32px">
+    <p style="margin:0 0 16px;font-size:16px;color:#0f172a">Dear <strong>${l.name}</strong>,</p>
+    <p style="margin:0 0 20px;font-size:15px;color:#334155;line-height:1.7">Great news — your <strong>Tax Investigation Package</strong> is ready for your review and signature. This package contains everything we need to get started working on your behalf with the IRS, including:</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px">
+      <tr><td style="padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:14px;color:#334155">📋 &nbsp;<strong>Tax Service Agreement</strong> — outlines the scope of our representation</td></tr>
+      <tr><td style="padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:14px;color:#334155">📄 &nbsp;<strong>Form 2848 — Power of Attorney</strong> — authorizes us to speak with the IRS on your behalf</td></tr>
+      <tr><td style="padding:8px 0;font-size:14px;color:#334155">📄 &nbsp;<strong>Form 8821 — Tax Information Authorization</strong> — allows us to access your IRS transcripts</td></tr>
+    </table>
+    <p style="margin:0 0 28px;font-size:14px;color:#64748b;line-height:1.7">Please take a moment to review each document and sign electronically. The entire process takes about 2–3 minutes. Once signed, we'll immediately begin your investigation.</p>
+    <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 28px">
+      <a href="${url}" style="display:inline-block;background:linear-gradient(135deg,#16a34a,#15803d);color:#ffffff;padding:16px 40px;border-radius:10px;text-decoration:none;font-weight:700;font-size:17px;letter-spacing:-.01em;box-shadow:0 4px 14px rgba(22,163,74,.35)">Review &amp; Sign Package →</a>
+    </td></tr></table>
+    <p style="margin:0 0 8px;font-size:12px;color:#94a3b8;text-align:center">Or copy this link into your browser:</p>
+    <p style="margin:0 0 32px;font-size:12px;color:#3b82f6;text-align:center;word-break:break-all"><a href="${url}" style="color:#3b82f6">${url}</a></p>
+    <div style="background:#f8fafc;border-radius:8px;padding:16px 20px;border-left:4px solid #3b82f6;margin-bottom:8px">
+      <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> Don't hesitate to reach out. We're here every step of the way.<br>📞 <strong>(888) 334-5052</strong> &nbsp;·&nbsp; ✉️ <strong>info@taxcasereview.org</strong></p>
+    </div>
+  </td></tr>
+  <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center">
+    <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.8">Tax Case Review &nbsp;·&nbsp; 631 US Highway One Ste 304, North Palm Beach, FL 33408<br>This email was sent regarding your active tax resolution case.</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`
         }})
         if(!eErr)emailSent=true
       }catch(e){console.error('Email error:',e)}
