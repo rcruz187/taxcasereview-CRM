@@ -62,6 +62,7 @@ function SectionHeader({ children }) {
 export default function FinancialProfile({ clientName, client, isLead = false }) {
   const { showToast, role } = useApp()
   const isTaxAdvisor = (role || '').trim().toLowerCase() === 'tax advisor'
+  // Tax Advisors cannot access OIC Calculator, P&L, or 433 tabs
   const ADVISOR_RESTRICTED = ['oic', 'pnl', 'f433f']
   const [searchParams, setSearchParams] = useSearchParams()
   const [tab, setTabRaw] = useState(() => searchParams.get('fptab') || 'intake')
@@ -255,16 +256,15 @@ export default function FinancialProfile({ clientName, client, isLead = false })
       {/* Sub-tabs */}
       <div style={{display:'flex',gap:4,marginBottom:16,borderBottom:'1px solid var(--br)',flexWrap:'wrap'}}>
         {[
-          // Compliance: visible to Tax Associates + Admins (not Tax Advisors)
+          // Tax Advisors: Compliance, TO Intake, I&E, Assets & Equity only
+          // Tax Associates, Admins, Managers: all tabs
           {key:'compliance', label:'📑 Compliance'},
-          {key:'intake', label:'📋 TO Intake'},
-          {key:'ie',     label:'💰 I&E'},
-          {key:'assets', label:'🏦 Assets & Equity'},
-          // OIC Calculator, P&L, and 433 are resolution-building tools used
-          // by Tax Associates and Admins -- Tax Advisors don't need them.
-          !isTaxAdvisor && {key:'oic',  label:'🧮 OIC Calculator'},
-          !isTaxAdvisor && {key:'pnl',  label:'📊 P&L'},
-          !isTaxAdvisor && {key:'f433f',label:'🗂️ 433'},
+          {key:'intake',     label:'📋 TO Intake'},
+          {key:'ie',         label:'💰 I&E'},
+          {key:'assets',     label:'🏦 Assets & Equity'},
+          !isTaxAdvisor && {key:'oic',   label:'🧮 OIC Calculator'},
+          !isTaxAdvisor && {key:'pnl',   label:'📊 P&L'},
+          !isTaxAdvisor && {key:'f433f', label:'🗂️ 433'},
         ].filter(Boolean).map(t=>(
           <button key={t.key} onClick={()=>setTab(t.key)} style={{
             padding:'8px 16px', borderRadius:'8px 8px 0 0',
