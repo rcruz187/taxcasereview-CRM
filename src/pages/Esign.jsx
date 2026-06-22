@@ -199,7 +199,7 @@ export default function Esign() {
     <div style={{ maxWidth: 1000 }}>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>✍️ E-Signatures</h2>
+        <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>✍️ E-Signatures</h2>
         <button className="btn pri" onClick={() => { setForm(BLANK); setModal(true) }}>+ New Signing Request</button>
       </div>
 
@@ -212,9 +212,9 @@ export default function Esign() {
           ['Declined', items.filter(i => i.status === 'Declined').length, 'var(--bad)'],
           ['Sign Rate', items.length ? Math.round((signed / items.length) * 100) + '%' : '—', 'var(--b2)'],
         ].map(([label, val, color]) => (
-          <div key={label} className="card" style={{ padding: '10px 12px', textAlign: 'center' }}>
-            <div style={{ fontWeight: 800, fontSize: 18, color, lineHeight: 1 }}>{val}</div>
-            <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 3 }}>{label}</div>
+          <div key={label} className="card" style={{ padding: '16px 18px', textAlign: 'center' }}>
+            <div style={{ fontWeight: 800, fontSize: 28, color, lineHeight: 1 }}>{val}</div>
+            <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 6, fontWeight: 600 }}>{label}</div>
           </div>
         ))}
       </div>
@@ -229,9 +229,9 @@ export default function Esign() {
       {/* Filters */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search client or document…"
-          style={{ flex: 1, minWidth: 160, padding: '7px 12px', background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 6, color: 'var(--tx)', fontSize: 12 }} />
+          style={{ flex: 1, minWidth: 160, padding: '9px 14px', background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 8, color: 'var(--tx)', fontSize: 14 }} />
         {['All', 'Awaiting', 'Signed', 'Declined', 'Expired'].map(s => (
-          <button key={s} className={`btn ${filterStatus === s ? 'pri' : 'sec'}`} style={{ fontSize: 10, padding: '4px 10px' }} onClick={() => setFilterStatus(s)}>{s}</button>
+          <button key={s} className={`btn ${filterStatus === s ? 'pri' : 'sec'}`} style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => setFilterStatus(s)}>{s}</button>
         ))}
       </div>
 
@@ -241,7 +241,7 @@ export default function Esign() {
           {items.length === 0 ? 'No e-signature requests yet. Create one to send a signing link to a client.' : 'No requests match your filters.'}
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(310px,1fr))', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(340px,1fr))', gap: 10 }}>
           {filtered.map(item => {
             const isSigned = item.status === 'Signed'
             const dp = daysPending(item)
@@ -253,8 +253,8 @@ export default function Esign() {
               }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>✍️ {item.doc_type}</div>
-                    <div style={{ fontSize: 12, color: 'var(--b2)', fontWeight: 600 }}>{item.client_name}</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>✍️ {item.doc_type}</div>
+                    <div style={{ fontSize: 14, color: 'var(--b2)', fontWeight: 700 }}>{item.client_name}</div>
                     {item.client_email && <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 1 }}>{item.client_email}</div>}
                     {item.investigation_fee && <div style={{ fontSize: 10, color: 'var(--ok)', marginTop: 2, fontWeight: 700 }}>Fee: ${item.investigation_fee}</div>}
                   </div>
@@ -445,3 +445,4 @@ export default function Esign() {
     </div>
   )
 }
+
