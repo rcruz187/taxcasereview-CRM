@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { sendGmailEmail, downloadGmailAttachment } from '../lib/gmailUtils'
 import { useGmailSync } from '../context/GmailSyncContext'
+import { useApp } from '../context/AppContext'
 
 const TEMPLATES = [
   { label:'Welcome Letter',         subject:'Welcome to Tax Case Review', body:"Dear {name},\n\nWelcome to Tax Case Review — we're glad to have you on board. Your case has been assigned to a dedicated representative who will be reaching out shortly to walk you through the next steps and what to expect along the way.\n\nIn the meantime, if anything comes up or you have questions, don't hesitate to reach out. We're here to help." },
@@ -44,6 +45,7 @@ export default function Email() {
   const [gmailClientId, setGmailClientId] = useState('')
   const [signature, setSignature] = useState({ text: '', logoUrl: '' })
   const { lastSyncAt, syncing, lastError, syncNow } = useGmailSync()
+  const { user } = useApp()
 
   // Multi-select for bulk archive. checkedIds = the actual selection;
   // focusIndex/anchorIndex track keyboard navigation within the currently
@@ -146,6 +148,19 @@ export default function Email() {
     const { error } = await supabase.from('emails').insert([{ ...form, status, created_at: new Date().toISOString() }])
     setSaving(false)
     if (error) { showToast('Error: ' + error.message); return }
+
+    // Auto-log to client activity history
+    if (form.clientName) {
+      const preview = (form.body || '').slice(0, 120).replace(/\n/g, ' ').trim()
+      await supabase.from('client_notes').insert({
+        client_name: form.clientName,
+        content: `📧 Email Sent — "${form.subject}"\n${preview}${form.body?.length > 120 ? '…' : ''}`,
+        note_type: 'Email',
+        created_by: user?.email || 'Staff',
+        created_at: new Date().toISOString(),
+      })
+    }
+
     showToast(status === 'Sent' ? '✅ Email sent via Gmail!' : '⚠️ Gmail is not connected — this was only saved as a log entry, nothing was emailed')
     setForm(BLANK); setView('inbox'); load()
   }

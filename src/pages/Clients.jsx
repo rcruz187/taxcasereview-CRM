@@ -1586,15 +1586,33 @@ export default function Clients() {
                 </div>
               </div>
               {relNotes.length===0&&<div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No notes yet.</div>}
-              {relNotes.map((n,i)=>(
-                <div key={n.id||i} style={{padding:'10px 0',borderBottom:'1px solid var(--br)'}}>
-                  <div style={{fontSize:13,lineHeight:1.6,color:'var(--tx)',whiteSpace:'pre-wrap'}}>{n.content}</div>
-                  <div style={{fontSize:11,color:'var(--t3)',marginTop:4,display:'flex',alignItems:'center',gap:8}}>
-                    <span>{n.created_by||'Staff'} · {n.created_at?new Date(n.created_at).toLocaleDateString():''}</span>
-                    {n.visible_to_client && <span style={{fontSize:10,fontWeight:700,color:'var(--ok)',background:'rgba(34,197,94,.12)',padding:'1px 7px',borderRadius:99}}>👁 Client can see this</span>}
+              {relNotes.map((n,i)=>{
+                const typeConfig = {
+                  'Email':  { icon: '📧', color: '#2563eb', bg: 'rgba(37,99,235,.12)' },
+                  'SMS':    { icon: '💬', color: '#0891b2', bg: 'rgba(8,145,178,.12)' },
+                  'Call':   { icon: '📞', color: '#16a34a', bg: 'rgba(22,163,74,.12)' },
+                  'Fax':    { icon: '📠', color: '#7c3aed', bg: 'rgba(124,58,237,.12)' },
+                  'System': { icon: '⚙️', color: '#6b7280', bg: 'rgba(107,114,128,.12)' },
+                  'Note':   { icon: '📝', color: '#d97706', bg: 'rgba(217,119,6,.12)' },
+                }
+                const tc = typeConfig[n.note_type] || typeConfig['Note']
+                return (
+                  <div key={n.id||i} style={{padding:'10px 0',borderBottom:'1px solid var(--br)'}}>
+                    <div style={{display:'flex',alignItems:'flex-start',gap:8,marginBottom:4}}>
+                      {n.note_type && (
+                        <span style={{fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:99,background:tc.bg,color:tc.color,flexShrink:0,marginTop:1}}>
+                          {tc.icon} {n.note_type}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{fontSize:13,lineHeight:1.6,color:'var(--tx)',whiteSpace:'pre-wrap'}}>{n.content}</div>
+                    <div style={{fontSize:11,color:'var(--t3)',marginTop:4,display:'flex',alignItems:'center',gap:8}}>
+                      <span>{n.created_by||'Staff'} · {n.created_at?new Date(n.created_at).toLocaleDateString():''}</span>
+                      {n.visible_to_client && <span style={{fontSize:10,fontWeight:700,color:'var(--ok)',background:'rgba(34,197,94,.12)',padding:'1px 7px',borderRadius:99}}>👁 Client can see this</span>}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
 

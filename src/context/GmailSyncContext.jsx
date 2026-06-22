@@ -55,6 +55,20 @@ export function GmailSyncProvider({ children }) {
           // filterUnknownIds already removed anything we have — plain insert is safe.
           // If a race condition produces a duplicate the error is caught and skipped.
           await supabase.from('emails').insert([parsed])
+
+          // Auto-log every email (inbound and outbound) to the client's activity history
+          if (parsed.clientName && parsed.clientName !== parsed.recipient) {
+            const direction = parsed.triage === 'Sent' ? 'Sent' : 'Received'
+            const preview = (parsed.body || '').slice(0, 120).replace(/\n/g, ' ').trim()
+            const noteContent = `📧 Email ${direction} — "${parsed.subject}"${preview ? `\n${preview}${parsed.body?.length > 120 ? '…' : ''}` : ''}`
+            await supabase.from('client_notes').insert({
+              client_name: parsed.clientName,
+              content: noteContent,
+              note_type: 'Email',
+              created_by: direction === 'Sent' ? 'Tax Case Review' : parsed.clientName,
+              created_at: parsed.created_at || new Date().toISOString(),
+            })
+          }
         }
       } catch (e) {
         console.error('Gmail import error for', id, e)

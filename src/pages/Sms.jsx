@@ -58,7 +58,25 @@ export default function Sms() {
   const [view,    setView]    = useState('compose')
   const [settings, setSettings] = useState({})
 
-  useEffect(()=>{load()},[] )
+  useEffect(()=>{
+    load()
+    // Auto-log inbound SMS to client activity when they arrive via SignalWire
+    const ch = supabase.channel('sms-inbound-note-logger')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sms_messages' }, ({ new: msg }) => {
+        if (msg.direction === 'inbound' && msg.clientName) {
+          const preview = (msg.body || '').slice(0, 120).trim()
+          supabase.from('client_notes').insert({
+            client_name: msg.clientName,
+            content: `💬 SMS Received — ${preview}${msg.body?.length > 120 ? '…' : ''}`,
+            note_type: 'SMS',
+            created_by: msg.clientName,
+            created_at: msg.created_at || new Date().toISOString(),
+          })
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  },[] )
 
   async function load(){
     const [{data:sms},{data:cls},{data:s}]=await Promise.all([
@@ -120,6 +138,19 @@ export default function Sms() {
     }])
     setSaving(false)
     if(error){showToast('Error: '+error.message);return}
+
+    // Auto-log outbound SMS to client activity history
+    if (form.clientName && status !== 'Failed') {
+      const preview = (form.body || '').slice(0, 120).trim()
+      await supabase.from('client_notes').insert({
+        client_name: form.clientName,
+        content: `💬 SMS Sent — ${preview}${form.body?.length > 120 ? '…' : ''}`,
+        note_type: 'SMS',
+        created_by: user?.email || 'Staff',
+        created_at: new Date().toISOString(),
+      })
+    }
+
     if (status === 'Sent') showToast('✅ SMS sent via SignalWire!')
     else if (status === 'Failed') showToast('SignalWire error: ' + (errMsg||'send failed'))
     else showToast('Logged — add SignalWire credentials in Settings to send for real')
