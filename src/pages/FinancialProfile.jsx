@@ -59,8 +59,9 @@ function SectionHeader({ children }) {
   return <div style={{fontSize:13,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',margin:'18px 0 8px',paddingTop:14,borderTop:'1px solid var(--br)'}}>{children}</div>
 }
 
-export default function FinancialProfile({ clientName, client }) {
-  const { showToast } = useApp()
+export default function FinancialProfile({ clientName, client, isLead = false }) {
+  const { showToast, role } = useApp()
+  const isTaxAdvisor = role === 'Tax Advisor'
   const [searchParams, setSearchParams] = useSearchParams()
   const [tab, setTabRaw] = useState(() => searchParams.get('fptab') || 'intake')
   function setTab(t) {
@@ -244,14 +245,19 @@ export default function FinancialProfile({ clientName, client }) {
       {/* Sub-tabs */}
       <div style={{display:'flex',gap:4,marginBottom:16,borderBottom:'1px solid var(--br)',flexWrap:'wrap'}}>
         {[
-          {key:'compliance', label:'📑 Compliance'},
+          // Compliance: only show here when on a Client page -- on Leads the
+          // lead's own tab bar already has a Compliance tab, so this would
+          // be a duplicate if we showed it again inside Financial Profile.
+          !isLead && {key:'compliance', label:'📑 Compliance'},
           {key:'intake', label:'📋 TO Intake'},
           {key:'ie',     label:'💰 I&E'},
           {key:'assets', label:'🏦 Assets & Equity'},
-          {key:'oic',    label:'🧮 OIC Calculator'},
-          {key:'pnl',    label:'📊 P&L'},
-          {key:'f433f',  label:'🗂️ 433'},
-        ].map(t=>(
+          // OIC Calculator, P&L, and 433 are resolution-building tools used
+          // by Tax Associates and Admins -- Tax Advisors don't need them.
+          !isTaxAdvisor && {key:'oic',  label:'🧮 OIC Calculator'},
+          !isTaxAdvisor && {key:'pnl',  label:'📊 P&L'},
+          !isTaxAdvisor && {key:'f433f',label:'🗂️ 433'},
+        ].filter(Boolean).map(t=>(
           <button key={t.key} onClick={()=>setTab(t.key)} style={{
             padding:'8px 16px', borderRadius:'8px 8px 0 0',
             border:'1px solid var(--br)', borderBottom: tab===t.key ? '1px solid var(--sf)' : '1px solid var(--br)',
