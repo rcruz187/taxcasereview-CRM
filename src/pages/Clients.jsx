@@ -926,7 +926,13 @@ export default function Clients() {
   const [payForm,     setPayForm]     = useState({ amount:'', method:'Credit Card', date:'', notes:'' })
   const [savingPay,   setSavingPay]   = useState(false)
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    const ch = supabase.channel('clients-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => load())
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [])
 
   // Save scroll position before refresh/navigation away, restore after detail (+ related data) loads.
   // Note: this targets .page-content, the element with overflow-y:auto — the
@@ -1020,6 +1026,38 @@ export default function Clients() {
 
   function showToast(msg){setToast(msg);setTimeout(()=>setToast(''),3500)}
   function fld(k,v){setForm(f=>({...f,[k]:v}))}
+
+  function fmtPhone(v) {
+    const d = v.replace(/\D/g,'').slice(0,10)
+    if (d.length <= 3) return d
+    if (d.length <= 6) return `(${d.slice(0,3)}) ${d.slice(3)}`
+    return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`
+  }
+  function fmtSsn(v) {
+    const d = v.replace(/\D/g,'').slice(0,9)
+    if (d.length <= 3) return d
+    if (d.length <= 5) return `${d.slice(0,3)}-${d.slice(3)}`
+    return `${d.slice(0,3)}-${d.slice(3,5)}-${d.slice(5)}`
+  }
+  function fmtEin(v) {
+    const d = v.replace(/\D/g,'').slice(0,9)
+    if (d.length <= 2) return d
+    return `${d.slice(0,2)}-${d.slice(2)}`
+  }
+  async function handleZip(v) {
+    const d = v.replace(/\D/g,'').slice(0,5)
+    fld('zip', d)
+    if (d.length === 5) {
+      try {
+        const r = await fetch(`https://api.zippopotam.us/us/${d}`)
+        if (r.ok) {
+          const data = await r.json()
+          const place = data.places?.[0]
+          if (place) setForm(f=>({...f, zip:d, city: place['place name'], state: place['state abbreviation']}))
+        }
+      } catch(e) {}
+    }
+  }
   const filtered = clients
     .filter(c => showArchived ? !!c.archived : !c.archived)
     .filter(c => filter==='All' || c.clientType===filter)
@@ -2411,8 +2449,8 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
           </div>
         </div>
         <div className="fg3">
-          <div className="field"><label>Phone 1</label><input value={form.phone||''} onChange={e=>fld('phone',e.target.value)} placeholder="(305) 555-0000"/></div>
-          <div className="field"><label>Phone 2</label><input value={form.phone2||''} onChange={e=>fld('phone2',e.target.value)}/></div>
+          <div className="field"><label>Phone 1</label><input value={form.phone||''} onChange={e=>fld('phone',fmtPhone(e.target.value))} placeholder="(305) 555-0000" maxLength={14}/></div>
+          <div className="field"><label>Phone 2</label><input value={form.phone2||''} onChange={e=>fld('phone2',fmtPhone(e.target.value))} placeholder="(305) 555-0000" maxLength={14}/></div>
           <div className="field"><label>Email</label><input value={form.email||''} onChange={e=>fld('email',e.target.value)}/></div>
         </div>
         <div className="field"><label>Street Address</label><input value={form.street||''} onChange={e=>fld('street',e.target.value)}/></div>
@@ -2423,7 +2461,7 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
               <option value="">Select…</option>{STATES.map(s=><option key={s}>{s}</option>)}
             </select>
           </div>
-          <div className="field"><label>ZIP</label><input value={form.zip||''} onChange={e=>fld('zip',e.target.value)}/></div>
+          <div className="field"><label>ZIP</label><input value={form.zip||''} onChange={e=>handleZip(e.target.value)} maxLength={5} placeholder="33408"/></div>
         </div>
         <div className="field"><label>County</label><input value={form.county||''} onChange={e=>fld('county',e.target.value)} placeholder="e.g. Palm Beach"/></div>
 
@@ -2431,8 +2469,8 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
         <div style={{background:'var(--s3)',borderRadius:8,padding:12,marginBottom:10}}>
           <div style={{fontWeight:700,fontSize:12,marginBottom:8}}>🔒 Taxpayer Info</div>
           <div className="fg2">
-            <div className="field"><label>SSN</label><input value={form.ssn||''} onChange={e=>fld('ssn',e.target.value)} placeholder="XXX-XX-XXXX" maxLength={11}/></div>
-            <div className="field"><label>EIN (if business)</label><input value={form.ein||''} onChange={e=>fld('ein',e.target.value)} placeholder="XX-XXXXXXX"/></div>
+            <div className="field"><label>SSN</label><input value={form.ssn||''} onChange={e=>fld('ssn',fmtSsn(e.target.value))} placeholder="XXX-XX-XXXX" maxLength={11}/></div>
+            <div className="field"><label>EIN (if business)</label><input value={form.ein||''} onChange={e=>fld('ein',fmtEin(e.target.value))} placeholder="XX-XXXXXXX" maxLength={10}/></div>
           </div>
           <div className="field"><label>Date of Birth</label>
             <div style={{display:'flex',gap:6}}>
