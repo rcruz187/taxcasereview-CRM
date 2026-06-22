@@ -65,7 +65,8 @@ const PRIORITY_COLOR = { High: '#f87171', Normal: '#60a5fa', Low: '#64748b' }
 
 export default function EmployeePortal() {
   const [screen, setScreen] = useState('login')
-  const [empId, setEmpId] = useState('')
+  const [empId, setEmpId] = useState('TCR-')
+  const [pin, setPin] = useState('')
   const [emp, setEmp] = useState(null)
   const [loginErr, setLoginErr] = useState('')
   const [logging, setLogging] = useState(false)
@@ -117,10 +118,14 @@ export default function EmployeePortal() {
   }, [emp?.id])
 
   async function handleLogin() {
-    if (!empId.trim()) return
+    if (!empId.trim() || empId.trim() === 'TCR-') return
+    if (!pin.trim()) { setLoginErr('Please enter your PIN.'); return }
     setLogging(true); setLoginErr('')
     const { data } = await supabase.from('employees').select('*').ilike('employee_id', empId.trim()).maybeSingle()
     if (!data) { setLoginErr('Employee ID not found. Check with your manager.'); setLogging(false); return }
+    if (data.portal_pin && data.portal_pin !== pin.trim()) {
+      setLoginErr('Incorrect PIN. Please try again.'); setLogging(false); return
+    }
     setEmp(data)
     await Promise.all([loadWeek(data, 0), loadPeriod(data, 0), loadTasks(data), loadEvents(data), loadTimeOff(data)])
     setScreen('home')
@@ -264,19 +269,33 @@ export default function EmployeePortal() {
       <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 32px' }}>Employee Portal</p>
       <div style={{ width: '100%', maxWidth: 360 }}>
         <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 6 }}>EMPLOYEE ID</label>
+        <div style={{ display: 'flex', alignItems: 'center', background: '#0f172a', border: '1px solid #334155', borderRadius: 12, marginBottom: 12, overflow: 'hidden' }}>
+          <span style={{ padding: '14px 0 14px 16px', color: '#3b82f6', fontSize: 16, fontWeight: 700, fontFamily: 'inherit', userSelect: 'none' }}>TCR-</span>
+          <input
+            value={empId.replace(/^TCR-/i, '')}
+            onChange={e => setEmpId('TCR-' + e.target.value.replace(/^TCR-/i, ''))}
+            onKeyDown={e => e.key === 'Enter' && handleLogin()}
+            placeholder="100"
+            style={{ flex: 1, padding: '14px 16px 14px 4px', background: 'transparent', border: 'none', color: '#f1f5f9', fontSize: 16, outline: 'none', fontFamily: 'inherit' }}
+            autoFocus
+          />
+        </div>
+        <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 6, marginTop: 4 }}>PIN</label>
         <input
-          value={empId} onChange={e => setEmpId(e.target.value)}
+          type="password"
+          value={pin}
+          onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
           onKeyDown={e => e.key === 'Enter' && handleLogin()}
-          placeholder="e.g. TCR-100"
-          style={{ width: '100%', padding: '14px 16px', background: '#0f172a', border: '1px solid #334155', borderRadius: 12, color: '#f1f5f9', fontSize: 16, outline: 'none', boxSizing: 'border-box', marginBottom: 12, fontFamily: 'inherit' }}
-          autoFocus
+          placeholder="••••"
+          inputMode="numeric"
+          style={{ width: '100%', padding: '14px 16px', background: '#0f172a', border: '1px solid #334155', borderRadius: 12, color: '#f1f5f9', fontSize: 20, letterSpacing: 8, outline: 'none', boxSizing: 'border-box', marginBottom: 12, fontFamily: 'inherit', textAlign: 'center' }}
         />
         {loginErr && <p style={{ color: '#f87171', fontSize: 13, margin: '0 0 12px' }}>{loginErr}</p>}
-        <button onClick={handleLogin} disabled={logging || !empId.trim()}
-          style={{ width: '100%', padding: 14, background: empId.trim() ? '#16a34a' : '#1e293b', border: 'none', borderRadius: 12, color: '#fff', fontSize: 16, fontWeight: 700, cursor: empId.trim() ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}>
+        <button onClick={handleLogin} disabled={logging || empId.trim() === 'TCR-' || !pin.trim()}
+          style={{ width: '100%', padding: 14, background: (empId.trim() !== 'TCR-' && pin.trim()) ? '#16a34a' : '#1e293b', border: 'none', borderRadius: 12, color: '#fff', fontSize: 16, fontWeight: 700, cursor: (empId.trim() !== 'TCR-' && pin.trim()) ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}>
           {logging ? 'Signing in…' : 'Sign In'}
         </button>
-        <p style={{ fontSize: 12, color: '#475569', textAlign: 'center', marginTop: 16 }}>Don't know your Employee ID? Ask your manager.</p>
+        <p style={{ fontSize: 12, color: '#475569', textAlign: 'center', marginTop: 16 }}>Don't know your Employee ID or PIN? Ask your manager.</p>
       </div>
     </div>
   )
@@ -674,3 +693,4 @@ export default function EmployeePortal() {
     </div>
   )
 }
+
