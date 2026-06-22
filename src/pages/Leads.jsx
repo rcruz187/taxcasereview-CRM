@@ -1439,7 +1439,6 @@ export default function Leads() {
               {key:'payments', icon:'💳', text:'Payments'},
               {key:'finintake', icon:'💰', text:'Financial Intake'},
               {key:'finprofile', icon:'🧮', text:'Financial Profile'},
-              !isTaxAdvisor && {key:'compliance', icon:'📋', text:'Compliance'},
               {key:'docs',  icon:'📁', text:'Documents'},
             ].filter(Boolean).map(t=>(
               <button key={t.key} onClick={()=>switchLeadTab(t.key)}
