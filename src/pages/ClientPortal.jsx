@@ -105,7 +105,7 @@ export default function ClientPortal() {
   const [payModalInv, setPayModalInv] = useState(null)
   const [toast, setToast] = useState('')
   // Payment plan slider
-  const [planMonths, setPlanMonths] = useState(6)
+  const [planMonths, setPlanMonths] = useState(4)
   const [planLocking, setPlanLocking] = useState(false)
   const [planEditing, setPlanEditing] = useState(false)
   // Notes
@@ -198,7 +198,7 @@ export default function ClientPortal() {
   async function lockInPlan() {
     if (!totalBalance || totalBalance <= 0) { showToast('No outstanding balance to set a plan for.'); return }
     const changes = client.payment_plan_changes || 0
-    if (changes >= 2 && client.autopay_enabled) { showToast('You have reached the maximum of 2 plan edits. Contact your representative to make further changes.'); return }
+    if (changes >= MAX_PLAN_CHANGES) { showToast('You have reached the maximum of 3 plan changes. Please call us at (888) 334-5052.'); return }
     setPlanLocking(true)
     const monthlyAmount = Math.ceil((totalBalance / planMonths) * 100) / 100
     const nextCharge = new Date(); nextCharge.setDate(nextCharge.getDate() + 1)
@@ -359,7 +359,8 @@ export default function ClientPortal() {
   }, 0)
   const monthlyPayment = totalBalance > 0 ? Math.ceil((totalBalance / planMonths) * 100) / 100 : 0
   const planChanges = client.payment_plan_changes || 0
-  const canEditPlan = planChanges < 2
+  const MAX_PLAN_CHANGES = 3
+  const canEditPlan = planChanges < MAX_PLAN_CHANGES
 
   return (
     <div style={styles.page}>
@@ -589,7 +590,7 @@ export default function ClientPortal() {
                       <div style={{ display: 'flex', gap: 8 }}>
                         {canEditPlan && (
                           <button onClick={() => setPlanEditing(true)} style={{ padding: '7px 14px', background: 'rgba(59,130,246,.2)', border: '1px solid rgba(59,130,246,.4)', borderRadius: 6, color: '#93c5fd', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
-                            ✏️ Edit Plan ({2 - planChanges} edit{2 - planChanges !== 1 ? 's' : ''} left)
+                            ✏️ Change Plan ({MAX_PLAN_CHANGES - planChanges} change{MAX_PLAN_CHANGES - planChanges !== 1 ? 's' : ''} left)
                           </button>
                         )}
                         <button onClick={cancelAutopay} style={{ padding: '7px 14px', background: 'transparent', border: '1px solid rgba(248,113,113,.4)', borderRadius: 6, color: '#f87171', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>Turn Off</button>
@@ -597,31 +598,48 @@ export default function ClientPortal() {
                     </div>
                     {!canEditPlan && (
                       <div style={{ fontSize: 11, color: '#f59e0b', background: 'rgba(245,158,11,.1)', borderRadius: 6, padding: '7px 10px' }}>
-                        You've used both plan edits. Contact your representative to make further changes.
+                        🔒 You've made the maximum of {MAX_PLAN_CHANGES} plan changes. Please call us at <strong>(888) 334-5052</strong> to make further changes.
                       </div>
                     )}
                   </div>
                 ) : (
-                  // Slider to pick plan
+                  // Fixed option buttons to pick plan
                   <div>
-                    <div style={{ marginBottom: 16 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <span style={{ fontSize: 12, color: '#94a3b8' }}>1 month</span>
-                        <span style={{ fontSize: 12, color: '#94a3b8' }}>10 months</span>
-                      </div>
-                      <input type="range" min={1} max={10} step={1} value={planMonths}
-                        onChange={e => setPlanMonths(Number(e.target.value))}
-                        style={{ width: '100%', accentColor: '#3b82f6', cursor: 'pointer' }} />
-                      <div style={{ textAlign: 'center', marginTop: 14 }}>
-                        <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 4 }}>{planMonths} month{planMonths !== 1 ? 's' : ''}</div>
-                        <div style={{ fontSize: 28, fontWeight: 800, color: '#fff' }}>
-                          ${monthlyPayment.toLocaleString('en-US', { minimumFractionDigits: 2 })}<span style={{ fontSize: 14, fontWeight: 400, color: '#94a3b8' }}>/mo</span>
-                        </div>
-                        <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
-                          {planMonths} × ${monthlyPayment.toLocaleString('en-US', { minimumFractionDigits: 2 })} toward ${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })} balance
-                        </div>
-                      </div>
+                    <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 12 }}>Select your preferred payment term:</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 18 }}>
+                      {[1, 2, 4, 8].map(m => {
+                        const mo = totalBalance > 0 ? Math.ceil((totalBalance / m) * 100) / 100 : 0
+                        const selected = planMonths === m
+                        return (
+                          <button key={m} onClick={() => setPlanMonths(m)}
+                            style={{ padding: '14px 8px', borderRadius: 10, cursor: 'pointer', textAlign: 'center',
+                              border: `2px solid ${selected ? '#3b82f6' : 'rgba(255,255,255,.1)'}`,
+                              background: selected ? 'rgba(59,130,246,.2)' : 'rgba(255,255,255,.04)',
+                              boxShadow: selected ? '0 0 16px rgba(59,130,246,.25)' : 'none',
+                            }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: selected ? '#93c5fd' : '#94a3b8', marginBottom: 6 }}>
+                              {m} month{m !== 1 ? 's' : ''}
+                            </div>
+                            <div style={{ fontSize: 18, fontWeight: 800, color: selected ? '#fff' : '#cbd5e1' }}>
+                              ${mo.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </div>
+                            <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>/month</div>
+                          </button>
+                        )
+                      })}
                     </div>
+
+                    {/* Summary */}
+                    <div style={{ background: 'rgba(255,255,255,.03)', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: 12, color: '#94a3b8', lineHeight: 1.8 }}>
+                      <span style={{ color: '#fff', fontWeight: 700 }}>{planMonths} × ${monthlyPayment.toLocaleString('en-US', { minimumFractionDigits: 2 })}/mo</span>
+                      {' '}toward your <span style={{ color: '#60a5fa' }}>${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span> balance
+                      {planChanges > 0 && (
+                        <span style={{ marginLeft: 10, color: '#f59e0b' }}>
+                          · {MAX_PLAN_CHANGES - planChanges} change{MAX_PLAN_CHANGES - planChanges !== 1 ? 's' : ''} remaining after this
+                        </span>
+                      )}
+                    </div>
+
                     <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                       {planEditing && (
                         <button onClick={() => setPlanEditing(false)} style={{ padding: '9px 16px', background: 'transparent', border: '1px solid rgba(255,255,255,.2)', borderRadius: 7, color: '#94a3b8', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Cancel</button>
@@ -630,11 +648,6 @@ export default function ClientPortal() {
                         {planLocking ? 'Locking in…' : `Lock In — ${fmt(monthlyPayment)}/mo`}
                       </button>
                     </div>
-                    {planEditing && canEditPlan && (
-                      <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 10 }}>
-                        You have {2 - planChanges} plan edit{2 - planChanges !== 1 ? 's' : ''} remaining after this change.
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
