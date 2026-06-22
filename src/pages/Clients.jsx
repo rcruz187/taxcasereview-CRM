@@ -912,6 +912,10 @@ export default function Clients() {
   const [stripeModal, setStripeModal] = useState(false)
   const [paymentLinkModal, setPaymentLinkModal] = useState(false)
   const [splitPaymentModal, setSplitPaymentModal] = useState(false)
+  const [installmentModal, setInstallmentModal] = useState(false)
+  const [installmentForm, setInstallmentForm] = useState({ totalFee: '', months: '4', irsLiability: '', description: '' })
+  const [installmentLoading, setInstallmentLoading] = useState(false)
+  const [installmentDone, setInstallmentDone] = useState(null)
   const [faxClient,   setFaxClient]   = useState(null)
   const [esignModal,  setEsignModal]  = useState(false)
   const [esignClient, setEsignClient] = useState(null)
@@ -1266,6 +1270,68 @@ export default function Clients() {
     setPayForm({amount:'',method:'Credit Card',date:'',notes:''})
     setPayModal(false)
     showToast('✅ Payment recorded!')
+  }
+
+  async function createInstallmentPlan() {
+    if (!installmentForm.totalFee || !installmentForm.months || !detail) return
+    setInstallmentLoading(true)
+    setInstallmentDone(null)
+    try {
+      const { data, error } = await supabase.functions.invoke('stripe-create-subscription', {
+        body: {
+          clientId: detail.id,
+          clientName: detail.name,
+          email: detail.email || '',
+          totalAmount: parseFloat(installmentForm.totalFee),
+          months: parseInt(installmentForm.months),
+          description: installmentForm.description || `Tax Resolution Services — ${installmentForm.months}-Month Plan`,
+        }
+      })
+      if (error || data?.error) throw new Error(data?.error || error?.message)
+
+      const monthlyAmt = parseFloat(installmentForm.totalFee) / parseInt(installmentForm.months)
+      const now = new Date()
+
+      // Create AR schedule entries in payments table
+      const arRows = Array.from({ length: parseInt(installmentForm.months) }, (_, i) => {
+        const dueDate = new Date(now.getFullYear(), now.getMonth() + i, now.getDate())
+        return {
+          clientName: detail.name,
+          amount: monthlyAmt.toFixed(2),
+          method: 'Stripe Subscription',
+          date: dueDate.toISOString().slice(0, 10),
+          scheduled_date: dueDate.toISOString().slice(0, 10),
+          payment_status: i === 0 ? 'Paid' : 'Scheduled', // first month charges immediately
+          trade_type: '2nd Trade',
+          status: i === 0 ? 'Cleared' : 'Scheduled',
+          notes: `Installment ${i + 1} of ${installmentForm.months}${installmentForm.irsLiability ? ` | IRS Liability: $${installmentForm.irsLiability}` : ''}`,
+          subscription_id: data.subscription_id || null,
+          created_at: new Date().toISOString(),
+        }
+      })
+      await supabase.from('payments').insert(arRows)
+
+      // Log to client notes
+      await supabase.from('client_notes').insert({
+        client_name: detail.name,
+        content: `💳 2nd Trade Installment Plan Created — $${parseFloat(installmentForm.totalFee).toLocaleString()} over ${installmentForm.months} months ($${monthlyAmt.toFixed(2)}/mo)${data.mode === 'checkout' ? '\nCheckout link sent to collect card.' : '\nSubscription started on saved card.'}`,
+        note_type: 'System',
+        created_by: user?.email || 'Staff',
+        created_at: new Date().toISOString(),
+      })
+
+      setInstallmentDone({ mode: data.mode, checkoutUrl: data.checkout_url, monthlyAmt, months: parseInt(installmentForm.months) })
+      if (data.mode === 'checkout' && data.checkout_url) {
+        window.open(data.checkout_url, '_blank')
+      }
+      showToast('✅ Installment plan created!')
+      // Refresh payments
+      const { data: pData } = await supabase.from('payments').select('*').eq('clientName', detail.name).order('created_at', { ascending: false })
+      if (pData) setRelPayments(pData)
+    } catch (e) {
+      showToast('Error: ' + e.message)
+    }
+    setInstallmentLoading(false)
   }
 
   function openEdit(c) {
@@ -1644,9 +1710,20 @@ export default function Clients() {
                 </div>
               </div>
 
+              {/* 2nd Trade Installment Builder */}
+              <div className="card" style={{marginBottom:12,borderLeft:'3px solid #7c3aed'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'#7c3aed',marginBottom:4}}>📅 2nd Trade Installment Plan</div>
+                    <div style={{fontSize:11,color:'var(--t3)'}}>Create a Stripe subscription with automatic monthly billing + AR schedule.</div>
+                  </div>
+                  <button className="btn sec" style={{padding:'4px 10px',fontSize:11,borderColor:'#7c3aed',color:'#7c3aed'}} onClick={()=>{setInstallmentModal(true);setInstallmentDone(null)}}>Set Up Plan</button>
+                </div>
+              </div>
+
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
                 <div style={{fontSize:12,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>
-                  💳 Payments ({relPayments.length})
+                  💳 Payments & AR ({relPayments.length})
                 </div>
                 <button className="btn pri" style={{fontSize:11,padding:'5px 12px'}} onClick={()=>setPayModal(true)}>+ Add Payment</button>
               </div>
@@ -1654,20 +1731,38 @@ export default function Clients() {
               {!loadingRel&&relPayments.length===0&&(
                 <div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No payments recorded yet.</div>
               )}
-              {relPayments.map(p=>(
-                <div key={p.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--br)'}}>
-                  <div>
-                    <div style={{fontSize:14,fontWeight:700,color:'var(--ok)'}}>+${Number(p.amount||0).toLocaleString()}</div>
-                    <div style={{fontSize:11,color:'var(--t3)'}}>{p.method||'Payment'} · {p.date||''}</div>
-                    {p.notes&&<div style={{fontSize:11,color:'var(--t2)',marginTop:2}}>{p.notes}</div>}
+              {relPayments.map(p=>{
+                const today = new Date(); today.setHours(0,0,0,0)
+                const arStatus = p.payment_status || (p.status === 'Cleared' ? 'Paid' : null)
+                const isScheduled = arStatus === 'Scheduled'
+                const isOverdue = isScheduled && p.scheduled_date && new Date(p.scheduled_date) < today
+                return (
+                  <div key={p.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--br)'}}>
+                    <div>
+                      <div style={{display:'flex',alignItems:'center',gap:8}}>
+                        <span style={{fontSize:14,fontWeight:700,color:isScheduled?'var(--t3)':'var(--ok)'}}>
+                          {isScheduled?'⏳':'+'} ${Number(p.amount||0).toLocaleString()}
+                        </span>
+                        {p.trade_type&&<span style={{fontSize:10,fontWeight:700,padding:'1px 6px',borderRadius:99,background:p.trade_type==='1st Trade'?'rgba(37,99,235,.12)':'rgba(124,58,237,.12)',color:p.trade_type==='1st Trade'?'var(--blue)':'#7c3aed'}}>{p.trade_type}</span>}
+                        {isOverdue&&<span style={{fontSize:10,fontWeight:700,padding:'1px 6px',borderRadius:99,background:'rgba(239,68,68,.12)',color:'var(--bad)'}}>⚠ Overdue</span>}
+                      </div>
+                      <div style={{fontSize:11,color:'var(--t3)'}}>{p.method||'Payment'} · {p.scheduled_date||p.date||''}</div>
+                      {p.notes&&<div style={{fontSize:11,color:'var(--t2)',marginTop:2}}>{p.notes}</div>}
+                    </div>
+                    {isScheduled&&(
+                      <button className="btn sec" style={{fontSize:10,padding:'3px 8px'}}
+                        onClick={async()=>{ await supabase.from('payments').update({payment_status:'Paid',status:'Cleared',date:new Date().toISOString().slice(0,10)}).eq('id',p.id); const{data}=await supabase.from('payments').select('*').eq('clientName',c.name).order('created_at',{ascending:false}); if(data)setRelPayments(data) }}>
+                        Mark Paid
+                      </button>
+                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
               {relPayments.length>0&&(
                 <div style={{marginTop:12,paddingTop:12,borderTop:'2px solid var(--br)',display:'flex',justifyContent:'space-between'}}>
                   <div style={{fontSize:12,fontWeight:700,color:'var(--t3)'}}>Total Collected</div>
                   <div style={{fontSize:16,fontWeight:800,color:'var(--ok)'}}>
-                    ${relPayments.reduce((s,p)=>s+Number(p.amount||0),0).toLocaleString()}
+                    ${relPayments.filter(p=>p.payment_status==='Paid'||p.status==='Cleared').reduce((s,p)=>s+Number(p.amount||0),0).toLocaleString()}
                   </div>
                 </div>
               )}
@@ -2102,6 +2197,95 @@ export default function Clients() {
           onClose={()=>setSplitPaymentModal(false)}
           onCharged={async()=>{ const {data}=await supabase.from('clients').select('*').eq('id',c.id).single(); if (data) setDetail(data) }}
         />
+      )}
+
+      {installmentModal && (
+        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setInstallmentModal(false)}>
+          <div className="modal" style={{width:480}}>
+            <div className="mh">
+              <span className="mt">📅 2nd Trade Installment Plan — {c.name}</span>
+              <button className="xbtn" onClick={()=>setInstallmentModal(false)}>&times;</button>
+            </div>
+
+            {!installmentDone ? (
+              <>
+                <div style={{fontSize:12,color:'var(--t3)',marginBottom:16,lineHeight:1.6}}>
+                  Creates a Stripe monthly subscription and auto-generates the AR schedule in the CRM.
+                  {c.stripe_default_pm ? ' ✅ Client has a saved card — subscription starts immediately.' : ' ⚠️ No card on file — client will receive a Checkout link to enter their card.'}
+                </div>
+
+                <div className="fg2">
+                  <div className="field">
+                    <label>IRS Liability ($)</label>
+                    <input type="number" value={installmentForm.irsLiability}
+                      onChange={e=>setInstallmentForm(f=>({...f,irsLiability:e.target.value}))}
+                      placeholder="e.g. 45000"/>
+                  </div>
+                  <div className="field">
+                    <label>Tax Resolution Fee ($) *</label>
+                    <input type="number" value={installmentForm.totalFee}
+                      onChange={e=>setInstallmentForm(f=>({...f,totalFee:e.target.value}))}
+                      placeholder="e.g. 3000"/>
+                  </div>
+                </div>
+
+                <div className="field">
+                  <label>Payment Term</label>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginTop:4}}>
+                    {['1','2','4','8'].map(m=>{
+                      const amt = installmentForm.totalFee ? (parseFloat(installmentForm.totalFee)/parseInt(m)).toFixed(2) : null
+                      const selected = installmentForm.months === m
+                      return (
+                        <button key={m} type="button"
+                          onClick={()=>setInstallmentForm(f=>({...f,months:m}))}
+                          style={{padding:'10px 8px',borderRadius:8,border:`2px solid ${selected?'var(--blue)':'var(--br)'}`,
+                            background:selected?'rgba(37,99,235,.1)':'var(--s2)',cursor:'pointer',textAlign:'center'}}>
+                          <div style={{fontWeight:700,fontSize:13,color:selected?'var(--blue)':'var(--tx)'}}>{m} mo</div>
+                          {amt&&<div style={{fontSize:11,color:'var(--t3)',marginTop:2}}>${parseFloat(amt).toLocaleString()}/mo</div>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {installmentForm.totalFee && (
+                  <div style={{background:'var(--s2)',borderRadius:8,padding:'12px 14px',marginBottom:14,fontSize:12,color:'var(--t2)',lineHeight:1.8}}>
+                    <div style={{fontWeight:700,color:'var(--tx)',marginBottom:4}}>Payment Summary</div>
+                    {installmentForm.irsLiability&&<div>IRS Liability: <strong>${parseFloat(installmentForm.irsLiability).toLocaleString()}</strong></div>}
+                    <div>Total Resolution Fee: <strong>${parseFloat(installmentForm.totalFee).toLocaleString()}</strong></div>
+                    <div>Monthly Payment: <strong>${(parseFloat(installmentForm.totalFee)/parseInt(installmentForm.months)).toFixed(2)}</strong></div>
+                    <div>Term: <strong>{installmentForm.months} month{installmentForm.months!=='1'?'s':''}</strong></div>
+                  </div>
+                )}
+
+                <div className="field">
+                  <label>Description (optional)</label>
+                  <input value={installmentForm.description}
+                    onChange={e=>setInstallmentForm(f=>({...f,description:e.target.value}))}
+                    placeholder="Tax Resolution Services — 4-Month Plan"/>
+                </div>
+
+                <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:12,fontSize:14,fontWeight:700}}
+                  onClick={createInstallmentPlan}
+                  disabled={!installmentForm.totalFee||installmentLoading}>
+                  {installmentLoading?'Creating Plan…':'🚀 Create Installment Plan'}
+                </button>
+              </>
+            ) : (
+              <div style={{textAlign:'center',padding:'20px 0'}}>
+                <div style={{fontSize:32,marginBottom:12}}>✅</div>
+                <div style={{fontWeight:700,fontSize:16,color:'var(--tx)',marginBottom:8}}>Installment Plan Created!</div>
+                <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.7,marginBottom:16}}>
+                  <strong>${installmentDone.monthlyAmt.toFixed(2)}/month</strong> for <strong>{installmentDone.months} months</strong><br/>
+                  {installmentDone.mode==='checkout'
+                    ? 'A Checkout link was opened for the client to enter their card. The subscription starts once they pay.'
+                    : 'Subscription started on saved card. AR schedule created in Payments tab.'}
+                </div>
+                <button className="btn sec" onClick={()=>setInstallmentModal(false)}>Close</button>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {portalModal && portalClient && (

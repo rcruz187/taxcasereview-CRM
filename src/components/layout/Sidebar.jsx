@@ -14,7 +14,7 @@ const SECTIONS = [
     items: [
       { path: '/',          icon: GridIcon,    label: 'Home',     section: null },
       { path: '/email',     icon: EmailIcon,   label: 'Email',         badge: 'email',    section: 'email' },
-      { path: '/chat',      icon: ChatIcon,    label: 'Team Chat',     section: 'chat' },
+      { path: '/chat',      icon: ChatIcon,    label: 'Team Chat',     badge: 'chat',     section: 'chat' },
       { path: '/calendar',  icon: CalIcon,     label: 'Calendar',      section: 'calendar' },
       { path: '/tasks',     icon: TaskIcon,    label: 'Tasks',         badge: 'tasks',    section: 'tasks' },
     ]
@@ -44,9 +44,10 @@ const SECTIONS = [
     key: 'billing',
     label: 'Billing',
     items: [
-      { path: '/invoices',  icon: InvIcon,     label: 'Invoices',      section: 'invoices' },
-      { path: '/payments',  icon: PayIcon,     label: 'Payments',      section: 'payments' },
-      { path: '/books',     icon: BooksIcon,   label: 'Books & Ledger', section: 'books' },
+      { path: '/invoices',  icon: InvIcon,     label: 'Invoices',              section: 'invoices' },
+      { path: '/payments',  icon: PayIcon,     label: 'Payments',              section: 'payments' },
+      { path: '/ar',        icon: ARIcon,      label: 'Accounts Receivable',   section: 'payments' },
+      { path: '/books',     icon: BooksIcon,   label: 'Books & Ledger',        section: 'books' },
     ]
   },
   {
@@ -130,7 +131,9 @@ export default function Sidebar() {
   const [pendingEsign, setPendingEsign] = useState(0)
   const [emailActionNeeded, setEmailActionNeeded] = useState(0)
   const [emailWaiting, setEmailWaiting] = useState(0)
+  const [unreadInbox, setUnreadInbox] = useState(0)
   const [openTasks, setOpenTasks] = useState(0)
+  const [unreadChat, setUnreadChat] = useState(0)
 
   useEffect(() => {
     async function loadPendingTimeOff() {
@@ -181,7 +184,7 @@ export default function Sidebar() {
     return () => { supabase.removeChannel(ch) }
   }, [])
 
-  const BADGE_COUNTS = { leads: newLeads, clients: newClients, cases: openCases, deadlines: dueSoonDeadlines, fax: unreadFax, sms: unreadSms, voicemails: unreadVoicemails, esign: pendingEsign, email: emailActionNeeded + emailWaiting, tasks: openTasks }
+  const BADGE_COUNTS = { leads: newLeads, clients: newClients, cases: openCases, deadlines: dueSoonDeadlines, fax: unreadFax, sms: unreadSms, voicemails: unreadVoicemails, esign: pendingEsign, email: unreadInbox, tasks: openTasks, chat: unreadChat }
 
   useEffect(() => {
     async function loadCommsCounts() {
@@ -208,13 +211,17 @@ export default function Sidebar() {
 
   useEffect(() => {
     async function loadEmailTaskCounts() {
-      const [actionRes, waitingRes, tasksRes] = await Promise.all([
+      // Count ALL unread emails (Inbox + Action Needed + Waiting — anything not Archive/Sent)
+      const [allUnreadRes, actionRes, waitingRes, tasksRes] = await Promise.all([
+        supabase.from('emails').select('id', { count: 'exact', head: true }).eq('is_read', false).not('triage', 'in', '("Sent","Archive")'),
         supabase.from('emails').select('id', { count: 'exact', head: true }).eq('triage', 'Action Needed').eq('is_read', false),
         supabase.from('emails').select('id', { count: 'exact', head: true }).eq('triage', 'Waiting').eq('is_read', false),
-        supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('done', false).eq('deleted', false),
+        supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('done', false),
       ])
       setEmailActionNeeded(actionRes.count || 0)
       setEmailWaiting(waitingRes.count || 0)
+      // Use total unread for the combined badge number (Inbox + Action Needed + Waiting)
+      setUnreadInbox(allUnreadRes.count || 0)
       setOpenTasks(tasksRes.count || 0)
     }
     loadEmailTaskCounts()
@@ -224,6 +231,41 @@ export default function Sidebar() {
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [])
+
+  // Chat badge — count messages newer than when this user last had /chat open
+  useEffect(() => {
+    const storageKey = `tcr_chat_last_seen_${user?.email || 'anon'}`
+    async function countUnreadChat() {
+      const lastSeen = localStorage.getItem(storageKey)
+      if (!lastSeen) { setUnreadChat(0); return }
+      const { count } = await supabase
+        .from('chat_messages')
+        .select('id', { count: 'exact', head: true })
+        .gt('created_at', lastSeen)
+        .neq('sender', user?.email || '')
+      setUnreadChat(count || 0)
+    }
+    countUnreadChat()
+    // Clear badge when user navigates to /chat
+    if (location.pathname.includes('/chat')) {
+      localStorage.setItem(storageKey, new Date().toISOString())
+      setUnreadChat(0)
+    }
+    // Realtime — new chat message arrives
+    const ch = supabase.channel('sidebar-chat-badge')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
+        if (payload.new?.sender !== (user?.email || '')) {
+          const isOnChat = window.location.pathname.includes('/chat')
+          if (isOnChat) {
+            localStorage.setItem(storageKey, new Date().toISOString())
+          } else {
+            setUnreadChat(n => n + 1)
+          }
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [user?.email, location.pathname])
 
   const [tagline,  setTagline]  = useState('IRS Resolution Services')
 
@@ -316,6 +358,15 @@ export default function Sidebar() {
                   {item.label}
                   {item.badge === 'email' ? (
                     <span style={{ marginLeft: 'auto', display: 'flex', gap: 4, alignItems: 'center' }}>
+                      {(() => {
+                        const inboxOnly = unreadInbox - emailActionNeeded - emailWaiting
+                        return inboxOnly > 0 ? (
+                          <span title={`${inboxOnly} Inbox`} style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(37,99,235,.15)', borderRadius: 10, padding: '1px 6px' }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--blue)', flexShrink: 0 }} />
+                            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--blue)' }}>{inboxOnly}</span>
+                          </span>
+                        ) : null
+                      })()}
                       {emailActionNeeded > 0 && (
                         <span title={`${emailActionNeeded} Action Needed`} style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(239,68,68,.15)', borderRadius: 10, padding: '1px 6px' }}>
                           <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--bad)', flexShrink: 0 }} />
@@ -386,6 +437,7 @@ function PortalIcon()  { return <svg viewBox="0 0 24 24" fill="none" stroke="cur
 function BarIcon()     { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> }
 function GearIcon()    { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> }
 function FaxIcon()   { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="4" height="16"/><path d="M22 7H6V3a1 1 0 011-1h14a1 1 0 011 1v4z"/><rect x="6" y="11" width="16" height="12"/></svg> }
+function ARIcon()    { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="7" y1="15" x2="10" y2="15"/><line x1="14" y1="15" x2="17" y2="15"/></svg> }
 function CorpIcon()   { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> }
 
 
