@@ -33,11 +33,11 @@ const SECTIONS = [
     key: 'comms',
     label: 'Communications',
     items: [
-      { path: '/dialer',    icon: DialIcon,    label: 'Dialer',        section: 'dialer' },
-      { path: '/sms',       icon: SmsIcon,     label: 'SMS',           section: 'sms' },
-      { path: '/fax',       icon: FaxIcon,     label: 'Fax',           section: 'fax' },
+      { path: '/dialer',    icon: DialIcon,    label: 'Dialer',        badge: 'voicemails', section: 'dialer' },
+      { path: '/sms',       icon: SmsIcon,     label: 'SMS',           badge: 'sms',    section: 'sms' },
+      { path: '/fax',       icon: FaxIcon,     label: 'Fax',           badge: 'fax',    section: 'fax' },
       { path: '/documents', icon: FolderIcon,  label: 'Documents',     section: 'documents' },
-      { path: '/esign',     icon: SignIcon,    label: 'E-Signatures',  section: 'esign' },
+      { path: '/esign',     icon: SignIcon,    label: 'E-Signatures',  badge: 'esign',  section: 'esign' },
     ]
   },
   {
@@ -118,6 +118,10 @@ export default function Sidebar() {
   const [newClients, setNewClients] = useState(0)
   const [openCases, setOpenCases] = useState(0)
   const [dueSoonDeadlines, setDueSoonDeadlines] = useState(0)
+  const [unreadFax, setUnreadFax] = useState(0)
+  const [unreadSms, setUnreadSms] = useState(0)
+  const [unreadVoicemails, setUnreadVoicemails] = useState(0)
+  const [pendingEsign, setPendingEsign] = useState(0)
 
   useEffect(() => {
     async function loadPendingTimeOff() {
@@ -168,7 +172,30 @@ export default function Sidebar() {
     return () => { supabase.removeChannel(ch) }
   }, [])
 
-  const BADGE_COUNTS = { leads: newLeads, clients: newClients, cases: openCases, deadlines: dueSoonDeadlines }
+  const BADGE_COUNTS = { leads: newLeads, clients: newClients, cases: openCases, deadlines: dueSoonDeadlines, fax: unreadFax, sms: unreadSms, voicemails: unreadVoicemails, esign: pendingEsign }
+
+  useEffect(() => {
+    async function loadCommsCounts() {
+      const [faxRes, smsRes, vmRes, esignRes] = await Promise.all([
+        supabase.from('fax_logs').select('id', { count: 'exact', head: true }).eq('direction', 'inbound').eq('read', false),
+        supabase.from('sms_messages').select('id', { count: 'exact', head: true }).eq('direction', 'inbound').eq('read', false),
+        supabase.from('call_logs').select('id', { count: 'exact', head: true }).eq('voicemail', true).eq('read', false),
+        supabase.from('esign_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+      ])
+      setUnreadFax(faxRes.count || 0)
+      setUnreadSms(smsRes.count || 0)
+      setUnreadVoicemails(vmRes.count || 0)
+      setPendingEsign(esignRes.count || 0)
+    }
+    loadCommsCounts()
+    const ch = supabase.channel('sidebar-comms-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fax_logs' }, loadCommsCounts)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sms_messages' }, loadCommsCounts)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'call_logs' }, loadCommsCounts)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'esign_requests' }, loadCommsCounts)
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [])
   const [tagline,  setTagline]  = useState('IRS Resolution Services')
 
   useEffect(() => {
@@ -316,4 +343,5 @@ function BarIcon()     { return <svg viewBox="0 0 24 24" fill="none" stroke="cur
 function GearIcon()    { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> }
 function FaxIcon()   { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="4" height="16"/><path d="M22 7H6V3a1 1 0 011-1h14a1 1 0 011 1v4z"/><rect x="6" y="11" width="16" height="12"/></svg> }
 function CorpIcon()   { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> }
+
 
