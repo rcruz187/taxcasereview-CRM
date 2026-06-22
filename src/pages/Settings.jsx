@@ -636,6 +636,42 @@ export default function Settings() {
               <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 10, lineHeight: 1.6 }}>
                 Controls the highlight color for the active sidebar item, selected tabs (like in Reports), buttons, and badges throughout the CRM.
               </div>
+              {/* Hue slider */}
+              <div style={{ marginBottom: 12 }}>
+                <input
+                  type="range" min="0" max="360" step="1"
+                  value={(() => {
+                    // Convert current hex to hue for slider position
+                    const hex = firm.primary_color || '#2563eb'
+                    const r = parseInt(hex.slice(1,3),16)/255, g = parseInt(hex.slice(3,5),16)/255, b = parseInt(hex.slice(5,7),16)/255
+                    const max = Math.max(r,g,b), min = Math.min(r,g,b), d = max - min
+                    if (d === 0) return 0
+                    let h = max === r ? ((g-b)/d + (g<b?6:0)) : max === g ? (b-r)/d+2 : (r-g)/d+4
+                    return Math.round(h * 60)
+                  })()}
+                  onChange={e => {
+                    // Convert hue → vivid hex (full saturation/lightness)
+                    const h = parseInt(e.target.value)
+                    const f = n => { const k=(n+h/30)%12; const a=1*Math.min(k-3,9-k,1); return Math.round((0.5-a*0.5)*255) }
+                    // HSL(h, 80%, 50%) for a rich color
+                    const toHex = (h,s,l) => {
+                      s/=100; l/=100
+                      const a=s*Math.min(l,1-l)
+                      const fn=n=>{ const k=(n+h/30)%12; return Math.round((l-a*Math.max(Math.min(k-3,9-k,1),-1))*255) }
+                      return '#'+[fn(0),fn(8),fn(4)].map(x=>x.toString(16).padStart(2,'0')).join('')
+                    }
+                    const hex = toHex(h, 80, 45)
+                    setFirm(f => ({ ...f, primary_color: hex }))
+                    applyBrandColor(hex)
+                  }}
+                  style={{
+                    width: '100%', height: 20, borderRadius: 10, cursor: 'pointer', border: 'none', padding: 0,
+                    background: 'linear-gradient(to right,#e53e3e,#ed8936,#ecc94b,#48bb78,#38b2ac,#4299e1,#667eea,#9f7aea,#ed64a6,#e53e3e)',
+                    WebkitAppearance: 'none', appearance: 'none',
+                  }}
+                />
+              </div>
+              {/* Preset swatches */}
               <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
                 {[
                   ['#2563eb', 'Blue'],

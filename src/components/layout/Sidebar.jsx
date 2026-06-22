@@ -46,19 +46,25 @@ const SECTIONS = [
     items: [
       { path: '/invoices',  icon: InvIcon,     label: 'Invoices',      section: 'invoices' },
       { path: '/payments',  icon: PayIcon,     label: 'Payments',      section: 'payments' },
-      { path: '/books',       icon: BooksIcon,   label: 'Books & Ledger',    section: 'books' },
-      { path: '/formacorp',    icon: CorpIcon,    label: 'FormaCorp',         section: 'formacorp' },
+      { path: '/books',     icon: BooksIcon,   label: 'Books & Ledger', section: 'books' },
+    ]
+  },
+  {
+    key: 'taxreturns',
+    label: 'Tax Returns & Entities',
+    items: [
+      { path: '/taxreturns',  icon: ReturnIcon, label: 'Tax Returns',   section: 'taxreturns' },
+      { path: '/formacorp',   icon: CorpIcon,   label: 'FormaCorp',     section: 'formacorp' },
     ]
   },
   {
     key: 'irs',
     label: 'IRS & State Resolution',
     items: [
-      { path: '/irsforms',    icon: FormIcon,  label: 'IRS Forms & Docs', section: 'irsforms' },
-      { path: '/stateforms',  icon: FormIcon,  label: 'State Forms & Docs', section: 'stateforms' },
+      { path: '/irsforms',    icon: FormIcon,      label: 'IRS Forms & Docs',      section: 'irsforms' },
+      { path: '/stateforms',  icon: FormIcon,      label: 'State Forms & Docs',    section: 'stateforms' },
       { path: '/irsreference', icon: PhoneBookIcon, label: 'IRS & State Reference', section: 'irsreference' },
-      { path: '/transcripts', icon: DocIcon,   label: 'Transcripts',   section: 'transcripts' },
-      { path: '/taxreturns',  icon: ReturnIcon,label: 'Tax Returns',   section: 'taxreturns' },
+      { path: '/transcripts', icon: DocIcon,       label: 'Transcripts',           section: 'transcripts' },
     ]
   },
   {
