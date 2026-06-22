@@ -67,6 +67,10 @@ export default function EmployeePortal() {
   const [screen, setScreen] = useState('login')
   const [empId, setEmpId] = useState('TCR-')
   const [pin, setPin] = useState('')
+  const [changingPin, setChangingPin] = useState(false)
+  const [newPin, setNewPin] = useState('')
+  const [confirmPin, setConfirmPin] = useState('')
+  const [pinMsg, setPinMsg] = useState('')
   const [emp, setEmp] = useState(null)
   const [loginErr, setLoginErr] = useState('')
   const [logging, setLogging] = useState(false)
@@ -116,6 +120,16 @@ export default function EmployeePortal() {
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [emp?.id])
+
+  async function changePin() {
+    if (newPin.length < 4) { setPinMsg('PIN must be at least 4 digits.'); return }
+    if (newPin !== confirmPin) { setPinMsg('PINs do not match.'); return }
+    const { error } = await supabase.from('employees').update({ portal_pin: newPin }).eq('id', emp.id)
+    if (error) { setPinMsg('Error saving PIN: ' + error.message); return }
+    setEmp(e => ({ ...e, portal_pin: newPin }))
+    setChangingPin(false); setNewPin(''); setConfirmPin(''); setPinMsg('')
+    alert('✅ PIN updated successfully!')
+  }
 
   async function handleLogin() {
     if (!empId.trim() || empId.trim() === 'TCR-') return
@@ -679,6 +693,44 @@ export default function EmployeePortal() {
           }} style={{ width: '100%', padding: 14, background: '#1e293b', border: '1px solid #334155', borderRadius: 12, color: '#f1f5f9', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
             🖨️ Print / Save My Badge
           </button>
+
+          {/* Change PIN */}
+          <div style={{ ...CARD, marginTop: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', marginBottom: 4 }}>🔐 Change My PIN</div>
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>Your PIN is used to log into the Employee Portal.</div>
+            {!changingPin ? (
+              <button onClick={() => { setChangingPin(true); setPinMsg('') }}
+                style={{ width: '100%', padding: '10px 14px', background: '#1e293b', border: '1px solid #334155', borderRadius: 10, color: '#f1f5f9', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Change PIN
+              </button>
+            ) : (
+              <div>
+                <div style={{ marginBottom: 10 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>NEW PIN (4–6 digits)</label>
+                  <input type="password" value={newPin} onChange={e => setNewPin(e.target.value.replace(/\D/g, '').slice(0,6))}
+                    placeholder="••••" inputMode="numeric" maxLength={6}
+                    style={{ width: '100%', padding: '12px 14px', background: '#0f172a', border: '1px solid #334155', borderRadius: 10, color: '#f1f5f9', fontSize: 20, letterSpacing: 8, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', textAlign: 'center' }} />
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>CONFIRM NEW PIN</label>
+                  <input type="password" value={confirmPin} onChange={e => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0,6))}
+                    placeholder="••••" inputMode="numeric" maxLength={6}
+                    style={{ width: '100%', padding: '12px 14px', background: '#0f172a', border: '1px solid #334155', borderRadius: 10, color: '#f1f5f9', fontSize: 20, letterSpacing: 8, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', textAlign: 'center' }} />
+                </div>
+                {pinMsg && <div style={{ fontSize: 12, color: '#f87171', marginBottom: 8 }}>{pinMsg}</div>}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => { setChangingPin(false); setNewPin(''); setConfirmPin(''); setPinMsg('') }}
+                    style={{ flex: 1, padding: '10px 14px', background: '#1e293b', border: '1px solid #334155', borderRadius: 10, color: '#94a3b8', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    Cancel
+                  </button>
+                  <button onClick={changePin} disabled={newPin.length < 4 || newPin !== confirmPin}
+                    style={{ flex: 2, padding: '10px 14px', background: newPin.length >= 4 && newPin === confirmPin ? '#16a34a' : '#1e293b', border: 'none', borderRadius: 10, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    Save New PIN
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
