@@ -87,15 +87,20 @@ export default function TopBar({ onNew }) {
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
-      <span className="page-title">{title}</span>
-      <input
-        className="search-input"
-        placeholder="Search clients, cases, leads…"
-        value={searchQ}
-        onChange={e => setSearchQ(e.target.value)}
-      />
 
-      {/* Firm contact numbers */}
+      {/* Left side: title + search together */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, minWidth: 0 }}>
+        <span className="page-title" style={{ flexShrink: 0 }}>{title}</span>
+        <input
+          className="search-input"
+          placeholder="Search clients, cases, leads…"
+          value={searchQ}
+          onChange={e => setSearchQ(e.target.value)}
+          style={{ maxWidth: 260 }}
+        />
+      </div>
+
+      {/* Right side: firm numbers, clock, controls */}
       <div style={{display:'flex',alignItems:'center',gap:14,flexShrink:0}}>
         <div style={{display:'flex',alignItems:'center',gap:5,fontSize:12,color:'var(--t2)',whiteSpace:'nowrap'}}>
           <span style={{fontSize:13}}>📞</span>
