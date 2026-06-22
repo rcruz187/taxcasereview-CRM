@@ -49,7 +49,7 @@ const blankEmp = {
   hourlyRate: '', payType: 'Hourly', paymentMethod: 'Direct Deposit',
   hireDate: '', emergencyContact: '', emergencyPhone: '',
   address: '', filingStatus: 'Single',
-  employeeId: '', ssn: '',
+  employeeId: '', ssn: '', portalPin: '',
   caf: '', ptin: '', sorShortId: '', sorUsername: '',
   bank_name: '', bank_account_type: 'Checking', routing_number: '', account_number: '',
   pto_balance: 0, sick_balance: 0, vacation_balance: 0,
@@ -83,6 +83,7 @@ function toDbPayload(form) {
     sor_short_id:      sorShortId,
     sor_username:      sorUsername,
     employee_id:       employeeId,
+    portal_pin:        form.portalPin || null,
     pto_balance:       numOrNull(pto_balance),
     sick_balance:      numOrNull(sick_balance),
     vacation_balance:  numOrNull(vacation_balance),
@@ -107,6 +108,7 @@ function fromDbRow(emp) {
     filingStatus:     emp.filing_status || emp.filingStatus || 'Single',
     employeeId:       emp.employee_id ?? '',
     ssn:              emp.ssn ?? '',
+    portalPin:        emp.portal_pin ?? '',
     caf:              emp.caf ?? '',
     ptin:             emp.ptin ?? '',
     sorShortId:       emp.sor_short_id ?? emp.sorShortId ?? '',
@@ -562,10 +564,14 @@ export default function Employees() {
                       <label>Social Security # <span style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 400 }}>(stored securely)</span></label>
                       <input value={form.ssn} onChange={e => setForm(f => ({ ...f, ssn: e.target.value }))} placeholder="XXX-XX-XXXX" maxLength={11} />
                     </div>
+                    <div className="field">
+                      <label>Portal PIN <span style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 400 }}>(4–6 digits, required to log into Employee Portal)</span></label>
+                      <input type="password" value={form.portalPin} onChange={e => setForm(f => ({ ...f, portalPin: e.target.value.replace(/\D/g, '').slice(0, 6) }))} placeholder="••••" maxLength={6} inputMode="numeric" />
+                    </div>
                   </div>
                   {form.employeeId && (
                     <div style={{ background: 'var(--s3)', border: '1px solid var(--br)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--t2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                      <span>🪪 Logs into the <strong>Employee Portal</strong> at <code style={{ background: 'var(--s2)', padding: '2px 6px', borderRadius: 4 }}>/employee</code> using this ID — no separate password, same as the clock-in kiosk.</span>
+                      <span>🪪 Logs into the <strong>Employee Portal</strong> at <code style={{ background: 'var(--s2)', padding: '2px 6px', borderRadius: 4 }}>/employee</code> using their Employee ID + PIN. Make sure to set a PIN above.</span>
                       <button type="button" className="btn sec" style={{ fontSize: 11, padding: '4px 10px', flexShrink: 0 }}
                         onClick={() => { navigator.clipboard.writeText(window.location.origin + '/taxcasereview-CRM/employee'); }}>
                         📋 Copy Portal Link
@@ -817,3 +823,4 @@ export default function Employees() {
     </div>
   )
 }
+
