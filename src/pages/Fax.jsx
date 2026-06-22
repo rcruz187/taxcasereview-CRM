@@ -30,6 +30,7 @@ export default function Fax() {
   const [search,   setSearch]   = useState('')
   const [filterStatus, setFilter] = useState('All')
   const [settings, setSettings]  = useState({})
+  const [settingsLoaded, setSettingsLoaded] = useState(false)
   const [confirmDel, setConfirmDel] = useState(null)
   const [showSug,  setShowSug]  = useState(false)
   const [sugg,     setSugg]     = useState([])
@@ -44,6 +45,7 @@ export default function Fax() {
     ])
     if (f) setLogs(f)
     if (c) setClients(c)
+    setSettingsLoaded(true)
     if (s) {
       setSettings(s)
       const defaultFrom = s.firm_fax_number || s.sw_inbound_did
@@ -151,7 +153,7 @@ export default function Fax() {
     <div style={{maxWidth:1000}}>
       {toast && <div className={`toast show ${toast.type==='err'?'terr':''}`}>{toast.msg||toast}</div>}
 
-      {!settings?.sw_space_url && (
+      {settingsLoaded && !settings?.sw_space_url && (
         <div style={{background:'rgba(245,158,11,.08)',border:'1px solid rgba(245,158,11,.3)',borderRadius:8,padding:'10px 16px',marginBottom:14,fontSize:12,color:'var(--warn)',display:'flex',alignItems:'center',gap:10}}>
           <span>⚠️</span>
           <span>SignalWire isn't configured yet. <strong>Settings → 📞 SignalWire</strong> to set up. You can still log faxes manually.</span>
@@ -334,3 +336,4 @@ export default function Fax() {
     </div>
   )
 }
+
