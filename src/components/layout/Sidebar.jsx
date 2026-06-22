@@ -360,22 +360,19 @@ export default function Sidebar() {
                       {(() => {
                         const inboxOnly = unreadInbox - emailActionNeeded - emailWaiting
                         return inboxOnly > 0 ? (
-                          <span title={`${inboxOnly} Inbox`} style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(37,99,235,.15)', borderRadius: 10, padding: '1px 6px' }}>
-                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--blue)', flexShrink: 0 }} />
-                            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--blue)' }}>{inboxOnly}</span>
+                          <span title={`${inboxOnly} Inbox`} style={{ display: 'flex', alignItems: 'center', gap: 3, background: '#1d4ed8', borderRadius: 10, padding: '1px 7px' }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{inboxOnly}</span>
                           </span>
                         ) : null
                       })()}
                       {emailActionNeeded > 0 && (
-                        <span title={`${emailActionNeeded} Action Needed`} style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(239,68,68,.15)', borderRadius: 10, padding: '1px 6px' }}>
-                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--bad)', flexShrink: 0 }} />
-                          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--bad)' }}>{emailActionNeeded}</span>
+                        <span title={`${emailActionNeeded} Action Needed`} style={{ display: 'flex', alignItems: 'center', gap: 3, background: '#dc2626', borderRadius: 10, padding: '1px 7px' }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{emailActionNeeded}</span>
                         </span>
                       )}
                       {emailWaiting > 0 && (
-                        <span title={`${emailWaiting} Waiting`} style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(234,179,8,.15)', borderRadius: 10, padding: '1px 6px' }}>
-                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--warn)', flexShrink: 0 }} />
-                          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--warn)' }}>{emailWaiting}</span>
+                        <span title={`${emailWaiting} Waiting`} style={{ display: 'flex', alignItems: 'center', gap: 3, background: '#d97706', borderRadius: 10, padding: '1px 7px' }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{emailWaiting}</span>
                         </span>
                       )}
                     </span>
