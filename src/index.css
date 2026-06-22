@@ -694,6 +694,14 @@ tbody tr:hover td { background: var(--s2); cursor: pointer; }
   /* Clients/Leads detail pages: Overview tab's 2-column layout (contact
      info beside other cards) stacks to 1 column on phone width. */
   .detail-2col { grid-template-columns: 1fr !important; }
+
+  /* Settings: the .fg2 2-column field grid (used heavily in Settings
+     for form fields) stacks to 1 column on phone. */
+  .fg2 { grid-template-columns: 1fr !important; }
+
+  /* Email: fixed 220px inbox sidebar would crush the compose/read area
+     on a phone. Hide it and rely on the existing tab-switching instead. */
+  .email-sidebar { display: none !important; }
 }
 
 

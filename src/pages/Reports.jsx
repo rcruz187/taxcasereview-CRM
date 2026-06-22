@@ -216,7 +216,7 @@ export default function Reports() {
             <StatCard icon="✍️" label="E-Sign Awaiting"  value={esigns.filter(e=>e.status==='Awaiting').length} color="var(--warn)" small/>
             <StatCard icon="⚠️" label="Overdue Deadlines" value={overdueDl} color={overdueDl>0?'var(--bad)':'var(--ok)'} small/>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:12}}>
             <div className="card">
               <SectionTitle title="Clients by Issue Type"/>
               {Object.entries(countBy(clients,'issueType')).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([l,v])=>(
@@ -338,7 +338,7 @@ export default function Reports() {
               })}
             </div>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:12}}>
             <div className="card">
               <SectionTitle title="Invoice Status"/>
               {Object.entries(countBy(invoices,'status')).sort((a,b)=>b[1]-a[1]).map(([l,v])=>(
@@ -389,7 +389,7 @@ export default function Reports() {
                   <div style={{fontSize:10,color:'var(--t3)'}}>collected</div>
                 </div>
               </div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:10}}>
                 {[
                   ['Clients',rep.clients,clients.length,'var(--blue)'],
                   ['Cases',rep.cases,Math.max(cases.length,1),'var(--warn)'],
@@ -419,7 +419,7 @@ export default function Reports() {
             <StatCard icon="🔄" label="Conversion Rate" value={conversionRate+'%'} color={conversionRate>30?'var(--ok)':'var(--warn)'} small/>
             <StatCard icon="👥" label="Became Clients"  value={clients.length} color="var(--ok)" small/>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:12,marginBottom:12}}>
             <div className="card">
               <SectionTitle title="Lead Status"
                 action={<ExportBtn name="Leads_Status" rows={[['Status','Count'],...Object.entries(countBy(leads,'status'))]}/>}/>
@@ -437,7 +437,7 @@ export default function Reports() {
               {leads.length===0&&<Empty/>}
             </div>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:12}}>
             <div className="card">
               <SectionTitle title="Issue Type"/>
               {Object.entries(countBy(leads,'issueType')).sort((a,b)=>b[1]-a[1]).map(([l,v])=>(
@@ -465,7 +465,7 @@ export default function Reports() {
             <StatCard icon="⏳" label="Pending IRS"  value={cases.filter(c=>c.status==='Pending IRS').length} color="var(--warn)" small/>
             <StatCard icon="✅" label="Closed"        value={cases.filter(c=>c.status==='Closed').length} color="var(--ok)" small/>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:12,marginBottom:12}}>
             <div className="card">
               <SectionTitle title="Cases by Status"
                 action={<ExportBtn name="Cases_Status" rows={[['Status','Count'],...Object.entries(countBy(cases,'status'))]}/>}/>
@@ -483,7 +483,7 @@ export default function Reports() {
               {cases.length===0&&<Empty/>}
             </div>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:12}}>
             <div className="card">
               <SectionTitle title="Cases by Rep"/>
               {Object.entries(countBy(cases,'assignedTo')).sort((a,b)=>b[1]-a[1]).map(([l,v])=>(
@@ -511,7 +511,7 @@ export default function Reports() {
             <StatCard icon="🎯" label="Completed"     value={tasks.filter(t=>t.done).length} color="var(--ok)" small/>
             <StatCard icon="📈" label="Completion %"  value={tasks.length?Math.round((tasks.filter(t=>t.done).length/tasks.length)*100)+'%':'0%'} color="var(--ok)" small/>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:12,marginBottom:12}}>
             <div className="card">
               <SectionTitle title="Tasks by Rep"
                 action={<ExportBtn name="Tasks_Rep" rows={[['Rep','Open','Done'],...repStats.map(r=>[r.name,r.openTasks,tasks.filter(t=>t.assignedTo===r.name&&t.done).length])]}/>}/>
@@ -579,7 +579,7 @@ export default function Reports() {
             <StatCard icon="⏳" label="In Progress"    value={taxReturns.filter(r=>r.status==='In Progress'||r.status==='Preparing').length} color="var(--warn)" small/>
             <StatCard icon="🔍" label="Under Review"   value={taxReturns.filter(r=>r.status==='Review').length} color="var(--warn)" small/>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:12,marginBottom:12}}>
             <div className="card">
               <SectionTitle title="Returns by Status"
                 action={<ExportBtn name="TaxReturns_Status" rows={[['Status','Count'],...Object.entries(countBy(taxReturns,'status'))]}/>}/>
@@ -597,7 +597,7 @@ export default function Reports() {
               {taxReturns.length===0&&<Empty/>}
             </div>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:12,marginBottom:12}}>
             <div className="card">
               <SectionTitle title="Returns by Tax Year"/>
               {Object.entries(countBy(taxReturns,'taxYear')).sort((a,b)=>Number(b[0])-Number(a[0])).map(([l,v])=>(
@@ -657,7 +657,7 @@ export default function Reports() {
             <StatCard icon="✅" label="Signed"        value={esigns.filter(e=>e.status==='Signed').length} color="var(--ok)" small/>
             <StatCard icon="📈" label="Sign Rate"    value={esigns.length?Math.round((esigns.filter(e=>e.status==='Signed').length/esigns.length)*100)+'%':'0%'} color="var(--ok)" small/>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:12,marginBottom:12}}>
             <div className="card">
               <SectionTitle title="By Status"/>
               {Object.entries(countBy(esigns,'status')).sort((a,b)=>b[1]-a[1]).map(([l,v])=>(
@@ -714,7 +714,7 @@ export default function Reports() {
             <StatCard icon="✅" label="Active"        value={formacorp.filter(f=>f.stage==='Active'||f.status==='Active').length} color="var(--ok)" small/>
             <StatCard icon="⏳" label="Pending"       value={formacorp.filter(f=>f.stage==='Pending'||f.status==='Pending').length} color="var(--warn)" small/>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:12,marginBottom:12}}>
             <div className="card">
               <SectionTitle title="By Stage/Status"
                 action={<ExportBtn name="FormaCorp_Status" rows={[['Stage','Count'],...Object.entries(countBy(formacorp,'stage'))]}/>}/>
@@ -783,7 +783,7 @@ export default function Reports() {
                   <StatCard icon="⬇️" label="Total Expenses" value={'$'+Math.round(totalOut).toLocaleString()} color="var(--bad)" small/>
                   <StatCard icon="💵" label="Net"           value={'$'+Math.round(net).toLocaleString()} color={net>=0?'var(--ok)':'var(--bad)'} small/>
                 </div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:12,marginBottom:12}}>
                   <div className="card">
                     <SectionTitle title="By Category"
                       action={<ExportBtn name="Books_Category" rows={[['Category','Amount'],...Object.entries(

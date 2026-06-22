@@ -241,7 +241,7 @@ export default function Email() {
       {toast && <div className="toast show">{toast}</div>}
 
       {/* ── Left sidebar ── */}
-      <div style={{ width: 220, flexShrink: 0, background: 'var(--nav)', borderRight: '1px solid var(--br)', display: 'flex', flexDirection: 'column' }}>
+      <div className="email-sidebar" style={{ width: 220, flexShrink: 0, background: 'var(--nav)', borderRight: '1px solid var(--br)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '16px 14px 10px' }}>
           <button className="btn pri" style={{ width: '100%', justifyContent: 'center', fontWeight: 700 }} onClick={() => { setForm(BLANK); setView('compose') }}>
             ✏️ Compose

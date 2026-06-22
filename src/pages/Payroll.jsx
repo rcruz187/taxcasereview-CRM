@@ -649,7 +649,7 @@ export default function Payroll() {
             </div>
 
             {/* Period setup */}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:10, marginBottom:14 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:10, marginBottom:14 }}>
               <div className="field" style={{ margin:0 }}>
                 <label>Pay Period Label *</label>
                 <input value={periodLabel} onChange={e=>setPeriodLabel(e.target.value)} placeholder="e.g. June 1–15, 2025"/>

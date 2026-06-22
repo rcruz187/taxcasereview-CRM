@@ -272,7 +272,7 @@ export default function Invoices() {
       <div class="section-value" style="color:#1A7FD4;font-size:18px">$${balance.toLocaleString('en-US',{minimumFractionDigits:2})}</div>
     </div>
   </div>
-  <table>
+  <div className="ovx"><table>
     <thead><tr><th>Description</th></tr></thead>
     <tbody>
       ${lineRows.map(r=>`<tr><td>${r}</td></tr>`).join('')}
@@ -337,7 +337,7 @@ export default function Invoices() {
             {items.length===0 ? 'No invoices yet. Click "+ New Invoice" to get started.' : 'No invoices match your filters.'}
           </div>
         ) : (
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+          <div className="ovx"><table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
             <thead>
               <tr style={{borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
                 {['Invoice #','Client','Total','Paid','Balance','Due Date','Status','Actions'].map(h=>(
@@ -375,7 +375,7 @@ export default function Invoices() {
                 )
               })}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
 

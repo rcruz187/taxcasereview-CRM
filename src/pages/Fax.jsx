@@ -195,7 +195,7 @@ export default function Fax() {
             {logs.length===0 ? '📠 No faxes sent yet. Click "+ Send Fax" to get started.' : 'No faxes match your filters.'}
           </div>
         ) : (
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+          <div className="ovx"><table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
             <thead>
               <tr style={{borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
                 {['','Date & Time','Client','To Number','Subject','File','Status','Sent By',''].map(h=>(
@@ -234,7 +234,7 @@ export default function Fax() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
 

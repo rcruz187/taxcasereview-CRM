@@ -303,7 +303,7 @@ export default function Payments() {
             {items.length===0?'No payments recorded yet.':'No payments match your filters.'}
           </div>
         ) : (
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+          <div className="ovx"><table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
             <thead>
               <tr style={{borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
                 {['Client','Invoice #','Amount','Method','Check #','Date','Status',''].map(h=>(
@@ -333,7 +333,7 @@ export default function Payments() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
 
