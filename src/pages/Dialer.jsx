@@ -281,10 +281,10 @@ export default function Dialer() {
            globally (see ActiveCallBar in App.jsx) so they're visible no
            matter which page you're on, not just here. ───────────────── */}
 
-      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+      <div className="dialer-layout" style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
 
         {/* ── Left: Dialpad ──────────────────────────────────────────── */}
-        <div className="card" style={{ width: 320, flexShrink: 0 }}>
+        <div className="card dialer-dialpad-card" style={{ width: 320, flexShrink: 0 }}>
           <div className="ch"><span className="ct">Dialpad</span></div>
 
           {/* Number display — a real input now, not just a click-built display.
@@ -375,7 +375,7 @@ export default function Dialer() {
           )}
 
           {/* Tabs */}
-          <div style={{ display: 'inline-flex', gap: 2, marginBottom: 12, background: 'var(--s2)', padding: 3, borderRadius: 9, border: '1px solid var(--br)' }}>
+          <div style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 2, marginBottom: 12, background: 'var(--s2)', padding: 3, borderRadius: 9, border: '1px solid var(--br)' }}>
             {[
               ['queue', '📋', 'Call Queue', leads.length],
               ['voicemail', '🔵', 'Voicemails', voicemails.filter(v => !v.is_read).length],

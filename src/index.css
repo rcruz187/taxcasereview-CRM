@@ -639,6 +639,12 @@ tbody tr:hover td { background: var(--s2); cursor: pointer; }
   }
 
   .cal-form-grid2 { grid-template-columns: 1fr !important; }
+
+  /* Dialer: fixed 320px dialpad beside a flexible queue/log panel
+     doesn't fit phone width side by side -- stack them instead, dialpad
+     first since starting a call is the primary action here. */
+  .dialer-layout { flex-direction: column !important; }
+  .dialer-dialpad-card { width: 100% !important; }
 }
 
 
