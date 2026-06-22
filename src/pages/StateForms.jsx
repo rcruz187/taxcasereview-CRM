@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '')
 
@@ -20,7 +21,15 @@ const STATE_FORMS = [
 ]
 
 export default function StateForms() {
-  const [search, setSearch] = useState('')
+  const [search, setSearch]               = useState('')
+  const [clients, setClients]             = useState([])
+  const [clientSearch, setClientSearch]   = useState('')
+  const [selectedClient, setSelectedClient] = useState(null)
+  const [showClientDrop, setShowClientDrop] = useState(false)
+
+  useEffect(() => {
+    supabase.from('clients').select('id,name,ssn,ein,street,city,state,zip,dob,phone,email,spouseName,spouseSsn,filingStatus').then(({ data }) => setClients(data || []))
+  }, [])
 
   const filtered = STATE_FORMS.filter(f => {
     const q = search.toLowerCase()
@@ -29,6 +38,59 @@ export default function StateForms() {
 
   return (
     <div>
+      {/* ── Pre-fill Section ─────────────────────────────────────────────── */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="ch">
+          <span className="ct">✏️ Pre-fill State Forms</span>
+          <span style={{ fontSize: 12, color: 'var(--t2)' }}>Select a client to carry their info into any state form below</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: 1, maxWidth: 320 }}>
+            <input
+              value={clientSearch}
+              onChange={e => { setClientSearch(e.target.value); setSelectedClient(null); setShowClientDrop(true) }}
+              onFocus={() => setShowClientDrop(true)}
+              onBlur={() => setTimeout(() => setShowClientDrop(false), 150)}
+              placeholder="Search client name…"
+              style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--bd)', fontSize: 13, background: 'var(--s2)', color: 'var(--tx)', boxSizing: 'border-box' }}
+            />
+            {showClientDrop && clientSearch && (() => {
+              const q = clientSearch.toLowerCase()
+              const matches = clients.filter(c => (c.name||'').toLowerCase().includes(q)).slice(0, 10)
+              return matches.length > 0 ? (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: 8, zIndex: 50, maxHeight: 220, overflowY: 'auto', boxShadow: '0 4px 16px rgba(0,0,0,.25)' }}>
+                  {matches.map(c => (
+                    <div key={c.id}
+                      onMouseDown={() => { setSelectedClient(c); setClientSearch(c.name); setShowClientDrop(false) }}
+                      style={{ padding: '9px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--tx)', borderBottom: '1px solid var(--br)' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--s2)'}
+                      onMouseLeave={e => e.currentTarget.style.background = ''}
+                    >
+                      {c.name}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: 8, zIndex: 50, padding: '10px 14px', fontSize: 13, color: 'var(--t3)' }}>
+                  No clients found
+                </div>
+              )
+            })()}
+          </div>
+          {selectedClient && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', background: 'var(--s2)', borderRadius: 8, border: '1px solid var(--br)', fontSize: 13 }}>
+              <span style={{ color: 'var(--ok)', fontWeight: 700 }}>✓</span>
+              <span style={{ color: 'var(--tx)' }}>{selectedClient.name}</span>
+              {selectedClient.ssn && <span style={{ color: 'var(--t3)' }}>· SSN on file</span>}
+              <button onClick={() => { setSelectedClient(null); setClientSearch('') }} style={{ background: 'none', border: 'none', color: 'var(--t3)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 0 0 4px' }}>×</button>
+            </div>
+          )}
+          {!selectedClient && (
+            <span style={{ fontSize: 12, color: 'var(--t3)' }}>Select a client above, then click any state form to open it</span>
+          )}
+        </div>
+      </div>
+
       {/* ── Section 1: State Form Downloads ─────────────────────────────── */}
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="ch">
