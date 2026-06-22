@@ -716,7 +716,7 @@ export default function Employees() {
                           </div>
                         </div>
                         {/* Level options */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0 }}>
+                        <div className="employees-level-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0 }}>
                           {LEVEL_OPTIONS.map(opt => (
                             <div
                               key={opt.value}

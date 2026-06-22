@@ -249,7 +249,7 @@ export default function Dashboard() {
       </div>
 
       {/* Main grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: isTaxAdvisor ? '1fr' : '1fr 1fr', gap: 14 }}>
+      <div className="detail-2col" style={{ display: 'grid', gridTemplateColumns: isTaxAdvisor ? '1fr' : '1fr 1fr', gap: 14 }}>
 
         {!isTaxAdvisor && (
         <>

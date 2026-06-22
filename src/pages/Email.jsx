@@ -237,7 +237,7 @@ export default function Email() {
   TRIAGE.forEach(t => { counts[t] = emails.filter(e => (e.triage || 'Inbox') === t && !e.is_read).length })
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 52px)', margin: '-16px', overflow: 'hidden', background: 'var(--bg)' }}>
+    <div style={{ display: 'flex', height: 'calc(100vh - 52px)', margin: '-16px', overflow: 'hidden', background: 'var(--bg)', position: 'relative' }}>
       {toast && <div className="toast show">{toast}</div>}
 
       {/* ── Left sidebar ── */}

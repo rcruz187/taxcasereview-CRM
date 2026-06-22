@@ -696,7 +696,7 @@ function calcAssets(profile) {
 // ════════════════════════════════════════════════════════════════════════
 function ExpField({ label, k, expenses, set, std }) {
   return (
-    <div style={{display:'grid',gridTemplateColumns: std!==undefined ? '1fr 140px 120px' : '1fr 140px', gap:10, alignItems:'center', padding:'7px 0'}}>
+    <div className="fp-expfield" style={{display:'grid',gridTemplateColumns: std!==undefined ? '1fr 140px 120px' : '1fr 140px', gap:10, alignItems:'center', padding:'7px 0'}}>
       <div style={{fontSize:14,fontWeight:500,color:'var(--tx)'}}>{label}</div>
       <input type="number" value={expenses[k] ?? ''} onChange={e=>set('expenses.'+k, e.target.value)} placeholder="0.00"
         style={{padding:'8px 10px',fontSize:14,background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)'}}/>
@@ -955,7 +955,7 @@ function OICTab({ profile, totalHousehold }) {
         Calculated from Net Disposable Income (I&E tab) and Asset Equity (Assets & Equity tab). Verify against current Form 656/433-A before submission.
       </div>
 
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}}>
+      <div className="fp-oic-grid" style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}}>
         <div className="card" style={{padding:'14px 16px'}}>
           <div style={{fontWeight:700,fontSize:13,marginBottom:10,textAlign:'center'}}>12-Month Offer</div>
           <div className="dr"><span className="dl">Future Income (NDI × 12)</span><span className="dv">{fmt(futureIncome12)}</span></div>

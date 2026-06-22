@@ -714,6 +714,16 @@ tbody tr:hover td { background: var(--s2); cursor: pointer; }
      Tailwind, etc.) and doesn't affect table layout at all. Tables already
      inside an ovx wrapper stay on the wrapper's scroll harmlessly. */
   table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Employees: the 4-column skill-level picker becomes 2 columns */
+  .employees-level-grid { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* FinancialProfile I&E: expense field rows (label + input + std amount)
+     stack to 1 column so inputs don't get squished to 50px wide */
+  .fp-expfield { grid-template-columns: 1fr !important; }
+
+  /* FinancialProfile OIC Calculator: 3 offer-type cards stack to 1 */
+  .fp-oic-grid { grid-template-columns: 1fr !important; }
 }
 
 
