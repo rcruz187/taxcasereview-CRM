@@ -46,6 +46,8 @@ export default function Dialer() {
   const [voicemails, setVoicemails] = useState([])
   const [recordings, setRecordings] = useState([])
   const [attachRec, setAttachRec]   = useState(null)   // recording being attached to a client
+  const [transcribingId, setTranscribingId] = useState(null)
+  const [otterLinks, setOtterLinks]     = useState({}) // recId -> otter URL
   const [attachSearch, setAttachSearch] = useState('')
   const [attachResults, setAttachResults] = useState([])
   const [attaching, setAttaching]   = useState(false)
@@ -471,6 +473,17 @@ export default function Dialer() {
                     ) : (
                       <span style={{ fontSize: 11, color: 'var(--t3)', flex: 1 }}>Recording unavailable</span>
                     )}
+                    {otterLinks[rec.id] ? (
+                      <a href={otterLinks[rec.id]} target="_blank" rel="noreferrer"
+                        className="btn sec" style={{ padding: '5px 10px', fontSize: 10.5, flexShrink: 0, textDecoration: 'none' }}>
+                        🦦 Open in Otter
+                      </a>
+                    ) : (
+                      <button className="btn sec" style={{ padding: '5px 10px', fontSize: 10.5, flexShrink: 0 }}
+                        onClick={() => transcribeWithOtter(rec)} disabled={transcribingId === rec.id}>
+                        {transcribingId === rec.id ? '⏳ Sending…' : '🦦 Transcribe'}
+                      </button>
+                    )}
                     <button className="btn sec" style={{ padding: '5px 10px', fontSize: 10.5, flexShrink: 0 }}
                       onClick={() => { setAttachRec(rec); setAttachSearch(''); setAttachResults([]) }}>
                       📎 Attach to Client
@@ -601,4 +614,5 @@ export default function Dialer() {
     </div>
   )
 }
+
 
