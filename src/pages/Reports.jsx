@@ -60,7 +60,9 @@ export default function Reports() {
     if (dateRange==='all') return arr
     const cutoff = new Date()
     if (dateRange==='30d') cutoff.setDate(cutoff.getDate()-30)
+    if (dateRange==='60d') cutoff.setDate(cutoff.getDate()-60)
     if (dateRange==='90d') cutoff.setDate(cutoff.getDate()-90)
+    if (dateRange==='6mo') cutoff.setMonth(cutoff.getMonth()-6)
     if (dateRange==='ytd') cutoff.setMonth(0,1)
     return arr.filter(r => r[field] && new Date(r[field])>=cutoff)
   }
@@ -182,7 +184,7 @@ export default function Reports() {
         <h2 style={{fontSize:15,fontWeight:700,margin:0}}>📊 Reports & Analytics</h2>
         <div style={{display:'flex',gap:6,alignItems:'center'}}>
           <span style={{fontSize:11,color:'var(--t3)'}}>Range:</span>
-          {[['all','All Time'],['30d','30 Days'],['90d','90 Days'],['ytd','YTD']].map(([k,l])=>(
+          {[['all','All Time'],['30d','30 Days'],['60d','60 Days'],['90d','90 Days'],['6mo','6 Months'],['ytd','YTD']].map(([k,l])=>(
             <button key={k} className={`btn ${dateRange===k?'pri':'sec'}`}
               style={{fontSize:10,padding:'3px 10px'}} onClick={()=>setDateRange(k)}>{l}</button>
           ))}
