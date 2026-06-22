@@ -94,6 +94,19 @@ export default function TopBar({ onNew }) {
         value={searchQ}
         onChange={e => setSearchQ(e.target.value)}
       />
+
+      {/* Firm contact numbers */}
+      <div style={{display:'flex',alignItems:'center',gap:14,flexShrink:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:5,fontSize:12,color:'var(--t2)',whiteSpace:'nowrap'}}>
+          <span style={{fontSize:13}}>📞</span>
+          <span style={{fontWeight:700,letterSpacing:'.02em'}}>(888) 334-5052</span>
+        </div>
+        <div style={{width:1,height:14,background:'var(--br)'}}/>
+        <div style={{display:'flex',alignItems:'center',gap:5,fontSize:12,color:'var(--t2)',whiteSpace:'nowrap'}}>
+          <span style={{fontSize:13}}>📠</span>
+          <span style={{fontWeight:700,letterSpacing:'.02em'}}>(239) 526-2666</span>
+        </div>
+      </div>
       <button
         onClick={() => {
           const next = !soundOn
@@ -169,3 +182,4 @@ export default function TopBar({ onNew }) {
     </div>
   )
 }
+
