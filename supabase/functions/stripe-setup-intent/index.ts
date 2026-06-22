@@ -59,10 +59,14 @@ serve(async (req) => {
 
     let customerId = record?.stripe_customer_id || null
 
+    // Only pass email to Stripe if it passes basic validation —
+    // Stripe's email check is strict and an invalid format throws a hard error.
+    const emailValid = email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+
     if (!customerId) {
       const customer = await stripeRequest('customers', {
         name: clientName || '',
-        ...(email ? { email } : {}),
+        ...(emailValid ? { email: email.trim() } : {}),
         [`metadata[${recordType === 'lead' ? 'lead_id' : 'client_id'}]`]: String(clientId),
       })
       customerId = customer.id
@@ -88,3 +92,4 @@ serve(async (req) => {
     })
   }
 })
+
