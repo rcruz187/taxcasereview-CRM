@@ -147,7 +147,11 @@ export default function SignPage() {
 
     if (error) { setSigning(false); setError('Error saving signature: ' + error.message); return }
 
-    // Client just signed — advance the matching lead's pipeline status.
+    // Everything after the DB write is best-effort — pipeline advance, PDF
+    // stamping, document inserts, email/SMS. If any of it hangs or throws the
+    // client still sees the confirmation screen; nothing here affects whether
+    // the signature is legally captured (that already happened above).
+    try {
     // Forward-only, so this is a safe no-op once the lead has already
     // converted to a client (no lead row left to match by name).
     if (doc.doc_type === 'Full Investigation Package') {
@@ -212,9 +216,8 @@ export default function SignPage() {
       await supabase.from('esigns').update({ signed_attachments: signedAttachments }).eq('id', id).catch(() => {})
     }
 
-    // Notify the client a signed copy is on file — this was never firing before
-    try {
-      const { data: cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
+    // Notify the client a signed copy is on file
+      const { data: cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle().catch(() => ({ data: null }))
       const attachmentLinks = signedAttachments.map(a => `<li><a href="${a.url}">${a.label}</a></li>`).join('')
       if (doc.client_email) {
         await supabase.functions.invoke('send-email', { body: {
@@ -223,15 +226,17 @@ export default function SignPage() {
           html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${doc.client_name}</strong>,</p><p>This confirms your signature was received on <strong>${doc.doc_type}</strong> on ${signedDate}. A copy has been saved to your file.</p>${attachmentLinks ? `<p>Signed documents:</p><ul>${attachmentLinks}</ul>` : ''}<p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
         }}).catch(() => {})
       }
-      if (doc.client_phone && cfg?.signalwire_backend) {
-        await fetch(cfg.signalwire_backend + '/sms/send', {
+      if (doc.client_phone && cfg?.data?.signalwire_backend) {
+        await fetch(cfg.data.signalwire_backend + '/sms/send', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ to: doc.client_phone, body: `Tax Case Review: your signature on ${doc.doc_type} was received and a copy has been saved to your file.` })
         }).catch(() => {})
       }
-    } catch (e) { console.error('Post-sign notification failed', e) }
-
-    setDone(true); setSigning(false)
+    } catch (e) {
+      console.error('Post-sign steps failed (signature already saved):', e)
+    } finally {
+      setDone(true); setSigning(false)
+    }
   }
 
   if (loading) return (
@@ -523,3 +528,4 @@ const styles = {
   secTitle:   { fontSize:11, fontWeight:800, color:'#3b82f6', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:6, paddingBottom:4, borderBottom:'1px solid #1e3a5f' },
   feeBox:     { background:'#0a2540', border:'1px solid #1e40af', borderRadius:8, padding:'10px 14px', marginBottom:10, fontSize:14, color:'#93c5fd', fontWeight:600 },
 }
+
