@@ -103,11 +103,6 @@ export function CallProvider({ children }) {
     if (ringIntervalRef.current) { clearInterval(ringIntervalRef.current); ringIntervalRef.current = null }
   }
 
-  // Diagnostic logging -- open the browser console (F12) during a test
-  // call and these lines show exactly what happened when ending a call,
-  // instead of guessing from symptoms alone.
-  function log(...args) { console.log('%c[call]', 'color:#f97316', ...args) }
-
   // Ending a call needs to be CONFIRMED, not fire-and-forget -- a call
   // that silently fails to disconnect on SignalWire's side leaves the
   // other party's phone connected indefinitely with no indication
@@ -116,18 +111,13 @@ export function CallProvider({ children }) {
   // attempt that could fail for an ordinary transient reason (network
   // blip, SignalWire API hiccup).
   async function endConferenceWithRetry(conferenceName, attempt = 1) {
-    log('ending conference', conferenceName, '(attempt', attempt + ')')
     const { data, error } = await supabase.functions.invoke('end-conference', { body: { conferenceName } })
     if (error || data?.error) {
-      log('end-conference FAILED:', error || data?.error)
       if (attempt < 3) {
         setTimeout(() => endConferenceWithRetry(conferenceName, attempt + 1), 2000)
       } else {
-        log('end-conference gave up after', attempt, 'attempts -- the other party may still be connected')
         showCallToast('⚠️ Could not confirm the call actually ended — check your phone, it may still be connected.')
       }
-    } else {
-      log('end-conference confirmed:', data)
     }
   }
 
@@ -523,3 +513,4 @@ export function CallProvider({ children }) {
 
   return <CallContext.Provider value={value}>{children}</CallContext.Provider>
 }
+
