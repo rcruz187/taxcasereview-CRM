@@ -14,6 +14,7 @@ import { ClientDocs } from './Clients'
 import InPlaceCaller from '../components/InPlaceCaller'
 import ChargeResolutionFeeModal from '../components/ChargeResolutionFeeModal'
 import FinancialIntakeView from '../components/FinancialIntakeView'
+import FinancialProfile from './FinancialProfile'
 import SendPaymentLinkModal from '../components/SendPaymentLinkModal'
 import SavedCardsPanel from '../components/SavedCardsPanel'
 import SplitPaymentModal from '../components/SplitPaymentModal'
@@ -1227,6 +1228,7 @@ export default function Leads() {
               {key:'tasks', icon:'✅', text:`Tasks (${leadTasks.length})`},
               {key:'payments', icon:'💳', text:'Payments'},
               {key:'finintake', icon:'💰', text:'Financial Intake'},
+              {key:'finprofile', icon:'🧮', text:'Financial Profile'},
               {key:'compliance', icon:'📋', text:'Compliance'},
               {key:'docs',  icon:'📁', text:'Documents'},
             ].map(t=>(
@@ -1380,6 +1382,11 @@ export default function Leads() {
             <div style={{padding:0}}>
               <ClientDocs clientName={l.name} supabase={supabase} showToast={showToast}/>
             </div>
+          )}
+          {leadDetailTab==='finprofile' && (
+            <ErrorBoundary>
+              <FinancialProfile clientName={l.name} client={l} isLead={true}/>
+            </ErrorBoundary>
           )}
           {leadDetailTab==='compliance' && (
             <div style={{padding:16}}>

@@ -130,30 +130,190 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
       answers, status: 'Submitted', submitted_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq('id', intakeId)
-    // Best-effort sync into the Lead's own record — only fields that are
-    // currently blank, so this never overwrites something a rep already
-    // verified and typed in manually. These three are the only Financial
-    // Intake answers that map 1:1 onto real Lead columns (the rest — income,
-    // assets, debts, expenses — don't have a corresponding structured field
-    // anywhere else in the CRM, so they stay in this record only).
+
+    // Sync core fields into the Lead record (same as before, unchanged).
     try {
       const { data: leadMatch } = await supabase.from('leads').select('id,dob,filingStatus,county').eq('name', record.client_name).maybeSingle()
       if (leadMatch) {
         const patch = {}
         if (!leadMatch.dob && answers.dob) patch.dob = answers.dob
         if (!leadMatch.filingStatus && answers.filing_status) {
-          // The wizard says "Widowed"; the Lead form's dropdown uses "Qualifying Widow(er)" — same option, different label.
           patch.filingStatus = answers.filing_status === 'Widowed' ? 'Qualifying Widow(er)' : answers.filing_status
         }
         if (!leadMatch.county && answers.county) patch.county = answers.county
         if (Object.keys(patch).length) await supabase.from('leads').update(patch).eq('id', leadMatch.id)
       }
     } catch (e) { console.error('Financial intake -> lead field sync error:', e) }
-    // Email a full copy of the submitted answers to the client. Best-effort:
-    // if this fails (no email on file, send-email hiccup, etc.) the
-    // submission itself is already saved above and the client still sees
-    // the Submitted confirmation screen -- losing the email shouldn't
-    // block or appear to undo a successful submission.
+
+    // ── Comprehensive sync into client_financial_profiles ──────────────────
+    // Maps all income, asset, expense, and debt answers into the structured
+    // profile the tax associate will review on the Financial Profile tabs
+    // (I&E, TO Intake, Assets & Equity). Non-destructive: upserts only --
+    // if a profile row already exists and a field is already filled in by a
+    // tax associate, we leave it alone and only fill blanks. This means a
+    // rep who did a quick intake over the phone and typed some notes won't
+    // get their work overwritten if the client later submits the wizard.
+    try {
+      const a = answers
+      const n = v => parseFloat(v) || 0
+
+      // Employment — wizard supports multiple jobs via `jobs_list` entries.
+      // Map the first two taxpayer jobs and first two spouse jobs into the
+      // four flat employment blocks the Financial Profile uses.
+      const jobs = a.jobs_list || []
+      const myJobs = jobs.filter(j => j.whose_job !== "My Spouse's")
+      const spouseJobs = jobs.filter(j => j.whose_job === "My Spouse's")
+      function mapJob(j) {
+        if (!j) return {}
+        return {
+          employer: j.employer || '',
+          position: j.position || '',
+          length_employed: j.length_employed || '',
+          pay_frequency: j.pay_frequency || '',
+          gross_monthly: n(j.gross_monthly),
+          fed_withheld: n(j.fed_withheld),
+          ss_med_withheld: n(j.ss_med_withheld),
+          state_withheld: n(j.state_withheld),
+        }
+      }
+
+      // Business — first two businesses from the wizard
+      const businesses = a.business_list || []
+      function mapBiz(b) {
+        if (!b) return {}
+        return {
+          business_name: b.business_name || '',
+          ein: b.ein || '',
+          structure: b.structure || '',
+          pct_ownership: b.pct_ownership || '',
+          num_employees: b.num_employees || '',
+          net_income_monthly: n(b.net_income_monthly),
+          notes: b.notes || '',
+        }
+      }
+
+      // Other income rows
+      const otherIncome = (a.other_income_list || []).map(r => ({
+        source: r.source || '',
+        amount: n(r.monthly_amount),
+      }))
+
+      // Real estate rows
+      const realEstate = (a.real_estate_list || []).map(r => ({
+        address: r.address || '',
+        property_type: r.property_type || '',
+        estimated_value: n(r.estimated_value),
+        mortgage_balance: n(r.mortgage_balance),
+        monthly_payment: n(r.monthly_payment),
+        rental_income: n(r.rental_income),
+      }))
+
+      // Vehicles rows
+      const vehicles = (a.vehicles_list || []).map(v => ({
+        make_model: v.make_model || '',
+        estimated_value: n(v.estimated_value),
+        remaining_balance: n(v.remaining_balance),
+        monthly_payment: n(v.monthly_payment),
+      }))
+
+      // Financial assets (bank/retirement/insurance)
+      const assets = (a.assets_list || []).map(asset => ({
+        asset_type: asset.asset_type || '',
+        description: asset.description || '',
+        value: n(asset.value),
+        loan_against: n(asset.loan_against),
+      }))
+
+      // Credit cards
+      const creditCards = (a.credit_cards_list || []).map(c => ({
+        card_name: c.card_name || '',
+        balance: n(c.balance),
+        credit_limit: n(c.credit_limit),
+        min_payment: n(c.min_payment),
+      }))
+
+      // Expenses -- direct 1:1 from schema IDs to profile expense object
+      const expenses = {
+        food_clothing: n(a.food_clothing),
+        housing: n(a.housing_payment),
+        homeowners_renters_insurance: n(a.homeowners_renters_insurance),
+        property_taxes: n(a.property_taxes),
+        hoa_dues: n(a.hoa_dues),
+        electricity: n(a.electricity),
+        water_sewer_trash: n(a.water_sewer_trash),
+        cell_phone: n(a.cell_phone),
+        internet: n(a.internet),
+        cable: n(a.cable),
+        maintenance: n(a.maintenance),
+        public_transportation: n(a.public_transportation),
+        car_misc: n(a.car_misc),
+        health_insurance: n(a.health_insurance),
+        health_dental_vision: n(a.health_dental_vision),
+        health_oop: n(a.health_oop),
+        child_care: n(a.child_care),
+        child_support: n(a.child_support),
+        court_judgment: n(a.court_judgment),
+        life_insurance: n(a.life_insurance),
+        irs_installment: n(a.irs_installment),
+        state_installment: n(a.state_installment),
+      }
+
+      // Other secured debt summary
+      const otherSecuredDebt = a.has_other_debt === 'Yes' ? {
+        monthly_payment: n(a.other_debt_payment),
+        remaining_balance: n(a.other_debt_balance),
+      } : {}
+
+      const profileData = {
+        client_name: record.client_name,
+        // Household/basic fields
+        dob: a.dob || null,
+        county: a.county || '',
+        filing_status: a.filing_status || '',
+        household_under_65: n(a.household_under_65),
+        household_over_65: n(a.household_over_65),
+        tax_years_not_filed: a.tax_years_not_filed || '',
+        has_lived_other_states: a.lived_other_states || '',
+        other_states_notes: a.other_states_notes || '',
+        // Employment
+        employment_taxpayer_1: myJobs[0] ? mapJob(myJobs[0]) : undefined,
+        employment_taxpayer_2: myJobs[1] ? mapJob(myJobs[1]) : undefined,
+        employment_spouse_1: spouseJobs[0] ? mapJob(spouseJobs[0]) : undefined,
+        employment_spouse_2: spouseJobs[1] ? mapJob(spouseJobs[1]) : undefined,
+        // Business
+        business_1: businesses[0] ? mapBiz(businesses[0]) : undefined,
+        business_2: businesses[1] ? mapBiz(businesses[1]) : undefined,
+        // Other income, real estate, vehicles, assets
+        other_income: otherIncome.length ? otherIncome : undefined,
+        real_estate: realEstate.length ? realEstate : undefined,
+        vehicles: vehicles.length ? vehicles : undefined,
+        assets: assets.length ? assets : undefined,
+        cash_on_hand: n(a.cash_on_hand),
+        // Debts
+        credit_cards: creditCards.length ? creditCards : undefined,
+        other_secured_debt: Object.keys(otherSecuredDebt).length ? otherSecuredDebt : undefined,
+        // Monthly expenses
+        expenses,
+        updated_at: new Date().toISOString(),
+      }
+
+      // Strip undefined values -- only upsert fields the intake actually
+      // collected so we don't accidentally zero out a field the tax associate
+      // typed in manually just because this intake question was optional and
+      // left blank.
+      const cleanProfile = Object.fromEntries(
+        Object.entries(profileData).filter(([, v]) => v !== undefined)
+      )
+
+      // Upsert by client_name -- inserts if no profile exists yet, updates
+      // (non-destructively by PostgreSQL's ON CONFLICT behavior) if one does.
+      await supabase.from('client_financial_profiles').upsert(cleanProfile, {
+        onConflict: 'client_name',
+        ignoreDuplicates: false,
+      })
+    } catch (e) { console.error('Financial intake -> financial profile sync error:', e) }
+
+    // Email a full copy of the submitted answers to the client.
     try { await sendIntakeCopyEmail(record, answers) } catch (e) { console.error('Financial intake copy email error:', e) }
     setSaving(false)
     setSubmitted(true)
