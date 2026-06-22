@@ -23,6 +23,7 @@ const SECTIONS = [
   { key: 'payments',   label: '💳 Payments' },
   { key: 'invoices',   label: '🧾 Invoices' },
   { key: 'ie',         label: '📊 Income & Expenses' },
+  { key: 'emails',     label: '📧 Emails' },
   { key: 'messages',   label: '💬 Messages' },
   { key: 'notes',      label: '📝 Notes' },
 ]
@@ -111,6 +112,8 @@ export default function ClientPortal() {
   const [notes, setNotes] = useState([])
   // SMS messages
   const [smsMessages, setSmsMessages] = useState([])
+  // Emails
+  const [clientEmails, setClientEmails] = useState([])
   // I&E
   const [financialProfile, setFinancialProfile] = useState(null)
   const [ieEdits, setIeEdits] = useState({})
@@ -145,7 +148,7 @@ export default function ClientPortal() {
   }
 
   async function loadAllData() {
-    const [{ data: comp }, { data: docsData }, { data: books }, { data: pays }, { data: notesData }, { data: orgs }, { data: invs }, { data: sms }, { data: fp }] = await Promise.all([
+    const [{ data: comp }, { data: docsData }, { data: books }, { data: pays }, { data: notesData }, { data: orgs }, { data: invs }, { data: sms }, { data: fp }, { data: emailsData }] = await Promise.all([
       supabase.from('client_compliance_records').select('*').eq('client_name', client.name),
       supabase.from('documents').select('*').eq('client', client.name).order('created_at', { ascending: false }),
       supabase.from('bookkeeping').select('*').eq('client_name', client.name).order('date', { ascending: false }),
@@ -154,6 +157,7 @@ export default function ClientPortal() {
       supabase.from('tax_organizer_responses').select('id,tax_year,status,updated_at').eq('client_name', client.name).order('tax_year', { ascending: false }),
       supabase.from('invoices').select('*').eq('clientName', client.name).neq('status', 'Paid').order('created_at', { ascending: false }),
       supabase.from('sms_messages').select('*').eq('clientName', client.name).order('created_at', { ascending: true }),
+      supabase.from('emails').select('*').eq('clientName', client.name).order('created_at', { ascending: false }),
       supabase.from('client_financial_profiles').select('*').eq('client_name', client.name).maybeSingle(),
     ])
     setRecords(comp || [])
@@ -164,6 +168,7 @@ export default function ClientPortal() {
     setOrganizers(orgs || [])
     setOpenInvoices(invs || [])
     setSmsMessages(sms || [])
+    setClientEmails(emailsData || [])
     setFinancialProfile(fp || null)
     setIeEdits(fp?.expenses || {})
     const firstWithData = FORM_TABS.find(t => (comp || []).some(r => r.form_type === t.key))
@@ -744,7 +749,21 @@ export default function ClientPortal() {
           </div>
         )}
 
-        {/* ── MESSAGES ── */}
+        {/* ── EMAILS ── */}
+        {section === 'emails' && (
+          <div>
+            <div style={{fontSize:12,color:'#64748b',marginBottom:16}}>All email correspondence between you and your Tax Case Review team.</div>
+            {clientEmails.length === 0 ? <Empty msg="No emails on file yet." /> : (
+              <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                {clientEmails.map(email => (
+                  <EmailCard key={email.id} email={email} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── MESSAGES ── */
         {section === 'messages' && (
           <div>
             <div style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>All text messages between you and your Tax Case Review team.</div>
@@ -791,6 +810,34 @@ export default function ClientPortal() {
         </div>
       </div>
       </div>
+    </div>
+  )
+}
+
+function EmailCard({ email }) {
+  const [expanded, setExpanded] = useState(false)
+  const isInbound = email.triage === 'Inbox'
+  return (
+    <div style={{background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.1)',borderRadius:10,overflow:'hidden'}}>
+      <div onClick={()=>setExpanded(e=>!e)} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'14px 16px',cursor:'pointer'}}>
+        <div style={{width:36,height:36,borderRadius:'50%',background:isInbound?'rgba(16,185,129,.2)':'rgba(59,130,246,.2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>
+          {isInbound ? '📩' : '📤'}
+        </div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+            <div style={{fontWeight:700,fontSize:13.5,color:'#f1f5f9',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{email.subject || '(No subject)'}</div>
+            <div style={{fontSize:11,color:'#64748b',flexShrink:0}}>{email.created_at ? new Date(email.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : ''}</div>
+          </div>
+          <div style={{fontSize:12,color:'#64748b',marginTop:3}}>{isInbound ? 'From you' : `From Tax Case Review`} · {email.status || 'Sent'}</div>
+          {!expanded && <div style={{fontSize:12,color:'#94a3b8',marginTop:4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{email.body?.replace(/<[^>]*>/g,'') || ''}</div>}
+        </div>
+        <div style={{color:'#64748b',fontSize:12,flexShrink:0}}>{expanded ? '▲' : '▼'}</div>
+      </div>
+      {expanded && (
+        <div style={{padding:'0 16px 16px',borderTop:'1px solid rgba(255,255,255,.06)'}}>
+          <div style={{fontSize:13,color:'#cbd5e1',lineHeight:1.7,marginTop:12,whiteSpace:'pre-wrap'}}>{email.body?.replace(/<[^>]*>/g,'') || '(No content)'}</div>
+        </div>
+      )}
     </div>
   )
 }
