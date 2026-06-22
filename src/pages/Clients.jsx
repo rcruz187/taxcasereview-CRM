@@ -368,8 +368,8 @@ function InlinePortalForm({ client, onClose, showToast }) {
         const { error } = await supabase.functions.invoke('send-email', {
           body: {
             to: client.email,
-            subject: `Your Tax Compliance Information — Tax Case Review`,
-            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${client.name}</strong>,</p><p>You can now view your tax compliance information online — filing status, balances, and key dates for each tax year on file.</p><p style="text-align:center;margin:24px 0"><a href="${url}" style="background:#3b82f6;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">View My Information</a></p><p style="font-size:12px;color:#64748b">You'll be asked to confirm your email and the last 4 digits of your SSN to access your information. Link: ${url}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
+            subject: `Welcome to Your Tax Case Review Client Portal`,
+            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#111"><div style="font-size:20px;font-weight:800;color:#1d4ed8;margin-bottom:4px">Tax Case Review</div><div style="font-size:12px;color:#64748b;margin-bottom:24px;border-bottom:1px solid #e2e8f0;padding-bottom:16px">631 US Highway One Ste 304, North Palm Beach, FL 33408</div><p style="font-size:15px">Dear <strong>${client.name}</strong>,</p><p style="font-size:14px;line-height:1.7;color:#334155">Welcome to Tax Case Review! Your personal Client Portal is now ready. You can log in anytime to stay up to date on your case and manage your account — all in one place.</p><p style="font-size:13px;font-weight:700;color:#1d4ed8;margin-bottom:6px">Here's what you can do in your portal:</p><ul style="font-size:13px;line-height:2;color:#334155;padding-left:20px;margin:0 0 20px"><li>📋 <strong>Compliance</strong> — View your IRS filing status, balances, liens, and key dates for each tax year</li><li>🧾 <strong>Tax Organizer</strong> — Fill out your tax organizer online for any year that needs to be filed</li><li>📁 <strong>Documents</strong> — Access and upload documents to your file</li><li>💳 <strong>Payments</strong> — Set up or manage your monthly payment plan and view payment history</li><li>🧾 <strong>Invoices</strong> — View and pay any outstanding invoices</li><li>📊 <strong>Income &amp; Expenses</strong> — Update your monthly income and expense information</li><li>💬 <strong>Messages</strong> — View your text message history with your advisor</li><li>📝 <strong>Notes</strong> — Read updates posted by your representative</li></ul><p style="text-align:center;margin:28px 0"><a href="${url}" style="background:#1d4ed8;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Access My Client Portal</a></p><p style="font-size:12px;color:#64748b;text-align:center">You'll be asked to confirm your email address and the last 4 digits of your SSN to log in.</p><p style="font-size:13px;line-height:1.7;color:#334155;margin-top:20px">If you have any questions at any time, please don't hesitate to reach out to your Tax Case Review representative — we're here to help every step of the way.</p><p style="font-size:13px;color:#334155">Warm regards,<br/><strong>Tax Case Review Team</strong></p><div style="font-size:11px;color:#94a3b8;margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408 · Direct link: ${url}</div></div>`
           }
         })
         if (!error) emailSent = true
@@ -379,7 +379,7 @@ function InlinePortalForm({ client, onClose, showToast }) {
       try {
         const r = await fetch(cfg.signalwire_backend + '/sms/send', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: client.phone, body: `Hi ${client.name}, view your tax compliance info here: ${url} (you'll need the last 4 of your SSN to access it)` })
+          body: JSON.stringify({ to: client.phone, body: `Hi ${client.name}, your Tax Case Review Client Portal is ready! View your case, documents, invoices, and more here: ${url} (you'll need your email + last 4 of your SSN to log in)` })
         })
         const d = await r.json()
         if (d.success) smsSent = true
@@ -2279,5 +2279,6 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
     </div>
   )
 }
+
 
 
