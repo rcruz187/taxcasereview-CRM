@@ -1438,7 +1438,7 @@ export default function Leads() {
 
         {/* Info grid — side by side like clients, shown only on the Overview tab */}
         {leadDetailTab==='overview' && (
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+        <div className="detail-2col" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
           <div className="card">
             <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>Contact Info</div>
             {[['Phone',l.phone],['Phone 2',l.phone2],['Email',l.email],['SSN',l.ssn?'***-**-'+l.ssn.replace(/-/g,'').slice(-4):null],['EIN',l.ein],['Date of Birth',l.dob],['Filing Status',l.filingStatus],['Spouse Name',l.spouseName],['Spouse DOB',l.spouseDob],['Spouse SSN',l.spouseSsn?'***-**-'+l.spouseSsn.replace(/-/g,'').slice(-4):null],['Address',[l.street,l.city,l.state,l.zip].filter(Boolean).join(', ')],['County',l.county],['Source',l.source]].map(([label,val])=>(

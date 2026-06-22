@@ -690,6 +690,10 @@ tbody tr:hover td { background: var(--s2); cursor: pointer; }
 
   /* Same for the public client meeting room */
   .meeting-tile { width: 100% !important; max-width: 280px; }
+
+  /* Clients/Leads detail pages: Overview tab's 2-column layout (contact
+     info beside other cards) stacks to 1 column on phone width. */
+  .detail-2col { grid-template-columns: 1fr !important; }
 }
 
 
