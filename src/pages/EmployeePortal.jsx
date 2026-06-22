@@ -290,7 +290,7 @@ export default function EmployeePortal() {
           onKeyDown={e => e.key === 'Enter' && handleLogin()}
           placeholder="you@taxcasereview.org"
           autoComplete="off"
-          style={{ width: '100%', padding: '14px 16px', background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 12, color: '#f1f5f9', fontSize: 15, outline: 'none', boxSizing: 'border-box', marginBottom: 14, fontFamily: 'inherit', WebkitBoxShadow: '0 0 0 1000px #0f172a inset', WebkitTextFillColor: '#f1f5f9' }}
+          style={{ width: '100%', padding: '14px 16px', background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 12, color: '#f1f5f9', fontSize: 15, outline: 'none', boxSizing: 'border-box', marginBottom: 14, fontFamily: 'inherit', colorScheme: 'dark' }}
           autoFocus
         />
         <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 6 }}>PIN</label>
@@ -302,7 +302,7 @@ export default function EmployeePortal() {
           placeholder="••••"
           inputMode="numeric"
           autoComplete="off"
-          style={{ width: '100%', padding: '14px 16px', background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 12, color: '#f1f5f9', fontSize: 24, letterSpacing: 10, outline: 'none', boxSizing: 'border-box', marginBottom: 14, fontFamily: 'inherit', textAlign: 'center', WebkitBoxShadow: '0 0 0 1000px #0f172a inset', WebkitTextFillColor: '#f1f5f9' }}
+          style={{ width: '100%', padding: '14px 16px', background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 12, color: '#f1f5f9', fontSize: 24, letterSpacing: 10, outline: 'none', boxSizing: 'border-box', marginBottom: 14, fontFamily: 'inherit', textAlign: 'center', colorScheme: 'dark' }}
         />
         {loginErr && <p style={{ color: '#f87171', fontSize: 13, margin: '0 0 12px', textAlign: 'center' }}>{loginErr}</p>}
         <button onClick={handleLogin} disabled={logging || !loginEmail.trim() || !pin.trim()}
