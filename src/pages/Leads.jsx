@@ -646,6 +646,38 @@ export default function Leads() {
 
   function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''),3000) }
   function fld(k,v) { setForm(f=>({...f,[k]:v})) }
+
+  function fmtPhone(v) {
+    const d = v.replace(/\D/g,'').slice(0,10)
+    if (d.length <= 3) return d
+    if (d.length <= 6) return `(${d.slice(0,3)}) ${d.slice(3)}`
+    return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`
+  }
+  function fmtSsn(v) {
+    const d = v.replace(/\D/g,'').slice(0,9)
+    if (d.length <= 3) return d
+    if (d.length <= 5) return `${d.slice(0,3)}-${d.slice(3)}`
+    return `${d.slice(0,3)}-${d.slice(3,5)}-${d.slice(5)}`
+  }
+  function fmtEin(v) {
+    const d = v.replace(/\D/g,'').slice(0,9)
+    if (d.length <= 2) return d
+    return `${d.slice(0,2)}-${d.slice(2)}`
+  }
+  async function handleZip(v) {
+    const d = v.replace(/\D/g,'').slice(0,5)
+    fld('zip', d)
+    if (d.length === 5) {
+      try {
+        const r = await fetch(`https://api.zippopotam.us/us/${d}`)
+        if (r.ok) {
+          const data = await r.json()
+          const place = data.places?.[0]
+          if (place) setForm(f=>({...f, zip:d, city: place['place name'], state: place['state abbreviation']}))
+        }
+      } catch(e) {}
+    }
+  }
   // Tab buttons swap content of different heights, which lets the browser
   // naturally clamp .page-content's scroll position toward the top. Capture
   // it before the switch and lock it back using a MutationObserver, which
@@ -1221,13 +1253,13 @@ export default function Leads() {
               <div className="field"><label>Last Name{form.clientType==='Individual'?' *':''}</label><input value={form.last} onChange={e=>fldLast(e.target.value)}/></div>
             </div>
             <div className="fg2">
-              <div className="field"><label>Phone</label><input value={form.phone} onChange={e=>fld('phone',e.target.value)} placeholder="(305) 555-0000"/></div>
-              <div className="field"><label>Phone 2 <span style={{color:'var(--t3)',fontWeight:400}}>(optional)</span></label><input value={form.phone2||''} onChange={e=>fld('phone2',e.target.value)} placeholder="(305) 555-0000"/></div>
+              <div className="field"><label>Phone</label><input value={form.phone} onChange={e=>fld('phone',fmtPhone(e.target.value))} placeholder="(305) 555-0000" maxLength={14}/></div>
+              <div className="field"><label>Phone 2 <span style={{color:'var(--t3)',fontWeight:400}}>(optional)</span></label><input value={form.phone2||''} onChange={e=>fld('phone2',fmtPhone(e.target.value))} placeholder="(305) 555-0000" maxLength={14}/></div>
               <div className="field"><label>Email</label><input value={form.email} onChange={e=>fld('email',e.target.value)}/></div>
             </div>
             <div className="fg3">
-              <div className="field"><label>SSN</label><input value={form.ssn} onChange={e=>fld('ssn',e.target.value)} placeholder="XXX-XX-XXXX" maxLength={11}/></div>
-              <div className="field"><label>EIN (if business)</label><input value={form.ein||''} onChange={e=>fld('ein',e.target.value)} placeholder="XX-XXXXXXX"/></div>
+              <div className="field"><label>SSN</label><input value={form.ssn} onChange={e=>fld('ssn',fmtSsn(e.target.value))} placeholder="XXX-XX-XXXX" maxLength={11}/></div>
+              <div className="field"><label>EIN (if business)</label><input value={form.ein||''} onChange={e=>fld('ein',fmtEin(e.target.value))} placeholder="XX-XXXXXXX" maxLength={10}/></div>
               <div className="field"><label>Date of Birth</label><input type="date" value={form.dob} onChange={e=>fld('dob',e.target.value)}/></div>
             </div>
 
@@ -1236,7 +1268,7 @@ export default function Leads() {
               <div style={{fontWeight:700,fontSize:12,marginBottom:8}}>👥 Spouse / Partner</div>
               <div className="fg2">
                 <div className="field"><label>Spouse Full Name</label><input value={form.spouseName||''} onChange={e=>fld('spouseName',e.target.value)}/></div>
-                <div className="field"><label>Spouse SSN</label><input value={form.spouseSsn||''} onChange={e=>fld('spouseSsn',e.target.value)} placeholder="XXX-XX-XXXX" maxLength={11}/></div>
+                <div className="field"><label>Spouse SSN</label><input value={form.spouseSsn||''} onChange={e=>fld('spouseSsn',fmtSsn(e.target.value))} placeholder="XXX-XX-XXXX" maxLength={11}/></div>
               </div>
               <div className="fg2">
                 <div className="field"><label>Spouse Date of Birth</label><input type="date" value={form.spouseDob||''} onChange={e=>fld('spouseDob',e.target.value)}/></div>
@@ -1256,7 +1288,7 @@ export default function Leads() {
                   <option value="">Select...</option>{STATES.map(s=><option key={s}>{s}</option>)}
                 </select>
               </div>
-              <div className="field"><label>ZIP</label><input value={form.zip} onChange={e=>fld('zip',e.target.value)}/></div>
+              <div className="field"><label>ZIP</label><input value={form.zip} onChange={e=>handleZip(e.target.value)} maxLength={5} placeholder="33408"/></div>
             </div>
             <div className="fg2">
               <div className="field"><label>Source</label>
