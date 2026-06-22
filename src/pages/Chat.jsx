@@ -79,6 +79,7 @@ export default function Chat() {
   const [reacting, setReacting]   = useState(null) // msg id
   const [reactions, setReactions] = useState({})   // { msgId: { emoji: count } }
   const [showMembers, setShowMembers] = useState(false)
+  const [showChannelsMobile, setShowChannelsMobile] = useState(false)
   const [newChanName, setNewChanName] = useState('')
   const [showNewChan, setShowNewChan] = useState(false)
   const [extraChans, setExtraChans]   = useState([])
@@ -164,6 +165,7 @@ export default function Chat() {
   function switchTo(item) {
     setActive(item); setShowEmoji(false); setThread(null)
     setReacting(null); setShowSearch(false); setSearchQ('')
+    setShowChannelsMobile(false)
   }
 
   function addReaction(msgId, emoji) {
@@ -285,7 +287,9 @@ export default function Chat() {
       <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
       {/* ── LEFT SIDEBAR ── */}
-      <div style={s.sidebar}>
+      {showChannelsMobile && <div className="chat-sidebar-backdrop" onClick={() => setShowChannelsMobile(false)} />}
+      <div style={s.sidebar} className={`chat-channel-sidebar${showChannelsMobile ? ' mobile-open' : ''}`}>
+        <button onClick={() => setShowChannelsMobile(false)} className="chat-sidebar-close-btn" aria-label="Close">×</button>
 
         {/* Workspace header */}
         <div style={{ padding: '14px 14px 12px', borderBottom: '1px solid #1e293b', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
@@ -412,7 +416,7 @@ export default function Chat() {
         {/* Huddle banner */}
         {huddle && (
           <div>
-          <div style={{ background: 'linear-gradient(90deg,#14532d,#15803d)', padding: '7px 20px', display: 'flex', alignItems: 'center', gap: 12, fontSize: 13, color: '#dcfce7', flexShrink: 0, borderBottom: '1px solid #16a34a' }}>
+          <div style={{ background: 'linear-gradient(90deg,#14532d,#15803d)', padding: '7px 20px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, fontSize: 13, color: '#dcfce7', flexShrink: 0, borderBottom: '1px solid #16a34a' }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4ade80', display: 'inline-block' }}/>
             <span style={{ fontWeight: 700 }}>Huddle</span>
             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
@@ -446,11 +450,11 @@ export default function Chat() {
             <div style={{ background: '#451a03', color: '#fdba74', fontSize: 12, padding: '6px 20px', borderBottom: '1px solid #92400e' }}>{webrtc.error}</div>
           )}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: 14, background: '#0a0f1a', borderBottom: '1px solid #1e293b', maxHeight: 340, overflowY: 'auto', flexShrink: 0 }}>
-            <div style={{ width: 340, flexShrink: 0 }}>
+            <div className="chat-huddle-tile" style={{ width: 340, flexShrink: 0 }}>
               <VideoTile stream={webrtc.localStreamRef.current} name={myName} label={`${myName} (you)`} muted mirror videoEnabled={cameraOn} />
             </div>
             {huddleMembers.filter(n => n !== myName).map(n => (
-              <div key={n} style={{ width: 340, flexShrink: 0 }}>
+              <div key={n} className="chat-huddle-tile" style={{ width: 340, flexShrink: 0 }}>
                 <VideoTile stream={webrtc.remoteStreams[n]} name={n} />
               </div>
             ))}
@@ -460,6 +464,10 @@ export default function Chat() {
 
         {/* Channel header */}
         <div style={{ height: 52, borderBottom: '1px solid #1e293b', display: 'flex', alignItems: 'center', padding: '0 20px', gap: 12, flexShrink: 0, background: '#0f172a' }}>
+          <button onClick={() => setShowChannelsMobile(true)} title="Channels" className="chat-channel-toggle-btn"
+            style={{ width: 32, height: 32, background: '#1e293b', border: '1px solid #334155', borderRadius: 6, color: '#94a3b8', cursor: 'pointer', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 16, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: 6 }}>
               {isChannel ? <><span style={{ color: '#475569', fontWeight: 400, fontSize: 18 }}>#</span>{active.label}</> : active.name}
@@ -601,7 +609,7 @@ export default function Chat() {
 
           {/* Members panel */}
           {showMembers && (
-            <div style={{ width: 220, flexShrink: 0, borderLeft: '1px solid #1e293b', background: '#0d1526', padding: '16px 0', overflowY: 'auto' }}>
+            <div className="chat-members-panel" style={{ width: 220, flexShrink: 0, borderLeft: '1px solid #1e293b', background: '#0d1526', padding: '16px 0', overflowY: 'auto' }}>
               <div style={{ padding: '0 16px 10px', fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.07em' }}>Members — {TEAM.length}</div>
               {TEAM.map(m => (
                 <div key={m.id} onClick={() => { switchTo(m); setShowMembers(false) }} style={{ padding: '7px 16px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
