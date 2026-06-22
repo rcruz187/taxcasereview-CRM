@@ -169,9 +169,17 @@ export default function Employees() {
     setLoading(false)
   }
 
-  function openNew() {
+  async function openNew() {
     setEditing(null)
-    setForm(blankEmp)
+    const { data: empIds } = await supabase.from('employees').select('employee_id')
+    let nextNum = 100
+    if (empIds?.length) {
+      const nums = empIds
+        .map(e => parseInt((e.employee_id || '').replace(/\D/g, '')) || 0)
+        .filter(n => n > 0)
+      if (nums.length) nextNum = Math.max(...nums) + 1
+    }
+    setForm({ ...blankEmp, employeeId: `TCR-${nextNum}` })
     setTab('info')
     setShowForm(true)
   }
@@ -187,21 +195,26 @@ export default function Employees() {
     setForm(f => ({ ...f, access: role, ...ROLE_PERM_DEFAULTS[role] }))
   }
 
-  async function save() {
-    if (!form.name || !form.email) return showToast('Name and email required', 'err')
+  async function save(silent = false) {
+    if (!form.name || !form.email) { if (!silent) showToast('Name and email required', 'err'); return false }
     setSaving(true)
     const payload = toDbPayload(form)
-    let error
+    let error, data
     if (editing) {
       ({ error } = await supabase.from('employees').update(payload).eq('id', editing))
     } else {
-      ({ error } = await supabase.from('employees').insert([payload]))
+      ({ error, data } = await supabase.from('employees').insert([payload]).select().single())
+      // After first insert, switch to edit mode so subsequent tab saves use update
+      if (!error && data?.id) setEditing(data.id)
     }
     setSaving(false)
-    if (error) return showToast(error.message, 'err')
-    showToast(editing ? 'Employee updated!' : 'Employee added!')
-    setShowForm(false)
+    if (error) { if (!silent) showToast(error.message, 'err'); return false }
+    if (!silent) {
+      showToast(editing ? 'Employee updated!' : 'Employee added!')
+      setShowForm(false)
+    }
     load()
+    return true
   }
 
   async function remove(id) {
@@ -388,7 +401,7 @@ export default function Employees() {
             {/* Tabs */}
             <div style={{ display: 'flex', gap: 4, padding: '12px 24px 0', borderBottom: '1px solid var(--br)' }}>
               {['info', ...(can('edit','employees') || form.email === user?.email ? ['irs'] : []), 'pay', ...(editing ? ['documents'] : []), 'permissions'].map(t => (
-                <button key={t} onClick={() => setTab(t)} style={{
+                <button key={t} onClick={async () => { if (showForm && !editing) { await save(true) } setTab(t) }} style={{
                   padding: '8px 18px', borderRadius: '8px 8px 0 0',
                   border: '1px solid var(--br)', borderBottom: tab === t ? '1px solid var(--sf)' : '1px solid var(--br)',
                   background: tab === t ? 'var(--sf)' : 'var(--s2)',
