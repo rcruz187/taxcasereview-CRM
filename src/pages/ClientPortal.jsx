@@ -299,9 +299,10 @@ export default function ClientPortal() {
   if (!unlocked) return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <div style={{ textAlign: 'center', marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa', letterSpacing: '.1em', textTransform: 'uppercase' }}>Tax Case Review</div>
-          <div style={{ fontSize: 19, fontWeight: 800, color: '#fff', marginTop: 6 }}>Client Portal</div>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style={{ height: 52, marginBottom: 14, objectFit: 'contain' }} onError={{e=>e.currentTarget.style.display='none'}}/>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 4 }}>Client Portal</div>
+          <div style={{ width: 40, height: 2, background: 'linear-gradient(90deg,transparent,#3b82f6,transparent)', margin: '0 auto' }}></div>
         </div>
         <div style={{ fontSize: 13, color: '#cbd5e1', textAlign: 'center', marginBottom: 18, lineHeight: 1.6 }}>
           Hi {client?.name}, please verify your identity to view your information.
@@ -345,13 +346,22 @@ export default function ClientPortal() {
 
   return (
     <div style={styles.page}>
+      {/* Background glow orbs */}
+      <div style={{ position:'fixed', inset:0, pointerEvents:'none', zIndex:0, overflow:'hidden' }}>
+        <div style={{ position:'absolute', top:'-10%', left:'-5%', width:500, height:500, borderRadius:'50%', background:'radial-gradient(circle,rgba(29,78,216,.18) 0%,transparent 70%)' }}/>
+        <div style={{ position:'absolute', bottom:'-15%', right:'-10%', width:600, height:600, borderRadius:'50%', background:'radial-gradient(circle,rgba(14,165,233,.12) 0%,transparent 70%)' }}/>
+        <div style={{ position:'absolute', top:'40%', right:'20%', width:300, height:300, borderRadius:'50%', background:'radial-gradient(circle,rgba(99,102,241,.08) 0%,transparent 70%)' }}/>
+      </div>
+      <div style={{ position:'relative', zIndex:1, width:'100%', display:'flex', alignItems:'center', justifyContent:'center' }}>
       {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#0f172a', border: '1px solid rgba(255,255,255,.15)', borderRadius: 8, padding: '10px 18px', color: '#f1f5f9', fontSize: 13, fontWeight: 600, zIndex: 1100, boxShadow: '0 8px 24px rgba(0,0,0,.4)' }}>{toast}</div>}
       <div style={{ ...styles.card, maxWidth: 880 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', letterSpacing: '.1em', textTransform: 'uppercase' }}>Tax Case Review</div>
-            <div style={{ fontSize: 19, fontWeight: 800, color: '#fff', marginTop: 4 }}>{client?.name}</div>
-            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>Client Portal</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style={{ height: 44, objectFit: 'contain' }} onError={{e=>e.currentTarget.style.display='none'}}/>
+            <div>
+              <div style={{ fontSize: 19, fontWeight: 800, color: '#fff' }}>{{client?.name}}</div>
+              <div style={{ fontSize: 12, color: '#60a5fa', marginTop: 2, fontWeight: 600 }}>Client Portal</div>
+            </div>
           </div>
         </div>
 
@@ -762,6 +772,7 @@ export default function ClientPortal() {
           Questions about this information? Contact your Tax Case Review representative.
         </div>
       </div>
+      </div>
     </div>
   )
 }
@@ -782,10 +793,12 @@ function StatBox({ label, value, color }) {
 const styles = {
   page: {
     minHeight: '100vh',
-    background: 'linear-gradient(160deg,#071c30 0%,#0a2f4e 55%,#0a3f60 100%)',
+    background: 'linear-gradient(160deg,#040e1c 0%,#071a30 40%,#0a2a48 70%,#0a3558 100%)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     padding: '32px 16px',
     fontFamily: '"DM Sans", system-ui, sans-serif',
+    position: 'relative',
+    overflow: 'hidden',
   },
   card: {
     background: 'rgba(255,255,255,.06)',
