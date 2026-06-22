@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
@@ -77,6 +77,67 @@ function TypeBdg({t,style}) {
   return <span className={`bdg ${m[t]||'bn'}`} style={style}>{t}</span>
 }
 
+
+const menuBtnStyle = {
+  display:'block', width:'100%', textAlign:'left', padding:'9px 14px', fontSize:12.5,
+  background:'none', border:'none', color:'var(--tx)', cursor:'pointer'
+}
+function PhoneLink({val, name}) {
+  const nav = useNavigate()
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [open])
+
+  if (!val) return <span style={{color:'var(--t3)'}}>—</span>
+  const digits = val.replace(/\D/g,'')
+
+  function callNow() {
+    sessionStorage.setItem('dialerNumber', digits)
+    sessionStorage.setItem('dialerName', name||'')
+    nav('/dialer')
+    setOpen(false)
+  }
+  function addToQueue() {
+    const queue = JSON.parse(sessionStorage.getItem('dialerQueue')||'[]')
+    queue.push({ name: name||'', phone: digits })
+    sessionStorage.setItem('dialerQueue', JSON.stringify(queue))
+    setOpen(false)
+  }
+  function copyNumber() {
+    navigator.clipboard?.writeText(val)
+    setOpen(false)
+  }
+
+  return (
+    <div ref={ref} style={{position:'relative',display:'inline-block'}}>
+      <span
+        onClick={() => setOpen(o=>!o)}
+        style={{color:'var(--blue)',fontWeight:600,display:'inline-flex',alignItems:'center',gap:5,cursor:'pointer'}}
+        onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
+        onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.18 1h3a2 2 0 012 1.72 12.05 12.05 0 00.7 2.81 2 2 0 01-.45 2.11L4.91 8.15a16 16 0 006.29 6.29l1.51-1.52a2 2 0 012.11-.45 12.05 12.05 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+        {val}
+      </span>
+      {open && (
+        <div style={{
+          position:'absolute', top:'calc(100% + 4px)', left:0, zIndex:50,
+          background:'var(--s2)', border:'1px solid var(--br)', borderRadius:8,
+          boxShadow:'0 6px 20px rgba(0,0,0,.35)', minWidth:180, overflow:'hidden'
+        }}>
+          <button onClick={callNow} style={menuBtnStyle}>📞 Call via Dialer</button>
+          <button onClick={addToQueue} style={menuBtnStyle}>➕ Add to Call Queue</button>
+          <button onClick={copyNumber} style={menuBtnStyle}>📋 Copy Number</button>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function ActionBtn({color, icon, label, sub, onClick}) {
   return (
@@ -292,6 +353,7 @@ export default function Leads() {
   const [converting, setConverting] = useState(false)
   const [pkgSending, setPkgSending] = useState(false)
   const [intakeSending, setIntakeSending] = useState(false)
+  const [backfillingIntake, setBackfillingIntake] = useState(false)
   const [inlineFaxLead, setInlineFaxLead] = useState(null)
   const [showFaxModal, setShowFaxModal] = useState(false)
   const [inlineEsignLead, setInlineEsignLead] = useState(null)
@@ -708,6 +770,100 @@ export default function Leads() {
 
     load()
     if (detail?.id === l.id) loadLeadNotes(l.id)
+  }
+
+  async function backfillFromIntake(l) {
+    setBackfillingIntake(true)
+    try {
+      const { data: rec, error } = await supabase
+        .from('financial_intake_responses')
+        .select('answers')
+        .eq('lead_id', l.id)
+        .eq('status', 'Submitted')
+        .order('submitted_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (error || !rec) { showToast('No submitted intake found for this lead'); return }
+      const a = rec.answers
+      const n = v => parseFloat(v) || 0
+      const jobs = a.jobs_list || []
+      const myJobs = jobs.filter(j => j.whose_job !== "My Spouse's")
+      const spouseJobs = jobs.filter(j => j.whose_job === "My Spouse's")
+      function mapJob(j) {
+        if (!j) return {}
+        return { employer: j.employer||'', position: j.position||'', length_employed: j.length_employed||'',
+          pay_frequency: j.pay_frequency||'', gross_monthly: n(j.gross_monthly),
+          fed_withheld: n(j.fed_withheld), ss_med_withheld: n(j.ss_med_withheld), state_withheld: n(j.state_withheld) }
+      }
+      const businesses = a.business_list || []
+      function mapBiz(b) {
+        if (!b) return {}
+        return { business_name: b.business_name||'', ein: b.ein||'', structure: b.structure||'',
+          pct_ownership: b.pct_ownership||'', num_employees: b.num_employees||'',
+          net_income_monthly: n(b.net_income_monthly), notes: b.notes||'' }
+      }
+      const otherIncome = (a.other_income_list||[]).map(r => ({ source: r.source||'', amount: n(r.monthly_amount) }))
+      const realEstate = (a.real_estate_list||[]).map(r => ({
+        address: r.address||'', property_type: r.property_type||'',
+        estimated_value: n(r.estimated_value), mortgage_balance: n(r.mortgage_balance),
+        monthly_payment: n(r.monthly_payment), rental_income: n(r.rental_income)
+      }))
+      const vehicles = (a.vehicles_list||[]).map(v => ({
+        make_model: v.make_model||'', estimated_value: n(v.estimated_value),
+        remaining_balance: n(v.remaining_balance), monthly_payment: n(v.monthly_payment)
+      }))
+      const assets = (a.assets_list||[]).map(asset => ({
+        asset_type: asset.asset_type||'', description: asset.description||'',
+        value: n(asset.value), loan_against: n(asset.loan_against)
+      }))
+      const creditCards = (a.credit_cards_list||[]).map(c => ({
+        card_name: c.card_name||'', balance: n(c.balance),
+        credit_limit: n(c.credit_limit), min_payment: n(c.min_payment)
+      }))
+      const otherSecuredDebt = a.has_other_debt === 'Yes'
+        ? { monthly_payment: n(a.other_debt_payment), remaining_balance: n(a.other_debt_balance) } : {}
+      const expenses = {
+        food_clothing: n(a.food_clothing), housing: n(a.housing_payment),
+        homeowners_renters_insurance: n(a.homeowners_renters_insurance), property_taxes: n(a.property_taxes),
+        hoa_dues: n(a.hoa_dues), electricity: n(a.electricity), water_sewer_trash: n(a.water_sewer_trash),
+        cell_phone: n(a.cell_phone), internet: n(a.internet), cable: n(a.cable),
+        maintenance: n(a.maintenance), public_transportation: n(a.public_transportation),
+        car_misc: n(a.car_misc), health_insurance: n(a.health_insurance),
+        health_dental_vision: n(a.health_dental_vision), health_oop: n(a.health_oop),
+        child_care: n(a.child_care), child_support: n(a.child_support),
+        court_judgment: n(a.court_judgment), life_insurance: n(a.life_insurance),
+        irs_installment: n(a.irs_installment), state_installment: n(a.state_installment),
+      }
+      const profileData = {
+        client_name: l.name,
+        dob: a.dob || null, county: a.county||'', filing_status: a.filing_status||'',
+        household_under_65: n(a.household_under_65), household_over_65: n(a.household_over_65),
+        tax_years_not_filed: a.tax_years_not_filed||'', has_lived_other_states: a.lived_other_states||'',
+        other_states_notes: a.other_states_notes||'',
+        employment_taxpayer_1: myJobs[0] ? mapJob(myJobs[0]) : undefined,
+        employment_taxpayer_2: myJobs[1] ? mapJob(myJobs[1]) : undefined,
+        employment_spouse_1: spouseJobs[0] ? mapJob(spouseJobs[0]) : undefined,
+        employment_spouse_2: spouseJobs[1] ? mapJob(spouseJobs[1]) : undefined,
+        business_1: businesses[0] ? mapBiz(businesses[0]) : undefined,
+        business_2: businesses[1] ? mapBiz(businesses[1]) : undefined,
+        other_income: otherIncome.length ? otherIncome : undefined,
+        real_estate: realEstate.length ? realEstate : undefined,
+        vehicles: vehicles.length ? vehicles : undefined,
+        assets: assets.length ? assets : undefined,
+        cash_on_hand: n(a.cash_on_hand),
+        credit_cards: creditCards.length ? creditCards : undefined,
+        other_secured_debt: Object.keys(otherSecuredDebt).length ? otherSecuredDebt : undefined,
+        expenses,
+        updated_at: new Date().toISOString(),
+      }
+      const cleanProfile = Object.fromEntries(Object.entries(profileData).filter(([,v]) => v !== undefined))
+      const { error: upsertErr } = await supabase.from('client_financial_profiles').upsert(cleanProfile, {
+        onConflict: 'client_name', ignoreDuplicates: false
+      })
+      if (upsertErr) { showToast('Error syncing profile: ' + upsertErr.message) }
+      else { showToast('✅ Financial Profile populated from intake!') }
+    } catch (e) { showToast('Error: ' + e.message) }
+    finally { setBackfillingIntake(false) }
   }
 
   async function sendFinancialIntake(l) {
@@ -1248,6 +1404,7 @@ export default function Leads() {
         {/* Quick Actions — matches clients ActionBtn style */}
         <div className="card" style={{marginBottom:12}}>
           <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Quick Actions</div>
+          <div className="ovx">
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             <ActionBtn color="#0891b2" icon="📅" label="Schedule" sub="Book Appointment" onClick={()=>setBookingLead(l)}/>
             <ActionBtn color="#16a34a" icon="📦" label={pkgSending?'Building…':'Full Package'} sub="2848/8821 + Agreement" onClick={()=>!pkgSending&&handleSendFullPackage(l)}/>
@@ -1267,6 +1424,7 @@ export default function Leads() {
 
             <ActionBtn color="#dc2626" icon="📠" label="Send Fax" sub="SignalWire Fax" onClick={()=>{setInlineFaxLead(l);setShowFaxModal(true)}}/>
             <ActionBtn color="#7c3aed" icon="✍️" label="E-Signature" sub="Request Sign" onClick={()=>{setInlineEsignLead(l);setShowEsignModal(true)}}/>
+          </div>
           </div>
         </div>
 
@@ -1450,6 +1608,12 @@ export default function Leads() {
           )}
           {leadDetailTab==='finintake' && (
             <ErrorBoundary>
+              <div style={{padding:'10px 16px 0',display:'flex',justifyContent:'flex-end'}}>
+                <button className="btn sec" style={{fontSize:12,padding:'6px 14px'}}
+                  onClick={()=>backfillFromIntake(l)} disabled={backfillingIntake}>
+                  {backfillingIntake ? '⏳ Importing…' : '⬇️ Import into Financial Profile'}
+                </button>
+              </div>
               <FinancialIntakeView clientName={l.name}/>
             </ErrorBoundary>
           )}
@@ -1737,7 +1901,7 @@ export default function Leads() {
                 <tr key={l.id} onClick={()=>{ setDetail(l); loadLeadNotes(l.id); navigate('/leads/'+l.id, {replace:true}) }} style={{cursor:'pointer'}}>
                   <td style={{fontWeight:600}}>{l.name}</td>
                   <td><span className="bdg bb">{l.clientType||'Individual'}</span></td>
-                  <td>{l.phone||'—'}</td>
+                  <td onClick={e=>e.stopPropagation()}><PhoneLink val={l.phone} name={l.name}/></td>
                   <td><TypeBdg t={l.issueType||'—'}/></td>
                   <td style={{color:'var(--t2)'}}>{l.irsBalance||'—'}</td>
                   <td style={{color:'var(--t2)'}}>{l.source||'—'}</td>
@@ -1761,5 +1925,6 @@ export default function Leads() {
     </div>
   )
 }
+
 
 
