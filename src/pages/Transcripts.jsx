@@ -202,7 +202,7 @@ export default function Transcripts() {
                     {isExpanded&&(
                       <tr key={t.id+'detail'}>
                         <td colSpan={9} style={{padding:'10px 16px',background:'var(--s3)',borderBottom:'1px solid var(--br)'}}>
-                          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                          <div className="form-grid2" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
                             <div>
                               <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',marginBottom:6}}>Tax Years Requested</div>
                               <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>

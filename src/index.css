@@ -702,6 +702,18 @@ tbody tr:hover td { background: var(--s2); cursor: pointer; }
   /* Email: fixed 220px inbox sidebar would crush the compose/read area
      on a phone. Hide it and rely on the existing tab-switching instead. */
   .email-sidebar { display: none !important; }
+
+  /* Remaining fixed multi-column form grids in Employees, TaxReturns,
+     Transcripts -- all stack to 1 column on narrow screens. */
+  .form-grid2 { grid-template-columns: 1fr !important; }
+
+  /* Global table scroll: data tables in Payroll, TimeClock, Transcripts,
+     Reports, Estimates that lack an explicit ovx wrapper scroll
+     horizontally instead of overflowing. display:block + overflow-x:auto
+     on the table itself is the standard cross-browser technique (Bootstrap,
+     Tailwind, etc.) and doesn't affect table layout at all. Tables already
+     inside an ovx wrapper stay on the wrapper's scroll harmlessly. */
+  table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 }
 
 

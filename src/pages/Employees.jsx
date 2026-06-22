@@ -403,7 +403,7 @@ export default function Employees() {
               {/* Pay & HR tab */}
               {tab === 'pay' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  <div className="form-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                     <div className="field">
                       <label>Pay Type</label>
                       <select value={form.payType||'Hourly'} onChange={e => setForm(f => ({ ...f, payType: e.target.value }))}>
@@ -417,7 +417,7 @@ export default function Employees() {
                       <input type="number" step="0.01" value={form.hourlyRate||''} onChange={e => setForm(f => ({ ...f, hourlyRate: e.target.value }))} placeholder={form.payType==='Salary'?'52000':'25.00'}/>
                     </div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  <div className="form-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                     <div className="field">
                       <label>Payment Method</label>
                       <select value={form.paymentMethod||'Direct Deposit'} onChange={e => setForm(f => ({ ...f, paymentMethod: e.target.value }))}>
@@ -434,7 +434,7 @@ export default function Employees() {
                   {(form.paymentMethod === 'Direct Deposit' || !form.paymentMethod) && (
                     <div style={{ background:'var(--s2)', border:'1px solid var(--br)', borderRadius:8, padding:'12px 14px', marginBottom:4 }}>
                       <div style={{ fontSize:11, fontWeight:700, color:'var(--b2)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:10 }}>🏦 Direct Deposit Banking Info</div>
-                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+                      <div className="form-grid2" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
                         <div className="field">
                           <label>Bank Name</label>
                           <input value={form.bank_name||''} onChange={e => setForm(f => ({ ...f, bank_name: e.target.value }))} placeholder="Chase Bank"/>
@@ -459,7 +459,7 @@ export default function Employees() {
                   )}
                   <div style={{ background:'var(--s2)', border:'1px solid var(--br)', borderRadius:8, padding:'12px 14px', marginBottom:4 }}>
                     <div style={{ fontSize:11, fontWeight:700, color:'var(--b2)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:10 }}>🌴 Time Off Balances</div>
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:14 }}>
+                    <div className="form-grid2" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:14 }}>
                       <div className="field">
                         <label>PTO days</label>
                         <input type="number" step="0.5" value={form.pto_balance??0} onChange={e => setForm(f => ({ ...f, pto_balance: e.target.value }))}/>
@@ -475,7 +475,7 @@ export default function Employees() {
                     </div>
                     <div style={{ fontSize:11, color:'var(--t3)', marginTop:8 }}>Approving a request on the Time Off page automatically deducts the days from the matching balance here.</div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  <div className="form-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                     <div className="field">
                       <label>Emergency Contact Name</label>
                       <input value={form.emergencyContact||''} onChange={e => setForm(f => ({ ...f, emergencyContact: e.target.value }))} placeholder="Jane Doe"/>
@@ -507,7 +507,7 @@ export default function Employees() {
                     <span>🔒</span>
                     <span>This information is only visible to admins and this employee. Used when calling the IRS or logging into the IRS e-Services portal (SOR).</span>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  <div className="form-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                     <div className="field">
                       <label>CAF Number</label>
                       <input value={form.caf||''} onChange={e => setForm(f => ({ ...f, caf: e.target.value }))} placeholder="0312-27862R"/>
@@ -517,7 +517,7 @@ export default function Employees() {
                       <input value={form.ptin||''} onChange={e => setForm(f => ({ ...f, ptin: e.target.value }))} placeholder="P01982875"/>
                     </div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  <div className="form-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                     <div className="field">
                       <label>SOR Short ID</label>
                       <input value={form.sorShortId||''} onChange={e => setForm(f => ({ ...f, sorShortId: e.target.value }))} placeholder="JBF1CGA29O"/>
@@ -533,7 +533,7 @@ export default function Employees() {
 
               {tab === 'info' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  <div className="form-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                     <div className="field">
                       <label>Full Name *</label>
                       <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Jane Doe" />
@@ -543,7 +543,7 @@ export default function Employees() {
                       <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="jane@taxcasereview.org" />
                     </div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  <div className="form-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                     <div className="field">
                       <label>Phone</label>
                       <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="(555) 555-5555" />
@@ -553,7 +553,7 @@ export default function Employees() {
                       <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Tax Analyst" />
                     </div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  <div className="form-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                     <div className="field">
                       <label>Employee ID</label>
                       <input value={form.employeeId} onChange={e => setForm(f => ({ ...f, employeeId: e.target.value }))} placeholder="e.g. TCR-100" />

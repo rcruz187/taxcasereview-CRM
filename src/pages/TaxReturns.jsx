@@ -356,7 +356,7 @@ export default function TaxReturns() {
       {/* Client + Meta */}
       <div className="card" style={{ marginBottom: 12 }}>
         <div style={{ fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--t3)', marginBottom: 10 }}>Return Info</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px', gap: 10, marginBottom: 10 }}>
+        <div className="form-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 130px', gap: 10, marginBottom: 10 }}>
           <div className="field" style={{ margin: 0 }}>
             <label>Client *</label>
             <input list="client-list" value={form.clientName} onChange={e => onClientChange(e.target.value)} placeholder="Type client name…"/>
@@ -369,7 +369,7 @@ export default function TaxReturns() {
             </select>
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+        <div className="form-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
           <div className="field" style={{ margin: 0 }}>
             <label>Return Type</label>
             <select value={form.returnType} onChange={e => fld('returnType', e.target.value)}>
@@ -440,7 +440,7 @@ export default function TaxReturns() {
             <MoneyField label="Alimony Paid (pre-2019 agreements)" field="alimonyPaid"/>
             <MoneyField label="Other Adjustments" field="otherAdjustments"/>
           </div>
-          <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div className="form-grid2" style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div style={{ padding: '10px 14px', background: 'var(--s3)', borderRadius: 6 }}>
               <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 2 }}>Total Adjustments</div>
               <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--bad)' }}>-{fmt(totals.adjustments)}</div>
@@ -494,7 +494,7 @@ export default function TaxReturns() {
             </>
           )}
 
-          <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div className="form-grid2" style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div style={{ padding: '10px 14px', background: 'var(--s3)', borderRadius: 6 }}>
               <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 2 }}>Total Deduction</div>
               <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--bad)' }}>-{fmt(totals.deductions)}</div>
@@ -518,7 +518,7 @@ export default function TaxReturns() {
             <MoneyField label="Education Credit" field="educationCredit" help="Form 8863"/>
             <MoneyField label="Other Credits" field="otherCredits"/>
           </div>
-          <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div className="form-grid2" style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div style={{ padding: '10px 14px', background: 'var(--s3)', borderRadius: 6 }}>
               <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 2 }}>Est. Tax Before Credits</div>
               <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--warn)' }}>{fmt(totals.tax)}</div>
@@ -673,7 +673,7 @@ export default function TaxReturns() {
             {/* Preparer info card */}
             <div className="card" style={{ marginBottom: 14 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)', marginBottom: 12 }}>🪪 Preparer Credentials</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12, maxWidth: 600 }}>
+              <div className="form-grid2" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12, maxWidth: 600 }}>
                 <div className="field" style={{ margin: 0 }}><label>Preparer Name</label>
                   <input value={preparer.name} onChange={e => setPreparer(p => ({...p, name: e.target.value}))} placeholder="Your name" />
                 </div>
