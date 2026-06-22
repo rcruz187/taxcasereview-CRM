@@ -211,16 +211,15 @@ export default function Sidebar() {
 
   useEffect(() => {
     async function loadEmailTaskCounts() {
-      // Count ALL unread emails (Inbox + Action Needed + Waiting — anything not Archive/Sent)
+      // Count ALL unread emails not in Sent or Archive
       const [allUnreadRes, actionRes, waitingRes, tasksRes] = await Promise.all([
-        supabase.from('emails').select('id', { count: 'exact', head: true }).eq('is_read', false).not('triage', 'in', '("Sent","Archive")'),
+        supabase.from('emails').select('id', { count: 'exact', head: true }).eq('is_read', false).neq('triage', 'Sent').neq('triage', 'Archive'),
         supabase.from('emails').select('id', { count: 'exact', head: true }).eq('triage', 'Action Needed').eq('is_read', false),
         supabase.from('emails').select('id', { count: 'exact', head: true }).eq('triage', 'Waiting').eq('is_read', false),
         supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('done', false),
       ])
       setEmailActionNeeded(actionRes.count || 0)
       setEmailWaiting(waitingRes.count || 0)
-      // Use total unread for the combined badge number (Inbox + Action Needed + Waiting)
       setUnreadInbox(allUnreadRes.count || 0)
       setOpenTasks(tasksRes.count || 0)
     }
