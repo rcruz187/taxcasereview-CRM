@@ -23,14 +23,13 @@ const BLANK = {
   taxYears: '',
   repName: '',
   message: '',
-  sendVia: 'both', // 'email' | 'sms' | 'both'
+  sendVia: 'both',
   priority: 'Normal', dueDate: ''
 }
 
 function signingUrl(id) {
   return `${window.location.origin}/taxcasereview-CRM/sign/${id}`
 }
-
 
 export default function Esign() {
   const { showToast } = useApp()
@@ -56,6 +55,7 @@ export default function Esign() {
   const [showSug, setShowSug] = useState(false)
   const [confirmDel, setConfirmDel] = useState(null)
   const [viewCert, setViewCert] = useState(null)
+  const [expandedRow, setExpandedRow] = useState(null)
 
   useEffect(() => { load() }, [])
 
@@ -91,23 +91,17 @@ export default function Esign() {
     const { sendVia, clientEmail, clientPhone, clientName } = item || form
     const msg = `Hi ${clientName}, Tax Case Review sent you a Tax Service Agreement to sign. Please review and sign here: ${url}`
     let smsSent = false, emailSent = false
-
     const { data: cfg } = await supabase.from('settings').select('signalwire_backend,smtp_host,smtp_email').limit(1).maybeSingle()
-
-    // SMS
     if ((sendVia === 'sms' || sendVia === 'both') && clientPhone) {
       try {
         const res = await fetch((cfg?.signalwire_backend || '') + '/sms/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ to: clientPhone, body: msg })
         })
         const d = await res.json()
         if (d.success) smsSent = true
       } catch (e) { console.error('SMS error:', e) }
     }
-
-    // Email (placeholder — real SMTP via edge function)
     if ((sendVia === 'email' || sendVia === 'both') && clientEmail) {
       try {
         const { error } = await supabase.functions.invoke('send-email', {
@@ -120,7 +114,6 @@ export default function Esign() {
         if (!error) emailSent = true
       } catch (e) { console.error('Email error:', e) }
     }
-
     return { smsSent, emailSent }
   }
 
@@ -145,7 +138,6 @@ export default function Esign() {
     }]).select().single()
     setSaving(false)
     if (error) { showToast('Error: ' + error.message); return }
-
     const url = signingUrl(data.id)
     await navigator.clipboard.writeText(url).catch(() => {})
     const { smsSent, emailSent } = await sendLink(url, { ...form, sendVia: form.sendVia })
@@ -166,8 +158,7 @@ export default function Esign() {
 
   async function updateStatus(id, status) {
     await supabase.from('esigns').update({ status, updated_at: new Date().toISOString() }).eq('id', id)
-    showToast(`✅ Marked as ${status}`)
-    load()
+    showToast(`✅ Marked as ${status}`); load()
   }
 
   async function del(id) {
@@ -175,11 +166,8 @@ export default function Esign() {
     setConfirmDel(null); showToast('Deleted'); load()
   }
 
-  function openSigningPage(item) {
-    window.open(signingUrl(item.id), '_blank')
-  }
+  function openSigningPage(item) { window.open(signingUrl(item.id), '_blank') }
 
-  // Reminder helper: days pending
   function daysPending(item) {
     if (!item.sent_at) return 0
     return Math.floor((Date.now() - new Date(item.sent_at)) / (1000 * 60 * 60 * 24))
@@ -193,117 +181,159 @@ export default function Esign() {
   })
 
   const awaiting = items.filter(i => i.status === 'Awaiting').length
-  const signed = items.filter(i => i.status === 'Signed').length
+  const signed   = items.filter(i => i.status === 'Signed').length
 
   return (
-    <div style={{ maxWidth: 1000 }}>
+    <div style={{ maxWidth: 1100 }}>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 8 }}>
         <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>✍️ E-Signatures</h2>
-        <button className="btn pri" onClick={() => { setForm(BLANK); setModal(true) }}>+ New Signing Request</button>
+        <button className="btn pri" style={{ fontSize: 14, padding: '9px 20px', fontWeight: 700 }} onClick={() => { setForm(BLANK); setModal(true) }}>+ New Signing Request</button>
       </div>
 
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(110px,1fr))', gap: 8, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 10, marginBottom: 20 }}>
         {[
-          ['Total Sent', items.length, 'var(--tx)'],
-          ['Awaiting', awaiting, 'var(--warn)'],
-          ['Signed', signed, 'var(--ok)'],
-          ['Declined', items.filter(i => i.status === 'Declined').length, 'var(--bad)'],
-          ['Sign Rate', items.length ? Math.round((signed / items.length) * 100) + '%' : '—', 'var(--b2)'],
+          ['Total Sent',  items.length,                                              'var(--tx)'],
+          ['Awaiting',    awaiting,                                                  'var(--warn)'],
+          ['Signed',      signed,                                                    'var(--ok)'],
+          ['Declined',    items.filter(i => i.status === 'Declined').length,         'var(--bad)'],
+          ['Sign Rate',   items.length ? Math.round((signed/items.length)*100)+'%' : '—', 'var(--b2)'],
         ].map(([label, val, color]) => (
           <div key={label} className="card" style={{ padding: '16px 18px', textAlign: 'center' }}>
-            <div style={{ fontWeight: 800, fontSize: 28, color, lineHeight: 1 }}>{val}</div>
-            <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 6, fontWeight: 600 }}>{label}</div>
+            <div style={{ fontWeight: 900, fontSize: 28, color, lineHeight: 1 }}>{val}</div>
+            <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 6, textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 600 }}>{label}</div>
           </div>
         ))}
       </div>
 
       {/* Reminder callout */}
       {items.some(i => i.status === 'Awaiting' && daysPending(i) >= 1) && (
-        <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: 12, color: 'var(--warn)' }}>
-          ⏰ <strong>Reminder needed:</strong> {items.filter(i => i.status === 'Awaiting' && daysPending(i) >= 1).length} agreement(s) unsigned for 1+ days — use <strong>Resend</strong> to send a reminder.
+        <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: 'var(--warn)' }}>
+          ⏰ <strong>Reminder needed:</strong> {items.filter(i => i.status === 'Awaiting' && daysPending(i) >= 1).length} agreement(s) unsigned for 1+ days — use <strong>Resend</strong> to follow up.
         </div>
       )}
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search client or document…"
-          style={{ flex: 1, minWidth: 160, padding: '9px 14px', background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 8, color: 'var(--tx)', fontSize: 14 }} />
+          style={{ flex: 1, minWidth: 200, padding: '9px 14px', background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 8, color: 'var(--tx)', fontSize: 14 }} />
         {['All', 'Awaiting', 'Signed', 'Declined', 'Expired'].map(s => (
-          <button key={s} className={`btn ${filterStatus === s ? 'pri' : 'sec'}`} style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => setFilterStatus(s)}>{s}</button>
+          <button key={s} className={`btn ${filterStatus === s ? 'pri' : 'sec'}`} style={{ fontSize: 12, padding: '6px 14px', fontWeight: 600 }} onClick={() => setFilterStatus(s)}>{s}</button>
         ))}
       </div>
 
-      {/* Cards */}
-      {filtered.length === 0 ? (
-        <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--t3)', fontSize: 13 }}>
-          {items.length === 0 ? 'No e-signature requests yet. Create one to send a signing link to a client.' : 'No requests match your filters.'}
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(340px,1fr))', gap: 10 }}>
-          {filtered.map(item => {
-            const isSigned = item.status === 'Signed'
-            const dp = daysPending(item)
-            const needsReminder = item.status === 'Awaiting' && [1, 3, 5].some(d => dp >= d)
-            return (
-              <div key={item.id} className="card" style={{
-                border: needsReminder ? '1px solid var(--warn)' : isSigned ? '1px solid var(--ok)44' : '1px solid var(--br)',
-                padding: '14px 16px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <div>
-                    <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>✍️ {item.doc_type}</div>
-                    <div style={{ fontSize: 14, color: 'var(--b2)', fontWeight: 700 }}>{item.client_name}</div>
-                    {item.client_email && <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 1 }}>{item.client_email}</div>}
-                    {item.investigation_fee && <div style={{ fontSize: 10, color: 'var(--ok)', marginTop: 2, fontWeight: 700 }}>Fee: ${item.investigation_fee}</div>}
-                  </div>
-                  <span className={`bdg ${isSigned ? 'bg' : item.status === 'Declined' ? 'br' : item.status === 'Expired' ? 'bw' : 'ba'}`}>{item.status}</span>
-                </div>
+      {/* Table */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        {filtered.length === 0 ? (
+          <div style={{ padding: 48, textAlign: 'center', color: 'var(--t3)', fontSize: 15 }}>
+            {items.length === 0 ? 'No e-signature requests yet. Create one to send a signing link to a client.' : 'No requests match your filters.'}
+          </div>
+        ) : (
+          <div className="ovx">
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--br)', background: 'var(--s2)' }}>
+                  {['Client', 'Document', 'Sent', 'Pending', 'Status', 'Signed By', 'Actions'].map(h => (
+                    <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(item => {
+                  const isSigned = item.status === 'Signed'
+                  const dp = daysPending(item)
+                  const needsReminder = item.status === 'Awaiting' && dp >= 1
+                  const isExpanded = expandedRow === item.id
 
-                {needsReminder && (
-                  <div style={{ background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 5, padding: '5px 9px', fontSize: 11, color: 'var(--warn)', marginBottom: 8 }}>
-                    ⏰ {dp}d unsigned — reminder recommended
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'var(--t3)', marginBottom: 10, flexWrap: 'wrap' }}>
-                  {item.sent_at && <span>Sent {new Date(item.sent_at).toLocaleDateString()}</span>}
-                  {item.status === 'Awaiting' && dp > 0 && <span style={{ color: dp > 5 ? 'var(--bad)' : dp > 2 ? 'var(--warn)' : 'var(--t3)' }}>⏱ {dp}d pending</span>}
-                  {item.signed_at && <span style={{ color: 'var(--ok)' }}>✓ Signed {new Date(item.signed_at).toLocaleDateString()}</span>}
-                  {item.signer_ip && <span>IP: {item.signer_ip}</span>}
-                </div>
-
-                {isSigned && item.signed_name && (
-                  <div style={{ background: 'var(--ok)11', border: '1px solid var(--ok)33', borderRadius: 6, padding: '6px 10px', marginBottom: 8, fontSize: 11 }}>
-                    <span style={{ color: 'var(--t3)' }}>Signed by: </span>
-                    <span style={{ fontFamily: 'Georgia,serif', fontSize: 15, color: 'var(--ok)', fontWeight: 600 }}>{item.signed_name}</span>
-                    {item.signer_ip && <div style={{ color: 'var(--t3)', fontSize: 10, marginTop: 2 }}>IP: {item.signer_ip} · {item.signed_at ? new Date(item.signed_at).toLocaleString() : ''}</div>}
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                  {item.status === 'Awaiting' && (
+                  return (
                     <>
-                      <button className="btn sec" style={{ fontSize: 10, padding: '4px 9px' }} onClick={() => resendLink(item)}>📨 Resend</button>
-                      <button className="btn sec" style={{ fontSize: 10, padding: '4px 9px' }} onClick={() => openSigningPage(item)}>👁 Preview</button>
-                      <button className="btn" style={{ fontSize: 10, padding: '4px 9px', background: 'var(--ok)', color: '#fff', border: 'none', borderRadius: 5, cursor: 'pointer' }} onClick={() => updateStatus(item.id, 'Signed')}>✓ Manual</button>
-                      <button className="btn sec" style={{ fontSize: 10, padding: '4px 9px' }} onClick={() => updateStatus(item.id, 'Declined')}>✗ Declined</button>
+                      <tr key={item.id}
+                        style={{ borderBottom: '1px solid var(--br)', background: needsReminder ? 'rgba(245,158,11,.04)' : '' }}
+                        onMouseEnter={e => e.currentTarget.style.background = needsReminder ? 'rgba(245,158,11,.08)' : 'var(--s2)'}
+                        onMouseLeave={e => e.currentTarget.style.background = needsReminder ? 'rgba(245,158,11,.04)' : ''}>
+
+                        {/* Client */}
+                        <td style={{ padding: '13px 14px' }}>
+                          <div style={{ fontWeight: 700, fontSize: 14 }}>{item.client_name}</div>
+                          {item.client_email && <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>{item.client_email}</div>}
+                          {item.investigation_fee && <div style={{ fontSize: 11, color: 'var(--ok)', fontWeight: 700, marginTop: 2 }}>Fee: ${item.investigation_fee}</div>}
+                        </td>
+
+                        {/* Document */}
+                        <td style={{ padding: '13px 14px', fontSize: 13, color: 'var(--t2)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {item.doc_type}
+                        </td>
+
+                        {/* Sent */}
+                        <td style={{ padding: '13px 14px', fontSize: 12, color: 'var(--t3)', whiteSpace: 'nowrap' }}>
+                          {item.sent_at ? new Date(item.sent_at).toLocaleDateString() : '—'}
+                        </td>
+
+                        {/* Pending */}
+                        <td style={{ padding: '13px 14px', whiteSpace: 'nowrap' }}>
+                          {item.status === 'Awaiting' ? (
+                            <span style={{ fontSize: 12, fontWeight: 700, color: dp > 5 ? 'var(--bad)' : dp > 2 ? 'var(--warn)' : 'var(--t3)' }}>
+                              {dp > 0 ? `${dp}d` : 'Today'}
+                            </span>
+                          ) : <span style={{ color: 'var(--t3)', fontSize: 12 }}>—</span>}
+                        </td>
+
+                        {/* Status */}
+                        <td style={{ padding: '13px 14px' }}>
+                          <span className={`bdg ${isSigned ? 'bg' : item.status === 'Declined' ? 'br' : item.status === 'Expired' ? 'bw' : 'ba'}`}
+                            style={{ fontSize: 12, padding: '3px 10px', fontWeight: 700 }}>
+                            {item.status}
+                          </span>
+                        </td>
+
+                        {/* Signed By */}
+                        <td style={{ padding: '13px 14px' }}>
+                          {isSigned && item.signed_name ? (
+                            <span style={{ fontFamily: 'Georgia,serif', fontSize: 14, color: 'var(--ok)', fontWeight: 600 }}>{item.signed_name}</span>
+                          ) : <span style={{ color: 'var(--t3)', fontSize: 12 }}>—</span>}
+                        </td>
+
+                        {/* Actions */}
+                        <td style={{ padding: '13px 14px' }}>
+                          <div style={{ display: 'flex', gap: 5, flexWrap: 'nowrap', alignItems: 'center' }}>
+                            {item.status === 'Awaiting' && (
+                              <>
+                                <button className="btn sec" style={{ fontSize: 11, padding: '4px 10px', whiteSpace: 'nowrap' }} onClick={() => resendLink(item)}>📨 Resend</button>
+                                <button className="btn sec" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => openSigningPage(item)}>👁</button>
+                                <button className="btn" style={{ fontSize: 11, padding: '4px 10px', background: 'var(--ok)', color: '#fff', border: 'none', borderRadius: 5, cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => updateStatus(item.id, 'Signed')}>✓</button>
+                              </>
+                            )}
+                            {isSigned && (
+                              <button className="btn sec" style={{ fontSize: 11, padding: '4px 10px', whiteSpace: 'nowrap' }} onClick={() => setViewCert(item)}>🔐 Cert</button>
+                            )}
+                            {!isSigned && item.status !== 'Awaiting' && (
+                              <button className="btn sec" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => resendLink(item)}>↻</button>
+                            )}
+                            <button className="btn del" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setConfirmDel(item.id)}>Del</button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Expanded row for signed details */}
+                      {isSigned && isExpanded && (
+                        <tr key={item.id + '-exp'} style={{ background: 'var(--s2)', borderBottom: '1px solid var(--br)' }}>
+                          <td colSpan={7} style={{ padding: '10px 14px' }}>
+                            <div style={{ fontSize: 12, color: 'var(--t3)' }}>
+                              IP: {item.signer_ip || '—'} · Signed: {item.signed_at ? new Date(item.signed_at).toLocaleString() : '—'}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
                     </>
-                  )}
-                  {isSigned && (
-                    <button className="btn sec" style={{ fontSize: 10, padding: '4px 9px' }} onClick={() => setViewCert(item)}>🔐 Certificate</button>
-                  )}
-                  {!isSigned && item.status !== 'Awaiting' && (
-                    <button className="btn sec" style={{ fontSize: 10, padding: '4px 9px' }} onClick={() => resendLink(item)}>↻ Reopen</button>
-                  )}
-                  <button className="btn del" style={{ fontSize: 10, padding: '4px 9px', marginLeft: 'auto' }} onClick={() => setConfirmDel(item.id)}>Del</button>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Certificate Modal */}
       {viewCert && (
@@ -316,16 +346,16 @@ export default function Esign() {
                 <div style={{ fontWeight: 700, fontSize: 15 }}>Legally Signed Document</div>
               </div>
               {[
-                ['Document', viewCert.doc_type],
-                ['Client', viewCert.client_name],
-                ['Email', viewCert.client_email || '—'],
-                ['Fee', viewCert.investigation_fee ? `$${viewCert.investigation_fee}` : '—'],
-                ['Signed Name', <span style={{ fontFamily: 'Georgia,serif', fontSize: 16, color: 'var(--ok)' }}>{viewCert.signed_name || '—'}</span>],
-                ['Full Name Entered', viewCert.signer_full_name || '—'],
-                ['IP Address', viewCert.signer_ip || 'Not captured'],
-                ['Signed At', viewCert.signed_at ? new Date(viewCert.signed_at).toLocaleString() : '—'],
-                ['Sent At', viewCert.sent_at ? new Date(viewCert.sent_at).toLocaleString() : '—'],
-                ['Device', viewCert.signed_user_agent ? viewCert.signed_user_agent.slice(0, 60) + '…' : '—'],
+                ['Document',         viewCert.doc_type],
+                ['Client',           viewCert.client_name],
+                ['Email',            viewCert.client_email || '—'],
+                ['Fee',              viewCert.investigation_fee ? `$${viewCert.investigation_fee}` : '—'],
+                ['Signed Name',      <span style={{ fontFamily: 'Georgia,serif', fontSize: 16, color: 'var(--ok)' }}>{viewCert.signed_name || '—'}</span>],
+                ['Full Name Entered',viewCert.signer_full_name || '—'],
+                ['IP Address',       viewCert.signer_ip || 'Not captured'],
+                ['Signed At',        viewCert.signed_at ? new Date(viewCert.signed_at).toLocaleString() : '—'],
+                ['Sent At',          viewCert.sent_at ? new Date(viewCert.sent_at).toLocaleString() : '—'],
+                ['Device',           viewCert.signed_user_agent ? viewCert.signed_user_agent.slice(0, 60) + '…' : '—'],
               ].map(([l, v]) => (
                 <div key={l} style={{ display: 'flex', borderBottom: '1px solid var(--br)', padding: '5px 0', gap: 12 }}>
                   <span style={{ color: 'var(--t3)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', minWidth: 130, paddingTop: 2 }}>{l}</span>
@@ -346,9 +376,9 @@ export default function Esign() {
       {confirmDel && (
         <div className="modal-bg open" onClick={e => e.target === e.currentTarget && setConfirmDel(null)}>
           <div className="modal" style={{ maxWidth: 380, textAlign: 'center' }}>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>🗑</div>
-            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>Delete this request?</div>
-            <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 20 }}>This permanently removes the signing request and all signature data. Cannot be undone.</div>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🗑</div>
+            <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 8 }}>Delete this request?</div>
+            <div style={{ fontSize: 14, color: 'var(--t3)', marginBottom: 24 }}>This permanently removes the signing request and all signature data. Cannot be undone.</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn sec" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setConfirmDel(null)}>Cancel</button>
               <button className="btn del" style={{ flex: 1, justifyContent: 'center' }} onClick={() => del(confirmDel)}>Delete</button>
@@ -433,10 +463,10 @@ export default function Esign() {
               </div>
             </div>
 
-            <div style={{ background: 'var(--s2)', borderRadius: 6, padding: '10px 14px', marginBottom: 14, fontSize: 12, color: 'var(--t3)', lineHeight: 1.6 }}>
-              💡 Reminders show automatically on unsigned agreements at 1, 3, and 5 days. Client receives the agreement via your selected method and a copy is saved to their file when signed.
+            <div style={{ background: 'var(--s2)', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 12, color: 'var(--t3)', lineHeight: 1.6 }}>
+              💡 Reminders show automatically on unsigned agreements at 1, 3, and 5 days.
             </div>
-            <button className="btn pri" style={{ width: '100%', justifyContent: 'center', padding: 10 }} onClick={save} disabled={saving}>
+            <button className="btn pri" style={{ width: '100%', justifyContent: 'center', padding: 12, fontSize: 15, fontWeight: 700 }} onClick={save} disabled={saving}>
               {saving ? 'Sending…' : '✅ Send Signing Request'}
             </button>
           </div>
@@ -445,4 +475,3 @@ export default function Esign() {
     </div>
   )
 }
-
