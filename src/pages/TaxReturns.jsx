@@ -24,7 +24,16 @@ create policy "anon_all" on tax_returns for all using (true) with check (true);`
 
 const TAX_YEARS = ['2024','2023','2022','2021','2020','2019','2018']
 const FILING_STATUSES = ['Single','Married Filing Jointly','Married Filing Separately','Head of Household','Qualifying Surviving Spouse']
-const RETURN_TYPES = ['Federal 1040','State Return','1040-X Amended','1040-SR Senior','1040-NR Non-Resident','941 Payroll','940 FUTA','1065 Partnership','1120 Corp','1120S S-Corp','1041 Estate/Trust']
+const RETURN_TYPES = [
+  // Personal
+  'Federal 1040','1040-SR Senior','1040-NR Non-Resident','1040-X Amended',
+  // Business
+  '1120 C-Corp','1120S S-Corp','1065 Partnership','1041 Estate/Trust',
+  // Payroll
+  '941 Quarterly Payroll','940 FUTA Annual',
+  // State
+  'State Return',
+]
 const RETURN_STATUSES = ['Draft','In Review','Client Review','Ready to File','Filed','Accepted','Rejected','Amended']
 
 const BLANK_RETURN = {
@@ -45,6 +54,41 @@ const BLANK_RETURN = {
   withholding: '', estimatedPayments: '', refundable: '',
   // Refund/Owed
   refundOrOwed: '', notes: '',
+  // 941 Payroll fields
+  q941_quarter: 'Q1', q941_numEmployees: '',
+  q941_wages: '', q941_federalIncomeTax: '',
+  q941_ss_wages: '', q941_medicare_wages: '',
+  q941_ss_tax: '', q941_medicare_tax: '',
+  q941_additional_medicare: '',
+  q941_totalTax: '', q941_deposits: '', q941_balance: '',
+  q941_overpayment: '', q941_refund: '',
+  // 940 FUTA fields
+  q940_totalWages: '', q940_exemptWages: '', q940_over7k: '',
+  q940_futa_wages: '', q940_futa_rate: '0.006',
+  q940_futa_tax: '', q940_state_credit: '',
+  q940_net_futa: '', q940_deposits: '', q940_balance: '',
+  q940_state: '',
+  // 1120 C-Corp fields
+  c_grossReceipts: '', c_returns: '', c_cogs: '',
+  c_grossProfit: '', c_dividends: '', c_interest: '',
+  c_grossRents: '', c_grossRoyalties: '', c_capitalGains: '',
+  c_otherIncome: '',
+  c_comp_officers: '', c_salaries: '', c_repairs: '',
+  c_badDebts: '', c_rents: '', c_taxes: '', c_interest_ded: '',
+  c_charitable: '', c_depreciation: '', c_depletion: '',
+  c_advertising: '', c_pension: '', c_empBenefits: '',
+  c_domesticProd: '', c_otherDed: '',
+  c_specialDed_drd: '', c_specialDed_nol: '', c_specialDed_other: '',
+  c_taxableIncome: '', c_tax: '', c_credits: '',
+  c_deposits: '', c_balance: '',
+  c_ein: '', c_stateInc: '', c_dateInc: '', c_totalAssets: '',
+  // State return fields
+  st_state: 'FL', st_filingType: 'Individual',
+  st_agi: '', st_stateAdditions: '', st_stateSubtractions: '',
+  st_stateIncome: '', st_stateDeduction: '', st_stateTaxableIncome: '',
+  st_stateRate: '', st_stateTax: '', st_stateCredits: '',
+  st_stateWithholding: '', st_stateRefund: '',
+  st_localTax: '', st_localJurisdiction: '',
 }
 
 function calcTotals(r) {
@@ -274,11 +318,16 @@ export default function TaxReturns() {
   const totals = calcTotals(form)
   const stdDed = { 'Single': 14600, 'Married Filing Jointly': 29200, 'Married Filing Separately': 14600, 'Head of Household': 21900, 'Qualifying Surviving Spouse': 29200 }
 
-  const is1040   = form.returnType?.includes('1040') || form.returnType === 'Federal 1040'
+  const is1040    = form.returnType?.includes('1040') || form.returnType === 'Federal 1040'
   const is1120S   = form.returnType === '1120S S-Corp'
+  const is1120C   = form.returnType === '1120 C-Corp'
   const is1065    = form.returnType === '1065 Partnership'
+  const is941     = form.returnType === '941 Quarterly Payroll'
+  const is940     = form.returnType === '940 FUTA Annual'
+  const isState   = form.returnType === 'State Return'
   const isSchedC  = form.returnType === 'Federal 1040'
-  const isBusiness = is1120S || is1065
+  const isBusiness = is1120S || is1065 || is1120C
+  const isPayroll  = is941 || is940
 
   const statusColors = { Draft:'bn', 'In Review':'ba', 'Client Review':'ba', 'Ready to File':'bb', Filed:'bg', Accepted:'bg', Rejected:'br', Amended:'bw' }
 
@@ -437,7 +486,27 @@ export default function TaxReturns() {
   )
 
   // ── EDIT VIEW ──
-  const TABS = isBusiness ? [
+  const TABS = is941 ? [
+    { key: 'q941',    label: '📋 941 Worksheet' },
+    { key: 'summary', label: '📊 Summary' },
+    { key: 'submit',  label: '📤 Submit / Export' },
+  ] : is940 ? [
+    { key: 'q940',    label: '📋 940 Worksheet' },
+    { key: 'summary', label: '📊 Summary' },
+    { key: 'submit',  label: '📤 Submit / Export' },
+  ] : isState ? [
+    { key: 'state',   label: '🏛 State Return' },
+    { key: 'summary', label: '📊 Summary' },
+    { key: 'submit',  label: '📤 Submit / Export' },
+  ] : is1120C ? [
+    { key: 'income',   label: '💰 Revenue' },
+    { key: 'expenses', label: '📋 Deductions' },
+    { key: 'special',  label: '⚡ Special Ded.' },
+    { key: 'credits',  label: '⭐ Credits' },
+    { key: 'payments', label: '💳 Payments' },
+    { key: 'summary',  label: '📊 Summary' },
+    { key: 'submit',   label: '📤 Submit / Export' },
+  ] : isBusiness ? [
     { key: 'income',   label: '💰 Revenue' },
     { key: 'expenses', label: '📋 Expenses' },
     ...(is1120S ? [{ key: 'officers', label: '👔 Officers' }] : []),
@@ -673,6 +742,418 @@ export default function TaxReturns() {
               style={{ width: '100%', minHeight: 80, padding: '8px 10px', background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 6, color: 'var(--tx)', fontSize: 12, resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
             />
           </div>
+        </div>
+      )}
+
+      {/* ── 941 QUARTERLY PAYROLL TAB ── */}
+      {tab === 'q941' && is941 && (
+        <div className="card">
+          <div style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:14}}>Form 941 — Employer's Quarterly Federal Tax Return</div>
+          <div className="fg2">
+            <div className="field"><label>Quarter</label>
+              <select value={form.q941_quarter||'Q1'} onChange={e=>fld('q941_quarter',e.target.value)}>
+                {['Q1 (Jan–Mar)','Q2 (Apr–Jun)','Q3 (Jul–Sep)','Q4 (Oct–Dec)'].map(q=><option key={q}>{q}</option>)}
+              </select>
+            </div>
+            <MoneyField label="Number of Employees" field="q941_numEmployees"/>
+          </div>
+          <div style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',margin:'14px 0 10px'}}>Wages & Tax</div>
+          <div className="fg2">
+            <MoneyField label="Wages, Tips & Other Compensation (Line 2)" field="q941_wages" help="Total gross wages"/>
+            <MoneyField label="Federal Income Tax Withheld (Line 3)" field="q941_federalIncomeTax"/>
+            <MoneyField label="Taxable SS Wages (Line 5a)" field="q941_ss_wages" help="×12.4% = SS tax"/>
+            <MoneyField label="Taxable Medicare Wages (Line 5c)" field="q941_medicare_wages" help="×2.9% = Medicare tax"/>
+            <MoneyField label="Additional Medicare Tax Withheld (Line 5d)" field="q941_additional_medicare" help="0.9% on wages over $200k"/>
+          </div>
+          {(()=>{
+            const n=f=>parseFloat(form[f]||0)
+            const ssTax   = n('q941_ss_wages') * 0.124
+            const medTax  = n('q941_medicare_wages') * 0.029
+            const addMed  = n('q941_additional_medicare')
+            const totalTax = n('q941_federalIncomeTax') + ssTax + medTax + addMed
+            const deposits = n('q941_deposits')
+            const balance  = totalTax - deposits
+            return (
+              <div style={{marginTop:14}}>
+                <div style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Calculated Tax (auto)</div>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:8,marginBottom:14}}>
+                  {[
+                    ['SS Tax (6.2% ×2)', ssTax, 'var(--tx)'],
+                    ['Medicare Tax (1.45% ×2)', medTax, 'var(--tx)'],
+                    ['Income Tax Withheld', n('q941_federalIncomeTax'), 'var(--tx)'],
+                    ['Total Tax (Line 6)', totalTax, 'var(--blue)'],
+                  ].map(([l,v,c])=>(
+                    <div key={l} style={{padding:'10px 14px',background:'var(--s3)',borderRadius:6}}>
+                      <div style={{fontSize:10,color:'var(--t3)',marginBottom:2}}>{l}</div>
+                      <div style={{fontSize:14,fontWeight:800,color:c}}>${parseFloat(v).toLocaleString('en-US',{minimumFractionDigits:2})}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Deposits & Balance</div>
+                <div className="fg2">
+                  <MoneyField label="Total Deposits Made (Line 13)" field="q941_deposits"/>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:8}}>
+                  <div style={{padding:'12px 14px',background:'var(--s3)',borderRadius:6}}>
+                    <div style={{fontSize:10,color:'var(--t3)',marginBottom:2}}>Balance Due</div>
+                    <div style={{fontSize:16,fontWeight:800,color:balance>0?'var(--bad)':'var(--ok)'}}>${Math.abs(balance).toLocaleString('en-US',{minimumFractionDigits:2})}</div>
+                    <div style={{fontSize:10,color:'var(--t3)',marginTop:2}}>{balance>0?'Amount owed to IRS':'Overpayment'}</div>
+                  </div>
+                  <div style={{padding:'12px 14px',background:'var(--s3)',borderRadius:6}}>
+                    <div style={{fontSize:10,color:'var(--t3)',marginBottom:2}}>Total Tax</div>
+                    <div style={{fontSize:16,fontWeight:800,color:'var(--blue)'}}>${totalTax.toLocaleString('en-US',{minimumFractionDigits:2})}</div>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+          <div style={{marginTop:14}}>
+            <div style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6}}>Preparer Notes</div>
+            <textarea value={form.notes||''} onChange={e=>fld('notes',e.target.value)} rows={2}
+              style={{width:'100%',resize:'none',padding:'10px 14px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:13,fontFamily:'inherit',boxSizing:'border-box'}}/>
+          </div>
+        </div>
+      )}
+
+      {/* ── 940 FUTA ANNUAL TAB ── */}
+      {tab === 'q940' && is940 && (
+        <div className="card">
+          <div style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:14}}>Form 940 — Employer's Annual FUTA Tax Return</div>
+          <div className="field" style={{maxWidth:260}}>
+            <label>State (for SUTA credit)</label>
+            <select value={form.q940_state||'FL'} onChange={e=>fld('q940_state',e.target.value)}>
+              {['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'].map(s=><option key={s}>{s}</option>)}
+            </select>
+          </div>
+          <div style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',margin:'14px 0 10px'}}>Wages</div>
+          <div className="fg2">
+            <MoneyField label="Total Payments to All Employees (Line 3)" field="q940_totalWages"/>
+            <MoneyField label="Exempt Payments (Line 4)" field="q940_exemptWages" help="Fringe benefits, retirement, etc."/>
+            <MoneyField label="Payments Over $7,000 Per Employee (Line 5)" field="q940_over7k" help="Wages above the $7k FUTA wage base"/>
+          </div>
+          {(()=>{
+            const n=f=>parseFloat(form[f]||0)
+            const futaWages = Math.max(0, n('q940_totalWages') - n('q940_exemptWages') - n('q940_over7k'))
+            const grossFuta = futaWages * 0.06
+            // Max SUTA credit is 5.4% if state taxes paid on time
+            const stateCredit = futaWages * 0.054
+            const netFuta = Math.max(0, grossFuta - stateCredit)
+            const balance = netFuta - n('q940_deposits')
+            return (
+              <div style={{marginTop:14}}>
+                <div style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>FUTA Calculation (auto)</div>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:8,marginBottom:14}}>
+                  {[
+                    ['FUTA Taxable Wages', futaWages, 'var(--tx)'],
+                    ['Gross FUTA Tax (6.0%)', grossFuta, 'var(--tx)'],
+                    ['Max State Credit (5.4%)', stateCredit, 'var(--ok)'],
+                    ['Net FUTA Tax (0.6%)', netFuta, 'var(--blue)'],
+                  ].map(([l,v,c])=>(
+                    <div key={l} style={{padding:'10px 14px',background:'var(--s3)',borderRadius:6}}>
+                      <div style={{fontSize:10,color:'var(--t3)',marginBottom:2}}>{l}</div>
+                      <div style={{fontSize:14,fontWeight:800,color:c}}>${parseFloat(v).toLocaleString('en-US',{minimumFractionDigits:2})}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{padding:'10px 14px',background:'rgba(245,158,11,.08)',border:'1px solid rgba(245,158,11,.25)',borderRadius:6,fontSize:12,color:'var(--warn)',marginBottom:14}}>
+                  ⚠️ State credit assumes all SUTA taxes were paid in full and on time. Reduce credit if late payments were made.
+                </div>
+                <div className="fg2">
+                  <MoneyField label="Total FUTA Tax Deposits Made" field="q940_deposits"/>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:8}}>
+                  <div style={{padding:'12px 14px',background:'var(--s3)',borderRadius:6}}>
+                    <div style={{fontSize:10,color:'var(--t3)',marginBottom:2}}>Balance Due / Overpayment</div>
+                    <div style={{fontSize:16,fontWeight:800,color:balance>0?'var(--bad)':'var(--ok)'}}>${Math.abs(balance).toLocaleString('en-US',{minimumFractionDigits:2})}</div>
+                    <div style={{fontSize:10,color:'var(--t3)',marginTop:2}}>{balance>0?'Balance due':'Overpayment'}</div>
+                  </div>
+                  <div style={{padding:'12px 14px',background:'var(--s3)',borderRadius:6}}>
+                    <div style={{fontSize:10,color:'var(--t3)',marginBottom:2}}>Net FUTA Rate</div>
+                    <div style={{fontSize:16,fontWeight:800,color:'var(--blue)'}}>0.6%</div>
+                    <div style={{fontSize:10,color:'var(--t3)',marginTop:2}}>After full state credit</div>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+          <div style={{marginTop:14}}>
+            <div style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6}}>Preparer Notes</div>
+            <textarea value={form.notes||''} onChange={e=>fld('notes',e.target.value)} rows={2}
+              style={{width:'100%',resize:'none',padding:'10px 14px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:13,fontFamily:'inherit',boxSizing:'border-box'}}/>
+          </div>
+        </div>
+      )}
+
+      {/* ── STATE RETURN TAB ── */}
+      {tab === 'state' && isState && (
+        <div className="card">
+          <div style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:14}}>State Income Tax Return</div>
+          <div className="fg2">
+            <div className="field"><label>State</label>
+              <select value={form.st_state||'FL'} onChange={e=>fld('st_state',e.target.value)}>
+                {[['AL','Alabama'],['AK','Alaska'],['AZ','Arizona'],['AR','Arkansas'],['CA','California'],
+                  ['CO','Colorado'],['CT','Connecticut'],['DE','Delaware'],['FL','Florida'],['GA','Georgia'],
+                  ['HI','Hawaii'],['ID','Idaho'],['IL','Illinois'],['IN','Indiana'],['IA','Iowa'],
+                  ['KS','Kansas'],['KY','Kentucky'],['LA','Louisiana'],['ME','Maine'],['MD','Maryland'],
+                  ['MA','Massachusetts'],['MI','Michigan'],['MN','Minnesota'],['MS','Mississippi'],['MO','Missouri'],
+                  ['MT','Montana'],['NE','Nebraska'],['NV','Nevada'],['NH','New Hampshire'],['NJ','New Jersey'],
+                  ['NM','New Mexico'],['NY','New York'],['NC','North Carolina'],['ND','North Dakota'],['OH','Ohio'],
+                  ['OK','Oklahoma'],['OR','Oregon'],['PA','Pennsylvania'],['RI','Rhode Island'],['SC','South Carolina'],
+                  ['SD','South Dakota'],['TN','Tennessee'],['TX','Texas'],['UT','Utah'],['VT','Vermont'],
+                  ['VA','Virginia'],['WA','Washington'],['WV','West Virginia'],['WI','Wisconsin'],['WY','Wyoming'],
+                ].map(([code,name])=><option key={code} value={code}>{code} — {name}</option>)}
+              </select>
+            </div>
+            <div className="field"><label>Filing Type</label>
+              <select value={form.st_filingType||'Individual'} onChange={e=>fld('st_filingType',e.target.value)}>
+                {['Individual','Joint','Married Separate','Head of Household','Corporate','Partnership','S-Corp'].map(t=><option key={t}>{t}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* No income tax states */}
+          {['AK','FL','NV','NH','SD','TN','TX','WA','WY'].includes(form.st_state||'FL') && (
+            <div style={{padding:'20px',background:'rgba(34,197,94,.08)',border:'1px solid rgba(34,197,94,.25)',borderRadius:8,textAlign:'center',margin:'14px 0'}}>
+              <div style={{fontSize:24,marginBottom:8}}>✅</div>
+              <div style={{fontWeight:800,fontSize:16,marginBottom:4,color:'var(--ok)'}}>No State Income Tax</div>
+              <div style={{fontSize:13,color:'var(--t2)'}}>
+                {form.st_state} does not impose a personal state income tax.
+                {form.st_state==='NH'?' (NH taxes interest & dividends only — check if applicable)':''}
+                {form.st_state==='TN'?' (TN eliminated income tax in 2021)':''}
+                {form.st_state==='WA'?' (WA has capital gains tax on gains over $262,000 — check if applicable)':''}
+              </div>
+              <div style={{marginTop:12,fontSize:12,color:'var(--t3)'}}>No state return filing required for income tax purposes.</div>
+            </div>
+          )}
+
+          {/* States with income tax */}
+          {!['AK','FL','NV','NH','SD','TN','TX','WA','WY'].includes(form.st_state||'FL') && (()=>{
+            const STATE_RATES = {
+              AL:{rate:5.0,std_single:2500,std_joint:7500},
+              AZ:{rate:2.5,std_single:12950,std_joint:25900},
+              AR:{rate:4.4,std_single:2200,std_joint:4400},
+              CA:{rate:9.3,std_single:4803,std_joint:9606,brackets:true},
+              CO:{rate:4.4,std_single:12950,std_joint:25900},
+              CT:{rate:6.99,std_single:15000,std_joint:24000,brackets:true},
+              DE:{rate:6.6,std_single:3250,std_joint:6500},
+              GA:{rate:5.49,std_single:5400,std_joint:7100},
+              HI:{rate:11.0,std_single:2200,std_joint:4400,brackets:true},
+              ID:{rate:5.8,std_single:12950,std_joint:25900},
+              IL:{rate:4.95,std_single:0,std_joint:0},
+              IN:{rate:3.15,std_single:1000,std_joint:2000},
+              IA:{rate:5.7,std_single:2210,std_joint:5450},
+              KS:{rate:5.7,std_single:3500,std_joint:8000},
+              KY:{rate:4.0,std_single:2980,std_joint:2980},
+              LA:{rate:4.25,std_single:4500,std_joint:9000},
+              ME:{rate:7.15,std_single:12950,std_joint:25900,brackets:true},
+              MD:{rate:5.75,std_single:2400,std_joint:4850},
+              MA:{rate:5.0,std_single:0,std_joint:0},
+              MI:{rate:4.25,std_single:5000,std_joint:10000},
+              MN:{rate:9.85,std_single:12900,std_joint:25800,brackets:true},
+              MS:{rate:5.0,std_single:2300,std_joint:4600},
+              MO:{rate:4.95,std_single:12950,std_joint:25900},
+              MT:{rate:6.75,std_single:5000,std_joint:10000},
+              NE:{rate:6.84,std_single:7900,std_joint:15800,brackets:true},
+              NJ:{rate:10.75,std_single:1000,std_joint:2000,brackets:true},
+              NM:{rate:5.9,std_single:12950,std_joint:25900,brackets:true},
+              NY:{rate:10.9,std_single:8000,std_joint:16050,brackets:true},
+              NC:{rate:4.5,std_single:12750,std_joint:25500},
+              ND:{rate:2.5,std_single:12950,std_joint:25900},
+              OH:{rate:3.99,std_single:0,std_joint:0},
+              OK:{rate:4.75,std_single:6350,std_joint:12700},
+              OR:{rate:9.9,std_single:2420,std_joint:4840,brackets:true},
+              PA:{rate:3.07,std_single:0,std_joint:0},
+              RI:{rate:5.99,std_single:9300,std_joint:18600,brackets:true},
+              SC:{rate:6.5,std_single:12950,std_joint:25900,brackets:true},
+              UT:{rate:4.65,std_single:792,std_joint:1584},
+              VT:{rate:8.75,std_single:6500,std_joint:13000,brackets:true},
+              VA:{rate:5.75,std_single:4500,std_joint:9000},
+              WV:{rate:6.5,std_single:0,std_joint:0},
+              WI:{rate:7.65,std_single:12180,std_joint:16280,brackets:true},
+            }
+            const info = STATE_RATES[form.st_state] || {rate:5.0,std_single:12950,std_joint:25900}
+            const n=f=>parseFloat(form[f]||0)
+            const stateIncome = n('st_stateIncome') || n('st_agi')
+            const deduction = n('st_stateDeduction') || (form.st_filingType?.includes('Joint') ? info.std_joint : info.std_single)
+            const taxable = Math.max(0, stateIncome - deduction - n('st_stateSubtractions') + n('st_stateAdditions'))
+            const estTax = taxable * (info.rate / 100)
+            const refund = n('st_stateWithholding') + n('st_stateCredits') - estTax
+
+            return (
+              <>
+                {info.brackets && (
+                  <div style={{padding:'8px 12px',background:'rgba(245,158,11,.08)',border:'1px solid rgba(245,158,11,.2)',borderRadius:6,fontSize:12,color:'var(--warn)',marginBottom:12}}>
+                    ⚠️ {form.st_state} has progressive tax brackets. Rate shown ({info.rate}%) is the top marginal rate — actual tax calculated at flat rate for worksheet purposes.
+                  </div>
+                )}
+                <div style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',margin:'14px 0 10px'}}>State Income Calculation</div>
+                <div className="fg2">
+                  <MoneyField label="Federal AGI (starting point)" field="st_agi" help="From federal return"/>
+                  <MoneyField label="State Additions" field="st_stateAdditions" help="Items taxable by state but not federal"/>
+                  <MoneyField label="State Subtractions" field="st_stateSubtractions" help="Items exempt from state tax"/>
+                  <MoneyField label="State Standard/Itemized Deduction" field="st_stateDeduction" help={`Default: $${(form.st_filingType?.includes('Joint')?info.std_joint:info.std_single).toLocaleString()}`}/>
+                  <MoneyField label="State Tax Credits" field="st_stateCredits"/>
+                  <MoneyField label="State Tax Withheld (W-2 Box 17)" field="st_stateWithholding"/>
+                </div>
+
+                {/* Local tax */}
+                <div style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',margin:'14px 0 10px'}}>Local / City Tax (if applicable)</div>
+                <div className="fg2">
+                  <div className="field"><label>City / Jurisdiction</label>
+                    <input value={form.st_localJurisdiction||''} onChange={e=>fld('st_localJurisdiction',e.target.value)} placeholder="e.g. New York City, Philadelphia"/>
+                  </div>
+                  <MoneyField label="Local Tax Amount" field="st_localTax"/>
+                </div>
+
+                <div style={{marginTop:14,display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:8}}>
+                  {[
+                    ['State Rate',`${info.rate}%`,'var(--tx)'],
+                    ['State Taxable Income', `$${taxable.toLocaleString('en-US',{minimumFractionDigits:2})}`, 'var(--blue)'],
+                    ['Est. State Tax', `$${estTax.toLocaleString('en-US',{minimumFractionDigits:2})}`, 'var(--warn)'],
+                    [refund>=0?'State Refund':'State Owed', `$${Math.abs(refund).toLocaleString('en-US',{minimumFractionDigits:2})}`, refund>=0?'var(--ok)':'var(--bad)'],
+                  ].map(([l,v,c])=>(
+                    <div key={l} style={{padding:'12px 14px',background:'var(--s3)',borderRadius:6}}>
+                      <div style={{fontSize:10,color:'var(--t3)',marginBottom:2}}>{l}</div>
+                      <div style={{fontSize:15,fontWeight:800,color:c}}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )
+          })()}
+
+          <div style={{marginTop:14}}>
+            <div style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6}}>Preparer Notes</div>
+            <textarea value={form.notes||''} onChange={e=>fld('notes',e.target.value)} rows={2}
+              style={{width:'100%',resize:'none',padding:'10px 14px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:13,fontFamily:'inherit',boxSizing:'border-box'}}/>
+          </div>
+        </div>
+      )}
+
+      {/* ── 1120 C-CORP INCOME TAB ── */}
+      {tab === 'income' && is1120C && (
+        <div className="card">
+          <div style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:14}}>Form 1120 — C-Corporation Income</div>
+          <div className="fg2">
+            <div className="field"><label>EIN</label><input value={form.c_ein||''} onChange={e=>fld('c_ein',e.target.value)} placeholder="XX-XXXXXXX"/></div>
+            <div className="field"><label>State of Incorporation</label><input value={form.c_stateInc||''} onChange={e=>fld('c_stateInc',e.target.value)} placeholder="e.g. FL"/></div>
+            <div className="field"><label>Date Incorporated</label><input type="date" value={form.c_dateInc||''} onChange={e=>fld('c_dateInc',e.target.value)}/></div>
+            <MoneyField label="Total Assets (end of year)" field="c_totalAssets"/>
+          </div>
+          <div style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',margin:'14px 0 10px'}}>Gross Income</div>
+          <div className="fg2">
+            <MoneyField label="Gross Receipts / Sales (Line 1a)" field="c_grossReceipts"/>
+            <MoneyField label="Returns & Allowances (Line 1b)" field="c_returns"/>
+            <MoneyField label="Cost of Goods Sold (Line 2)" field="c_cogs"/>
+            <MoneyField label="Dividends (Line 4)" field="c_dividends"/>
+            <MoneyField label="Interest (Line 5)" field="c_interest"/>
+            <MoneyField label="Gross Rents (Line 6)" field="c_grossRents"/>
+            <MoneyField label="Gross Royalties (Line 7)" field="c_grossRoyalties"/>
+            <MoneyField label="Capital Gains (Line 8)" field="c_capitalGains"/>
+            <MoneyField label="Other Income (Line 10)" field="c_otherIncome"/>
+          </div>
+          {(()=>{
+            const n=f=>parseFloat(form[f]||0)
+            const grossInc = n('c_grossReceipts')-n('c_returns')-n('c_cogs')+n('c_dividends')+n('c_interest')+n('c_grossRents')+n('c_grossRoyalties')+n('c_capitalGains')+n('c_otherIncome')
+            return (
+              <div style={{marginTop:12,padding:'10px 14px',background:'var(--s3)',borderRadius:6,display:'flex',justifyContent:'space-between'}}>
+                <span style={{fontSize:12,fontWeight:700}}>Total Income (Line 11)</span>
+                <span style={{fontSize:16,fontWeight:800,color:'var(--blue)'}}>${grossInc.toLocaleString('en-US',{minimumFractionDigits:2})}</span>
+              </div>
+            )
+          })()}
+        </div>
+      )}
+
+      {/* ── 1120 C-CORP DEDUCTIONS TAB ── */}
+      {tab === 'expenses' && is1120C && (
+        <div className="card">
+          <div style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:14}}>Form 1120 — Deductions</div>
+          <div className="fg2">
+            <MoneyField label="Compensation of Officers (Line 12)" field="c_comp_officers" help="See Schedule E"/>
+            <MoneyField label="Salaries & Wages (Line 13)" field="c_salaries"/>
+            <MoneyField label="Repairs & Maintenance (Line 14)" field="c_repairs"/>
+            <MoneyField label="Bad Debts (Line 15)" field="c_badDebts"/>
+            <MoneyField label="Rents (Line 16)" field="c_rents"/>
+            <MoneyField label="Taxes & Licenses (Line 17)" field="c_taxes"/>
+            <MoneyField label="Interest (Line 18)" field="c_interest_ded"/>
+            <MoneyField label="Charitable Contributions (Line 19)" field="c_charitable" help="Max 10% of taxable income"/>
+            <MoneyField label="Depreciation (Form 4562, Line 20)" field="c_depreciation"/>
+            <MoneyField label="Depletion (Line 21)" field="c_depletion"/>
+            <MoneyField label="Advertising (Line 22)" field="c_advertising"/>
+            <MoneyField label="Pension & Profit Sharing (Line 23)" field="c_pension"/>
+            <MoneyField label="Employee Benefits (Line 24)" field="c_empBenefits"/>
+            <MoneyField label="Domestic Production Deduction (Line 25)" field="c_domesticProd"/>
+            <MoneyField label="Other Deductions (Line 26)" field="c_otherDed"/>
+          </div>
+          {(()=>{
+            const n=f=>parseFloat(form[f]||0)
+            const totalDed=['c_comp_officers','c_salaries','c_repairs','c_badDebts','c_rents','c_taxes','c_interest_ded','c_charitable','c_depreciation','c_depletion','c_advertising','c_pension','c_empBenefits','c_domesticProd','c_otherDed'].reduce((s,k)=>s+n(k),0)
+            const grossInc=n('c_grossReceipts')-n('c_returns')-n('c_cogs')+n('c_dividends')+n('c_interest')+n('c_grossRents')+n('c_grossRoyalties')+n('c_capitalGains')+n('c_otherIncome')
+            return (
+              <div style={{marginTop:12,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                <div style={{padding:'10px 14px',background:'var(--s3)',borderRadius:6}}>
+                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:2}}>Total Deductions (Line 27)</div>
+                  <div style={{fontSize:15,fontWeight:800,color:'var(--bad)'}}>${totalDed.toLocaleString('en-US',{minimumFractionDigits:2})}</div>
+                </div>
+                <div style={{padding:'10px 14px',background:'var(--s3)',borderRadius:6}}>
+                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:2}}>Taxable Income Before Special Ded.</div>
+                  <div style={{fontSize:15,fontWeight:800,color:'var(--blue)'}}>${Math.max(0,grossInc-totalDed).toLocaleString('en-US',{minimumFractionDigits:2})}</div>
+                </div>
+              </div>
+            )
+          })()}
+        </div>
+      )}
+
+      {/* ── 1120 SPECIAL DEDUCTIONS TAB ── */}
+      {tab === 'special' && is1120C && (
+        <div className="card">
+          <div style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:14}}>Special Deductions & Final Tax</div>
+          <div className="fg2">
+            <MoneyField label="Dividends Received Deduction (DRD)" field="c_specialDed_drd" help="Schedule C"/>
+            <MoneyField label="Net Operating Loss (NOL)" field="c_specialDed_nol" help="Form 1139"/>
+            <MoneyField label="Other Special Deductions" field="c_specialDed_other"/>
+          </div>
+          {(()=>{
+            const n=f=>parseFloat(form[f]||0)
+            const grossInc=n('c_grossReceipts')-n('c_returns')-n('c_cogs')+n('c_dividends')+n('c_interest')+n('c_grossRents')+n('c_grossRoyalties')+n('c_capitalGains')+n('c_otherIncome')
+            const totalDed=['c_comp_officers','c_salaries','c_repairs','c_badDebts','c_rents','c_taxes','c_interest_ded','c_charitable','c_depreciation','c_depletion','c_advertising','c_pension','c_empBenefits','c_domesticProd','c_otherDed'].reduce((s,k)=>s+n(k),0)
+            const specialDed=n('c_specialDed_drd')+n('c_specialDed_nol')+n('c_specialDed_other')
+            const taxableInc=Math.max(0,grossInc-totalDed-specialDed)
+            const corpTax=taxableInc*0.21
+            return (
+              <div style={{marginTop:14}}>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:8}}>
+                  {[
+                    ['Total Special Deductions', specialDed,'var(--ok)'],
+                    ['Taxable Income (Line 30)', taxableInc,'var(--blue)'],
+                    ['Corporate Tax @ 21% (Line 31)', corpTax,'var(--warn)'],
+                  ].map(([l,v,c])=>(
+                    <div key={l} style={{padding:'12px 14px',background:'var(--s3)',borderRadius:6}}>
+                      <div style={{fontSize:10,color:'var(--t3)',marginBottom:2}}>{l}</div>
+                      <div style={{fontSize:15,fontWeight:800,color:c}}>${parseFloat(v).toLocaleString('en-US',{minimumFractionDigits:2})}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{marginTop:14,fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Credits & Payments</div>
+                <div className="fg2">
+                  <MoneyField label="Tax Credits (Schedule J)" field="c_credits"/>
+                  <MoneyField label="Estimated Tax Deposits" field="c_deposits"/>
+                </div>
+                <div style={{marginTop:8,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                  <div style={{padding:'12px 14px',background:'var(--s3)',borderRadius:6}}>
+                    <div style={{fontSize:10,color:'var(--t3)',marginBottom:2}}>Tax After Credits</div>
+                    <div style={{fontSize:15,fontWeight:800,color:'var(--warn)'}}>${Math.max(0,corpTax-n('c_credits')).toLocaleString('en-US',{minimumFractionDigits:2})}</div>
+                  </div>
+                  <div style={{padding:'12px 14px',background:'var(--s3)',borderRadius:6}}>
+                    <div style={{fontSize:10,color:'var(--t3)',marginBottom:2}}>{(corpTax-n('c_credits')-n('c_deposits'))>=0?'Balance Due':'Overpayment'}</div>
+                    <div style={{fontSize:15,fontWeight:800,color:(corpTax-n('c_credits')-n('c_deposits'))>=0?'var(--bad)':'var(--ok)'}}>${Math.abs(corpTax-n('c_credits')-n('c_deposits')).toLocaleString('en-US',{minimumFractionDigits:2})}</div>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
         </div>
       )}
 
@@ -1269,5 +1750,6 @@ Submit to the IRS via IRS-approved e-file software (Drake,
 ProSeries, Lacerte, etc.) using your EFIN after review.
 ===============================================================`
 }
+
 
 
