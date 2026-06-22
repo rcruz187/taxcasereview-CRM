@@ -77,7 +77,6 @@ export default function Fax() {
     try {
       let mediaUrl = null
 
-      // Upload file to Supabase storage first if provided
       if (file) {
         const path = `fax/${Date.now()}_${file.name}`
         const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
@@ -86,25 +85,18 @@ export default function Fax() {
         mediaUrl = urlData.publicUrl
       }
 
-      // Format numbers E.164
       const toNum   = '+1' + form.to_number.replace(/\D/g,'').slice(-10)
       const fromNum = form.from_number
         ? '+1' + form.from_number.replace(/\D/g,'').slice(-10)
         : (settings.firm_fax_number || settings.sw_inbound_did || '')
 
-      // Call the send-fax Supabase Edge Function
       const { data: resData, error: invokeErr } = await supabase.functions.invoke('send-fax', {
-        body: {
-          to: toNum,
-          from: fromNum,
-          ...(mediaUrl ? { document_url: mediaUrl } : {}),
-        }
+        body: { to: toNum, from: fromNum, ...(mediaUrl ? { document_url: mediaUrl } : {}) }
       })
 
       const sw_id = resData?.sid || null
       const status = !invokeErr && resData?.success ? 'Sent' : 'Failed'
 
-      // Log to Supabase regardless of result
       const { error: logErr } = await supabase.from('fax_logs').insert([{
         to_number: toNum, from_number: fromNum,
         client_name: form.client_name, subject: form.subject,
@@ -148,95 +140,109 @@ export default function Fax() {
   const sent     = outboundLogs.filter(l=>l.status==='Sent').length
   const failed   = outboundLogs.filter(l=>l.status==='Failed').length
   const received = inboundLogs.length
+  const thisMonth = logs.filter(l=>(l.sent_at||l.created_at)?.slice(0,7)===new Date().toISOString().slice(0,7)).length
+
+  const statCards = [
+    { label: 'Total Sent',  value: outboundLogs.length, color: 'var(--tx)' },
+    { label: 'Successful',  value: sent,                color: 'var(--ok)' },
+    { label: 'Failed',      value: failed,              color: 'var(--bad)' },
+    { label: 'Received',    value: received,            color: 'var(--blue)' },
+    { label: 'This Month',  value: thisMonth,           color: 'var(--b2)' },
+  ]
 
   return (
-    <div style={{maxWidth:1000}}>
+    <div style={{maxWidth:1100}}>
       {toast && <div className={`toast show ${toast.type==='err'?'terr':''}`}>{toast.msg||toast}</div>}
 
       {settingsLoaded && !settings?.sw_space_url && (
-        <div style={{background:'rgba(245,158,11,.08)',border:'1px solid rgba(245,158,11,.3)',borderRadius:8,padding:'10px 16px',marginBottom:14,fontSize:12,color:'var(--warn)',display:'flex',alignItems:'center',gap:10}}>
+        <div style={{background:'rgba(245,158,11,.08)',border:'1px solid rgba(245,158,11,.3)',borderRadius:10,padding:'12px 18px',marginBottom:20,fontSize:13,color:'var(--warn)',display:'flex',alignItems:'center',gap:10}}>
           <span>⚠️</span>
           <span>SignalWire isn't configured yet. <strong>Settings → 📞 SignalWire</strong> to set up. You can still log faxes manually.</span>
         </div>
       )}
 
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:8}}>
-        <h2 style={{fontSize:15,fontWeight:700,margin:0}}>📠 Fax</h2>
-        <button className="btn pri" onClick={()=>{setForm(BLANK);setFile(null);setModal(true)}}>+ Send Fax</button>
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,flexWrap:'wrap',gap:8}}>
+        <h2 style={{fontSize:22,fontWeight:800,margin:0,letterSpacing:'-0.3px'}}>📠 Fax</h2>
+        <button className="btn pri" style={{fontSize:14,padding:'9px 20px',fontWeight:700}} onClick={()=>{setForm(BLANK);setFile(null);setModal(true)}}>+ Send Fax</button>
       </div>
 
       {/* Stats */}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))',gap:8,marginBottom:14}}>
-        {[
-          ['Total Sent', outboundLogs.length, 'var(--tx)'],
-          ['Successful', sent, 'var(--ok)'],
-          ['Failed', failed, 'var(--bad)'],
-          ['Received', received, 'var(--blue)'],
-          ['This Month', logs.filter(l=>(l.sent_at||l.created_at)?.slice(0,7)===new Date().toISOString().slice(0,7)).length, 'var(--b2)'],
-        ].map(([l,v,c])=>(
-          <div key={l} className="card" style={{padding:'10px 14px',textAlign:'center'}}>
-            <div style={{fontWeight:800,fontSize:20,color:c}}>{v}</div>
-            <div style={{fontSize:10,color:'var(--t3)',marginTop:2,textTransform:'uppercase',letterSpacing:'.05em'}}>{l}</div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))',gap:10,marginBottom:20}}>
+        {statCards.map(({label,value,color})=>(
+          <div key={label} className="card" style={{padding:'16px 18px',textAlign:'center'}}>
+            <div style={{fontWeight:900,fontSize:28,color,lineHeight:1}}>{value}</div>
+            <div style={{fontSize:11,color:'var(--t3)',marginTop:6,textTransform:'uppercase',letterSpacing:'.06em',fontWeight:600}}>{label}</div>
           </div>
         ))}
       </div>
 
       {/* Filters */}
-      <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
+      <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search client, number, subject…"
-          style={{flex:1,minWidth:180,padding:'7px 12px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12}}/>
+          style={{flex:1,minWidth:200,padding:'9px 14px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:8,color:'var(--tx)',fontSize:14}}/>
         {['All','Sent','Failed','Pending'].map(s=>(
-          <button key={s} className={`btn ${filterStatus===s?'pri':'sec'}`} style={{fontSize:10,padding:'4px 10px'}} onClick={()=>setFilter(s)}>{s}</button>
+          <button key={s} className={`btn ${filterStatus===s?'pri':'sec'}`} style={{fontSize:12,padding:'6px 14px',fontWeight:600}} onClick={()=>setFilter(s)}>{s}</button>
         ))}
       </div>
 
       {/* Fax log table */}
       <div className="card" style={{padding:0,overflow:'hidden'}}>
         {filtered.length===0 ? (
-          <div style={{padding:32,textAlign:'center',color:'var(--t3)',fontSize:13}}>
-            {logs.length===0 ? '📠 No faxes sent yet. Click "+ Send Fax" to get started.' : 'No faxes match your filters.'}
+          <div style={{padding:48,textAlign:'center',color:'var(--t3)',fontSize:15}}>
+            {logs.length===0 ? '📠 No faxes yet. Click "+ Send Fax" to get started.' : 'No faxes match your filters.'}
           </div>
         ) : (
-          <div className="ovx"><table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
-            <thead>
-              <tr style={{borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
-                {['','Date & Time','Client','To Number','Subject','File','Status','Sent By',''].map(h=>(
-                  <th key={h} style={{padding:'9px 12px',textAlign:'left',fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.05em'}}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(l=>(
-                <tr key={l.id} style={{borderBottom:'1px solid var(--br)'}}
-                  onMouseEnter={e=>e.currentTarget.style.background='var(--s2)'}
-                  onMouseLeave={e=>e.currentTarget.style.background=''}>
-                  <td style={{padding:'9px 12px'}}>{l.direction==='inbound'?<span title="Received" style={{color:'var(--blue)'}}>📥</span>:<span title="Sent" style={{color:'var(--t3)'}}>📤</span>}</td>
-                  <td style={{padding:'9px 12px',color:'var(--t2)',whiteSpace:'nowrap'}}>
-                    <div style={{fontWeight:600,fontSize:12}}>{(l.sent_at||l.created_at) ? new Date(l.sent_at||l.created_at).toLocaleDateString() : '—'}</div>
-                    <div style={{fontSize:10,color:'var(--t3)'}}>{(l.sent_at||l.created_at) ? new Date(l.sent_at||l.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : ''}</div>
-                  </td>
-                  <td style={{padding:'9px 12px',fontWeight:600}}>{l.client_name||'—'}</td>
-                  <td style={{padding:'9px 12px',fontFamily:'monospace',fontSize:11}}>{l.to_number||'—'}</td>
-                  <td style={{padding:'9px 12px',color:'var(--t2)',maxWidth:140,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.subject||'—'}</td>
-                  <td style={{padding:'9px 12px'}}>
-                    {l.file_url ? (
-                      <a href={l.file_url} target="_blank" rel="noreferrer" style={{fontSize:11,color:'var(--blue)',textDecoration:'none',display:'flex',alignItems:'center',gap:4}}>
-                        📄 {l.file_name?.slice(0,18)||'View'}
-                      </a>
-                    ) : <span style={{color:'var(--t3)'}}>—</span>}
-                  </td>
-                  <td style={{padding:'9px 12px'}}>
-                    <span className={`bdg ${l.status==='Sent'?'bg':l.status==='Failed'?'br':'ba'}`}>{l.status}</span>
-                    {l.error_msg && <div style={{fontSize:9,color:'var(--bad)',marginTop:2,maxWidth:120,overflow:'hidden',textOverflow:'ellipsis'}}>{l.error_msg.slice(0,40)}</div>}
-                  </td>
-                  <td style={{padding:'9px 12px',fontSize:11,color:'var(--t3)'}}>{l.sent_by?.split('@')[0]||'—'}</td>
-                  <td style={{padding:'9px 12px'}}>
-                    <button className="btn del" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>setConfirmDel(l.id)}>Del</button>
-                  </td>
+          <div className="ovx">
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
+              <thead>
+                <tr style={{borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
+                  {['','Date & Time','Client','Number','Subject','File','Status','Sent By',''].map(h=>(
+                    <th key={h} style={{padding:'11px 14px',textAlign:'left',fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table></div>
+              </thead>
+              <tbody>
+                {filtered.map(l=>(
+                  <tr key={l.id} style={{borderBottom:'1px solid var(--br)'}}
+                    onMouseEnter={e=>e.currentTarget.style.background='var(--s2)'}
+                    onMouseLeave={e=>e.currentTarget.style.background=''}>
+                    <td style={{padding:'12px 14px',fontSize:18}}>
+                      {l.direction==='inbound'
+                        ? <span title="Received" style={{color:'var(--blue)'}}>📥</span>
+                        : <span title="Sent" style={{color:'var(--t3)'}}>📤</span>}
+                    </td>
+                    <td style={{padding:'12px 14px',whiteSpace:'nowrap'}}>
+                      <div style={{fontWeight:700,fontSize:14}}>{(l.sent_at||l.created_at) ? new Date(l.sent_at||l.created_at).toLocaleDateString() : '—'}</div>
+                      <div style={{fontSize:12,color:'var(--t3)',marginTop:2}}>{(l.sent_at||l.created_at) ? new Date(l.sent_at||l.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : ''}</div>
+                    </td>
+                    <td style={{padding:'12px 14px',fontWeight:600,fontSize:14}}>{l.client_name||'—'}</td>
+                    <td style={{padding:'12px 14px',fontFamily:'monospace',fontSize:13,color:'var(--t2)'}}>{l.to_number ? fmtPhone(l.to_number) : '—'}</td>
+                    <td style={{padding:'12px 14px',color:'var(--t2)',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:13}}>{l.subject||'—'}</td>
+                    <td style={{padding:'12px 14px'}}>
+                      {l.file_url ? (
+                        <a href={l.file_url} target="_blank" rel="noreferrer"
+                          style={{fontSize:13,color:'var(--blue)',textDecoration:'none',display:'flex',alignItems:'center',gap:5,fontWeight:600}}>
+                          📄 View
+                        </a>
+                      ) : <span style={{color:'var(--t3)'}}>—</span>}
+                    </td>
+                    <td style={{padding:'12px 14px'}}>
+                      <span className={`bdg ${l.status==='Sent'||l.status==='Received'?'bg':l.status==='Failed'?'br':'ba'}`}
+                        style={{fontSize:12,padding:'3px 10px',fontWeight:700}}>
+                        {l.status}
+                      </span>
+                      {l.error_msg && <div style={{fontSize:10,color:'var(--bad)',marginTop:3,maxWidth:120,overflow:'hidden',textOverflow:'ellipsis'}}>{l.error_msg.slice(0,40)}</div>}
+                    </td>
+                    <td style={{padding:'12px 14px',fontSize:12,color:'var(--t3)'}}>{l.sent_by?.split('@')[0]||'—'}</td>
+                    <td style={{padding:'12px 14px'}}>
+                      <button className="btn del" style={{fontSize:11,padding:'4px 10px'}} onClick={()=>setConfirmDel(l.id)}>Del</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -244,9 +250,9 @@ export default function Fax() {
       {confirmDel && (
         <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setConfirmDel(null)}>
           <div className="modal" style={{maxWidth:360,textAlign:'center'}}>
-            <div style={{fontSize:36,marginBottom:12}}>🗑</div>
-            <div style={{fontWeight:700,fontSize:15,marginBottom:8}}>Delete this fax log?</div>
-            <div style={{fontSize:13,color:'var(--t3)',marginBottom:20}}>This cannot be undone.</div>
+            <div style={{fontSize:40,marginBottom:12}}>🗑</div>
+            <div style={{fontWeight:800,fontSize:17,marginBottom:8}}>Delete this fax log?</div>
+            <div style={{fontSize:14,color:'var(--t3)',marginBottom:24}}>This cannot be undone.</div>
             <div style={{display:'flex',gap:8}}>
               <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={()=>setConfirmDel(null)}>Cancel</button>
               <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>del(confirmDel)}>Delete</button>
@@ -258,7 +264,7 @@ export default function Fax() {
       {/* Send Fax Modal */}
       {modal && (
         <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setModal(false)}>
-          <div className="modal" style={{width:540}}>
+          <div className="modal" style={{width:560}}>
             <div className="mh">
               <span className="mt">📠 Send Fax</span>
               <button className="xbtn" onClick={()=>setModal(false)}>&times;</button>
@@ -269,11 +275,11 @@ export default function Fax() {
               {showSug && sugg.length>0 && (
                 <div style={{position:'absolute',top:'100%',left:0,right:0,background:'var(--sf)',border:'1px solid var(--br)',borderRadius:6,zIndex:50,maxHeight:160,overflowY:'auto'}}>
                   {sugg.map(c=>(
-                    <div key={c.id} onClick={()=>pickClient(c)} style={{padding:'8px 12px',cursor:'pointer',fontSize:13,display:'flex',justifyContent:'space-between'}}
+                    <div key={c.id} onClick={()=>pickClient(c)} style={{padding:'9px 14px',cursor:'pointer',fontSize:14,display:'flex',justifyContent:'space-between'}}
                       onMouseEnter={e=>e.currentTarget.style.background='var(--s2)'}
                       onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                       <span>{c.name}</span>
-                      {c.phone&&<span style={{color:'var(--t3)',fontSize:11}}>{c.phone}</span>}
+                      {c.phone&&<span style={{color:'var(--t3)',fontSize:12}}>{c.phone}</span>}
                     </div>
                   ))}
                 </div>
@@ -283,7 +289,7 @@ export default function Fax() {
             <div className="fg2">
               <div className="field"><label>To Fax Number *</label>
                 <input value={form.to_number} onChange={e=>fld('to_number',e.target.value.replace(/\D/g,''))} placeholder="8005551234" maxLength={11}/>
-                <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>10 digits, no dashes</div>
+                <div style={{fontSize:11,color:'var(--t3)',marginTop:3}}>10 digits, no dashes</div>
               </div>
               <div className="field"><label>From Number (override)</label>
                 <input value={form.from_number} onChange={e=>fld('from_number',e.target.value.replace(/\D/g,''))} placeholder={settings.firm_fax_number||settings.sw_inbound_did||'Uses SignalWire DID'}/>
@@ -295,22 +301,22 @@ export default function Fax() {
             </div>
 
             <div className="field"><label>Attach PDF / Document</label>
-              <div style={{border:'2px dashed var(--br)',borderRadius:8,padding:'16px',textAlign:'center',cursor:'pointer',background:file?'rgba(34,197,94,.06)':'var(--s2)'}}
+              <div style={{border:'2px dashed var(--br)',borderRadius:8,padding:'20px',textAlign:'center',cursor:'pointer',background:file?'rgba(34,197,94,.06)':'var(--s2)'}}
                 onClick={()=>document.getElementById('fax-file').click()}
                 onDragOver={e=>{e.preventDefault();e.currentTarget.style.borderColor='var(--blue)'}}
                 onDragLeave={e=>e.currentTarget.style.borderColor='var(--br)'}
                 onDrop={e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f)setFile(f);e.currentTarget.style.borderColor='var(--br)'}}>
                 {file ? (
                   <div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'center'}}>
-                    <span style={{fontSize:20}}>📄</span>
-                    <span style={{fontSize:13,fontWeight:600,color:'var(--ok)'}}>{file.name}</span>
-                    <button onClick={e=>{e.stopPropagation();setFile(null)}} style={{background:'none',border:'none',color:'var(--bad)',cursor:'pointer',fontSize:16}}>×</button>
+                    <span style={{fontSize:22}}>📄</span>
+                    <span style={{fontSize:14,fontWeight:700,color:'var(--ok)'}}>{file.name}</span>
+                    <button onClick={e=>{e.stopPropagation();setFile(null)}} style={{background:'none',border:'none',color:'var(--bad)',cursor:'pointer',fontSize:18}}>×</button>
                   </div>
                 ) : (
                   <div>
-                    <div style={{fontSize:24,marginBottom:6}}>📎</div>
-                    <div style={{fontSize:12,color:'var(--t2)'}}>Drop PDF here or click to browse</div>
-                    <div style={{fontSize:10,color:'var(--t3)',marginTop:4}}>PDF, TIFF, or image files</div>
+                    <div style={{fontSize:28,marginBottom:6}}>📎</div>
+                    <div style={{fontSize:14,color:'var(--t2)',fontWeight:500}}>Drop PDF here or click to browse</div>
+                    <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>PDF, TIFF, or image files</div>
                   </div>
                 )}
                 <input id="fax-file" type="file" accept=".pdf,.tiff,.tif,.jpg,.png" style={{display:'none'}} onChange={e=>setFile(e.target.files[0])}/>
@@ -319,15 +325,15 @@ export default function Fax() {
 
             <div className="field"><label>Additional Notes (logged internally)</label>
               <textarea value={form.notes} onChange={e=>fld('notes',e.target.value)} rows={2}
-                style={{width:'100%',resize:'none',padding:'8px 12px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:13,fontFamily:'inherit'}}
+                style={{width:'100%',resize:'none',padding:'10px 14px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:14,fontFamily:'inherit'}}
                 placeholder="Internal notes about this fax…"/>
             </div>
 
-            <div style={{background:'var(--s2)',borderRadius:6,padding:'8px 14px',marginBottom:14,fontSize:11,color:'var(--t3)',lineHeight:1.6}}>
+            <div style={{background:'var(--s2)',borderRadius:8,padding:'10px 16px',marginBottom:16,fontSize:12,color:'var(--t3)',lineHeight:1.6}}>
               🕐 Every fax is automatically <strong>timestamped</strong> with date, time, sender, recipient, and file — all saved in the client's fax history.
             </div>
 
-            <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:10}} onClick={sendFax} disabled={sending}>
+            <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:12,fontSize:15,fontWeight:700}} onClick={sendFax} disabled={sending}>
               {sending ? '📠 Sending…' : '📠 Send Fax'}
             </button>
           </div>
@@ -336,4 +342,3 @@ export default function Fax() {
     </div>
   )
 }
-
