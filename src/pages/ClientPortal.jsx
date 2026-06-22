@@ -763,7 +763,7 @@ export default function ClientPortal() {
           </div>
         )}
 
-        {/* ── MESSAGES ── */
+        {/* ── MESSAGES ── */}
         {section === 'messages' && (
           <div>
             <div style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>All text messages between you and your Tax Case Review team.</div>
