@@ -142,7 +142,7 @@ export default function Dashboard() {
     'MTD 1st Trades':   '#22c55e',
     'MTD 2nd Trades':   '#22c55e',
     'Unpaid Invoices':  '#a855f7',
-    'Open Tasks':       'var(--blue)',
+    'Open Tasks':       '#1A7FD4',
     'Upcoming DL':      '#f59e0b',
     'Overdue DL':       '#ef4444',
     'Closed Leads':     '#a855f7',
@@ -216,7 +216,7 @@ export default function Dashboard() {
             <StatCard label="Clients"         val={metrics.totalClients}  color="var(--ok)"    to="/clients"   icon="🏢" />
             <StatCard label="MTD 2nd Trades"  val={'$' + Math.round(metrics.my2ndTradeMtd).toLocaleString()} color="var(--ok)" icon="💵" sub="Your enrollments" />
             <StatCard label="Unpaid Invoices" val={metrics.unpaidInvoices} color="#a855f7" to="/invoices" icon="🧾" sub={metrics.unpaidAmt > 0 ? '$' + Math.round(metrics.unpaidAmt).toLocaleString() + ' outstanding' : 'All paid'} />
-            <StatCard label="Open Tasks"      val={metrics.openTasks}     color="var(--blue)"  to="/tasks"     icon="✅" sub={metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track'} />
+            <StatCard label="Open Tasks"      val={metrics.openTasks}     color="#1A7FD4"  to="/tasks"     icon="✅" sub={metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track'} />
             <StatCard label="Upcoming DL"     val={metrics.upcomingDl}    color="var(--warn)"  to="/deadlines" icon="⏰" />
             <StatCard label="Overdue DL"      val={metrics.overdueDl}     color={metrics.overdueDl > 0 ? 'var(--bad)' : 'var(--ok)'} to="/deadlines" icon="🚨" />
           </>
@@ -229,7 +229,7 @@ export default function Dashboard() {
             <StatCard label="MTD 1st Trades"  val={'$' + Math.round(metrics.my1stTradeMtd).toLocaleString()} color="var(--ok)" icon="💰" sub={'Team: $' + Math.round(metrics.mtd1stTrades).toLocaleString()} />
             <StatCard label="MTD 2nd Trades"  val={'$' + Math.round(metrics.my2ndTradeMtd).toLocaleString()} color="var(--ok)" icon="💵" sub={'Team: $' + Math.round(metrics.mtd2ndTrades).toLocaleString()} />
             <StatCard label="Unpaid Invoices" val={metrics.unpaidInvoices} color="#a855f7" to="/invoices" icon="🧾" sub={metrics.unpaidAmt > 0 ? '$' + Math.round(metrics.unpaidAmt).toLocaleString() + ' outstanding' : 'All paid'} />
-            <StatCard label="Open Tasks"      val={metrics.openTasks}     color="var(--blue)"  to="/tasks"     icon="✅" sub={metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track'} />
+            <StatCard label="Open Tasks"      val={metrics.openTasks}     color="#1A7FD4"  to="/tasks"     icon="✅" sub={metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track'} />
             <StatCard label="Upcoming DL"     val={metrics.upcomingDl}    color="var(--warn)"  to="/deadlines" icon="⏰" />
             <StatCard label="Overdue DL"      val={metrics.overdueDl}     color={metrics.overdueDl > 0 ? 'var(--bad)' : 'var(--ok)'} to="/deadlines" icon="🚨" />
           </>
@@ -241,7 +241,7 @@ export default function Dashboard() {
             <StatCard label="MTD 1st Trades"  val={'$' + Math.round(metrics.mtd1stTrades).toLocaleString()} color="var(--ok)" icon="💰" sub={'Total: $' + Math.round(metrics.total1stTrades).toLocaleString()} />
             <StatCard label="MTD 2nd Trades"  val={'$' + Math.round(metrics.mtd2ndTrades).toLocaleString()} color="var(--ok)" icon="💵" sub={'Total: $' + Math.round(metrics.total2ndTrades).toLocaleString()} />
             <StatCard label="Unpaid Invoices" val={metrics.unpaidInvoices} color="#a855f7" to="/invoices" icon="🧾" sub={metrics.unpaidAmt > 0 ? '$' + Math.round(metrics.unpaidAmt).toLocaleString() + ' outstanding' : 'All paid'} />
-            <StatCard label="Open Tasks"      val={metrics.openTasks}     color="var(--blue)"  to="/tasks"     icon="✅" sub={metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track'} />
+            <StatCard label="Open Tasks"      val={metrics.openTasks}     color="#1A7FD4"  to="/tasks"     icon="✅" sub={metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track'} />
             <StatCard label="Upcoming DL"     val={metrics.upcomingDl}    color="var(--warn)"  to="/deadlines" icon="⏰" />
             <StatCard label="Overdue DL"      val={metrics.overdueDl}     color={metrics.overdueDl > 0 ? 'var(--bad)' : 'var(--ok)'} to="/deadlines" icon="🚨" />
           </>
