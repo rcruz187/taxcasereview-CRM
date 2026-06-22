@@ -653,7 +653,59 @@ export default function Leads() {
       text: noteText,
       type: 'System', author: actor, created_at: new Date().toISOString()
     }])
-    showToast(willArchive ? 'Status updated — lead archived' : willRestore ? 'Status updated — lead restored' : 'Status updated!')
+
+    // ── Pipeline trigger tasks ──────────────────────────────────────────
+    // When a lead moves to "Tax Investigation Active", assign tasks to the
+    // tax associate (or any staff if none assigned) to call the IRS and
+    // review the financial intake info so they can build the resolution.
+    // When it moves to "IRS Facts Received", notify the original tax advisor
+    // so they can go over the IRS results with the client.
+    if (status === 'Tax Investigation Active') {
+      const dueDate = new Date(); dueDate.setDate(dueDate.getDate() + 1)
+      const dueDateStr = dueDate.toISOString().slice(0, 10)
+      await supabase.from('tasks').insert([
+        {
+          title: `📞 Call IRS — gather tax investigation info for ${l.name}`,
+          clientName: l.name,
+          priority: 'High',
+          dueDate: dueDateStr,
+          done: false,
+          assignedTo: actor, // assigned to whoever triggered this (tax associate on file)
+          notes: 'Call IRS with POA to pull transcripts, balances, lien info, assessment dates, and filing history. Enter results into the Compliance tab on this lead.',
+          created_at: new Date().toISOString(),
+        },
+        {
+          title: `🧾 Review financial intake — build resolution plan for ${l.name}`,
+          clientName: l.name,
+          priority: 'High',
+          dueDate: dueDateStr,
+          done: false,
+          assignedTo: actor,
+          notes: 'Review the Financial Profile (I&E, Assets & Equity tabs) populated from the client\'s intake submission. Cross-reference with IRS results to determine the best resolution path (OIC, IA, CNC, etc.).',
+          created_at: new Date().toISOString(),
+        },
+      ])
+      showToast('Status updated — 2 tasks created for tax investigation')
+    } else if (status === 'IRS Facts Received') {
+      // Notify the original tax advisor who sold this lead
+      const advisor = l.assignedTo || actor
+      const dueDate = new Date(); dueDate.setDate(dueDate.getDate() + 1)
+      const dueDateStr = dueDate.toISOString().slice(0, 10)
+      await supabase.from('tasks').insert([{
+        title: `📋 Review IRS results with ${l.name} — go over findings`,
+        clientName: l.name,
+        priority: 'High',
+        dueDate: dueDateStr,
+        done: false,
+        assignedTo: advisor,
+        notes: 'IRS/State investigation is complete. Review the Compliance tab for the results and call the client to go over what the IRS has on file and the proposed resolution.',
+        created_at: new Date().toISOString(),
+      }])
+      showToast(`Status updated — task created for ${advisor} to review IRS results`)
+    } else {
+      showToast(willArchive ? 'Status updated — lead archived' : willRestore ? 'Status updated — lead restored' : 'Status updated!')
+    }
+
     load()
     if (detail?.id === l.id) loadLeadNotes(l.id)
   }
