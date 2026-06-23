@@ -47,13 +47,27 @@ let primed = false
 function primeOnce() {
   if (primed) return
   primed = true
-  try { getCtx() } catch (_) {}
+  try {
+    const c = getCtx()
+    // Play a silent buffer to fully unlock the AudioContext
+    const buf = c.createBuffer(1, 1, 22050)
+    const src = c.createBufferSource()
+    src.buffer = buf
+    src.connect(c.destination)
+    src.start(0)
+  } catch (_) {}
   window.removeEventListener('pointerdown', primeOnce)
   window.removeEventListener('keydown', primeOnce)
+  window.removeEventListener('touchstart', primeOnce)
+  window.removeEventListener('mousemove', primeOnce)
+  window.removeEventListener('scroll', primeOnce)
 }
 if (typeof window !== 'undefined') {
   window.addEventListener('pointerdown', primeOnce)
   window.addEventListener('keydown', primeOnce)
+  window.addEventListener('touchstart', primeOnce)
+  window.addEventListener('mousemove', primeOnce, { once: true })
+  window.addEventListener('scroll', primeOnce, { once: true })
 }
 
 export function isSoundEnabled() {
@@ -68,6 +82,17 @@ export function playSound(kind) {
   if (!isSoundEnabled()) return
   try {
     const audioCtx = getCtx()
+    // If context is still suspended, try to resume it then retry
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().then(() => {
+        try {
+          const pattern = PATTERNS[kind] || PATTERNS.message
+          const now = audioCtx.currentTime
+          pattern.forEach(([freq, offset, dur]) => tone(freq, now + offset, dur, audioCtx))
+        } catch (_) {}
+      }).catch(() => {})
+      return
+    }
     const pattern = PATTERNS[kind] || PATTERNS.message
     const now = audioCtx.currentTime
     pattern.forEach(([freq, offset, dur]) => tone(freq, now + offset, dur, audioCtx))

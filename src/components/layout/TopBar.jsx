@@ -119,7 +119,8 @@ export default function TopBar({ onNew }) {
           setSoundEnabled(next)
           if (next) playSound('message')
         }}
-        title={soundOn ? 'Notification sounds on (click to mute)' : 'Notification sounds muted (click to unmute)'}
+        title={soundOn ? 'Notification sounds on — click to mute | right-click to test' : 'Notification sounds muted — click to unmute'}
+        onContextMenu={e => { e.preventDefault(); playSound('sms'); }}
         style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: soundOn ? 'var(--t2)' : 'var(--t3)', padding: '0 4px', lineHeight: 1 }}
       >
         {soundOn ? '🔔' : '🔇'}
