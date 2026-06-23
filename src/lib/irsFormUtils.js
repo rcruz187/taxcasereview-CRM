@@ -345,7 +345,7 @@ export async function generateCcAuthPdf(client) {
   page.drawText('FOR BANK ACCOUNT (ACH) ONLY:', { x: margin, y, size: 9, font: bold, color: rgb(0.3,0.3,0.3) });
   y -= 16;
   drawLine('Bank Name', margin, lineW * 0.48, y);
-  drawLine('Account Type:  ☐ Checking  ☐ Savings', margin + lineW * 0.52, lineW * 0.48, y);
+  drawLine('Account Type:  [ ] Checking  [ ] Savings', margin + lineW * 0.52, lineW * 0.48, y);
   y -= 22;
   drawLine('Routing Number', margin, lineW * 0.48, y);
   drawLine('Account Number', margin + lineW * 0.52, lineW * 0.48, y);

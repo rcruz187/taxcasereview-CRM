@@ -652,6 +652,38 @@ export default function Leads() {
 
   function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''),3000) }
   function fld(k,v) { setForm(f=>({...f,[k]:v})) }
+
+  function fmtPhone(v) {
+    const d = v.replace(/\D/g,'').slice(0,10)
+    if (d.length <= 3) return d
+    if (d.length <= 6) return `(${d.slice(0,3)}) ${d.slice(3)}`
+    return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`
+  }
+  function fmtSsn(v) {
+    const d = v.replace(/\D/g,'').slice(0,9)
+    if (d.length <= 3) return d
+    if (d.length <= 5) return `${d.slice(0,3)}-${d.slice(3)}`
+    return `${d.slice(0,3)}-${d.slice(3,5)}-${d.slice(5)}`
+  }
+  function fmtEin(v) {
+    const d = v.replace(/\D/g,'').slice(0,9)
+    if (d.length <= 2) return d
+    return `${d.slice(0,2)}-${d.slice(2)}`
+  }
+  async function handleZip(v) {
+    const d = v.replace(/\D/g,'').slice(0,5)
+    fld('zip', d)
+    if (d.length === 5) {
+      try {
+        const r = await fetch(`https://api.zippopotam.us/us/${d}`)
+        if (r.ok) {
+          const data = await r.json()
+          const place = data.places?.[0]
+          if (place) setForm(f=>({...f, zip:d, city: place['place name'], state: place['state abbreviation']}))
+        }
+      } catch(e) {}
+    }
+  }
   // Tab buttons swap content of different heights, which lets the browser
   // naturally clamp .page-content's scroll position toward the top. Capture
   // it before the switch and lock it back using a MutationObserver, which
@@ -968,6 +1000,9 @@ export default function Leads() {
     const url = res.url
     await navigator.clipboard.writeText(url).catch(()=>{})
 
+    // Build Financial Intake link for this lead
+    const intakeUrl = `${window.location.origin}/taxcasereview-CRM/intake/${l.id}`
+
     // Generate Stripe Checkout link for the 1st Trade investigation fee
     let stripePayUrl = null
     try {
@@ -1026,7 +1061,15 @@ export default function Leads() {
     </div>
     ${paymentSection}
     <p style="margin:0 0 4px;font-size:11px;color:#94a3b8;text-align:center">Sign link: <a href="${url}" style="color:#3b82f6">${url}</a></p>
-    ${stripePayUrl?`<p style="margin:0 0 28px;font-size:11px;color:#94a3b8;text-align:center">Payment link: <a href="${stripePayUrl}" style="color:#0ea5e9">${stripePayUrl}</a></p>`:'<div style="margin-bottom:28px"></div>'}
+    ${stripePayUrl?`<p style="margin:0 0 4px;font-size:11px;color:#94a3b8;text-align:center">Payment link: <a href="${stripePayUrl}" style="color:#0ea5e9">${stripePayUrl}</a></p>`:''}
+    <div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:10px;padding:20px 24px;margin:0 0 24px">
+      <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#7e22ce;text-transform:uppercase;letter-spacing:.06em">📋 Step 3 — Complete Your Financial Intake</p>
+      <p style="margin:0 0 14px;font-size:14px;color:#6b21a8;line-height:1.6">To build your resolution strategy, your advisor needs a picture of your current finances. This takes about 10 minutes and your progress saves automatically.</p>
+      <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+        <a href="${intakeUrl}" style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#ffffff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;letter-spacing:-.01em;box-shadow:0 4px 14px rgba(124,58,237,.35)">Start Financial Intake →</a>
+      </td></tr></table>
+      <p style="margin:12px 0 0;font-size:11px;color:#94a3b8;text-align:center">Financial Intake link: <a href="${intakeUrl}" style="color:#7c3aed">${intakeUrl}</a></p>
+    </div>
     <div style="background:#f8fafc;border-radius:8px;padding:16px 20px;border-left:4px solid #3b82f6;margin-bottom:8px">
       <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> Don't hesitate to reach out. We're here every step of the way.<br>📞 <strong>(888) 334-5052</strong> &nbsp;·&nbsp; ✉️ <strong>info@taxcasereview.org</strong></p>
     </div>
@@ -1044,8 +1087,8 @@ export default function Leads() {
     if(l.phone&&cfg?.signalwire_backend){
       try{
         const smsBody = stripePayUrl
-          ? `Hi ${l.name}, Tax Case Review sent your Investigation Package. Step 1 – Sign: ${url}  |  Step 2 – Pay $${Number(taxFeeAmt).toLocaleString()}: ${stripePayUrl}`
-          : `Hi ${l.name}, Tax Case Review sent you a Tax Investigation Package to review and sign: ${url}`
+          ? `Hi ${l.name}, Tax Case Review sent your Investigation Package. Step 1 – Sign: ${url}  |  Step 2 – Pay $${Number(taxFeeAmt).toLocaleString()}: ${stripePayUrl}  |  Step 3 – Financial Intake: ${intakeUrl}`
+          : `Hi ${l.name}, Tax Case Review sent you a Tax Investigation Package to review and sign: ${url}  |  Financial Intake: ${intakeUrl}`
         const r=await fetch(cfg.signalwire_backend+'/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:l.phone,body:smsBody})})
         const d=await r.json();if(d.success)smsSent=true
       }catch(e){console.error('SMS error:',e)}
@@ -1227,13 +1270,13 @@ export default function Leads() {
               <div className="field"><label>Last Name{form.clientType==='Individual'?' *':''}</label><input value={form.last} onChange={e=>fldLast(e.target.value)}/></div>
             </div>
             <div className="fg2">
-              <div className="field"><label>Phone</label><input value={form.phone} onChange={e=>fld('phone',e.target.value)} placeholder="(305) 555-0000"/></div>
-              <div className="field"><label>Phone 2 <span style={{color:'var(--t3)',fontWeight:400}}>(optional)</span></label><input value={form.phone2||''} onChange={e=>fld('phone2',e.target.value)} placeholder="(305) 555-0000"/></div>
+              <div className="field"><label>Phone</label><input value={form.phone} onChange={e=>fld('phone',fmtPhone(e.target.value))} placeholder="(305) 555-0000" maxLength={14}/></div>
+              <div className="field"><label>Phone 2 <span style={{color:'var(--t3)',fontWeight:400}}>(optional)</span></label><input value={form.phone2||''} onChange={e=>fld('phone2',fmtPhone(e.target.value))} placeholder="(305) 555-0000" maxLength={14}/></div>
               <div className="field"><label>Email</label><input value={form.email} onChange={e=>fld('email',e.target.value)}/></div>
             </div>
             <div className="fg3">
-              <div className="field"><label>SSN</label><input value={form.ssn} onChange={e=>fld('ssn',e.target.value)} placeholder="XXX-XX-XXXX" maxLength={11}/></div>
-              <div className="field"><label>EIN (if business)</label><input value={form.ein||''} onChange={e=>fld('ein',e.target.value)} placeholder="XX-XXXXXXX"/></div>
+              <div className="field"><label>SSN</label><input value={form.ssn} onChange={e=>fld('ssn',fmtSsn(e.target.value))} placeholder="XXX-XX-XXXX" maxLength={11}/></div>
+              <div className="field"><label>EIN (if business)</label><input value={form.ein||''} onChange={e=>fld('ein',fmtEin(e.target.value))} placeholder="XX-XXXXXXX" maxLength={10}/></div>
               <div className="field"><label>Date of Birth</label><input type="date" value={form.dob} onChange={e=>fld('dob',e.target.value)}/></div>
             </div>
 
@@ -1242,7 +1285,7 @@ export default function Leads() {
               <div style={{fontWeight:700,fontSize:12,marginBottom:8}}>👥 Spouse / Partner</div>
               <div className="fg2">
                 <div className="field"><label>Spouse Full Name</label><input value={form.spouseName||''} onChange={e=>fld('spouseName',e.target.value)}/></div>
-                <div className="field"><label>Spouse SSN</label><input value={form.spouseSsn||''} onChange={e=>fld('spouseSsn',e.target.value)} placeholder="XXX-XX-XXXX" maxLength={11}/></div>
+                <div className="field"><label>Spouse SSN</label><input value={form.spouseSsn||''} onChange={e=>fld('spouseSsn',fmtSsn(e.target.value))} placeholder="XXX-XX-XXXX" maxLength={11}/></div>
               </div>
               <div className="fg2">
                 <div className="field"><label>Spouse Date of Birth</label><input type="date" value={form.spouseDob||''} onChange={e=>fld('spouseDob',e.target.value)}/></div>
@@ -1262,7 +1305,7 @@ export default function Leads() {
                   <option value="">Select...</option>{STATES.map(s=><option key={s}>{s}</option>)}
                 </select>
               </div>
-              <div className="field"><label>ZIP</label><input value={form.zip} onChange={e=>fld('zip',e.target.value)}/></div>
+              <div className="field"><label>ZIP</label><input value={form.zip} onChange={e=>handleZip(e.target.value)} maxLength={5} placeholder="33408"/></div>
             </div>
             <div className="fg2">
               <div className="field"><label>Source</label>
