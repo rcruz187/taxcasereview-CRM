@@ -359,26 +359,7 @@ export default function Sidebar() {
                   <Icon />
                   {item.label}
                   {item.badge === 'email' ? (
-                    <span style={{ marginLeft: 'auto', display: 'flex', gap: 4, alignItems: 'center' }}>
-                      {(() => {
-                        const inboxOnly = unreadInbox - emailActionNeeded - emailWaiting
-                        return inboxOnly > 0 ? (
-                          <span title={`${inboxOnly} Inbox`} style={{ display: 'flex', alignItems: 'center', gap: 3, background: '#1d4ed8', borderRadius: 10, padding: '1px 7px' }}>
-                            <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{inboxOnly}</span>
-                          </span>
-                        ) : null
-                      })()}
-                      {emailActionNeeded > 0 && (
-                        <span title={`${emailActionNeeded} Action Needed`} style={{ display: 'flex', alignItems: 'center', gap: 3, background: '#dc2626', borderRadius: 10, padding: '1px 7px' }}>
-                          <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{emailActionNeeded}</span>
-                        </span>
-                      )}
-                      {emailWaiting > 0 && (
-                        <span title={`${emailWaiting} Waiting`} style={{ display: 'flex', alignItems: 'center', gap: 3, background: '#d97706', borderRadius: 10, padding: '1px 7px' }}>
-                          <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{emailWaiting}</span>
-                        </span>
-                      )}
-                    </span>
+                    unreadInbox > 0 && <span className="nav-badge">{unreadInbox}</span>
                   ) : item.badge && (
                     item.badge === 'timeoff'
                       ? (pendingTimeOff > 0 && <span className="nav-badge">{pendingTimeOff}</span>)
