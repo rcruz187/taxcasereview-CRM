@@ -187,6 +187,7 @@ export default function TaxReturns() {
   }
 
   function handleDocsParsed(parsedDocs) {
+    console.log('handleDocsParsed received:', JSON.stringify(parsedDocs))
     // Auto-detect return type from uploaded docs
     const docTypes = parsedDocs.map(p => p.docType)
     let autoReturnType = null
@@ -195,32 +196,36 @@ export default function TaxReturns() {
     else if (docTypes.some(d => d === 'Schedule C (prior)')) autoReturnType = 'Federal 1040'
     else if (docTypes.some(d => ['W-2','1099-NEC','1099-INT','1099-DIV','1099-R','1099-G'].includes(d))) autoReturnType = 'Federal 1040'
 
+    // Helper to safely parse any numeric value Claude might return
+    const n = (v) => { const f = parseFloat(String(v || '').replace(/[^0-9.-]/g,'')); return isNaN(f) ? 0 : f }
+
     // Map parsed doc data into the return form fields
     const updates = {}
     if (autoReturnType) updates.returnType = autoReturnType
     parsedDocs.forEach(({ docType, data }) => {
       if (!data) return
+      console.log('Processing docType:', docType, 'data keys:', Object.keys(data))
       if (docType === 'W-2') {
-        updates.wages = (parseFloat(updates.wages || 0) + parseFloat(data.box1_wages || 0)).toFixed(2)
-        updates.withholding = (parseFloat(updates.withholding || 0) + parseFloat(data.box2_federal_withheld || 0)).toFixed(2)
+        updates.wages = (n(updates.wages) + n(data.box1_wages)).toFixed(2)
+        updates.withholding = (n(updates.withholding) + n(data.box2_federal_withheld)).toFixed(2)
       }
       if (docType === '1099-NEC') {
-        updates.businessIncome = (parseFloat(updates.businessIncome || 0) + parseFloat(data.box1_nonemployee_comp || 0)).toFixed(2)
-        updates.withholding = (parseFloat(updates.withholding || 0) + parseFloat(data.box4_federal_withheld || 0)).toFixed(2)
+        updates.businessIncome = (n(updates.businessIncome) + n(data.box1_nonemployee_comp)).toFixed(2)
+        updates.withholding = (n(updates.withholding) + n(data.box4_federal_withheld)).toFixed(2)
       }
       if (docType === '1099-INT') {
-        updates.interest = (parseFloat(updates.interest || 0) + parseFloat(data.box1_interest_income || 0)).toFixed(2)
+        updates.interest = (n(updates.interest) + n(data.box1_interest_income)).toFixed(2)
       }
       if (docType === '1099-DIV') {
-        updates.dividends = (parseFloat(updates.dividends || 0) + parseFloat(data.box1a_total_dividends || 0)).toFixed(2)
-        updates.capitalGains = (parseFloat(updates.capitalGains || 0) + parseFloat(data.box2a_capital_gain_distrib || 0)).toFixed(2)
+        updates.dividends = (n(updates.dividends) + n(data.box1a_total_dividends)).toFixed(2)
+        updates.capitalGains = (n(updates.capitalGains) + n(data.box2a_capital_gain_distrib)).toFixed(2)
       }
       if (docType === '1099-R') {
-        updates.retirementIncome = (parseFloat(updates.retirementIncome || 0) + parseFloat(data.box2a_taxable_amount || 0)).toFixed(2)
-        updates.withholding = (parseFloat(updates.withholding || 0) + parseFloat(data.box4_federal_withheld || 0)).toFixed(2)
+        updates.retirementIncome = (n(updates.retirementIncome) + n(data.box2a_taxable_amount)).toFixed(2)
+        updates.withholding = (n(updates.withholding) + n(data.box4_federal_withheld)).toFixed(2)
       }
       if (docType === '1099-G') {
-        updates.otherIncome = (parseFloat(updates.otherIncome || 0) + parseFloat(data.box1_unemployment_comp || 0)).toFixed(2)
+        updates.otherIncome = (n(updates.otherIncome) + n(data.box1_unemployment_comp)).toFixed(2)
       }
       if (docType === 'K-1 (1065)' || docType === 'K-1 (1120-S)') {
         updates.businessIncome = (parseFloat(updates.businessIncome || 0) + parseFloat(data.box1_ordinary_income || 0)).toFixed(2)
