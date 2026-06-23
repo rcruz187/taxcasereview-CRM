@@ -53,20 +53,23 @@ const FIELD_LABELS = {
 }
 
 async function parseDocWithAI(file, docType) {
-  // Convert PDF to base64
-  const base64 = await new Promise((res, rej) => {
-    const r = new FileReader()
-    r.onload = () => res(r.result.split(',')[1])
-    r.onerror = rej
-    r.readAsDataURL(file)
-  })
+  // Upload PDF to Supabase Storage so edge function can fetch it (avoids 500KB body limit)
+  const path = `tax-doc-uploads/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g,'-')}`
+  const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: true, contentType: 'application/pdf' })
+  if (upErr) throw new Error('Upload failed: ' + upErr.message)
+  const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+  const fileUrl = urlData.publicUrl
 
   const fields = DOC_TYPES[docType] || DOC_TYPES['Other']
   const fieldList = fields.map(f => `"${f}": "${FIELD_LABELS[f] || f}"`).join(', ')
 
   const { data: fnData, error: fnErr } = await supabase.functions.invoke('parse-tax-doc', {
-    body: { base64, docType, fieldList }
+    body: { fileUrl, docType, fieldList }
   })
+
+  // Clean up temp file
+  supabase.storage.from('documents').remove([path]).catch(() => {})
+
   if (fnErr) throw new Error(fnErr.message)
   return fnData?.parsed || {}
 }
