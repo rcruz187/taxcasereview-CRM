@@ -13,6 +13,7 @@ export const FIELD_MAPS = {
     phone:       'Text26',   // daytime phone
     date:        'Text23',   // signature date (page 2)
     idType:      'ssn',
+    // printName has no AcroForm field — drawn directly in fillForm via drawText
   },
   // 2848 Business (named fields)
   '2848_business': {
@@ -151,6 +152,13 @@ export async function fillForm(formType, client, useEin = false) {
     setText(map.ssn, taxId);
     setText(map.phone, client.phone || '');
     setText(map.date, today);
+    // Draw print name directly on page 2 (no AcroForm field exists for this line)
+    try {
+      const pages = pdfDoc.getPages();
+      const pg2 = pages[1];
+      const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      pg2.drawText(client.name || '', { x: 40, y: 95, size: 10, font: helvetica, color: rgb(0,0,0) });
+    } catch(_) {}
   }
 
   else if (formType === '2848_business') {

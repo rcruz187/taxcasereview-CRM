@@ -64,45 +64,11 @@ async function parseDocWithAI(file, docType) {
   const fields = DOC_TYPES[docType] || DOC_TYPES['Other']
   const fieldList = fields.map(f => `"${f}": "${FIELD_LABELS[f] || f}"`).join(', ')
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1000,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'document',
-            source: { type: 'base64', media_type: 'application/pdf', data: base64 }
-          },
-          {
-            type: 'text',
-            text: `You are a professional tax document parser. Extract ALL values from this ${docType} tax document.
-
-Return ONLY a valid JSON object with these exact keys: {${fieldList}}
-
-Rules:
-- Use null for any field not found in the document
-- For dollar amounts, return numbers only (no $ or commas) e.g. 52341.00
-- For EINs use format XX-XXXXXXX, for SSNs use XXX-XX-XXXX
-- For Box 12 codes, return just the letter code (e.g. "D")
-- Be precise — extract exact values as printed on the document
-- Return ONLY the JSON object, no explanation, no markdown`
-          }
-        ]
-      }]
-    })
+  const { data: fnData, error: fnErr } = await supabase.functions.invoke('parse-tax-doc', {
+    body: { base64, docType, fieldList }
   })
-
-  const data = await response.json()
-  const text = data.content?.[0]?.text || '{}'
-  try {
-    return JSON.parse(text.replace(/```json|```/g, '').trim())
-  } catch {
-    return {}
-  }
+  if (fnErr) throw new Error(fnErr.message)
+  return fnData?.parsed || {}
 }
 
 export default function TaxDocParser({ clientName = '', taxYear = '2024', onParsed }) {
