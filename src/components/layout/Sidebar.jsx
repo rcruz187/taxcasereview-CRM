@@ -231,7 +231,7 @@ export default function Sidebar() {
     return () => { supabase.removeChannel(ch) }
   }, [])
 
-  // Chat badge — count messages newer than when this user last had /chat open
+  // Chat badge — count messages (rebuild) newer than when this user last had /chat open
   useEffect(() => {
     const storageKey = `tcr_chat_last_seen_${user?.email || 'anon'}`
     async function countUnreadChat() {
