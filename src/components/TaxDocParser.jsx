@@ -124,16 +124,34 @@ export default function TaxDocParser({ clientName = '', taxYear = '2024', onPars
     if (!pending.length) return
     setParsing(true)
 
+    const results = []
     for (const item of pending) {
       setFiles(prev => prev.map(f => f.id === item.id ? { ...f, status: 'parsing' } : f))
       try {
         const parsed = await parseDocWithAI(item.file, item.docType)
         setFiles(prev => prev.map(f => f.id === item.id ? { ...f, status: 'done', parsed } : f))
+        results.push({ item, parsed })
       } catch (e) {
         setFiles(prev => prev.map(f => f.id === item.id ? { ...f, status: 'error', error: e.message } : f))
       }
     }
     setParsing(false)
+
+    // Auto-fire onParsed immediately after all docs finish — no second button click needed
+    if (results.length > 0 && onParsed) {
+      // Save to DB in background (don't await — don't block the handoff)
+      const inserts = results.map(({ item, parsed }) => ({
+        client_name: clientName,
+        tax_year: taxYear,
+        doc_type: item.docType,
+        file_name: item.file.name,
+        parsed_data: parsed,
+        created_at: new Date().toISOString(),
+      }))
+      supabase.from('tax_doc_uploads').insert(inserts).catch(() => {})
+
+      onParsed(results.map(({ item, parsed }) => ({ docType: item.docType, data: parsed })))
+    }
   }
 
   async function saveAndContinue() {
@@ -265,3 +283,4 @@ export default function TaxDocParser({ clientName = '', taxYear = '2024', onPars
     </div>
   )
 }
+
