@@ -603,30 +603,30 @@ export default function ClientPortal() {
                     )}
                   </div>
                 ) : (
-                  // Fixed option buttons to pick plan
+                  // Slider to pick 1–8 months
                   <div>
-                    <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 12 }}>Select your preferred payment term:</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 18 }}>
-                      {[1, 2, 4, 8].map(m => {
-                        const mo = totalBalance > 0 ? Math.ceil((totalBalance / m) * 100) / 100 : 0
-                        const selected = planMonths === m
-                        return (
-                          <button key={m} onClick={() => setPlanMonths(m)}
-                            style={{ padding: '14px 8px', borderRadius: 10, cursor: 'pointer', textAlign: 'center',
-                              border: `2px solid ${selected ? '#3b82f6' : 'rgba(255,255,255,.1)'}`,
-                              background: selected ? 'rgba(59,130,246,.2)' : 'rgba(255,255,255,.04)',
-                              boxShadow: selected ? '0 0 16px rgba(59,130,246,.25)' : 'none',
-                            }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: selected ? '#93c5fd' : '#94a3b8', marginBottom: 6 }}>
-                              {m} month{m !== 1 ? 's' : ''}
-                            </div>
-                            <div style={{ fontSize: 18, fontWeight: 800, color: selected ? '#fff' : '#cbd5e1' }}>
-                              ${mo.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                            </div>
-                            <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>/month</div>
-                          </button>
-                        )
-                      })}
+                    <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 16 }}>Drag to select your preferred payment term:</div>
+                    <div style={{ textAlign: 'center', marginBottom: 8 }}>
+                      <div style={{ fontSize: 36, fontWeight: 900, color: '#fff', lineHeight: 1 }}>
+                        ${monthlyPayment.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        <span style={{ fontSize: 14, fontWeight: 400, color: '#94a3b8' }}> / month</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 6 }}>
+                        {planMonths} month{planMonths !== 1 ? 's' : ''} · ${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })} total
+                      </div>
+                    </div>
+                    <div style={{ padding: '0 8px', marginBottom: 18 }}>
+                      <input
+                        type="range" min={1} max={8} step={1}
+                        value={planMonths}
+                        onChange={e => setPlanMonths(Number(e.target.value))}
+                        style={{ width: '100%', accentColor: '#3b82f6', cursor: 'pointer', height: 6 }}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+                        {[1,2,3,4,5,6,7,8].map(m => (
+                          <span key={m} style={{ fontSize: 10, color: planMonths === m ? '#60a5fa' : '#475569', fontWeight: planMonths === m ? 700 : 400 }}>{m}mo</span>
+                        ))}
+                      </div>
                     </div>
 
                     {/* Summary */}
