@@ -53,29 +53,27 @@ const FIELD_LABELS = {
 }
 
 async function parseDocWithAI(file, docType) {
-  // Upload PDF to Supabase Storage so edge function can fetch it (avoids 500KB body limit)
-  const path = `tax-doc-uploads/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g,'-')}`
-  const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: true, contentType: 'application/pdf' })
-  if (upErr) throw new Error('Upload failed: ' + upErr.message)
-  const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
-  const fileUrl = urlData.publicUrl
+  // Convert PDF to base64 in browser — no storage bucket needed, works for all users
+  const base64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result.split(',')[1])
+    reader.onerror = () => reject(new Error('Failed to read file'))
+    reader.readAsDataURL(file)
+  })
 
   const fields = DOC_TYPES[docType] || DOC_TYPES['Other']
   const fieldList = fields.map(f => `"${f}": "${FIELD_LABELS[f] || f}"`).join(', ')
 
   const { data: fnData, error: fnErr } = await supabase.functions.invoke('parse-tax-doc', {
-    body: { fileUrl, docType, fieldList }
+    body: { base64, docType, fieldList }
   })
-
-  // Clean up temp file
-  supabase.storage.from('documents').remove([path]).catch(() => {})
 
   if (fnErr) throw new Error(fnErr.message)
   return fnData?.parsed || {}
 }
 
 export default function TaxDocParser({ clientName = '', taxYear = '2024', onParsed }) {
-  const [files, setFiles] = useState([]) // [{file, docType, status, parsed, error}]
+  const [files, setFiles] = useState([])
   const [parsing, setParsing] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const inputRef = useRef()
@@ -88,7 +86,6 @@ export default function TaxDocParser({ clientName = '', taxYear = '2024', onPars
       status: 'pending',
       parsed: null,
       error: null,
-      editing: false,
     }))
     setFiles(prev => [...prev, ...items])
   }
@@ -137,9 +134,9 @@ export default function TaxDocParser({ clientName = '', taxYear = '2024', onPars
     }
     setParsing(false)
 
-    // Auto-fire onParsed immediately after all docs finish — no second button click needed
+    // Auto-fire onParsed immediately — no second button click needed
     if (results.length > 0 && onParsed) {
-      // Save to DB in background (don't await — don't block the handoff)
+      // Save to DB in background
       const inserts = results.map(({ item, parsed }) => ({
         client_name: clientName,
         tax_year: taxYear,
@@ -154,28 +151,6 @@ export default function TaxDocParser({ clientName = '', taxYear = '2024', onPars
     }
   }
 
-  async function saveAndContinue() {
-    const parsed = files.filter(f => f.status === 'done' && f.parsed)
-    if (!parsed.length) return
-
-    // Save parsed docs to DB
-    const inserts = parsed.map(item => ({
-      client_name: clientName,
-      tax_year: taxYear,
-      doc_type: item.docType,
-      file_name: item.file.name,
-      parsed_data: item.parsed,
-      created_at: new Date().toISOString(),
-    }))
-
-    const { error } = await supabase.from('tax_doc_uploads').insert(inserts)
-    if (error) console.error('Save error:', error)
-
-    // Pass all parsed data up to parent (for pre-filling return wizard)
-    if (onParsed) onParsed(parsed.map(p => ({ docType: p.docType, data: p.parsed })))
-  }
-
-  const allDone = files.length > 0 && files.every(f => f.status === 'done' || f.status === 'error')
   const hasPending = files.some(f => f.status === 'pending')
 
   return (
@@ -211,7 +186,6 @@ export default function TaxDocParser({ clientName = '', taxYear = '2024', onPars
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
           {files.map(item => (
             <div key={item.id} className="card" style={{ padding: '14px 16px' }}>
-              {/* File header */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: item.parsed ? 12 : 0 }}>
                 <span style={{ fontSize: 20 }}>
                   {item.status === 'pending' ? '📄' : item.status === 'parsing' ? '⏳' : item.status === 'done' ? '✅' : '❌'}
@@ -225,18 +199,14 @@ export default function TaxDocParser({ clientName = '', taxYear = '2024', onPars
                     {item.status === 'error' && <span style={{ color: 'var(--bad)', marginLeft: 8 }}>{item.error}</span>}
                   </div>
                 </div>
-
-                {/* Doc type selector */}
                 <select value={item.docType} onChange={e => setDocType(item.id, e.target.value)}
                   style={{ fontSize: 12, padding: '4px 8px', background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 6, color: 'var(--tx)' }}>
                   {Object.keys(DOC_TYPES).map(t => <option key={t}>{t}</option>)}
                 </select>
-
                 <button onClick={() => removeFile(item.id)}
                   style={{ background: 'none', border: 'none', color: 'var(--t3)', cursor: 'pointer', fontSize: 18, padding: '0 4px' }}>×</button>
               </div>
 
-              {/* Parsed fields */}
               {item.status === 'done' && item.parsed && (
                 <div style={{ borderTop: '1px solid var(--br)', paddingTop: 12 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>
@@ -263,24 +233,13 @@ export default function TaxDocParser({ clientName = '', taxYear = '2024', onPars
         </div>
       )}
 
-      {/* Actions */}
-      {files.length > 0 && (
-        <div style={{ display: 'flex', gap: 10 }}>
-          {hasPending && (
-            <button className="btn pri" style={{ flex: 1, justifyContent: 'center', padding: '11px', fontSize: 14, fontWeight: 700 }}
-              onClick={parseAll} disabled={parsing}>
-              {parsing ? '⏳ Parsing documents…' : `🤖 Parse ${files.filter(f => f.status === 'pending').length} Document${files.filter(f => f.status === 'pending').length > 1 ? 's' : ''} with AI`}
-            </button>
-          )}
-          {allDone && (
-            <button className="btn" style={{ flex: 1, justifyContent: 'center', padding: '11px', fontSize: 14, fontWeight: 700, background: 'var(--ok)', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer' }}
-              onClick={saveAndContinue}>
-              ✅ Save & Continue to Return →
-            </button>
-          )}
-        </div>
+      {/* Parse button */}
+      {files.length > 0 && hasPending && (
+        <button className="btn pri" style={{ width: '100%', justifyContent: 'center', padding: '11px', fontSize: 14, fontWeight: 700 }}
+          onClick={parseAll} disabled={parsing}>
+          {parsing ? '⏳ Parsing documents…' : `🤖 Parse ${files.filter(f => f.status === 'pending').length} Document${files.filter(f => f.status === 'pending').length > 1 ? 's' : ''} with AI`}
+        </button>
       )}
     </div>
   )
 }
-
