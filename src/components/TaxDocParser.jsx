@@ -64,7 +64,7 @@ async function parseDocWithAI(file, docType) {
   const fields = DOC_TYPES[docType] || DOC_TYPES['Other']
   const fieldList = fields.map(f => `"${f}": "${FIELD_LABELS[f] || f}"`).join(', ')
 
-  const { data: fnData, error: fnErr } = await supabase.functions.invoke('parse-tax-doc', {
+  const { data: fnData, error: fnErr } = await supabase.functions.invoke('parsetaxdoc', {
     body: { base64, docType, fieldList }
   })
   if (fnErr) throw new Error(fnErr.message)
