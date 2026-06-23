@@ -174,6 +174,7 @@ export default function Sidebar() {
       }).length
       setDueSoonDeadlines(dueSoon)
     }
+    if (!user) return
     loadCounts()
     const ch = supabase.channel('sidebar-counts-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, loadCounts)
@@ -182,7 +183,7 @@ export default function Sidebar() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deadlines' }, loadCounts)
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [])
+  }, [user])
 
   const BADGE_COUNTS = { leads: newLeads, clients: newClients, cases: openCases, deadlines: dueSoonDeadlines, fax: unreadFax, sms: unreadSms, voicemails: unreadVoicemails, esign: pendingEsign, email: unreadInbox, tasks: openTasks, chat: unreadChat }
 
@@ -199,6 +200,7 @@ export default function Sidebar() {
       setUnreadVoicemails(vmRes.count || 0)
       setPendingEsign(esignRes.count || 0)
     }
+    if (!user) return
     loadCommsCounts()
     const ch = supabase.channel('sidebar-comms-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fax_logs' }, loadCommsCounts)
@@ -207,7 +209,7 @@ export default function Sidebar() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'esign_requests' }, loadCommsCounts)
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [])
+  }, [user])
 
   useEffect(() => {
     async function loadEmailTaskCounts() {
@@ -223,13 +225,14 @@ export default function Sidebar() {
       setUnreadInbox(allUnreadRes.count || 0)
       setOpenTasks(tasksRes.count || 0)
     }
+    if (!user) return
     loadEmailTaskCounts()
     const ch = supabase.channel('sidebar-email-tasks-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'emails' }, loadEmailTaskCounts)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, loadEmailTaskCounts)
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [])
+  }, [user])
 
   // Chat badge — count messages (rebuild) newer than when this user last had /chat open
   useEffect(() => {
