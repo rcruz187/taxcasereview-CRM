@@ -1586,6 +1586,7 @@ export default function Leads() {
                 setFillerLead({...l, address:l.street, business_name:l.name})
               } catch (err) { showToast('Error opening form: ' + err.message) }
             }}/>
+            <ActionBtn color="#0f766e" icon="🏛️" label="Pre-Fill State POA" sub={l.state ? l.state+' Form' : 'State Form'} onClick={()=>nav('/stateforms?lead='+l.id)}/>
             <ActionBtn color="#1d4ed8" icon="📊" label={intakeSending?'Sending…':'Financial Intake'} sub="Send / Resend Link" onClick={()=>!intakeSending&&sendFinancialIntake(l)}/>
             <ActionBtn color="#0d9488" icon="💵" label="Charge Investigation Fee" sub={l.taxFee?`Quoted: $${l.taxFee}`:'Send Payment Link'} onClick={()=>setPaymentLinkModal({purpose:'investigation_fee', defaultAmount:l.taxFee||'', defaultDescription:'Tax Investigation Fee'})}/>
             <ActionBtn color="#d97706" icon="📝" label="Addendum" sub="After IRS facts" onClick={()=>{setAddForm({resolutionFee:'',paymentPlan:'',startDate:'',notes:'',services:[],sendVia:'email'});setAddModal(true)}}/>
