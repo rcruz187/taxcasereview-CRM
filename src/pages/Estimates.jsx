@@ -113,7 +113,7 @@ export default function Estimates() {
   const accepted   = items.filter(e=>e.status==='Accepted').reduce((s,e)=>s+parseFloat(e.amount||0),0)
 
   return (
-    <div>
+    <div style={{padding:'20px 24px',maxWidth:1100,margin:'0 auto'}}>
       {toast&&<div className="toast show">{toast}</div>}
 
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:8}}>

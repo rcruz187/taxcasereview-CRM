@@ -110,7 +110,7 @@ export default function Transcripts() {
   const statusColors = { 'Pending':'ba','Requested — Waiting':'bb','Received — Partial':'bw','Received — Complete':'bg','Error / Rejected':'br','On Hold':'bn' }
 
   return (
-    <div>
+    <div style={{padding:'20px 24px',maxWidth:700,margin:'0 auto'}}>
       {toast&&<div className="toast show">{toast}</div>}
 
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:8}}>

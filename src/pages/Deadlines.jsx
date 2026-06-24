@@ -171,7 +171,7 @@ export default function Deadlines() {
   }
 
   return (
-    <div style={{maxWidth:1000}}>
+    <div style={{padding:'20px 24px',maxWidth:1000,margin:'0 auto'}}>
       {toast&&<div className="toast show">{toast}</div>}
 
       {/* Stat cards — double as quick filters */}

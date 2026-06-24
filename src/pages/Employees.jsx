@@ -275,7 +275,7 @@ export default function Employees() {
   )
 
   return (
-    <div>
+    <div style={{padding:'20px 24px',maxWidth:1100,margin:'0 auto'}}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         <div>

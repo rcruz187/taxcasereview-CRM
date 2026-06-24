@@ -166,7 +166,7 @@ export default function Sms() {
   const smsCount  = Math.ceil(charCount/160)||0
 
   return (
-    <div style={{maxWidth:1100}}>
+    <div style={{padding:'20px 24px',maxWidth:1100,margin:'0 auto'}}>
       {toast&&<div className="toast show">{toast}</div>}
 
       {/* Tab bar */}

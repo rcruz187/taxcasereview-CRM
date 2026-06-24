@@ -202,7 +202,7 @@ export default function TimeClock() {
   }
 
   return (
-    <div>
+    <div style={{padding:'20px 24px',maxWidth:1000,margin:'0 auto'}}>
       {toast && <div className="toast show">{toast}</div>}
 
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, flexWrap:'wrap', gap:8 }}>

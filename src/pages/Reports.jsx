@@ -178,7 +178,7 @@ export default function Reports() {
   const countBy = (arr, key) => arr.reduce((a,r)=>{ const v=r[key]||'Unknown'; a[v]=(a[v]||0)+1; return a },{})
 
   return (
-    <div style={{maxWidth:1100}}>
+    <div style={{padding:'20px 24px',maxWidth:1100,margin:'0 auto'}}>
       {/* Header */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:8}}>
         <h2 style={{fontSize:15,fontWeight:700,margin:0}}>📊 Reports & Analytics</h2>

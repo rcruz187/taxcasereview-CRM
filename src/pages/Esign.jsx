@@ -187,7 +187,7 @@ export default function Esign() {
   const signed   = items.filter(i => i.status === 'Signed').length
 
   return (
-    <div style={{ maxWidth: 1100 }}>
+    <div style={{ padding: '20px 24px', maxWidth: 1100, margin: '0 auto' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 8 }}>

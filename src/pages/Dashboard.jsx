@@ -180,7 +180,7 @@ export default function Dashboard() {
   )}
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ padding:'20px 24px', maxWidth:1100, margin:'0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       {/* Greeting + clock */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>

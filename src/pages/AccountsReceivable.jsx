@@ -83,7 +83,7 @@ export default function AccountsReceivable() {
   }
 
   return (
-    <div>
+    <div style={{padding:'20px 24px',maxWidth:1000,margin:'0 auto'}}>
       {/* Stat cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[

@@ -151,7 +151,7 @@ export default function Fax() {
   ]
 
   return (
-    <div style={{maxWidth:1100}}>
+    <div style={{padding:'20px 24px',maxWidth:1100,margin:'0 auto'}}>
       {toast && <div className={`toast show ${toast.type==='err'?'terr':''}`}>{toast.msg||toast}</div>}
 
       {settingsLoaded && !settings?.sw_space_url && (

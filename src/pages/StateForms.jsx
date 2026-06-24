@@ -37,7 +37,7 @@ export default function StateForms() {
   })
 
   return (
-    <div>
+    <div style={{padding:'20px 24px',maxWidth:1000,margin:'0 auto'}}>
       {/* ── Section 1: State Form Downloads ─────────────────────────────── */}
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="ch">

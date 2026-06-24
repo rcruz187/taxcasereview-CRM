@@ -148,7 +148,7 @@ export default function Cases() {
   if (detail) {
     const c = detail
     return (
-      <div style={{maxWidth:760,margin:'0 auto'}}>
+      <div style={{padding:'20px 24px',maxWidth:860,margin:'0 auto'}}>
         {toast&&<div className="toast show">{toast}</div>}
         <div style={{display:'flex',gap:8,marginBottom:16,alignItems:'center'}}>
           <button className="btn" onClick={()=>{ setDetail(null); navigate('/cases',{replace:true}) }}>← Back to Cases</button>
