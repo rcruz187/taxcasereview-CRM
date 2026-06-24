@@ -116,6 +116,8 @@ export default function Cases() {
     setSaving(false)
     if (error) { showToast('❌ Save error: ' + error.message); return }
     showToast('✅ Case created!')
+    const actorCase = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    await triggerWorkflow('case_created', 'case', payload.clientName || '', actorCase).catch(()=>{})
     setModal(false); setForm(BLANK); load()
   }
 

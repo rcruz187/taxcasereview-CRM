@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { advanceLeadStatus } from '../lib/leadStatus'
 import { sendGmailEmail } from '../lib/gmailUtils'
 
@@ -180,6 +181,9 @@ export default function Calendar() {
     setSaving(false)
     if (error) { showToast('Error: ' + error.message); return }
     showToast('✅ Event saved!')
+    const actorCal = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    if (!form.id) await triggerWorkflow('lead_appointment_set', form.clientName ? 'client' : 'lead', form.clientName || '', actorCal).catch(()=>{})
+    if (form.status === 'completed') await triggerWorkflow('lead_appointment_completed', 'client', form.clientName || '', actorCal).catch(()=>{})
     setShowForm(false); setForm({ title:'',clientName:'',assignedTo:'',date:'',time:'',endTime:'',eventType:'Consultation Call',color:'bb',notes:'',recurring:'none',status:'scheduled' })
     load()
   }

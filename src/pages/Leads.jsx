@@ -622,7 +622,7 @@ export default function Leads() {
     setLeadSmsSending(false)
     if (error) { showToast('Error: '+error.message); return }
 
-    if (status === 'Sent') showToast('✅ Text sent!')
+    if (status === 'Sent') { showToast('✅ Text sent!'); await triggerWorkflow('lead_sms_sent', 'lead', l?.name || '', actor).catch(()=>{}) }
     else if (status === 'Failed') showToast('SignalWire error: ' + (errMsg||'send failed'))
     else showToast('Logged — add SignalWire credentials in Settings to actually send')
 
@@ -763,7 +763,7 @@ export default function Leads() {
     if (oldName && oldName !== form.name) {
       await supabase.from('client_compliance_records').update({ client_name: form.name }).eq('client_name', oldName)
     }
-    if (!skipped.length) showToast(modal==='edit' ? '✅ Lead updated!' : '✅ Lead added!')
+    if (!skipped.length) { showToast(modal==='edit' ? '✅ Lead updated!' : '✅ Lead added!'); if (modal !== 'edit') await triggerWorkflow('lead_created', 'lead', form.name, actor) }
     setModal(false); setForm(BLANK); load()
     if (modal==='edit' && detail) {
       const { data } = await supabase.from('leads').select('*').eq('id', form.id).single()
@@ -777,7 +777,7 @@ export default function Leads() {
     if (!window.confirm(`Archive ${l.name}? This hides it from the active list — nothing is deleted, and you can restore it anytime from the Archived view.`)) return
     const { error } = await supabase.from('leads').update({ archived: true }).eq('id', l.id)
     if (error) { showToast('Error: ' + error.message); return }
-    showToast('Lead archived'); setDetail(null); load()
+    showToast('Lead archived'); await triggerWorkflow('lead_archived', 'lead', detail?.name || '', actor); setDetail(null); load()
   }
 
   async function restoreLead(l) {

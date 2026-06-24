@@ -11,6 +11,7 @@ import SplitPaymentModal from '../components/SplitPaymentModal'
 import FinancialProfile from './FinancialProfile'
 import OrganizerView from '../components/OrganizerView'
 import { supabase } from '../lib/supabase'
+import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { useApp } from '../context/AppContext'
 import { generateAddendum, sendAddendumForSignature } from '../lib/docUtils'
 import { RESOLUTION_SERVICES } from '../lib/irsFormUtils'
@@ -1095,6 +1096,8 @@ export default function Clients() {
     setSaving(false)
     if (error){showToast('Error: '+error.message);return}
     showToast(skipped.length ? `✅ Client added — but skipped fields not in the database yet: ${skipped.join(', ')}` : '✅ Client added!')
+    const actorC = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    await triggerWorkflow('client_created', 'client', form.name, actorC).catch(()=>{})
     setModal(false);setForm(BLANK);load()
   }
 
@@ -1131,6 +1134,8 @@ export default function Clients() {
     if (!window.confirm(`Archive ${name}? This hides it from the active roster — nothing is deleted, and you can restore it anytime from the Archived view.`)) return
     const { error } = await supabase.from('clients').update({ archived: true }).eq('id',id)
     if (error) { showToast('Error: '+error.message); return }
+    const actorA = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    await triggerWorkflow('client_archived', 'client', detail?.name || '', actorA).catch(()=>{})
     showToast('Client archived');setDetail(null);load()
   }
 
@@ -1184,7 +1189,7 @@ export default function Clients() {
     setSmsSending(false)
     if (error) { showToast('Error: '+error.message); return }
 
-    if (status === 'Sent') showToast('✅ Text sent!')
+    if (status === 'Sent') { showToast('✅ Text sent!'); const actorS = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'; await triggerWorkflow('client_email_sent', 'client', c?.name || '', actorS).catch(()=>{}) }
     else if (status === 'Failed') showToast('SignalWire error: ' + (errMsg||'send failed'))
     else showToast('Logged — add SignalWire credentials in Settings to actually send')
 

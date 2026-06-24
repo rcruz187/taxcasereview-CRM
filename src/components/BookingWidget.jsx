@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { advanceLeadStatus } from '../lib/leadStatus'
 
 const CLIENT_EVENT_TYPES = [
@@ -82,6 +83,10 @@ export default function BookingWidget({ contact, onClose, mode = 'lead' }) {
       // forward-only, so this is a no-op if the lead is already past this stage.
       await advanceLeadStatus(supabase, contact?.name, 'Consultation Scheduled')
     }
+
+    // Workflow trigger — appointment scheduled
+    const entityType = mode === 'lead' ? 'lead' : 'client'
+    await triggerWorkflow('lead_appointment_set', entityType, contact?.name || '', 'Staff').catch(()=>{})
 
     // Team notification
     await supabase.from('chat_messages').insert([{

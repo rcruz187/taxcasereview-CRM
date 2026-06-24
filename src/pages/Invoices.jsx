@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { sendGmailEmail } from '../lib/gmailUtils'
 import { useApp } from '../context/AppContext'
 import { useFirm } from '../lib/useFirm'
@@ -151,6 +152,8 @@ export default function Invoices() {
       await sendGmailEmail(supabase, { to, subject, body, attachments })
       await supabase.from('invoices').update({ status: isReminder ? inv.status : 'Sent', updated_at: new Date().toISOString() }).eq('id', inv.id)
       showToast(`✅ ${isReminder ? 'Reminder' : 'Invoice'} sent to ${to}`)
+      const actorI = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+      if (!isReminder) await triggerWorkflow('invoice_sent', 'client', inv?.clientName || '', actorI).catch(()=>{})
       load()
     } catch (e) {
       showToast('Email error: ' + e.message)
@@ -174,7 +177,7 @@ export default function Invoices() {
 
   async function markPaid(inv) {    const total = parseFloat(inv.total||0)
     const {error} = await supabase.from('invoices').update({paid:String(total), status:'Paid', updated_at:new Date().toISOString()}).eq('id',inv.id)
-    if (!error) { showToast('✅ Marked as Paid!'); load() }
+    if (!error) { showToast('✅ Marked as Paid!'); const actorIP = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'; await triggerWorkflow('invoice_paid', 'client', inv?.clientName || '', actorIP).catch(()=>{}); load() }
   }
 
   async function deleteItem(id) {

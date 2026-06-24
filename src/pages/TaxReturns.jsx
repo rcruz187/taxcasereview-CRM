@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { triggerWorkflow } from '../lib/triggerWorkflow'
 import TaxDocParser from '../components/TaxDocParser'
 import { generateTaxReturnPdf, downloadTaxReturnPdf } from '../lib/taxReturnPdf'
 
@@ -1615,6 +1616,7 @@ export default function TaxReturns() {
                     fld('status', 'Filed')
                     await supabase.from('tax_returns').update({ status: 'Filed', updated_at: new Date().toISOString() }).eq('id', current?.id)
                     showToast('✅ Return marked as Filed!')
+                    await triggerWorkflow('tax_return_filed', 'client', ret?.clientName || '', user?.user_metadata?.name || 'Staff').catch(()=>{})
                     load()
                   }} disabled={!current?.id}>Mark as Filed</button>
                 </div>

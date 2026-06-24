@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { useLocation } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 
@@ -143,6 +144,8 @@ export default function Esign() {
     const { smsSent, emailSent } = await sendLink(url, { ...form, sendVia: form.sendVia })
     const sent = [smsSent && 'SMS', emailSent && 'Email'].filter(Boolean)
     showToast(sent.length ? `✅ Agreement sent via ${sent.join(' & ')}!` : '✅ Created — signing link copied to clipboard.')
+    const actorE = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    await triggerWorkflow('esign_sent', form.entityType || 'lead', form.clientName || '', actorE).catch(()=>{})
     setModal(false); setForm(BLANK); load()
   }
 
