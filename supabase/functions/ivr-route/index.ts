@@ -70,7 +70,7 @@ serve(async (req) => {
         if (insErr) console.error('incoming_calls insert error:', insErr)
       }
 
-      const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Conference startConferenceOnEnter="true" endConferenceOnExit="true" waitUrl="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/hold-music" waitMethod="GET" record="record-from-start" recordingStatusCallback="${CALL_RECORDED_URL}">${conferenceName}</Conference></Dial></Response>`
+      const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Conference startConferenceOnEnter="true" endConferenceOnExit="false" waitUrl="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/hold-music" waitMethod="GET" record="record-from-start" recordingStatusCallback="${CALL_RECORDED_URL}">${conferenceName}</Conference></Dial></Response>`
       console.log('routing to conference:', conferenceName, '| department:', department)
       return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
     }
