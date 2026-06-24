@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { useLocation } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { DOC_FOLDERS as ROOT_FOLDERS } from './Clients'
@@ -94,6 +95,7 @@ export default function Documents() {
     setSaving(false)
     if (error) { showToast('Error: '+error.message); return }
     showToast('✅ Document saved!')
+    await triggerWorkflow('document_uploaded', form.clientType || 'client', form.clientName || '', 'Staff').catch(()=>{})
     setModal(false)
     setForm({ name:'', client:'', docType:'IRS Docs', notes:'' })
     setFile(null)

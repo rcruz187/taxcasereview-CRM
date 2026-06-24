@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { stampSignature } from '../lib/irsFormUtils'
 import { useFirm } from '../lib/useFirm'
 import { advanceLeadStatus } from '../lib/leadStatus'
@@ -146,6 +147,9 @@ export default function SignPage() {
     }).eq('id', id)
 
     if (error) { setSigning(false); setError('Error saving signature: ' + error.message); return }
+
+    // Fire esign_signed workflow trigger
+    await triggerWorkflow('esign_signed', doc.lead_id ? 'lead' : 'client', doc.client_name, 'System').catch(()=>{})
 
     // Everything after the DB write is best-effort — pipeline advance, PDF
     // stamping, document inserts, email/SMS. If any of it hangs or throws the

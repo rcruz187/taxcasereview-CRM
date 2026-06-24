@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { triggerWorkflow } from '../lib/triggerWorkflow'
 
 const BLANK = { clientName:'', invNum:'', amount:'', method:'Credit Card', checkNum:'', date:'', status:'Cleared', notes:'' }
 const METHODS = ['Credit Card','ACH / Bank Transfer','Check','Cash','Zelle','Venmo','PayPal','Money Order','Wire Transfer','Other']
@@ -127,6 +128,8 @@ export default function Payments() {
     }
 
     showToast('✅ Payment recorded!')
+    const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    await triggerWorkflow('payment_received', 'client', form.clientName, actor).catch(()=>{})
     setModal(false); setForm(BLANK); setEditId(null); load()
   }
 

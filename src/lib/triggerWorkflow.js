@@ -27,8 +27,11 @@ export async function triggerWorkflow(event, entityType, entityName, actorName, 
     if (tmplErr || !templates?.length) return
 
     // Filter by trigger_value if event requires it
+    const STATUS_CHANGE_EVENTS = [
+      'lead_status_changed', 'case_status_changed', 'client_status_changed'
+    ]
     const matching = templates.filter(t => {
-      if (event === 'lead_status_changed' || event === 'case_status_changed') {
+      if (STATUS_CHANGE_EVENTS.includes(event)) {
         return !t.trigger_value || t.trigger_value === value
       }
       return true
