@@ -336,8 +336,10 @@ export default function Invoices() {
       {/* Table */}
       <div className="card" style={{padding:0,overflow:'hidden'}}>
         {filtered.length===0 ? (
-          <div style={{padding:24,textAlign:'center',color:'var(--t3)',fontSize:13}}>
-            {items.length===0 ? 'No invoices yet. Click "+ New Invoice" to get started.' : 'No invoices match your filters.'}
+          <div style={{textAlign:'center',padding:'40px 20px',color:'var(--t3)'}}>
+            <div style={{fontSize:32,marginBottom:8}}>🧾</div>
+            <div style={{fontWeight:600,fontSize:14,color:'var(--tx)',marginBottom:4}}>{items.length===0?'No invoices yet':'No invoices match your filters'}</div>
+            <div style={{fontSize:12}}>{items.length===0?'Click + New Invoice to create your first invoice.':''}</div>
           </div>
         ) : (
           <div className="ovx"><table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
@@ -365,13 +367,13 @@ export default function Invoices() {
                     <td style={{padding:'9px 12px'}}><SBdg s={isOverdue&&inv.status!=='Paid'?'Overdue':inv.status||'Unpaid'}/></td>
                     <td style={{padding:'9px 8px'}}>
                       <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-                        <button className="btn sec" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>openEdit(inv)}>✏️</button>
-                        {inv.status!=='Paid'&&<button className="btn" style={{fontSize:10,padding:'3px 8px',background:'var(--ok)',color:'#fff',border:'none',borderRadius:5,cursor:'pointer'}} onClick={()=>markPaid(inv)}>✓ Paid</button>}
-                        {inv.status!=='Paid'&&<button className="btn sec" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>recordPayment(inv)}>💳</button>}
-                        <button className="btn sec" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>sendInvoiceEmail(inv)}>📧</button>
+                        <button className="btn sec" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>openEdit(inv)}>✏️</button>
+                        {inv.status!=='Paid'&&<button className="btn" style={{fontSize:12,padding:'4px 10px',background:'var(--ok)',color:'#fff',border:'none',borderRadius:5,cursor:'pointer'}} onClick={()=>markPaid(inv)}>✓ Paid</button>}
+                        {inv.status!=='Paid'&&<button className="btn sec" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>recordPayment(inv)}>💳</button>}
+                        <button className="btn sec" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>sendInvoiceEmail(inv)}>📧</button>
                         {isOverdue&&<button className="btn sec" style={{fontSize:10,padding:'3px 6px',color:'var(--warn)'}} onClick={()=>sendInvoiceEmail(inv,true)}>⚠️ Remind</button>}
-                        <button className="btn sec" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>printInvoice(inv)}>🖨️</button>
-                        <button className="btn del" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>deleteItem(inv.id)}>🗑</button>
+                        <button className="btn sec" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>printInvoice(inv)}>🖨️</button>
+                        <button className="btn del" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>deleteItem(inv.id)}>🗑</button>
                       </div>
                     </td>
                   </tr>

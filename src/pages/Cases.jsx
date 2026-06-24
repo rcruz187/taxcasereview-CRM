@@ -322,7 +322,7 @@ export default function Cases() {
             <thead><tr><th>#</th><th>Client</th><th>Type</th><th>Balance</th><th>Status</th><th>Assigned</th><th>Deadline</th><th></th></tr></thead>
             <tbody>
               {filtered.length===0
-                ?<tr><td colSpan={8} style={{textAlign:'center',color:'var(--t3)',padding:20}}>No cases yet</td></tr>
+                ?<tr><td colSpan={8}><div style={{textAlign:'center',padding:'40px 20px',color:'var(--t3)'}}><div style={{fontSize:32,marginBottom:8}}>📁</div><div style={{fontWeight:600,fontSize:14,color:'var(--tx)',marginBottom:4}}>No cases yet</div><div style={{fontSize:12}}>Create cases from a client profile.</div></div></td></tr>
                 :filtered.map(c=>(
                   <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>openDetail(c)}>
                     <td style={{color:'var(--t2)',fontSize:11}}>{c.caseNum}</td>

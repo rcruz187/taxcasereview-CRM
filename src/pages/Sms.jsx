@@ -262,7 +262,7 @@ export default function Sms() {
               </thead>
               <tbody>
                 {sent.length===0
-                  ?<tr><td colSpan={7} style={{textAlign:'center',color:'var(--t3)',padding:40,fontSize:14}}>No messages logged yet</td></tr>
+                  ?<tr><td colSpan={7} style={{textAlign:'center',color:'var(--t3)',padding:'40px 20px'}}><div style={{fontSize:32,marginBottom:8}}>💬</div><div style={{fontWeight:600,fontSize:14,color:'var(--tx)',marginBottom:4}}>No messages yet</div><div style={{fontSize:12}}>Send an SMS to see it here.</div></td></tr>
                   :sent.map(s=>(
                     <tr key={s.id} style={{borderBottom:'1px solid var(--br)'}}
                       onMouseEnter={e=>e.currentTarget.style.background='var(--s2)'}

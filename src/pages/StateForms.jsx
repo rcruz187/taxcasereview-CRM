@@ -38,6 +38,11 @@ export default function StateForms() {
 
   return (
     <div style={{padding:'20px 24px',maxWidth:1000,margin:'0 auto'}}>
+      <div style={{marginBottom:20}}>
+        <h2 style={{fontSize:17,fontWeight:700,margin:0}}>🏛️ State Forms & Documents</h2>
+        <p style={{fontSize:12,color:'var(--t3)',margin:'4px 0 0'}}>Official state tax power of attorney forms — pre-fill and download.</p>
+      </div>
+
       {/* ── Section 1: State Form Downloads ─────────────────────────────── */}
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="ch">

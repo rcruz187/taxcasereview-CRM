@@ -162,8 +162,8 @@ export default function Deadlines() {
         </td>
         <td>
           <div style={{display:'flex',gap:4}}>
-            {getClient(d)!=='—'&&<button className="btn sec" style={{fontSize:10,padding:'2px 7px'}} onClick={()=>sendDeadlineReminder(d)} title="Email reminder to client">📧</button>}
-            <button className="btn del" style={{fontSize:10,padding:'2px 7px'}} onClick={()=>deleteItem(d.id)}>🗑</button>
+            {getClient(d)!=='—'&&<button className="btn sec" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>sendDeadlineReminder(d)} title="Email reminder to client">📧</button>}
+            <button className="btn del" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>deleteItem(d.id)}>🗑</button>
           </div>
         </td>
       </tr>
@@ -173,6 +173,14 @@ export default function Deadlines() {
   return (
     <div style={{padding:'20px 24px',maxWidth:1000,margin:'0 auto'}}>
       {toast&&<div className="toast show">{toast}</div>}
+
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:10}}>
+        <div>
+          <h2 style={{fontSize:17,fontWeight:700,margin:0}}>⏰ Deadlines</h2>
+          <p style={{fontSize:12,color:'var(--t3)',margin:'4px 0 0'}}>Track IRS deadlines, CSED dates, and compliance due dates.</p>
+        </div>
+        <button className="btn pri" onClick={()=>{setForm(BLANK);setModal(true)}}>+ Add Deadline</button>
+      </div>
 
       {/* Stat cards — double as quick filters */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:10,marginBottom:14}}>

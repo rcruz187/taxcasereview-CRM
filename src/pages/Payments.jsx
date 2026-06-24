@@ -303,7 +303,9 @@ export default function Payments() {
       <div className="card" style={{padding:0,overflow:'hidden'}}>
         {filtered.length===0 ? (
           <div style={{padding:24,textAlign:'center',color:'var(--t3)',fontSize:13}}>
-            {items.length===0?'No payments recorded yet.':'No payments match your filters.'}
+            <div style={{fontSize:32,marginBottom:8}}>💰</div>
+            <div style={{fontWeight:600,fontSize:14,color:'var(--tx)',marginBottom:4}}>{items.length===0?'No payments yet':'No payments match your filters'}</div>
+            <div style={{fontSize:12}}>{items.length===0?'Click + Record Payment to log your first payment.':''}</div>
           </div>
         ) : (
           <div className="ovx"><table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
@@ -328,9 +330,9 @@ export default function Payments() {
                   <td style={{padding:'9px 12px'}}><span className={`bdg ${p.status==='Cleared'?'bg':p.status==='Failed'?'br':'ba'}`}>{p.status}</span></td>
                   <td style={{padding:'9px 12px'}}>
                     <div style={{display:'flex',gap:5}}>
-                      <button className="btn sec" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>openEdit(p)}>Edit</button>
-                      <button className="btn sec" style={{fontSize:10,padding:'3px 8px',marginRight:2}} onClick={()=>printReceipt(pay)}>🖨️</button>
-                    <button className="btn del" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>deleteItem(p.id)}>Del</button>
+                      <button className="btn sec" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>openEdit(p)}>Edit</button>
+                      <button className="btn sec" style={{fontSize:12,padding:'4px 10px',marginRight:2}} onClick={()=>printReceipt(pay)}>🖨️</button>
+                    <button className="btn del" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>deleteItem(p.id)}>Del</button>
                     </div>
                   </td>
                 </tr>

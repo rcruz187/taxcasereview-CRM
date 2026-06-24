@@ -192,13 +192,13 @@ export default function Tasks() {
         <div style={{display:'flex',gap:4,flexShrink:0}}>
           {!showRestore ? (
             <>
-              {!t.done&&<button className="btn sec" style={{fontSize:10,padding:'2px 7px'}} onClick={()=>toggleDone(t)}>✓ Done</button>}
-              <button className="btn del" style={{fontSize:10,padding:'2px 7px'}} onClick={()=>softDelete(t.id)}>Del</button>
+              {!t.done&&<button className="btn sec" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>toggleDone(t)}>✓ Done</button>}
+              <button className="btn del" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>softDelete(t.id)}>Del</button>
             </>
           ) : isSuperAdmin ? (
             <>
-              <button className="btn sec" style={{fontSize:10,padding:'2px 8px',color:'var(--ok)'}} onClick={()=>restore(t.id)}>↩ Restore</button>
-              <button className="btn del" style={{fontSize:10,padding:'2px 7px'}} onClick={()=>permDelete(t.id)}>☠ Perm</button>
+              <button className="btn sec" style={{fontSize:12,padding:'4px 10px',color:'var(--ok)'}} onClick={()=>restore(t.id)}>↩ Restore</button>
+              <button className="btn del" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>permDelete(t.id)}>☠ Perm</button>
             </>
           ) : null}
         </div>
@@ -214,6 +214,14 @@ export default function Tasks() {
   return (
     <div style={{padding:'20px 24px',maxWidth:1000,margin:'0 auto'}}>
       {toast&&<div className="toast show">{toast}</div>}
+
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:10}}>
+        <div>
+          <h2 style={{fontSize:17,fontWeight:700,margin:0}}>✅ Tasks</h2>
+          <p style={{fontSize:12,color:'var(--t3)',margin:'4px 0 0'}}>Track and manage work assigned to the team.</p>
+        </div>
+        <button className="btn pri" onClick={()=>setModal(true)}>+ Add Task</button>
+      </div>
 
       {/* Stats */}
       <div className="metrics" style={{marginBottom:12}}>

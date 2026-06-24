@@ -297,6 +297,11 @@ export default function IrsForms() {
     <div style={{padding:'20px 24px',maxWidth:1100,margin:'0 auto'}}>
       {toast && <div className="toast show">{toast}</div>}
 
+      <div style={{marginBottom:20}}>
+        <h2 style={{fontSize:17,fontWeight:700,margin:0}}>📋 IRS Forms & Documents</h2>
+        <p style={{fontSize:12,color:'var(--t3)',margin:'4px 0 0'}}>Download official IRS forms, pre-fill with client data, and manage POA.</p>
+      </div>
+
       {/* ── Section 1: IRS Form Downloads ─────────────────────────────── */}
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="ch">

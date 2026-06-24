@@ -150,8 +150,10 @@ export default function Estimates() {
       {/* Table */}
       <div className="card" style={{padding:0,overflow:'hidden'}}>
         {filtered.length===0 ? (
-          <div style={{padding:24,textAlign:'center',color:'var(--t3)',fontSize:13}}>
-            {items.length===0?'No estimates yet. Click "+ New Estimate" to start.':'No estimates match your filters.'}
+          <div style={{textAlign:'center',padding:'40px 20px',color:'var(--t3)'}}>
+            <div style={{fontSize:32,marginBottom:8}}>📝</div>
+            <div style={{fontWeight:600,fontSize:14,color:'var(--tx)',marginBottom:4}}>{items.length===0?'No estimates yet':'No estimates match your filters'}</div>
+            <div style={{fontSize:12}}>{items.length===0?'Click + New Estimate to get started.':''}</div>
           </div>
         ) : (
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
@@ -183,10 +185,10 @@ export default function Estimates() {
                     </td>
                     <td style={{padding:'9px 12px'}}>
                       <div style={{display:'flex',gap:5}}>
-                        <button className="btn sec" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>{setForm({...BLANK,...est});setEditId(est.id);setModal(true)}}>✏️</button>
-                        <button className="btn sec" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>sendEstimate(est)}>📧 Send</button>
-                        {est.status!=='Rejected'&&<button className="btn" style={{fontSize:10,padding:'3px 8px',background:'var(--ok)',color:'#fff',border:'none',borderRadius:5,cursor:'pointer'}} onClick={()=>convertToInvoice(est)}>→ Invoice</button>}
-                        <button className="btn del" style={{fontSize:10,padding:'3px 8px'}} onClick={()=>del(est.id)}>🗑</button>
+                        <button className="btn sec" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>{setForm({...BLANK,...est});setEditId(est.id);setModal(true)}}>✏️</button>
+                        <button className="btn sec" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>sendEstimate(est)}>📧 Send</button>
+                        {est.status!=='Rejected'&&<button className="btn" style={{fontSize:12,padding:'4px 10px',background:'var(--ok)',color:'#fff',border:'none',borderRadius:5,cursor:'pointer'}} onClick={()=>convertToInvoice(est)}>→ Invoice</button>}
+                        <button className="btn del" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>del(est.id)}>🗑</button>
                       </div>
                     </td>
                   </tr>
