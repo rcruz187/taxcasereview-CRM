@@ -31,18 +31,27 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
+    // 'ringing' with no agent = missed. 'answered' with agent = completed.
     if (confName) {
+      await supabase.from('incoming_calls')
+        .update({ status: 'completed' })
+        .eq('conference_name', confName)
+        .eq('status', 'answered')
       await supabase.from('incoming_calls')
         .update({ status: 'missed' })
         .eq('conference_name', confName)
-        .in('status', ['ringing', 'answered'])
-      console.log('marked incoming_calls missed for conf:', confName)
+        .eq('status', 'ringing')
+      console.log('caller-hangup: marked incoming_calls completed/missed for conf:', confName)
     } else if (callSid) {
+      await supabase.from('incoming_calls')
+        .update({ status: 'completed' })
+        .eq('callsid', callSid)
+        .eq('status', 'answered')
       await supabase.from('incoming_calls')
         .update({ status: 'missed' })
         .eq('callsid', callSid)
-        .in('status', ['ringing', 'answered'])
-      console.log('marked incoming_calls missed for callSid:', callSid)
+        .eq('status', 'ringing')
+      console.log('caller-hangup: marked incoming_calls completed/missed for callSid:', callSid)
     }
 
     return new Response('ok')

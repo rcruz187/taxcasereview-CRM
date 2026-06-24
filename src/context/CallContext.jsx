@@ -327,6 +327,24 @@ export function CallProvider({ children }) {
     activeConferenceRef.current = row.conference_name || null
     activeInboundCallsidRef.current = row.callsid || null
 
+    // Server-side backup hangup detector for inbound calls — mirrors outboundPollRef.
+    // When the caller hangs up, caller-hangup marks the row 'completed' or 'missed'.
+    // The RELAY SDK hangup event is unreliable for the agent's self-dial leg, so
+    // poll the DB every 3s as a guaranteed fallback to end the active call UI.
+    const inboundCallsid = row.callsid
+    const inboundPollRef = setInterval(async () => {
+      const { data: row } = await supabase
+        .from('incoming_calls')
+        .select('status')
+        .eq('callsid', inboundCallsid)
+        .maybeSingle()
+      if (row?.status === 'completed' || row?.status === 'missed') {
+        clearInterval(inboundPollRef)
+        finalizeCallEnd({ alreadyHungUp: true })
+        handleRemoteHangup()
+      }
+    }, 3000)
+
     // Bridge in using the exact same outbound-dial mechanism that's been
     // working reliably all day — the browser dials the business number
     // itself, and receive-call recognizes that self-dial and connects it
