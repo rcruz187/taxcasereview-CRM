@@ -41,7 +41,7 @@ serve(async (req) => {
     }
 
     console.log('routing to extension conference:', conferenceName, '| employee:', emp.name)
-    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Conference startConferenceOnEnter="true" endConferenceOnExit="false" waitUrl="${HOLD_MUSIC_URL}" waitMethod="GET" record="record-from-start" recordingStatusCallback="${CALL_RECORDED_URL}">${conferenceName}</Conference></Dial></Response>`
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial action="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/caller-hangup?conf=${conferenceName}" method="POST"><Conference startConferenceOnEnter="true" endConferenceOnExit="false" waitUrl="${HOLD_MUSIC_URL}" waitMethod="GET" record="record-from-start" recordingStatusCallback="${CALL_RECORDED_URL}">${conferenceName}</Conference></Dial></Response>`
     return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
 
   } catch (err) {
