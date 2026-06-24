@@ -174,6 +174,7 @@ export default function Calendar() {
       ;({ error } = await supabase.from('calevents').update(payload).eq('id', form.id))
     } else {
       payload.created_at = new Date().toISOString()
+      delete payload.id  // prevent null id from violating not-null constraint
       ;({ error } = await supabase.from('calevents').insert([payload]))
     }
     setSaving(false)
