@@ -255,22 +255,8 @@ export function CallProvider({ children }) {
       lastHandledInboundRef.current = data.callsid
       pendingInboundRef.current = data
       setIncomingCall({ options: { remoteCallerNumber: data.from_number } })
-      // Force AudioContext resume before playing — browser suspends it after
-      // inactivity. playSound already handles this but we force it here too
-      // so the very first ring on a fresh page load always fires.
-      try {
-        const ac = new (window.AudioContext || window.webkitAudioContext)()
-        ac.resume().then(() => {
-          playSound('call')
-          ringIntervalRef.current = setInterval(() => playSound('call'), 3000)
-        }).catch(() => {
-          playSound('call')
-          ringIntervalRef.current = setInterval(() => playSound('call'), 3000)
-        })
-      } catch(_) {
-        playSound('call')
-        ringIntervalRef.current = setInterval(() => playSound('call'), 3000)
-      }
+      playSound('call')
+      ringIntervalRef.current = setInterval(() => playSound('call'), 3000)
       // Shows immediately as a fallback label ("Tax Professional" /
       // "Front Desk" from the IVR choice) — overwritten the instant a real
       // Client/Lead match comes back, same as before.

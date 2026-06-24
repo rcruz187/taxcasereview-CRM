@@ -412,12 +412,11 @@ export default function TaxReturns() {
     <div>
       {toast && <div className="toast show">{toast}</div>}
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
         <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>🧾 Tax Returns</h2>
-        <button className="btn pri" onClick={openNew}>+ New Return</button>
       </div>
 
-      {/* Stats bar */}
+      {/* Stats bar + New Return button */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(110px,1fr))', gap: 8, marginBottom: 14 }}>
         {[
           ['Total', returns.length, 'var(--blue)'],
@@ -432,6 +431,7 @@ export default function TaxReturns() {
             <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 3 }}>{label}</div>
           </div>
         ))}
+        <button className="btn pri" onClick={openNew} style={{ fontSize: 14, fontWeight: 700, padding: '10px 12px', height: '100%', minHeight: 60 }}>+ New Return</button>
       </div>
 
       {/* Filing Requirement Reference Chart */}
