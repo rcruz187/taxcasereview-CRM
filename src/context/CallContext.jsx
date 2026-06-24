@@ -257,12 +257,37 @@ export function CallProvider({ children }) {
     return () => { cancelled = true; clearInterval(poll); stopRing() }
   }, [relayStatus, calling])
 
-  function answerIncoming() {
+  async function answerIncoming() {
     const row = pendingInboundRef.current
     if (!row) return
     if (inboundTimeoutRef.current) { clearTimeout(inboundTimeoutRef.current); inboundTimeoutRef.current = null }
     stopRing()
 
+    // ── Atomic claim: only one agent wins, even if multiple click Answer
+    // at the same instant. The second .eq('status','ringing') means this
+    // update is a no-op for any agent who arrives after the first one
+    // flipped the row to 'answered'. If data comes back empty, we lost the
+    // race — silently dismiss the banner and let the winner handle the call.
+    const agentName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    const { data: claimed, error: claimErr } = await supabase
+      .from('incoming_calls')
+      .update({ status: 'answered', claimed_by: agentName })
+      .eq('callsid', row.callsid)
+      .eq('status', 'ringing')
+      .select('callsid')
+
+    if (claimErr) console.error('incoming_calls claim error:', claimErr)
+
+    if (!claimed || claimed.length === 0) {
+      // Another agent claimed this call first — dismiss banner silently
+      console.log('[answerIncoming] lost claim race for', row.callsid, '— another agent answered first')
+      pendingInboundRef.current = null
+      setIncomingCall(null)
+      setIncomingMatch(null)
+      return
+    }
+
+    // We won the claim — proceed with full answer flow
     const m = incomingMatchRef.current
     uiStartedRef.current = true
     setIncomingCall(null)
@@ -278,9 +303,6 @@ export function CallProvider({ children }) {
       status: 'Manual',
       entityType: (m && !m.isDepartment) ? m.entityType : null,
     })
-
-    supabase.from('incoming_calls').update({ status: 'answered' }).eq('callsid', row.callsid)
-      .then(({ error }) => error && console.error('incoming_calls update error:', error))
 
     activeConferenceRef.current = row.conference_name || null
     activeInboundCallsidRef.current = row.callsid || null
