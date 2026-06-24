@@ -78,8 +78,7 @@ export default function MeetingRoom() {
     return (
       <div style={S.page}>
         <div style={S.card}>
-          <img src="/taxcasereview-CRM/tcr-bg.png" alt="" style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 10, marginBottom: 16, opacity: .7 }}/>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: 4 }}>Join your meeting</div>
+<div style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: 4 }}>Join your meeting</div>
           <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 20 }}>Tax Case Review — secure video meeting</div>
           <label style={S.label}>Your name</label>
           <input
