@@ -159,11 +159,11 @@ export default function Workflows() {
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
           {templates.map(t => (
             <div key={t.id} className="card" style={{ padding:0, overflow:'hidden' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', cursor:'pointer' }}
+              <div style={{ display:'flex', alignItems:'center', gap:12, padding:'16px 20px', cursor:'pointer' }}
                 onClick={() => setExpandedId(expandedId === t.id ? null : t.id)}>
                 <div style={{ width:10, height:10, borderRadius:'50%', background: t.active ? 'var(--ok)' : 'var(--t3)', flexShrink:0 }}/>
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontWeight:600, fontSize:14 }}>{t.name}</div>
+                  <div style={{ fontWeight:700, fontSize:15 }}>{t.name}</div>
                   <div style={{ fontSize:11, color:'var(--t3)', marginTop:2 }}>
                     {t.entity_type.charAt(0).toUpperCase()+t.entity_type.slice(1)} · {TRIGGER_EVENTS[t.entity_type]?.find(e=>e.value===t.trigger_event)?.label || t.trigger_event}
                     {t.trigger_value ? ` → "${t.trigger_value}"` : ''}
@@ -171,11 +171,11 @@ export default function Workflows() {
                   </div>
                 </div>
                 <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                  <button onClick={e=>{e.stopPropagation();toggleActive(t)}} className="btn" style={{ fontSize:11, padding:'3px 10px', background: t.active ? 'var(--ok)' : 'var(--s2)', color: t.active ? '#fff' : 'var(--t3)', border:'none' }}>
+                  <button onClick={e=>{e.stopPropagation();toggleActive(t)}} className="btn" style={{ fontSize:12, padding:'5px 14px', fontWeight:600, background: t.active ? 'var(--ok)' : 'var(--s2)', color: t.active ? '#fff' : 'var(--t3)', border:'none' }}>
                     {t.active ? 'Active' : 'Off'}
                   </button>
-                  <button onClick={e=>{e.stopPropagation();openEdit(t)}} className="btn" style={{ fontSize:11, padding:'3px 10px' }}>Edit</button>
-                  <button onClick={e=>{e.stopPropagation();deleteTemplate(t)}} className="btn" style={{ fontSize:11, padding:'3px 10px', color:'var(--bad)', border:'1px solid var(--bad)' }}>Del</button>
+                  <button onClick={e=>{e.stopPropagation();openEdit(t)}} className="btn" style={{ fontSize:12, padding:'5px 14px', fontWeight:600 }}>Edit</button>
+                  <button onClick={e=>{e.stopPropagation();deleteTemplate(t)}} className="btn" style={{ fontSize:12, padding:'5px 14px', fontWeight:600, color:'var(--bad)', border:'1px solid var(--bad)' }}>Delete</button>
                   <span style={{ color:'var(--t3)', fontSize:12 }}>{expandedId === t.id ? '▲' : '▼'}</span>
                 </div>
               </div>
@@ -205,8 +205,8 @@ export default function Workflows() {
 
       {/* Create/Edit Modal */}
       {showForm && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.6)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
-          <div className="card" style={{ width:'100%', maxWidth:640, maxHeight:'90vh', overflowY:'auto', padding:24 }}>
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.7)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+          <div className="card" style={{ width:'100%', maxWidth:780, maxHeight:'92vh', overflowY:'auto', padding:28 }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
               <h3 style={{ margin:0, fontSize:16, fontWeight:700 }}>{editId ? 'Edit Workflow' : 'New Workflow'}</h3>
               <button onClick={()=>setShowForm(false)} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:'var(--t3)' }}>×</button>

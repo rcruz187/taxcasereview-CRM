@@ -212,6 +212,13 @@ export default function Email() {
     if (email.is_read) return
     await supabase.from('emails').update({ is_read: true }).eq('id', email.id)
     setEmails(es => es.map(e => e.id === email.id ? { ...e, is_read: true } : e))
+
+  async function markUnread(email) {
+    await supabase.from('emails').update({ is_read: false }).eq('id', email.id)
+    setEmails(es => es.map(e => e.id === email.id ? { ...e, is_read: false } : e))
+    if (selected?.id === email.id) setSelected(prev => ({ ...prev, is_read: false }))
+    showToast('Marked as new')
+  }
   }
 
   function openEmail(email, index) {
@@ -446,13 +453,14 @@ export default function Email() {
                       <div style={{ fontSize: 13, color: 'var(--t3)' }}>To: {selected.clientName} {selected.recipient ? `<${selected.recipient}>` : ''}</div>
                       <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{selected.created_at ? new Date(selected.created_at).toLocaleString() : ''}</div>
                     </div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                       {/* Move triage */}
-                      {TRIAGE.filter(t => t !== (selected.triage || 'Inbox')).map(t => (
-                        <button key={t} className="btn sec" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => moveTriage(selected.id, t)}>→ {t}</button>
+                      {TRIAGE.filter(t => t !== (selected.triage || 'Inbox') && t !== 'Sent').map(t => (
+                        <button key={t} className="btn sec" style={{ fontSize: 12, padding: '6px 14px', fontWeight: 600 }} onClick={() => moveTriage(selected.id, t)}>→ {t}</button>
                       ))}
-                      <button className="btn" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => { setForm({ ...BLANK, clientName: selected.clientName, recipient: selected.recipient, subject: 'Re: ' + selected.subject }); setView('compose') }}>↩ Reply</button>
-                      <button className="btn del" title="Archive" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => archiveEmail(selected.id)}>🗑 Archive</button>
+                      <button className="btn" style={{ fontSize: 12, padding: '6px 14px', fontWeight: 600 }} onClick={() => { setForm({ ...BLANK, clientName: selected.clientName, recipient: selected.recipient, subject: 'Re: ' + selected.subject }); setView('compose') }}>↩ Reply</button>
+                      <button className="btn" style={{ fontSize: 12, padding: '6px 14px', fontWeight: 600, background: 'var(--blue)', color: '#fff', border: 'none' }} onClick={() => markUnread(selected)}>● Mark as New</button>
+                      <button className="btn del" style={{ fontSize: 12, padding: '6px 14px', fontWeight: 600 }} onClick={() => archiveEmail(selected.id)}>🗑 Archive</button>
                     </div>
                   </div>
                   {selected.body_html ? (
