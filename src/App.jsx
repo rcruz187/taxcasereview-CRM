@@ -56,6 +56,7 @@ const Chat          = lazy(() => import('./pages/Chat'))
 const Books         = lazy(() => import('./pages/Books'))
 const FormaCorp     = lazy(() => import('./pages/FormaCorp'))
 const Fax           = lazy(() => import('./pages/Fax'))
+const Workflows     = lazy(() => import('./pages/Workflows'))
 
 const style = document.createElement('style')
 style.textContent = `@keyframes spin { to { transform: rotate(360deg) } }`
@@ -159,6 +160,7 @@ function Shell() {
             <Route path="/books"       element={<Guard section="books"><Books /></Guard>} />
             <Route path="/formacorp"   element={<Guard section="books"><FormaCorp /></Guard>} />
             <Route path="/fax"         element={<Guard section="email"><Fax /></Guard>} />
+            <Route path="/workflows"   element={<Guard section="workflows"><Workflows /></Guard>} />
             <Route path="*"            element={<Navigate to="/" />} />
           </Routes>
           </Suspense>

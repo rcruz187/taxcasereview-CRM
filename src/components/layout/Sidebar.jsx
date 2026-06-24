@@ -85,6 +85,7 @@ const SECTIONS = [
     items: [
       { path: '/employees', icon: EmpIcon,     label: 'Employees',     section: 'employees' },
       { path: '/reports',   icon: BarIcon,     label: 'Reports',       section: 'reports' },
+      { path: '/workflows', icon: GearIcon,    label: 'Workflows',     section: 'workflows' },
       { path: '/settings',  icon: GearIcon,    label: 'Settings',      section: 'settings' },
     ]
   },

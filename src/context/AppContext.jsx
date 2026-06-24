@@ -34,6 +34,7 @@ export const SECTION_COLS = {
   dialer:      'perm_comms',
   chat:        'perm_comms',
   settings:    'perm_settings',
+  workflows:   'perm_settings',   // workflows use settings perm — Admin/Super Admin only
   dashboard:   null,   // always visible
   kiosk:       null,
 }

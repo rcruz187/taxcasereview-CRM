@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { useApp } from '../context/AppContext'
 import { useFirm } from '../lib/useFirm'
 import { generateClientPackage, generateAddendum, generatePOACoverLetter, sendFullPackage, generateCreditCardAuthForm, sendAddendumForSignature } from '../lib/docUtils'
@@ -859,6 +860,9 @@ export default function Leads() {
       showToast(willArchive ? 'Status updated — lead archived' : willRestore ? 'Status updated — lead restored' : 'Status updated!')
     }
 
+    // ── Workflow engine — fires alongside hardcoded triggers ──
+    await triggerWorkflow('lead_status_changed', 'lead', l.name, actor, status)
+
     load()
     if (detail?.id === l.id) loadLeadNotes(l.id)
   }
@@ -1230,6 +1234,9 @@ export default function Leads() {
       : intakeSent ? ', financial intake form emailed'
       : (l.email ? '' : ', financial intake created but no email on file to send it to')
     showToast(count ? `✅ ${l.name} converted to Client! 3 onboarding tasks created${intakeMsg}, compliance data (${count} records) carried over.` : `✅ ${l.name} converted to Client! 3 onboarding tasks created${intakeMsg}.`)
+    // ── Workflow engine — lead converted trigger ──
+    const convActor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    await triggerWorkflow('lead_converted', 'lead', l.name, convActor)
     setDetail(null); load()
   }
 

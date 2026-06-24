@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { useApp } from '../context/AppContext'
 
 const STATUSES = ['Open','Pending IRS','Active Plan','Docs Needed','POA Sent','Under Review','Resolved','Completed','Closed']
@@ -209,6 +210,7 @@ export default function Cases() {
                     created_by: actor,
                     visible_to_client: false,
                   })
+                  await triggerWorkflow('case_status_changed', 'case', c.clientName, actor, s)
                   const {data}=await supabase.from('cases').select('*').eq('id',c.id).single()
                   if(data)setDetail(data)
                   load()
