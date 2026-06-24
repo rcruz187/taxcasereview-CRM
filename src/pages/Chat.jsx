@@ -12,11 +12,7 @@ const CHANNELS = [
   { id: 'hr',       label: 'hr',       desc: 'HR and internal ops' },
 ]
 
-const TEAM = [
-  { id: 'dm_romy',    name: 'Romy Cruz',        initials: 'RC', color: '#4f8ef7', role: 'Super Admin' },
-  { id: 'dm_dana',    name: 'Dana Richard',      initials: 'DR', color: '#a855f7', role: 'Admin' },
-  { id: 'dm_yesenia', name: 'Yesenia Gonzalez',  initials: 'YG', color: '#22c55e', role: 'Admin' },
-]
+// TEAM is now loaded dynamically from employees table — see useEffect in Chat()
 
 const QUICK_EMOJIS = ['👍','✅','🔥','💯','😊','🎉','👀','⚠️','📌','❤️','😂','🙏','💪','🤝','⏰','📋']
 const ALL_EMOJIS   = ['👍','👎','❤️','🔥','✅','❌','⚠️','📌','📋','💯','🎉','😊','😂','🙏','💪','🤝','⏰','🕐','📞','📧','💬','🗒️','📁','💰','🏦','⚖️','📊','📈','📉','🔑','🔒','✉️','📨','📩','🚀','⭐','💡','🔔','🔕','👀','🤔','😅','🥳']
@@ -86,6 +82,7 @@ export default function Chat() {
   const [thread, setThread]     = useState(null)  // message being replied to
   const [searchQ, setSearchQ]   = useState('')
   const [showSearch, setShowSearch] = useState(false)
+  const [TEAM, setTEAM] = useState([])
   const bottomRef = useRef(null)
   const inputRef  = useRef(null)
   const fileRef   = useRef(null)
@@ -103,6 +100,19 @@ export default function Chat() {
     const op = el.style.padding, oo = el.style.overflow, oh = el.style.height, opos = el.style.position
     el.style.padding = '0'; el.style.overflow = 'hidden'; el.style.height = '100%'; el.style.position = 'relative'
     return () => { el.style.padding = op; el.style.overflow = oo; el.style.height = oh; el.style.position = opos }
+  }, [])
+
+  // ── fetch all employees for DM list ──
+  useEffect(() => {
+    supabase.from('employees').select('id, name, role').order('name').then(({ data }) => {
+      if (!data) return
+      setTEAM(data.map(e => ({
+        id: 'dm_' + e.id,
+        name: e.name,
+        role: e.role || '',
+        color: colorFor(e.name),
+      })))
+    })
   }, [])
 
   const loadMessages = useCallback(async (silent = false) => {
