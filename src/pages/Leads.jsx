@@ -142,17 +142,17 @@ function PhoneLink({val, name}) {
 function ActionBtn({color, icon, label, sub, onClick}) {
   return (
     <div onClick={onClick} style={{
-      display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
-      gap:4,padding:'10px 8px',borderRadius:10,cursor:'pointer',minWidth:80,flex:'1 1 80px',
-      background:color,color:'#fff',textAlign:'center',userSelect:'none',
+      display:'flex',flexDirection:'row',alignItems:'center',
+      gap:7,padding:'7px 13px',borderRadius:7,cursor:'pointer',
+      background:color,color:'#fff',userSelect:'none',whiteSpace:'nowrap',flexShrink:0,
+      fontSize:12,fontWeight:600,
       transition:'transform .1s,opacity .1s',
     }}
-      onMouseEnter={e=>{e.currentTarget.style.opacity='.85';e.currentTarget.style.transform='translateY(-2px)'}}
+      onMouseEnter={e=>{e.currentTarget.style.opacity='.85';e.currentTarget.style.transform='translateY(-1px)'}}
       onMouseLeave={e=>{e.currentTarget.style.opacity='1';e.currentTarget.style.transform=''}}
     >
-      <span style={{fontSize:20}}>{icon}</span>
-      <span style={{fontSize:11,fontWeight:700,lineHeight:1.2}}>{label}</span>
-      {sub&&<span style={{fontSize:9,opacity:.85,lineHeight:1.1}}>{sub}</span>}
+      <span style={{fontSize:15,lineHeight:1}}>{icon}</span>
+      <span>{label}</span>
     </div>
   )
 }
@@ -1576,7 +1576,7 @@ export default function Leads() {
         <div className="card" style={{marginBottom:12}}>
           <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Quick Actions</div>
           <div className="ovx">
-          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          <div style={{display:'flex',gap:6,flexWrap:'nowrap',alignItems:'center'}}>
             <ActionBtn color="#0891b2" icon="📅" label="Schedule" sub="Book Appointment" onClick={()=>setBookingLead(l)}/>
             <ActionBtn color="#16a34a" icon="📦" label={pkgSending?'Building…':'Full Package'} sub="2848/8821 + Agreement" onClick={()=>!pkgSending&&handleSendFullPackage(l)}/>
             <ActionBtn color="#22863a" icon="📄" label="Tax Engagement" sub="Service Agreement" onClick={()=>generateClientPackage(l)}/>
@@ -1898,7 +1898,7 @@ export default function Leads() {
                 </div>
                 <div style={{marginTop:16,paddingTop:12,borderTop:'1px solid var(--br)'}}>
                   <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>Exit statuses — can be set from any stage above</div>
-                  <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                  <div style={{display:'flex',gap:6,flexWrap:'nowrap',alignItems:'center'}}>
                     {EXIT_FLOW.map(item => (
                       <div key={item.s} onClick={()=>{updateStatus(detail, item.s);setShowFlow(false)}} style={{background:item.c,color:'#fff',borderRadius:6,padding:'7px 9px',fontSize:11,fontWeight:700,textAlign:'center',width:112,lineHeight:1.2,cursor:'pointer',outline:detail?.status===item.s?'2px solid #fff':'none',outlineOffset:-2}}>{item.s}</div>
                     ))}
