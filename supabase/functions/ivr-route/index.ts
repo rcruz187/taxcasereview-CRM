@@ -22,10 +22,15 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const VOICEMAIL_PROMPT_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/voicemail-prompt'
 const CALL_RECORDED_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/call-recorded'
+const IVR_EXTENSION_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/ivr-extension'
 
+// Press 1 = Dial by extension (routes to ivr-extension submenu)
+// Press 2 = Tax Advisor
+// Press 3 = Tax Account Representative
+// Press 0 = Operator
 const DEPARTMENTS: Record<string, string> = {
-  '1': 'Tax Advisor',
-  '2': 'Tax Account Representative',
+  '2': 'Tax Advisor',
+  '3': 'Tax Account Representative',
   '0': 'Operator',
 }
 
@@ -38,6 +43,13 @@ serve(async (req) => {
   const from = params.get('From') || ''
 
   try {
+    // Press 1 -> dial by extension submenu
+    if (digits === '1') {
+      const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Gather numDigits="3" timeout="8" action="${IVR_EXTENSION_URL}" method="POST"><Say voice="Polly.Joanna-Neural">Please enter the 3 digit extension you would like to reach.</Say></Gather><Redirect method="POST">${VOICEMAIL_PROMPT_URL}</Redirect></Response>`
+      console.log('routing to extension submenu')
+      return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
+    }
+
     const department = DEPARTMENTS[digits]
     if (department) {
       const conferenceName = `office-${callSid || Date.now()}`
