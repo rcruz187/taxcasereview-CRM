@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { useWebRTCRoom } from '../lib/webrtcRoom'
 import { useVideoBackground } from '../lib/videoBackground'
+// MediaPipe Selfie Segmentation loaded dynamically in videoBackground.js
 import VirtualBackground from '../components/VirtualBackground'
 import VideoTile from '../components/VideoTile'
 
@@ -14,7 +15,7 @@ export default function MeetingRoom() {
   const [processedStream, setProcessedStream] = useState(null)
 
   const webrtc  = useWebRTCRoom('meet')
-  const vbg     = useVideoBackground()
+  const vbg = useVideoBackground()
   const rawRef  = useRef(null)  // original camera stream
 
   useEffect(() => {
@@ -137,6 +138,7 @@ export default function MeetingRoom() {
         <VirtualBackground
           bgMode={vbg.bgMode}
           bgPreset={vbg.bgPreset}
+          segStatus={vbg.segStatus}
           onSelect={handleBgSelect}
         />
       )}
