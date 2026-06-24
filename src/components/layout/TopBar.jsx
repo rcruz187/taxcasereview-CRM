@@ -4,18 +4,23 @@ import { useApp } from '../../context/AppContext'
 import { isSoundEnabled, setSoundEnabled, playSound } from '../../lib/notifySound'
 
 const PAGE_TITLES = {
-  '/':            'Dashboard',  '/calendar':    'Calendar',
-  '/leads':       'Leads',      '/clients':     'Clients',
-  '/cases':       'Cases',      '/tasks':       'Tasks',
-  '/transcripts': 'Transcripts','/irsforms':    'IRS Forms',
-  '/deadlines':   'Deadlines',  '/invoices':    'Invoices',
-  '/payments':    'Payments',   '/sms':         'SMS',
-  '/email':       'Email',      '/documents':   'Documents',
-  '/esign':       'E-Signatures','/timeclock':  'Time Clock',
-  '/payroll':     'Payroll',    '/employees':   'Employees',
-  '/reports':     'Reports',    '/settings':    'Settings',
-  '/books':       'Books & FormACorp', '/dialer': 'Dialer',
-  '/chat':        'Team Chat',  '/taxreturns':  'Tax Returns',
+  '/':             'Dashboard',      '/calendar':    'Calendar',
+  '/leads':        'Leads',          '/clients':     'Clients',
+  '/cases':        'Cases',          '/tasks':       'Tasks',
+  '/transcripts':  'Transcripts',    '/irsforms':    'IRS Forms',
+  '/deadlines':    'Deadlines',      '/invoices':    'Invoices',
+  '/payments':     'Payments',       '/sms':         'SMS',
+  '/email':        'Email',          '/documents':   'Documents',
+  '/esign':        'E-Signatures',   '/timeclock':   'Time Clock',
+  '/payroll':      'Payroll',        '/employees':   'Employees',
+  '/reports':      'Reports',        '/settings':    'Settings',
+  '/books':        'Books',          '/dialer':      'Dialer',
+  '/chat':         'Team Chat',      '/taxreturns':  'Tax Returns',
+  '/fax':          'Fax',            '/ar':          'Accounts Receivable',
+  '/stateforms':   'State Forms',    '/irsreference':'IRS Reference',
+  '/formacorp':    'FormaCorp',      '/timeoff':     'Time Off Requests',
+  '/workflows':    'Workflows',      '/kiosk':       'Clock-In Kiosk',
+  '/timeclock':    'Time Clock',     '/payroll':     'Payroll',
 }
 
 const NEW_ITEMS = [

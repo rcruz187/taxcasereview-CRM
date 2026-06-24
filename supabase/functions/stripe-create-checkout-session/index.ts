@@ -50,11 +50,10 @@ serve(async (req) => {
         status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
-    if (!STRIPE_SUCCESS_URL || !STRIPE_CANCEL_URL) {
-      return new Response(JSON.stringify({ error: 'STRIPE_SUCCESS_URL / STRIPE_CANCEL_URL not set in Edge Function secrets' }), {
-        status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
+    // Fall back to the CRM app URL if success/cancel URLs not explicitly set
+    const successUrl = STRIPE_SUCCESS_URL || 'https://taxresolutioncrm.github.io/taxcasereview-CRM/'
+    const cancelUrl  = STRIPE_CANCEL_URL  || 'https://taxresolutioncrm.github.io/taxcasereview-CRM/'
+
 
     const { recordType, recordId, name, email, amount, description, purpose } = await req.json()
     if (!recordId || !recordType || !amount) {
@@ -102,8 +101,8 @@ serve(async (req) => {
       [`metadata[record_type]`]: recordType,
       [`metadata[record_id]`]: String(recordId),
       ...(purpose ? { [`metadata[purpose]`]: String(purpose) } : {}),
-      success_url: STRIPE_SUCCESS_URL,
-      cancel_url: STRIPE_CANCEL_URL,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
     })
 
     await supabase.from(table).update({
