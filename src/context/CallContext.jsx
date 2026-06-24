@@ -219,7 +219,27 @@ export function CallProvider({ children }) {
     let cancelled = false
 
     const poll = setInterval(async () => {
-      if (cancelled || pendingInboundRef.current || calling) return
+      if (cancelled) return
+
+      // If we have a pending inbound call, check if caller hung up (row flipped to missed)
+      if (pendingInboundRef.current && !calling) {
+        const { data: check } = await supabase
+          .from('incoming_calls')
+          .select('status')
+          .eq('callsid', pendingInboundRef.current.callsid)
+          .maybeSingle()
+        if (check?.status === 'missed' || check?.status === 'completed') {
+          console.log('[poll] caller hung up — clearing banner, status:', check.status)
+          if (inboundTimeoutRef.current) { clearTimeout(inboundTimeoutRef.current); inboundTimeoutRef.current = null }
+          pendingInboundRef.current = null
+          setIncomingCall(null)
+          setIncomingMatch(null)
+          stopRing()
+          return
+        }
+      }
+
+      if (pendingInboundRef.current || calling) return
       const { data, error } = await supabase
         .from('incoming_calls')
         .select('callsid, conference_name, from_number, department, created_at')
