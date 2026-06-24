@@ -9,7 +9,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 //   Press 1 -> "speak with a tax advisor" (sales) -> hold in conference,
 //             banner shows in the CRM labeled "Tax Advisor"
 //   Press 2 -> "speak with a tax account representative" -> hold in
-//             conference, banner labeled "Tax Account Representative"
+//             conference, banner labeled "Tax Associate"
 //   Press 0 -> "speak with the operator" -> hold in conference, banner
 //             labeled "Operator"
 //   anything else / no input -> straight to voicemail (simplest safe
@@ -26,11 +26,11 @@ const IVR_EXTENSION_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1
 
 // Press 1 = Dial by extension (routes to ivr-extension submenu)
 // Press 2 = Tax Advisor
-// Press 3 = Tax Account Representative
+// Press 3 = Tax Associate
 // Press 0 = Operator
 const DEPARTMENTS: Record<string, string> = {
   '2': 'Tax Advisor',
-  '3': 'Tax Account Representative',
+  '3': 'Tax Associate',
   '0': 'Operator',
 }
 

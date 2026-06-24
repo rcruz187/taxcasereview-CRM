@@ -227,11 +227,13 @@ export default function Sidebar() {
     }
     if (!user) return
     loadEmailTaskCounts()
+    // Poll every 30s as fallback in case realtime misses an event
+    const poll = setInterval(loadEmailTaskCounts, 30000)
     const ch = supabase.channel('sidebar-email-tasks-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'emails' }, loadEmailTaskCounts)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, loadEmailTaskCounts)
       .subscribe()
-    return () => { supabase.removeChannel(ch) }
+    return () => { supabase.removeChannel(ch); clearInterval(poll) }
   }, [user])
 
   // Chat badge — count messages (rebuild) newer than when this user last had /chat open

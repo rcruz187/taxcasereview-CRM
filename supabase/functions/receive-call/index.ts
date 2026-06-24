@@ -161,7 +161,7 @@ serve(async (req) => {
     // digit (or no digit) comes back, including holding the caller in a
     // conference for Option 1/2/0 -- this function's job stops at
     // presenting the menu.
-    const greeting = 'Thank you for calling Tax Case Review. To check your tax status instantly, please check your email or text messages for your personal client portal link. Otherwise, please choose from the following options. Press 1 to dial by extension. Press 2 to speak with a tax advisor. Press 3 to speak with a tax account representative. Press 0 to speak with the operator.'
+    const greeting = 'Thank you for calling Tax Case Review. To check your tax status instantly, please check your email or text messages for your personal client portal link. Otherwise, please choose from the following options. Press 1 to dial by extension. Press 2 to speak with a tax advisor. Press 3 to speak with a tax associate. Press 0 to speak with the operator.'
     const ivrRouteUrl = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/ivr-route'
     const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Gather numDigits="1" timeout="8" action="${ivrRouteUrl}" method="POST"><Say voice="Polly.Joanna-Neural">${greeting}</Say></Gather><Redirect method="POST">${ivrRouteUrl}</Redirect></Response>`
 
