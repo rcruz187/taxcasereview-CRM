@@ -91,6 +91,7 @@ export function CallProvider({ children }) {
   const lastHandledInboundRef = useRef(null)
   const inboundTimeoutRef = useRef(null)
   const ringIntervalRef = useRef(null)
+  const ringAudioRef = useRef(null)
   // Backup confirmation that an outbound call has actually ended, started
   // explicitly inside startCall() once the conference name is known
   // (rather than a useEffect keyed on `calling` -- that state flips true
@@ -101,6 +102,7 @@ export function CallProvider({ children }) {
 
   function stopRing() {
     if (ringIntervalRef.current) { clearInterval(ringIntervalRef.current); ringIntervalRef.current = null }
+    if (ringAudioRef.current) { try { ringAudioRef.current.pause(); ringAudioRef.current.currentTime = 0 } catch(_) {} }
   }
 
   // Ending a call needs to be CONFIRMED, not fire-and-forget -- a call
@@ -253,9 +255,22 @@ export function CallProvider({ children }) {
       lastHandledInboundRef.current = data.callsid
       pendingInboundRef.current = data
       setIncomingCall({ options: { remoteCallerNumber: data.from_number } })
-      playSound('call')
-      stopRing()
-      ringIntervalRef.current = setInterval(() => playSound('call'), 3000) // re-ring every 3s, matches the IVR's "ring ~3 times" cadence
+      // Force AudioContext resume before playing — browser suspends it after
+      // inactivity. playSound already handles this but we force it here too
+      // so the very first ring on a fresh page load always fires.
+      try {
+        const ac = new (window.AudioContext || window.webkitAudioContext)()
+        ac.resume().then(() => {
+          playSound('call')
+          ringIntervalRef.current = setInterval(() => playSound('call'), 3000)
+        }).catch(() => {
+          playSound('call')
+          ringIntervalRef.current = setInterval(() => playSound('call'), 3000)
+        })
+      } catch(_) {
+        playSound('call')
+        ringIntervalRef.current = setInterval(() => playSound('call'), 3000)
+      }
       // Shows immediately as a fallback label ("Tax Professional" /
       // "Front Desk" from the IVR choice) — overwritten the instant a real
       // Client/Lead match comes back, same as before.
