@@ -204,7 +204,8 @@ export default function Fax() {
               </thead>
               <tbody>
                 {filtered.map(l=>(
-                  <tr key={l.id} style={{borderBottom:'1px solid var(--br)'}}
+                  <tr key={l.id} style={{borderBottom:'1px solid var(--br)',cursor:l.file_url?'pointer':'default'}}
+                    onClick={()=>l.file_url&&window.open(l.file_url,'_blank')}
                     onMouseEnter={e=>e.currentTarget.style.background='var(--s2)'}
                     onMouseLeave={e=>e.currentTarget.style.background=''}>
                     <td style={{padding:'12px 14px',fontSize:18}}>
