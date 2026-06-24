@@ -215,9 +215,9 @@ export default function Sidebar() {
     async function loadEmailTaskCounts() {
       // Count ALL unread emails not in Sent or Archive
       const [allUnreadRes, actionRes, waitingRes, tasksRes] = await Promise.all([
-        supabase.from('emails').select('id', { count: 'exact', head: true }).eq('is_read', false).or('triage.is.null,triage.eq.Inbox,triage.eq.Action Needed,triage.eq.Waiting'),
-        supabase.from('emails').select('id', { count: 'exact', head: true }).eq('triage', 'Action Needed').eq('is_read', false),
-        supabase.from('emails').select('id', { count: 'exact', head: true }).eq('triage', 'Waiting').eq('is_read', false),
+        supabase.from('emails').select('id', { count: 'exact', head: true }).neq('is_read', true).or('triage.is.null,triage.eq.Inbox,triage.eq.Action Needed,triage.eq.Waiting'),
+        supabase.from('emails').select('id', { count: 'exact', head: true }).eq('triage', 'Action Needed').neq('is_read', true),
+        supabase.from('emails').select('id', { count: 'exact', head: true }).eq('triage', 'Waiting').neq('is_read', true),
         supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('done', false),
       ])
       setEmailActionNeeded(actionRes.count || 0)
