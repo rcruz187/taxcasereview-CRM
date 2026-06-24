@@ -282,90 +282,107 @@ export default function Workflows() {
 
       {/* Create/Edit Modal */}
       {showForm && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.7)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
-          <div className="card" style={{ width:'100%', maxWidth:780, maxHeight:'92vh', overflowY:'auto', padding:28 }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
-              <h3 style={{ margin:0, fontSize:16, fontWeight:700 }}>{editId ? 'Edit Workflow' : 'New Workflow'}</h3>
-              <button onClick={()=>setShowForm(false)} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:'var(--t3)' }}>×</button>
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.75)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+          <div className="card" style={{ width:'100%', maxWidth:860, maxHeight:'94vh', overflowY:'auto', padding:0, display:'flex', flexDirection:'column' }}>
+
+            {/* Header */}
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'24px 32px 20px', borderBottom:'1px solid var(--br)' }}>
+              <div>
+                <h3 style={{ margin:0, fontSize:20, fontWeight:700 }}>{editId ? 'Edit Workflow' : 'New Workflow'}</h3>
+                <p style={{ margin:'4px 0 0', fontSize:13, color:'var(--t3)' }}>Define a trigger event and the tasks to auto-create when it fires.</p>
+              </div>
+              <button onClick={()=>setShowForm(false)} style={{ background:'none', border:'none', fontSize:24, cursor:'pointer', color:'var(--t3)', lineHeight:1, padding:'4px 8px' }}>×</button>
             </div>
 
-            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            {/* Body */}
+            <div style={{ padding:'28px 32px', display:'flex', flexDirection:'column', gap:24, flex:1 }}>
+
+              {/* Workflow Name */}
               <div>
-                <label style={{ fontSize:11, fontWeight:600, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em' }}>Workflow Name *</label>
-                <input className="inp" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="e.g. New Lead Onboarding" style={{ marginTop:4, width:'100%', boxSizing:'border-box' }}/>
+                <label style={{ display:'block', fontSize:12, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:8 }}>Workflow Name *</label>
+                <input className="inp" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="e.g. New Lead Onboarding, Post-Signing Tasks…" style={{ width:'100%', boxSizing:'border-box', fontSize:15, padding:'10px 14px' }}/>
               </div>
 
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              {/* Entity + Trigger */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 2fr', gap:16 }}>
                 <div>
-                  <label style={{ fontSize:11, fontWeight:600, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em' }}>Entity Type *</label>
-                  <select className="inp" value={form.entity_type} onChange={e=>setForm(f=>({...f,entity_type:e.target.value,trigger_event:'',trigger_value:''}))} style={{ marginTop:4, width:'100%' }}>
+                  <label style={{ display:'block', fontSize:12, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:8 }}>Entity Type *</label>
+                  <select className="inp" value={form.entity_type} onChange={e=>setForm(f=>({...f,entity_type:e.target.value,trigger_event:'',trigger_value:''}))} style={{ width:'100%', fontSize:14, padding:'10px 14px' }}>
                     <option value="lead">Lead</option>
                     <option value="client">Client</option>
                     <option value="case">Case</option>
                   </select>
                 </div>
                 <div>
-                  <label style={{ fontSize:11, fontWeight:600, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em' }}>Trigger Event *</label>
-                  <select className="inp" value={form.trigger_event} onChange={e=>setForm(f=>({...f,trigger_event:e.target.value,trigger_value:''}))} style={{ marginTop:4, width:'100%' }}>
-                    <option value="">Select trigger…</option>
+                  <label style={{ display:'block', fontSize:12, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:8 }}>Trigger Event *</label>
+                  <select className="inp" value={form.trigger_event} onChange={e=>setForm(f=>({...f,trigger_event:e.target.value,trigger_value:''}))} style={{ width:'100%', fontSize:14, padding:'10px 14px' }}>
+                    <option value="">Select trigger event…</option>
                     {triggers.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
                 </div>
               </div>
 
+              {/* Status value if needed */}
               {needsValue && (
                 <div>
-                  <label style={{ fontSize:11, fontWeight:600, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em' }}>Status Value *</label>
-                  <select className="inp" value={form.trigger_value} onChange={e=>setForm(f=>({...f,trigger_value:e.target.value}))} style={{ marginTop:4, width:'100%' }}>
+                  <label style={{ display:'block', fontSize:12, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:8 }}>When Status Changes To *</label>
+                  <select className="inp" value={form.trigger_value} onChange={e=>setForm(f=>({...f,trigger_value:e.target.value}))} style={{ width:'100%', fontSize:14, padding:'10px 14px' }}>
                     <option value="">Select status…</option>
                     {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
               )}
 
-              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                <input type="checkbox" id="wf-active" checked={form.active} onChange={e=>setForm(f=>({...f,active:e.target.checked}))}/>
-                <label htmlFor="wf-active" style={{ fontSize:13 }}>Active (trigger fires immediately when enabled)</label>
+              {/* Active toggle */}
+              <div style={{ display:'flex', alignItems:'center', gap:10, background:'var(--s1)', borderRadius:8, padding:'12px 16px' }}>
+                <input type="checkbox" id="wf-active" checked={form.active} onChange={e=>setForm(f=>({...f,active:e.target.checked}))} style={{ width:16, height:16, cursor:'pointer' }}/>
+                <label htmlFor="wf-active" style={{ fontSize:14, cursor:'pointer', fontWeight:500 }}>
+                  Active — trigger fires automatically when this event occurs
+                </label>
               </div>
 
               {/* Steps */}
               <div>
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-                  <label style={{ fontSize:11, fontWeight:600, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em' }}>Steps (Tasks to Auto-Create)</label>
-                  <button onClick={addStep} className="btn" style={{ fontSize:11, padding:'3px 10px' }}>+ Add Step</button>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+                  <div>
+                    <div style={{ fontSize:12, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.06em' }}>Steps — Tasks to Auto-Create</div>
+                    <div style={{ fontSize:12, color:'var(--t3)', marginTop:3 }}>Each step becomes a task assigned to the specified role when the trigger fires.</div>
+                  </div>
+                  <button onClick={addStep} className="btn pri" style={{ fontSize:13, padding:'7px 16px', fontWeight:600 }}>+ Add Step</button>
                 </div>
-                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
                   {steps.map((s, i) => (
-                    <div key={i} style={{ background:'var(--s1)', border:'1px solid var(--br)', borderRadius:8, padding:12 }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                        <div style={{ width:22, height:22, borderRadius:'50%', background:'var(--blue)', color:'#fff', fontSize:11, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{i+1}</div>
-                        <input className="inp" value={s.title} onChange={e=>updateStep(i,'title',e.target.value)} placeholder="Task title *" style={{ flex:1 }}/>
+                    <div key={i} style={{ background:'var(--s1)', border:'1px solid var(--br)', borderRadius:10, padding:'18px 20px' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
+                        <div style={{ width:28, height:28, borderRadius:'50%', background:'var(--blue)', color:'#fff', fontSize:13, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{i+1}</div>
+                        <input className="inp" value={s.title} onChange={e=>updateStep(i,'title',e.target.value)} placeholder="Task title — what needs to be done? *" style={{ flex:1, fontSize:14, padding:'9px 13px' }}/>
                         {steps.length > 1 && (
-                          <button onClick={()=>removeStep(i)} style={{ background:'none', border:'none', color:'var(--bad)', cursor:'pointer', fontSize:16, padding:'0 4px' }}>×</button>
+                          <button onClick={()=>removeStep(i)} style={{ background:'none', border:'none', color:'var(--bad)', cursor:'pointer', fontSize:20, padding:'0 6px', lineHeight:1 }}>×</button>
                         )}
                       </div>
-                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
                         <div>
-                          <label style={{ fontSize:10, color:'var(--t3)' }}>Assign to Role</label>
-                          <select className="inp" value={s.assigned_role} onChange={e=>updateStep(i,'assigned_role',e.target.value)} style={{ width:'100%', marginTop:2 }}>
+                          <label style={{ display:'block', fontSize:11, fontWeight:600, color:'var(--t3)', marginBottom:6 }}>Assign to Role</label>
+                          <select className="inp" value={s.assigned_role} onChange={e=>updateStep(i,'assigned_role',e.target.value)} style={{ width:'100%', fontSize:14, padding:'9px 13px' }}>
                             {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                           </select>
                         </div>
                         <div>
-                          <label style={{ fontSize:10, color:'var(--t3)' }}>Due in (days)</label>
-                          <input className="inp" type="number" min="1" max="30" value={s.due_in_days} onChange={e=>updateStep(i,'due_in_days',parseInt(e.target.value)||1)} style={{ width:'100%', marginTop:2 }}/>
+                          <label style={{ display:'block', fontSize:11, fontWeight:600, color:'var(--t3)', marginBottom:6 }}>Due in (days from trigger)</label>
+                          <input className="inp" type="number" min="1" max="90" value={s.due_in_days} onChange={e=>updateStep(i,'due_in_days',parseInt(e.target.value)||1)} style={{ width:'100%', fontSize:14, padding:'9px 13px' }}/>
                         </div>
                       </div>
-                      <textarea className="inp" value={s.notes} onChange={e=>updateStep(i,'notes',e.target.value)} placeholder="Notes for assignee (optional)" rows={2} style={{ width:'100%', boxSizing:'border-box', resize:'vertical' }}/>
+                      <textarea className="inp" value={s.notes} onChange={e=>updateStep(i,'notes',e.target.value)} placeholder="Notes or instructions for the assignee (optional)" rows={2} style={{ width:'100%', boxSizing:'border-box', resize:'vertical', fontSize:13, padding:'9px 13px' }}/>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
 
-            <div style={{ display:'flex', gap:10, marginTop:20, justifyContent:'flex-end' }}>
-              <button onClick={()=>setShowForm(false)} className="btn" style={{ padding:'8px 18px' }}>Cancel</button>
-              <button onClick={save} className="btn pri" disabled={saving} style={{ padding:'8px 18px' }}>{saving ? 'Saving…' : editId ? 'Update Workflow' : 'Create Workflow'}</button>
+            {/* Footer */}
+            <div style={{ display:'flex', gap:12, padding:'20px 32px 24px', borderTop:'1px solid var(--br)', justifyContent:'flex-end' }}>
+              <button onClick={()=>setShowForm(false)} className="btn" style={{ padding:'10px 24px', fontSize:14 }}>Cancel</button>
+              <button onClick={save} className="btn pri" disabled={saving} style={{ padding:'10px 28px', fontSize:14, fontWeight:700 }}>{saving ? 'Saving…' : editId ? 'Update Workflow' : 'Create Workflow'}</button>
             </div>
           </div>
         </div>
