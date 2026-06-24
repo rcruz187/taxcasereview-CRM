@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { Relay } from '@signalwire/js'
 import { supabase } from '../lib/supabase'
 import { useApp } from './AppContext'
-import { playSound } from '../lib/notifySound'
+import { playSound, playRing, stopRingAudio } from '../lib/notifySound'
 
 // ──────────────────────────────────────────────────────────────────────
 // This used to live entirely inside Dialer.jsx. The problem: React
@@ -102,7 +102,7 @@ export function CallProvider({ children }) {
 
   function stopRing() {
     if (ringIntervalRef.current) { clearInterval(ringIntervalRef.current); ringIntervalRef.current = null }
-    if (ringAudioRef.current) { try { ringAudioRef.current.pause(); ringAudioRef.current.currentTime = 0 } catch(_) {} }
+    stopRingAudio()
   }
 
   // Ending a call needs to be CONFIRMED, not fire-and-forget -- a call
@@ -255,8 +255,8 @@ export function CallProvider({ children }) {
       lastHandledInboundRef.current = data.callsid
       pendingInboundRef.current = data
       setIncomingCall({ options: { remoteCallerNumber: data.from_number } })
-      playSound('call')
-      ringIntervalRef.current = setInterval(() => playSound('call'), 3000)
+      playRing()
+      ringIntervalRef.current = setInterval(() => playRing(), 3000)
       // Shows immediately as a fallback label ("Tax Professional" /
       // "Front Desk" from the IVR choice) — overwritten the instant a real
       // Client/Lead match comes back, same as before.
