@@ -50,14 +50,17 @@ function getRingAudio() {
 
 export function playRing() {
   if (!isSoundEnabled()) return
+  // Create a fresh Audio element each time — avoids stale state
+  // and sidesteps autoplay restrictions since the WAV is inline data
   try {
-    const a = getRingAudio()
-    a.currentTime = 0
-    a.play().catch(() => {
-      // Audio element blocked too — fall back to Web Audio API
+    const a = new Audio(RING_WAV)
+    a.volume = 0.7
+    a.play().catch(err => {
+      console.warn('[playRing] Audio element blocked:', err)
       playSound('call')
     })
-  } catch(_) {
+  } catch(err) {
+    console.warn('[playRing] Error:', err)
     playSound('call')
   }
 }
