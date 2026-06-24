@@ -14,6 +14,7 @@ import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { useApp } from '../context/AppContext'
 import { generateAddendum, sendAddendumForSignature } from '../lib/docUtils'
+import ChargeResolutionFeeModal from '../components/ChargeResolutionFeeModal'
 import { RESOLUTION_SERVICES } from '../lib/irsFormUtils'
 import { generatePOACoverLetterPdf } from '../lib/irsFormUtils'
 
@@ -849,10 +850,12 @@ export default function Clients() {
   const [saving,    setSaving]    = useState(false)
   const [toast,     setToast]     = useState('')
   const [detail,    setDetail]    = useState(null)
-  // Addendum modal
+  // Addendum + 2nd Trade combined modal
   const [addModal,    setAddModal]    = useState(false)
+  const [addModalTab, setAddModalTab] = useState('addendum') // 'addendum' | 'charge'
   const [addForm,     setAddForm]     = useState({ resolutionFee:'', paymentPlan:'', startDate:'', notes:'', services:[], sendVia:'email' })
   const [addendumSending, setAddendumSending] = useState(false)
+  const [showChargeModal, setShowChargeModal] = useState(false)
   // Related data for detail view
   const [relCases,    setRelCases]    = useState([])
   const [relDeadlines,setRelDeadlines]= useState([])
@@ -2166,64 +2169,105 @@ export default function Clients() {
 
         {addModal&&(
           <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setAddModal(false)}>
-            <div className="modal" style={{width:600,maxHeight:'88vh',overflowY:'auto'}}>
+            <div className="modal" style={{width:620,maxHeight:'90vh',overflowY:'auto'}}>
               <div className="mh">
-                <span className="mt">📋 Generate Addendum — {c.name}</span>
+                <span className="mt">📋 Addendum & 2nd Trade — {c.name}</span>
                 <button className="xbtn" onClick={()=>setAddModal(false)}>&times;</button>
               </div>
-              <div style={{fontSize:12,color:'var(--t3)',marginBottom:14}}>
-                Fill in the resolution fee and scope details, check off the services that apply based on the investigation results, then print a hard copy or send it straight to the client for e-signature.
+
+              {/* Tab switcher */}
+              <div style={{display:'flex',gap:4,background:'var(--s1)',borderRadius:9,padding:4,marginBottom:18}}>
+                {[['addendum','📋 Send Addendum'],['charge','💳 Charge 2nd Trade']].map(([tab,label])=>(
+                  <button key={tab} onClick={()=>setAddModalTab(tab)} style={{
+                    flex:1,padding:'8px 0',borderRadius:7,border:'none',cursor:'pointer',fontSize:13,fontWeight:700,
+                    background:addModalTab===tab?'var(--blue)':'transparent',
+                    color:addModalTab===tab?'#fff':'var(--t3)',
+                    transition:'all .15s',
+                  }}>{label}</button>
+                ))}
               </div>
-              <div className="fg2">
-                <div className="field"><label>Resolution Service Fee ($) *</label>
-                  <input type="number" value={addForm.resolutionFee} onChange={e=>setAddForm(f=>({...f,resolutionFee:e.target.value}))} placeholder="e.g. 3500"/>
+
+              {/* ── Addendum Tab ── */}
+              {addModalTab==='addendum'&&(<>
+                <div style={{fontSize:12,color:'var(--t3)',marginBottom:14}}>
+                  Fill in the resolution fee and scope details, check off the services that apply, then print or send for e-signature.
                 </div>
-                <div className="field"><label>Monthly Payment Plan ($)</label>
-                  <input type="number" value={addForm.paymentPlan} onChange={e=>setAddForm(f=>({...f,paymentPlan:e.target.value}))} placeholder="e.g. 350"/>
+                <div className="fg2">
+                  <div className="field"><label>Resolution Service Fee ($) *</label>
+                    <input type="number" value={addForm.resolutionFee} onChange={e=>setAddForm(f=>({...f,resolutionFee:e.target.value}))} placeholder="e.g. 3500"/>
+                  </div>
+                  <div className="field"><label>Monthly Payment Plan ($)</label>
+                    <input type="number" value={addForm.paymentPlan} onChange={e=>setAddForm(f=>({...f,paymentPlan:e.target.value}))} placeholder="e.g. 350"/>
+                  </div>
                 </div>
-              </div>
-              <div className="field"><label>Payments Start Date</label>
-                <input type="date" value={addForm.startDate} onChange={e=>setAddForm(f=>({...f,startDate:e.target.value}))}/>
-              </div>
-
-              <div className="field"><label>Resolution Services Authorized — based on investigation results</label>
-                <div style={{background:'var(--s2)',border:'1px solid var(--br)',borderRadius:7,padding:'8px 12px',maxHeight:180,overflowY:'auto'}}>
-                  {RESOLUTION_SERVICES.map(s=>(
-                    <label key={s.key} style={{display:'flex',alignItems:'center',gap:8,padding:'5px 0',fontSize:12.5,cursor:'pointer'}}>
-                      <input type="checkbox" style={{width:'auto'}}
-                        checked={addForm.services.includes(s.key)}
-                        onChange={()=>setAddForm(f=>({...f,services:f.services.includes(s.key)?f.services.filter(k=>k!==s.key):[...f.services,s.key]}))}/>
-                      {s.label}
-                    </label>
-                  ))}
+                <div className="field"><label>Payments Start Date</label>
+                  <input type="date" value={addForm.startDate} onChange={e=>setAddForm(f=>({...f,startDate:e.target.value}))}/>
                 </div>
-              </div>
+                <div className="field"><label>Resolution Services Authorized — based on investigation results</label>
+                  <div style={{background:'var(--s2)',border:'1px solid var(--br)',borderRadius:7,padding:'8px 12px',maxHeight:180,overflowY:'auto'}}>
+                    {RESOLUTION_SERVICES.map(s=>(
+                      <label key={s.key} style={{display:'flex',alignItems:'center',gap:8,padding:'5px 0',fontSize:12.5,cursor:'pointer'}}>
+                        <input type="checkbox" style={{width:'auto'}}
+                          checked={addForm.services.includes(s.key)}
+                          onChange={()=>setAddForm(f=>({...f,services:f.services.includes(s.key)?f.services.filter(k=>k!==s.key):[...f.services,s.key]}))}/>
+                        {s.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="field"><label>Additional Scope / Work Notes</label>
+                  <textarea value={addForm.notes} onChange={e=>setAddForm(f=>({...f,notes:e.target.value}))} style={{minHeight:60}} placeholder="e.g. Includes filing 3 years of unfiled returns..."/>
+                </div>
+                <div className="field"><label>Send Via</label>
+                  <select value={addForm.sendVia} onChange={e=>setAddForm(f=>({...f,sendVia:e.target.value}))}>
+                    <option value="email">Email</option>
+                    <option value="sms">Text Message</option>
+                    <option value="both">Email + Text</option>
+                  </select>
+                </div>
+                <div style={{display:'flex',gap:8,marginTop:6}}>
+                  <button className="btn sec" style={{flex:1,justifyContent:'center',padding:11}} onClick={()=>{
+                    if(!addForm.resolutionFee){showToast('Enter the resolution fee first');return}
+                    generateAddendum(c, addForm)
+                  }}>🖨️ Print</button>
+                  <button className="btn pri" style={{flex:2,justifyContent:'center',padding:11}} disabled={addendumSending} onClick={sendAddendum}>
+                    {addendumSending ? 'Sending…' : '✍️ Send for E-Signature'}
+                  </button>
+                </div>
+              </>)}
 
-              <div className="field"><label>Additional Scope / Work Notes</label>
-                <textarea value={addForm.notes} onChange={e=>setAddForm(f=>({...f,notes:e.target.value}))} style={{minHeight:60}} placeholder="e.g. Includes filing 3 years of unfiled returns..."/>
-              </div>
-
-              <div className="field"><label>Send Via</label>
-                <select value={addForm.sendVia} onChange={e=>setAddForm(f=>({...f,sendVia:e.target.value}))}>
-                  <option value="email">Email</option>
-                  <option value="sms">Text Message</option>
-                  <option value="both">Email + Text</option>
-                </select>
-              </div>
-
-              <div style={{display:'flex',gap:8,marginTop:6}}>
-                <button className="btn sec" style={{flex:1,justifyContent:'center',padding:11}} onClick={()=>{
-                  if(!addForm.resolutionFee){showToast('Enter the resolution fee first');return}
-                  generateAddendum(c, addForm)
-                }}>
-                  🖨️ Print
-                </button>
-                <button className="btn pri" style={{flex:2,justifyContent:'center',padding:11}} disabled={addendumSending} onClick={sendAddendum}>
-                  {addendumSending ? 'Sending…' : '✍️ Send for E-Signature'}
-                </button>
-              </div>
+              {/* ── 2nd Trade / Charge Tab ── */}
+              {addModalTab==='charge'&&(
+                <div>
+                  <div style={{fontSize:12,color:'var(--t3)',marginBottom:16,lineHeight:1.6}}>
+                    Charge the resolution fee directly to the card on file. This is the 2nd Trade — separate from the investigation fee already paid. Commission goes to whoever sent the addendum.
+                  </div>
+                  <div style={{background:'var(--s2)',borderRadius:10,padding:'16px 18px',border:'1px solid var(--br)',marginBottom:16}}>
+                    <div style={{fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>Client on File</div>
+                    <div style={{fontWeight:700,fontSize:15}}>{c.name}</div>
+                    {c.email&&<div style={{fontSize:12,color:'var(--t3)',marginTop:3}}>{c.email}</div>}
+                    {addForm.resolutionFee&&<div style={{fontSize:13,color:'var(--ok)',marginTop:6,fontWeight:600}}>Addendum fee: ${Number(addForm.resolutionFee).toLocaleString()}</div>}
+                  </div>
+                  <button className="btn pri" style={{width:'100%',padding:12,fontSize:14,fontWeight:700,justifyContent:'center'}}
+                    onClick={()=>{setAddModal(false);setShowChargeModal(true)}}>
+                    💳 Open Stripe Charge Form →
+                  </button>
+                  <div style={{fontSize:11,color:'var(--t3)',marginTop:8,textAlign:'center'}}>
+                    Opens a secure Stripe payment form. Card info never touches our servers.
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+        )}
+
+        {showChargeModal&&(
+          <ChargeResolutionFeeModal
+            lead={c}
+            showToast={showToast}
+            onClose={()=>setShowChargeModal(false)}
+            onPaid={()=>{ setShowChargeModal(false); loadRelated(c.name); showToast('✅ 2nd Trade charged!') }}
+          />
         )}
 
       {faxModal && faxClient && (
