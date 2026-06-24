@@ -213,16 +213,18 @@ export default function Sidebar() {
 
   useEffect(() => {
     async function loadEmailTaskCounts() {
-      // Count ALL unread emails not in Sent or Archive
-      const [allUnreadRes, actionRes, waitingRes, tasksRes] = await Promise.all([
-        supabase.from('emails').select('id', { count: 'exact', head: true }).neq('is_read', true).or('triage.is.null,triage.eq.Inbox,triage.eq.Action Needed,triage.eq.Waiting'),
-        supabase.from('emails').select('id', { count: 'exact', head: true }).eq('triage', 'Action Needed').neq('is_read', true),
-        supabase.from('emails').select('id', { count: 'exact', head: true }).eq('triage', 'Waiting').neq('is_read', true),
+      // Fetch rows in JS and count with !e.is_read — identical to Email.jsx line 272
+      // so badge always matches inbox count exactly. DB count queries miss NULL is_read.
+      const [emailsRes, tasksRes] = await Promise.all([
+        supabase.from('emails').select('id,is_read,triage'),
         supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('done', false),
       ])
-      setEmailActionNeeded(actionRes.count || 0)
-      setEmailWaiting(waitingRes.count || 0)
-      setUnreadInbox(allUnreadRes.count || 0)
+      const emails = emailsRes.data || []
+      const inboxTriages = ['Inbox', 'Action Needed', 'Waiting']
+      const inboxEmails = emails.filter(e => inboxTriages.includes(e.triage || 'Inbox'))
+      setUnreadInbox(inboxEmails.filter(e => !e.is_read).length)
+      setEmailActionNeeded(emails.filter(e => e.triage === 'Action Needed' && !e.is_read).length)
+      setEmailWaiting(emails.filter(e => e.triage === 'Waiting' && !e.is_read).length)
       setOpenTasks(tasksRes.count || 0)
     }
     if (!user) return
