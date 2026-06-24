@@ -189,24 +189,22 @@ export default function Sidebar() {
 
   useEffect(() => {
     async function loadCommsCounts() {
-      const [faxRes, smsRes, vmRes, esignRes] = await Promise.all([
-        supabase.from('fax_logs').select('id', { count: 'exact', head: true }).eq('direction', 'inbound').eq('read', false),
-        supabase.from('sms_messages').select('id', { count: 'exact', head: true }).eq('direction', 'inbound').eq('read', false),
-        supabase.from('call_logs').select('id', { count: 'exact', head: true }).eq('voicemail', true).eq('read', false),
-        supabase.from('esign_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+      // All queries match the exact tables/fields the pages themselves use
+      const [vmRes, esignRes] = await Promise.all([
+        supabase.from('voicemails').select('id,is_read'),           // matches Dialer.jsx
+        supabase.from('esigns').select('id,status'),                // matches Esign.jsx
       ])
-      setUnreadFax(faxRes.count || 0)
-      setUnreadSms(smsRes.count || 0)
-      setUnreadVoicemails(vmRes.count || 0)
-      setPendingEsign(esignRes.count || 0)
+      // Voicemails: count !is_read in JS (catches NULL) — matches Dialer.jsx line 383
+      setUnreadVoicemails((vmRes.data || []).filter(v => !v.is_read).length)
+      // Esigns: status === 'Awaiting' — matches Esign.jsx line 183
+      setPendingEsign((esignRes.data || []).filter(e => e.status === 'Awaiting').length)
+      // Fax/SMS have no read field — badges handled via localStorage timestamps
     }
     if (!user) return
     loadCommsCounts()
     const ch = supabase.channel('sidebar-comms-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fax_logs' }, loadCommsCounts)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sms_messages' }, loadCommsCounts)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'call_logs' }, loadCommsCounts)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'esign_requests' }, loadCommsCounts)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'voicemails' }, loadCommsCounts)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'esigns' }, loadCommsCounts)
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [user])
