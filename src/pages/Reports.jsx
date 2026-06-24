@@ -315,12 +315,71 @@ export default function Reports() {
       {/* ── REVENUE ── */}
       {tab==='revenue'&&(
         <div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:10,marginBottom:16}}>
-            <StatCard icon="💰" label="Total Collected"  value={'$'+Math.round(totalRevenue).toLocaleString()} color="var(--ok)"/>
-            <StatCard icon="⏳" label="Pending / Open"   value={'$'+Math.round(pendingRevenue).toLocaleString()} color="var(--warn)" small/>
-            <StatCard icon="🧾" label="Invoices Paid"    value={invoices.filter(i=>i.status==='Paid').length} sub={`of ${invoices.length} total`} small/>
-            <StatCard icon="📅" label="Avg per Client"   value={clients.length?'$'+Math.round(totalRevenue/Math.max(clients.length,1)).toLocaleString():'$0'} small/>
+
+          {/* ── Trade Headers ── */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:16}}>
+
+            {/* 1st Trade Card */}
+            <div className="card" style={{borderTop:'3px solid var(--blue)',padding:'16px 18px'}}>
+              <div style={{fontSize:11,fontWeight:700,color:'var(--blue)',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:10}}>
+                🎯 1st Trade — Acquisition Revenue
+              </div>
+              <div style={{fontSize:11,color:'var(--t3)',marginBottom:12,lineHeight:1.5}}>Investigation fees collected at enrollment. Source: leads.taxFee field.</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                <div style={{background:'var(--s2)',borderRadius:8,padding:'10px 12px'}}>
+                  <div style={{fontSize:10,color:'var(--t3)',fontWeight:600,textTransform:'uppercase',letterSpacing:'.05em',marginBottom:4}}>MTD</div>
+                  <div style={{fontSize:22,fontWeight:800,color:'var(--ok)'}}>${Math.round(leads.filter(l=>l.created_at?.startsWith(new Date().toISOString().slice(0,7))).reduce((s,l)=>s+parseFloat(l.taxFee||0),0)).toLocaleString()}</div>
+                </div>
+                <div style={{background:'var(--s2)',borderRadius:8,padding:'10px 12px'}}>
+                  <div style={{fontSize:10,color:'var(--t3)',fontWeight:600,textTransform:'uppercase',letterSpacing:'.05em',marginBottom:4}}>All Time</div>
+                  <div style={{fontSize:22,fontWeight:800,color:'var(--tx)'}}>${Math.round(leads.reduce((s,l)=>s+parseFloat(l.taxFee||0),0)).toLocaleString()}</div>
+                </div>
+                <div style={{background:'var(--s2)',borderRadius:8,padding:'10px 12px'}}>
+                  <div style={{fontSize:10,color:'var(--t3)',fontWeight:600,textTransform:'uppercase',letterSpacing:'.05em',marginBottom:4}}>Total Leads</div>
+                  <div style={{fontSize:22,fontWeight:800,color:'var(--tx)'}}>{leads.length}</div>
+                </div>
+                <div style={{background:'var(--s2)',borderRadius:8,padding:'10px 12px'}}>
+                  <div style={{fontSize:10,color:'var(--t3)',fontWeight:600,textTransform:'uppercase',letterSpacing:'.05em',marginBottom:4}}>Avg Fee</div>
+                  <div style={{fontSize:22,fontWeight:800,color:'var(--tx)'}}>{leads.filter(l=>l.taxFee>0).length?'$'+Math.round(leads.reduce((s,l)=>s+parseFloat(l.taxFee||0),0)/Math.max(leads.filter(l=>l.taxFee>0).length,1)).toLocaleString():'$0'}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* 2nd Trade Card */}
+            <div className="card" style={{borderTop:'3px solid var(--ok)',padding:'16px 18px'}}>
+              <div style={{fontSize:11,fontWeight:700,color:'var(--ok)',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:10}}>
+                💵 2nd Trade — Service Revenue
+              </div>
+              <div style={{fontSize:11,color:'var(--t3)',marginBottom:12,lineHeight:1.5}}>Resolution fees + installment collections. Source: payments tagged resolution_fee + AR.</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                <div style={{background:'var(--s2)',borderRadius:8,padding:'10px 12px'}}>
+                  <div style={{fontSize:10,color:'var(--t3)',fontWeight:600,textTransform:'uppercase',letterSpacing:'.05em',marginBottom:4}}>MTD</div>
+                  <div style={{fontSize:22,fontWeight:800,color:'var(--ok)'}}>${Math.round(payments.filter(p=>p.source==='resolution_fee'&&p.status==='Cleared'&&p.created_at?.startsWith(new Date().toISOString().slice(0,7))).reduce((s,p)=>s+parseFloat(p.amount||0),0)).toLocaleString()}</div>
+                </div>
+                <div style={{background:'var(--s2)',borderRadius:8,padding:'10px 12px'}}>
+                  <div style={{fontSize:10,color:'var(--t3)',fontWeight:600,textTransform:'uppercase',letterSpacing:'.05em',marginBottom:4}}>All Time</div>
+                  <div style={{fontSize:22,fontWeight:800,color:'var(--tx)'}}>${Math.round(payments.filter(p=>p.source==='resolution_fee'&&p.status==='Cleared').reduce((s,p)=>s+parseFloat(p.amount||0),0)).toLocaleString()}</div>
+                </div>
+                <div style={{background:'var(--s2)',borderRadius:8,padding:'10px 12px'}}>
+                  <div style={{fontSize:10,color:'var(--t3)',fontWeight:600,textTransform:'uppercase',letterSpacing:'.05em',marginBottom:4}}>AR Outstanding</div>
+                  <div style={{fontSize:22,fontWeight:800,color:'var(--warn)'}}>${Math.round(pendingRevenue).toLocaleString()}</div>
+                </div>
+                <div style={{background:'var(--s2)',borderRadius:8,padding:'10px 12px'}}>
+                  <div style={{fontSize:10,color:'var(--t3)',fontWeight:600,textTransform:'uppercase',letterSpacing:'.05em',marginBottom:4}}>Invoices Paid</div>
+                  <div style={{fontSize:22,fontWeight:800,color:'var(--tx)'}}>{invoices.filter(i=>i.status==='Paid').length}<span style={{fontSize:12,color:'var(--t3)',fontWeight:400}}> / {invoices.length}</span></div>
+                </div>
+              </div>
+            </div>
           </div>
+
+          {/* Combined total strip */}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:10,marginBottom:16}}>
+            <StatCard icon="💰" label="Total Collected (All)"  value={'$'+Math.round(totalRevenue).toLocaleString()} color="var(--ok)"/>
+            <StatCard icon="⏳" label="AR Outstanding"          value={'$'+Math.round(pendingRevenue).toLocaleString()} color="var(--warn)" small/>
+            <StatCard icon="🧾" label="Invoices Paid"           value={invoices.filter(i=>i.status==='Paid').length} sub={`of ${invoices.length} total`} small/>
+            <StatCard icon="📅" label="Avg per Client"          value={clients.length?'$'+Math.round(totalRevenue/Math.max(clients.length,1)).toLocaleString():'$0'} small/>
+          </div>
+
           <div className="card" style={{marginBottom:12}}>
             <SectionTitle title="Revenue by Month (All Time)"
               action={<ExportBtn name="Revenue" rows={[['Month','Revenue'],...MONTHS.map((m,i)=>[m,'$'+Math.round(revByMonth[i])])]}/>}/>

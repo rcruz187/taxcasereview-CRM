@@ -156,25 +156,29 @@ export default function Dashboard() {
       background: 'var(--sf)',
       border: '1px solid var(--br)',
       borderTop: 'none',
-      borderRadius: '0 0 10px 10px',
-      padding: '14px 16px',
+      borderRadius: '0 0 12px 12px',
+      padding: '18px 20px',
       cursor: to ? 'pointer' : 'default',
       transition: 'transform .15s, box-shadow .15s',
       position: 'relative',
       overflow: 'hidden',
+      minHeight: 100,
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'space-between',
     }}
       onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 6px 24px ${borderColor}40` }}
       onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}
     >
-      {/* Thick colored top bar — Jobber style */}
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: borderColor, borderRadius: '0' }}/>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', paddingTop: 8 }}>
-        <div>
-          <div style={{ fontSize: 10, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>{label}</div>
-          <div style={{ fontSize: 26, fontWeight: 900, color: color || 'var(--tx)', lineHeight: 1 }}>{val ?? '—'}</div>
-          {sub && <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 5 }}>{sub}</div>}
+      {/* Thick colored top bar */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: borderColor }}/>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', paddingTop: 6 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 10, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>{label}</div>
+          <div style={{ fontSize: 28, fontWeight: 900, color: color || 'var(--tx)', lineHeight: 1 }}>{val ?? '—'}</div>
+          {sub && <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 6 }}>{sub}</div>}
         </div>
-        {icon && <div style={{ fontSize: 24, opacity: .2 }}>{icon}</div>}
+        {icon && <div style={{ fontSize: 28, opacity: .15, flexShrink: 0 }}>{icon}</div>}
       </div>
     </div>
   )}
@@ -201,7 +205,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stat cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 14 }}>
         {isTaxAdvisor ? (
           <>
             <StatCard label="Open Leads"      val={metrics.myOpenLeads}   color="var(--warn)"  to="/leads"     icon="👤" sub="Assigned to you" />

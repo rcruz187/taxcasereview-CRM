@@ -373,29 +373,38 @@ export default function ClientPortal() {
       </div>
       <div style={{position:'relative',zIndex:1,width:'100%',display:'flex',alignItems:'flex-start',justifyContent:'center',minHeight:'100vh',paddingTop:32,paddingBottom:32}}>
       {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#0f172a', border: '1px solid rgba(255,255,255,.15)', borderRadius: 8, padding: '10px 18px', color: '#f1f5f9', fontSize: 13, fontWeight: 600, zIndex: 1100, boxShadow: '0 8px 24px rgba(0,0,0,.4)' }}>{toast}</div>}
-      <div style={{...styles.card,maxWidth:920,background:'linear-gradient(145deg,rgba(15,25,50,.95) 0%,rgba(10,18,38,.98) 100%)',border:'1px solid rgba(255,255,255,.09)',boxShadow:'0 40px 100px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06)'}}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
-          <div style={{display:'flex',alignItems:'center',gap:14}}>
-            <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style={{height:48,objectFit:'contain'}} onError={e=>{e.currentTarget.style.display="none"}}/>
+      <div style={{...styles.card,maxWidth:1060,background:'linear-gradient(145deg,rgba(15,25,50,.97) 0%,rgba(8,15,32,.99) 100%)',border:'1px solid rgba(255,255,255,.1)',boxShadow:'0 48px 120px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.07)'}}>
+        {/* ── Premium Header ── */}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24,paddingBottom:20,borderBottom:'1px solid rgba(255,255,255,.08)',flexWrap:'wrap',gap:12}}>
+          <div style={{display:'flex',alignItems:'center',gap:16}}>
+            <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review"
+              style={{height:52,objectFit:'contain',filter:'drop-shadow(0 2px 8px rgba(59,130,246,.3))'}}
+              onError={e=>{e.currentTarget.style.display="none"}}/>
             <div>
-              <div style={{fontSize:20,fontWeight:800,color:'#fff',letterSpacing:'-.02em'}}>{client?.name}</div>
-              <div style={{fontSize:11,color:'#60a5fa',marginTop:2,fontWeight:600,letterSpacing:'.04em',textTransform:'uppercase'}}>Client Portal</div>
+              <div style={{fontSize:24,fontWeight:800,color:'#fff',letterSpacing:'-.03em',lineHeight:1.1}}>{client?.name}</div>
+              <div style={{fontSize:11,color:'#60a5fa',marginTop:4,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',display:'flex',alignItems:'center',gap:6}}>
+                <span style={{display:'inline-block',width:6,height:6,borderRadius:'50%',background:'#22c55e'}}/>
+                Secure Client Portal
+              </div>
             </div>
           </div>
-          <div style={{textAlign:'right',display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4}}>
-            <div style={{fontSize:11,color:'#64748b'}}>Questions? Call us</div>
-            <div style={{fontSize:14,fontWeight:700,color:'#f1f5f9'}}>(888) 334-5052</div>
+          <div style={{textAlign:'right'}}>
+            <div style={{fontSize:11,color:'#64748b',marginBottom:2}}>Need help? Call us anytime</div>
+            <a href="tel:8883345052" style={{fontSize:18,fontWeight:800,color:'#f1f5f9',textDecoration:'none',letterSpacing:'-.01em'}}>(888) 334-5052</a>
+            <div style={{fontSize:10,color:'#4ade80',marginTop:2,fontWeight:600}}>✓ Encrypted · Secure</div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap', borderBottom: '1px solid rgba(255,255,255,.1)', paddingBottom: 14 }}>
+        <div style={{display:'flex',gap:4,marginBottom:24,flexWrap:'wrap',background:'rgba(0,0,0,.25)',borderRadius:12,padding:4,border:'1px solid rgba(255,255,255,.06)'}}>
           {SECTIONS.map(s => (
             <button key={s.key} onClick={() => setSection(s.key)} style={{
-              padding: '7px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
-              border: '1px solid ' + (section === s.key ? '#3b82f6' : 'rgba(255,255,255,.1)'),
-              background: section === s.key ? 'linear-gradient(135deg,rgba(59,130,246,.3),rgba(37,99,235,.2))' : 'rgba(255,255,255,.04)',
-              color: section === s.key ? '#bfdbfe' : '#64748b',
-              boxShadow: section === s.key ? '0 2px 12px rgba(59,130,246,.25)' : 'none',
+              padding: '9px 18px', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              border: 'none',
+              background: section === s.key ? 'linear-gradient(135deg,rgba(59,130,246,.4),rgba(37,99,235,.3))' : 'transparent',
+              color: section === s.key ? '#e0effe' : '#4b5563',
+              boxShadow: section === s.key ? '0 2px 16px rgba(59,130,246,.3), inset 0 1px 0 rgba(255,255,255,.1)' : 'none',
+              transition: 'all .15s',
+              whiteSpace: 'nowrap',
             }}>{s.label}</button>
           ))}
         </div>
@@ -855,8 +864,14 @@ function EmailCard({ email }) {
   )
 }
 
-function Empty({ msg }) {
-  return <div style={{ textAlign: 'center', padding: '32px 0', color: '#64748b', fontSize: 13 }}>{msg}</div>
+function Empty({ msg, icon='📂' }) {
+  return (
+    <div style={{ textAlign:'center', padding:'48px 20px', color:'#64748b' }}>
+      <div style={{ fontSize:40, marginBottom:12, opacity:.5 }}>{icon}</div>
+      <div style={{ fontSize:14, fontWeight:600, color:'#475569', marginBottom:6 }}>{msg}</div>
+      <div style={{ fontSize:12, color:'#374151' }}>Contact your representative if you have questions.</div>
+    </div>
+  )
 }
 
 function StatBox({ label, value, color }) {
