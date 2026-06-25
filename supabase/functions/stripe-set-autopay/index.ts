@@ -49,7 +49,7 @@ serve(async (req) => {
     // for autopay, so a lead's id will simply come back not found here.
     const { data: client, error: lookupErr } = await supabase
       .from('clients')
-      .select('id,default_payment_method_id')
+      .select('id')
       .eq('id', clientId)
       .maybeSingle()
     if (lookupErr) throw new Error(lookupErr.message)
@@ -71,16 +71,14 @@ serve(async (req) => {
       })
     }
 
-    // Turning ON: needs a real amount and a saved payment method already on file.
+    // Turning ON: just needs a valid amount. Payment method can be added
+    // later before the autopay batch runs — we don't require it here because
+    // clients may have paid manually (no Stripe card on file) and still need
+    // to set a plan schedule.
     const numAmount = parseFloat(amount)
     if (!numAmount || numAmount <= 0) {
       return new Response(JSON.stringify({ error: 'Enter a valid monthly amount' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-    if (!client.default_payment_method_id) {
-      return new Response(JSON.stringify({ error: 'Add a payment method before setting up monthly payments' }), {
-        status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
