@@ -2100,6 +2100,62 @@ export default function Leads() {
             onCharged={async()=>{ const {data}=await supabase.from('leads').select('*').eq('id',l.id).single(); if (data) setDetail(data) }}
           />
         )}
+
+        {poaModal && poaLead && (() => {
+          const matchedForms = STATE_POA_FORMS.filter(f => f.state === poaLead.state)
+          const hasMatch = matchedForms.length > 0
+          return (
+            <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setPoaModal(false)}>
+              <div className="modal" style={{width:560,maxHeight:'88vh',overflowY:'auto'}}>
+                <div className="mh">
+                  <span className="mt">🏛️ State POA — {poaLead.name}</span>
+                  <button className="xbtn" onClick={()=>setPoaModal(false)}>&times;</button>
+                </div>
+                <div style={{fontSize:12,color:'var(--t3)',marginBottom:16,lineHeight:1.6}}>
+                  Send the {poaLead.state||'state'} Power of Attorney for e-signature. Client gets an email/text with a signing link.
+                </div>
+                <div style={{background:'var(--s2)',borderRadius:8,padding:'10px 14px',marginBottom:16,fontSize:13}}>
+                  <div style={{fontWeight:700}}>{poaLead.name}</div>
+                  <div style={{color:'var(--t3)',marginTop:2}}>{poaLead.email} {poaLead.phone ? '· '+poaLead.phone : ''}</div>
+                  {poaLead.state && <div style={{color:'var(--blue)',marginTop:2,fontWeight:600}}>State: {poaLead.state}</div>}
+                </div>
+                {!poaLead.state ? (
+                  <div style={{color:'var(--warn)',fontSize:13,marginBottom:16}}>⚠️ No state on file. Edit the lead profile to add their state first.</div>
+                ) : !hasMatch ? (
+                  <div style={{color:'var(--t3)',fontSize:13,marginBottom:16}}>No POA form on file for {poaLead.state}. Available: FL, NC, TX, OH, NY, PA, CA, GA, IL, MA, MO, OR, TN, WA, WY, AZ, ID.</div>
+                ) : (
+                  <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:16}}>
+                    {matchedForms.map(form=>(
+                      <div key={form.num} style={{background:'var(--s2)',borderRadius:8,padding:'10px 14px',border:'1px solid var(--br)'}}>
+                        <div style={{fontWeight:600,fontSize:13}}>{form.state} — {form.label}</div>
+                        <div style={{fontSize:11,color:'var(--t3)',marginTop:2}}>{form.num}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {hasMatch && poaLead.state && (<>
+                  <div className="field"><label>Send Via</label>
+                    <select value={poaSendVia} onChange={e=>setPoaSendVia(e.target.value)}>
+                      <option value="email">Email</option>
+                      <option value="sms">Text Message</option>
+                      <option value="both">Email + Text</option>
+                    </select>
+                  </div>
+                  <div style={{display:'flex',gap:8,marginTop:6}}>
+                    <button className="btn sec" style={{flex:1,justifyContent:'center',padding:11}}
+                      onClick={()=>window.open(`${import.meta.env.BASE_URL.replace(/\/$/,'')}/state-forms/${matchedForms[0].file}`,'_blank')}>
+                      ⬇ Download Blank
+                    </button>
+                    <button className="btn pri" style={{flex:2,justifyContent:'center',padding:11}}
+                      disabled={poaSending} onClick={()=>sendLeadStatePOA(poaLead, matchedForms[0], poaSendVia)}>
+                      {poaSending ? 'Sending…' : '✍️ Send for E-Signature'}
+                    </button>
+                  </div>
+                </>)}
+              </div>
+            </div>
+          )
+        })()}
       </div>
     )
   }
@@ -2162,62 +2218,6 @@ export default function Leads() {
 
       {/* Add/Edit Modal */}
       {editLeadModal}
-
-      {poaModal && poaLead && (() => {
-        const matchedForms = STATE_POA_FORMS.filter(f => f.state === poaLead.state)
-        const hasMatch = matchedForms.length > 0
-        return (
-          <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setPoaModal(false)}>
-            <div className="modal" style={{width:560,maxHeight:'88vh',overflowY:'auto'}}>
-              <div className="mh">
-                <span className="mt">🏛️ State POA — {poaLead.name}</span>
-                <button className="xbtn" onClick={()=>setPoaModal(false)}>&times;</button>
-              </div>
-              <div style={{fontSize:12,color:'var(--t3)',marginBottom:16,lineHeight:1.6}}>
-                Send the {poaLead.state||'state'} Power of Attorney for e-signature. Client gets an email/text with a signing link.
-              </div>
-              <div style={{background:'var(--s2)',borderRadius:8,padding:'10px 14px',marginBottom:16,fontSize:13}}>
-                <div style={{fontWeight:700}}>{poaLead.name}</div>
-                <div style={{color:'var(--t3)',marginTop:2}}>{poaLead.email} {poaLead.phone ? '· '+poaLead.phone : ''}</div>
-                {poaLead.state && <div style={{color:'var(--blue)',marginTop:2,fontWeight:600}}>State: {poaLead.state}</div>}
-              </div>
-              {!poaLead.state ? (
-                <div style={{color:'var(--warn)',fontSize:13,marginBottom:16}}>⚠️ No state on file. Edit the lead profile to add their state first.</div>
-              ) : !hasMatch ? (
-                <div style={{color:'var(--t3)',fontSize:13,marginBottom:16}}>No POA form on file for {poaLead.state}. Available: FL, NC, TX, OH, NY, PA, CA, GA, IL, MA, MO, OR, TN, WA, WY, AZ, ID.</div>
-              ) : (
-                <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:16}}>
-                  {matchedForms.map(form=>(
-                    <div key={form.num} style={{background:'var(--s2)',borderRadius:8,padding:'10px 14px',border:'1px solid var(--br)'}}>
-                      <div style={{fontWeight:600,fontSize:13}}>{form.state} — {form.label}</div>
-                      <div style={{fontSize:11,color:'var(--t3)',marginTop:2}}>{form.num}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {hasMatch && poaLead.state && (<>
-                <div className="field"><label>Send Via</label>
-                  <select value={poaSendVia} onChange={e=>setPoaSendVia(e.target.value)}>
-                    <option value="email">Email</option>
-                    <option value="sms">Text Message</option>
-                    <option value="both">Email + Text</option>
-                  </select>
-                </div>
-                <div style={{display:'flex',gap:8,marginTop:6}}>
-                  <button className="btn sec" style={{flex:1,justifyContent:'center',padding:11}}
-                    onClick={()=>window.open(`${import.meta.env.BASE_URL.replace(/\/$/,'')}/state-forms/${matchedForms[0].file}`,'_blank')}>
-                    ⬇ Download Blank
-                  </button>
-                  <button className="btn pri" style={{flex:2,justifyContent:'center',padding:11}}
-                    disabled={poaSending} onClick={()=>sendLeadStatePOA(poaLead, matchedForms[0], poaSendVia)}>
-                    {poaSending ? 'Sending…' : '✍️ Send for E-Signature'}
-                  </button>
-                </div>
-              </>)}
-            </div>
-          </div>
-        )
-      })()}
 
     </div>
   )
