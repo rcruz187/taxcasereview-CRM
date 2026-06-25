@@ -2004,13 +2004,16 @@ export default function Leads() {
 
         {addModal && detail && (
           <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setAddModal(false)}>
-            <div className="modal" style={{width:600,maxHeight:'88vh',overflowY:'auto'}}>
+            <div className="modal" style={{width:620,maxHeight:'90vh',overflowY:'auto'}}>
               <div className="mh">
-                <span className="mt">📋 Generate Addendum — {detail.name}</span>
+                <span className="mt">📋 Addendum & 2nd Trade — {detail.name}</span>
                 <button className="xbtn" onClick={()=>setAddModal(false)}>&times;</button>
               </div>
+
+              {/* ── Addendum Section ── */}
+              <div style={{fontSize:11,fontWeight:700,color:'var(--blue)',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:10}}>📋 Service Addendum</div>
               <div style={{fontSize:12,color:'var(--t3)',marginBottom:14}}>
-                Fill in the resolution fee and scope details, check off the services that apply based on the investigation results, then print a hard copy or send it straight to the client for e-signature.
+                Fill in the resolution fee and scope details, check off the services that apply based on the investigation results, then print or send for e-signature.
               </div>
               <div className="fg2">
                 <div className="field"><label>Resolution Service Fee ($) *</label>
@@ -2023,7 +2026,6 @@ export default function Leads() {
               <div className="field"><label>Payments Start Date</label>
                 <input type="date" value={addForm.startDate} onChange={e=>setAddForm(f=>({...f,startDate:e.target.value}))}/>
               </div>
-
               <div className="field"><label>Resolution Services Authorized — based on investigation results</label>
                 <div style={{background:'var(--s2)',border:'1px solid var(--br)',borderRadius:7,padding:'8px 12px',maxHeight:180,overflowY:'auto'}}>
                   {RESOLUTION_SERVICES.map(s=>(
@@ -2036,11 +2038,9 @@ export default function Leads() {
                   ))}
                 </div>
               </div>
-
               <div className="field"><label>Additional Scope / Work Notes</label>
                 <textarea value={addForm.notes} onChange={e=>setAddForm(f=>({...f,notes:e.target.value}))} style={{minHeight:60}} placeholder="e.g. Includes filing 3 years of unfiled returns..."/>
               </div>
-
               <div className="field"><label>Send Via</label>
                 <select value={addForm.sendVia} onChange={e=>setAddForm(f=>({...f,sendVia:e.target.value}))}>
                   <option value="email">Email</option>
@@ -2048,16 +2048,30 @@ export default function Leads() {
                   <option value="both">Email + Text</option>
                 </select>
               </div>
-
-              <div style={{display:'flex',gap:8,marginTop:6}}>
+              <div style={{display:'flex',gap:8,marginBottom:20}}>
                 <button className="btn sec" style={{flex:1,justifyContent:'center',padding:11}} onClick={()=>{
                   if(!addForm.resolutionFee){showToast('Enter the resolution fee first');return}
                   generateAddendum(detail, addForm)
-                }}>
-                  🖨️ Print
-                </button>
+                }}>🖨️ Print</button>
                 <button className="btn pri" style={{flex:2,justifyContent:'center',padding:11}} disabled={addendumSending} onClick={()=>sendAddendum(detail)}>
                   {addendumSending ? 'Sending…' : '✍️ Send for E-Signature'}
+                </button>
+              </div>
+
+              {/* ── 2nd Trade Section ── */}
+              <div style={{borderTop:'1px solid var(--br)',paddingTop:18}}>
+                <div style={{fontSize:11,fontWeight:700,color:'var(--ok)',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:10}}>💳 Charge 2nd Trade</div>
+                <div style={{fontSize:12,color:'var(--t3)',marginBottom:12,lineHeight:1.6}}>
+                  Charge the resolution fee directly to the card on file. Commission goes to whoever sent the addendum.
+                </div>
+                <div style={{background:'var(--s2)',borderRadius:8,padding:'10px 14px',border:'1px solid var(--br)',marginBottom:12,fontSize:13}}>
+                  <div style={{fontWeight:700}}>{detail.name}</div>
+                  {detail.email&&<div style={{fontSize:12,color:'var(--t3)',marginTop:2}}>{detail.email}</div>}
+                  {addForm.resolutionFee&&<div style={{fontSize:12,color:'var(--ok)',marginTop:4,fontWeight:600}}>Fee entered: ${Number(addForm.resolutionFee).toLocaleString()}</div>}
+                </div>
+                <button className="btn pri" style={{width:'100%',padding:11,fontWeight:700,justifyContent:'center'}}
+                  onClick={()=>{setAddModal(false);setResolutionFeeLead(detail)}}>
+                  💳 Open Stripe Charge Form →
                 </button>
               </div>
             </div>
