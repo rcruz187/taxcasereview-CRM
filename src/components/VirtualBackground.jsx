@@ -83,7 +83,7 @@ export default function VirtualBackground({ bgMode, bgPreset, segStatus, onSelec
           ? 'Background blurred. Your face stays sharp in the center.'
           : bgMode !== 'none'
             ? segStatus === 'ready'
-              ? 'AI is segmenting you from your background in real time.'
+              ? 'Virtual background active.'
               : 'Background replacing behind you.'
             : 'No background effect active.'}
       </div>
