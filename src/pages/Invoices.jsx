@@ -146,8 +146,22 @@ export default function Invoices() {
     }
 
     const body = isReminder
-      ? `Dear ${inv.clientName},\n\nThis is a friendly reminder that Invoice #${invNum} for $${balance.toLocaleString()} is due on ${inv.dueDate||'soon'} and remains unpaid.${payLink ? `\n\nPay securely online: ${payLink}` : ''}\n\nPlease contact our office if you have any questions.`
-      : `Dear ${inv.clientName},\n\n${attachedOk ? 'Please find your invoice attached.' : 'Here are the details for your invoice:'}\n\nInvoice #: ${invNum}\nDue Date: ${inv.dueDate||'Upon receipt'}\n\n${inv.lineItems||''}\n\n${breakdown}${payLink ? `\n\nPay securely online: ${payLink}` : ''}\n\nPlease contact our office with any questions.`
+      ? `Dear ${inv.clientName},
+
+This is a friendly reminder that Invoice #${invNum} for $${balance.toLocaleString()} is due on ${inv.dueDate||'soon'} and remains unpaid.${payLink ? `\n\n━━━━━━━━━━━━━━━━━━━━━\n💳 PAY ONLINE (SECURE)\n${payLink}\n━━━━━━━━━━━━━━━━━━━━━` : ''}
+
+Please contact our office if you have any questions.`
+      : `Dear ${inv.clientName},
+
+${attachedOk ? 'Please find your invoice attached.' : 'Here are the details for your invoice:'}
+
+Invoice #: ${invNum}
+Due Date: ${inv.dueDate||'Upon receipt'}
+
+${breakdown}
+${payLink ? `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n💳 PAY ONLINE — SECURE CLIENT PORTAL\n\nCurrent Balance Due: $${balance.toLocaleString('en-US',{minimumFractionDigits:2})}\n\nClick the link below to make a payment, set up a monthly payment plan, or view your payment history:\n${payLink}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━` : ''}
+
+Please contact our office with any questions.`
 
     try {
       await sendGmailEmail(supabase, { to, subject, body, attachments })

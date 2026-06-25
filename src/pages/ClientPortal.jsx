@@ -389,9 +389,15 @@ export default function ClientPortal() {
             </div>
           </div>
           <div style={{textAlign:'right'}}>
-            <div style={{fontSize:11,color:'#64748b',marginBottom:2}}>Need help? Call us anytime</div>
-            <a href="tel:8883345052" style={{fontSize:18,fontWeight:800,color:'#f1f5f9',textDecoration:'none',letterSpacing:'-.01em'}}>(888) 334-5052</a>
-            <div style={{fontSize:10,color:'#4ade80',marginTop:2,fontWeight:600}}>✓ Encrypted · Secure</div>
+            <div style={{fontSize:11,color:'#64748b',marginBottom:4}}>Need help? Call us anytime</div>
+            <a href="tel:8883345052" style={{
+              display:'inline-block', padding:'10px 18px',
+              background:'linear-gradient(135deg,rgba(59,130,246,.3),rgba(37,99,235,.2))',
+              border:'1px solid rgba(59,130,246,.45)', borderRadius:10,
+              fontSize:22, fontWeight:900, color:'#fff', textDecoration:'none', letterSpacing:'-.01em',
+              boxShadow:'0 0 18px rgba(59,130,246,.2)'
+            }}>(888) 334-5052</a>
+            <div style={{fontSize:11,color:'#4ade80',marginTop:6,fontWeight:600}}>✓ Encrypted · Secure</div>
           </div>
         </div>
 
@@ -777,9 +783,10 @@ export default function ClientPortal() {
             <div style={{fontSize:12,color:'#64748b',marginBottom:16}}>All email correspondence between you and your Tax Case Review team.</div>
             {clientEmails.length === 0 ? <Empty msg="No emails on file yet." /> : (
               <div style={{display:'flex',flexDirection:'column',gap:10}}>
-                {clientEmails.map(email => (
-                  <EmailCard key={email.id} email={email} />
-                ))}
+                {clientEmails.map(email => {
+                  try { return <EmailCard key={email.id} email={email} /> }
+                  catch(e) { return null }
+                })}
               </div>
             )}
           </div>
