@@ -75,11 +75,41 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
 
   useEffect(() => {
     async function load() {
+      // First try direct lookup by intake record ID
       const { data, error } = await supabase.from('financial_intake_responses').select('*').eq('id', intakeId).maybeSingle()
-      if (error || !data) { setError('Financial intake form not found or expired.'); setLoading(false); return }
-      setRecord(data)
-      setAnswers(data.answers || {})
-      if (data.status === 'Submitted') setSubmitted(true)
+      if (data && !error) {
+        setRecord(data)
+        setAnswers(data.answers || {})
+        if (data.status === 'Submitted') setSubmitted(true)
+        setLoading(false)
+        return
+      }
+      // Fallback: the URL might contain a lead ID (old emails sent before fix).
+      // Look up the lead by ID, then find or create their intake record by name.
+      const { data: lead } = await supabase.from('leads').select('id,name,email').eq('id', intakeId).maybeSingle()
+      if (lead) {
+        const { data: existing } = await supabase.from('financial_intake_responses')
+          .select('*').eq('client_name', lead.name).order('created_at', { ascending: false }).limit(1).maybeSingle()
+        if (existing) {
+          setRecord(existing)
+          setAnswers(existing.answers || {})
+          if (existing.status === 'Submitted') setSubmitted(true)
+          setLoading(false)
+          return
+        }
+        // Create a fresh intake record for this lead
+        const { data: created } = await supabase.from('financial_intake_responses').insert([{
+          client_name: lead.name, client_email: lead.email || '', status: 'Sent',
+          answers: {}, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        }]).select().single()
+        if (created) {
+          setRecord(created)
+          setAnswers({})
+          setLoading(false)
+          return
+        }
+      }
+      setError('Financial intake form not found or expired.')
       setLoading(false)
     }
     if (intakeId) load()
