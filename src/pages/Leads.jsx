@@ -2324,14 +2324,14 @@ export default function Leads() {
                 </td></tr>
               ) : filtered.map(l => (
                 <tr key={l.id} onClick={()=>{ setDetail(l); loadLeadNotes(l.id); navigate('/leads/'+l.id, {replace:true}) }} style={{cursor:'pointer'}}>
-                  <td style={{fontWeight:600}}>{l.name}</td>
+                  <td style={{fontWeight:700,color:'var(--tx)',fontSize:13}}>{l.name}</td>
                   <td><span className="bdg bb">{l.clientType||'Individual'}</span></td>
                   <td onClick={e=>e.stopPropagation()}><PhoneLink val={l.phone} name={l.name}/></td>
                   <td><TypeBdg t={l.issueType||'—'}/></td>
                   <td style={{color:l.irsBalance&&l.irsBalance!=='—'?'var(--bad)':'var(--t3)',fontWeight:l.irsBalance&&l.irsBalance!=='—'?600:400}}>{l.irsBalance||'—'}</td>
-                  <td style={{color:'var(--t2)',fontSize:12}}>{l.source||'—'}</td>
+                  <td style={{color:'var(--t2)',fontSize:12.5}}>{l.source||'—'}</td>
                   <td><Bdg s={l.status||'New Lead'}/></td>
-                  <td style={{color:'var(--t2)',fontSize:12}}>{l.assignedTo||<span style={{color:'var(--warn)'}}>Unassigned</span>}</td>
+                  <td style={{color:'var(--t2)',fontSize:12.5}}>{l.assignedTo||<span style={{color:'var(--warn)'}}>Unassigned</span>}</td>
                   <td onClick={e=>e.stopPropagation()}>
                     {l.archived
                       ? <button className="btn" style={{padding:'3px 8px',fontSize:12}} onClick={()=>restoreLead(l)}>↩ Restore</button>

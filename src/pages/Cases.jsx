@@ -446,7 +446,7 @@ export default function Cases() {
                   return (
                     <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => openDetail(c)}>
                       <td style={{ color: 'var(--t3)', fontSize: 11 }}>{c.caseNum}</td>
-                      <td style={{ fontWeight: 600 }}>{c.clientName}</td>
+                      <td style={{ fontWeight: 700, color: 'var(--tx)', fontSize: 13 }}>{c.clientName}</td>
                       <td><span className="bdg bb">{c.caseType}</span></td>
                       <td style={{ color: c.irsBalance ? 'var(--bad)' : 'var(--t3)', fontWeight: 600 }}>{fmt$(c.irsBalance)}</td>
                       <td>

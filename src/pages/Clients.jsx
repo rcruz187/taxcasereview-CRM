@@ -2626,7 +2626,7 @@ export default function Clients() {
                 </td></tr>
               ):filtered.map(c=>(
                 <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>openDetail(c)}>
-                  <td style={{fontWeight:600}}>{c.name}</td>
+                  <td style={{fontWeight:700,color:'var(--tx)',fontSize:13}}>{c.name}</td>
                   <td><span className="bdg bb">{c.clientType||'Individual'}</span></td>
                   <td onClick={e=>e.stopPropagation()}><PhoneLink val={c.phone} name={c.name}/></td>
                   <td style={{color:'var(--t2)',fontSize:12}}>{c.email||'—'}</td>
