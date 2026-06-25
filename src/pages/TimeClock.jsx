@@ -465,8 +465,8 @@ export default function TimeClock() {
           </div>
         </div>
       )}
+      <DeleteConfirmModal open={!!confirmDel} label="time entry" onConfirm={confirmDelEntry} onCancel={() => setConfirmDel(null)} />
     </div>
-  <DeleteConfirmModal open={!!confirmDel} label="time entry" onConfirm={confirmDelEntry} onCancel={() => setConfirmDel(null)} />
   )
 }
 
