@@ -1,3 +1,4 @@
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
@@ -180,11 +181,10 @@ export default function Invoices() {
     if (!error) { showToast('✅ Marked as Paid!'); const actorIP = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'; await triggerWorkflow('invoice_paid', 'client', inv?.clientName || '', actorIP).catch(()=>{}); load() }
   }
 
-  async function deleteItem(id) {
-    if (!confirmDel) { setConfirmDel(id); return }
-    setConfirmDel(null)
-    await supabase.from('invoices').delete().eq('id',id)
-    showToast('Deleted'); load()
+  async function deleteItem(id) { setConfirmDel(id) }
+  async function confirmDeleteInvoice() {
+    await supabase.from('invoices').delete().eq('id', confirmDel)
+    setConfirmDel(null); showToast('Deleted'); load()
   }
 
   const totalInvoiced = items.reduce((s,i)=>s+parseFloat(i.total||0),0)
@@ -480,19 +480,8 @@ export default function Invoices() {
         </div>
       )}
 
-      {confirmDel && (
-        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setConfirmDel(null)}>
-          <div className="modal" style={{maxWidth:360,textAlign:'center'}}>
-            <div style={{fontSize:36,marginBottom:12}}>🗑</div>
-            <div style={{fontWeight:700,fontSize:15,marginBottom:8}}>Delete this invoice?</div>
-            <div style={{fontSize:13,color:'var(--t3)',marginBottom:20}}>This cannot be undone.</div>
-            <div style={{display:'flex',gap:8}}>
-              <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={()=>setConfirmDel(null)}>Cancel</button>
-              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>{deleteItem(confirmDel);setConfirmDel(null)}}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal open={!!confirmDel} label="invoice" onConfirm={confirmDeleteInvoice} onCancel={() => setConfirmDel(null)} />
     </div>
   )
 }
+
