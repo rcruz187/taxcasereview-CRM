@@ -1006,6 +1006,7 @@ function UptimeTab() {
 
     try {
       const { data, error } = await supabase.functions.invoke('check-service-status')
+      console.log('[Uptime] edge function response:', { data, error })
       if (!error && data) {
         // Supabase
         if (data.supabase && !data.supabase.error) {
@@ -1025,7 +1026,7 @@ function UptimeTab() {
             description: data.stripe?.status?.description,
           }
         } else {
-          results['Stripe'] = { error: data.stripe?.error || 'Failed' }
+          results['Stripe'] = { error: JSON.stringify(data.stripe) || 'Failed' }
         }
         // Anthropic
         if (data.anthropic && !data.anthropic.error) {
@@ -1035,10 +1036,16 @@ function UptimeTab() {
             description: data.anthropic?.status?.description,
           }
         } else {
-          results['Anthropic'] = { error: data.anthropic?.error || 'Failed' }
+          results['Anthropic'] = { error: JSON.stringify(data.anthropic) || 'Failed' }
         }
+      } else {
+        console.log('[Uptime] error from edge function:', error)
+        results['Supabase']  = { error: error?.message || 'Function error' }
+        results['Stripe']    = { error: error?.message || 'Function error' }
+        results['Anthropic'] = { error: error?.message || 'Function error' }
       }
     } catch(e) {
+      console.log('[Uptime] caught exception:', e)
       results['Supabase'] = { error: 'Edge function unreachable' }
       results['Stripe']   = { error: 'Edge function unreachable' }
       results['Anthropic']= { error: 'Edge function unreachable' }
