@@ -1,3 +1,4 @@
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
@@ -310,7 +311,7 @@ export default function Calendar() {
           {!selectedEvent._isDl && (
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => openEditForm(selectedEvent)} style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>✏️ Edit</button>
-              <button onClick={() => deleteEvent(selectedEvent.id)} style={{ padding: '8px 16px', background: '#3b1a1a', color: '#fca5a5', border: '1px solid #ef4444', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>🗑 Delete</button>
+              <button onClick={() => setConfirmDel(selectedEvent.id)} style={{ padding: '8px 16px', background: '#3b1a1a', color: '#fca5a5', border: '1px solid #ef4444', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>🗑 Delete</button>
             </div>
           )}
         </div>
@@ -674,20 +675,9 @@ export default function Calendar() {
         </div>
       )}
 
-      {confirmDel && (
-        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setConfirmDel(null)}>
-          <div className="modal" style={{maxWidth:360,textAlign:'center'}}>
-            <div style={{fontSize:36,marginBottom:12}}>🗑</div>
-            <div style={{fontWeight:700,fontSize:15,marginBottom:8}}>Delete this event?</div>
-            <div style={{fontSize:13,color:'var(--t3)',marginBottom:20}}>This cannot be undone.</div>
-            <div style={{display:'flex',gap:8}}>
-              <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={()=>setConfirmDel(null)}>Cancel</button>
-              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>deleteEvent(confirmDel)}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal open={!!confirmDel} label="event" onConfirm={() => deleteEvent(confirmDel)} onCancel={() => setConfirmDel(null)} />
     </div>
   )
 }
+
 
