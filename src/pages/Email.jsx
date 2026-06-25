@@ -57,6 +57,14 @@ export default function Email() {
   const anchorIndexRef = useRef(-1)
   const listRef = useRef(null)
 
+  // Scroll the active email row into view when navigating with arrow keys
+  useEffect(() => {
+    if (focusIndex < 0 || !listRef.current) return
+    const rows = listRef.current.querySelectorAll('[data-email-row]')
+    const row = rows[focusIndex]
+    if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [focusIndex])
+
   useEffect(() => {
     load(); loadGmailConfig()
     const onFocus = () => loadGmailConfig()
@@ -444,6 +452,7 @@ export default function Email() {
                   let isDragging = false
                   return (
                   <div key={e.id}
+                    data-email-row
                     onClick={() => { if (!isDragging) openEmail(e, i) }}
                     draggable
                     onDragStart={ev => { isDragging = true; ev.dataTransfer.setData('emailId', e.id); ev.dataTransfer.effectAllowed = 'move' }}
