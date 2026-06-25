@@ -1,3 +1,4 @@
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -134,8 +135,9 @@ export default function Cases() {
     load()
   }
 
-  async function deleteCase(id) {
-    if (confirmDel !== id) { setConfirmDel(id); return }
+  async function deleteCase(id) { setConfirmDel(id) }
+  async function confirmDeleteCase() {
+    const id = confirmDel
     setConfirmDel(null)
     await supabase.from('cases').delete().eq('id',id)
     showToast('Deleted'); setDetail(null); navigate('/cases',{replace:true}); load()
@@ -344,19 +346,7 @@ export default function Cases() {
       </div>
       {modal&&<CaseModal form={form} fld={fld} reps={reps} saving={saving} onSave={save} onClose={()=>setModal(false)} title="New Case" clients={clients} sug={sug} searchClient={searchClient} pickClient={pickClient}/>}
 
-      {confirmDel && (
-        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setConfirmDel(null)}>
-          <div className="modal" style={{maxWidth:360,textAlign:'center'}}>
-            <div style={{fontSize:36,marginBottom:12}}>🗑</div>
-            <div style={{fontWeight:700,fontSize:15,marginBottom:8}}>Delete this case?</div>
-            <div style={{fontSize:13,color:'var(--t3)',marginBottom:20}}>This cannot be undone.</div>
-            <div style={{display:'flex',gap:8}}>
-              <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={()=>setConfirmDel(null)}>Cancel</button>
-              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>deleteCase(confirmDel)}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal open={!!confirmDel} label="case" onConfirm={confirmDeleteCase} onCancel={() => setConfirmDel(null)} />
     </div>
   )
 }
@@ -410,3 +400,4 @@ function CaseModal({form,fld,reps,saving,onSave,onClose,title,sug,searchClient,p
     </div>
   )
 }
+
