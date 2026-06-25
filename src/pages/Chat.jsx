@@ -65,6 +65,7 @@ export default function Chat() {
   const [showHuddleInvite, setShowHuddleInvite] = useState(false)
   const [incomingHuddle, setIncomingHuddle] = useState(null) // { from, huddleId }
   const webrtc = useWebRTCRoom('huddle')
+  const peerConnsRef = webrtc.peerConnsRef
   const huddle = webrtc.joined
   const huddleMembers = webrtc.members
   const micOn = webrtc.micOn
@@ -240,14 +241,26 @@ export default function Chat() {
   async function handleHuddleBgSelect(mode, presetId, customUrl) {
     const raw = rawHuddleRef.current
     if (!raw) return
-    const out = await vbg.changeBackground(raw, mode, presetId, customUrl)
     if (mode === 'none') {
+      vbg.stopLoop()
       webrtc.localStreamRef.current = raw
       setHuddleProcessedStream(null)
-    } else {
-      webrtc.localStreamRef.current = out
-      setHuddleProcessedStream(out)
+      return
     }
+    const out = await vbg.changeBackground(raw, mode, presetId, customUrl)
+    if (!out) return
+    webrtc.localStreamRef.current = out
+    setHuddleProcessedStream(new MediaStream(out.getTracks()))
+    try {
+      const newTrack = out.getVideoTracks()[0]
+      if (newTrack) {
+        const pcs = Object.values(webrtc.peerConnsRef?.current || {})
+        for (const pc of pcs) {
+          const sender = pc.getSenders().find(s => s.track?.kind === 'video')
+          if (sender) sender.replaceTrack(newTrack).catch(() => {})
+        }
+      }
+    } catch (_) {}
   }
 
   // Listen for incoming huddle invites via chat messages
