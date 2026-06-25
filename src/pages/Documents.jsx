@@ -80,6 +80,7 @@ export default function Documents() {
 
   async function upload() {
     if (!form.name || !form.docType) { showToast('Name and folder required'); return }
+    if (file) { const _v = validateFile(file); if (!_v.ok) { showToast('❌ ' + _v.error); return }; if (_v.warn) showToast('⚠️ ' + _v.warn) }
     setSaving(true)
     let fileUrl = null, fileName = null, fileSize = null
     if (file) {

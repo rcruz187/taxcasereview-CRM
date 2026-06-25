@@ -164,6 +164,9 @@ export default function Chat() {
 
   async function sendFile(e) {
     const file = e.target.files[0]; if (!file) return
+    const _v = validateFile(file)
+    if (!_v.ok) { alert('❌ ' + _v.error); return }
+    if (_v.warn) showToast('⚠️ ' + _v.warn)
     const path = `chat/${Date.now()}_${file.name}`
     const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
     if (upErr) { alert('Upload failed: ' + upErr.message); return }
