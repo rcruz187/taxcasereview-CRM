@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import { useWebRTCRoom } from '../lib/webrtcRoom'
+import { useVideoBackground } from '../lib/videoBackground'
+import VirtualBackground from '../components/VirtualBackground'
 import VideoTile from '../components/VideoTile'
 
 const CHANNELS = [
@@ -67,6 +69,10 @@ export default function Chat() {
   const huddleMembers = webrtc.members
   const micOn = webrtc.micOn
   const cameraOn = webrtc.cameraOn
+  const vbg = useVideoBackground()
+  const rawHuddleRef = useRef(null)
+  const [huddleProcessedStream, setHuddleProcessedStream] = useState(null)
+  const [showBgPanel, setShowBgPanel] = useState(false)
   const [chatToast, setChatToast] = useState('')
   function showToast(msg) { setChatToast(msg); setTimeout(() => setChatToast(''), 4000) }
   const [showEmoji, setShowEmoji]   = useState(false)
@@ -195,6 +201,7 @@ export default function Chat() {
     setShowHuddleInvite(false)
     const result = await webrtc.join(id, myName, true)
     if (!result.ok) { showToast(result.reason || 'Could not start huddle'); return }
+    rawHuddleRef.current = webrtc.localStreamRef.current
     setHuddleId(id)
     await supabase.from('chat_messages').insert([{
       channel: 'general', sender: '🔔 System',
@@ -207,6 +214,7 @@ export default function Chat() {
     setIncomingHuddle(null)
     const result = await webrtc.join(id, myName, true)
     if (!result.ok) { showToast(result.reason || 'Could not join huddle'); return }
+    rawHuddleRef.current = webrtc.localStreamRef.current
     setHuddleId(id)
   }
 
@@ -221,9 +229,25 @@ export default function Chat() {
   }
 
   async function leaveHuddle() {
+    vbg.stopLoop()
+    setHuddleProcessedStream(null)
+    setShowBgPanel(false)
     await webrtc.leave()
     setHuddleId(null)
     setShowHuddleInvite(false)
+  }
+
+  async function handleHuddleBgSelect(mode, presetId, customUrl) {
+    const raw = rawHuddleRef.current
+    if (!raw) return
+    const out = await vbg.changeBackground(raw, mode, presetId, customUrl)
+    if (mode === 'none') {
+      webrtc.localStreamRef.current = raw
+      setHuddleProcessedStream(null)
+    } else {
+      webrtc.localStreamRef.current = out
+      setHuddleProcessedStream(out)
+    }
   }
 
   // Listen for incoming huddle invites via chat messages
@@ -454,14 +478,24 @@ export default function Chat() {
             <button onClick={webrtc.toggleCamera} style={{ padding: '3px 12px', borderRadius: 5, background: 'rgba(255,255,255,.15)', border: '1px solid rgba(255,255,255,.3)', color: '#dcfce7', cursor: 'pointer', fontWeight: 600, fontSize: 12 }} title={cameraOn ? 'Turn camera off' : 'Turn camera on'}>
               {cameraOn ? '📹 Camera On' : '📷 Off'}
             </button>
+            <button onClick={() => setShowBgPanel(p => !p)} style={{ padding: '3px 12px', borderRadius: 5, background: showBgPanel ? 'rgba(59,130,246,.3)' : 'rgba(255,255,255,.15)', border: showBgPanel ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,.3)', color: showBgPanel ? '#93c5fd' : '#dcfce7', cursor: 'pointer', fontWeight: 600, fontSize: 12 }} title="Virtual Background">
+              🖼️ BG
+            </button>
             <button onClick={leaveHuddle} style={{ marginLeft: 4, padding: '3px 12px', borderRadius: 5, background: 'rgba(239,68,68,.2)', border: '1px solid #ef4444', color: '#fca5a5', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>Leave Huddle</button>
           </div>
           {webrtc.error && (
             <div style={{ background: '#451a03', color: '#fdba74', fontSize: 12, padding: '6px 20px', borderBottom: '1px solid #92400e' }}>{webrtc.error}</div>
           )}
+          {/* Virtual background panel */}
+          {showBgPanel && (
+            <VirtualBackground
+              bgMode={vbg.bgMode} bgPreset={vbg.bgPreset} segStatus={vbg.segStatus}
+              onSelect={handleHuddleBgSelect}
+            />
+          )}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: 14, background: '#0a0f1a', borderBottom: '1px solid #1e293b', maxHeight: 340, overflowY: 'auto', flexShrink: 0 }}>
             <div className="chat-huddle-tile" style={{ width: 340, flexShrink: 0 }}>
-              <VideoTile stream={webrtc.localStreamRef.current} name={myName} label={`${myName} (you)`} muted mirror videoEnabled={cameraOn} />
+              <VideoTile stream={huddleProcessedStream || webrtc.localStreamRef.current} name={myName} label={`${myName} (you)`} muted mirror videoEnabled={cameraOn} />
             </div>
             {huddleMembers.filter(n => n !== myName).map(n => (
               <div key={n} className="chat-huddle-tile" style={{ width: 340, flexShrink: 0 }}>
