@@ -100,6 +100,21 @@ export default function Dashboard() {
     setLoading(false)
   }
 
+  // Drag state
+  const [cardOrder, setCardOrder] = useState(null) // null = use default
+  const [dragIdx, setDragIdx]     = useState(null)
+  const [dragOver, setDragOver]   = useState(null)
+  const [saveIndicator, setSaveIndicator] = useState(false)
+
+  // Load saved layout from employees table on mount (after load())
+  useEffect(() => {
+    if (!user?.email) return
+    supabase.from('employees').select('dashboard_layout').eq('email', user.email).maybeSingle()
+      .then(({ data }) => {
+        if (data?.dashboard_layout?.length) setCardOrder(data.dashboard_layout)
+      })
+  }, [user?.email])
+
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: 'var(--t3)', fontSize: 14 }}>
       Loading dashboard…
@@ -196,21 +211,6 @@ export default function Dashboard() {
     { label: 'Overdue DL',    val: metrics.overdueDl,     color: metrics.overdueDl > 0 ? 'var(--bad)' : 'var(--ok)', to: '/deadlines', icon: '🚨' },
     { label: 'AR Outstanding', val: '$' + Math.round(metrics.arOutstanding || 0).toLocaleString(), color: '#ef4444', to: '/ar', icon: '💳', sub: 'Scheduled installments' },
   ]
-
-  // Drag state
-  const [cardOrder, setCardOrder] = useState(null) // null = use default
-  const [dragIdx, setDragIdx]     = useState(null)
-  const [dragOver, setDragOver]   = useState(null)
-  const [saveIndicator, setSaveIndicator] = useState(false)
-
-  // Load saved layout from employees table on mount (after load())
-  useEffect(() => {
-    if (!user?.email) return
-    supabase.from('employees').select('dashboard_layout').eq('email', user.email).maybeSingle()
-      .then(({ data }) => {
-        if (data?.dashboard_layout?.length) setCardOrder(data.dashboard_layout)
-      })
-  }, [user?.email])
 
   // Ordered cards: apply saved order or use default
   const defaultOrder = ALL_ROLE_CARDS.map(c => c.label)
