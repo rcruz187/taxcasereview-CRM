@@ -391,14 +391,30 @@ export default function Email() {
                 </div>
               </div>
 
-              {/* Bulk action bar — appears once anything is checked (click a
-                  checkbox, or hold Shift and press Up/Down) */}
+              {/* Bulk action bar — appears once anything is checked */}
               {checkedIds.size > 0 && (
-                <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--br)', background: 'rgba(26,127,212,.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--blue)' }}>{checkedIds.size} selected</span>
-                  <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--br)', background: 'rgba(26,127,212,.12)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--blue)' }}>{checkedIds.size} email{checkedIds.size !== 1 ? 's' : ''} selected</span>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <select
+                      defaultValue=""
+                      onChange={async e => {
+                        const folder = e.target.value
+                        if (!folder) return
+                        e.target.value = ''
+                        const ids = [...checkedIds]
+                        await supabase.from('emails').update({ triage: folder }).in('id', ids)
+                        if (selected && ids.includes(selected.id)) setSelected(null)
+                        setCheckedIds(new Set()); anchorIndexRef.current = -1
+                        showToast(`Moved ${ids.length} to ${folder}`)
+                        load()
+                      }}
+                      style={{ fontSize: 11, padding: '4px 8px', background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 6, color: 'var(--tx)', cursor: 'pointer' }}>
+                      <option value="">Move to…</option>
+                      {TRIAGE.filter(t => t !== triageFilter).map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
                     <button className="btn sec" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => { setCheckedIds(new Set()); anchorIndexRef.current = -1 }}>Clear</button>
-                    <button className="btn pri" style={{ fontSize: 11, padding: '4px 10px' }} onClick={archiveSelected}>📦 Archive Selected</button>
+                    <button className="btn del" style={{ fontSize: 11, padding: '4px 12px', fontWeight: 700 }} onClick={archiveSelected}>🗑 Delete Selected</button>
                   </div>
                 </div>
               )}
