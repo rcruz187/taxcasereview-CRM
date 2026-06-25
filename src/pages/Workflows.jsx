@@ -5,100 +5,168 @@ import { useApp } from '../context/AppContext'
 
 const TRIGGER_EVENTS = {
   lead: [
-    // Lead lifecycle
-    { value: 'lead_created',              label: 'New Lead Created' },
-    { value: 'lead_status_changed',       label: 'Lead Status Changes To…' },
-    { value: 'lead_converted',            label: 'Lead Converted to Client' },
-    { value: 'lead_archived',             label: 'Lead Archived' },
-    { value: 'lead_assigned',             label: 'Lead Assigned to Rep' },
-    // Communications
-    { value: 'lead_appointment_set',      label: 'Appointment Scheduled' },
-    { value: 'lead_appointment_completed',label: 'Appointment Completed' },
-    { value: 'lead_called',               label: 'Call Logged on Lead' },
-    { value: 'lead_sms_sent',             label: 'SMS Sent to Lead' },
-    { value: 'lead_email_sent',           label: 'Email Sent to Lead' },
-    // Documents & Signing
-    { value: 'esign_sent',                label: 'E-Signature Package Sent' },
-    { value: 'esign_signed',              label: 'E-Signature Signed' },
-    { value: 'document_uploaded',         label: 'Document Uploaded' },
-    // Financial
-    { value: 'payment_received',          label: 'Payment Received' },
-    { value: 'payment_failed',            label: 'Payment Failed' },
-    { value: 'invoice_sent',              label: 'Invoice Sent' },
-    { value: 'investigation_fee_paid',    label: 'Investigation Fee Paid' },
-    // IRS / Resolution
-    { value: 'irs_facts_received',        label: 'IRS Facts Received' },
-    { value: 'financial_intake_submitted',label: 'Financial Intake Submitted' },
-    { value: 'resolution_proposed',       label: 'Resolution Proposed' },
-    { value: 'poa_sent',                  label: 'POA Sent to IRS' },
-    { value: 'tax_investigation_active',  label: 'Tax Investigation Activated' },
+    { value: 'lead_appointment_completed', label: 'Appointment Completed' },
+    { value: 'lead_appointment_set',       label: 'Appointment Scheduled' },
+    { value: 'lead_called',                label: 'Call Logged on Lead' },
+    { value: 'document_uploaded',          label: 'Document Uploaded' },
+    { value: 'lead_email_sent',            label: 'Email Sent to Lead' },
+    { value: 'esign_sent',                 label: 'E-Signature Package Sent' },
+    { value: 'esign_signed',               label: 'E-Signature Signed' },
+    { value: 'financial_intake_submitted', label: 'Financial Intake Submitted' },
+    { value: 'investigation_fee_paid',     label: 'Investigation Fee Paid' },
+    { value: 'invoice_sent',               label: 'Invoice Sent' },
+    { value: 'irs_facts_received',         label: 'IRS Facts Received' },
+    { value: 'lead_archived',              label: 'Lead Archived' },
+    { value: 'lead_assigned',              label: 'Lead Assigned to Rep' },
+    { value: 'lead_converted',             label: 'Lead Converted to Client' },
+    { value: 'lead_created',               label: 'New Lead Created' },
+    { value: 'lead_status_changed',        label: 'Lead Status Changes To…' },
+    { value: 'payment_failed',             label: 'Payment Failed' },
+    { value: 'payment_received',           label: 'Payment Received' },
+    { value: 'poa_sent',                   label: 'POA Sent to IRS' },
+    { value: 'resolution_proposed',        label: 'Resolution Proposed' },
+    { value: 'lead_sms_sent',              label: 'SMS Sent to Lead' },
+    { value: 'tax_investigation_active',   label: 'Tax Investigation Activated' },
   ],
   client: [
-    // Client lifecycle
-    { value: 'client_created',            label: 'New Client Created' },
-    { value: 'client_status_changed',     label: 'Client Status Changes To…' },
-    { value: 'client_assigned',           label: 'Client Assigned to Rep' },
-    // Communications
-    { value: 'client_appointment_set',    label: 'Appointment Scheduled' },
+    { value: 'addendum_sent',              label: 'Addendum Sent' },
+    { value: 'addendum_signed',            label: 'Addendum Signed' },
     { value: 'client_appointment_completed', label: 'Appointment Completed' },
-    { value: 'client_called',             label: 'Call Logged on Client' },
-    { value: 'client_email_sent',         label: 'Email Sent to Client' },
-    // Documents & Signing
-    { value: 'esign_sent',                label: 'E-Signature Package Sent' },
-    { value: 'esign_signed',              label: 'E-Signature Signed' },
-    { value: 'document_uploaded',         label: 'Document Uploaded' },
-    { value: 'addendum_sent',             label: 'Addendum Sent' },
-    { value: 'addendum_signed',           label: 'Addendum Signed' },
-    // Financial
-    { value: 'payment_received',          label: 'Payment Received' },
-    { value: 'payment_failed',            label: 'Payment Failed' },
-    { value: 'payment_plan_created',      label: 'Payment Plan Created' },
-    { value: 'invoice_sent',              label: 'Invoice Sent' },
-    { value: 'invoice_paid',              label: 'Invoice Paid' },
-    { value: 'autopay_enabled',           label: 'Autopay Enabled' },
-    // IRS / Resolution
-    { value: 'financial_intake_submitted',label: 'Financial Intake Submitted' },
-    { value: 'irs_facts_received',        label: 'IRS Facts Received' },
-    { value: 'poa_sent',                  label: 'POA Sent to IRS' },
-    { value: 'resolution_filed',          label: 'Resolution Filed with IRS' },
-    { value: 'irs_approved',              label: 'IRS Approved Resolution' },
+    { value: 'client_appointment_set',     label: 'Appointment Scheduled' },
+    { value: 'autopay_enabled',            label: 'Autopay Enabled' },
+    { value: 'client_called',              label: 'Call Logged on Client' },
     { value: 'case_closed',               label: 'Case Closed / Completed' },
-    // Tax Returns
-    { value: 'tax_return_filed',          label: 'Tax Return Filed' },
-    { value: 'tax_return_accepted',       label: 'Tax Return Accepted' },
-    { value: 'tax_return_rejected',       label: 'Tax Return Rejected' },
+    { value: 'client_assigned',            label: 'Client Assigned to Rep' },
+    { value: 'client_created',             label: 'Client Created' },
+    { value: 'client_status_changed',      label: 'Client Status Changes To…' },
+    { value: 'document_uploaded',          label: 'Document Uploaded' },
+    { value: 'client_email_sent',          label: 'Email Sent to Client' },
+    { value: 'esign_sent',                 label: 'E-Signature Package Sent' },
+    { value: 'esign_signed',               label: 'E-Signature Signed' },
+    { value: 'financial_intake_submitted', label: 'Financial Intake Submitted' },
+    { value: 'irs_approved',               label: 'IRS Approved Resolution' },
+    { value: 'irs_facts_received',         label: 'IRS Facts Received' },
+    { value: 'invoice_paid',               label: 'Invoice Paid' },
+    { value: 'invoice_sent',               label: 'Invoice Sent' },
+    { value: 'payment_failed',             label: 'Payment Failed' },
+    { value: 'payment_plan_created',       label: 'Payment Plan Created' },
+    { value: 'payment_received',           label: 'Payment Received' },
+    { value: 'poa_sent',                   label: 'POA Sent to IRS' },
+    { value: 'resolution_filed',           label: 'Resolution Filed with IRS' },
+    { value: 'tax_return_accepted',        label: 'Tax Return Accepted' },
+    { value: 'tax_return_filed',           label: 'Tax Return Filed' },
+    { value: 'tax_return_rejected',        label: 'Tax Return Rejected' },
   ],
   case: [
-    // Case lifecycle
-    { value: 'case_created',              label: 'New Case Created' },
+    { value: 'agreement_reached',          label: 'Agreement Reached' },
+    { value: 'case_assigned',              label: 'Case Assigned to Rep' },
+    { value: 'case_closed',               label: 'Case Closed' },
+    { value: 'case_created',              label: 'Case Created' },
+    { value: 'case_resolved',             label: 'Case Resolved' },
     { value: 'case_status_changed',       label: 'Case Status Changes To…' },
-    { value: 'case_assigned',             label: 'Case Assigned to Rep' },
     { value: 'case_type_changed',         label: 'Case Type Changed' },
-    // IRS Actions
-    { value: 'poa_sent',                  label: 'POA Sent to IRS' },
-    { value: 'irs_facts_received',        label: 'IRS Facts Received' },
-    { value: 'docs_submitted',            label: 'Documents Submitted to IRS' },
-    { value: 'irs_under_review',          label: 'IRS Under Review' },
-    { value: 'irs_approved',              label: 'IRS Approved' },
-    { value: 'negotiating',               label: 'Negotiating with IRS' },
-    { value: 'agreement_reached',         label: 'Agreement Reached' },
-    // Deadlines & Compliance
+    { value: 'compliance_issue',          label: 'Compliance Issue Flagged' },
+    { value: 'currently_not_collectible', label: 'Currently Not Collectible Filed' },
     { value: 'deadline_approaching',      label: 'Deadline Within 7 Days' },
     { value: 'deadline_passed',           label: 'Deadline Passed' },
-    { value: 'compliance_issue',          label: 'Compliance Issue Flagged' },
-    // Resolution
-    { value: 'oic_submitted',             label: 'OIC Submitted' },
-    { value: 'ia_established',            label: 'Installment Agreement Established' },
-    { value: 'currently_not_collectible', label: 'Currently Not Collectible Filed' },
-    { value: 'penalty_abatement_filed',   label: 'Penalty Abatement Filed' },
-    { value: 'case_resolved',             label: 'Case Resolved' },
-    { value: 'case_closed',               label: 'Case Closed' },
-    // Documents
-    { value: 'document_uploaded',         label: 'Document Uploaded to Case' },
     { value: 'docs_needed',               label: 'Docs Needed Flag Set' },
+    { value: 'docs_submitted',            label: 'Documents Submitted to IRS' },
+    { value: 'document_uploaded',         label: 'Document Uploaded to Case' },
+    { value: 'ia_established',            label: 'Installment Agreement Established' },
+    { value: 'irs_approved',              label: 'IRS Approved' },
+    { value: 'irs_facts_received',        label: 'IRS Facts Received' },
+    { value: 'irs_under_review',          label: 'IRS Under Review' },
+    { value: 'negotiating',               label: 'Negotiating with IRS' },
+    { value: 'oic_submitted',             label: 'OIC Submitted' },
+    { value: 'penalty_abatement_filed',   label: 'Penalty Abatement Filed' },
+    { value: 'poa_sent',                  label: 'POA Sent to IRS' },
+  ],
+  deadline: [
+    { value: 'deadline_created',          label: 'Deadline Created' },
+    { value: 'deadline_completed',        label: 'Deadline Marked Complete' },
+    { value: 'deadline_passed',           label: 'Deadline Passed' },
+    { value: 'deadline_approaching_1',    label: 'Deadline Tomorrow' },
+    { value: 'deadline_approaching_3',    label: 'Deadline Within 3 Days' },
+    { value: 'deadline_approaching_7',    label: 'Deadline Within 7 Days' },
+  ],
+  sms: [
+    { value: 'sms_failed',               label: 'SMS Failed to Deliver' },
+    { value: 'sms_opted_out',            label: 'SMS Opted Out' },
+    { value: 'sms_received',             label: 'SMS Received' },
+    { value: 'sms_sent',                 label: 'SMS Sent' },
+  ],
+  fax: [
+    { value: 'fax_failed',               label: 'Fax Failed' },
+    { value: 'fax_received',             label: 'Fax Received' },
+    { value: 'fax_sent',                 label: 'Fax Sent' },
+  ],
+  document: [
+    { value: 'addendum_sent',            label: 'Addendum Sent' },
+    { value: 'addendum_signed',          label: 'Addendum Signed' },
+    { value: 'document_deleted',         label: 'Document Deleted' },
+    { value: 'document_downloaded',      label: 'Document Downloaded' },
+    { value: 'document_uploaded',        label: 'Document Uploaded' },
+    { value: 'esign_sent',               label: 'E-Signature Package Sent' },
+    { value: 'esign_signed',             label: 'E-Signature Signed' },
+    { value: 'esign_voided',             label: 'E-Signature Voided' },
+    { value: 'poa_sent',                 label: 'POA Sent to IRS' },
+  ],
+  invoice: [
+    { value: 'invoice_created',          label: 'Invoice Created' },
+    { value: 'invoice_overdue',          label: 'Invoice Overdue' },
+    { value: 'invoice_paid',             label: 'Invoice Paid' },
+    { value: 'invoice_sent',             label: 'Invoice Sent' },
+    { value: 'invoice_voided',           label: 'Invoice Voided' },
+  ],
+  payment: [
+    { value: 'ar_overdue',               label: 'AR Balance Overdue' },
+    { value: 'ar_paid',                  label: 'AR Balance Paid Off' },
+    { value: 'autopay_disabled',         label: 'Autopay Disabled' },
+    { value: 'autopay_enabled',          label: 'Autopay Enabled' },
+    { value: 'autopay_failed',           label: 'Autopay Payment Failed' },
+    { value: 'payment_failed',           label: 'Payment Failed' },
+    { value: 'payment_plan_created',     label: 'Payment Plan Created' },
+    { value: 'payment_plan_updated',     label: 'Payment Plan Updated' },
+    { value: 'payment_received',         label: 'Payment Received' },
+  ],
+  books: [
+    { value: 'expense_added',            label: 'Expense Added' },
+    { value: 'income_added',             label: 'Income Recorded' },
+    { value: 'month_closed',             label: 'Month Closed / Locked' },
+    { value: 'reconciliation_completed', label: 'Reconciliation Completed' },
+  ],
+  irs: [
+    { value: 'form_2848_sent',           label: 'Form 2848 Sent' },
+    { value: 'form_8821_sent',           label: 'Form 8821 Sent' },
+    { value: 'irs_form_logged',          label: 'IRS Form Logged' },
+    { value: 'irs_notice_received',      label: 'IRS Notice Received' },
+    { value: 'state_form_logged',        label: 'State Form Logged' },
+    { value: 'state_poa_sent',           label: 'State POA Sent' },
+    { value: 'transcript_received',      label: 'Transcript Received' },
+    { value: 'transcript_requested',     label: 'Transcript Requested' },
+  ],
+  tax_return: [
+    { value: 'return_accepted',          label: 'Return Accepted by IRS/State' },
+    { value: 'return_approved',          label: 'Return Approved by Client' },
+    { value: 'return_created',           label: 'Return Created' },
+    { value: 'return_extension_filed',   label: 'Return Extension Filed' },
+    { value: 'return_filed',             label: 'Return Filed' },
+    { value: 'return_in_progress',       label: 'Return In Progress' },
+    { value: 'return_rejected',          label: 'Return Rejected' },
+    { value: 'return_sent_to_client',    label: 'Return Sent to Client for Review' },
+  ],
+  employee: [
+    { value: 'employee_added',           label: 'Employee Added' },
+    { value: 'employee_clocked_in',      label: 'Employee Clocked In' },
+    { value: 'employee_clocked_out',     label: 'Employee Clocked Out' },
+    { value: 'employee_role_changed',    label: 'Employee Role Changed' },
+    { value: 'payroll_run_approved',     label: 'Payroll Run Approved' },
+    { value: 'payroll_run_created',      label: 'Payroll Run Created' },
+    { value: 'time_off_approved',        label: 'Time Off Approved' },
+    { value: 'time_off_denied',          label: 'Time Off Denied' },
+    { value: 'time_off_requested',       label: 'Time Off Requested' },
   ],
 }
-
 const LEAD_STATUSES = [
   'New Lead','Contacted','Qualified','Appointment Set','Tax Investigation Active',
   'IRS Facts Received','Resolution Proposed','Negotiating','Agreement Reached',
@@ -313,9 +381,31 @@ export default function Workflows() {
                 <div>
                   <label style={{ display:'block', fontSize:12, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:8 }}>Entity Type *</label>
                   <select className="inp" value={form.entity_type} onChange={e=>setForm(f=>({...f,entity_type:e.target.value,trigger_event:'',trigger_value:''}))} style={{ width:'100%', fontSize:14, padding:'10px 14px' }}>
-                    <option value="lead">Lead</option>
-                    <option value="client">Client</option>
-                    <option value="case">Case</option>
+                    <optgroup label="Core">
+                      <option value="lead">Lead</option>
+                      <option value="client">Client</option>
+                      <option value="case">Case</option>
+                    </optgroup>
+                    <optgroup label="Communications">
+                      <option value="sms">SMS</option>
+                      <option value="fax">Fax</option>
+                    </optgroup>
+                    <optgroup label="Documents">
+                      <option value="document">Documents &amp; E-Signatures</option>
+                    </optgroup>
+                    <optgroup label="Billing">
+                      <option value="invoice">Invoices</option>
+                      <option value="payment">Payments &amp; AR</option>
+                      <option value="books">Books &amp; Ledger</option>
+                    </optgroup>
+                    <optgroup label="IRS &amp; Tax">
+                      <option value="irs">IRS &amp; State Forms</option>
+                      <option value="tax_return">Tax Returns</option>
+                    </optgroup>
+                    <optgroup label="Operations">
+                      <option value="deadline">Deadlines</option>
+                      <option value="employee">Employee / HR / Payroll</option>
+                    </optgroup>
                   </select>
                 </div>
                 <div>
