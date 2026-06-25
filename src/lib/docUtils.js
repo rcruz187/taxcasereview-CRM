@@ -1,5 +1,5 @@
 // ─── Shared document utilities — Tax Case Review CRM ─────────────────────────
-import { getPackageFormTypes, FORM_LABELS, FORM_USES_EIN, fillForm, generateCcAuthPdf, RESOLUTION_SERVICES, generateAddendumPdf } from './irsFormUtils'
+import { getPackageFormTypes, FORM_LABELS, FORM_USES_EIN, fillForm, generateCcAuthPdf, RESOLUTION_SERVICES, generateAddendumPdf, generateStatePOAWithCover } from './irsFormUtils'
 
 const LOGO_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo'
 
@@ -1079,16 +1079,19 @@ export async function sendFullPackage(client, supabase) {
   }
 
   // State POA — auto-include when irsOrState is State or Both IRS + State
+  // Generates a pre-filled cover page with client info merged with the blank state form
   if (includeState && clientState && STATE_POA_FILES[clientState]) {
     try {
       const poaFile = STATE_POA_FILES[clientState]
       const poaUrl  = `${base}/state-forms/${poaFile}`
       const poaRes  = await fetch(poaUrl)
       if (!poaRes.ok) throw new Error(`Could not load ${clientState} POA PDF`)
-      const poaBlob = await poaRes.blob()
+      const rawBytes  = new Uint8Array(await poaRes.arrayBuffer())
+      // Merge cover page (with client info) + raw state form
+      const mergedBytes = await generateStatePOAWithCover(client, rawBytes)
       const path = `docs/${safeName}/package/state_poa_${clientState}.pdf`
       const { error: upErr } = await supabase.storage.from('documents')
-        .upload(path, poaBlob, { upsert: true, contentType: 'application/pdf' })
+        .upload(path, new Blob([mergedBytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
       if (upErr) throw upErr
       const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
       pdfAttachments.push({ formType: 'state_poa', label: `${clientState} State Power of Attorney`, url: urlData.publicUrl })

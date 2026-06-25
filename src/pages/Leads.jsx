@@ -542,7 +542,11 @@ export default function Leads() {
       const base = import.meta.env.BASE_URL.replace(/\/$/, '')
       const pdfRes = await fetch(`${base}/state-forms/${formDef.file}`)
       if (!pdfRes.ok) throw new Error('Could not load ' + formDef.state + ' POA PDF')
-      const pdfBlob = await pdfRes.blob()
+      const rawBytes = new Uint8Array(await pdfRes.arrayBuffer())
+      // Merge cover page with client info + blank state form
+      const { generateStatePOAWithCover } = await import('../lib/irsFormUtils')
+      const mergedBytes = await generateStatePOAWithCover(lead, rawBytes)
+      const pdfBlob = new Blob([mergedBytes], { type: 'application/pdf' })
       const safeName = (lead.name||'lead').replace(/[^a-zA-Z0-9]+/g,'-')
       const path = `docs/${safeName}/state-poa/${formDef.state}_POA_${Date.now()}.pdf`
       const { error: upErr } = await supabase.storage.from('documents').upload(path, pdfBlob, { upsert:true, contentType:'application/pdf' })
@@ -1478,7 +1482,7 @@ export default function Leads() {
             <div className="field">
               <label>Filing Requirements</label>
               <div style={{display:'flex',gap:14,flexWrap:'wrap',padding:'6px 0'}}>
-                {['1040','1120','1065','1120S','940','941'].map(ft=>(
+                {['1040','1120','1065','1120S','940','941','State'].map(ft=>(
                   <label key={ft} style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:13,cursor:'pointer'}}>
                     <input type="checkbox" style={{width:'auto'}}
                       checked={(form.filingRequirements||[]).includes(ft)}

@@ -1436,3 +1436,110 @@ export async function generateFinancialIntakePdf(clientName, answers = {}, submi
 
   return pdfDoc.save();
 }
+
+// ─── STATE POA — PRE-FILL COVER PAGE ──────────────────────────────────────────
+// Generates a pre-filled info page merged with the raw state POA PDF.
+// Since state forms vary and most aren't fillable AcroForms, we generate a
+// clean client info cover sheet as page 1, then append the blank state form.
+export async function generateStatePOACover(client) {
+  const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib')
+  const doc  = await PDFDocument.create()
+  const page = doc.addPage([612, 792])
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold)
+  const font = await doc.embedFont(StandardFonts.Helvetica)
+
+  const name    = client?.name || ''
+  const ssn     = client?.ssn  ? `***-**-${String(client.ssn).replace(/-/g,'').slice(-4)}` : ''
+  const ein     = client?.ein  || ''
+  const street  = client?.street || ''
+  const city    = client?.city   || ''
+  const state   = client?.state  || ''
+  const zip     = client?.zip    || ''
+  const phone   = client?.phone  || ''
+  const email   = client?.email  || ''
+  const dob     = client?.dob    || ''
+  const address = [street, city && state ? `${city}, ${state} ${zip}` : city || state].filter(Boolean).join(' ')
+  let taxYears  = ''
+  try { taxYears = JSON.parse(client?.taxYears || '[]').join(', ') } catch { taxYears = client?.taxYearsCustom || '' }
+  const date    = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})
+
+  const { width, height } = page.getSize()
+  const margin = 56
+
+  // Header bar
+  page.drawRectangle({ x: 0, y: height - 90, width, height: 90, color: rgb(0.07, 0.13, 0.30) })
+  page.drawText('Tax Case Review', { x: margin, y: height - 40, size: 22, font: bold, color: rgb(1,1,1) })
+  page.drawText('State Power of Attorney — Taxpayer Information', { x: margin, y: height - 62, size: 11, font, color: rgb(0.6,0.75,1) })
+  page.drawText(date, { x: width - margin - 80, y: height - 52, size: 10, font, color: rgb(0.6,0.75,1) })
+
+  let y = height - 120
+  const section = (label) => {
+    y -= 8
+    page.drawRectangle({ x: margin, y: y - 4, width: width - margin*2, height: 20, color: rgb(0.93,0.95,0.98) })
+    page.drawText(label, { x: margin + 6, y: y + 3, size: 9, font: bold, color: rgb(0.2,0.2,0.4) })
+    y -= 24
+  }
+  const row = (label, value) => {
+    if (!value) return
+    page.drawText(label + ':', { x: margin, y, size: 9, font: bold, color: rgb(0.4,0.4,0.4) })
+    page.drawText(String(value), { x: margin + 130, y, size: 10, font, color: rgb(0.1,0.1,0.1) })
+    y -= 18
+  }
+
+  section('TAXPAYER INFORMATION')
+  row('Full Legal Name', name)
+  row('SSN', ssn || (ein ? `EIN: ${ein}` : ''))
+  row('Date of Birth', dob)
+  row('Address', address)
+  row('Phone', phone)
+  row('Email', email)
+  row('Tax Years', taxYears)
+
+  section('REPRESENTATIVE — AUTHORIZED AGENT')
+  row('Name', 'Rommel Cruz Rivera, EA')
+  row('Firm', 'Tax Case Review')
+  row('Address', '631 US Highway One Ste 304, North Palm Beach, FL 33408')
+  row('Phone', '(888) 334-5052')
+  row('Fax', '(239) 526-2666')
+  row('Email', 'info@taxcasereview.org')
+  row('CAF No.', '0312-27862R')
+  row('PTIN', 'P01982875')
+
+  y -= 20
+  page.drawText('Instructions:', { x: margin, y, size: 9, font: bold, color: rgb(0.2,0.2,0.4) })
+  y -= 16
+  const instructions = [
+    '1. This cover sheet summarizes the taxpayer information for the attached state Power of Attorney form.',
+    '2. Please complete the attached state form using the information above.',
+    '3. Sign and date the attached form where indicated.',
+    '4. Return the signed form to Tax Case Review at the address above.',
+  ]
+  for (const line of instructions) {
+    page.drawText(line, { x: margin, y, size: 9, font, color: rgb(0.3,0.3,0.3), maxWidth: width - margin*2 })
+    y -= 14
+  }
+
+  // Footer
+  page.drawLine({ start: { x: margin, y: 60 }, end: { x: width - margin, y: 60 }, thickness: 0.5, color: rgb(0.8,0.8,0.8) })
+  page.drawText('Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408 · (888) 334-5052 · info@taxcasereview.org', { x: margin, y: 44, size: 8, font, color: rgb(0.6,0.6,0.6) })
+
+  return await doc.save()
+}
+
+// Merge the cover page with the raw state POA PDF
+export async function generateStatePOAWithCover(client, poaPdfBytes) {
+  const { PDFDocument } = await import('pdf-lib')
+  const coverBytes = await generateStatePOACover(client)
+  const merged     = await PDFDocument.create()
+
+  const coverDoc = await PDFDocument.load(coverBytes)
+  const poaDoc   = await PDFDocument.load(poaPdfBytes)
+
+  const coverPages = await merged.copyPages(coverDoc, coverDoc.getPageIndices())
+  coverPages.forEach(p => merged.addPage(p))
+  const poaPages = await merged.copyPages(poaDoc, poaDoc.getPageIndices())
+  poaPages.forEach(p => merged.addPage(p))
+
+  return await merged.save()
+}
+

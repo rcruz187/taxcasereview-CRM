@@ -88,6 +88,14 @@ export default function BookingWidget({ contact, onClose, mode = 'lead' }) {
     const entityType = mode === 'lead' ? 'lead' : 'client'
     await triggerWorkflow('lead_appointment_set', entityType, contact?.name || '', 'Staff').catch(()=>{})
 
+    // Log note on the lead or client record
+    const noteText = `📅 Appointment scheduled: ${form.date} at ${form.time}${form.eventType ? ` (${form.eventType})` : ''}${form.notes ? ` — ${form.notes}` : ''}`
+    if (mode === 'lead' && contact?.id) {
+      await supabase.from('lead_notes').insert({ lead_id: contact.id, lead_name: contact.name, text: noteText, type: 'Appointment', author: 'System', created_at: new Date().toISOString() }).catch(()=>{})
+    } else if (contact?.name) {
+      await supabase.from('client_notes').insert({ client_name: contact.name, content: noteText, created_by: 'System', visible_to_client: false }).catch(()=>{})
+    }
+
     // Team notification
     await supabase.from('chat_messages').insert([{
       channel: 'general', sender: '🔔 System',

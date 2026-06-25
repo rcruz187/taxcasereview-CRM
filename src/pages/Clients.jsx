@@ -1284,7 +1284,10 @@ export default function Clients() {
       const base = import.meta.env.BASE_URL.replace(/\/$/, '')
       const pdfRes = await fetch(`${base}/state-forms/${formDef.file}`)
       if (!pdfRes.ok) throw new Error('Could not load ' + formDef.state + ' POA PDF')
-      const pdfBlob = await pdfRes.blob()
+      const rawBytes = new Uint8Array(await pdfRes.arrayBuffer())
+      const { generateStatePOAWithCover } = await import('../lib/irsFormUtils')
+      const mergedBytes = await generateStatePOAWithCover(client, rawBytes)
+      const pdfBlob = new Blob([mergedBytes], { type: 'application/pdf' })
       const safeName = (client.name||'client').replace(/[^a-zA-Z0-9]+/g,'-')
       const path = `docs/${safeName}/state-poa/${formDef.state}_POA_${Date.now()}.pdf`
       const { error: upErr } = await supabase.storage.from('documents').upload(path, pdfBlob, { upsert:true, contentType:'application/pdf' })
