@@ -292,8 +292,8 @@ export default function Estimates() {
           </div>
         </div>
       )}
+      <DeleteConfirmModal open={!!confirmDel} label="estimate" onConfirm={confirmDelEstimate} onCancel={() => setConfirmDel(null)} />
     </div>
-  <DeleteConfirmModal open={!!confirmDel} label="estimate" onConfirm={confirmDelEstimate} onCancel={() => setConfirmDel(null)} />
   )
 }
 
