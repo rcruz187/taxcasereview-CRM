@@ -101,51 +101,41 @@ export default function Dashboard() {
     setLoading(false)
   }
 
-  // Fetch TAS blog feed — try multiple proxies, fallback to hardcoded recent posts
+  // Fetch TAS blog feed — localStorage cache for instant load, refresh every 4hrs
   useEffect(() => {
+    const CACHE_KEY = 'tcr_tas_feed', CACHE_TTL = 4*60*60*1000
     const TAS_FALLBACK = [
       { title: 'NTA Blog: Understanding Your Rights as a Taxpayer', link: 'https://www.taxpayeradvocate.irs.gov/blog/', pubDate: new Date().toISOString() },
-      { title: 'TAS Tax Tips: What to Do When the IRS Contacts You', link: 'https://www.taxpayeradvocate.irs.gov/blog/', pubDate: new Date(Date.now() - 86400000 * 3).toISOString() },
-      { title: 'Know Your Rights: Free Tax Help Available Nationwide', link: 'https://www.taxpayeradvocate.irs.gov/blog/', pubDate: new Date(Date.now() - 86400000 * 7).toISOString() },
+      { title: 'TAS Tax Tips: What to Do When the IRS Contacts You', link: 'https://www.taxpayeradvocate.irs.gov/blog/', pubDate: new Date(Date.now()-86400000*3).toISOString() },
+      { title: 'Know Your Rights: Free Tax Help Available Nationwide', link: 'https://www.taxpayeradvocate.irs.gov/blog/', pubDate: new Date(Date.now()-86400000*7).toISOString() },
     ]
-
+    try {
+      const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null')
+      if (cached?.items?.length && Date.now() - cached.ts < CACHE_TTL) { setTasFeeds(cached.items); return }
+    } catch(_) {}
     async function fetchFeed() {
       const TAS_RSS = encodeURIComponent('https://www.taxpayeradvocate.irs.gov/feed/')
-      const proxies = [
-        `https://api.rss2json.com/v1/api.json?rss_url=${TAS_RSS}&count=3`,
-        `https://api.allorigins.win/get?url=${TAS_RSS}`,
-      ]
+      const proxies = [`https://api.rss2json.com/v1/api.json?rss_url=${TAS_RSS}&count=3`, `https://api.allorigins.win/get?url=${TAS_RSS}`]
       for (const url of proxies) {
         try {
-          const r = await fetch(url)
-          const d = await r.json()
-          // rss2json format
-          if (d.status === 'ok' && d.items?.length) { setTasFeeds(d.items.slice(0,3)); return }
-          // allorigins format — parse XML manually
+          const r = await fetch(url), d = await r.json()
+          if (d.status === 'ok' && d.items?.length) { const items = d.items.slice(0,3); setTasFeeds(items); localStorage.setItem(CACHE_KEY, JSON.stringify({items, ts: Date.now()})); return }
           if (d.contents) {
-            const parser = new DOMParser()
-            const xml = parser.parseFromString(d.contents, 'text/xml')
-            const items = [...xml.querySelectorAll('item')].slice(0,3).map(el => ({
-              title: el.querySelector('title')?.textContent || '',
-              link:  el.querySelector('link')?.textContent || 'https://www.taxpayeradvocate.irs.gov/blog/',
-              pubDate: el.querySelector('pubDate')?.textContent || '',
-            }))
-            if (items.length) { setTasFeeds(items); return }
+            const xml = new DOMParser().parseFromString(d.contents, 'text/xml')
+            const items = [...xml.querySelectorAll('item')].slice(0,3).map(el => ({ title: el.querySelector('title')?.textContent||'', link: el.querySelector('link')?.textContent||'https://www.taxpayeradvocate.irs.gov/blog/', pubDate: el.querySelector('pubDate')?.textContent||'' }))
+            if (items.length) { setTasFeeds(items); localStorage.setItem(CACHE_KEY, JSON.stringify({items, ts: Date.now()})); return }
           }
-        } catch {}
+        } catch(_) {}
       }
-      // All proxies failed — show hardcoded fallback so widget is never empty
-      setTasFeeds(TAS_FALLBACK)
+      setTasFeeds(TAS_FALLBACK); localStorage.setItem(CACHE_KEY, JSON.stringify({items: TAS_FALLBACK, ts: Date.now()}))
     }
-
     fetchFeed()
-    // Refresh every 4 hours
-    const interval = setInterval(fetchFeed, 4 * 60 * 60 * 1000)
-    return () => clearInterval(interval)
   }, [])
 
   // Drag state — use refs for drag tracking (not state) to avoid re-render freeze
   const [cardOrder, setCardOrder]       = useState(null)
+  const [tipIdx, setTipIdx]             = useState(0)
+  useEffect(() => { const t = setInterval(() => setTipIdx(i => (i + 1) % CRM_TIPS.length), 5000); return () => clearInterval(t) }, [])
   const [saveIndicator, setSaveIndicator] = useState(false)
   const dragIdx  = useRef(null)
   const dragOver = useRef(null)
@@ -349,6 +339,59 @@ export default function Dashboard() {
       </div>
     )
   }
+
+  const CRM_TIPS = [
+    { icon: '🖱️', tip: 'Drag any dashboard card to rearrange your layout — it saves automatically per employee.' },
+    { icon: '👤', tip: 'Add a new lead with the + New button in the top bar from any page.' },
+    { icon: '📋', tip: 'Log a note on a lead by opening their file and scrolling to the Notes section.' },
+    { icon: '📅', tip: 'Book an appointment from a lead file — it logs a note with the date, time, and event type automatically.' },
+    { icon: '🔄', tip: 'Convert a lead to a client in one click — all notes, documents, and history carry over.' },
+    { icon: '👥', tip: 'Assign a lead to a specific rep using the Assigned To field in their detail view.' },
+    { icon: '🗄️', tip: 'Archive a lead to hide it from the active list — restore it anytime from the Archived view.' },
+    { icon: '📞', tip: 'Click a lead phone number to dial them instantly through the built-in SignalWire dialer.' },
+    { icon: '🏢', tip: 'The Client Portal lets clients view documents, make payments, and sign forms — no app needed.' },
+    { icon: '🔐', tip: 'Clients log into their portal with just their email and last 4 digits of their SSN.' },
+    { icon: '💳', tip: 'Send a payment link via SMS or email from the Payments tab on any client file.' },
+    { icon: '📊', tip: 'The Financial Profile tab builds a full TO Worksheet with all six 433 forms and an OIC calculator.' },
+    { icon: '📝', tip: 'The Filing Requirements section tracks which returns a client still needs to file.' },
+    { icon: '✍️', tip: 'Send a 2848, 8821, CC Auth, State POA, or Service Addendum for e-signature in one click.' },
+    { icon: '📄', tip: 'State POA forms auto-match to the client state — just select the client and hit Send.' },
+    { icon: '🗂️', tip: 'Signed documents are auto-saved to the client Documents tab under E-Signatures.' },
+    { icon: '📦', tip: 'The Full Investigation Package sends the 2848, 8821, and CC Auth together in one e-sign flow.' },
+    { icon: '🔍', tip: 'Use Pre-fill IRS Forms to auto-populate 2848, 8821, and 433 forms with client data.' },
+    { icon: '📞', tip: 'Press 1 on any inbound call to connect it to the first available agent automatically.' },
+    { icon: '🎙️', tip: 'Every outbound call is recorded automatically — find recordings in the Dialer page.' },
+    { icon: '📝', tip: 'Call transcriptions are generated after each call — review them in the Dialer under Transcriptions.' },
+    { icon: '📬', tip: 'Missed calls go straight to voicemail — listen and delete them from the Dialer voicemail tab.' },
+    { icon: '📲', tip: 'You can send an SMS to any lead or client directly from their file or from the SMS page.' },
+    { icon: '📧', tip: 'Gmail is synced — incoming emails from clients appear automatically in the Email tab.' },
+    { icon: '🔴', tip: 'Mark an email Action Needed to flag it for follow-up — it moves to its own triage bucket.' },
+    { icon: '📤', tip: 'Reply to any email directly from the CRM — it sends from your connected Gmail account.' },
+    { icon: '📅', tip: 'The Calendar shows all scheduled appointments across the whole team.' },
+    { icon: '✅', tip: 'Create tasks with due dates and assign them to team members — track them on the Tasks page.' },
+    { icon: '⏰', tip: 'Set deadlines on cases to get reminders and track upcoming IRS response windows.' },
+    { icon: '📋', tip: 'The IRS Form Tracker lets you log when forms like 2848 or 9465 were filed and their status.' },
+    { icon: '🏛️', tip: 'Download official IRS PDFs directly from the IRS Forms & Docs page.' },
+    { icon: '📜', tip: 'Request IRS transcripts directly from the Transcripts page and track their status.' },
+    { icon: '🗺️', tip: 'State Forms & Docs has POA forms for every state — download or send for e-sign.' },
+    { icon: '💰', tip: 'Record a payment and it automatically updates the balance in Accounts Receivable.' },
+    { icon: '🧾', tip: 'Create and send invoices from the Invoices page — clients can pay online via the portal.' },
+    { icon: '📈', tip: 'The AR page tracks all scheduled installment payments and outstanding balances.' },
+    { icon: '📚', tip: 'Books & Ledger tracks firm income and expenses — export to Excel for your accountant.' },
+    { icon: '⚡', tip: 'Workflows can auto-send an SMS or email the moment a lead is created — set it and forget it.' },
+    { icon: '🔁', tip: 'Create a workflow to notify the team via email when a client signs their agreement.' },
+    { icon: '📋', tip: 'Workflows support 10+ entity types — leads, clients, cases, payments, deadlines, and more.' },
+    { icon: '🕐', tip: 'Employees clock in and out from the Kiosk page — accessible via QR code on any device.' },
+    { icon: '🏖️', tip: 'Employees can request time off from the Employee Portal — managers approve or deny it.' },
+    { icon: '💵', tip: 'Run payroll from the Payroll page — it calculates net pay based on clock-in hours.' },
+    { icon: '💬', tip: 'Use Team Chat to message the whole team or start a direct conversation.' },
+    { icon: '🎥', tip: 'Start a video huddle from Team Chat — click the camera icon to go live with your team.' },
+    { icon: '🖼️', tip: 'Virtual backgrounds are available in meetings — choose TCR Brand, Office, Blur, and more.' },
+    { icon: '📑', tip: 'Track all client tax returns in the Tax Returns page — log status from In Progress to Filed.' },
+    { icon: '🏛️', tip: 'The FormaCorp section handles entity formation documents for business clients.' },
+    { icon: '🔒', tip: 'Role-based access controls what each employee can see — Tax Advisors only see their leads.' },
+    { icon: '📱', tip: 'The CRM is fully mobile responsive — access it from your phone or tablet on the go.' },
+  ]
 
   // TAS widget (extracted so it renders in sidebar)
   const TASWidget = () => (
@@ -583,7 +626,29 @@ export default function Dashboard() {
       </div>
 
       {/* TAS Sidebar — right side, Admin/SuperAdmin only */}
-      {!isTaxAdvisor && !isTaxAssociate && !isManager && <TASWidget />}
+      {!isTaxAdvisor && !isTaxAssociate && !isManager && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: 230, flexShrink: 0 }}>
+          <TASWidget />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 28 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg,#f59e0b,#d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>💡</div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#f1f5f9' }}>CRM Tips</div>
+                <div style={{ fontSize: 10, color: '#f59e0b', fontWeight: 600 }}>● Daily Hint</div>
+              </div>
+            </div>
+            <div>
+              <div style={{ background: 'linear-gradient(135deg,#1c2a1c,#1a2e1a)', border: '1px solid rgba(34,197,94,.2)', borderRadius: '4px 14px 14px 14px', padding: '12px 14px' }}>
+                <div style={{ fontSize: 22, marginBottom: 8 }}>{CRM_TIPS[tipIdx].icon}</div>
+                <div style={{ fontSize: 12, color: '#e2e8f0', lineHeight: 1.55, fontWeight: 500 }}>{CRM_TIPS[tipIdx].tip}</div>
+              </div>
+              <div style={{ marginTop: 6, paddingLeft: 2 }}>
+                <div style={{ fontSize: 10, color: 'var(--t3)' }}>{tipIdx + 1} of {CRM_TIPS.length}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
