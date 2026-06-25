@@ -24,8 +24,14 @@ export default function Settings() {
   })
 
   const [pw, setPw] = useState({ next: '', confirm: '' })
+  const [employees, setEmployees] = useState([])
 
-  useEffect(() => { loadFirm(); loadLogo() }, [])
+  useEffect(() => { loadFirm(); loadLogo(); loadEmployees() }, [])
+
+  async function loadEmployees() {
+    const { data } = await supabase.from('employees').select('id,name,email,role,status,created_at').order('created_at', { ascending: true })
+    if (data) setEmployees(data)
+  }
 
   function applyBrandColor(hex) {
     if (!hex || !hex.startsWith('#')) return
@@ -760,27 +766,33 @@ export default function Settings() {
         <div className="card">
           <div className="card-header"><span className="card-title">Team Members</span></div>
           <div style={{ padding: '0 20px 20px' }}>
-            {[
-              { name:'Romy Cruz',        email:'romy@taxcasereview.org',    role:'Super Admin', color:'br' },
-              { name:'Dana Richard',     email:'flipnitnow@gmail.com',    role:'Admin',       color:'bb' },
-              { name:'Yesenia Gonzalez', email:'yeseniagt1@gmail.com', role:'Admin',       color:'bb' },
-            ].map(m => (
-              <div key={m.email} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 0', borderBottom:'1px solid var(--br)' }}>
-                <div style={{ width:40, height:40, borderRadius:'50%', background:'var(--blue)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:16, color:'#fff', flexShrink:0 }}>
-                  {m.name[0]}
-                </div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontWeight:700, fontSize:14 }}>
-                    {m.name}
-                    {m.email === user?.email && <span style={{ fontSize:10, color:'var(--ok)', marginLeft:8 }}>● You</span>}
+            {employees.length === 0
+              ? <div style={{ color:'var(--t3)', fontSize:13, padding:'20px 0' }}>No employees found.</div>
+              : employees.map(m => {
+                const roleColor = m.role === 'Super Admin' ? 'br' : m.role === 'Admin' ? 'bb' : m.role === 'Manager' ? 'bg' : 'bn'
+                const isYou = m.email === user?.email
+                const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase()
+                const inactive = m.status && m.status !== 'Active'
+                return (
+                  <div key={m.id} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 0', borderBottom:'1px solid var(--br)', opacity: inactive ? 0.5 : 1 }}>
+                    <div style={{ width:40, height:40, borderRadius:'50%', background:'var(--blue)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:15, color:'#fff', flexShrink:0 }}>
+                      {initials}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontWeight:700, fontSize:14, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                        {m.name}
+                        {isYou && <span style={{ fontSize:10, color:'var(--ok)' }}>● You</span>}
+                        {inactive && <span style={{ fontSize:10, color:'var(--t3)' }}>({m.status})</span>}
+                      </div>
+                      <div style={{ color:'var(--t2)', fontSize:12, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.email || '—'}</div>
+                    </div>
+                    <span className={`bdg ${roleColor}`} style={{ fontSize:11, flexShrink:0 }}>{m.role || 'Staff'}</span>
                   </div>
-                  <div style={{ color:'var(--t2)', fontSize:12 }}>{m.email}</div>
-                </div>
-                <span className={`bdg ${m.color}`} style={{ fontSize:11 }}>{m.role}</span>
-              </div>
-            ))}
+                )
+              })
+            }
             <div style={{ color:'var(--t3)', fontSize:12, marginTop:14 }}>
-              To add or remove team members, go to Supabase → Authentication → Users.
+              To add or remove team members, go to <strong>Employees</strong> in the sidebar.
             </div>
           </div>
         </div>
