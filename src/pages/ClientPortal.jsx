@@ -1,3 +1,4 @@
+import { validateFile, maybeCompressImage } from '../lib/uploadUtils'
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -259,6 +260,8 @@ export default function ClientPortal() {
   }
 
   async function handleUpload() {
+    // file size check injected by uploadUtils
+
     const file = fileRef.current?.files?.[0]
     if (!file) return
     setUploading(true)

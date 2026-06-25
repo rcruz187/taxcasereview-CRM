@@ -1,3 +1,4 @@
+import { validateFile } from '../lib/uploadUtils'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { ORGANIZER_STEPS, shouldShow } from '../lib/organizerSchema'

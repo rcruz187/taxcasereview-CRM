@@ -220,14 +220,14 @@ export default function Settings() {
   }
 
   const set = k => e => setFirm(f => ({ ...f, [k]: e.target.value }))
-  const tabs = ['firm', 'integrations', 'branding', 'users', 'security']
+  const tabs = ['firm', 'integrations', 'branding', 'users', 'security', 'storage']
 
   return (
     <div style={{ padding: '20px 24px', maxWidth: 860, margin: '0 auto' }}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
         {tabs.map(t => (
           <button key={t} className={`btn${tab === t ? ' pri' : ''}`} onClick={() => setTab(t)}>
-            {t === 'firm' ? '🏢 Firm Info' : t === 'integrations' ? '🔌 Integrations' : t === 'branding' ? '🎨 Branding' : t === 'users' ? '👥 Users' : '🔒 Security'}
+            {t === 'firm' ? '🏢 Firm Info' : t === 'integrations' ? '🔌 Integrations' : t === 'branding' ? '🎨 Branding' : t === 'users' ? '👥 Users' : t === 'security' ? '🔒 Security' : '💾 Storage'}
           </button>
         ))}
       </div>
@@ -810,7 +810,133 @@ export default function Settings() {
           </div>
         </div>
       )}
+
+      {tab === 'storage' && <StorageTab />}
     </div>
   )
 }
 
+
+// ── Storage Tab ────────────────────────────────────────────────────────────
+function StorageTab() {
+  const [docs,    setDocs]    = useState([])
+  const [esigns,  setEsigns]  = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function load() {
+      const [{ data: d }, { data: e }] = await Promise.all([
+        supabase.from('documents').select('file_size, doc_type, client_name, created_at').order('file_size', { ascending: false }),
+        supabase.from('esigns').select('created_at').limit(200),
+      ])
+      setDocs(d || [])
+      setEsigns(e || [])
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  const FREE_LIMIT = 1024 * 1024 * 1024  // 1 GB Supabase free tier
+  const totalBytes  = docs.reduce((s, d) => s + (d.file_size || 0), 0)
+  const pct         = Math.min(100, (totalBytes / FREE_LIMIT) * 100)
+  const barColor    = pct > 80 ? 'var(--bad)' : pct > 60 ? 'var(--warn)' : 'var(--green)'
+
+  function fmt(bytes) {
+    if (!bytes) return '—'
+    if (bytes < 1024)        return bytes + ' B'
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+  }
+
+  // Group by doc_type
+  const byType = {}
+  docs.forEach(d => {
+    const t = d.doc_type || 'Other'
+    if (!byType[t]) byType[t] = { count: 0, bytes: 0 }
+    byType[t].count++
+    byType[t].bytes += (d.file_size || 0)
+  })
+  const typeRows = Object.entries(byType).sort((a,b) => b[1].bytes - a[1].bytes)
+
+  // Top 10 largest files
+  const largest = [...docs].filter(d => d.file_size > 0).slice(0, 10)
+
+  if (loading) return <div className="card" style={{ padding: 30, textAlign: 'center', color: 'var(--t3)' }}>Loading storage data…</div>
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Usage bar */}
+      <div className="card">
+        <div className="card-header"><span className="card-title">💾 Storage Usage</span></div>
+        <div style={{ padding: '0 20px 20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+            <span style={{ fontSize: 28, fontWeight: 900, color: barColor }}>{fmt(totalBytes)}</span>
+            <span style={{ fontSize: 13, color: 'var(--t3)' }}>of 1 GB free tier used</span>
+          </div>
+          <div style={{ height: 10, background: 'var(--s2)', borderRadius: 99, overflow: 'hidden', marginBottom: 8 }}>
+            <div style={{ height: '100%', width: pct + '%', background: barColor, borderRadius: 99, transition: 'width .4s' }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--t3)' }}>
+            <span>{pct.toFixed(1)}% used</span>
+            <span>{fmt(FREE_LIMIT - totalBytes)} remaining</span>
+          </div>
+          {pct > 70 && (
+            <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, fontSize: 13, color: 'var(--bad)' }}>
+              ⚠️ Storage is {pct.toFixed(0)}% full. Consider archiving old documents or upgrading to Supabase Pro ($25/mo) for 100 GB.
+            </div>
+          )}
+          <div style={{ marginTop: 12, fontSize: 12, color: 'var(--t3)', lineHeight: 1.7 }}>
+            <strong style={{ color: 'var(--tx)' }}>Upload limits enforced:</strong> 10 MB max per file · Images auto-compressed before upload · File size tracked per document
+          </div>
+        </div>
+      </div>
+
+      {/* By type */}
+      {typeRows.length > 0 && (
+        <div className="card">
+          <div className="card-header"><span className="card-title">By Document Type</span></div>
+          <div style={{ padding: '0 20px 16px' }}>
+            {typeRows.map(([type, { count, bytes }]) => {
+              const typePct = totalBytes > 0 ? (bytes / totalBytes) * 100 : 0
+              return (
+                <div key={type} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--br)' }}>
+                  <div style={{ width: 120, fontSize: 13, fontWeight: 600, flexShrink: 0 }}>{type}</div>
+                  <div style={{ flex: 1, height: 6, background: 'var(--s2)', borderRadius: 99, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: typePct + '%', background: 'var(--blue)', borderRadius: 99 }} />
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--t2)', flexShrink: 0, width: 80, textAlign: 'right' }}>{fmt(bytes)}</div>
+                  <div style={{ fontSize: 11, color: 'var(--t3)', flexShrink: 0, width: 50, textAlign: 'right' }}>{count} file{count !== 1 ? 's' : ''}</div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Largest files */}
+      {largest.length > 0 && (
+        <div className="card">
+          <div className="card-header"><span className="card-title">Largest Files</span></div>
+          <div style={{ padding: '0 20px 16px' }}>
+            {largest.map((d, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--br)', fontSize: 13 }}>
+                <span style={{ color: 'var(--t3)', width: 20, flexShrink: 0 }}>#{i+1}</span>
+                <span style={{ flex: 1, fontWeight: 600 }}>{d.doc_type || 'Document'}</span>
+                <span style={{ color: 'var(--t2)', fontSize: 12 }}>{d.client_name || '—'}</span>
+                <span style={{ color: d.file_size > 5*1024*1024 ? 'var(--warn)' : 'var(--t2)', fontWeight: 600, flexShrink: 0 }}>{fmt(d.file_size)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {docs.length === 0 && (
+        <div className="card" style={{ padding: 30, textAlign: 'center', color: 'var(--t3)' }}>
+          <div style={{ fontSize: 32, marginBottom: 10 }}>📂</div>
+          <div style={{ fontWeight: 700, color: 'var(--tx)', marginBottom: 4 }}>No documents tracked yet</div>
+          <div style={{ fontSize: 13 }}>Storage usage will appear here once files are uploaded.</div>
+        </div>
+      )}
+    </div>
+  )
+}

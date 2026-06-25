@@ -1,3 +1,4 @@
+import { validateFile, maybeCompressImage } from '../lib/uploadUtils'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'

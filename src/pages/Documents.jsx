@@ -1,5 +1,6 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect, useRef } from 'react'
+import { validateFile, maybeCompressImage } from '../lib/uploadUtils'
 import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { useLocation } from 'react-router-dom'
