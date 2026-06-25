@@ -1003,13 +1003,33 @@ function UptimeTab() {
   async function fetchStatuses() {
     setLoading(true)
     const results = {}
+
+    // Statuspage.io supports JSONP via ?callback=fnName — this bypasses CORS
+    // which blocks direct fetch() from GitHub Pages to external status APIs.
+    function jsonpFetch(url, timeoutMs = 8000) {
+      return new Promise((resolve, reject) => {
+        const cbName = '_sp_' + Math.random().toString(36).slice(2)
+        const script = document.createElement('script')
+        const timer = setTimeout(() => {
+          cleanup(); reject(new Error('Timeout'))
+        }, timeoutMs)
+        function cleanup() {
+          clearTimeout(timer)
+          delete window[cbName]
+          if (script.parentNode) script.parentNode.removeChild(script)
+        }
+        window[cbName] = (data) => { cleanup(); resolve(data) }
+        script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cbName
+        script.onerror = () => { cleanup(); reject(new Error('Script load failed')) }
+        document.head.appendChild(script)
+      })
+    }
+
     await Promise.all(
       SERVICES.map(async svc => {
         if (!svc.apiUrl) { results[svc.name] = { type: 'link-only' }; return }
         try {
-          const res = await fetch(svc.apiUrl, { cache: 'no-store' })
-          if (!res.ok) throw new Error('HTTP ' + res.status)
-          const json = await res.json()
+          const json = await jsonpFetch(svc.apiUrl)
           const indicator   = svc.indicatorPath?.reduce((o, k) => o?.[k], json)
           const description = svc.descriptionPath?.reduce((o, k) => o?.[k], json)
           results[svc.name] = { indicator, description, ok: true }
