@@ -259,19 +259,7 @@ export default function Cases() {
 
         {editCase&&<CaseModal form={form} fld={fld} reps={reps} saving={saving} onSave={saveEdit} onClose={()=>setEditCase(null)} title="Edit Case" clients={clients} sug={sug} searchClient={searchClient} pickClient={pickClient}/>}
 
-        {confirmDel && (
-          <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setConfirmDel(null)}>
-            <div className="modal" style={{maxWidth:360,textAlign:'center'}}>
-              <div style={{fontSize:36,marginBottom:12}}>🗑</div>
-              <div style={{fontWeight:700,fontSize:15,marginBottom:8}}>Delete this case?</div>
-              <div style={{fontSize:13,color:'var(--t3)',marginBottom:20}}>This cannot be undone.</div>
-              <div style={{display:'flex',gap:8}}>
-                <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={()=>setConfirmDel(null)}>Cancel</button>
-                <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>deleteCase(confirmDel)}>Delete</button>
-              </div>
-            </div>
-          </div>
-        )}
+
       </div>
     )
   }
