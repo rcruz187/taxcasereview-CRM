@@ -220,14 +220,14 @@ export default function Settings() {
   }
 
   const set = k => e => setFirm(f => ({ ...f, [k]: e.target.value }))
-  const tabs = ['firm', 'integrations', 'branding', 'users', 'security', 'storage']
+  const tabs = ['firm', 'integrations', 'branding', 'users', 'security', 'storage', 'uptime']
 
   return (
     <div style={{ padding: '20px 24px', maxWidth: 860, margin: '0 auto' }}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
         {tabs.map(t => (
           <button key={t} className={`btn${tab === t ? ' pri' : ''}`} onClick={() => setTab(t)}>
-            {t === 'firm' ? '🏢 Firm Info' : t === 'integrations' ? '🔌 Integrations' : t === 'branding' ? '🎨 Branding' : t === 'users' ? '👥 Users' : t === 'security' ? '🔒 Security' : '💾 Storage'}
+            {t === 'firm' ? '🏢 Firm Info' : t === 'integrations' ? '🔌 Integrations' : t === 'branding' ? '🎨 Branding' : t === 'users' ? '👥 Users' : t === 'security' ? '🔒 Security' : t === 'storage' ? '💾 Storage' : '🟢 Uptime'}
           </button>
         ))}
       </div>
@@ -812,6 +812,7 @@ export default function Settings() {
       )}
 
       {tab === 'storage' && <StorageTab />}
+      {tab === 'uptime' && <UptimeTab />}
     </div>
   )
 }
@@ -937,6 +938,163 @@ function StorageTab() {
           <div style={{ fontSize: 13 }}>Storage usage will appear here once files are uploaded.</div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Uptime Tab ─────────────────────────────────────────────────────────────
+const SERVICES = [
+  {
+    name: 'Supabase',
+    description: 'Database, storage, edge functions',
+    statusUrl: 'https://status.supabase.com/',
+    apiUrl: 'https://status.supabase.com/api/v2/status.json',
+    indicatorPath: ['status', 'indicator'],    // green | yellow | red | none
+    descriptionPath: ['status', 'description'],
+    logo: '⚡',
+  },
+  {
+    name: 'Stripe',
+    description: 'Payments, invoices, autopay',
+    statusUrl: 'https://status.stripe.com/',
+    apiUrl: 'https://status.stripe.com/api/v2/status.json',
+    indicatorPath: ['status', 'indicator'],
+    descriptionPath: ['status', 'description'],
+    logo: '💳',
+  },
+  {
+    name: 'SignalWire',
+    description: 'Phone calls, SMS, fax, IVR',
+    statusUrl: 'https://signalwire.trust.pagerduty.com/posts/dashboard',
+    apiUrl: null, // PagerDuty dashboard — no public JSON API, link only
+    logo: '📞',
+  },
+  {
+    name: 'Gmail / Google',
+    description: 'Email sending and sync',
+    statusUrl: 'https://www.google.com/appsstatus/dashboard/',
+    apiUrl: null, // Google status has no public JSON API
+    logo: '📧',
+  },
+  {
+    name: 'Anthropic',
+    description: 'AI document parsing (parse-tax-doc)',
+    statusUrl: 'https://status.anthropic.com/',
+    apiUrl: 'https://status.anthropic.com/api/v2/status.json',
+    indicatorPath: ['status', 'indicator'],
+    descriptionPath: ['status', 'description'],
+    logo: '🤖',
+  },
+]
+
+function indicatorToStatus(indicator) {
+  if (!indicator || indicator === 'none') return { label: 'Operational', color: 'var(--green)', dot: '#22c55e' }
+  if (indicator === 'minor')              return { label: 'Minor Issues', color: 'var(--warn)', dot: '#f59e0b' }
+  if (indicator === 'major')              return { label: 'Major Outage', color: 'var(--bad)', dot: '#ef4444' }
+  if (indicator === 'critical')           return { label: 'Critical Outage', color: 'var(--bad)', dot: '#ef4444' }
+  return { label: 'Unknown', color: 'var(--t3)', dot: '#64748b' }
+}
+
+function UptimeTab() {
+  const [statuses, setStatuses] = useState({})
+  const [loading,  setLoading]  = useState(true)
+  const [lastChecked, setLastChecked] = useState(null)
+
+  async function fetchStatuses() {
+    setLoading(true)
+    const results = {}
+    await Promise.all(
+      SERVICES.map(async svc => {
+        if (!svc.apiUrl) { results[svc.name] = { type: 'link-only' }; return }
+        try {
+          const res = await fetch(svc.apiUrl, { cache: 'no-store' })
+          if (!res.ok) throw new Error('HTTP ' + res.status)
+          const json = await res.json()
+          const indicator   = svc.indicatorPath?.reduce((o, k) => o?.[k], json)
+          const description = svc.descriptionPath?.reduce((o, k) => o?.[k], json)
+          results[svc.name] = { indicator, description, ok: true }
+        } catch(e) {
+          results[svc.name] = { error: e.message }
+        }
+      })
+    )
+    setStatuses(results)
+    setLastChecked(new Date())
+    setLoading(false)
+  }
+
+  useEffect(() => { fetchStatuses() }, [])
+
+  const allGreen = SERVICES.filter(s => s.apiUrl).every(s => {
+    const r = statuses[s.name]
+    return r?.ok && (!r.indicator || r.indicator === 'none')
+  })
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Header */}
+      <div className="card" style={{ padding: '16px 20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 12, height: 12, borderRadius: '50%', background: loading ? '#94a3b8' : allGreen ? '#22c55e' : '#f59e0b', boxShadow: loading ? 'none' : `0 0 8px ${allGreen ? '#22c55e' : '#f59e0b'}`, flexShrink: 0 }} />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>
+                {loading ? 'Checking services…' : allGreen ? 'All systems operational' : 'One or more services have issues'}
+              </div>
+              {lastChecked && <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>Last checked {lastChecked.toLocaleTimeString()}</div>}
+            </div>
+          </div>
+          <button className="btn sec" style={{ fontSize: 12, padding: '6px 14px' }} onClick={fetchStatuses} disabled={loading}>
+            {loading ? 'Checking…' : '↻ Refresh'}
+          </button>
+        </div>
+      </div>
+
+      {/* Service cards */}
+      {SERVICES.map(svc => {
+        const result = statuses[svc.name]
+        const isLinkOnly = svc.apiUrl === null
+        const status = isLinkOnly ? null : (result?.error ? { label: 'Check failed', color: 'var(--t3)', dot: '#94a3b8' } : indicatorToStatus(result?.indicator))
+        const desc = result?.description || (result?.error ? 'Could not reach status API' : null)
+
+        return (
+          <div key={svc.name} className="card" style={{ padding: '14px 20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+              {/* Icon */}
+              <div style={{ fontSize: 24, flexShrink: 0 }}>{svc.logo}</div>
+
+              {/* Info */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{svc.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--t3)' }}>{svc.description}</div>
+                {desc && !isLinkOnly && <div style={{ fontSize: 11, color: status?.color || 'var(--t2)', marginTop: 3 }}>{desc}</div>}
+              </div>
+
+              {/* Status */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                {loading && !result ? (
+                  <span style={{ fontSize: 12, color: 'var(--t3)' }}>Checking…</span>
+                ) : isLinkOnly ? (
+                  <span style={{ fontSize: 12, color: 'var(--t3)', fontStyle: 'italic' }}>No API — check link</span>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ width: 9, height: 9, borderRadius: '50%', background: status?.dot, flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, fontWeight: 700, color: status?.color }}>{status?.label}</span>
+                  </div>
+                )}
+                <a href={svc.statusUrl} target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize: 11, color: 'var(--blue)', textDecoration: 'none', padding: '4px 10px', border: '1px solid var(--br)', borderRadius: 6, whiteSpace: 'nowrap' }}>
+                  Status page ↗
+                </a>
+              </div>
+            </div>
+          </div>
+        )
+      })}
+
+      <div style={{ fontSize: 11, color: 'var(--t3)', textAlign: 'center', marginTop: 4 }}>
+        SignalWire and Gmail don't provide a public status API — click their status page links to check manually.
+      </div>
     </div>
   )
 }
