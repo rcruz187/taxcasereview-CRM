@@ -644,7 +644,11 @@ export default function Dashboard() {
                 <div style={{ fontSize: 12, color: '#e2e8f0', lineHeight: 1.55, fontWeight: 500 }}>{CRM_TIPS[tipIdx].tip}</div>
               </div>
               <div style={{ marginTop: 6, paddingLeft: 2 }}>
-                <div style={{ fontSize: 10, color: 'var(--t3)' }}>{tipIdx + 1} of {CRM_TIPS.length}</div>
+                <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginTop: 4 }}>
+                  {CRM_TIPS.map((_, i) => (
+                    <div key={i} style={{ width: i === tipIdx ? 14 : 5, height: 5, borderRadius: 3, background: i === tipIdx ? '#93c5fd' : 'rgba(255,255,255,.2)', transition: 'all .3s', cursor: 'pointer' }} onClick={() => setTipIdx(i)} />
+                  ))}
+                </div>
               </div>
             </div>
           </div>

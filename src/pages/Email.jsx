@@ -40,6 +40,7 @@ export default function Email() {
   const [resizing, setResizing] = useState(false)
   const [triageFilter, setTriageFilter] = useState('Inbox')
   const [selected, setSelected] = useState(null)
+  const [dragOverFolder, setDragOverFolder] = useState(null)
   const [search, setSearch]     = useState('')
   const [gmailConnected, setGmailConnected] = useState(false)
   const [gmailClientId, setGmailClientId] = useState('')
@@ -328,12 +329,23 @@ export default function Email() {
         <div style={{ padding: '4px 0' }}>
           <div style={{ padding: '6px 14px 4px', fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.07em' }}>Triage</div>
           {TRIAGE.map(t => (
-            <div key={t} onClick={() => { setTriageFilter(t); setView('inbox'); setSelected(null); setCheckedIds(new Set()); setFocusIndex(-1); anchorIndexRef.current = -1 }} style={{
-              padding: '7px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              background: triageFilter === t && view === 'inbox' ? 'rgba(26,127,212,.18)' : 'transparent',
-              borderLeft: triageFilter === t && view === 'inbox' ? '3px solid var(--blue)' : '3px solid transparent',
-              borderRadius: 0, transition: 'all .1s',
-            }}>
+            <div key={t}
+              onClick={() => { setTriageFilter(t); setView('inbox'); setSelected(null); setCheckedIds(new Set()); setFocusIndex(-1); anchorIndexRef.current = -1 }}
+              onDragOver={ev => { ev.preventDefault(); ev.dataTransfer.dropEffect = 'move'; setDragOverFolder(t) }}
+              onDragLeave={() => setDragOverFolder(null)}
+              onDrop={ev => {
+                ev.preventDefault()
+                const id = ev.dataTransfer.getData('emailId')
+                if (id) moveTriage(id, t)
+                setDragOverFolder(null)
+              }}
+              style={{
+                padding: '7px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                background: dragOverFolder === t ? (TRIAGE_COLORS[t] + '22') : triageFilter === t && view === 'inbox' ? 'rgba(26,127,212,.18)' : 'transparent',
+                borderLeft: dragOverFolder === t ? `3px solid ${TRIAGE_COLORS[t] || 'var(--blue)'}` : triageFilter === t && view === 'inbox' ? '3px solid var(--blue)' : '3px solid transparent',
+                borderRadius: 0, transition: 'all .1s',
+                outline: dragOverFolder === t ? `1px dashed ${TRIAGE_COLORS[t] || 'var(--blue)'}` : 'none',
+              }}>
               <span style={{ fontSize: 13, color: triageFilter === t && view === 'inbox' ? 'var(--blue)' : 'var(--t2)', fontWeight: triageFilter === t ? 700 : 400 }}>
                 {t === 'Action Needed' ? '🔴' : t === 'Waiting' ? '🟡' : t === 'Inbox' ? '📥' : t === 'Sent' ? '📤' : '📦'} {t}
               </span>
@@ -399,7 +411,10 @@ export default function Email() {
                 {filtered.length === 0 ? (
                   <div style={{ padding: 30, textAlign: 'center', color: 'var(--t3)', fontSize: 13 }}>No emails in {triageFilter}</div>
                 ) : filtered.map((e, i) => (
-                  <div key={e.id} onClick={() => openEmail(e, i)} style={{
+                  <div key={e.id} onClick={() => openEmail(e, i)}
+                    draggable
+                    onDragStart={ev => { ev.dataTransfer.setData('emailId', e.id); ev.dataTransfer.effectAllowed = 'move' }}
+                    style={{
                     padding: '12px 14px', borderBottom: '1px solid var(--br)', cursor: 'pointer',
                     display: 'flex', gap: 10, alignItems: 'flex-start',
                     background: checkedIds.has(e.id) ? 'rgba(26,127,212,.10)' : selected?.id === e.id ? 'rgba(26,127,212,.14)' : 'transparent',
