@@ -1007,39 +1007,19 @@ function UptimeTab() {
     try {
       const { data, error } = await supabase.functions.invoke('check-service-status')
       console.log('[Uptime] edge function response:', { data, error })
-      console.log('[Uptime] stripe raw:', JSON.stringify(data?.stripe))
-      console.log('[Uptime] anthropic raw:', JSON.stringify(data?.anthropic))
-      console.log('[Uptime] supabase raw:', JSON.stringify(data?.supabase))
       if (!error && data) {
-        // Supabase
-        if (data.supabase && !data.supabase.error) {
-          results['Supabase'] = {
-            ok: true,
-            indicator: data.supabase?.status?.indicator,
-            description: data.supabase?.status?.description,
+        // All three use Statuspage.io format: { page: {...}, status: { indicator, description } }
+        for (const [key, name] of [['supabase','Supabase'],['stripe','Stripe'],['anthropic','Anthropic']]) {
+          const svc = data[key]
+          if (svc && !svc.error) {
+            results[name] = {
+              ok: true,
+              indicator: svc?.status?.indicator || svc?.page?.status?.indicator,
+              description: svc?.status?.description || svc?.page?.status?.description,
+            }
+          } else {
+            results[name] = { error: svc?.error || 'No data' }
           }
-        } else {
-          results['Supabase'] = { error: data.supabase?.error || 'Failed' }
-        }
-        // Stripe
-        if (data.stripe && !data.stripe.error) {
-          results['Stripe'] = {
-            ok: true,
-            indicator: data.stripe?.status?.indicator,
-            description: data.stripe?.status?.description,
-          }
-        } else {
-          results['Stripe'] = { error: JSON.stringify(data.stripe) || 'Failed' }
-        }
-        // Anthropic
-        if (data.anthropic && !data.anthropic.error) {
-          results['Anthropic'] = {
-            ok: true,
-            indicator: data.anthropic?.status?.indicator,
-            description: data.anthropic?.status?.description,
-          }
-        } else {
-          results['Anthropic'] = { error: JSON.stringify(data.anthropic) || 'Failed' }
         }
       } else {
         console.log('[Uptime] error from edge function:', error)

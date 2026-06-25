@@ -6,9 +6,9 @@ const corsHeaders = {
 }
 
 const SERVICES: Record<string, string> = {
-  supabase:   'https://status.supabase.com/api/v2/status.json',
-  stripe:     'https://status.stripe.com/api/v2/status.json',
-  anthropic:  'https://status.anthropic.com/api/v2/status.json',
+  supabase:  'https://status.supabase.com/api/v2/status.json',
+  stripe:    'https://status.stripe.com/api/v2/status.json',
+  anthropic: 'https://status.anthropic.com/api/v2/status.json',
 }
 
 serve(async (req) => {
@@ -19,7 +19,7 @@ serve(async (req) => {
       Object.entries(SERVICES).map(async ([name, url]) => {
         try {
           const res = await fetch(url, {
-            headers: { 'Accept': 'application/json', 'User-Agent': 'TaxCaseReview-CRM/1.0' },
+            headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
           })
           if (!res.ok) { results[name] = { error: 'HTTP ' + res.status }; return }
           results[name] = await res.json()
