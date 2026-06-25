@@ -1007,6 +1007,9 @@ function UptimeTab() {
     try {
       const { data, error } = await supabase.functions.invoke('check-service-status')
       console.log('[Uptime] edge function response:', { data, error })
+      console.log('[Uptime] stripe raw:', JSON.stringify(data?.stripe))
+      console.log('[Uptime] anthropic raw:', JSON.stringify(data?.anthropic))
+      console.log('[Uptime] supabase raw:', JSON.stringify(data?.supabase))
       if (!error && data) {
         // Supabase
         if (data.supabase && !data.supabase.error) {
