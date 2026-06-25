@@ -20,7 +20,6 @@ const PAGE_TITLES = {
   '/stateforms':   'State Forms',    '/irsreference':'IRS Reference',
   '/formacorp':    'FormaCorp',      '/timeoff':     'Time Off Requests',
   '/workflows':    'Workflows',      '/kiosk':       'Clock-In Kiosk',
-  '/timeclock':    'Time Clock',     '/payroll':     'Payroll',
 }
 
 const NEW_ITEMS = [

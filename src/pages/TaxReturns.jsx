@@ -1386,7 +1386,7 @@ export default function TaxReturns() {
         </div>
       )}
 
-      {/* ── SUMMARY TAB ── */}}
+      {/* ── SUMMARY TAB ── */}
       {tab === 'summary' && (
         <div>
           {/* Refund / Owed Banner */}
