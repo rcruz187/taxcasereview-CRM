@@ -8,6 +8,7 @@ const METHODS = ['Credit Card','ACH / Bank Transfer','Check','Cash','Zelle','Ven
 
 export default function Payments() {
   const [items,    setItems]    = useState([])
+  const [confirmDel, setConfirmDel] = useState(null)
   const [invoices, setInvoices] = useState([])
   const [clients,  setClients]  = useState([])
   const [modal,    setModal]    = useState(false)
