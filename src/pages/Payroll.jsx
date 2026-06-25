@@ -1,3 +1,4 @@
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import PayrollStatCards from '../components/PayrollStatCards'
@@ -13,6 +14,7 @@ function Stat({ label, value, color, bold, big }) {
       <div style={{ fontSize:9, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:2 }}>{label}</div>
       <div style={{ fontSize: big?15:12, fontWeight: bold?800:600, color: color||'var(--tx)' }}>{value}</div>
     </div>
+  <DeleteConfirmModal open={!!confirmDel} label="payroll run" onConfirm={confirmDel2} onCancel={() => setConfirmDel(null)} />
   )
 }
 
@@ -23,6 +25,7 @@ export default function Payroll() {
   const [runs,       setRuns]       = useState([])
   const [employees,  setEmployees]  = useState([])
   const [timeEntries,setTimeEntries]= useState([])
+  const [confirmDel, setConfirmDel] = useState(null)
   const [modal,      setModal]      = useState(false)
   const [detailId,   setDetailId]   = useState(null)
   const [saving,     setSaving]     = useState(false)
@@ -177,10 +180,10 @@ export default function Payroll() {
     setModal(false); load()
   }
 
-  async function del(id) {
-    if (!confirm('Delete this payroll run?')) return
-    await supabase.from('payrollruns').delete().eq('id',id)
-    showToast('Deleted'); load()
+  async function del(id) { setConfirmDel(id) }
+  async function confirmDel2() {
+    await supabase.from('payrollruns').delete().eq('id', confirmDel)
+    setConfirmDel(null); showToast('Deleted'); load()
   }
 
   const totalNet   = runs.reduce((s,r)=>s+parseFloat(r.netPay||0),0)
@@ -753,3 +756,4 @@ export default function Payroll() {
     </div>
   )
 }
+
