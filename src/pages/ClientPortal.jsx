@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import OrganizerWizard from '../components/OrganizerWizard'
 import StripeInvoicePayModal from '../components/StripeInvoicePayModal'
+import StripeAddCardModal from '../components/StripeAddCardModal'
 
 const FORM_TABS = [
   { key: '1040',  label: 'Personal Federal (1040)', quarterly: false },
@@ -108,6 +109,7 @@ export default function ClientPortal() {
   const [planMonths, setPlanMonths] = useState(4)
   const [planLocking, setPlanLocking] = useState(false)
   const [planEditing, setPlanEditing] = useState(false)
+  const [addCardModal, setAddCardModal] = useState(false)
   // Notes
   const [notes, setNotes] = useState([])
   // SMS messages
@@ -655,13 +657,30 @@ export default function ClientPortal() {
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
                       {planEditing && (
                         <button onClick={() => setPlanEditing(false)} style={{ padding: '9px 16px', background: 'transparent', border: '1px solid rgba(255,255,255,.2)', borderRadius: 7, color: '#94a3b8', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Cancel</button>
                       )}
-                      <button onClick={lockInPlan} disabled={planLocking} style={{ padding: '13px 28px', background: '#1A7FD4', border: 'none', borderRadius: 9, color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer', opacity: planLocking ? 0.7 : 1 }}>
-                        {planLocking ? 'Locking in…' : `Lock In — ${fmt(monthlyPayment)}/mo`}
-                      </button>
+                      {!client.default_payment_method_id ? (
+                        <div style={{ width: '100%' }}>
+                          <div style={{ fontSize: 12, color: '#fbbf24', background: 'rgba(251,191,36,.1)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 8, padding: '10px 14px', marginBottom: 12 }}>
+                            ⚠️ <strong>No card on file.</strong> Add a payment method first to set up monthly payments.
+                          </div>
+                          <button onClick={() => setAddCardModal(true)} style={{ width: '100%', padding: '13px 28px', background: 'linear-gradient(135deg,#059669,#047857)', border: 'none', borderRadius: 9, color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+                            💳 Add Payment Method
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ fontSize: 11, color: '#4ade80', marginRight: 'auto' }}>
+                            ✓ Card on file: {client.payment_method_brand || 'Card'} ····{client.payment_method_last4 || ''}
+                            <span onClick={() => setAddCardModal(true)} style={{ marginLeft: 10, color: '#60a5fa', cursor: 'pointer', textDecoration: 'underline' }}>Change</span>
+                          </div>
+                          <button onClick={lockInPlan} disabled={planLocking} style={{ padding: '13px 28px', background: '#1A7FD4', border: 'none', borderRadius: 9, color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer', opacity: planLocking ? 0.7 : 1 }}>
+                            {planLocking ? 'Locking in…' : `Lock In — ${fmt(monthlyPayment)}/mo`}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
@@ -693,6 +712,15 @@ export default function ClientPortal() {
             )}
             {payModalInv && (
               <StripeInvoicePayModal invoice={payModalInv} onClose={() => setPayModalInv(null)} onPaid={() => refreshPaymentsAndInvoices()} />
+            )}
+            {addCardModal && (
+              <StripeAddCardModal
+                clientId={client.id}
+                clientName={client.name}
+                email={client.email}
+                onClose={() => setAddCardModal(false)}
+                onSaved={() => { setAddCardModal(false); refreshClientAutopay(); showToast('✅ Card saved! You can now lock in your payment plan.') }}
+              />
             )}
           </div>
         )}
