@@ -313,7 +313,7 @@ export default function TaxReturns() {
   async function deleteReturn(id) { setConfirmDel(id) }
   async function confirmDeleteReturn() {
     await supabase.from('tax_returns').delete().eq('id', confirmDel)
-    setConfirmDel(null); showToast('Deleted'); load()
+    setItems(prev => prev.filter(i => i.id !== confirmDel)); setConfirmDel(null); showToast('Deleted')
   }
 
   async function updateStatus(id, status) {

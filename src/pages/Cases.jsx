@@ -157,7 +157,7 @@ export default function Cases() {
     const id = confirmDel
     setConfirmDel(null)
     await supabase.from('cases').delete().eq('id', id)
-    showToast('Deleted'); setDetail(null); navigate('/cases', { replace: true }); load()
+    setCases(prev => prev.filter(c => c.id !== id)); showToast('Deleted'); setDetail(null); navigate('/cases', { replace: true })
   }
 
   function openDetail(c) { setDetail(c); loadCaseNotes(c.id); navigate('/cases/' + c.id, { replace: true }) }

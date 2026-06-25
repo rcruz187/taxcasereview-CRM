@@ -163,7 +163,7 @@ export default function TimeClock() {
   async function del(id) { setConfirmDel(id) }
   async function confirmDelEntry() {
     await supabase.from('timeentries').delete().eq('id', confirmDel)
-    setConfirmDel(null); showToast('Deleted'); load()
+    setItems(prev => prev.filter(i => i.id !== confirmDel)); setConfirmDel(null); showToast('Deleted')
   }
 
   const empNames = employees.length > 0 ? employees.map(e => e.name) : ['Romy Cruz', 'Dana Richard', 'Yesenia Gonzalez']

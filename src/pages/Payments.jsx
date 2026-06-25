@@ -145,7 +145,7 @@ export default function Payments() {
   async function confirmDeleteItem() {
     if (!confirmDel) return
     await supabase.from('payments').delete().eq('id', confirmDel)
-    setConfirmDel(null); showToast('Deleted'); load()
+    setItems(prev => prev.filter(i => i.id !== confirmDel)); setConfirmDel(null); showToast('Deleted')
   }
 
   const cleared = items.filter(p=>p.status==='Cleared').reduce((s,p)=>s+parseFloat(p.amount||0),0)

@@ -221,6 +221,7 @@ export default function Employees() {
     if (confirmDel !== id) { setConfirmDel(id); return }
     setConfirmDel(null)
     await supabase.from('employees').delete().eq('id', id)
+    setEmployees(prev => prev.filter(e => e.id !== id))
     showToast('Employee removed')
     load()
   }

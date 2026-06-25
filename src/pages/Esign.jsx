@@ -167,7 +167,7 @@ export default function Esign() {
 
   async function del(id) {
     await supabase.from('esigns').delete().eq('id', id)
-    setConfirmDel(null); showToast('Deleted'); load()
+    setItems(prev => prev.filter(i => i.id !== id)); setConfirmDel(null); showToast('Deleted')
   }
 
   function openSigningPage(item) { window.open(signingUrl(item.id), '_blank') }

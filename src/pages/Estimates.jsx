@@ -99,7 +99,7 @@ export default function Estimates() {
   async function del(id) { setConfirmDel(id) }
   async function confirmDelEstimate() {
     await supabase.from('estimates').delete().eq('id', confirmDel)
-    setConfirmDel(null); showToast('Deleted'); load()
+    setItems(prev => prev.filter(i => i.id !== confirmDel)); setConfirmDel(null); showToast('Deleted')
   }
 
   const reps = employees.length>0 ? employees.map(e=>e.name) : ['Romy Cruz','Dana Richard','Yesenia Gonzalez']

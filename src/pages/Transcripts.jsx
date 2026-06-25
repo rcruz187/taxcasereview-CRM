@@ -93,7 +93,7 @@ export default function Transcripts() {
   async function del(id) { setConfirmDel(id) }
   async function confirmDelTranscript() {
     await supabase.from('transcripts').delete().eq('id', confirmDel)
-    setConfirmDel(null); showToast('Deleted'); load()
+    setConfirmDel(null); showToast('Deleted'); setItems(prev => prev.filter(i => i.id !== (editId || confirmDel))); setConfirmDel(null); showToast('Deleted')
   }
 
   function parseYears(t) {

@@ -110,21 +110,21 @@ export default function Tasks() {
   async function softDelete(id) {
     const {error} = await supabase.from('tasks').update({deleted:true, deleted_at:new Date().toISOString()}).eq('id',id)
     if (error) {
-      // Column may not exist — fall back to hard delete
       await supabase.from('tasks').delete().eq('id',id)
+      setTasks(prev => prev.filter(t => t.id !== id))
       showToast('Task deleted')
     } else {
+      setTasks(prev => prev.map(t => t.id === id ? {...t, deleted:true, deleted_at:new Date().toISOString()} : t))
       showToast('Task moved to deleted')
     }
-    load()
   }
 
   // Restore a deleted task (Super Admin only)
   async function restore(id) {
     const {error} = await supabase.from('tasks').update({deleted:false, deleted_at:null}).eq('id',id)
     if (error){showToast('❌ '+error.message);return}
+    setTasks(prev => prev.map(t => t.id === id ? {...t, deleted:false, deleted_at:null} : t))
     showToast('✅ Task restored!')
-    load()
   }
 
   // Permanent delete (Super Admin only)
@@ -132,7 +132,7 @@ export default function Tasks() {
     if (!window._confirmDel) { setConfirmDelId(id); return }
     window._confirmDel = false
     await supabase.from('tasks').delete().eq('id',id)
-    showToast('Permanently deleted'); load()
+    setTasks(prev => prev.filter(t => t.id !== id)); showToast('Permanently deleted')
   }
 
   const reps = employees.length>0 ? employees.map(e=>e.name) : ['Romy Cruz','Dana Richard','Yesenia Gonzalez']

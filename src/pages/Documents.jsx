@@ -109,6 +109,7 @@ export default function Documents() {
       if (path) await supabase.storage.from('documents').remove([path]).catch(()=>{})
     }
     await supabase.from('documents').delete().eq('id', doc.id)
+    setDocs(prev => prev.filter(d => d.id !== doc.id))
     setConfirmDel(null); showToast('Deleted'); loadAll()
   }
 

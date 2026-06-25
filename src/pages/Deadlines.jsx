@@ -79,7 +79,7 @@ export default function Deadlines() {
 
   async function deleteItem(id) {
     await supabase.from('deadlines').delete().eq('id',id)
-    showToast('Deleted'); load()
+    setItems(prev => prev.filter(i => i.id !== id)); showToast('Deleted')
   }
 
   // CSED = Collection Statute Expiration Date — 10 years from assessment date by default
