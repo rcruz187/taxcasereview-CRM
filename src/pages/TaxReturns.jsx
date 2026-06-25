@@ -1,3 +1,4 @@
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
@@ -144,6 +145,7 @@ export default function TaxReturns() {
   const [current, setCurrent]   = useState(null)
   const [form, setForm]         = useState(BLANK_RETURN)
   const [saving, setSaving]     = useState(false)
+  const [confirmDel, setConfirmDel] = useState(null)
   const [genPdf, setGenPdf]     = useState(false)
   const [toast, setToast]       = useState('')
   const [search, setSearch]     = useState('')
@@ -308,11 +310,10 @@ export default function TaxReturns() {
     }
   }
 
-  async function deleteReturn(id) {
-    if (!confirm('Delete this return?')) return
-    await supabase.from('tax_returns').delete().eq('id', id)
-    showToast('Deleted')
-    load()
+  async function deleteReturn(id) { setConfirmDel(id) }
+  async function confirmDeleteReturn() {
+    await supabase.from('tax_returns').delete().eq('id', confirmDel)
+    setConfirmDel(null); showToast('Deleted'); load()
   }
 
   async function updateStatus(id, status) {
@@ -1633,6 +1634,7 @@ export default function TaxReturns() {
         )
       })()}
     </div>
+  <DeleteConfirmModal open={!!confirmDel} label="tax return" onConfirm={confirmDeleteReturn} onCancel={() => setConfirmDel(null)} />
   )
 }
 
@@ -1806,6 +1808,7 @@ Submit to the IRS via IRS-approved e-file software (Drake,
 ProSeries, Lacerte, etc.) using your EFIN after review.
 ===============================================================`
 }
+
 
 
 
