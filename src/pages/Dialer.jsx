@@ -36,6 +36,7 @@ export default function Dialer() {
   } = useCall()
   const { role } = useApp()
   const canDeleteRecordings = role === 'Super Admin' || role === 'Admin'
+  const [confirmDel, setConfirmDel] = useState(null)
 
   const [leads, setLeads]       = useState([])
   const [callLog, setCallLog]   = useState([])
