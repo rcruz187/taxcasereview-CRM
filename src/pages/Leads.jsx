@@ -1105,7 +1105,7 @@ export default function Leads() {
     await navigator.clipboard.writeText(url).catch(()=>{})
 
     // Build Financial Intake link for this lead
-    const intakeUrl = `${window.location.origin}/taxcasereview-CRM/intake/${l.id}`
+    const intakeUrl = `${window.location.origin}/taxcasereview-CRM/financial-intake/${l.id}`
 
     // Generate Stripe Checkout link for the 1st Trade investigation fee
     let stripePayUrl = null
@@ -1165,7 +1165,7 @@ export default function Leads() {
     </div>
     ${paymentSection}
     <p style="margin:0 0 4px;font-size:11px;color:#94a3b8;text-align:center">Sign link: <a href="${url}" style="color:#3b82f6">${url}</a></p>
-    ${stripePayUrl?`<p style="margin:0 0 4px;font-size:11px;color:#94a3b8;text-align:center">Payment link: <a href="${stripePayUrl}" style="color:#0ea5e9">${stripePayUrl}</a></p>`:''}
+    ${stripePayUrl?`<p style="margin:0 0 4px;font-size:11px;color:#94a3b8;text-align:center">Can't click the button above? <a href="${stripePayUrl}" style="color:#0ea5e9">Click here to pay</a></p>`:''}
     <div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:10px;padding:20px 24px;margin:0 0 24px">
       <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#7e22ce;text-transform:uppercase;letter-spacing:.06em">📋 Step 3 — Complete Your Financial Intake</p>
       <p style="margin:0 0 14px;font-size:14px;color:#6b21a8;line-height:1.6">To build your resolution strategy, your advisor needs a picture of your current finances. This takes about 10 minutes and your progress saves automatically.</p>

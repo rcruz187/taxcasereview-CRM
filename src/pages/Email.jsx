@@ -410,12 +410,16 @@ export default function Email() {
                 style={{ flex: 1, overflow: 'auto', outline: 'none' }}>
                 {filtered.length === 0 ? (
                   <div style={{ padding: 30, textAlign: 'center', color: 'var(--t3)', fontSize: 13 }}>No emails in {triageFilter}</div>
-                ) : filtered.map((e, i) => (
-                  <div key={e.id} onClick={() => openEmail(e, i)}
+                ) : filtered.map((e, i) => {
+                  let isDragging = false
+                  return (
+                  <div key={e.id}
+                    onClick={() => { if (!isDragging) openEmail(e, i) }}
                     draggable
-                    onDragStart={ev => { ev.dataTransfer.setData('emailId', e.id); ev.dataTransfer.effectAllowed = 'move' }}
+                    onDragStart={ev => { isDragging = true; ev.dataTransfer.setData('emailId', e.id); ev.dataTransfer.effectAllowed = 'move' }}
+                    onDragEnd={() => { setTimeout(() => { isDragging = false }, 100) }}
                     style={{
-                    padding: '12px 14px', borderBottom: '1px solid var(--br)', cursor: 'pointer',
+                    padding: '12px 14px', borderBottom: '1px solid var(--br)', cursor: 'grab',
                     display: 'flex', gap: 10, alignItems: 'flex-start',
                     background: checkedIds.has(e.id) ? 'rgba(26,127,212,.10)' : selected?.id === e.id ? 'rgba(26,127,212,.14)' : 'transparent',
                     borderLeft: selected?.id === e.id ? '3px solid var(--blue)' : '3px solid transparent',
@@ -444,7 +448,8 @@ export default function Email() {
                       <div style={{ fontSize: 11, color: 'var(--t3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.body?.slice(0, 80)}</div>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
 
