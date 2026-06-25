@@ -212,13 +212,13 @@ export default function Email() {
     if (email.is_read) return
     await supabase.from('emails').update({ is_read: true }).eq('id', email.id)
     setEmails(es => es.map(e => e.id === email.id ? { ...e, is_read: true } : e))
+  }
 
   async function markUnread(email) {
     await supabase.from('emails').update({ is_read: false }).eq('id', email.id)
     setEmails(es => es.map(e => e.id === email.id ? { ...e, is_read: false } : e))
     if (selected?.id === email.id) setSelected(prev => ({ ...prev, is_read: false }))
     showToast('Marked as new')
-  }
   }
 
   function openEmail(email, index) {
