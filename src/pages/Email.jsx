@@ -180,9 +180,11 @@ export default function Email() {
   }
 
   async function moveTriage(id, triage) {
-    await supabase.from('emails').update({ triage }).eq('id', id)
-    load()
     if (selected?.id === id) setSelected(prev => ({ ...prev, triage }))
+    setEmails(prev => prev.map(e => e.id === id ? { ...e, triage } : e))
+    await supabase.from('emails').update({ triage }).eq('id', id)
+    showToast(`Moved to ${triage}`)
+    load()
   }
 
   // The trash icon archives instead of permanently deleting. Two reasons:
