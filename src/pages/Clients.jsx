@@ -379,6 +379,7 @@ function InlinePortalForm({ client, onClose, showToast }) {
 
   <!-- Header banner -->
   <tr><td style="background:linear-gradient(135deg,#0f2d5c 0%,#1a4080 50%,#0e3060 100%);border-radius:16px 16px 0 0;padding:36px 40px;text-align:center">
+    <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style="max-height:64px;max-width:220px;object-fit:contain;margin-bottom:14px;display:block;margin-left:auto;margin-right:auto" onerror="this.style.display='none'"/>
     <div style="font-size:11px;font-weight:800;color:#93c5fd;letter-spacing:.15em;text-transform:uppercase;margin-bottom:12px">Tax Case Review</div>
     <div style="font-size:28px;font-weight:800;color:#ffffff;margin-bottom:6px">Welcome, ${client.name}!</div>
     <div style="font-size:15px;color:#bfdbfe;margin-bottom:0">Your Client Portal is ready and waiting for you.</div>

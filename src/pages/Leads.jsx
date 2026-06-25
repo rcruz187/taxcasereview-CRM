@@ -1104,8 +1104,24 @@ export default function Leads() {
     const url = res.url
     await navigator.clipboard.writeText(url).catch(()=>{})
 
-    // Build Financial Intake link for this lead
-    const intakeUrl = `${window.location.origin}/taxcasereview-CRM/financial-intake/${l.id}`
+    // Find or create the financial intake record and use its real ID
+    let intakeId = null
+    try {
+      const { data: existingIntake } = await supabase.from('financial_intake_responses')
+        .select('id').eq('client_name', l.name).order('created_at',{ascending:false}).limit(1).maybeSingle()
+      if (existingIntake) {
+        intakeId = existingIntake.id
+      } else {
+        const { data: newIntake } = await supabase.from('financial_intake_responses').insert([{
+          client_name: l.name, client_email: l.email || '', status: 'Sent',
+          answers: {}, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        }]).select().single()
+        if (newIntake) intakeId = newIntake.id
+      }
+    } catch(e) { console.error('Intake record lookup error:', e) }
+    const intakeUrl = intakeId
+      ? `${window.location.origin}/taxcasereview-CRM/financial-intake/${intakeId}`
+      : `${window.location.origin}/taxcasereview-CRM/financial-intake/${l.id}`
 
     // Generate Stripe Checkout link for the 1st Trade investigation fee
     let stripePayUrl = null
