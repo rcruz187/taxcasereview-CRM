@@ -1,20 +1,15 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-// Creates a Stripe Checkout link (hosted payment page) for a lead or client
-// and lets the rep copy it or text it straight to them. The client fills in
-// their own card on Stripe's page — none of it touches our servers. Once
-// paid, stripe-checkout-webhook logs the payment and saves the card on file
-// for future use, the same as the embedded card-on-file flow does.
 export default function SendPaymentLinkModal({ record, recordType, onClose, showToast, purpose, defaultAmount, defaultDescription }) {
   const [amount, setAmount] = useState(defaultAmount ? String(defaultAmount) : '')
   const [description, setDescription] = useState(defaultDescription || '')
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
+  const [emailing, setEmailing] = useState(false)
   const [err, setErr] = useState('')
   const [link, setLink] = useState(null)
   const [copied, setCopied] = useState(false)
-  const [emailing, setEmailing] = useState(false)
 
   async function generate() {
     if (!amount || parseFloat(amount) <= 0) { setErr('Enter a valid amount'); return }
@@ -51,6 +46,8 @@ export default function SendPaymentLinkModal({ record, recordType, onClose, show
     showToast?.('✅ Payment link emailed')
     onClose()
   }
+
+  async function textLink() {
     if (!record.phone) { setErr('No phone number on file'); return }
     setSending(true); setErr('')
     const toNum = '+1' + record.phone.replace(/\D/g, '').slice(-10)
@@ -94,7 +91,7 @@ export default function SendPaymentLinkModal({ record, recordType, onClose, show
           </>
         ) : (
           <>
-            <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 10 }}>Link ready — copy it or text it directly:</div>
+            <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 10 }}>Link ready — copy it or send it directly:</div>
             <div style={{ background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: 'var(--tx)', wordBreak: 'break-all', marginBottom: 12 }}>
               {link}
             </div>
