@@ -15,6 +15,7 @@ export default function MeetingRoom() {
   const [processedStream, setProcessedStream] = useState(null)
 
   const webrtc  = useWebRTCRoom('meet')
+  const peerConnsRef = webrtc.peerConnsRef
   const vbg = useVideoBackground()
   const rawRef  = useRef(null)  // original camera stream
 
@@ -46,40 +47,44 @@ export default function MeetingRoom() {
     const raw = rawRef.current
     if (!raw) return
 
-    const out = await vbg.changeBackground(raw, mode, presetId, customUrl)
-
     if (mode === 'none') {
-      // Restore raw stream
-      webrtc.localStreamRef.current = raw
+      vbg.stopLoop()
       setProcessedStream(null)
-      // Replace video track in all peer connections back to raw
-      replacePeerTrack(raw.getVideoTracks()[0])
-    } else {
-      webrtc.localStreamRef.current = out
-      setProcessedStream(out)
-      // Replace video track in all peer connections with processed canvas track
-      const newTrack = out.getVideoTracks()[0]
-      if (newTrack) replacePeerTrack(newTrack)
+      webrtc.localStreamRef.current = raw
+      return
     }
+
+    const out = await vbg.changeBackground(raw, mode, presetId, customUrl)
+    if (!out) return // failed silently
+
+    // Directly set the processed stream — VideoTile will pick it up via useEffect
+    webrtc.localStreamRef.current = out
+    setProcessedStream(new MediaStream(out.getTracks())) // new ref forces VideoTile re-render
+
+    // Also replace track in any active peer connections
+    try {
+      const newTrack = out.getVideoTracks()[0]
+      if (newTrack) {
+        const pcs = Object.values(webrtc.peerConnsRef?.current || {})
+        for (const pc of pcs) {
+          const sender = pc.getSenders().find(s => s.track?.kind === 'video')
+          if (sender) sender.replaceTrack(newTrack).catch(() => {})
+        }
+      }
+    } catch (_) {}
   }
 
-  function replacePeerTrack(newTrack) {
-    if (!newTrack) return
-    // Access the peer connections through the webrtc hook's internal ref
-    // by iterating RTCPeerConnections in the window (they register themselves)
-    // We trigger a re-render so VideoTile picks up the new stream reference
-    setProcessedStream(s => s === null ? undefined : null) // force re-render
-    setTimeout(() => setProcessedStream(webrtc.localStreamRef.current), 50)
-  }
-
-  const displayStream = processedStream !== null ? processedStream : webrtc.localStreamRef.current
+  const displayStream = processedStream || webrtc.localStreamRef.current
 
   if (!entered) {
     return (
       <div style={S.page}>
         <div style={S.card}>
-<div style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: 4 }}>Join your meeting</div>
-          <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 20 }}>Tax Case Review — secure video meeting</div>
+          <div style={{ textAlign: 'center', marginBottom: 20 }}>
+            <img src="/taxcasereview-CRM/logo.png" alt="Tax Case Review" style={{ height: 48, objectFit: 'contain', marginBottom: 14 }} onError={e => e.target.style.display='none'} />
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: 4 }}>Join your meeting</div>
+            <div style={{ fontSize: 13, color: '#94a3b8' }}>Tax Case Review — secure video meeting</div>
+          </div>
           <label style={S.label}>Your name</label>
           <input
             style={S.textInput}
