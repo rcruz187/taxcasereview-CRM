@@ -245,11 +245,11 @@ export default function Email() {
   // as a file explorer. Plain Up/Down without Shift just moves which
   // single email is open for reading, clearing any multi-select.
   function onListKeyDown(e) {
-    // Delete or Backspace archives the selected email
-    if ((e.key === 'Delete' || e.key === 'Backspace') && selected && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+    // Delete or Backspace: if emails are checked, delete all checked; else delete the open one
+    if ((e.key === 'Delete' || e.key === 'Backspace') && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
       e.preventDefault()
-      archiveEmail(selected.id)
-      return
+      if (checkedIds.size > 0) { archiveSelected(); return }
+      if (selected) { archiveEmail(selected.id); return }
     }
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
     if (filtered.length === 0) return
@@ -383,6 +383,20 @@ export default function Email() {
               display: 'flex', flexDirection: 'column', background: 'var(--sf)'
             }}>
               <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--br)', display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  type="checkbox"
+                  title="Select all"
+                  checked={filtered.length > 0 && filtered.every(e => checkedIds.has(e.id))}
+                  ref={el => { if (el) el.indeterminate = checkedIds.size > 0 && !filtered.every(e => checkedIds.has(e.id)) }}
+                  onChange={e => {
+                    if (e.target.checked) {
+                      setCheckedIds(new Set(filtered.map(e => e.id)))
+                    } else {
+                      setCheckedIds(new Set()); anchorIndexRef.current = -1
+                    }
+                  }}
+                  style={{ cursor: 'pointer', flexShrink: 0, width: 15, height: 15 }}
+                />
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search emails…"
                   style={{ flex: 1, padding: '7px 12px', borderRadius: 8, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--tx)', fontSize: 13 }} />
                 <div style={{ display: 'flex', border: '1px solid var(--br)', borderRadius: 7, overflow: 'hidden', flexShrink: 0 }}>
