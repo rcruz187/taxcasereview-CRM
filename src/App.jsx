@@ -1,4 +1,22 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { supabase } from './lib/supabase'
+
+// Auto-logout after 3.5 hours of inactivity — all employees
+const IDLE_MS = 3.5 * 60 * 60 * 1000
+let _idleTimer = null
+function _resetIdle() {
+  clearTimeout(_idleTimer)
+  _idleTimer = setTimeout(async () => {
+    await supabase.auth.signOut()
+    window.location.href = '/taxcasereview-CRM/'
+  }, IDLE_MS)
+}
+if (typeof window !== 'undefined') {
+  ;['mousedown','mousemove','keydown','scroll','touchstart','click'].forEach(ev =>
+    window.addEventListener(ev, _resetIdle, { passive: true })
+  )
+  _resetIdle()
+}
 import { Suspense, lazy } from 'react'
 import { AppProvider, useApp } from './context/AppContext'
 import { CallProvider } from './context/CallContext'
