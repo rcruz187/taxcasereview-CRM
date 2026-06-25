@@ -1633,8 +1633,8 @@ export default function TaxReturns() {
           </div>
         )
       })()}
+      <DeleteConfirmModal open={!!confirmDel} label="tax return" onConfirm={confirmDeleteReturn} onCancel={() => setConfirmDel(null)} />
     </div>
-  <DeleteConfirmModal open={!!confirmDel} label="tax return" onConfirm={confirmDeleteReturn} onCancel={() => setConfirmDel(null)} />
   )
 }
 
