@@ -1564,7 +1564,7 @@ export default function Clients() {
                 setFillerClient({...c, address:c.street, business_name:c.name})
               } catch (err) { showToast('Error opening form: ' + err.message) }
             }}/>
-            <ActionBtn color="#0f766e" icon="🏛️" label="Pre-Fill State POA" sub={c.state ? c.state+' Form' : 'State Form'} onClick={()=>nav('/stateforms?client='+c.id)}/>
+            <ActionBtn color="#0f766e" icon="🏛️" label="Pre-Fill State POA" sub={c.state ? c.state+' Form' : 'State Form'} onClick={()=>navigate('/stateforms?client='+c.id)}/>
             <ActionBtn color="#d97706" icon="📋" label="Addendum" sub="Add Services" onClick={()=>{setAddForm({resolutionFee:'',paymentPlan:'',startDate:'',notes:'',services:[],sendVia:'email'});setAddModal(true)}}/>
             <ActionBtn color="#0ea5e9" icon="🔓" label="Client Portal" sub="Compliance Access" onClick={()=>{setPortalClient(c);setPortalModal(true)}}/>
             <ActionBtn color="#9333ea" icon="🧾" label="Tax Organizer" sub="Send for Filing" onClick={()=>{setOrgClient(c);setOrgModal(true)}}/>
