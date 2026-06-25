@@ -2233,6 +2233,29 @@ export default function Leads() {
     <div>
       {toast && <div className="toast show">{toast}</div>}
 
+      {/* Stat cards */}
+      {!showArchived && (() => {
+        const active = leads.filter(l=>!l.archived&&!['Dead','Do Not Contact','Converted to Client'].includes(l.status)).length
+        const newL   = leads.filter(l=>!l.archived&&l.status==='New Lead').length
+        const conv   = leads.filter(l=>!l.archived&&l.status==='Converted to Client').length
+        const dead   = leads.filter(l=>!l.archived&&['Dead','Do Not Contact'].includes(l.status)).length
+        return (
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:10,marginBottom:14}}>
+            {[
+              {label:'Total Leads', val:leads.filter(l=>!l.archived).length, color:'var(--tx)'},
+              {label:'New',         val:newL,   color:'var(--blue)'},
+              {label:'In Progress', val:active, color:'var(--warn)'},
+              {label:'Converted',   val:conv,   color:'var(--green)'},
+            ].map(({label,val,color})=>(
+              <div key={label} className="card" style={{padding:'12px 16px',textAlign:'center'}}>
+                <div style={{fontSize:26,fontWeight:900,color,lineHeight:1}}>{val}</div>
+                <div style={{fontSize:10,color:'var(--t3)',marginTop:4,textTransform:'uppercase',letterSpacing:'.05em'}}>{label}</div>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
+
       <div style={{marginBottom:10,display:'flex',flexWrap:'wrap',gap:4,alignItems:'center'}}>
         {['All',...STATUSES.slice(0,8)].map(s => (
           <span key={s} className={`chip${filter===s?' on':''}`} onClick={()=>setFilter(s)}>{s}</span>
@@ -2252,7 +2275,7 @@ export default function Leads() {
 
       <div className="card">
         <div className="ch">
-          <span className="ct">All Leads ({filtered.length})</span>
+          <span className="ct">{showArchived ? 'Archived Leads' : 'All Leads'} <span style={{fontSize:12,fontWeight:500,color:'var(--t3)',marginLeft:6}}>({filtered.length})</span></span>
           <button className="btn pri" onClick={()=>{ setForm(isTaxAdvisor && employeeName ? { ...BLANK, assignedTo: employeeName } : BLANK); setModal(true) }}>+ Add Lead</button>
         </div>
         <div className="ovx">
@@ -2262,21 +2285,29 @@ export default function Leads() {
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={9} style={{textAlign:'center',color:'var(--t3)',padding:20}}>No leads yet — add your first one!</td></tr>
+                <tr><td colSpan={9}>
+                  <div style={{textAlign:'center',padding:'48px 20px',color:'var(--t3)'}}>
+                    <div style={{fontSize:36,marginBottom:10}}>📋</div>
+                    <div style={{fontWeight:700,fontSize:15,color:'var(--tx)',marginBottom:4}}>
+                      {showArchived ? 'No archived leads' : filter !== 'All' ? `No leads with status "${filter}"` : 'No leads yet'}
+                    </div>
+                    {!showArchived && filter === 'All' && <div style={{fontSize:13}}>Add your first lead to get started.</div>}
+                  </div>
+                </td></tr>
               ) : filtered.map(l => (
                 <tr key={l.id} onClick={()=>{ setDetail(l); loadLeadNotes(l.id); navigate('/leads/'+l.id, {replace:true}) }} style={{cursor:'pointer'}}>
                   <td style={{fontWeight:600}}>{l.name}</td>
                   <td><span className="bdg bb">{l.clientType||'Individual'}</span></td>
                   <td onClick={e=>e.stopPropagation()}><PhoneLink val={l.phone} name={l.name}/></td>
                   <td><TypeBdg t={l.issueType||'—'}/></td>
-                  <td style={{color:'var(--t2)'}}>{l.irsBalance||'—'}</td>
-                  <td style={{color:'var(--t2)'}}>{l.source||'—'}</td>
+                  <td style={{color:l.irsBalance&&l.irsBalance!=='—'?'var(--bad)':'var(--t3)',fontWeight:l.irsBalance&&l.irsBalance!=='—'?600:400}}>{l.irsBalance||'—'}</td>
+                  <td style={{color:'var(--t2)',fontSize:12}}>{l.source||'—'}</td>
                   <td><Bdg s={l.status||'New Lead'}/></td>
                   <td style={{color:'var(--t2)',fontSize:12}}>{l.assignedTo||<span style={{color:'var(--warn)'}}>Unassigned</span>}</td>
                   <td onClick={e=>e.stopPropagation()}>
                     {l.archived
-                      ? <button className="btn" onClick={()=>restoreLead(l)}>↩</button>
-                      : <button className="btn del" onClick={()=>archiveLead(l)}>Del</button>}
+                      ? <button className="btn" style={{padding:'3px 8px',fontSize:12}} onClick={()=>restoreLead(l)}>↩ Restore</button>
+                      : <button className="btn del" style={{padding:'3px 8px',fontSize:13}} onClick={()=>archiveLead(l)}>🗑</button>}
                   </td>
                 </tr>
               ))}

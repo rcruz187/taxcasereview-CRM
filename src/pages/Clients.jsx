@@ -2563,12 +2563,35 @@ export default function Clients() {
   }
 
   // ── List View ────────────────────────────────────────────────────────────────
+  const totalClients   = clients.filter(c=>!c.archived).length
+  const activeClients  = clients.filter(c=>!c.archived&&c.status==='Active').length
+  const indivClients   = clients.filter(c=>!c.archived&&(c.clientType||'Individual')==='Individual').length
+  const bizClients     = clients.filter(c=>!c.archived&&c.clientType==='Business').length
+
   return (
     <div>
       {toast&&<div className="toast show">{toast}</div>}
+
+      {/* Stat cards */}
+      {!showArchived&&(
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:10,marginBottom:14}}>
+          {[
+            {label:'Total Clients', val:totalClients,  color:'var(--tx)'},
+            {label:'Active',        val:activeClients,  color:'var(--green)'},
+            {label:'Individuals',   val:indivClients,   color:'var(--blue)'},
+            {label:'Businesses',    val:bizClients,     color:'var(--warn)'},
+          ].map(({label,val,color})=>(
+            <div key={label} className="card" style={{padding:'12px 16px',textAlign:'center'}}>
+              <div style={{fontSize:26,fontWeight:900,color,lineHeight:1}}>{val}</div>
+              <div style={{fontSize:10,color:'var(--t3)',marginTop:4,textTransform:'uppercase',letterSpacing:'.05em'}}>{label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="card">
         <div className="ch">
-          <span className="ct">Client Roster ({filtered.length})</span>
+          <span className="ct">{showArchived?'Archived Clients':'Client Roster'} <span style={{fontSize:12,fontWeight:500,color:'var(--t3)',marginLeft:6}}>({filtered.length})</span></span>
           <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
             {['All','Individual','Business'].map(f=>(
               <span key={f} className={`chip${filter===f?' on':''}`} onClick={()=>setFilter(f)}>{f}</span>
@@ -2580,26 +2603,31 @@ export default function Clients() {
         <div className="ovx">
           <table>
             <thead>
-              <tr><th>Name</th><th>Type</th><th>Phone</th><th>Email</th><th>IRS Balance</th><th>Issue</th><th>Assigned</th><th>Status</th><th>Since</th><th></th></tr>
+              <tr><th>Name</th><th>Type</th><th>Phone</th><th>Email</th><th>IRS Balance</th><th>Issue</th><th>Assigned</th><th>Status</th><th></th></tr>
             </thead>
             <tbody>
               {filtered.length===0?(
-                <tr><td colSpan={10} style={{textAlign:'center',color:'var(--t3)',padding:20}}>No clients yet</td></tr>
+                <tr><td colSpan={9}>
+                  <div style={{textAlign:'center',padding:'48px 20px',color:'var(--t3)'}}>
+                    <div style={{fontSize:36,marginBottom:10}}>👤</div>
+                    <div style={{fontWeight:700,fontSize:15,color:'var(--tx)',marginBottom:4}}>No clients yet</div>
+                    <div style={{fontSize:13}}>Add your first client to get started.</div>
+                  </div>
+                </td></tr>
               ):filtered.map(c=>(
                 <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>openDetail(c)}>
                   <td style={{fontWeight:600}}>{c.name}</td>
                   <td><span className="bdg bb">{c.clientType||'Individual'}</span></td>
                   <td onClick={e=>e.stopPropagation()}><PhoneLink val={c.phone} name={c.name}/></td>
                   <td style={{color:'var(--t2)',fontSize:12}}>{c.email||'—'}</td>
-                  <td>{formatBalance(c.irsBalance)}</td>
-                  <td>{c.issueType||'—'}</td>
+                  <td style={{color:c.irsBalance?'var(--bad)':'var(--t3)',fontWeight:c.irsBalance?600:400}}>{formatBalance(c.irsBalance)}</td>
+                  <td><span className="bdg bn" style={{fontSize:11}}>{c.issueType||'—'}</span></td>
                   <td style={{color:'var(--t2)',fontSize:12}}>{c.assignedTo||'—'}</td>
                   <td><span className={`bdg ${c.status==='Active'?'bg':'bn'}`}>{c.status||'Active'}</span></td>
-                  <td style={{color:'var(--t2)',fontSize:12}}>{c.clientSince||'—'}</td>
                   <td onClick={e=>e.stopPropagation()}>
                     {c.archived
-                      ? <button className="btn" onClick={()=>restoreClient(c.id)}>↩</button>
-                      : <button className="btn del" onClick={()=>archiveClient(c.id,c.name)}>Del</button>}
+                      ? <button className="btn" style={{padding:'3px 8px',fontSize:12}} onClick={()=>restoreClient(c.id)}>↩ Restore</button>
+                      : <button className="btn del" style={{padding:'3px 8px',fontSize:13}} onClick={()=>archiveClient(c.id,c.name)}>🗑</button>}
                   </td>
                 </tr>
               ))}
@@ -2607,7 +2635,16 @@ export default function Clients() {
           </table>
         </div>
       </div>
+
       {modal&&<ClientFormModal form={form} fld={fld} reps={reps} saving={saving} onSave={save} onClose={()=>setModal(false)} title="Add Client"/>}
+
+      {/* ✅ Fixed: DeleteConfirmModal must live HERE in the parent component, not inside ClientFormModal */}
+      <DeleteConfirmModal
+        open={!!confirmArchive}
+        label={`client "${confirmArchive?.name}"`}
+        onConfirm={confirmArchiveClient}
+        onCancel={() => setConfirmArchive(null)}
+      />
     </div>
   )
 }
@@ -2837,12 +2874,6 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
           {saving?'Saving…':title}
         </button>
       </div>
-      <DeleteConfirmModal
-        open={!!confirmArchive}
-        label={`client "${confirmArchive?.name}"`}
-        onConfirm={confirmArchiveClient}
-        onCancel={() => setConfirmArchive(null)}
-      />
     </div>
   )
 }
