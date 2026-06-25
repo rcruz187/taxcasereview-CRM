@@ -1,3 +1,4 @@
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import PayrollStatCards from '../components/PayrollStatCards'
@@ -52,6 +53,7 @@ export default function TimeClock() {
   const [items,      setItems]      = useState([])
   const [employees,  setEmployees]  = useState([])
   const [modal,      setModal]      = useState(false)
+  const [confirmDel, setConfirmDel] = useState(null)
   const [editId,     setEditId]     = useState(null)
   const [form,       setForm]       = useState(BLANK)
   const [saving,     setSaving]     = useState(false)
@@ -158,10 +160,10 @@ export default function TimeClock() {
     setSaving(false); setModal(false); setForm(BLANK); setEditId(null); load()
   }
 
-  async function del(id) {
-    if (!confirm('Delete this entry?')) return
-    await supabase.from('timeentries').delete().eq('id', id)
-    showToast('Deleted'); load()
+  async function del(id) { setConfirmDel(id) }
+  async function confirmDelEntry() {
+    await supabase.from('timeentries').delete().eq('id', confirmDel)
+    setConfirmDel(null); showToast('Deleted'); load()
   }
 
   const empNames = employees.length > 0 ? employees.map(e => e.name) : ['Romy Cruz', 'Dana Richard', 'Yesenia Gonzalez']
@@ -464,5 +466,7 @@ export default function TimeClock() {
         </div>
       )}
     </div>
+  <DeleteConfirmModal open={!!confirmDel} label="time entry" onConfirm={confirmDelEntry} onCancel={() => setConfirmDel(null)} />
   )
 }
+
