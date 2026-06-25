@@ -190,10 +190,8 @@ export default function Calendar() {
   }
 
   async function deleteEvent(id) {
-    if (confirmDel !== id) { setConfirmDel(id); return }
-    setConfirmDel(null)
     await supabase.from('calevents').delete().eq('id', id)
-    setSelectedEvent(null); showToast('Deleted'); load()
+    setSelectedEvent(null); setConfirmDel(null); showToast('Deleted'); load()
   }
 
   async function quickStatus(ev, status) {
