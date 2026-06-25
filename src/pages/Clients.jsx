@@ -1,3 +1,4 @@
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import IRSFormFiller from '../components/IRSFormFiller'
@@ -844,6 +845,7 @@ export default function Clients() {
   const [employees, setEmployees] = useState([])
   const [filter,    setFilter]    = useState('All')
   const [showArchived, setShowArchived] = useState(false)
+  const [confirmArchive, setConfirmArchive] = useState(null)
   const [modal,     setModal]     = useState(false)
   const [editModal, setEditModal] = useState(false)
   const [form,      setForm]      = useState(BLANK)
@@ -1137,8 +1139,9 @@ export default function Clients() {
 
   // Clients are archived, never permanently deleted — this hides them from
   // the active roster but keeps every field, note, document, and payment intact.
-  async function archiveClient(id,name) {
-    if (!window.confirm(`Archive ${name}? This hides it from the active roster — nothing is deleted, and you can restore it anytime from the Archived view.`)) return
+  async function archiveClient(id,name) { setConfirmArchive({id,name}) }
+  async function confirmArchiveClient() {
+    const {id,name} = confirmArchive; setConfirmArchive(null)
     const { error } = await supabase.from('clients').update({ archived: true }).eq('id',id)
     if (error) { showToast('Error: '+error.message); return }
     const actorA = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
@@ -2834,6 +2837,12 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
           {saving?'Saving…':title}
         </button>
       </div>
+      <DeleteConfirmModal
+        open={!!confirmArchive}
+        label={`client "${confirmArchive?.name}"`}
+        onConfirm={confirmArchiveClient}
+        onCancel={() => setConfirmArchive(null)}
+      />
     </div>
   )
 }
