@@ -863,10 +863,17 @@ export default function Leads() {
       await supabase.from('client_compliance_records').update({ client_name: form.name }).eq('client_name', oldName)
     }
     if (!skipped.length) { showToast(modal==='edit' ? '✅ Lead updated!' : '✅ Lead added!'); if (modal !== 'edit') await triggerWorkflow('lead_created', 'lead', form.name, actor) }
-    setModal(false); setForm(BLANK); load()
-    if (modal==='edit' && detail) {
+    setModal(false); setForm(BLANK)
+    if (modal === 'edit' && detail) {
       const { data } = await supabase.from('leads').select('*').eq('id', form.id).single()
       if (data) setDetail(data)
+      load()
+    } else {
+      // New lead — reload then navigate straight into the detail view
+      const { data: allLeads } = await supabase.from('leads').select('*').order('created_at', { ascending: false })
+      if (allLeads) setLeads(allLeads)
+      const newest = allLeads?.find(l => l.name === form.name)
+      if (newest) { setDetail(newest); loadLeadNotes(newest.id); navigate('/leads/' + newest.id, { replace: true }) }
     }
   }
 
@@ -877,7 +884,12 @@ export default function Leads() {
     const l = confirmArchive; setConfirmArchive(null)
     const { error } = await supabase.from('leads').update({ archived: true }).eq('id', l.id)
     if (error) { showToast('Error: ' + error.message); return }
-    showToast('Lead archived'); await triggerWorkflow('lead_archived', 'lead', detail?.name || '', actor); setDetail(null); load()
+    // Update local state immediately — no refresh needed
+    setLeads(prev => prev.map(lead => lead.id === l.id ? { ...lead, archived: true } : lead))
+    setDetail(null)
+    navigate('/leads', { replace: true })
+    showToast('Lead archived')
+    await triggerWorkflow('lead_archived', 'lead', l.name || '', actor)
   }
 
   async function restoreLead(l) {

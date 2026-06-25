@@ -1108,7 +1108,12 @@ export default function Clients() {
     showToast(skipped.length ? `✅ Client added — but skipped fields not in the database yet: ${skipped.join(', ')}` : '✅ Client added!')
     const actorC = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
     await triggerWorkflow('client_created', 'client', form.name, actorC).catch(()=>{})
-    setModal(false);setForm(BLANK);load()
+    setModal(false); setForm(BLANK)
+    // Reload then navigate straight into the new client's detail
+    const { data: allClients } = await supabase.from('clients').select('*').order('created_at', { ascending: false })
+    if (allClients) setClients(allClients)
+    const newest = allClients?.find(c => c.name === form.name)
+    if (newest) { setDetail(newest); loadRelated(newest.name); navigate('/clients/' + newest.id, { replace: true }) }
   }
 
   async function saveEdit() {
@@ -1146,8 +1151,12 @@ export default function Clients() {
     const { error } = await supabase.from('clients').update({ archived: true }).eq('id',id)
     if (error) { showToast('Error: '+error.message); return }
     const actorA = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
-    await triggerWorkflow('client_archived', 'client', detail?.name || '', actorA).catch(()=>{})
-    showToast('Client archived');setDetail(null);load()
+    await triggerWorkflow('client_archived', 'client', name || '', actorA).catch(()=>{})
+    // Update local state immediately — no refresh needed
+    setClients(prev => prev.map(c => c.id === id ? { ...c, archived: true } : c))
+    setDetail(null)
+    navigate('/clients', { replace: true })
+    showToast('Client archived')
   }
 
   async function restoreClient(id) {
