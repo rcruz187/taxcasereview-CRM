@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useFirm } from '../lib/useFirm'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
@@ -9,23 +10,41 @@ const STATE_FORMS = [
   { num: 'AZ-285-I',       state: 'AZ', label: 'Individual Tax Disclosure / POA',                     url: `${BASE}/state-forms/AZ_POA.pdf` },
   { num: 'CA-3520-PIT',    state: 'CA', label: 'Individual or Fiduciary POA Declaration',             url: `${BASE}/state-forms/CA_POA.pdf` },
   { num: 'CA-3520-BE',     state: 'CA', label: 'Business Entity POA Declaration',                     url: `${BASE}/state-forms/CA_POA_Biz.pdf` },
-  { num: 'FL-DR-835',      state: 'FL', label: 'Power of Attorney and Declaration of Representative', url: `${BASE}/state-forms/FL_POA.pdf` },
-  { num: 'GA-RD-1061',     state: 'GA', label: 'Power of Attorney and Declaration of Representative', url: `${BASE}/state-forms/GA_POA.pdf` },
+  { num: 'FL-DR-835',      state: 'FL', label: 'Power of Attorney', url: `${BASE}/state-forms/FL_POA.pdf` },
+  { num: 'GA-RD-1061',     state: 'GA', label: 'Power of Attorney', url: `${BASE}/state-forms/GA_POA.pdf` },
   { num: 'ID-POA',         state: 'ID', label: 'Power of Attorney',                                   url: `${BASE}/state-forms/ID_POA.pdf` },
   { num: 'IL-2848',        state: 'IL', label: 'Power of Attorney',                                   url: `${BASE}/state-forms/IL_POA.pdf` },
-  { num: 'MA-M-2848',      state: 'MA', label: 'Power of Attorney and Declaration of Representative', url: `${BASE}/state-forms/MA_POA.pdf` },
+  { num: 'MA-M-2848',      state: 'MA', label: 'Power of Attorney', url: `${BASE}/state-forms/MA_POA.pdf` },
   { num: 'MO-2827',        state: 'MO', label: 'Power of Attorney',                                   url: `${BASE}/state-forms/MO_POA.pdf` },
   { num: 'MO-149',         state: 'MO', label: 'Sales and Use Tax Exemption Certificate',             url: `${BASE}/state-forms/Form_149_MO.pdf` },
   { num: 'OR-150-800-005', state: 'OR', label: 'Tax Information Authorization and POA',               url: `${BASE}/state-forms/OR_POA.pdf` },
   { num: 'TN-RV-F0103801', state: 'TN', label: 'Power of Attorney',                                   url: `${BASE}/state-forms/TN_POA.pdf` },
-  { num: 'WA-42-2446',     state: 'WA', label: 'Confidential Tax Information Authorization',          url: `${BASE}/state-forms/Washington_POA.pdf` },
-  { num: 'WY-POA',         state: 'WY', label: 'Statutory Form Power of Attorney',                    url: `${BASE}/state-forms/Wyoming.pdf` },
+  { num: 'WA-42-2446',     state: 'WA', label: 'Power of Attorney', url: `${BASE}/state-forms/Washington_POA.pdf` },
+  { num: 'WY-POA',         state: 'WY', label: 'Power of Attorney', url: `${BASE}/state-forms/Wyoming.pdf` },
 ]
+
+const firmName = 'Tax Case Review & Resolution Services'
+const address  = '631 US Highway One Ste 304, North Palm Beach, FL 33408'
+const email    = 'info@taxcasereview.com'
+const LOGO_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo'
+function printHeader(title) { return `<div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #1A7FD4;padding-bottom:16px"><img src="${LOGO_URL}" style="height:48px;margin-bottom:8px" onerror="this.style.display='none'"/><div style="font-size:20px;font-weight:700;color:#1A7FD4">${firmName}</div><div style="font-size:11px;color:#666">${address} · ${email}</div><div style="font-size:16px;font-weight:700;margin-top:10px;color:#111">${title}</div></div>` }
+function sigBlock(l1='Client Signature',l2='Authorized Representative'){return `<div style="display:flex;gap:40px;margin-top:32px"><div style="flex:1;border-top:1px solid #333;padding-top:6px;font-size:11px;color:#555">${l1}<br/>Date: ___________________</div><div style="flex:1;border-top:1px solid #333;padding-top:6px;font-size:11px;color:#555">${l2} — ${firmName}<br/>Date: ___________________</div></div>`}
+function printBase(title,body){const w=window.open('','_blank','width=860,height=1000');w.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:40px 48px;max-width:800px;margin:0 auto}h3{color:#1A7FD4;margin:18px 0 6px}p{margin:6px 0;line-height:1.6}.fee-box{border:2px solid #1A7FD4;border-radius:6px;padding:12px 16px;margin:16px 0;background:#f0f7ff}</style></head><body>${printHeader(title)}${body}</body></html>`);w.document.close();setTimeout(()=>w.print(),400)}
+function generateServiceAgreement(){printBase('Tax Investigation Service Agreement',`<p>This Tax Investigation Service Agreement is entered into between <b>${firmName}</b> and the undersigned client.</p><h3>1. Scope of Services</h3><p>Initial tax investigation including transcript review, liability identification, evaluation of resolution programs, and written summary of findings.</p><h3>2. Investigation Fee</h3><div class="fee-box"><b>Investigation Fee: $___________</b></div><h3>3. Not a Law Firm</h3><p>${firmName} is a tax resolution consulting firm, not a law firm.</p>${sigBlock()}`)}
+function generateAddendum(){printBase('Service Addendum',`<p>This Addendum supplements the Tax Investigation Service Agreement between <b>${firmName}</b> and the undersigned client.</p><h3>Additional Services</h3><ul><li>Full IRS/State representation</li><li>POA representation</li><li>Filing of delinquent returns</li></ul><div class="fee-box"><b>Additional Service Fee: $___________</b><br/>Payment plan: $___________ /month</div>${sigBlock()}`)}
+function generateEngagementLetter(){printBase('Engagement Letter',`<p>Dear Client,</p><p>Thank you for choosing <b>${firmName}</b>. We are pleased to confirm our engagement to assist you with your tax resolution matter.</p><h3>Services</h3><ul><li>Review tax transcripts</li><li>Identify outstanding liabilities</li><li>Represent you through resolution</li></ul>${sigBlock('Client Acknowledgment','Authorized Representative')}`)}
+function generatePOALetter(){printBase('Power of Attorney Cover Letter',`<p><b>Internal Revenue Service</b></p><p><b>Re: Form 2848 — Taxpayer: _____________________________</b></p><p>Enclosed is a completed Form 2848 authorizing <b>${firmName}</b> to represent the above-named taxpayer.</p><div style="border-left:3px solid #1A7FD4;padding-left:16px;margin:16px 0"><b>${firmName}</b><br/>${address}<br/>Email: ${email}</div>${sigBlock('','Authorized Representative — ' + firmName)}`)}
 
 export default function StateForms() {
   const [searchParams] = useSearchParams()
   const { user } = useApp()
   const [search, setSearch]               = useState('')
+  const [stateItems, setStateItems]       = useState([])
+  const [stateModal, setStateModal]       = useState(false)
+  const [stateSaving, setStateSaving]     = useState(false)
+  const SBLANK = { formNumber: '', state: '', client: '', filedDate: '', status: 'Not Filed', notes: '' }
+  const [stateForm, setStateForm]         = useState(SBLANK)
+  function sfld(k, v) { setStateForm(f => ({ ...f, [k]: v })) }
   const [clients, setClients]             = useState([])
   const [clientSearch, setClientSearch]   = useState('')
   const [selectedClient, setSelectedClient] = useState(null)
@@ -36,8 +55,11 @@ export default function StateForms() {
   const prefillRef = useRef(null)
 
   const [leads, setLeads] = useState([])
+  async function saveStateItem() { setStateSaving(true); await supabase.from('state_form_tracker').insert([{...stateForm,created_at:new Date().toISOString()}]); const {data}=await supabase.from('state_form_tracker').select('*').order('created_at',{ascending:false}); setStateItems(data||[]); setStateForm(SBLANK); setStateModal(false); setStateSaving(false) }
+  async function deleteStateItem(id) { await supabase.from('state_form_tracker').delete().eq('id',id); setStateItems(s=>s.filter(x=>x.id!==id)) }
 
   useEffect(() => {
+    supabase.from('state_form_tracker').select('*').order('created_at',{ascending:false}).then(({data})=>setStateItems(data||[]))
     supabase.from('clients').select('id,name,ssn,ein,street,city,state,zip,dob,phone,email,spouseName,spouseSsn,filingStatus')
       .then(({ data }) => setClients(data || []))
     supabase.from('leads').select('id,name,ssn,ein,street,city,state,zip,dob,phone,email')
@@ -316,6 +338,42 @@ export default function StateForms() {
           ))}
         </div>
       </div>
+
+      {/* Document Templates */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="ch"><span className="ct">Document Templates</span><span style={{fontSize:12,color:'var(--t2)'}}>Opens print-ready PDF window</span></div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:10,padding:'4px 0'}}>
+          {[{icon:'📄',label:'Tax Investigation\nService Agreement',desc:'Full TCR agreement w/ fees & signatures',action:generateServiceAgreement,color:'var(--blue)'},
+            {icon:'📋',label:'Service\nAddendum',desc:'Supplemental agreement for additional services',action:generateAddendum,color:'#25A25A'},
+            {icon:'✉️',label:'Engagement\nLetter',desc:'Client engagement confirmation letter',action:generateEngagementLetter,color:'#7B5EA7'},
+            {icon:'🔐',label:'POA Cover\nLetter',desc:'Form 2848 cover letter to IRS',action:generatePOALetter,color:'#D4930A'},
+          ].map(t=>(
+            <button key={t.label} className="btn sec" onClick={t.action} style={{display:'flex',flexDirection:'column',alignItems:'flex-start',padding:'12px 14px',gap:4,height:'auto',borderLeft:`3px solid ${t.color}`}}>
+              <div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontSize:18}}>{t.icon}</span><span style={{fontWeight:700,fontSize:12,lineHeight:1.3,whiteSpace:'pre-line',textAlign:'left'}}>{t.label}</span></div>
+              <span style={{fontSize:11,color:'var(--t2)',textAlign:'left',lineHeight:1.4}}>{t.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* State Form Tracker */}
+      <div className="card">
+        <div className="ch"><span className="ct">State Form Tracker ({stateItems.length})</span><button className="btn pri" onClick={()=>setStateModal(true)}>+ Log State Form</button></div>
+        <div className="ovx">
+          <table><thead><tr><th>Form</th><th>State</th><th>Client</th><th>Filed Date</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+            <tbody>{stateItems.length===0?(<tr><td colSpan={7} style={{textAlign:'center',color:'var(--t3)',padding:20}}>No state forms logged yet</td></tr>):stateItems.map(f=>(
+              <tr key={f.id}><td><span className="bdg bb" style={{fontWeight:700}}>{f.formNumber}</span></td><td><span className="bdg bn">{f.state||'—'}</span></td><td style={{fontWeight:600}}>{f.client||'—'}</td><td style={{color:'var(--t2)'}}>{f.filedDate||'—'}</td><td><span className="bdg bn">{f.status}</span></td><td style={{color:'var(--t2)',fontSize:12}}>{f.notes||'—'}</td><td><button className="btn del" onClick={()=>deleteStateItem(f.id)}>Del</button></td></tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </div>
+
+      {stateModal&&(<div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setStateModal(false)}><div className="modal"><div className="mh"><span className="mt">Log State Form</span><button className="xbtn" onClick={()=>setStateModal(false)}>&times;</button></div>
+        <div className="fg2"><div className="field"><label>Form / Type</label><input value={stateForm.formNumber} onChange={e=>sfld('formNumber',e.target.value)} placeholder="e.g. POA, M-2848"/></div><div className="field"><label>State</label><input value={stateForm.state} onChange={e=>sfld('state',e.target.value)} placeholder="e.g. FL, NY"/></div></div>
+        <div className="fg2"><div className="field"><label>Client</label><input value={stateForm.client} onChange={e=>sfld('client',e.target.value)} placeholder="Client name"/></div><div className="field"><label>Status</label><select value={stateForm.status} onChange={e=>sfld('status',e.target.value)}>{['Not Filed','Draft','Sent','Filed','Pending','Approved','Missing'].map(s=><option key={s}>{s}</option>)}</select></div></div>
+        <div className="fg2"><div className="field"><label>Filed Date</label><input type="date" value={stateForm.filedDate} onChange={e=>sfld('filedDate',e.target.value)}/></div><div className="field"><label>Notes</label><input value={stateForm.notes} onChange={e=>sfld('notes',e.target.value)} placeholder="Optional notes"/></div></div>
+        <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:10}} onClick={saveStateItem} disabled={stateSaving}>{stateSaving?'Saving...':'Log State Form'}</button>
+      </div></div>)}
     </div>
   )
 }
