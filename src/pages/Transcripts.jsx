@@ -318,8 +318,8 @@ export default function Transcripts() {
           </div>
         </div>
       )}
+      <DeleteConfirmModal open={!!confirmDel} label="transcript request" onConfirm={confirmDelTranscript} onCancel={() => setConfirmDel(null)} />
     </div>
-  <DeleteConfirmModal open={!!confirmDel} label="transcript request" onConfirm={confirmDelTranscript} onCancel={() => setConfirmDel(null)} />
   )
 }
 
