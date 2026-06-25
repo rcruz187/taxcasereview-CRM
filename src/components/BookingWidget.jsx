@@ -96,13 +96,6 @@ export default function BookingWidget({ contact, onClose, mode = 'lead' }) {
       await supabase.from('client_notes').insert({ client_name: contact.name, content: noteText, created_by: 'System', visible_to_client: false }).catch(()=>{})
     }
 
-    // Team notification
-    await supabase.from('chat_messages').insert([{
-      channel: 'general', sender: '🔔 System',
-      text: `📅 New appointment scheduled: **${contact?.name || 'Client'}** on ${form.date} at ${form.time}${form.eventType ? ` (${form.eventType})` : ''}.`,
-      created_at: new Date().toISOString()
-    }])
-
     setConfirmed(true)
     setTimeout(() => { setConfirmed(false); onClose() }, 1500)
   }
@@ -136,7 +129,7 @@ export default function BookingWidget({ contact, onClose, mode = 'lead' }) {
           {confirmed ? (
             <div style={{ textAlign: 'center', color: 'var(--ok)', fontWeight: 700, fontSize: 14, padding: '24px 0' }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
-              Appointment scheduled & team notified!
+              Appointment scheduled!
             </div>
           ) : (
             <>
@@ -253,7 +246,7 @@ export default function BookingWidget({ contact, onClose, mode = 'lead' }) {
 
               <button className="btn pri" style={{ width: '100%', justifyContent: 'center', padding: 11, fontSize: 14, fontWeight: 700, gap: 8 }}
                 onClick={confirmBooking} disabled={saving || !form.date || !form.time}>
-                {saving ? 'Saving…' : '✅ Schedule & Notify Team'}
+                {saving ? 'Saving…' : '✅ Schedule Appointment'}
               </button>
             </>
           )}
