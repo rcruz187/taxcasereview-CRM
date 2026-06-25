@@ -156,12 +156,30 @@ export default function SignPage() {
     // client still sees the confirmation screen; nothing here affects whether
     // the signature is legally captured (that already happened above).
     try {
-    // Forward-only, so this is a safe no-op once the lead has already
-    // converted to a client (no lead row left to match by name).
-    if (doc.doc_type === 'Full Investigation Package') {
-      await advanceLeadStatus(supabase, doc.client_name, 'Tax Inv Agreement Signed')
-    } else if (doc.doc_type === 'Service Addendum') {
-      await advanceLeadStatus(supabase, doc.client_name, 'Addendum Signed')
+
+    // ── Pipeline advance ──────────────────────────────────────────────────
+    // Map doc_type to the correct pipeline status. Forward-only — safe no-op
+    // once lead is converted or already past that stage.
+    const pipelineMap = {
+      'Full Investigation Package': 'Tax Inv Agreement Signed',
+      'Service Addendum':           'Addendum Signed',
+      'Tax Service Agreement':      'Tax Inv Agreement Signed',
+      'Service Agreement':          'Tax Inv Agreement Signed',
+    }
+    // State POA signed — doesn't change pipeline but logs a note
+    const targetStatus = pipelineMap[doc.doc_type] || null
+    if (targetStatus) {
+      await advanceLeadStatus(supabase, doc.client_name, targetStatus).catch(()=>{})
+    }
+
+    // ── Log note on lead/client file ──────────────────────────────────────
+    const noteText = `✅ ${doc.doc_type} signed — by: ${fullname} | IP: ${ip} | ${signedAt}`
+    // Try lead first, then client
+    const { data: leadRow } = await supabase.from('leads').select('id').eq('name', doc.client_name).maybeSingle().catch(()=>({data:null}))
+    if (leadRow?.id) {
+      await supabase.from('lead_notes').insert({ lead_id: leadRow.id, lead_name: doc.client_name, text: noteText, type: 'E-Sign', author: 'System', created_at: signedAt }).catch(()=>{})
+    } else {
+      await supabase.from('client_notes').insert({ client_name: doc.client_name, content: noteText, created_by: 'System', visible_to_client: false, created_at: signedAt }).catch(()=>{})
     }
 
     // Service Addendum is a contract — files under the Agreements folder
@@ -171,8 +189,7 @@ export default function SignPage() {
     // ('E-Signatures', plural) or it silently won't show under that folder.
     const savedDocType = doc.doc_type === 'Service Addendum' ? 'Agreements' : 'E-Signatures'
 
-    // Save to documents table so it appears in client file — this record is
-    // the signature certificate: who signed, from what IP, and when.
+    // Save signature certificate record to documents table
     await supabase.from('documents').insert([{
       client:     doc.client_name,
       name:       `Signed ${doc.doc_type} — ${doc.client_name}`,
@@ -230,8 +247,8 @@ export default function SignPage() {
           html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${doc.client_name}</strong>,</p><p>This confirms your signature was received on <strong>${doc.doc_type}</strong> on ${signedDate}. A copy has been saved to your file.</p>${attachmentLinks ? `<p>Signed documents:</p><ul>${attachmentLinks}</ul>` : ''}<p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
         }}).catch(() => {})
       }
-      if (doc.client_phone && cfg?.data?.signalwire_backend) {
-        await fetch(cfg.data.signalwire_backend + '/sms/send', {
+      if (doc.client_phone && cfg?.signalwire_backend) {
+        await fetch(cfg.signalwire_backend + '/sms/send', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ to: doc.client_phone, body: `Tax Case Review: your signature on ${doc.doc_type} was received and a copy has been saved to your file.` })
         }).catch(() => {})

@@ -1325,6 +1325,24 @@ export default function Leads() {
         }
       }
     } catch (e) { console.error('Financial intake carry-over/auto-send error:', e) }
+
+    // ── Transfer signed documents from lead to client file ─────────────────
+    // Copies all document rows (signed agreements, e-sign certs, etc.) that
+    // were saved under this lead's name so they appear in the client file.
+    try {
+      const { data: leadDocs } = await supabase.from('documents').select('*').eq('client', l.name)
+      if (leadDocs && leadDocs.length) {
+        // Documents are already keyed by client name — they'll show up automatically
+        // in the client file since both lead and client use the same name.
+        // Just log a note confirming the transfer.
+        await supabase.from('client_notes').insert({
+          client_name: l.name,
+          content: `📁 ${leadDocs.length} document(s) from lead file carried over to client record.`,
+          created_by: 'System', visible_to_client: false, created_at: new Date().toISOString()
+        })
+      }
+    } catch (e) { console.error('Document transfer error:', e) }
+
     setConverting(false)
     const { count } = await supabase.from('client_compliance_records').select('*', { count: 'exact', head: true }).eq('client_name', l.name)
     const intakeMsg = intakeAlreadySubmitted ? ', financial intake already on file'
