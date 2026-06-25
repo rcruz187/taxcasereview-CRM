@@ -1,3 +1,4 @@
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -351,6 +352,7 @@ export default function Leads() {
   }, [isTaxAdvisor, employeeName])
   const [employees, setEmployees] = useState([])
   const [showArchived, setShowArchived] = useState(false)
+  const [confirmArchive, setConfirmArchive] = useState(null)
   const [modal, setModal]   = useState(false)
   const [showScript, setShowScript] = useState(false)
   const [bookingLead, setBookingLead] = useState(null)
@@ -870,8 +872,9 @@ export default function Leads() {
 
   // Leads are archived, never permanently deleted — this hides them from the
   // active list but keeps every field, note, and document intact.
-  async function archiveLead(l) {
-    if (!window.confirm(`Archive ${l.name}? This hides it from the active list — nothing is deleted, and you can restore it anytime from the Archived view.`)) return
+  async function archiveLead(l) { setConfirmArchive(l) }
+  async function confirmArchiveLead() {
+    const l = confirmArchive; setConfirmArchive(null)
     const { error } = await supabase.from('leads').update({ archived: true }).eq('id', l.id)
     if (error) { showToast('Error: ' + error.message); return }
     showToast('Lead archived'); await triggerWorkflow('lead_archived', 'lead', detail?.name || '', actor); setDetail(null); load()
@@ -2285,6 +2288,12 @@ export default function Leads() {
       {/* Add/Edit Modal */}
       {editLeadModal}
 
+      <DeleteConfirmModal
+        open={!!confirmArchive}
+        label={`lead "${confirmArchive?.name}"`}
+        onConfirm={confirmArchiveLead}
+        onCancel={() => setConfirmArchive(null)}
+      />
     </div>
   )
 }
