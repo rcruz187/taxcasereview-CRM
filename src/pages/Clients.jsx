@@ -1331,6 +1331,33 @@ export default function Clients() {
 
     const url = res.url
     await navigator.clipboard.writeText(url).catch(()=>{})
+
+    // Generate Stripe checkout link for resolution fee so client can pay inline
+    let stripePayUrl = null
+    try {
+      const { data: stripeData } = await supabase.functions.invoke('stripe-create-checkout-session', {
+        body: {
+          recordType: 'client', recordId: c.id, name: c.name, email: c.email,
+          amount: String(addForm.resolutionFee),
+          description: `Resolution Service Fee — ${c.name}`,
+          purpose: 'resolution_fee',
+        }
+      })
+      if (stripeData?.url) stripePayUrl = stripeData.url
+    } catch(_) {}
+
+    const feeDisplay = `$${Number(addForm.resolutionFee).toLocaleString()}`
+    const planDisplay = addForm.paymentPlan ? ` ($${Number(addForm.paymentPlan).toLocaleString()}/mo)` : ''
+
+    const paymentSection = stripePayUrl ? `
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:20px 24px;margin:0 0 24px">
+      <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.06em">💳 Step 2 — Pay Your Resolution Fee</p>
+      <p style="margin:0 0 14px;font-size:14px;color:#15803d;line-height:1.6">Your Resolution Service Fee is <strong>${feeDisplay}${planDisplay}</strong>. Pay securely below — your card will be saved on file.</p>
+      <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+        <a href="${stripePayUrl}" style="display:inline-block;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#ffffff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;letter-spacing:-.01em;box-shadow:0 4px 14px rgba(14,165,233,.35)">Pay ${feeDisplay} Now →</a>
+      </td></tr></table>
+    </div>` : ''
+
     let emailSent=false, smsSent=false
 
     if ((via==='email'||via==='both') && c.email) {
@@ -1349,12 +1376,12 @@ export default function Clients() {
   <tr><td style="padding:40px 40px 32px">
     <p style="margin:0 0 16px;font-size:16px;color:#0f172a">Dear <strong>${c.name}</strong>,</p>
     <p style="margin:0 0 20px;font-size:15px;color:#334155;line-height:1.7">Your <strong>Service Addendum</strong> is ready for your review and signature. This document authorizes Tax Case Review to proceed with the resolution services we've outlined for your case and confirms the associated service fee.</p>
-    <p style="margin:0 0 24px;font-size:14px;color:#64748b;line-height:1.7">Please review the details carefully, then sign electronically. If you have any questions before signing, don't hesitate to call us.</p>
-    <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 28px">
+    <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#0f172a;text-transform:uppercase;letter-spacing:.06em">✍️ Step 1 — Review &amp; Sign</p>
+    <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 20px">
       <a href="${url}" style="display:inline-block;background:linear-gradient(135deg,#16a34a,#15803d);color:#ffffff;padding:16px 40px;border-radius:10px;text-decoration:none;font-weight:700;font-size:17px;box-shadow:0 4px 14px rgba(22,163,74,.35)">Review &amp; Sign Addendum →</a>
     </td></tr></table>
-    <p style="margin:0 0 8px;font-size:12px;color:#94a3b8;text-align:center">Or copy this link:</p>
-    <p style="margin:0 0 32px;font-size:12px;color:#3b82f6;text-align:center;word-break:break-all"><a href="${url}" style="color:#3b82f6">${url}</a></p>
+    <p style="margin:0 0 24px;font-size:12px;color:#94a3b8;text-align:center;word-break:break-all"><a href="${url}" style="color:#3b82f6">${url}</a></p>
+    ${paymentSection}
     <div style="background:#f8fafc;border-radius:8px;padding:16px 20px;border-left:4px solid #3b82f6">
       <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> We're here to help.<br>📞 <strong>(888) 334-5052</strong> &nbsp;·&nbsp; ✉️ <strong>info@taxcasereview.org</strong></p>
     </div>
