@@ -1,3 +1,4 @@
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { sendGmailEmail } from '../lib/gmailUtils'
@@ -11,6 +12,7 @@ export default function Estimates() {
   const [clients,   setClients]  = useState([])
   const [employees, setEmployees]= useState([])
   const [modal,     setModal]    = useState(false)
+  const [confirmDel, setConfirmDel] = useState(null)
   const [editId,    setEditId]   = useState(null)
   const [form,      setForm]     = useState(BLANK)
   const [saving,    setSaving]   = useState(false)
@@ -94,10 +96,10 @@ export default function Estimates() {
     load()
   }
 
-  async function del(id) {
-    if (!confirm('Delete this estimate?')) return
-    await supabase.from('estimates').delete().eq('id',id)
-    showToast('Deleted'); load()
+  async function del(id) { setConfirmDel(id) }
+  async function confirmDelEstimate() {
+    await supabase.from('estimates').delete().eq('id', confirmDel)
+    setConfirmDel(null); showToast('Deleted'); load()
   }
 
   const reps = employees.length>0 ? employees.map(e=>e.name) : ['Romy Cruz','Dana Richard','Yesenia Gonzalez']
@@ -291,5 +293,7 @@ export default function Estimates() {
         </div>
       )}
     </div>
+  <DeleteConfirmModal open={!!confirmDel} label="estimate" onConfirm={confirmDelEstimate} onCancel={() => setConfirmDel(null)} />
   )
 }
+
