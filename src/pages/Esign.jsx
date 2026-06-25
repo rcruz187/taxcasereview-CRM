@@ -1,3 +1,4 @@
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
@@ -375,20 +376,7 @@ export default function Esign() {
         </div>
       )}
 
-      {/* Delete Modal */}
-      {confirmDel && (
-        <div className="modal-bg open" onClick={e => e.target === e.currentTarget && setConfirmDel(null)}>
-          <div className="modal" style={{ maxWidth: 380, textAlign: 'center' }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>🗑</div>
-            <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 8 }}>Delete this request?</div>
-            <div style={{ fontSize: 14, color: 'var(--t3)', marginBottom: 24 }}>This permanently removes the signing request and all signature data. Cannot be undone.</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn sec" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setConfirmDel(null)}>Cancel</button>
-              <button className="btn del" style={{ flex: 1, justifyContent: 'center' }} onClick={() => del(confirmDel)}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal open={!!confirmDel} label="signing request" onConfirm={() => del(confirmDel)} onCancel={() => setConfirmDel(null)} />
 
       {/* New Request Modal */}
       {modal && (
@@ -478,3 +466,4 @@ export default function Esign() {
     </div>
   )
 }
+
