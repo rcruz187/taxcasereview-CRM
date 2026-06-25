@@ -14,7 +14,6 @@ function Stat({ label, value, color, bold, big }) {
       <div style={{ fontSize:9, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:2 }}>{label}</div>
       <div style={{ fontSize: big?15:12, fontWeight: bold?800:600, color: color||'var(--tx)' }}>{value}</div>
     </div>
-  <DeleteConfirmModal open={!!confirmDel} label="payroll run" onConfirm={confirmDel2} onCancel={() => setConfirmDel(null)} />
   )
 }
 
@@ -753,6 +752,7 @@ export default function Payroll() {
           </div>
         </div>
       )}
+      <DeleteConfirmModal open={!!confirmDel} label="payroll run" onConfirm={confirmDel2} onCancel={() => setConfirmDel(null)} />
     </div>
   )
 }
