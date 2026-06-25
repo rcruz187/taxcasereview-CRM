@@ -1,3 +1,4 @@
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useCall } from '../context/CallContext'
@@ -173,26 +174,30 @@ export default function Dialer() {
   }
 
   async function deleteVoicemail(vm) {
-    if (!window.confirm('Delete this voicemail? This cannot be undone.')) return
+    setConfirmDel({ type: 'voicemail', item: vm })
+  }
+  async function confirmDeleteVoicemail(vm) {
     await supabase.from('voicemails').delete().eq('id', vm.id)
     if (vm.recording_url?.includes('/storage/v1/object/public/voicemails/')) {
       const fileName = vm.recording_url.split('/voicemails/').pop()
       if (fileName) await supabase.storage.from('voicemails').remove([fileName]).catch(() => {})
     }
     setVoicemails(vs => vs.filter(v => v.id !== vm.id))
-    showToast('Voicemail deleted.')
+    setConfirmDel(null); showToast('Voicemail deleted.')
   }
 
   async function deleteRecording(rec) {
     if (!canDeleteRecordings) return
-    if (!window.confirm('Delete this recording? This cannot be undone.')) return
+    setConfirmDel({ type: 'recording', item: rec })
+  }
+  async function confirmDeleteRecording(rec) {
     if (rec.recording_url?.includes('/documents/')) {
       const path = rec.recording_url.split('/documents/')[1]
       if (path) await supabase.storage.from('documents').remove([path]).catch(() => {})
     }
     await supabase.from('call_recordings').delete().eq('id', rec.id)
     setRecordings(rs => rs.filter(r => r.id !== rec.id))
-    showToast('Recording deleted.')
+    setConfirmDel(null); showToast('Recording deleted.')
   }
 
   // Attach to Client — drops a row into that client's Documents pointing at
@@ -611,8 +616,15 @@ export default function Dialer() {
       {/* ── Log Call Modal now renders globally too (see ActiveCallBar
            in App.jsx), so it pops up correctly even if the call ended
            while you were on a different page. ─────────────────────── */}
+    <DeleteConfirmModal
+      open={!!confirmDel}
+      label={confirmDel?.type === 'voicemail' ? 'voicemail' : 'recording'}
+      onConfirm={() => confirmDel?.type === 'voicemail' ? confirmDeleteVoicemail(confirmDel.item) : confirmDeleteRecording(confirmDel.item)}
+      onCancel={() => setConfirmDel(null)}
+    />
     </div>
   )
 }
+
 
 
