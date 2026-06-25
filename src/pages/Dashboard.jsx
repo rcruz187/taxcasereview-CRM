@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
@@ -14,6 +14,7 @@ export default function Dashboard() {
   const [recentLeads, setRecentLeads] = useState([])
   const [loading, setLoading] = useState(true)
   const [time, setTime] = useState(new Date())
+  const [tasFeeds, setTasFeeds] = useState([])
 
   useEffect(() => { load() }, [])
   useEffect(() => {
@@ -100,13 +101,23 @@ export default function Dashboard() {
     setLoading(false)
   }
 
-  // Drag state
-  const [cardOrder, setCardOrder] = useState(null) // null = use default
-  const [dragIdx, setDragIdx]     = useState(null)
-  const [dragOver, setDragOver]   = useState(null)
-  const [saveIndicator, setSaveIndicator] = useState(false)
+  // Fetch TAS blog feed (Taxpayer Advocate Service)
+  useEffect(() => {
+    const TAS_RSS = 'https://www.taxpayeradvocate.irs.gov/feed/'
+    const API = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(TAS_RSS)}&count=3`
+    fetch(API)
+      .then(r => r.json())
+      .then(d => { if (d.status === 'ok') setTasFeeds(d.items || []) })
+      .catch(() => {})
+  }, [])
 
-  // Load saved layout from employees table on mount (after load())
+  // Drag state — use refs for drag tracking (not state) to avoid re-render freeze
+  const [cardOrder, setCardOrder]       = useState(null)
+  const [saveIndicator, setSaveIndicator] = useState(false)
+  const dragIdx  = useRef(null)
+  const dragOver = useRef(null)
+
+  // Load saved layout from employees table on mount
   useEffect(() => {
     if (!user?.email) return
     supabase.from('employees').select('dashboard_layout').eq('email', user.email).maybeSingle()
@@ -227,62 +238,68 @@ export default function Dashboard() {
   }
 
   function onDragStart(e, idx) {
-    setDragIdx(idx)
+    dragIdx.current = idx
     e.dataTransfer.effectAllowed = 'move'
   }
   function onDragOver(e, idx) {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
-    setDragOver(idx)
+    dragOver.current = idx
+    // Highlight drop target visually via DOM directly (no state re-render)
+    document.querySelectorAll('[data-card-idx]').forEach(el => {
+      el.style.outline = el.dataset.cardIdx === String(idx) && idx !== dragIdx.current
+        ? '2px dashed var(--blue)' : ''
+    })
   }
   function onDrop(e, idx) {
     e.preventDefault()
-    if (dragIdx === null || dragIdx === idx) { setDragIdx(null); setDragOver(null); return }
+    document.querySelectorAll('[data-card-idx]').forEach(el => { el.style.outline = '' })
+    if (dragIdx.current === null || dragIdx.current === idx) { dragIdx.current = null; dragOver.current = null; return }
     const next = [...orderedLabels]
-    const [moved] = next.splice(dragIdx, 1)
+    const [moved] = next.splice(dragIdx.current, 1)
     next.splice(idx, 0, moved)
+    dragIdx.current = null
+    dragOver.current = null
     setCardOrder(next)
-    setDragIdx(null)
-    setDragOver(null)
     saveLayout(next)
   }
-  function onDragEnd() { setDragIdx(null); setDragOver(null) }
+  function onDragEnd() {
+    document.querySelectorAll('[data-card-idx]').forEach(el => { el.style.outline = '' })
+    dragIdx.current = null
+    dragOver.current = null
+  }
 
   const StatCard = ({ card, idx }) => {
     const { label, val, sub, color, to, icon } = card
     const borderColor = CARD_COLORS[label] || 'var(--blue)'
-    const isDragging  = dragIdx === idx
-    const isOver      = dragOver === idx && dragIdx !== idx
     return (
       <div
         draggable
-        onDragStart={e => onDragStart(e, idx)}
+        data-card-idx={idx}
+        onDragStart={e => { e.currentTarget.style.opacity = '0.4'; onDragStart(e, idx) }}
         onDragOver={e => onDragOver(e, idx)}
-        onDrop={e => onDrop(e, idx)}
-        onDragEnd={onDragEnd}
-        onClick={() => to && dragIdx === null && navigate(to)}
+        onDrop={e => { e.currentTarget.style.opacity = '1'; onDrop(e, idx) }}
+        onDragEnd={e => { e.currentTarget.style.opacity = '1'; onDragEnd() }}
+        onClick={() => to && dragIdx.current === null && navigate(to)}
         title="Drag to rearrange"
         style={{
           background: 'var(--sf)',
-          border: isOver ? `2px dashed ${borderColor}` : '1px solid var(--br)',
-          borderTop: isOver ? `2px dashed ${borderColor}` : 'none',
+          border: '1px solid var(--br)',
+          borderTop: 'none',
           borderRadius: '0 0 12px 12px',
           padding: '18px 20px',
           cursor: 'grab',
-          transition: 'transform .15s, box-shadow .15s, opacity .15s',
+          transition: 'transform .15s, box-shadow .15s',
           position: 'relative',
           overflow: 'hidden',
           minHeight: 100,
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          opacity: isDragging ? 0.4 : 1,
-          transform: isOver ? 'scale(1.02)' : '',
-          boxShadow: isOver ? `0 6px 24px ${borderColor}40` : '',
           userSelect: 'none',
         }}
-        onMouseEnter={e => { if (dragIdx === null) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 6px 24px ${borderColor}40` } }}
-        onMouseLeave={e => { if (dragIdx === null) { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' } }}
+        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 6px 24px ${borderColor}40` }}
+        onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}
       >
         {/* Thick colored top bar */}
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: borderColor }}/>
@@ -336,7 +353,67 @@ export default function Dashboard() {
       </div>
 
       {/* Main grid */}
-      <div className="detail-2col" style={{ display: 'grid', gridTemplateColumns: isTaxAdvisor ? '1fr' : '1fr 1fr', gap: 14 }}>
+      <div className="detail-2col" style={{ display: 'grid', gridTemplateColumns: isTaxAdvisor ? '1fr' : (!isTaxAssociate && !isManager) ? '280px 1fr 1fr' : '1fr 1fr', gap: 14 }}>
+
+        {/* TAS News Feed — Admin/SuperAdmin only, left column */}
+        {!isTaxAdvisor && !isTaxAssociate && !isManager && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {/* Phone frame header */}
+            <div style={{ background: '#1a1a2e', borderRadius: '16px 16px 0 0', padding: '10px 14px 8px', border: '1px solid var(--br)', borderBottom: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#1A7FD4,#0ea5e9)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>⚖️</div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#f1f5f9' }}>Taxpayer Advocate</div>
+                <div style={{ fontSize: 10, color: '#22c55e', fontWeight: 600 }}>● IRS.gov Updates</div>
+              </div>
+            </div>
+            {/* Message bubbles area */}
+            <div style={{ background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: '0 0 16px 16px', padding: '12px 12px 16px', display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
+              {tasFeeds.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {[1,2,3].map(i => (
+                    <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+                      <div style={{ background: '#1e293b', borderRadius: '4px 14px 14px 14px', padding: '10px 13px', maxWidth: '90%', animation: 'pulse 1.5s infinite' }}>
+                        <div style={{ width: 120, height: 10, background: 'var(--br)', borderRadius: 4, marginBottom: 6 }}/>
+                        <div style={{ width: 80, height: 8, background: 'var(--br)', borderRadius: 4 }}/>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : tasFeeds.map((item, i) => {
+                const date = item.pubDate ? new Date(item.pubDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''
+                const title = item.title || ''
+                const url = item.link || '#'
+                return (
+                  <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3 }}>
+                    <a href={url} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', maxWidth: '92%' }}>
+                      <div style={{
+                        background: 'linear-gradient(135deg,#1e3a5f,#1a2a4a)',
+                        border: '1px solid rgba(59,130,246,.25)',
+                        borderRadius: '4px 14px 14px 14px',
+                        padding: '10px 13px',
+                        cursor: 'pointer',
+                        transition: 'all .15s',
+                      }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,.6)'; e.currentTarget.style.background = 'linear-gradient(135deg,#1e3a6e,#1a3060)' }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,.25)'; e.currentTarget.style.background = 'linear-gradient(135deg,#1e3a5f,#1a2a4a)' }}
+                      >
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', lineHeight: 1.4, marginBottom: 4 }}>{title}</div>
+                        <div style={{ fontSize: 10, color: '#60a5fa', fontWeight: 600 }}>Tap to read →</div>
+                      </div>
+                    </a>
+                    <div style={{ fontSize: 10, color: 'var(--t3)', paddingLeft: 4 }}>{date}</div>
+                  </div>
+                )
+              })}
+              <div style={{ marginTop: 4, textAlign: 'center' }}>
+                <a href="https://www.taxpayeradvocate.irs.gov/blog/" target="_blank" rel="noreferrer"
+                  style={{ fontSize: 10, color: 'var(--t3)', textDecoration: 'none', fontWeight: 600 }}>
+                  taxpayeradvocate.irs.gov →
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
 
         {!isTaxAdvisor && (
         <>
