@@ -1,3 +1,4 @@
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
@@ -421,19 +422,7 @@ export default function Tasks() {
           </div>
         </div>
       )}
-      {confirmDelId&&(
-        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setConfirmDelId(null)}>
-          <div className="modal" style={{maxWidth:380,textAlign:'center'}}>
-            <div style={{fontSize:36,marginBottom:12}}>🗑</div>
-            <div style={{fontWeight:700,fontSize:15,marginBottom:8}}>Delete this task?</div>
-            <div style={{fontSize:13,color:'var(--t3)',marginBottom:20}}>This cannot be undone.</div>
-            <div style={{display:'flex',gap:8}}>
-              <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={()=>setConfirmDelId(null)}>Cancel</button>
-              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>{window._confirmDel=true;permDelete(confirmDelId);setConfirmDelId(null)}}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal open={!!confirmDelId} label="task" onConfirm={() => { window._confirmDel=true; permDelete(confirmDelId); setConfirmDelId(null) }} onCancel={() => setConfirmDelId(null)} />
     </div>
   )
 }
