@@ -1004,40 +1004,50 @@ function UptimeTab() {
     setLoading(true)
     const results = {}
 
-    // Statuspage.io supports JSONP via ?callback=fnName — this bypasses CORS
-    // which blocks direct fetch() from GitHub Pages to external status APIs.
-    function jsonpFetch(url, timeoutMs = 8000) {
-      return new Promise((resolve, reject) => {
-        const cbName = '_sp_' + Math.random().toString(36).slice(2)
-        const script = document.createElement('script')
-        const timer = setTimeout(() => {
-          cleanup(); reject(new Error('Timeout'))
-        }, timeoutMs)
-        function cleanup() {
-          clearTimeout(timer)
-          delete window[cbName]
-          if (script.parentNode) script.parentNode.removeChild(script)
+    try {
+      const { data, error } = await supabase.functions.invoke('check-service-status')
+      if (!error && data) {
+        // Supabase
+        if (data.supabase && !data.supabase.error) {
+          results['Supabase'] = {
+            ok: true,
+            indicator: data.supabase?.status?.indicator,
+            description: data.supabase?.status?.description,
+          }
+        } else {
+          results['Supabase'] = { error: data.supabase?.error || 'Failed' }
         }
-        window[cbName] = (data) => { cleanup(); resolve(data) }
-        script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cbName
-        script.onerror = () => { cleanup(); reject(new Error('Script load failed')) }
-        document.head.appendChild(script)
-      })
+        // Stripe
+        if (data.stripe && !data.stripe.error) {
+          results['Stripe'] = {
+            ok: true,
+            indicator: data.stripe?.status?.indicator,
+            description: data.stripe?.status?.description,
+          }
+        } else {
+          results['Stripe'] = { error: data.stripe?.error || 'Failed' }
+        }
+        // Anthropic
+        if (data.anthropic && !data.anthropic.error) {
+          results['Anthropic'] = {
+            ok: true,
+            indicator: data.anthropic?.status?.indicator,
+            description: data.anthropic?.status?.description,
+          }
+        } else {
+          results['Anthropic'] = { error: data.anthropic?.error || 'Failed' }
+        }
+      }
+    } catch(e) {
+      results['Supabase'] = { error: 'Edge function unreachable' }
+      results['Stripe']   = { error: 'Edge function unreachable' }
+      results['Anthropic']= { error: 'Edge function unreachable' }
     }
 
-    await Promise.all(
-      SERVICES.map(async svc => {
-        if (!svc.apiUrl) { results[svc.name] = { type: 'link-only' }; return }
-        try {
-          const json = await jsonpFetch(svc.apiUrl)
-          const indicator   = svc.indicatorPath?.reduce((o, k) => o?.[k], json)
-          const description = svc.descriptionPath?.reduce((o, k) => o?.[k], json)
-          results[svc.name] = { indicator, description, ok: true }
-        } catch(e) {
-          results[svc.name] = { error: e.message }
-        }
-      })
-    )
+    // Link-only services
+    results['SignalWire']     = { type: 'link-only' }
+    results['Gmail / Google'] = { type: 'link-only' }
+
     setStatuses(results)
     setLastChecked(new Date())
     setLoading(false)
