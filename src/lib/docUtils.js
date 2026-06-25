@@ -1037,12 +1037,31 @@ By typing/drawing your signature below, you electronically sign this Tax Service
 // Builds the pre-filled 2848/8821 PDFs for a client (based on clientType),
 // uploads them to Supabase storage, and creates a single "Full Package"
 // e-sign record. Returns { id, url, error }.
+// State POA form file mappings — same list as the inline modal
+const STATE_POA_FILES = {
+  FL:'FL_POA.pdf', NC:'NC_POA.pdf', TX:'TX_POA.pdf', OH:'OH_POA.pdf',
+  NY:'NY_POA.pdf', PA:'PA_POA.pdf', CA:'CA_POA.pdf', GA:'GA_POA.pdf',
+  IL:'IL_POA.pdf', MA:'MA_POA.pdf', MO:'MO_POA.pdf', OR:'OR_POA.pdf',
+  TN:'TN_POA.pdf', WA:'Washington_POA.pdf', WY:'Wyoming.pdf',
+  AZ:'AZ_POA.pdf', ID:'ID_POA.pdf',
+}
+
 export async function sendFullPackage(client, supabase) {
-  const clientType = client?.clientType || 'Individual'
-  const formTypes = getPackageFormTypes(clientType)
-  const safeName = (client?.name || 'client').replace(/[^a-zA-Z0-9]+/g, '-')
+  const clientType  = client?.clientType || 'Individual'
+  const irsOrState  = client?.irsOrState || 'IRS Federal'
+  const clientState = client?.state || ''
+  const safeName    = (client?.name || 'client').replace(/[^a-zA-Z0-9]+/g, '-')
+  const base        = typeof import.meta !== 'undefined' ? import.meta.env?.BASE_URL?.replace(/\/$/, '') : '/taxcasereview-CRM'
+
+  // Determine which IRS forms to include based on irsOrState
+  const includeIRS   = irsOrState !== 'State'       // IRS Federal or Both
+  const includeState = irsOrState !== 'IRS Federal'  // State or Both
+
+  const formTypes = includeIRS ? getPackageFormTypes(clientType) : ['cc_auth']
 
   const pdfAttachments = []
+
+  // IRS forms (2848, 8821, cc_auth)
   for (const formType of formTypes) {
     try {
       const bytes = formType === 'cc_auth'
@@ -1056,6 +1075,26 @@ export async function sendFullPackage(client, supabase) {
       pdfAttachments.push({ formType, label: FORM_LABELS[formType], url: urlData.publicUrl })
     } catch (e) {
       return { error: `Failed to build ${FORM_LABELS[formType] || formType}: ${e.message}` }
+    }
+  }
+
+  // State POA — auto-include when irsOrState is State or Both IRS + State
+  if (includeState && clientState && STATE_POA_FILES[clientState]) {
+    try {
+      const poaFile = STATE_POA_FILES[clientState]
+      const poaUrl  = `${base}/state-forms/${poaFile}`
+      const poaRes  = await fetch(poaUrl)
+      if (!poaRes.ok) throw new Error(`Could not load ${clientState} POA PDF`)
+      const poaBlob = await poaRes.blob()
+      const path = `docs/${safeName}/package/state_poa_${clientState}.pdf`
+      const { error: upErr } = await supabase.storage.from('documents')
+        .upload(path, poaBlob, { upsert: true, contentType: 'application/pdf' })
+      if (upErr) throw upErr
+      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+      pdfAttachments.push({ formType: 'state_poa', label: `${clientState} State Power of Attorney`, url: urlData.publicUrl })
+    } catch (e) {
+      console.warn('State POA auto-include failed:', e.message)
+      // Non-fatal — package continues without state POA
     }
   }
 
