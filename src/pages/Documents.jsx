@@ -1,3 +1,4 @@
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
@@ -300,20 +301,7 @@ export default function Documents() {
         </div>
       </div>
 
-      {/* Delete confirm */}
-      {confirmDel && (
-        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setConfirmDel(null)}>
-          <div className="modal" style={{maxWidth:360,textAlign:'center'}}>
-            <div style={{fontSize:36,marginBottom:12}}>🗑️</div>
-            <div style={{fontWeight:700,fontSize:15,marginBottom:8}}>Delete "{confirmDel.name}"?</div>
-            <div style={{fontSize:13,color:'var(--t3)',marginBottom:20}}>This cannot be undone.</div>
-            <div style={{display:'flex',gap:8}}>
-              <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={()=>setConfirmDel(null)}>Cancel</button>
-              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>del(confirmDel)}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal open={!!confirmDel} label="document" onConfirm={() => del(confirmDel)} onCancel={() => setConfirmDel(null)} />
 
       {/* Upload Modal */}
       {modal && (
@@ -372,3 +360,4 @@ export default function Documents() {
     </div>
   )
 }
+
