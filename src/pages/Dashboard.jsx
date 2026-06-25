@@ -210,7 +210,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stat cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 14 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {isTaxAdvisor ? (
           <>
             <StatCard label="Open Leads"      val={metrics.myOpenLeads}   color="var(--warn)"  to="/leads"     icon="👤" sub="Assigned to you" />
@@ -246,16 +246,22 @@ export default function Dashboard() {
           </>
         ) : (
           <>
-            <StatCard label="Active Cases"    val={metrics.activeCases}   color="var(--blue)"  to="/cases"     icon="📁" />
-            <StatCard label="Open Leads"      val={metrics.openLeads}     color="var(--warn)"  to="/leads"     icon="👤" />
-            <StatCard label="Clients"         val={metrics.totalClients}  color="var(--ok)"    to="/clients"   icon="🏢" />
-            <StatCard label="MTD 1st Trades"  val={'$' + Math.round(metrics.mtd1stTrades).toLocaleString()} color="var(--ok)" icon="💰" sub={'Total: $' + Math.round(metrics.total1stTrades).toLocaleString()} />
-            <StatCard label="MTD 2nd Trades"  val={'$' + Math.round(metrics.mtd2ndTrades).toLocaleString()} color="var(--ok)" icon="💵" sub={'Total: $' + Math.round(metrics.total2ndTrades).toLocaleString()} />
-            <StatCard label="AR Outstanding" val={'$' + Math.round(metrics.arOutstanding).toLocaleString()} color="#ef4444" to="/ar" icon="💳" sub="Scheduled installments" />
-            <StatCard label="Unpaid Invoices" val={metrics.unpaidInvoices} color="#a855f7" to="/invoices" icon="🧾" sub={metrics.unpaidAmt > 0 ? '$' + Math.round(metrics.unpaidAmt).toLocaleString() + ' outstanding' : 'All paid'} />
-            <StatCard label="Open Tasks"      val={metrics.openTasks}     color="#1A7FD4"  to="/tasks"     icon="✅" sub={metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track'} />
-            <StatCard label="Upcoming DL"     val={metrics.upcomingDl}    color="var(--warn)"  to="/deadlines" icon="⏰" />
-            <StatCard label="Overdue DL"      val={metrics.overdueDl}     color={metrics.overdueDl > 0 ? 'var(--bad)' : 'var(--ok)'} to="/deadlines" icon="🚨" />
+            {/* Row 1: Pipeline */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14 }}>
+              <StatCard label="Open Leads"      val={metrics.openLeads}     color="var(--warn)"  to="/leads"     icon="👤" />
+              <StatCard label="Clients"         val={metrics.totalClients}  color="var(--ok)"    to="/clients"   icon="🏢" />
+              <StatCard label="Active Cases"    val={metrics.activeCases}   color="var(--blue)"  to="/cases"     icon="📁" />
+              <StatCard label="MTD 1st Trades"  val={'$' + Math.round(metrics.mtd1stTrades).toLocaleString()} color="var(--ok)" icon="💰" sub={'Total: $' + Math.round(metrics.total1stTrades).toLocaleString()} />
+              <StatCard label="MTD 2nd Trades"  val={'$' + Math.round(metrics.mtd2ndTrades).toLocaleString()} color="var(--ok)" icon="💵" sub={'Total: $' + Math.round(metrics.total2ndTrades).toLocaleString()} />
+            </div>
+            {/* Row 2: Operations */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14 }}>
+              <StatCard label="Unpaid Invoices" val={metrics.unpaidInvoices} color="#a855f7" to="/invoices" icon="🧾" sub={metrics.unpaidAmt > 0 ? '$' + Math.round(metrics.unpaidAmt).toLocaleString() + ' outstanding' : 'All paid'} />
+              <StatCard label="Open Tasks"      val={metrics.openTasks}     color="#1A7FD4"  to="/tasks"     icon="✅" sub={metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track'} />
+              <StatCard label="Upcoming DL"     val={metrics.upcomingDl}    color="var(--warn)"  to="/deadlines" icon="⏰" />
+              <StatCard label="Overdue DL"      val={metrics.overdueDl}     color={metrics.overdueDl > 0 ? 'var(--bad)' : 'var(--ok)'} to="/deadlines" icon="🚨" />
+              <StatCard label="AR Outstanding" val={'$' + Math.round(metrics.arOutstanding).toLocaleString()} color="#ef4444" to="/ar" icon="💳" sub="Scheduled installments" />
+            </div>
           </>
         )}
       </div>
@@ -408,3 +414,4 @@ export default function Dashboard() {
     </div>
   )
 }
+
