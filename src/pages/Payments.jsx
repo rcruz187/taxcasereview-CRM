@@ -1,3 +1,4 @@
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
@@ -138,9 +139,12 @@ export default function Payments() {
   }
 
   async function deleteItem(id) {
-    if (!confirm('Delete this payment?')) return
-    await supabase.from('payments').delete().eq('id',id)
-    showToast('Deleted'); load()
+    setConfirmDel(id)
+  }
+  async function confirmDeleteItem() {
+    if (!confirmDel) return
+    await supabase.from('payments').delete().eq('id', confirmDel)
+    setConfirmDel(null); showToast('Deleted'); load()
   }
 
   const cleared = items.filter(p=>p.status==='Cleared').reduce((s,p)=>s+parseFloat(p.amount||0),0)
@@ -425,6 +429,8 @@ export default function Payments() {
           </div>
         </div>
       )}
+    <DeleteConfirmModal open={!!confirmDel} label="payment" onConfirm={confirmDeleteItem} onCancel={() => setConfirmDel(null)} />
     </div>
   )
 }
+
