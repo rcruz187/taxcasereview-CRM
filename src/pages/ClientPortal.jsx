@@ -204,7 +204,7 @@ export default function ClientPortal() {
     const nextCharge = new Date(); nextCharge.setDate(nextCharge.getDate() + 1)
     const nextChargeStr = nextCharge.toISOString().split('T')[0]
     const { data, error } = await supabase.functions.invoke('stripe-set-autopay', {
-      body: { clientId: client.id, enabled: true, amount: monthlyAmount, frequency: 'monthly', nextCharge: nextChargeStr }
+      body: { clientId: client.id, enabled: true, amount: monthlyAmount, frequency: 'monthly', nextChargeDate: nextChargeStr }
     })
     if (error || data?.error) { showToast('❌ ' + (data?.error || error?.message || 'Error setting plan')); setPlanLocking(false); return }
     // Track the change count
@@ -653,7 +653,7 @@ export default function ClientPortal() {
                       {planEditing && (
                         <button onClick={() => setPlanEditing(false)} style={{ padding: '9px 16px', background: 'transparent', border: '1px solid rgba(255,255,255,.2)', borderRadius: 7, color: '#94a3b8', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Cancel</button>
                       )}
-                      <button onClick={lockInPlan} disabled={planLocking} style={{ padding: '9px 20px', background: '#1A7FD4', border: 'none', borderRadius: 7, color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: planLocking ? 0.7 : 1 }}>
+                      <button onClick={lockInPlan} disabled={planLocking} style={{ padding: '13px 28px', background: '#1A7FD4', border: 'none', borderRadius: 9, color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer', opacity: planLocking ? 0.7 : 1 }}>
                         {planLocking ? 'Locking in…' : `Lock In — ${fmt(monthlyPayment)}/mo`}
                       </button>
                     </div>
@@ -838,7 +838,10 @@ export default function ClientPortal() {
 
 function EmailCard({ email }) {
   const [expanded, setExpanded] = useState(false)
+  if (!email) return null
   const isInbound = email.triage === 'Inbox'
+  const bodyText = (email.body || '').replace(/<[^>]*>/g, '').trim()
+  const dateStr = email.created_at ? new Date(email.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : ''
   return (
     <div style={{background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.1)',borderRadius:10,overflow:'hidden'}}>
       <div onClick={()=>setExpanded(e=>!e)} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'14px 16px',cursor:'pointer'}}>
@@ -848,16 +851,16 @@ function EmailCard({ email }) {
         <div style={{flex:1,minWidth:0}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap'}}>
             <div style={{fontWeight:700,fontSize:13.5,color:'#f1f5f9',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{email.subject || '(No subject)'}</div>
-            <div style={{fontSize:11,color:'#64748b',flexShrink:0}}>{email.created_at ? new Date(email.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : ''}</div>
+            <div style={{fontSize:11,color:'#64748b',flexShrink:0}}>{dateStr}</div>
           </div>
           <div style={{fontSize:12,color:'#64748b',marginTop:3}}>{isInbound ? 'From you' : `From Tax Case Review`} · {email.status || 'Sent'}</div>
-          {!expanded && <div style={{fontSize:12,color:'#94a3b8',marginTop:4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{email.body?.replace(/<[^>]*>/g,'') || ''}</div>}
+          {!expanded && <div style={{fontSize:12,color:'#94a3b8',marginTop:4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{bodyText}</div>}
         </div>
         <div style={{color:'#64748b',fontSize:12,flexShrink:0}}>{expanded ? '▲' : '▼'}</div>
       </div>
       {expanded && (
         <div style={{padding:'0 16px 16px',borderTop:'1px solid rgba(255,255,255,.06)'}}>
-          <div style={{fontSize:13,color:'#cbd5e1',lineHeight:1.7,marginTop:12,whiteSpace:'pre-wrap'}}>{email.body?.replace(/<[^>]*>/g,'') || '(No content)'}</div>
+          <div style={{fontSize:13,color:'#cbd5e1',lineHeight:1.7,marginTop:12,whiteSpace:'pre-wrap'}}>{bodyText || '(No content)'}</div>
         </div>
       )}
     </div>
@@ -929,4 +932,5 @@ const styles = {
   th: { padding: '7px 8px', textAlign: 'left', color: '#64748b', fontSize: 10, textTransform: 'uppercase', fontWeight: 700 },
   td: { padding: '8px 8px', color: '#cbd5e1' },
 }
+
 
