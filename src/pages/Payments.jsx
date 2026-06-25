@@ -429,7 +429,7 @@ export default function Payments() {
           </div>
         </div>
       )}
-    <DeleteConfirmModal open={!!confirmDel} label="payment" onConfirm={confirmDeleteItem} onCancel={() => setConfirmDel(null)} />
+      <DeleteConfirmModal open={!!confirmDel} label="payment" onConfirm={confirmDeleteItem} onCancel={() => setConfirmDel(null)} />
     </div>
   )
 }
