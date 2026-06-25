@@ -1,3 +1,4 @@
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -65,11 +66,10 @@ export default function Books() {
     loadAll()
   }
 
-  async function deleteEntry(id) {
-    if (confirmDel !== id) { setConfirmDel(id); return }
-    setConfirmDel(null)
-    await supabase.from('bookkeeping').delete().eq('id', id)
-    showToast('Deleted')
+  async function deleteEntry(id) { setConfirmDel(id) }
+  async function confirmDeleteEntry() {
+    await supabase.from('bookkeeping').delete().eq('id', confirmDel)
+    setConfirmDel(null); showToast('Deleted')
     loadAll()
   }
 
@@ -389,22 +389,11 @@ export default function Books() {
         </div>
       )}
 
-      {confirmDel && (
-        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setConfirmDel(null)}>
-          <div className="modal" style={{maxWidth:360,textAlign:'center'}}>
-            <div style={{fontSize:36,marginBottom:12}}>🗑</div>
-            <div style={{fontWeight:700,fontSize:15,marginBottom:8}}>Delete this entry?</div>
-            <div style={{fontSize:13,color:'var(--t3)',marginBottom:20}}>This cannot be undone.</div>
-            <div style={{display:'flex',gap:8}}>
-              <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={()=>setConfirmDel(null)}>Cancel</button>
-              <button className="btn del" style={{flex:1,justifyContent:'center'}} onClick={()=>deleteEntry(confirmDel)}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal open={!!confirmDel} label="bookkeeping entry" onConfirm={confirmDeleteEntry} onCancel={() => setConfirmDel(null)} />
     </div>
   )
 }
+
 
 
 
