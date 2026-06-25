@@ -121,10 +121,16 @@ export default function Documents() {
     byFolder[f].push(d)
   })
 
-  const filtered = docs.filter(d => {
+  const filtered = (() => {
     const q = search.toLowerCase()
-    return !q || d.name?.toLowerCase().includes(q) || d.client?.toLowerCase().includes(q) || d.file_name?.toLowerCase().includes(q)
-  })
+    let base = docs
+    if (folder !== 'All') base = byFolder[folder] || []
+    if (clientFilter) base = base.filter(d => d.client === clientFilter)
+    if (q) base = base.filter(d => d.name?.toLowerCase().includes(q) || d.client?.toLowerCase().includes(q) || d.file_name?.toLowerCase().includes(q))
+    // Recent Uploads view (All + no filters) → show latest 20 only
+    if (folder === 'All' && !clientFilter && !q) base = base.slice(0, 20)
+    return base
+  })()
 
   const totalSize = docs.reduce((s,d) => s+(d.file_size||0), 0)
 
@@ -167,7 +173,7 @@ export default function Documents() {
               color:folder==='All'?'var(--blue)':'var(--tx)',
               borderLeft:folder==='All'?'3px solid var(--blue)':'3px solid transparent',
               display:'flex',alignItems:'center',justifyContent:'space-between',transition:'all .1s'}}>
-            <span style={{display:'flex',alignItems:'center',gap:8}}>🗂️ All Files</span>
+            <span style={{display:'flex',alignItems:'center',gap:8}}>🕐 Recent Uploads</span>
             <span style={{fontSize:11,background:folder==='All'?'rgba(59,130,246,.2)':'var(--s3)',
               color:folder==='All'?'var(--blue)':'var(--t3)',borderRadius:20,padding:'1px 8px',fontWeight:700}}>{docs.length}</span>
           </div>
@@ -224,8 +230,8 @@ export default function Documents() {
         <div style={{flex:1,overflowY:'auto',padding:16,background:'var(--sf)'}}>
           {/* Breadcrumb */}
           <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:14,fontSize:12,color:'var(--t3)'}}>
-            <span style={{cursor:'pointer',color:'var(--blue)',fontWeight:600}} onClick={()=>{setFolder('All');setClientFilter('')}}>All Files</span>
-            {folder !== 'All' && <><span>›</span><span style={{color:'var(--tx)',fontWeight:600}}>{folder}</span></>}
+            <span style={{cursor:'pointer',color:'var(--blue)',fontWeight:600}} onClick={()=>{setFolder('All');setClientFilter('')}}>Recent Uploads</span>
+            {folder !== 'All' && <><span>›</span><span style={{color:'var(--tx)',fontWeight:600}}>{folder}</span></> }
             {clientFilter && <><span>›</span><span style={{color:'var(--tx)',fontWeight:600}}>{clientFilter}</span>
               <button onClick={()=>setClientFilter('')} style={{marginLeft:2,background:'rgba(239,68,68,.12)',border:'1px solid rgba(239,68,68,.3)',borderRadius:4,color:'var(--bad)',cursor:'pointer',fontSize:10,padding:'1px 6px',fontWeight:700}}>✕ clear</button>
             </>}
@@ -235,7 +241,7 @@ export default function Documents() {
             <div style={{textAlign:'center',padding:'80px 20px',color:'var(--t3)'}}>
               <div style={{fontSize:56,marginBottom:16,opacity:.4}}>📁</div>
               <div style={{fontWeight:700,fontSize:15,color:'var(--tx)',marginBottom:6}}>No documents found</div>
-              <div style={{fontSize:13}}>{clientFilter ? `No files on record for "${clientFilter}"` : 'Upload files using the "+ Upload Document" button.'}</div>
+              <div style={{fontSize:13}}>{clientFilter ? `No files on record for "${clientFilter}"` : folder === 'All' ? 'No documents uploaded yet.' : 'No files in this folder yet.'}</div>
               {clientFilter && <button onClick={()=>setClientFilter('')} className="btn sec" style={{marginTop:12}}>Clear Filter</button>}
             </div>
           ) : (
