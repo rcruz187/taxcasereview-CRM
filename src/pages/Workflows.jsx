@@ -1,3 +1,4 @@
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
@@ -191,11 +192,15 @@ export default function Workflows() {
     load()
   }
 
+  const [confirmDel, setConfirmDel] = useState(null)
+
   async function deleteTemplate(t) {
-    if (!window.confirm(`Delete workflow "${t.name}"? This cannot be undone.`)) return
-    await supabase.from('workflow_templates').delete().eq('id', t.id)
-    showToast('Workflow deleted')
-    load()
+    setConfirmDel(t)
+  }
+  async function confirmDeleteTemplate() {
+    if (!confirmDel) return
+    await supabase.from('workflow_templates').delete().eq('id', confirmDel.id)
+    setConfirmDel(null); showToast('Workflow deleted'); load()
   }
 
   function addStep() { setSteps(s => [...s, { ...BLANK_STEP, step_order: s.length }]) }
@@ -387,6 +392,8 @@ export default function Workflows() {
           </div>
         </div>
       )}
+      <DeleteConfirmModal open={!!confirmDel} label="workflow" onConfirm={confirmDeleteTemplate} onCancel={() => setConfirmDel(null)} />
     </div>
   )
 }
+
