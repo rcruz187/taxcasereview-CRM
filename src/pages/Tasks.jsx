@@ -225,8 +225,8 @@ export default function Tasks() {
 
       {/* Stats */}
       <div className="metrics" style={{marginBottom:12}}>
-        <div className="metric"><div className="ml">Open</div><div className="mv" style={{color:'var(--b2)'}}>{open.length}</div></div>
-        <div className="metric"><div className="ml">Completed</div><div className="mv" style={{color:'var(--ok)'}}>{totalCompleted}</div></div>
+        <div className="metric" style={{cursor:'pointer'}} onClick={()=>setView('open')}><div className="ml">Open</div><div className="mv" style={{color:'var(--b2)'}}>{open.length}</div></div>
+        <div className="metric" style={{cursor:'pointer'}} onClick={()=>setView('completed')}><div className="ml">Completed</div><div className="mv" style={{color:'var(--ok)'}}>{totalCompleted}</div></div>
         <div className="metric"><div className="ml">Total Created</div><div className="mv">{totalCreated}</div></div>
         {isSuperAdmin&&<div className="metric" style={{cursor:'pointer'}} onClick={()=>setView('deleted')}>
           <div className="ml">Deleted</div>

@@ -25,7 +25,7 @@ export default function Dashboard() {
     const [
       { data: leads }, { data: clients }, { data: cases },
       { data: tasks }, { data: invoices }, { data: payments },
-      { data: deadlines },
+      { data: deadlines }, { data: arScheduled },
     ] = await Promise.all([
       supabase.from('leads').select('*').order('created_at', { ascending: false }),
       supabase.from('clients').select('*').order('created_at', { ascending: false }),
@@ -34,6 +34,7 @@ export default function Dashboard() {
       supabase.from('invoices').select('id,total,status,clientName'),
       supabase.from('payments').select('id,amount,status,created_at,source,enrolled_by'),
       supabase.from('deadlines').select('*').order('dueDate', { ascending: true }),
+      supabase.from('payments').select('amount,payment_status,scheduled_date').eq('payment_status', 'Scheduled'),
     ])
 
     const now = new Date()
@@ -74,12 +75,15 @@ export default function Dashboard() {
       .filter(p => p.source === 'resolution_fee' && p.enrolled_by === employeeName && p.created_at?.startsWith(thisMonth))
       .reduce((s, p) => s + parseFloat(p.amount || 0), 0)
 
+    const arOutstanding = (arScheduled || []).reduce((s, p) => s + parseFloat(p.amount || 0), 0)
+
     setMetrics({
       activeCases: (cases || []).filter(c => ['Open', 'Pending IRS', 'Active Plan', 'Under Review'].includes(c.status)).length,
       openLeads: (leads || []).filter(l => !['Converted to Client', 'Dead', 'Do Not Contact'].includes(l.status)).length,
       totalClients: (clients || []).length,
       mtd1stTrades, total1stTrades, mtd2ndTrades, total2ndTrades,
       closedLeads, myOpenLeads, myClosedLeads, my1stTradeMtd, my2ndTradeMtd,
+      arOutstanding,
       unpaidInvoices: (invoices || []).filter(i => i.status === 'Unpaid' || i.status === 'Overdue').length,
       unpaidAmt: (invoices || []).filter(i => i.status === 'Unpaid' || i.status === 'Overdue').reduce((s, i) => s + parseFloat(i.total || 0), 0),
       openTasks: (tasks || []).filter(t => !t.done).length,
@@ -141,6 +145,7 @@ export default function Dashboard() {
     'Clients':          '#3b82f6',
     'MTD 1st Trades':   '#22c55e',
     'MTD 2nd Trades':   '#22c55e',
+    'AR Outstanding':   '#ef4444',
     'Unpaid Invoices':  '#a855f7',
     'Open Tasks':       '#1A7FD4',
     'Upcoming DL':      '#f59e0b',
@@ -219,6 +224,7 @@ export default function Dashboard() {
             <StatCard label="Open Leads"      val={metrics.openLeads}     color="var(--warn)"  to="/leads"     icon="👤" />
             <StatCard label="Clients"         val={metrics.totalClients}  color="var(--ok)"    to="/clients"   icon="🏢" />
             <StatCard label="MTD 2nd Trades"  val={'$' + Math.round(metrics.my2ndTradeMtd).toLocaleString()} color="var(--ok)" icon="💵" sub="Your enrollments" />
+            <StatCard label="AR Outstanding" val={'$' + Math.round(metrics.arOutstanding).toLocaleString()} color="#ef4444" to="/ar" icon="💳" sub="Scheduled installments" />
             <StatCard label="Unpaid Invoices" val={metrics.unpaidInvoices} color="#a855f7" to="/invoices" icon="🧾" sub={metrics.unpaidAmt > 0 ? '$' + Math.round(metrics.unpaidAmt).toLocaleString() + ' outstanding' : 'All paid'} />
             <StatCard label="Open Tasks"      val={metrics.openTasks}     color="#1A7FD4"  to="/tasks"     icon="✅" sub={metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track'} />
             <StatCard label="Upcoming DL"     val={metrics.upcomingDl}    color="var(--warn)"  to="/deadlines" icon="⏰" />
@@ -232,6 +238,7 @@ export default function Dashboard() {
             <StatCard label="Clients"         val={metrics.totalClients}  color="var(--ok)"    to="/clients"   icon="🏢" />
             <StatCard label="MTD 1st Trades"  val={'$' + Math.round(metrics.my1stTradeMtd).toLocaleString()} color="var(--ok)" icon="💰" sub={'Team: $' + Math.round(metrics.mtd1stTrades).toLocaleString()} />
             <StatCard label="MTD 2nd Trades"  val={'$' + Math.round(metrics.my2ndTradeMtd).toLocaleString()} color="var(--ok)" icon="💵" sub={'Team: $' + Math.round(metrics.mtd2ndTrades).toLocaleString()} />
+            <StatCard label="AR Outstanding" val={'$' + Math.round(metrics.arOutstanding).toLocaleString()} color="#ef4444" to="/ar" icon="💳" sub="Scheduled installments" />
             <StatCard label="Unpaid Invoices" val={metrics.unpaidInvoices} color="#a855f7" to="/invoices" icon="🧾" sub={metrics.unpaidAmt > 0 ? '$' + Math.round(metrics.unpaidAmt).toLocaleString() + ' outstanding' : 'All paid'} />
             <StatCard label="Open Tasks"      val={metrics.openTasks}     color="#1A7FD4"  to="/tasks"     icon="✅" sub={metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track'} />
             <StatCard label="Upcoming DL"     val={metrics.upcomingDl}    color="var(--warn)"  to="/deadlines" icon="⏰" />
@@ -244,6 +251,7 @@ export default function Dashboard() {
             <StatCard label="Clients"         val={metrics.totalClients}  color="var(--ok)"    to="/clients"   icon="🏢" />
             <StatCard label="MTD 1st Trades"  val={'$' + Math.round(metrics.mtd1stTrades).toLocaleString()} color="var(--ok)" icon="💰" sub={'Total: $' + Math.round(metrics.total1stTrades).toLocaleString()} />
             <StatCard label="MTD 2nd Trades"  val={'$' + Math.round(metrics.mtd2ndTrades).toLocaleString()} color="var(--ok)" icon="💵" sub={'Total: $' + Math.round(metrics.total2ndTrades).toLocaleString()} />
+            <StatCard label="AR Outstanding" val={'$' + Math.round(metrics.arOutstanding).toLocaleString()} color="#ef4444" to="/ar" icon="💳" sub="Scheduled installments" />
             <StatCard label="Unpaid Invoices" val={metrics.unpaidInvoices} color="#a855f7" to="/invoices" icon="🧾" sub={metrics.unpaidAmt > 0 ? '$' + Math.round(metrics.unpaidAmt).toLocaleString() + ' outstanding' : 'All paid'} />
             <StatCard label="Open Tasks"      val={metrics.openTasks}     color="#1A7FD4"  to="/tasks"     icon="✅" sub={metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track'} />
             <StatCard label="Upcoming DL"     val={metrics.upcomingDl}    color="var(--warn)"  to="/deadlines" icon="⏰" />
