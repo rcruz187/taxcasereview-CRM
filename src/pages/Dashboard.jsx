@@ -139,54 +139,166 @@ export default function Dashboard() {
   // surface clients, not leads. Tax Advisor never sees Clients at all.
   const showRecentClients = isTaxAssociate || isManager
 
+  // ── Drag-and-drop dashboard layout ──────────────────────────────────────────
+
   const CARD_COLORS = {
-    'Active Cases':     '#f59e0b',
-    'Open Leads':       '#a855f7',
-    'Clients':          '#3b82f6',
-    'MTD 1st Trades':   '#22c55e',
-    'MTD 2nd Trades':   '#22c55e',
-    'AR Outstanding':   '#ef4444',
-    'Unpaid Invoices':  '#a855f7',
-    'Open Tasks':       '#1A7FD4',
-    'Upcoming DL':      '#f59e0b',
-    'Overdue DL':       '#ef4444',
-    'Closed Leads':     '#a855f7',
+    'Active Cases':        '#f59e0b',
+    'Open Leads':          '#a855f7',
+    'Clients':             '#3b82f6',
+    'MTD 1st Trades':      '#22c55e',
+    'MTD 2nd Trades':      '#22c55e',
+    'AR Outstanding':      '#ef4444',
+    'Unpaid Invoices':     '#a855f7',
+    'Open Tasks':          '#1A7FD4',
+    'Upcoming DL':         '#f59e0b',
+    'Overdue DL':          '#ef4444',
+    'Closed Leads':        '#a855f7',
     'Team MTD 1st Trades': '#3b82f6',
   }
 
-  const StatCard = ({ label, val, sub, color, to, icon }) => {
+  // All cards available per role — label is the unique key
+  const ALL_ROLE_CARDS = isTaxAdvisor ? [
+    { label: 'Open Leads',           val: metrics.myOpenLeads,   color: 'var(--warn)', to: '/leads',     icon: '👤', sub: 'Assigned to you' },
+    { label: 'Closed Leads',         val: metrics.myClosedLeads, color: 'var(--ok)',   to: '/leads',     icon: '🏁', sub: 'Assigned to you' },
+    { label: 'MTD 1st Trades',       val: '$' + Math.round(metrics.my1stTradeMtd || 0).toLocaleString(), color: 'var(--ok)', icon: '💰', sub: 'Your enrollments' },
+    { label: 'Team MTD 1st Trades',  val: '$' + Math.round(metrics.mtd1stTrades  || 0).toLocaleString(), color: 'var(--blue)', icon: '👥', sub: 'Whole sales team' },
+  ] : isTaxAssociate ? [
+    { label: 'Active Cases',   val: metrics.activeCases,   color: 'var(--blue)', to: '/cases',     icon: '📁' },
+    { label: 'Open Leads',     val: metrics.openLeads,     color: 'var(--warn)', to: '/leads',     icon: '👤' },
+    { label: 'Clients',        val: metrics.totalClients,  color: 'var(--ok)',   to: '/clients',   icon: '🏢' },
+    { label: 'MTD 2nd Trades', val: '$' + Math.round(metrics.my2ndTradeMtd || 0).toLocaleString(), color: 'var(--ok)', icon: '💵', sub: 'Your enrollments' },
+    { label: 'AR Outstanding', val: '$' + Math.round(metrics.arOutstanding  || 0).toLocaleString(), color: '#ef4444', to: '/ar', icon: '💳', sub: 'Scheduled installments' },
+    { label: 'Unpaid Invoices',val: metrics.unpaidInvoices, color: '#a855f7', to: '/invoices', icon: '🧾', sub: metrics.unpaidAmt > 0 ? '$' + Math.round(metrics.unpaidAmt).toLocaleString() + ' outstanding' : 'All paid' },
+    { label: 'Open Tasks',     val: metrics.openTasks,     color: '#1A7FD4',  to: '/tasks',     icon: '✅', sub: metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track' },
+    { label: 'Upcoming DL',   val: metrics.upcomingDl,    color: 'var(--warn)', to: '/deadlines', icon: '⏰' },
+    { label: 'Overdue DL',    val: metrics.overdueDl,     color: metrics.overdueDl > 0 ? 'var(--bad)' : 'var(--ok)', to: '/deadlines', icon: '🚨' },
+  ] : isManager ? [
+    { label: 'Active Cases',   val: metrics.activeCases,   color: 'var(--blue)', to: '/cases',     icon: '📁' },
+    { label: 'Open Leads',     val: metrics.openLeads,     color: 'var(--warn)', to: '/leads',     icon: '👤' },
+    { label: 'Closed Leads',   val: metrics.closedLeads,   color: 'var(--ok)',   to: '/leads',     icon: '🏁' },
+    { label: 'Clients',        val: metrics.totalClients,  color: 'var(--ok)',   to: '/clients',   icon: '🏢' },
+    { label: 'MTD 1st Trades', val: '$' + Math.round(metrics.my1stTradeMtd || 0).toLocaleString(), color: 'var(--ok)', icon: '💰', sub: 'Team: $' + Math.round(metrics.mtd1stTrades || 0).toLocaleString() },
+    { label: 'MTD 2nd Trades', val: '$' + Math.round(metrics.my2ndTradeMtd || 0).toLocaleString(), color: 'var(--ok)', icon: '💵', sub: 'Team: $' + Math.round(metrics.mtd2ndTrades || 0).toLocaleString() },
+    { label: 'AR Outstanding', val: '$' + Math.round(metrics.arOutstanding  || 0).toLocaleString(), color: '#ef4444', to: '/ar', icon: '💳', sub: 'Scheduled installments' },
+    { label: 'Unpaid Invoices',val: metrics.unpaidInvoices, color: '#a855f7', to: '/invoices', icon: '🧾', sub: metrics.unpaidAmt > 0 ? '$' + Math.round(metrics.unpaidAmt).toLocaleString() + ' outstanding' : 'All paid' },
+    { label: 'Open Tasks',     val: metrics.openTasks,     color: '#1A7FD4',  to: '/tasks',     icon: '✅', sub: metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track' },
+    { label: 'Upcoming DL',   val: metrics.upcomingDl,    color: 'var(--warn)', to: '/deadlines', icon: '⏰' },
+    { label: 'Overdue DL',    val: metrics.overdueDl,     color: metrics.overdueDl > 0 ? 'var(--bad)' : 'var(--ok)', to: '/deadlines', icon: '🚨' },
+  ] : [
+    { label: 'Open Leads',     val: metrics.openLeads,     color: 'var(--warn)', to: '/leads',     icon: '👤' },
+    { label: 'Clients',        val: metrics.totalClients,  color: 'var(--ok)',   to: '/clients',   icon: '🏢' },
+    { label: 'Active Cases',   val: metrics.activeCases,   color: 'var(--blue)', to: '/cases',     icon: '📁' },
+    { label: 'MTD 1st Trades', val: '$' + Math.round(metrics.mtd1stTrades  || 0).toLocaleString(), color: 'var(--ok)', icon: '💰', sub: 'Total: $' + Math.round(metrics.total1stTrades || 0).toLocaleString() },
+    { label: 'MTD 2nd Trades', val: '$' + Math.round(metrics.mtd2ndTrades  || 0).toLocaleString(), color: 'var(--ok)', icon: '💵', sub: 'Total: $' + Math.round(metrics.total2ndTrades || 0).toLocaleString() },
+    { label: 'Unpaid Invoices',val: metrics.unpaidInvoices, color: '#a855f7', to: '/invoices', icon: '🧾', sub: metrics.unpaidAmt > 0 ? '$' + Math.round(metrics.unpaidAmt).toLocaleString() + ' outstanding' : 'All paid' },
+    { label: 'Open Tasks',     val: metrics.openTasks,     color: '#1A7FD4',  to: '/tasks',     icon: '✅', sub: metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track' },
+    { label: 'Upcoming DL',   val: metrics.upcomingDl,    color: 'var(--warn)', to: '/deadlines', icon: '⏰' },
+    { label: 'Overdue DL',    val: metrics.overdueDl,     color: metrics.overdueDl > 0 ? 'var(--bad)' : 'var(--ok)', to: '/deadlines', icon: '🚨' },
+    { label: 'AR Outstanding', val: '$' + Math.round(metrics.arOutstanding || 0).toLocaleString(), color: '#ef4444', to: '/ar', icon: '💳', sub: 'Scheduled installments' },
+  ]
+
+  // Drag state
+  const [cardOrder, setCardOrder] = useState(null) // null = use default
+  const [dragIdx, setDragIdx]     = useState(null)
+  const [dragOver, setDragOver]   = useState(null)
+  const [saveIndicator, setSaveIndicator] = useState(false)
+
+  // Load saved layout from employees table on mount (after load())
+  useEffect(() => {
+    if (!user?.email) return
+    supabase.from('employees').select('dashboard_layout').eq('email', user.email).maybeSingle()
+      .then(({ data }) => {
+        if (data?.dashboard_layout?.length) setCardOrder(data.dashboard_layout)
+      })
+  }, [user?.email])
+
+  // Ordered cards: apply saved order or use default
+  const defaultOrder = ALL_ROLE_CARDS.map(c => c.label)
+  const orderedLabels = cardOrder
+    ? cardOrder.filter(l => defaultOrder.includes(l)).concat(defaultOrder.filter(l => !cardOrder.includes(l)))
+    : defaultOrder
+  const orderedCards = orderedLabels.map(l => ALL_ROLE_CARDS.find(c => c.label === l)).filter(Boolean)
+
+  async function saveLayout(newOrder) {
+    if (!user?.email) return
+    await supabase.from('employees').update({ dashboard_layout: newOrder }).eq('email', user.email)
+    setSaveIndicator(true)
+    setTimeout(() => setSaveIndicator(false), 1500)
+  }
+
+  function onDragStart(e, idx) {
+    setDragIdx(idx)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+  function onDragOver(e, idx) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOver(idx)
+  }
+  function onDrop(e, idx) {
+    e.preventDefault()
+    if (dragIdx === null || dragIdx === idx) { setDragIdx(null); setDragOver(null); return }
+    const next = [...orderedLabels]
+    const [moved] = next.splice(dragIdx, 1)
+    next.splice(idx, 0, moved)
+    setCardOrder(next)
+    setDragIdx(null)
+    setDragOver(null)
+    saveLayout(next)
+  }
+  function onDragEnd() { setDragIdx(null); setDragOver(null) }
+
+  const StatCard = ({ card, idx }) => {
+    const { label, val, sub, color, to, icon } = card
     const borderColor = CARD_COLORS[label] || 'var(--blue)'
+    const isDragging  = dragIdx === idx
+    const isOver      = dragOver === idx && dragIdx !== idx
     return (
-    <div onClick={() => to && navigate(to)} style={{
-      background: 'var(--sf)',
-      border: '1px solid var(--br)',
-      borderTop: 'none',
-      borderRadius: '0 0 12px 12px',
-      padding: '18px 20px',
-      cursor: to ? 'pointer' : 'default',
-      transition: 'transform .15s, box-shadow .15s',
-      position: 'relative',
-      overflow: 'hidden',
-      minHeight: 100,
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'space-between',
-    }}
-      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 6px 24px ${borderColor}40` }}
-      onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}
-    >
-      {/* Thick colored top bar */}
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: borderColor }}/>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', paddingTop: 6 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 10, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>{label}</div>
-          <div style={{ fontSize: 28, fontWeight: 900, color: color || 'var(--tx)', lineHeight: 1 }}>{val ?? '—'}</div>
-          {sub && <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 6 }}>{sub}</div>}
+      <div
+        draggable
+        onDragStart={e => onDragStart(e, idx)}
+        onDragOver={e => onDragOver(e, idx)}
+        onDrop={e => onDrop(e, idx)}
+        onDragEnd={onDragEnd}
+        onClick={() => to && dragIdx === null && navigate(to)}
+        title="Drag to rearrange"
+        style={{
+          background: 'var(--sf)',
+          border: isOver ? `2px dashed ${borderColor}` : '1px solid var(--br)',
+          borderTop: isOver ? `2px dashed ${borderColor}` : 'none',
+          borderRadius: '0 0 12px 12px',
+          padding: '18px 20px',
+          cursor: 'grab',
+          transition: 'transform .15s, box-shadow .15s, opacity .15s',
+          position: 'relative',
+          overflow: 'hidden',
+          minHeight: 100,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          opacity: isDragging ? 0.4 : 1,
+          transform: isOver ? 'scale(1.02)' : '',
+          boxShadow: isOver ? `0 6px 24px ${borderColor}40` : '',
+          userSelect: 'none',
+        }}
+        onMouseEnter={e => { if (dragIdx === null) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 6px 24px ${borderColor}40` } }}
+        onMouseLeave={e => { if (dragIdx === null) { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' } }}
+      >
+        {/* Thick colored top bar */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: borderColor }}/>
+        {/* Drag handle hint */}
+        <div style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, color: 'var(--t3)', opacity: 0.5, lineHeight: 1, letterSpacing: 1 }}>⠿</div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', paddingTop: 6 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 10, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>{label}</div>
+            <div style={{ fontSize: 28, fontWeight: 900, color: color || 'var(--tx)', lineHeight: 1 }}>{val ?? '—'}</div>
+            {sub && <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 6 }}>{sub}</div>}
+          </div>
+          {icon && <div style={{ fontSize: 28, opacity: .15, flexShrink: 0 }}>{icon}</div>}
         </div>
-        {icon && <div style={{ fontSize: 28, opacity: .15, flexShrink: 0 }}>{icon}</div>}
       </div>
-    </div>
-  )}
+    )
+  }
 
   return (
     <div style={{ padding:'20px 24px', maxWidth:1100, margin:'0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -209,60 +321,17 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Stat cards */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {isTaxAdvisor ? (
-          <>
-            <StatCard label="Open Leads"      val={metrics.myOpenLeads}   color="var(--warn)"  to="/leads"     icon="👤" sub="Assigned to you" />
-            <StatCard label="Closed Leads"     val={metrics.myClosedLeads} color="var(--ok)"    to="/leads"     icon="🏁" sub="Assigned to you" />
-            <StatCard label="MTD 1st Trades"  val={'$' + Math.round(metrics.my1stTradeMtd).toLocaleString()} color="var(--ok)" icon="💰" sub="Your enrollments" />
-            <StatCard label="Team MTD 1st Trades" val={'$' + Math.round(metrics.mtd1stTrades).toLocaleString()} color="var(--blue)" icon="👥" sub="Whole sales team" />
-          </>
-        ) : isTaxAssociate ? (
-          <>
-            <StatCard label="Active Cases"    val={metrics.activeCases}   color="var(--blue)"  to="/cases"     icon="📁" />
-            <StatCard label="Open Leads"      val={metrics.openLeads}     color="var(--warn)"  to="/leads"     icon="👤" />
-            <StatCard label="Clients"         val={metrics.totalClients}  color="var(--ok)"    to="/clients"   icon="🏢" />
-            <StatCard label="MTD 2nd Trades"  val={'$' + Math.round(metrics.my2ndTradeMtd).toLocaleString()} color="var(--ok)" icon="💵" sub="Your enrollments" />
-            <StatCard label="AR Outstanding" val={'$' + Math.round(metrics.arOutstanding).toLocaleString()} color="#ef4444" to="/ar" icon="💳" sub="Scheduled installments" />
-            <StatCard label="Unpaid Invoices" val={metrics.unpaidInvoices} color="#a855f7" to="/invoices" icon="🧾" sub={metrics.unpaidAmt > 0 ? '$' + Math.round(metrics.unpaidAmt).toLocaleString() + ' outstanding' : 'All paid'} />
-            <StatCard label="Open Tasks"      val={metrics.openTasks}     color="#1A7FD4"  to="/tasks"     icon="✅" sub={metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track'} />
-            <StatCard label="Upcoming DL"     val={metrics.upcomingDl}    color="var(--warn)"  to="/deadlines" icon="⏰" />
-            <StatCard label="Overdue DL"      val={metrics.overdueDl}     color={metrics.overdueDl > 0 ? 'var(--bad)' : 'var(--ok)'} to="/deadlines" icon="🚨" />
-          </>
-        ) : isManager ? (
-          <>
-            <StatCard label="Active Cases"    val={metrics.activeCases}   color="var(--blue)"  to="/cases"     icon="📁" />
-            <StatCard label="Open Leads"      val={metrics.openLeads}     color="var(--warn)"  to="/leads"     icon="👤" />
-            <StatCard label="Closed Leads"     val={metrics.closedLeads}   color="var(--ok)"    to="/leads"     icon="🏁" />
-            <StatCard label="Clients"         val={metrics.totalClients}  color="var(--ok)"    to="/clients"   icon="🏢" />
-            <StatCard label="MTD 1st Trades"  val={'$' + Math.round(metrics.my1stTradeMtd).toLocaleString()} color="var(--ok)" icon="💰" sub={'Team: $' + Math.round(metrics.mtd1stTrades).toLocaleString()} />
-            <StatCard label="MTD 2nd Trades"  val={'$' + Math.round(metrics.my2ndTradeMtd).toLocaleString()} color="var(--ok)" icon="💵" sub={'Team: $' + Math.round(metrics.mtd2ndTrades).toLocaleString()} />
-            <StatCard label="AR Outstanding" val={'$' + Math.round(metrics.arOutstanding).toLocaleString()} color="#ef4444" to="/ar" icon="💳" sub="Scheduled installments" />
-            <StatCard label="Unpaid Invoices" val={metrics.unpaidInvoices} color="#a855f7" to="/invoices" icon="🧾" sub={metrics.unpaidAmt > 0 ? '$' + Math.round(metrics.unpaidAmt).toLocaleString() + ' outstanding' : 'All paid'} />
-            <StatCard label="Open Tasks"      val={metrics.openTasks}     color="#1A7FD4"  to="/tasks"     icon="✅" sub={metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track'} />
-            <StatCard label="Upcoming DL"     val={metrics.upcomingDl}    color="var(--warn)"  to="/deadlines" icon="⏰" />
-            <StatCard label="Overdue DL"      val={metrics.overdueDl}     color={metrics.overdueDl > 0 ? 'var(--bad)' : 'var(--ok)'} to="/deadlines" icon="🚨" />
-          </>
-        ) : (
-          <>
-            {/* Row 1: Pipeline */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14 }}>
-              <StatCard label="Open Leads"      val={metrics.openLeads}     color="var(--warn)"  to="/leads"     icon="👤" />
-              <StatCard label="Clients"         val={metrics.totalClients}  color="var(--ok)"    to="/clients"   icon="🏢" />
-              <StatCard label="Active Cases"    val={metrics.activeCases}   color="var(--blue)"  to="/cases"     icon="📁" />
-              <StatCard label="MTD 1st Trades"  val={'$' + Math.round(metrics.mtd1stTrades).toLocaleString()} color="var(--ok)" icon="💰" sub={'Total: $' + Math.round(metrics.total1stTrades).toLocaleString()} />
-              <StatCard label="MTD 2nd Trades"  val={'$' + Math.round(metrics.mtd2ndTrades).toLocaleString()} color="var(--ok)" icon="💵" sub={'Total: $' + Math.round(metrics.total2ndTrades).toLocaleString()} />
-            </div>
-            {/* Row 2: Operations */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14 }}>
-              <StatCard label="Unpaid Invoices" val={metrics.unpaidInvoices} color="#a855f7" to="/invoices" icon="🧾" sub={metrics.unpaidAmt > 0 ? '$' + Math.round(metrics.unpaidAmt).toLocaleString() + ' outstanding' : 'All paid'} />
-              <StatCard label="Open Tasks"      val={metrics.openTasks}     color="#1A7FD4"  to="/tasks"     icon="✅" sub={metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track'} />
-              <StatCard label="Upcoming DL"     val={metrics.upcomingDl}    color="var(--warn)"  to="/deadlines" icon="⏰" />
-              <StatCard label="Overdue DL"      val={metrics.overdueDl}     color={metrics.overdueDl > 0 ? 'var(--bad)' : 'var(--ok)'} to="/deadlines" icon="🚨" />
-              <StatCard label="AR Outstanding" val={'$' + Math.round(metrics.arOutstanding).toLocaleString()} color="#ef4444" to="/ar" icon="💳" sub="Scheduled installments" />
-            </div>
-          </>
+      {/* Stat cards — drag to rearrange, auto-saves per employee */}
+      <div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14 }}>
+          {orderedCards.map((card, idx) => (
+            <StatCard key={card.label} card={card} idx={idx} />
+          ))}
+        </div>
+        {saveIndicator && (
+          <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--ok)', marginTop: 6, fontWeight: 600 }}>
+            ✅ Layout saved
+          </div>
         )}
       </div>
 
