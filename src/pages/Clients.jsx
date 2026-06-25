@@ -856,6 +856,10 @@ export default function Clients() {
   const [addForm,     setAddForm]     = useState({ resolutionFee:'', paymentPlan:'', startDate:'', notes:'', services:[], sendVia:'email' })
   const [addendumSending, setAddendumSending] = useState(false)
   const [showChargeModal, setShowChargeModal] = useState(false)
+  const [poaModal, setPoaModal] = useState(false)
+  const [poaClient, setPoaClient] = useState(null)
+  const [poaSending, setPoaSending] = useState(false)
+  const [poaSendVia, setPoaSendVia] = useState('email')
   // Related data for detail view
   const [relCases,    setRelCases]    = useState([])
   const [relDeadlines,setRelDeadlines]= useState([])
@@ -1253,6 +1257,65 @@ export default function Clients() {
     showToast('✅ Task added!')
   }
 
+  const STATE_POA_FORMS = [
+    { num:'FL-DR-835',state:'FL',label:'Power of Attorney',file:'FL_POA.pdf' },
+    { num:'NC-GEN-58B',state:'NC',label:'Power of Attorney',file:'NC_POA.pdf' },
+    { num:'TX-89-224',state:'TX',label:'Power of Attorney',file:'TX_POA.pdf' },
+    { num:'OH-1-2',state:'OH',label:'Power of Attorney',file:'OH_POA.pdf' },
+    { num:'NY-POA-1',state:'NY',label:'Power of Attorney',file:'NY_POA.pdf' },
+    { num:'PA-REV-677',state:'PA',label:'Power of Attorney',file:'PA_POA.pdf' },
+    { num:'CA-3520-PIT',state:'CA',label:'Individual or Fiduciary POA',file:'CA_POA.pdf' },
+    { num:'GA-RD-1061',state:'GA',label:'Power of Attorney',file:'GA_POA.pdf' },
+    { num:'IL-2848',state:'IL',label:'Power of Attorney',file:'IL_POA.pdf' },
+    { num:'MA-M-2848',state:'MA',label:'Power of Attorney',file:'MA_POA.pdf' },
+    { num:'MO-2827',state:'MO',label:'Power of Attorney',file:'MO_POA.pdf' },
+    { num:'OR-150-800-005',state:'OR',label:'Tax Info Auth & POA',file:'OR_POA.pdf' },
+    { num:'TN-RV-F0103801',state:'TN',label:'Power of Attorney',file:'TN_POA.pdf' },
+    { num:'WA-42-2446',state:'WA',label:'Confidential Tax Info Auth',file:'Washington_POA.pdf' },
+    { num:'WY-POA',state:'WY',label:'Power of Attorney',file:'Wyoming.pdf' },
+    { num:'AZ-285-I',state:'AZ',label:'Individual Tax Disclosure / POA',file:'AZ_POA.pdf' },
+    { num:'ID-POA',state:'ID',label:'Power of Attorney',file:'ID_POA.pdf' },
+  ]
+
+  async function sendStatePOA(client, formDef, via) {
+    setPoaSending(true)
+    try {
+      const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+      const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+      const pdfRes = await fetch(`${base}/state-forms/${formDef.file}`)
+      if (!pdfRes.ok) throw new Error('Could not load ' + formDef.state + ' POA PDF')
+      const pdfBlob = await pdfRes.blob()
+      const safeName = (client.name||'client').replace(/[^a-zA-Z0-9]+/g,'-')
+      const path = `docs/${safeName}/state-poa/${formDef.state}_POA_${Date.now()}.pdf`
+      const { error: upErr } = await supabase.storage.from('documents').upload(path, pdfBlob, { upsert:true, contentType:'application/pdf' })
+      if (upErr) throw new Error(upErr.message)
+      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+      const { data: esign, error: esignErr } = await supabase.from('esigns').insert([{
+        doc_type: `State POA — ${formDef.state} (${formDef.num})`,
+        client_name: client.name, client_email: client.email||'', client_phone: client.phone||'',
+        message: `Please review and sign your ${formDef.state} Power of Attorney. This authorizes Tax Case Review to represent you before the ${formDef.state} tax authority.`,
+        pdf_attachments: [{ formType:'state_poa', label:`${formDef.state} POA — ${formDef.label}`, url:urlData.publicUrl }],
+        priority:'Normal', status:'Awaiting', sent_at:new Date().toISOString(), created_at:new Date().toISOString(), sent_by:actor,
+      }]).select().single()
+      if (esignErr) throw new Error(esignErr.message)
+      const sigUrl = `${window.location.origin}/taxcasereview-CRM/sign/${esign.id}`
+      await navigator.clipboard.writeText(sigUrl).catch(()=>{})
+      let emailSent=false, smsSent=false
+      if ((via==='email'||via==='both') && client.email) {
+        const { error:eErr } = await supabase.functions.invoke('send-email', { body: { to:client.email, subject:`Action Required: Sign Your ${formDef.state} Power of Attorney — Tax Case Review`, html:`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div><p>Dear <strong>${client.name}</strong>,</p><p>Your <strong>${formDef.state} Power of Attorney (${formDef.num})</strong> is ready for your review and signature.</p><p style="text-align:center;margin:24px 0"><a href="${sigUrl}" style="background:#1d4ed8;color:#fff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Review &amp; Sign →</a></p><p style="font-size:12px;color:#64748b">${sigUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408<br/>📞 (888) 334-5052</p></div>` }})
+        emailSent = !eErr
+      }
+      if ((via==='sms'||via==='both') && client.phone) {
+        const { data:cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
+        if (cfg?.signalwire_backend) { try { await fetch(cfg.signalwire_backend+'/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:client.phone,body:`Tax Case Review: sign your ${formDef.state} POA here: ${sigUrl}`})}); smsSent=true } catch(_){} }
+      }
+      await supabase.from('client_notes').insert({ client_name:client.name, content:`🏛️ ${formDef.state} State POA sent for e-signature (${formDef.num})${emailSent?' via email':''}${smsSent?' via SMS':''}`, created_by:actor, visible_to_client:false })
+      setPoaModal(false)
+      showToast(emailSent||smsSent ? `✅ ${formDef.state} POA sent for signature!` : '✅ Signing link copied to clipboard')
+    } catch(e) { showToast('Error: '+e.message) }
+    setPoaSending(false)
+  }
+
   // Sends the Service Addendum for e-signature (vs. the print-only path,
   // which stays available as a separate button in the same modal). Mirrors
   // handleSendFullPackage's email/SMS pattern in Leads.jsx.
@@ -1564,7 +1627,7 @@ export default function Clients() {
                 setFillerClient({...c, address:c.street, business_name:c.name})
               } catch (err) { showToast('Error opening form: ' + err.message) }
             }}/>
-            <ActionBtn color="#0f766e" icon="🏛️" label="Pre-Fill State POA" sub={c.state ? c.state+' Form' : 'State Form'} onClick={()=>navigate('/stateforms?client='+c.id)}/>
+            <ActionBtn color="#0f766e" icon="🏛️" label="Pre-Fill State POA" sub={c.state ? c.state+' Form' : 'State Form'} onClick={()=>{ setPoaClient(c); setPoaModal(true) }}/>
             <ActionBtn color="#d97706" icon="📋" label="Addendum" sub="Add Services" onClick={()=>{setAddForm({resolutionFee:'',paymentPlan:'',startDate:'',notes:'',services:[],sendVia:'email'});setAddModal(true)}}/>
             <ActionBtn color="#0ea5e9" icon="🔓" label="Client Portal" sub="Compliance Access" onClick={()=>{setPortalClient(c);setPortalModal(true)}}/>
             <ActionBtn color="#9333ea" icon="🧾" label="Tax Organizer" sub="Send for Filing" onClick={()=>{setOrgClient(c);setOrgModal(true)}}/>
@@ -2269,6 +2332,66 @@ export default function Clients() {
             onPaid={()=>{ setShowChargeModal(false); loadRelated(c.name); showToast('✅ 2nd Trade charged!') }}
           />
         )}
+
+        {poaModal && poaClient && (() => {
+          const matchedForms = STATE_POA_FORMS.filter(f => f.state === poaClient.state)
+          const hasMatch = matchedForms.length > 0
+          return (
+            <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setPoaModal(false)}>
+              <div className="modal" style={{width:560,maxHeight:'88vh',overflowY:'auto'}}>
+                <div className="mh">
+                  <span className="mt">🏛️ State POA — {poaClient.name}</span>
+                  <button className="xbtn" onClick={()=>setPoaModal(false)}>&times;</button>
+                </div>
+                <div style={{fontSize:12,color:'var(--t3)',marginBottom:16,lineHeight:1.6}}>
+                  Send the {poaClient.state||'state'} Power of Attorney for e-signature. Works exactly like the 2848 — client gets an email/text with a signing link.
+                </div>
+
+                {/* Client info */}
+                <div style={{background:'var(--s2)',borderRadius:8,padding:'10px 14px',marginBottom:16,fontSize:13}}>
+                  <div style={{fontWeight:700}}>{poaClient.name}</div>
+                  <div style={{color:'var(--t3)',marginTop:2}}>{poaClient.email} {poaClient.phone ? '· '+poaClient.phone : ''}</div>
+                  {poaClient.state && <div style={{color:'var(--blue)',marginTop:2,fontWeight:600}}>State: {poaClient.state}</div>}
+                </div>
+
+                {!poaClient.state ? (
+                  <div style={{color:'var(--warn)',fontSize:13,marginBottom:16}}>⚠️ No state on file for this client. Edit the client profile to add their state first.</div>
+                ) : !hasMatch ? (
+                  <div style={{color:'var(--t3)',fontSize:13,marginBottom:16}}>No state POA form on file for {poaClient.state}. Available states: FL, NC, TX, OH, NY, PA, CA, GA, IL, MA, MO, OR, TN, WA, WY, AZ, ID.</div>
+                ) : (
+                  <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:16}}>
+                    {matchedForms.map(form=>(
+                      <div key={form.num} style={{background:'var(--s2)',borderRadius:8,padding:'10px 14px',border:'1px solid var(--br)'}}>
+                        <div style={{fontWeight:600,fontSize:13}}>{form.state} — {form.label}</div>
+                        <div style={{fontSize:11,color:'var(--t3)',marginTop:2}}>{form.num}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {hasMatch && poaClient.state && (<>
+                  <div className="field"><label>Send Via</label>
+                    <select value={poaSendVia} onChange={e=>setPoaSendVia(e.target.value)}>
+                      <option value="email">Email</option>
+                      <option value="sms">Text Message</option>
+                      <option value="both">Email + Text</option>
+                    </select>
+                  </div>
+                  <div style={{display:'flex',gap:8,marginTop:6}}>
+                    <button className="btn sec" style={{flex:1,justifyContent:'center',padding:11}}
+                      onClick={()=>{ const base=import.meta.env.BASE_URL.replace(/\/$/,''); window.open(`${base}/state-forms/${matchedForms[0].file}`,'_blank') }}>
+                      ⬇ Download Blank
+                    </button>
+                    <button className="btn pri" style={{flex:2,justifyContent:'center',padding:11}}
+                      disabled={poaSending} onClick={()=>sendStatePOA(poaClient, matchedForms[0], poaSendVia)}>
+                      {poaSending ? 'Sending…' : '✍️ Send for E-Signature'}
+                    </button>
+                  </div>
+                </>)}
+              </div>
+            </div>
+          )
+        })()}
 
       {faxModal && faxClient && (
         <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setFaxModal(false)}>
