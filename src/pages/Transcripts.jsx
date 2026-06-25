@@ -1,3 +1,4 @@
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
@@ -17,6 +18,7 @@ export default function Transcripts() {
   const [clients,   setClients]  = useState([])
   const [employees, setEmployees]= useState([])
   const [modal,     setModal]    = useState(false)
+  const [confirmDel, setConfirmDel] = useState(null)
   const [editId,    setEditId]   = useState(null)
   const [form,      setForm]     = useState(BLANK)
   const [saving,    setSaving]   = useState(false)
@@ -88,10 +90,10 @@ export default function Transcripts() {
     load()
   }
 
-  async function del(id) {
-    if (!confirm('Delete this request?')) return
-    await supabase.from('transcripts').delete().eq('id',id)
-    showToast('Deleted'); load()
+  async function del(id) { setConfirmDel(id) }
+  async function confirmDelTranscript() {
+    await supabase.from('transcripts').delete().eq('id', confirmDel)
+    setConfirmDel(null); showToast('Deleted'); load()
   }
 
   function parseYears(t) {
@@ -317,5 +319,7 @@ export default function Transcripts() {
         </div>
       )}
     </div>
+  <DeleteConfirmModal open={!!confirmDel} label="transcript request" onConfirm={confirmDelTranscript} onCancel={() => setConfirmDel(null)} />
   )
 }
+
