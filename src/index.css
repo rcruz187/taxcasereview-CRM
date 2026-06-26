@@ -805,3 +805,171 @@ tbody tr:hover td { background: var(--s2); cursor: pointer; }
 }
 .print-title { display: none; }
 
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE & TABLET OPTIMIZATION — June 2026
+   Covers iOS Safari, Android Chrome, and tablet widths (768–1024px).
+   Strategy: fluid containers, touch-friendly tap targets, readable text.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Tablet (768–1024px) ─────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .sidebar { width: 200px; }
+  :root { --nav-w: 200px; }
+  .modal { width: min(95vw, 680px) !important; }
+}
+
+/* ── Mobile (≤640px) — comprehensive overrides ───────────────────────── */
+@media (max-width: 640px) {
+
+  /* ── Base typography ── */
+  body { font-size: 14px; }
+  .page-content { padding: 10px 12px !important; }
+
+  /* ── All modals: fluid width, full-height scrollable ── */
+  .modal-bg { align-items: flex-end !important; padding: 0 !important; }
+  .modal {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    max-height: 92vh !important;
+    border-radius: 18px 18px 0 0 !important;
+    overflow-y: auto !important;
+    padding: 16px !important;
+  }
+
+  /* ── Cards & containers ── */
+  .card { padding: 12px 14px !important; border-radius: 10px !important; }
+  .card-header { padding: 10px 14px !important; }
+
+  /* ── Chips: larger tap targets ── */
+  .chip { padding: 6px 12px !important; font-size: 12px !important; min-height: 32px; }
+
+  /* ── Buttons: minimum 44px tap target (Apple HIG) ── */
+  .btn { min-height: 36px; padding: 7px 12px !important; font-size: 13px !important; }
+  .btn.pri { min-height: 40px; }
+
+  /* ── Form fields: larger inputs for touch ── */
+  input, select, textarea {
+    font-size: 16px !important; /* prevents iOS auto-zoom on focus */
+    min-height: 40px;
+  }
+  .field label { font-size: 12px !important; }
+
+  /* ── Stat cards: 2-per-row on mobile ── */
+  .stat-grid,
+  div[style*="gridTemplateColumns"][style*="130px"],
+  div[style*="gridTemplateColumns"][style*="140px"],
+  div[style*="gridTemplateColumns"][style*="150px"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* ── Tables: horizontal scroll + larger touch rows ── */
+  table { font-size: 12px !important; }
+  td, th { padding: 8px 6px !important; }
+
+  /* ── Topbar: compact ── */
+  .topbar { height: 48px !important; padding: 0 8px !important; gap: 6px !important; }
+  .topbar-clock, .topbar-datestr { display: none !important; }
+
+  /* ── Badge: readable on small screens ── */
+  .bdg { font-size: 10px !important; padding: 2px 7px !important; }
+
+  /* ── Detail view headers: stack on mobile ── */
+  .detail-header-row { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
+
+  /* ── Quick action buttons in Leads/Clients: wrap and shrink ── */
+  .quick-actions-row {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 6px !important;
+  }
+  .quick-action-btn {
+    width: 100% !important;
+    min-width: 0 !important;
+    font-size: 10px !important;
+    padding: 8px 4px !important;
+  }
+
+  /* ── Flex rows with too many items: wrap them ── */
+  .ch { flex-wrap: wrap !important; gap: 6px !important; }
+  .filter-row { flex-wrap: wrap !important; }
+
+  /* ── Email page: show folder switcher as tab bar ── */
+  .email-sidebar { display: none !important; }
+  .email-folder-tabs { display: flex !important; }
+
+  /* ── Financial Profile: fix wide inner containers ── */
+  .fp-tabs { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; }
+
+  /* ── Dashboard: tiles scroll horizontally on mobile ── */
+  .dashboard-locked-row { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; flex-wrap: nowrap !important; }
+
+  /* ── Dialer: stack vertically ── */
+  .dialer-layout { flex-direction: column !important; }
+  .dialer-dialpad-card { width: 100% !important; min-width: 0 !important; }
+
+  /* ── Leads/Clients detail tabs: horizontal scroll ── */
+  .detail-tabs { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; flex-wrap: nowrap !important; white-space: nowrap !important; }
+  .detail-tab-btn { flex-shrink: 0 !important; }
+
+  /* ── Active call bar: full width on mobile ── */
+  .active-call-bar { width: 100% !important; left: 0 !important; right: 0 !important; border-radius: 0 !important; bottom: 0 !important; }
+
+  /* ── Toast: full width ── */
+  .toast { left: 10px !important; right: 10px !important; bottom: 70px !important; max-width: none !important; }
+
+  /* ── Pipeline/status filter chips: horizontal scroll ── */
+  .pipeline-chips { overflow-x: auto !important; flex-wrap: nowrap !important; -webkit-overflow-scrolling: touch !important; padding-bottom: 4px !important; }
+  .pipeline-chips .chip { flex-shrink: 0 !important; }
+
+  /* ── IRS Forms / StateForms wide containers ── */
+  .irs-form-container { overflow-x: auto !important; }
+
+  /* ── Payroll wide table ── */
+  .payroll-table-wrap { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; }
+
+  /* ── Cases detail stat tiles: 2-col ── */
+  .case-stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* ── Client Portal: full width on mobile ── */
+  .portal-container { padding: 12px !important; }
+  .portal-tabs { overflow-x: auto !important; flex-wrap: nowrap !important; }
+  .portal-tab-btn { flex-shrink: 0 !important; white-space: nowrap !important; }
+}
+
+/* ── iOS Safari specific fixes ───────────────────────────────────────── */
+@supports (-webkit-touch-callout: none) {
+  /* Prevent iOS rubber-band scroll on the body */
+  body { overscroll-behavior: none; }
+
+  /* Fix iOS input zoom (must be 16px+ to prevent auto-zoom) */
+  input[type="text"],
+  input[type="email"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="date"],
+  input[type="password"],
+  select,
+  textarea { font-size: 16px !important; }
+
+  /* Fix iOS fixed positioning inside scrollable containers */
+  .modal { -webkit-overflow-scrolling: touch; }
+
+  /* Prevent tap highlight flash on buttons */
+  button, a, .chip, .btn { -webkit-tap-highlight-color: transparent; }
+
+  /* Fix safe area for iPhone notch/home indicator */
+  .topbar { padding-top: env(safe-area-inset-top, 0); }
+  .sidebar { padding-bottom: env(safe-area-inset-bottom, 0); }
+  .toast { bottom: calc(env(safe-area-inset-bottom, 0px) + 70px) !important; }
+}
+
+/* ── Tablet-specific (641–1024px) ────────────────────────────────────── */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .modal { width: min(90vw, 680px) !important; max-width: 90vw !important; }
+  .quick-actions-row { flex-wrap: wrap !important; }
+  .quick-action-btn { min-width: 100px !important; }
+  input, select, textarea { font-size: 15px !important; }
+  .btn { min-height: 38px; }
+}

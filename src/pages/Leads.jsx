@@ -1733,7 +1733,7 @@ export default function Leads() {
         <div className="card" style={{marginBottom:12}}>
           <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Quick Actions</div>
           <div className="ovx">
-          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          <div className="quick-actions-row" style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             <ActionBtn color="#0891b2" icon="📅" label="Schedule" sub="Book Appointment" onClick={()=>setBookingLead(l)}/>
             <ActionBtn color="#16a34a" icon="📦" label={pkgSending?'Building…':'Full Package'} sub="2848/8821 + Agreement" onClick={()=>!pkgSending&&handleSendFullPackage(l)}/>
             <ActionBtn color="#22863a" icon="📄" label="Tax Engagement" sub="Service Agreement" onClick={()=>generateClientPackage(l)}/>
@@ -1759,7 +1759,7 @@ export default function Leads() {
 
         {/* Overview / Notes / Documents — tabbed, matching the Clients detail page style */}
         <div className="card" style={{padding:0,overflow:'hidden',marginBottom:12}}>
-          <div style={{display:'flex',flexWrap:'nowrap',overflowX:'auto',borderBottom:'1px solid var(--br)',background:'var(--s2)',scrollbarWidth:'none'}}>
+          <div className="detail-tabs" style={{display:'flex',flexWrap:'nowrap',overflowX:'auto',borderBottom:'1px solid var(--br)',background:'var(--s2)',scrollbarWidth:'none'}}>
             {[
               {key:'overview', icon:'📋', text:'Overview'},
               {key:'sms', icon:'💬', text:'SMS'},
@@ -2288,7 +2288,7 @@ export default function Leads() {
         )
       })()}
 
-      <div style={{marginBottom:10,display:'flex',flexWrap:'wrap',gap:4,alignItems:'center'}}>
+      <div className="pipeline-chips" style={{marginBottom:10,display:'flex',flexWrap:'wrap',gap:4,alignItems:'center'}}>
         {['All',...STATUSES.slice(0,8)].map(s => (
           <span key={s} className={`chip${filter===s?' on':''}`} onClick={()=>setFilter(s)}>{s}</span>
         ))}
