@@ -12,6 +12,8 @@ export default function ActiveCallBar() {
   const [transcript,     setTranscript]     = useState('')     // final confirmed text
   const [interimText,    setInterimText]    = useState('')     // live unconfirmed text
   const [showTranscript, setShowTranscript] = useState(false)
+  const [showDialpad,    setShowDialpad]    = useState(false)
+  const [dtmfPressed,    setDtmfPressed]    = useState('')
   const recognitionRef = useRef(null)
   const shouldRestartRef = useRef(false)
 
@@ -19,7 +21,7 @@ export default function ActiveCallBar() {
     incomingCall, incomingMatch, calling, active, elapsed, formatTime,
     answerIncoming, declineIncoming, cancelCall, endCall,
     logModal, logForm, setLogForm, saving, OUTCOMES, saveCallLog, closeLogModalWithoutSaving,
-    callToast,
+    callToast, sendDTMF,
   } = useCall()
 
   function openFile(entry) {
@@ -227,6 +229,15 @@ export default function ActiveCallBar() {
                 style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none' }}>
                 Cancel
               </button>
+              <button onClick={() => setShowDialpad(d => !d)}
+                style={{
+                  background: showDialpad ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)',
+                  color: '#fff', border: 'none', borderRadius: 8,
+                  padding: '8px 12px', fontWeight: 700, cursor: 'pointer', fontSize: 13,
+                }}
+                title="Open dialpad for IRS prompts">
+                ⌨️
+              </button>
               <button onClick={endCall}
                 style={{
                   background: '#C0202F', color: '#fff', border: 'none',
@@ -237,6 +248,43 @@ export default function ActiveCallBar() {
               </button>
             </div>
           </div>
+
+          {/* ── DTMF Dialpad — appears below call bar ── */}
+          {showDialpad && (
+            <div style={{
+              position: 'fixed', top: 82, left: '50%', transform: 'translateX(-50%)', zIndex: 3498,
+              width: 220,
+              background: 'rgba(5,15,30,0.97)',
+              border: '1px solid rgba(255,255,255,.15)',
+              borderTop: 'none',
+              borderRadius: '0 0 12px 12px',
+              padding: '12px',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+            }}>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.08em' }}>
+                Keypad — {dtmfPressed || 'Press to send tones'}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6 }}>
+                {['1','2','3','4','5','6','7','8','9','*','0','#'].map(d => (
+                  <button key={d} onClick={() => {
+                    sendDTMF(d)
+                    setDtmfPressed(p => (p + d).slice(-8))
+                  }}
+                    style={{
+                      background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)',
+                      borderRadius: 8, padding: '10px 0', fontSize: 18, fontWeight: 700,
+                      cursor: 'pointer', fontFamily: 'monospace',
+                      transition: 'background .1s',
+                    }}
+                    onMouseDown={e => e.currentTarget.style.background='rgba(255,255,255,0.3)'}
+                    onMouseUp={e => e.currentTarget.style.background='rgba(255,255,255,0.12)'}
+                    onTouchStart={e => e.currentTarget.style.background='rgba(255,255,255,0.3)'}
+                    onTouchEnd={e => e.currentTarget.style.background='rgba(255,255,255,0.12)'}
+                  >{d}</button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Live transcript panel — attached below the call bar */}
           {showTranscript && (

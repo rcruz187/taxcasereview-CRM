@@ -71,6 +71,7 @@ export function CallProvider({ children }) {
   const [callToast, setCallToast] = useState('')
 
   const relayRef = useRef(null)
+  const activeCallRef = useRef(null) // ref to the live RELAY call object for DTMF
   const liveCallRef = useRef(null)
   const callerNumberRef = useRef(null)
   const activeConferenceRef = useRef(null)
@@ -168,6 +169,7 @@ export function CallProvider({ children }) {
         console.log('[RELAY] callUpdate — direction:', call.direction, '| state:', call.state, '| from:', call.options?.remoteCallerNumber)
         if (call.state === 'active' && !uiStartedRef.current) {
           uiStartedRef.current = true
+          activeCallRef.current = call  // store for DTMF
           setIncomingCall(null)
           stopRing()
           setCalling(true)
@@ -185,6 +187,7 @@ export function CallProvider({ children }) {
           })
         }
         if (call.state === 'hangup' || call.state === 'destroy') {
+          activeCallRef.current = null
           setIncomingCall(null)
           setIncomingMatch(null)
           stopRing()
@@ -583,6 +586,13 @@ export function CallProvider({ children }) {
     logForm, setLogForm, logModal, setLogModal, saving, callToast,
     OUTCOMES, formatTime,
     answerIncoming, declineIncoming, startCall, endCall, cancelCall,
+    sendDTMF: (digit) => {
+      if (activeCallRef.current?.dtmf) {
+        activeCallRef.current.dtmf(digit)
+      } else {
+        console.warn('[DTMF] no active call or dtmf not available')
+      }
+    },
     saveCallLog, closeLogModalWithoutSaving,
   }
 
