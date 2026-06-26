@@ -54,6 +54,55 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ── Light Mode ── */
+html.light {
+  --bg:   #F0F4F8;
+  --nav:  #E2E8F0;
+  --sf:   #FFFFFF;
+  --s2:   #EDF2F7;
+  --s3:   #E2E8F0;
+
+  --br:   rgba(0,0,0,.10);
+  --b2c:  rgba(0,0,0,.16);
+  --tx:   #1A202C;
+  --t2:   #4A5568;
+  --t3:   #718096;
+
+  --shadow: 0 4px 24px rgba(0,0,0,.12);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,.08);
+}
+
+html.light .card {
+  background: #FFFFFF;
+  border-color: rgba(0,0,0,.10);
+}
+
+html.light .sidebar {
+  background: var(--nav);
+}
+
+html.light .topbar {
+  background: #FFFFFF;
+  border-bottom-color: rgba(0,0,0,.10);
+}
+
+html.light input,
+html.light textarea,
+html.light select {
+  background: #FFFFFF;
+  border-color: rgba(0,0,0,.18);
+  color: var(--tx);
+}
+
+html.light .btn {
+  color: var(--tx);
+}
+
+html.light .btn.pri {
+  color: #fff;
+}
+
+
 /* ── Scrollbars — hidden but functional ── */
 ::-webkit-scrollbar { width: 0px; height: 0px; }
 ::-webkit-scrollbar-track { background: transparent; }

@@ -47,6 +47,16 @@ export default function TopBar({ onNew }) {
   const [dateStr, setDateStr] = useState('')
   const [open, setOpen] = useState(false)
   const [soundOn, setSoundOnState] = useState(isSoundEnabled())
+  const [dark, setDark] = useState(() => {
+    const saved = localStorage.getItem('tcr-theme')
+    if (saved) return saved === 'dark'
+    return true // default dark
+  })
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('light', !dark)
+    localStorage.setItem('tcr-theme', dark ? 'dark' : 'light')
+  }, [dark])
   const panelRef = useRef(null)
   const btnRef   = useRef(null)
 
@@ -128,6 +138,13 @@ export default function TopBar({ onNew }) {
         style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: soundOn ? 'var(--t2)' : 'var(--t3)', padding: '0 4px', lineHeight: 1 }}
       >
         {soundOn ? '🔔' : '🔇'}
+      </button>
+      <button
+        onClick={() => setDark(d => !d)}
+        title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--t2)', padding: '0 4px', lineHeight: 1 }}
+      >
+        {dark ? '☀️' : '🌙'}
       </button>
       <span className="topbar-datestr" style={{ fontSize: 12, color: 'var(--t3)', whiteSpace: 'nowrap' }}>{dateStr}</span>
       <span className="topbar-clock">{clock}</span>
