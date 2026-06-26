@@ -205,13 +205,14 @@ export default function Reports() {
       </div>
 
       {/* Tab Bar */}
-      <div style={{display:'flex',gap:2,borderBottom:'1px solid var(--br)',marginBottom:16,overflowX:'auto',paddingBottom:1}}>
+      <div style={{display:'flex',gap:0,borderBottom:'1px solid var(--br)',marginBottom:16}}>
         {TABS.map(t=>(
           <button key={t.key} onClick={()=>setTab(t.key)}
-            style={{padding:'6px 12px',fontSize:11,fontWeight:tab===t.key?700:400,
-              borderBottom:tab===t.key?'2px solid var(--blue)':'2px solid transparent',
+            style={{flex:1,padding:'10px 2px',fontSize:13,fontWeight:tab===t.key?700:500,
+              borderBottom:tab===t.key?'3px solid var(--blue)':'3px solid transparent',
               background:'none',border:'none',
-              color:tab===t.key?'var(--blue)':'var(--t2)',cursor:'pointer',whiteSpace:'nowrap',paddingBottom:8}}>
+              color:tab===t.key?'var(--blue)':'var(--t2)',cursor:'pointer',whiteSpace:'nowrap',paddingBottom:10,
+              transition:'color .15s'}}>
             {t.label}
           </button>
         ))}
