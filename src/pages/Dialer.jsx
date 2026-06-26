@@ -157,7 +157,7 @@ export default function Dialer() {
 
     const merged = [...inRows, ...outRows]
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .slice(0, 150)
+      .slice(0, 100)
     setCallLog(merged)
   }
 
@@ -402,7 +402,7 @@ export default function Dialer() {
               ['queue', '📋', 'Call Queue', leads.length],
               ['voicemail', '🔵', 'Voicemails', voicemails.filter(v => !v.is_read).length],
               ['recordings', '🎙️', 'Recordings', recordings.length],
-              ['log', '📞', 'Call History', callLog.length],
+              ['log', '📞', 'Call History', callLog.length > 99 ? '99+' : callLog.length],
             ].map(([key, icon, label, count]) => (
               <button key={key} onClick={() => setTab(key)}
                 style={{
