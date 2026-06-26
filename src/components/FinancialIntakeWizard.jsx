@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { FINANCIAL_INTAKE_STEPS, shouldShow } from '../lib/financialIntakeSchema'
+import { getStateTaxRate } from '../lib/stateTaxRates'
 
 const LOGO_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo'
 
@@ -71,6 +72,7 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  const [leadState, setLeadState] = useState(null) // for state tax auto-calc
   const saveTimer = useRef(null)
 
   useEffect(() => {
@@ -82,6 +84,11 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
         setAnswers(data.answers || {})
         if (data.status === 'Submitted') setSubmitted(true)
         setLoading(false)
+        // Load lead's state for state tax auto-calc
+        if (data.client_name) {
+          supabase.from('leads').select('state,irsOrState').eq('name', data.client_name).maybeSingle()
+            .then(({ data: lead }) => { if (lead?.state) setLeadState(lead.state) })
+        }
         return
       }
       // Fallback: the URL might contain a lead ID (old emails sent before fix).
@@ -146,6 +153,15 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
   function updateEntry(questionId, idx, fieldId, value) {
     const current = [...(answers[questionId] || [])]
     current[idx] = { ...current[idx], [fieldId]: value }
+
+    // Auto-calculate state tax when gross pay changes on an employment entry
+    if (questionId === 'jobs_list' && fieldId === 'gross_monthly' && leadState) {
+      const rate = getStateTaxRate(leadState)
+      if (rate !== null && rate > 0 && !current[idx].state_withheld) {
+        current[idx].state_withheld = Math.round(parseFloat(value || 0) * rate)
+      }
+    }
+
     setAnswer(questionId, current)
   }
   function removeEntry(questionId, idx) {
@@ -200,7 +216,7 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
           position: j.position || '',
           length_employed: j.length_employed || '',
           pay_frequency: j.pay_frequency || '',
-          gross_monthly: n(j.gross_monthly),
+          gross_monthly_salary: n(j.gross_monthly), // profile uses gross_monthly_salary
           fed_withheld: n(j.fed_withheld),
           ss_med_withheld: n(j.ss_med_withheld),
           state_withheld: n(j.state_withheld),
@@ -212,12 +228,13 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
       function mapBiz(b) {
         if (!b) return {}
         return {
-          business_name: b.business_name || '',
+          name: b.business_name || '',        // profile uses 'name' not 'business_name'
           ein: b.ein || '',
           structure: b.structure || '',
           pct_ownership: b.pct_ownership || '',
           num_employees: b.num_employees || '',
-          net_income_monthly: n(b.net_income_monthly),
+          net_income: n(b.net_income_monthly), // profile uses 'net_income' not 'net_income_monthly'
+          current_941: b.current_941 || '',
           notes: b.notes || '',
         }
       }
@@ -483,8 +500,15 @@ function Question({ q, answers, setAnswer, addEntry, updateEntry, removeEntry })
                       ))}
                     </div>
                   ) : (
-                    <input type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'} placeholder={f.placeholder||''}
-                      value={entry[f.id]||''} onChange={e=>updateEntry(q.id, idx, f.id, e.target.value)} style={S.inputSm}/>
+                    <>
+                      <input type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'} placeholder={f.placeholder||''}
+                        value={entry[f.id]||''} onChange={e=>updateEntry(q.id, idx, f.id, e.target.value)} style={S.inputSm}/>
+                      {f.id === 'state_withheld' && leadState && getStateTaxRate(leadState) !== null && (
+                        <div style={{fontSize:10, color:'#60a5fa', marginTop:3}}>
+                          Auto-estimated from {leadState} state tax rate ({Math.round((getStateTaxRate(leadState)||0)*100)}%). You can override this.
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               ))}

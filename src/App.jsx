@@ -50,6 +50,7 @@ const Esign         = lazy(() => import('./pages/Esign'))
 const TimeClock     = lazy(() => import('./pages/TimeClock'))
 const Payroll       = lazy(() => import('./pages/Payroll'))
 const Employees     = lazy(() => import('./pages/Employees'))
+const ActivityReport= lazy(() => import('./pages/ActivityReport'))
 const Reports       = lazy(() => import('./pages/Reports'))
 const Settings      = lazy(() => import('./pages/Settings'))
 const Dialer        = lazy(() => import('./pages/Dialer'))
@@ -154,6 +155,7 @@ function Shell() {
             <Route path="/payroll"     element={<Guard section="payroll"><Payroll /></Guard>} />
             <Route path="/timeoff"     element={<Guard section="timeoff"><TimeOff /></Guard>} />
             <Route path="/employees"   element={<Guard section="employees"><Employees /></Guard>} />
+            <Route path="/activity-report" element={<Guard section="employees"><ActivityReport /></Guard>} />
             <Route path="/reports"     element={<Guard section="reports"><Reports /></Guard>} />
             <Route path="/settings"    element={<Guard section="settings"><Settings /></Guard>} />
             <Route path="/dialer"      element={<Guard section="dialer"><Dialer /></Guard>} />

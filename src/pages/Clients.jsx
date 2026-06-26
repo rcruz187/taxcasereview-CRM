@@ -1,4 +1,5 @@
 import { validateFile } from '../lib/uploadUtils'
+import { logActivity, getActor } from '../lib/activityLog'
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -1109,6 +1110,7 @@ export default function Clients() {
     showToast(skipped.length ? `✅ Client added — but skipped fields not in the database yet: ${skipped.join(', ')}` : '✅ Client added!')
     const actorC = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
     await triggerWorkflow('client_created', 'client', form.name, actorC).catch(()=>{})
+    await logActivity(supabase,{employeeName:actorC,action:'client_created',category:'client',description:`Added client: ${form.name}`,entityName:form.name}).catch(()=>{})
     setModal(false); setForm(BLANK)
     // Reload then navigate straight into the new client's detail
     const { data: allClients } = await supabase.from('clients').select('*').order('created_at', { ascending: false })
@@ -1158,6 +1160,7 @@ export default function Clients() {
     setDetail(null)
     navigate('/clients', { replace: true })
     showToast('Client archived')
+    const _caa=getActor(user); await logActivity(supabase,{employeeName:_caa.name,employeeEmail:_caa.email,action:'client_archived',category:'client',description:`Archived client: ${name}`,entityName:name}).catch(()=>{})
   }
 
   async function restoreClient(id) {

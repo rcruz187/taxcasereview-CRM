@@ -1,4 +1,5 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect, useRef } from 'react'
 import { validateFile, maybeCompressImage } from '../lib/uploadUtils'
 import { supabase } from '../lib/supabase'
@@ -98,7 +99,7 @@ export default function Documents() {
     setSaving(false)
     if (error) { showToast('Error: '+error.message); return }
     showToast('✅ Document saved!')
-    await triggerWorkflow('document_uploaded', form.clientType || 'client', form.clientName || '', 'Staff').catch(()=>{})
+    const _du = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'; await triggerWorkflow('document_uploaded', form.clientType || 'client', form.clientName || '', _du).catch(()=>{}); await logActivity(supabase,{employeeName:_du,action:'document_uploaded',category:'document',description:`Uploaded doc: ${form.name} — ${form.clientName||'General'}`,entityName:form.clientName,meta:{docType:form.docType,fileName:form.name}}).catch(()=>{})
     setModal(false)
     setForm({ name:'', client:'', docType:'IRS Docs', notes:'' })
     setFile(null)

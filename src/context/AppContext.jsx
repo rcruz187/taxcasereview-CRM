@@ -136,8 +136,22 @@ export function AppProvider({ children }) {
     })
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
-      if (session?.user) { loadRole(session.user.email); loadBrandColor() }
-      else { setRole('Tax Associate'); setPerms(null); setEmployeeName('') }
+      if (session?.user) {
+        loadRole(session.user.email); loadBrandColor()
+        // Log login event
+        if (_event === 'SIGNED_IN') {
+          const name = session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Staff'
+          import('../lib/activityLog').then(({ logActivity }) => {
+            logActivity(supabase, {
+              employeeName: name, employeeEmail: session.user.email,
+              action: 'session_login', category: 'session',
+              description: `${name} logged in`, meta: { event: _event }
+            }).catch(() => {})
+          })
+        }
+      } else {
+        setRole('Tax Associate'); setPerms(null); setEmployeeName('')
+      }
     })
     return () => listener.subscription.unsubscribe()
   }, [])

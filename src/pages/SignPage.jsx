@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
-import { stampSignature } from '../lib/irsFormUtils'
+import { stampSignature, buildCertificatePage, addTearDropStamp, appendPdfPages } from '../lib/irsFormUtils'
 import { useFirm } from '../lib/useFirm'
 import { advanceLeadStatus } from '../lib/leadStatus'
 
@@ -198,6 +198,12 @@ export default function SignPage() {
       created_at: signedAt,
     }]).catch(() => {})
 
+    // ── Build Certificate of Completion page ─────────────────────────────
+    const certBytes = await buildCertificatePage({
+      docType: doc.doc_type, clientName: doc.client_name,
+      signedBy: fullname, ip, signedAt,
+    }).catch(() => null)
+
     // Stamp signature onto each pre-filled IRS PDF attached to this package
     const pdfAttachments = Array.isArray(doc.pdf_attachments) ? doc.pdf_attachments : []
     const signatureText = (mode === 'type' ? typedSig.trim() : fullname.trim())
@@ -207,30 +213,54 @@ export default function SignPage() {
     for (const att of pdfAttachments) {
       try {
         const bytes = await fetch(att.url).then(r => r.arrayBuffer())
-        const signedBytes = await stampSignature(
-          bytes,
-          att.formType,
-          signatureText,
-          signedDate,
+        let signedBytes = await stampSignature(
+          bytes, att.formType, signatureText, signedDate,
           mode === 'draw' ? sigImage : null
         )
+        // Internal copy: append certificate as final page
+        if (certBytes) signedBytes = await appendPdfPages(signedBytes, certBytes).catch(() => signedBytes)
+        // Client copy: teardrop stamp on last page
+        const clientBytes = await addTearDropStamp(signedBytes, { signedBy: fullname, signedAt, ip }).catch(() => signedBytes)
+
         const path = `docs/${safeName}/signed/${att.formType}_signed.pdf`
         await supabase.storage.from('documents')
           .upload(path, new Blob([signedBytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
         const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
-        signedAttachments.push({ formType: att.formType, label: att.label, url: urlData.publicUrl })
+
+        const clientPath = `docs/${safeName}/signed/${att.formType}_client_copy.pdf`
+        await supabase.storage.from('documents')
+          .upload(clientPath, new Blob([clientBytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
+        const { data: clientUrlData } = supabase.storage.from('documents').getPublicUrl(clientPath)
+
+        signedAttachments.push({ formType: att.formType, label: att.label, url: urlData.publicUrl, clientUrl: clientUrlData?.publicUrl })
         await supabase.from('documents').insert([{
-          client:     doc.client_name,
-          name:       `Signed ${att.label.split(' — ')[0]} — ${doc.client_name}`,
-          docType:    savedDocType,
-          file_url:   urlData.publicUrl,
-          file_name:  `${att.formType}_signed.pdf`,
-          notes:      `Signed by: ${fullname}\nIP: ${ip}\nDate: ${signedAt}`,
-          created_at: signedAt,
+          client: doc.client_name,
+          name: `Signed ${att.label.split(' — ')[0]} — ${doc.client_name}`,
+          docType: savedDocType, file_url: urlData.publicUrl,
+          file_name: `${att.formType}_signed.pdf`, file_size: signedBytes.byteLength,
+          notes: `Signed by: ${fullname}\nIP: ${ip}\nDate: ${signedAt}\n✅ Certificate of completion appended`,
+          source: 'E-Signature', uploaded_by: 'System', created_at: signedAt,
         }]).catch(() => {})
       } catch (e) {
         console.error('Failed to stamp', att.formType, e)
       }
+    }
+
+    // Save certificate as standalone doc record
+    if (certBytes) {
+      const certPath = `docs/${safeName}/signed/certificate_${Date.now()}.pdf`
+      await supabase.storage.from('documents')
+        .upload(certPath, new Blob([certBytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
+        .catch(() => {})
+      const { data: certUrlData } = supabase.storage.from('documents').getPublicUrl(certPath)
+      await supabase.from('documents').insert([{
+        client: doc.client_name,
+        name: `Certificate of Completion — ${doc.doc_type} — ${doc.client_name}`,
+        docType: savedDocType, file_url: certUrlData?.publicUrl,
+        file_name: 'certificate_completion.pdf',
+        notes: `Signed by: ${fullname} | IP: ${ip} | ${signedAt}`,
+        source: 'E-Signature', uploaded_by: 'System', created_at: signedAt,
+      }]).catch(() => {})
     }
 
     if (signedAttachments.length) {
@@ -239,7 +269,9 @@ export default function SignPage() {
 
     // Notify the client a signed copy is on file
       const { data: cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle().catch(() => ({ data: null }))
-      const attachmentLinks = signedAttachments.map(a => `<li><a href="${a.url}">${a.label}</a></li>`).join('')
+      const attachmentLinks = signedAttachments.map(a =>
+        `<li><a href="${a.clientUrl || a.url}" style="color:#3b82f6">${a.label} — Your Signed Copy</a></li>`
+      ).join('')
       if (doc.client_email) {
         await supabase.functions.invoke('send-email', { body: {
           to: doc.client_email,

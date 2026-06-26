@@ -74,9 +74,10 @@ const SECTIONS = [
     items: [
       { path: '/kiosk',     icon: KioskIcon,   label: 'Time Kiosk',    section: null },
       { path: '/employee',  icon: PortalIcon,  label: 'Employee Portal', section: null },
-      { path: '/timeclock', icon: ClockIcon,   label: 'Time Clock',    section: 'timeclock' },
-      { path: '/timeoff',   icon: TimeOffIcon, label: 'Time Off',      badge: 'timeoff', section: 'timeoff' },
-      { path: '/payroll',   icon: PayrollIcon, label: 'Payroll',       section: 'payroll' },
+      { path: '/timeclock',       icon: ClockIcon,    label: 'Time Clock',       section: 'timeclock' },
+      { path: '/timeoff',         icon: TimeOffIcon,  label: 'Time Off',         badge: 'timeoff', section: 'timeoff' },
+      { path: '/payroll',         icon: PayrollIcon,  label: 'Payroll',          section: 'payroll' },
+      { path: '/activity-report', icon: ActivityIcon, label: 'Activity Report',  section: 'employees' },
     ]
   },
   {
@@ -413,7 +414,8 @@ function EmailIcon()   { return <svg viewBox="0 0 24 24" fill="none" stroke="cur
 function FolderIcon()  { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> }
 function SignIcon()    { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> }
 function ChatIcon()    { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="9" y1="10" x2="15" y2="10"/><line x1="9" y1="14" x2="13" y2="14"/></svg> }
-function PayrollIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> }
+function PayrollIcon()   { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> }
+function ActivityIcon()  { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> }
 function EmpIcon()     { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg> }
 function KioskIcon()   { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.01"/><rect x="8" y="6" width="8" height="8" rx="1"/></svg> }
 function PortalIcon()  { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg> }

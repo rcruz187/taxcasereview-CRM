@@ -1,4 +1,5 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
@@ -168,7 +169,7 @@ Please contact our office with any questions.`
       await supabase.from('invoices').update({ status: isReminder ? inv.status : 'Sent', updated_at: new Date().toISOString() }).eq('id', inv.id)
       showToast(`✅ ${isReminder ? 'Reminder' : 'Invoice'} sent to ${to}`)
       const actorI = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
-      if (!isReminder) await triggerWorkflow('invoice_sent', 'client', inv?.clientName || '', actorI).catch(()=>{})
+      if (!isReminder) { await triggerWorkflow('invoice_sent', 'client', inv?.clientName || '', actorI).catch(()=>{}); await logActivity(supabase,{employeeName:actorI,action:'invoice_sent',category:'invoice',description:`Sent invoice #${invNum} ($${balance.toLocaleString()}) → ${inv.clientName}`,entityName:inv.clientName,meta:{amount:balance,invNum}}).catch(()=>{}) }
       load()
     } catch (e) {
       showToast('Email error: ' + e.message)
@@ -192,7 +193,7 @@ Please contact our office with any questions.`
 
   async function markPaid(inv) {    const total = parseFloat(inv.total||0)
     const {error} = await supabase.from('invoices').update({paid:String(total), status:'Paid', updated_at:new Date().toISOString()}).eq('id',inv.id)
-    if (!error) { showToast('✅ Marked as Paid!'); const actorIP = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'; await triggerWorkflow('invoice_paid', 'client', inv?.clientName || '', actorIP).catch(()=>{}); load() }
+    if (!error) { showToast('✅ Marked as Paid!'); const actorIP = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'; await triggerWorkflow('invoice_paid', 'client', inv?.clientName || '', actorIP).catch(()=>{}); await logActivity(supabase,{employeeName:actorIP,action:'invoice_paid',category:'invoice',description:`Marked invoice paid — ${inv.clientName}`,entityName:inv.clientName,meta:{invNum:inv.invNum}}).catch(()=>{}); load() }
   }
 
   async function deleteItem(id) { setConfirmDel(id) }

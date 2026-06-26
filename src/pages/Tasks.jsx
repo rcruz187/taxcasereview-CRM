@@ -1,4 +1,5 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
@@ -99,6 +100,7 @@ export default function Tasks() {
     if (error){showToast('❌ '+error.message);return}
     showToast('✅ Task added!')
     setModal(false); setForm(BLANK); setQt(QT_BLANK); load()
+    const _ta=getActor(user); await logActivity(supabase,{employeeName:_ta.name,employeeEmail:_ta.email,action:'task_created',category:'task',description:`Created task: ${form.title}`,entityName:form.clientName,meta:{assignedTo:form.assignedTo,priority:form.priority}}).catch(()=>{})
   }
 
   async function toggleDone(t) {

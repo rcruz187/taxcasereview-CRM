@@ -1,4 +1,5 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -862,7 +863,7 @@ export default function Leads() {
     if (oldName && oldName !== form.name) {
       await supabase.from('client_compliance_records').update({ client_name: form.name }).eq('client_name', oldName)
     }
-    if (!skipped.length) { showToast(modal==='edit' ? '✅ Lead updated!' : '✅ Lead added!'); if (modal !== 'edit') await triggerWorkflow('lead_created', 'lead', form.name, actor) }
+    if (!skipped.length) { showToast(modal==='edit' ? '✅ Lead updated!' : '✅ Lead added!'); if (modal !== 'edit') { await triggerWorkflow('lead_created', 'lead', form.name, actor); const _a=getActor(user); await logActivity(supabase,{employeeName:_a.name,employeeEmail:_a.email,action:'lead_created',category:'lead',description:`Added lead: ${form.name}`,entityName:form.name,meta:{status:form.status||'New Lead'}}) } else { const _a=getActor(user); await logActivity(supabase,{employeeName:_a.name,employeeEmail:_a.email,action:'lead_updated',category:'lead',description:`Updated lead: ${form.name}`,entityName:form.name}) } }
     setModal(false); setForm(BLANK)
     if (modal === 'edit' && detail) {
       const { data } = await supabase.from('leads').select('*').eq('id', form.id).single()
@@ -890,6 +891,7 @@ export default function Leads() {
     navigate('/leads', { replace: true })
     showToast('Lead archived')
     await triggerWorkflow('lead_archived', 'lead', l.name || '', actor)
+    await logActivity(supabase,{employeeName:actor,action:'lead_archived',category:'lead',description:`Archived lead: ${l.name}`,entityName:l.name})
   }
 
   async function restoreLead(l) {
@@ -1111,7 +1113,8 @@ export default function Leads() {
     }
     setPkgSending(true)
     const res = await sendFullPackage({...l, address:l.street, business_name:l.name}, supabase)
-    if (res.error) { setPkgSending(false); showToast('Error: '+res.error); return }
+    if (res.error) { setPkgSending(false)
+      const _pa=getActor(user); await logActivity(supabase,{employeeName:_pa.name,employeeEmail:_pa.email,action:'package_sent',category:'esign',description:`Sent Tax Inv Package to: ${l.name}`,entityName:l.name}).catch(()=>{}); showToast('Error: '+res.error); return }
 
     const url = res.url
     await navigator.clipboard.writeText(url).catch(()=>{})
@@ -1383,6 +1386,7 @@ export default function Leads() {
     // ── Workflow engine — lead converted trigger ──
     const convActor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
     await triggerWorkflow('lead_converted', 'lead', l.name, convActor)
+    const _ca=getActor(user); await logActivity(supabase,{employeeName:_ca.name,employeeEmail:_ca.email,action:'lead_converted',category:'lead',description:`Converted to client: ${l.name}`,entityName:l.name})
     setDetail(null); load()
   }
 

@@ -1543,3 +1543,127 @@ export async function generateStatePOAWithCover(client, poaPdfBytes) {
   return await merged.save()
 }
 
+
+// ── Certificate of Completion page ────────────────────────────────────────────
+// Generates a standalone PDF page that can be appended to any signed document.
+// Used internally (appended to firm's copy) and as the last page of the
+// client's copy with a teardrop timestamp stamp.
+export async function buildCertificatePage({ docType, clientName, signedBy, ip, signedAt, logoUrl }) {
+  const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib')
+  const doc  = await PDFDocument.create()
+  const page = doc.addPage([612, 792]) // US Letter
+  const { width, height } = page.getSize()
+  const font     = await doc.embedFont(StandardFonts.Helvetica)
+  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold)
+  const fontMono = await doc.embedFont(StandardFonts.Courier)
+
+  const green  = rgb(0.13, 0.74, 0.38)
+  const dark   = rgb(0.04, 0.09, 0.19)
+  const gray   = rgb(0.38, 0.45, 0.55)
+  const white  = rgb(1, 1, 1)
+  const border = rgb(0.13, 0.74, 0.38)
+
+  // Background
+  page.drawRectangle({ x:0, y:0, width, height, color: rgb(0.05, 0.09, 0.15) })
+
+  // Header bar
+  page.drawRectangle({ x:0, y:height-80, width, height:80, color: rgb(0.07, 0.17, 0.35) })
+
+  // Header text
+  page.drawText('TAX CASE REVIEW', {
+    x: 40, y: height-36, size: 10, font: fontBold, color: rgb(0.58, 0.76, 0.98),
+    characterSpacing: 2,
+  })
+  page.drawText('CERTIFICATE OF COMPLETION', {
+    x: 40, y: height-58, size: 18, font: fontBold, color: white,
+  })
+
+  // Green checkmark circle
+  const cx = width - 60, cy = height - 42
+  page.drawCircle({ x: cx, y: cy, size: 24, color: green })
+  page.drawText('✓', { x: cx - 7, y: cy - 7, size: 16, font: fontBold, color: white })
+
+  // Document info box
+  const boxY = height - 200
+  page.drawRectangle({ x:40, y:boxY, width:width-80, height:120, color: rgb(0.07, 0.13, 0.25), borderColor: border, borderWidth: 1 })
+
+  const infoLines = [
+    ['DOCUMENT', docType || 'Agreement'],
+    ['CLIENT', clientName || '—'],
+    ['SIGNED BY', signedBy || '—'],
+    ['IP ADDRESS', ip || 'Recorded'],
+    ['TIMESTAMP', signedAt ? new Date(signedAt).toLocaleString('en-US', { timeZone: 'America/New_York', hour12: true }) + ' ET' : '—'],
+  ]
+  infoLines.forEach(([label, value], i) => {
+    const y = boxY + 95 - i * 20
+    page.drawText(label + ':', { x:54, y, size: 8, font: fontBold, color: rgb(0.58, 0.76, 0.98), characterSpacing: 1 })
+    page.drawText(value, { x:160, y, size: 9, font: fontMono, color: white })
+  })
+
+  // Legal text
+  const legalText = 'This certificate confirms that the above-named individual electronically signed the referenced document. ' +
+    'The electronic signature was captured via Tax Case Review\'s secure signing portal and has the same legal effect ' +
+    'as a handwritten signature under the Electronic Signatures in Global and National Commerce Act (ESIGN) and ' +
+    'the Uniform Electronic Transactions Act (UETA).'
+
+  const words = legalText.split(' ')
+  let line = '', lineY = boxY - 40, maxW = width - 80
+  for (const word of words) {
+    const test = line ? line + ' ' + word : word
+    const tw = font.widthOfTextAtSize(test, 9)
+    if (tw > maxW) {
+      page.drawText(line, { x:40, y:lineY, size:9, font, color:gray })
+      line = word; lineY -= 14
+    } else { line = test }
+  }
+  if (line) page.drawText(line, { x:40, y:lineY, size:9, font, color:gray })
+
+  // Footer
+  page.drawRectangle({ x:0, y:0, width, height:40, color: rgb(0.07, 0.17, 0.35) })
+  page.drawText('Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408 · (888) 334-5052 · taxcasereview.org', {
+    x:40, y:14, size:7.5, font, color:gray,
+  })
+
+  return await doc.save()
+}
+
+// ── Teardrop timestamp stamp ──────────────────────────────────────────────────
+// Adds a small teardrop/badge stamp in the bottom-right corner of the LAST page
+// of a PDF. Shows on the client's signed copy only.
+export async function addTearDropStamp(pdfBytes, { signedBy, signedAt, ip }) {
+  const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib')
+  const doc   = await PDFDocument.load(pdfBytes, { ignoreEncryption: true })
+  const pages = doc.getPages()
+  const page  = pages[pages.length - 1] // stamp on LAST page only
+  const font  = await doc.embedFont(StandardFonts.Helvetica)
+  const fontB = await doc.embedFont(StandardFonts.HelveticaBold)
+  const { width } = page.getSize()
+
+  const x = width - 175, y = 15
+  const bw = 162, bh = 52
+
+  // Badge background
+  page.drawRectangle({ x, y, width:bw, height:bh, color:rgb(0.04,0.09,0.19), borderColor:rgb(0.13,0.74,0.38), borderWidth:1.5, opacity:0.93 })
+
+  // Teardrop shape (triangle pointing down-left)
+  page.drawRectangle({ x:x-8, y:y+18, width:12, height:12, color:rgb(0.13,0.74,0.38) })
+
+  // Badge text
+  const ts = signedAt ? new Date(signedAt).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true}) : ''
+  page.drawText('✓ ELECTRONICALLY SIGNED', { x:x+6, y:y+39, size:6.5, font:fontB, color:rgb(0.58,0.76,0.98), characterSpacing:0.5 })
+  page.drawText('By: ' + (signedBy||'').slice(0,28), { x:x+6, y:y+27, size:7.5, font:fontB, color:rgb(1,1,1) })
+  page.drawText(ts, { x:x+6, y:y+16, size:7, font, color:rgb(0.7,0.85,1) })
+  page.drawText('IP: ' + (ip||'').slice(0,24), { x:x+6, y:y+6, size:6.5, font, color:rgb(0.4,0.55,0.7) })
+
+  return await doc.save()
+}
+
+// ── Append pages from one PDF to another ─────────────────────────────────────
+export async function appendPdfPages(baseBytes, appendBytes) {
+  const { PDFDocument } = await import('pdf-lib')
+  const base   = await PDFDocument.load(baseBytes, { ignoreEncryption: true })
+  const extra  = await PDFDocument.load(appendBytes, { ignoreEncryption: true })
+  const copied = await base.copyPages(extra, extra.getPageIndices())
+  copied.forEach(p => base.addPage(p))
+  return await base.save()
+}

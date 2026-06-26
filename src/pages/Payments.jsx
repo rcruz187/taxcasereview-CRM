@@ -1,4 +1,5 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
@@ -132,6 +133,7 @@ export default function Payments() {
     showToast('✅ Payment recorded!')
     const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
     await triggerWorkflow('payment_received', 'client', form.clientName, actor).catch(()=>{})
+    await logActivity(supabase,{employeeName:actor,action:'payment_recorded',category:'payment',description:`Recorded payment $${form.amount} — ${form.clientName}`,entityName:form.clientName,meta:{amount:form.amount,method:form.method}}).catch(()=>{})
     setModal(false); setForm(BLANK); setEditId(null); load()
   }
 

@@ -1,4 +1,5 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
@@ -147,6 +148,7 @@ export default function Esign() {
     showToast(sent.length ? `✅ Agreement sent via ${sent.join(' & ')}!` : '✅ Created — signing link copied to clipboard.')
     const actorE = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
     await triggerWorkflow('esign_sent', form.entityType || 'lead', form.clientName || '', actorE).catch(()=>{})
+    await logActivity(supabase,{employeeName:actorE,action:'esign_sent',category:'esign',description:`Sent e-sign: ${form.docType} → ${form.clientName}`,entityName:form.clientName,meta:{docType:form.docType}}).catch(()=>{})
     setModal(false); setForm(BLANK); load()
   }
 

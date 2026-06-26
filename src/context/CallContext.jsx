@@ -546,6 +546,20 @@ export function CallProvider({ children }) {
     showCallToast('Call logged!')
     setLogModal(false)
 
+    // Log to activity_log
+    const _callActor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    import('../lib/activityLog').then(({ logActivity }) => {
+      logActivity(supabase, {
+        employeeName: _callActor,
+        employeeEmail: user?.email,
+        action: 'call_logged',
+        category: 'call',
+        description: `Call with ${record.clientName} — ${record.outcome} (${record.duration})`,
+        entityName: record.clientName,
+        meta: { outcome: record.outcome, duration: record.duration, phone: record.phone }
+      }).catch(() => {})
+    })
+
     if (active.status === 'Client Queue') {
       try {
         const q = JSON.parse(sessionStorage.getItem('dialerQueue') || '[]')

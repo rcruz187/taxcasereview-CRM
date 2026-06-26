@@ -1,4 +1,5 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -136,6 +137,7 @@ export default function Cases() {
     showToast('✅ Case created!')
     const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
     await triggerWorkflow('case_created', 'case', payload.clientName || '', actor).catch(() => {})
+    await logActivity(supabase,{employeeName:actor,action:'case_created',category:'case',description:`Opened case: ${payload.clientName} — ${payload.caseType}`,entityName:payload.clientName,meta:{caseType:payload.caseType}}).catch(()=>{})
     setModal(false); setForm(BLANK); load()
   }
 
@@ -267,6 +269,7 @@ export default function Cases() {
                     if (data) setDetail(data)
                     load()
                     showToast(`✅ Status → ${s}`)
+                    const _csa=getActor(user); await logActivity(supabase,{employeeName:_csa.name,employeeEmail:_csa.email,action:'case_status_changed',category:'case',description:`Case status: ${prevStatus} → ${s} (${c.clientName})`,entityName:c.clientName,meta:{from:prevStatus,to:s}}).catch(()=>{})
                   }}
                 >{s}</button>
               )
