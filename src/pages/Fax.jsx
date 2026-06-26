@@ -280,7 +280,7 @@ export default function Fax() {
                       onMouseEnter={e=>e.currentTarget.style.background='var(--s2)'}
                       onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                       <span>{c.name}</span>
-                      {c.phone&&<span style={{color:'var(--t3)',fontSize:12}}>{c.phone}</span>}
+                      {c.phone&&<a href={`tel:${c.phone.replace(/\D/g,'')}`} onClick={e=>e.stopPropagation()} style={{color:'var(--blue)',textDecoration:'none',fontSize:12}}>{c.phone}</a>}
                     </div>
                   ))}
                 </div>

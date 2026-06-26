@@ -366,7 +366,9 @@ export default function Dialer() {
                     <div className={`av ${avColor(entry.name || '?')}`} style={{ width: 24, height: 24, fontSize: 9.5 }}>{initialsFor(entry.name)}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: 12.5, color: 'var(--tx)' }}>{entry.name || 'Unknown'}</div>
-                      <div style={{ fontSize: 11, color: 'var(--t3)', fontFamily: 'monospace', marginTop: 1 }}>{entry.phone}</div>
+                      <div style={{ fontSize: 11, color: 'var(--t3)', fontFamily: 'monospace', marginTop: 1 }}>
+                        <a href={`tel:${entry.phone?.replace(/\D/g,'')}`} onClick={e=>e.stopPropagation()} style={{color:'var(--blue)',textDecoration:'none'}}>{entry.phone}</a>
+                      </div>
                     </div>
                     <button className="btn pri" style={{ padding: '5px 11px', fontSize: 11, gap: 4 }}
                       onClick={() => callQueueEntry(entry)} disabled={calling}>
@@ -524,7 +526,9 @@ export default function Dialer() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 700, fontSize: 12.5, color: 'var(--tx)' }}>{name}</div>
                         <div style={{ fontSize: 11, color: 'var(--t3)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
-                          <span style={{ fontFamily: 'monospace' }}>{lead.phone || '—'}</span>
+                          <span style={{ fontFamily: 'monospace' }}>
+                            <a href={`tel:${(lead.phone||'').replace(/\D/g,'')}`} onClick={e=>e.stopPropagation()} style={{color:'var(--blue)',textDecoration:'none'}}>{lead.phone || '—'}</a>
+                          </span>
                           {lead.source && <><span>·</span><span>{lead.source}</span></>}
                         </div>
                       </div>
@@ -604,7 +608,9 @@ export default function Dialer() {
                   onMouseLeave={e => e.currentTarget.style.background = ''}>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{cl.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--t3)', fontFamily: 'monospace' }}>{cl.phone || '—'}</div>
+                    <div style={{ fontSize: 11, color: 'var(--t3)', fontFamily: 'monospace' }}>
+                      <a href={`tel:${(cl.phone||'').replace(/\D/g,'')}`} onClick={e=>e.stopPropagation()} style={{color:'var(--blue)',textDecoration:'none'}}>{cl.phone || '—'}</a>
+                    </div>
                   </div>
                   <span style={{ fontSize: 12, color: 'var(--blue)', fontWeight: 600 }}>{attaching ? 'Attaching…' : 'Attach →'}</span>
                 </div>

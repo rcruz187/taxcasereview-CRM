@@ -269,7 +269,9 @@ export default function Sms() {
                       onMouseLeave={e=>e.currentTarget.style.background=''}>
                       <td style={{padding:'12px 14px',fontSize:18}}>{s.direction==='inbound'?<span style={{color:'var(--blue)'}}>📥</span>:<span style={{color:'var(--t3)'}}>📤</span>}</td>
                       <td style={{padding:'12px 14px',fontWeight:700,fontSize:14}}>{s.clientName}</td>
-                      <td style={{padding:'12px 14px',fontSize:13,color:'var(--t2)',fontFamily:'monospace'}}>{s.phone||'—'}</td>
+                      <td style={{padding:'12px 14px',fontSize:13,fontFamily:'monospace'}}>
+                        {s.phone ? <a href={`tel:${s.phone.replace(/\D/g,'')}`} style={{color:'var(--blue)',textDecoration:'none'}}>{s.phone}</a> : <span style={{color:'var(--t3)'}}>—</span>}
+                      </td>
                       <td style={{padding:'12px 14px',fontSize:13,maxWidth:240,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'var(--t2)'}}>{s.body}</td>
                       <td style={{padding:'12px 14px',fontSize:12,color:'var(--t3)',whiteSpace:'nowrap'}}>{s.created_at?.slice(0,10)}</td>
                       <td style={{padding:'12px 14px'}}><span className="bdg bg" style={{fontSize:12,padding:'3px 10px',fontWeight:700}}>{s.status||'Sent'}</span></td>
