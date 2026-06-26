@@ -527,7 +527,7 @@ export default function Dialer() {
                         <div style={{ fontWeight: 700, fontSize: 12.5, color: 'var(--tx)' }}>{name}</div>
                         <div style={{ fontSize: 11, color: 'var(--t3)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
                           <span style={{ fontFamily: 'monospace' }}>
-                            <a href={`tel:${(lead.phone||'').replace(/\D/g,'')}`} onClick={e=>e.stopPropagation()} style={{color:'var(--blue)',textDecoration:'none'}}>{lead.phone || '—'}</a>
+                            <PhoneNumber val={lead.phone} />
                           </span>
                           {lead.source && <><span>·</span><span>{lead.source}</span></>}
                         </div>
@@ -609,7 +609,7 @@ export default function Dialer() {
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{cl.name}</div>
                     <div style={{ fontSize: 11, color: 'var(--t3)', fontFamily: 'monospace' }}>
-                      <a href={`tel:${(cl.phone||'').replace(/\D/g,'')}`} onClick={e=>e.stopPropagation()} style={{color:'var(--blue)',textDecoration:'none'}}>{cl.phone || '—'}</a>
+                      <PhoneNumber val={cl.phone} />
                     </div>
                   </div>
                   <span style={{ fontSize: 12, color: 'var(--blue)', fontWeight: 600 }}>{attaching ? 'Attaching…' : 'Attach →'}</span>

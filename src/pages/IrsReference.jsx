@@ -284,20 +284,27 @@ function EntryCard({ entry, showState, onCopy, onEdit, onDelete }) {
             )}
           </div>
           {entry.content && (() => {
-            // Detect if content is a phone number (digits, dashes, spaces, slashes, parens)
             const isPhone = /^[\d\s\-().\/+]+$/.test(entry.content.trim()) && entry.content.replace(/\D/g,'').length >= 7
             if (isPhone) {
-              // May contain multiple numbers separated by / or newlines
               const parts = entry.content.split(/\s*[\/\n]\s*/)
+              const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
               return (
                 <div style={{ fontSize: 14, color: 'var(--blue)', marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {parts.map((p, i) => {
                     const digits = p.replace(/\D/g,'')
-                    return digits.length >= 7 ? (
+                    if (digits.length < 7) return <span key={i} style={{ color: 'var(--t2)' }}>{p.trim()}</span>
+                    return isMobile ? (
                       <a key={i} href={`tel:${digits}`} style={{ color: 'var(--blue)', textDecoration: 'none', fontWeight: 600, fontFamily: 'monospace' }}>
                         📞 {p.trim()}
                       </a>
-                    ) : <span key={i} style={{ color: 'var(--t2)' }}>{p.trim()}</span>
+                    ) : (
+                      <span key={i}
+                        onClick={() => { navigator.clipboard.writeText(p.trim()); onCopy(p.trim()) }}
+                        style={{ color: 'var(--blue)', fontWeight: 600, fontFamily: 'monospace', cursor: 'pointer' }}
+                        title="Click to copy">
+                        📞 {p.trim()}
+                      </span>
+                    )
                   })}
                 </div>
               )

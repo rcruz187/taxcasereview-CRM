@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import PhoneNumber from '../components/PhoneNumber'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import { useLocation } from 'react-router-dom'
@@ -280,7 +281,7 @@ export default function Fax() {
                       onMouseEnter={e=>e.currentTarget.style.background='var(--s2)'}
                       onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                       <span>{c.name}</span>
-                      {c.phone&&<a href={`tel:${c.phone.replace(/\D/g,'')}`} onClick={e=>e.stopPropagation()} style={{color:'var(--blue)',textDecoration:'none',fontSize:12}}>{c.phone}</a>}
+                      {c.phone && <PhoneNumber val={c.phone} />}
                     </div>
                   ))}
                 </div>
