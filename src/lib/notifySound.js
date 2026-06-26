@@ -127,3 +127,52 @@ export function playSound(kind) {
     pattern.forEach(([freq, offset, dur]) => tone(freq, now + offset, dur, audioCtx))
   } catch (_) {}
 }
+
+// ─── Outbound ringback tone ───────────────────────────────────────────────────
+// US standard ringback: 2s on, 4s off cycle using 440Hz + 480Hz tones.
+// Played locally in the browser while waiting for the outbound call to connect.
+let ringbackNodes = []
+let ringbackInterval = null
+
+export function playRingback() {
+  stopRingback()
+  try {
+    const c = getCtx()
+    if (c.state === 'suspended') c.resume()
+
+    function startBurst() {
+      const gain = c.createGain()
+      gain.gain.setValueAtTime(0.18, c.currentTime)
+      gain.connect(c.destination)
+
+      const freqs = [440, 480]
+      const nodes = freqs.map(f => {
+        const osc = c.createOscillator()
+        osc.type = 'sine'
+        osc.frequency.value = f
+        osc.connect(gain)
+        osc.start()
+        return osc
+      })
+
+      // Stop after 2s (on time)
+      const stopAt = c.currentTime + 2
+      gain.gain.setValueAtTime(0.18, stopAt - 0.05)
+      gain.gain.linearRampToValueAtTime(0, stopAt)
+      nodes.forEach(n => n.stop(stopAt + 0.05))
+      ringbackNodes = [...ringbackNodes, ...nodes, gain]
+    }
+
+    startBurst()
+    // Repeat every 6s (2s on, 4s off)
+    ringbackInterval = setInterval(startBurst, 6000)
+  } catch(e) {
+    console.warn('[ringback] error:', e)
+  }
+}
+
+export function stopRingback() {
+  if (ringbackInterval) { clearInterval(ringbackInterval); ringbackInterval = null }
+  ringbackNodes.forEach(n => { try { n.stop?.(); n.disconnect?.() } catch(_){} })
+  ringbackNodes = []
+}

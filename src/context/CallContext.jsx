@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { Relay } from '@signalwire/js'
 import { supabase } from '../lib/supabase'
 import { useApp } from './AppContext'
-import { playSound, playRing, stopRingAudio } from '../lib/notifySound'
+import { playSound, playRing, stopRingAudio, playRingback, stopRingback } from '../lib/notifySound'
 
 // ──────────────────────────────────────────────────────────────────────
 // This used to live entirely inside Dialer.jsx. The problem: React
@@ -169,6 +169,7 @@ export function CallProvider({ children }) {
         console.log('[RELAY] callUpdate — direction:', call.direction, '| state:', call.state, '| from:', call.options?.remoteCallerNumber)
         if (call.state === 'active') {
           activeCallRef.current = call  // always update ref so DTMF works
+          stopRingback()               // stop ringback when call connects
         }
         if (call.state === 'active' && !uiStartedRef.current) {
           uiStartedRef.current = true
@@ -401,6 +402,7 @@ export function CallProvider({ children }) {
     setElapsed(0)
     setLogForm(BLANK_LOG)
     timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000)
+    playRingback() // play US ringback tone while waiting to connect
 
     // Manual dial-pad calls don't know who they're calling yet — check
     // if the number matches an existing client/lead so the recap still
@@ -472,6 +474,7 @@ export function CallProvider({ children }) {
   // one shared function means these three paths can't drift out of sync
   // with each other again.
   function finalizeCallEnd({ alreadyHungUp }) {
+    stopRingback()
     if (outboundPollRef.current) { clearInterval(outboundPollRef.current); outboundPollRef.current = null }
     if (!alreadyHungUp) liveCallRef.current?.hangup()
     liveCallRef.current = null

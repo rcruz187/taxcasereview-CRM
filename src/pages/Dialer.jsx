@@ -104,11 +104,23 @@ export default function Dialer() {
     // never showed up in History at all. incoming_calls/outbound_calls get
     // a row for every real call attempt regardless, so pull from those and
     // use calllog only to enrich with outcome/notes/duration when present.
-    const [{ data: inbound }, { data: outbound }, { data: logged }] = await Promise.all([
+    // Also load contacts for name matching outbound calls (IRS, clients, leads)
+    const [{ data: inbound }, { data: outbound }, { data: logged }, { data: allLeads }, { data: allClients }] = await Promise.all([
       supabase.from('incoming_calls').select('*').order('created_at', { ascending: false }).limit(150),
       supabase.from('outbound_calls').select('*').order('created_at', { ascending: false }).limit(150),
       supabase.from('calllog').select('*').order('created_at', { ascending: false }).limit(300),
+      supabase.from('leads').select('id,name,phone').limit(2000),
+      supabase.from('clients').select('id,name,phone').limit(2000),
     ])
+
+    // Match a phone number to a known contact name
+    function matchPhone(phone) {
+      if (!phone) return null
+      const digits = phone.replace(/\D/g,'')
+      const all = [...(allLeads||[]), ...(allClients||[])]
+      const found = all.find(c => c.phone?.replace(/\D/g,'') === digits || c.phone?.replace(/\D/g,'') === digits.slice(-10))
+      return found?.name || null
+    }
 
     // Best-effort match to a manually-logged outcome — same phone number,
     // logged within 15 min of the raw call (the log modal saves moments
@@ -124,7 +136,7 @@ export default function Dialer() {
       const match = findLogged(c.from_number, c.created_at)
       return {
         id: 'in-' + c.id, direction: 'Inbound', phone: c.from_number,
-        clientName: match?.clientName || null,
+        clientName: match?.clientName || matchPhone(c.from_number) || null,
         outcome: match?.outcome || RAW_STATUS_LABEL[c.status] || c.status || '—',
         duration: match?.duration || null,
         notes: match?.notes || null,
@@ -135,7 +147,7 @@ export default function Dialer() {
       const match = findLogged(c.destination_number, c.created_at)
       return {
         id: 'out-' + c.id, direction: 'Outbound', phone: c.destination_number,
-        clientName: match?.clientName || null,
+        clientName: match?.clientName || matchPhone(c.destination_number) || null,
         outcome: match?.outcome || RAW_STATUS_LABEL[c.status] || c.status || '—',
         duration: match?.duration || null,
         notes: match?.notes || null,
