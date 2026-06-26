@@ -89,7 +89,7 @@ export default function ClockIn() {
       const inTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
       const date = new Date().toISOString().slice(0, 10)
       const { error } = await supabase.from('timeentries').insert([{
-        employee: empName, date, inTime, outTime: null, hours: null, notes: null
+        employee: empName, date, inTime, outTime: null, hours: null, notes: null, method: 'Kiosk'
       }])
       setSaving(null)
       if (error) { setDone({ name: empName, action: 'error', error: error.message }); return }

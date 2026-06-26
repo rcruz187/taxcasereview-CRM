@@ -343,13 +343,13 @@ export default function Payroll() {
 
       <PayrollStatCards employees={employees} timeEntries={timeEntries} />
 
-      {/* Tab Bar */}
-      <div style={{ display:'flex', gap:4, marginBottom:16, borderBottom:'1px solid var(--br)' }}>
-        {[['payroll','Payroll'],['stubs','Pay Stubs'],['timeentries','⏱ Time Entries']].map(([k,l]) => (
+      {/* Tab Bar — matches PHL CRM layout */}
+      <div style={{ display:'flex', gap:0, marginBottom:16, borderBottom:'1px solid var(--br)' }}>
+        {[['today',"Today's Log"],['payroll','Payroll'],['stubs','Pay Stubs'],['punch','Punch History']].map(([k,l]) => (
           <button key={k} onClick={()=>setActiveTab(k)}
-            style={{ padding:'10px 18px', border:'none', borderBottom: activeTab===k?'2px solid var(--blue)':'2px solid transparent',
+            style={{ padding:'10px 20px', border:'none', borderBottom: activeTab===k?'2px solid var(--blue)':'2px solid transparent',
               background:'none', cursor:'pointer', fontSize:13, fontWeight:activeTab===k?700:500,
-              color:activeTab===k?'var(--blue)':'var(--t2)' }}>
+              color:activeTab===k?'var(--blue)':'var(--t2)', whiteSpace:'nowrap' }}>
             {l}
           </button>
         ))}
@@ -513,8 +513,141 @@ export default function Payroll() {
         </div>
       </>)}
 
-      {/* ── Time Entries Tab ─────────────────────────────────────── */}
-      {activeTab==='timeentries' && (<>
+      {/* ── Today's Log Tab ─────────────────────────────────────── */}
+      {activeTab==='today' && (
+        <div className="card" style={{ padding:0, overflow:'hidden' }}>
+          <div style={{ padding:'14px 16px', borderBottom:'1px solid var(--br)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <span style={{ fontWeight:700, fontSize:14 }}>Live Clock Status — {new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</span>
+            <span style={{ fontSize:11, color:'var(--t3)' }}>Updates every 30s</span>
+          </div>
+          {(() => {
+            const today = new Date().toISOString().slice(0,10)
+            const todayEntries = timeEntries.filter(e => e.date === today)
+            const clockedIn = todayEntries.filter(e => e.inTime && !e.outTime)
+            const clockedOut = todayEntries.filter(e => e.inTime && e.outTime)
+            if (todayEntries.length === 0) return (
+              <div style={{ padding:40, textAlign:'center', color:'var(--t3)' }}>
+                <div style={{ fontSize:32, marginBottom:8 }}>⏰</div>
+                <div style={{ fontWeight:700, color:'var(--tx)', marginBottom:4 }}>No punches yet today</div>
+                <div style={{ fontSize:12 }}>Staff can clock in via the Time Kiosk (/clockin) or Employee Portal</div>
+              </div>
+            )
+            return (
+              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+                <thead>
+                  <tr style={{ borderBottom:'1px solid var(--br)', background:'var(--s2)' }}>
+                    {['Employee','Clock In','Clock Out','Hours','Method','Status'].map(h=>(
+                      <th key={h} style={{ padding:'9px 14px', textAlign:'left', fontSize:10, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {todayEntries.sort((a,b)=>(b.inTime||'').localeCompare(a.inTime||'')).map(e => (
+                    <tr key={e.id} style={{ borderBottom:'1px solid var(--br)' }}>
+                      <td style={{ padding:'11px 14px', fontWeight:700 }}>{e.employee}</td>
+                      <td style={{ padding:'11px 14px', color:'var(--ok)', fontWeight:600 }}>{fmt12Local(e.inTime)}</td>
+                      <td style={{ padding:'11px 14px', color:e.outTime?'var(--bad)':'var(--t3)' }}>{e.outTime ? fmt12Local(e.outTime) : '—'}</td>
+                      <td style={{ padding:'11px 14px', fontWeight:700, color:'#38BDF8' }}>{e.hours ? e.hours+'h' : e.inTime && !e.outTime ? <span style={{ color:'var(--warn)', fontSize:12 }}>Live</span> : '—'}</td>
+                      <td style={{ padding:'11px 14px' }}>
+                        <span className="bdg bn" style={{ fontSize:11 }}>{e.method || 'Manual'}</span>
+                      </td>
+                      <td style={{ padding:'11px 14px' }}>
+                        {e.outTime
+                          ? <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:12, color:'var(--t2)' }}><span style={{ width:8,height:8,borderRadius:'50%',background:'#64748b',flexShrink:0 }}/>Clocked Out</span>
+                          : <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:12, color:'var(--ok)', fontWeight:700 }}><span style={{ width:8,height:8,borderRadius:'50%',background:'var(--ok)',flexShrink:0, animation:'pulse 1.5s infinite' }}/>Active</span>
+                        }
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          })()}
+        </div>
+      )}
+
+      {/* ── Punch History Tab ─────────────────────────────────────── */}
+      {activeTab==='punch' && (<>
+        <div style={{ display:'flex', gap:8, marginBottom:12, flexWrap:'wrap', alignItems:'center' }}>
+          <input value={teSearch} onChange={e=>setTeSearch(e.target.value)} placeholder="Search employee…"
+            style={{ flex:1, minWidth:140, padding:'7px 12px', background:'var(--s2)', border:'1px solid var(--br)', borderRadius:6, color:'var(--tx)', fontSize:12 }}/>
+          <select value={teFilterEmp} onChange={e=>setTeFilterEmp(e.target.value)}
+            style={{ padding:'7px 10px', background:'var(--s2)', border:'1px solid var(--br)', borderRadius:6, color:'var(--tx)', fontSize:12 }}>
+            <option value="All">All Staff</option>
+            {[...new Set(timeEntries.map(t=>t.employee).filter(Boolean))].sort().map(e=><option key={e}>{e}</option>)}
+          </select>
+        </div>
+        <div className="card" style={{ padding:0, overflow:'hidden' }}>
+          <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--br)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <span style={{ fontWeight:700, fontSize:13 }}>Punch History — {currentPeriod().label}</span>
+            <span style={{ fontSize:11, color:'var(--t3)' }}>
+              {timeEntries.filter(e=>{ const ms=teFilterEmp==='All'||e.employee===teFilterEmp; const ss=!teSearch||e.employee?.toLowerCase().includes(teSearch.toLowerCase()); return ms&&ss }).length} events
+            </span>
+          </div>
+          {timeEntries.filter(e=>{
+            const ms = teFilterEmp==='All'||e.employee===teFilterEmp
+            const ss = !teSearch || e.employee?.toLowerCase().includes(teSearch.toLowerCase())
+            return ms && ss
+          }).length === 0 ? (
+            <div style={{ padding:32, textAlign:'center', color:'var(--t3)', fontSize:13 }}>No punch history for this period.</div>
+          ) : (
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+              <thead>
+                <tr style={{ borderBottom:'1px solid var(--br)', background:'var(--s2)' }}>
+                  {['Employee','Date','Clock In','Clock Out','Hours','Method','Status',''].map(h=>(
+                    <th key={h} style={{ padding:'9px 12px', textAlign:'left', fontSize:10, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em', whiteSpace:'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {timeEntries.filter(e=>{
+                  const ms = teFilterEmp==='All'||e.employee===teFilterEmp
+                  const ss = !teSearch || e.employee?.toLowerCase().includes(teSearch.toLowerCase())
+                  return ms && ss
+                }).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.inTime||'').localeCompare(a.inTime||'')).map(e=>(
+                  <tr key={e.id} style={{ borderBottom:'1px solid var(--br)' }}
+                    onMouseEnter={ev=>ev.currentTarget.style.background='var(--s2)'}
+                    onMouseLeave={ev=>ev.currentTarget.style.background=''}>
+                    <td style={{ padding:'11px 12px' }}>
+                      <div style={{ fontWeight:700, fontSize:13 }}>{e.employee}</div>
+                      <div style={{ fontSize:10, color:'var(--t3)' }}>{e.employeeId || ''}</div>
+                    </td>
+                    <td style={{ padding:'11px 12px', color:'var(--t2)' }}>
+                      {e.date ? new Date(e.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) : '—'}
+                    </td>
+                    <td style={{ padding:'11px 12px', color:'var(--ok)', fontWeight:600 }}>{fmt12Local(e.inTime)}</td>
+                    <td style={{ padding:'11px 12px', color:e.outTime?'var(--bad)':'var(--t3)', fontWeight:e.outTime?600:400 }}>
+                      {e.outTime ? fmt12Local(e.outTime) : <span className="bdg ba" style={{ fontSize:10 }}>Active</span>}
+                    </td>
+                    <td style={{ padding:'11px 12px', fontWeight:700, color:'#38BDF8' }}>{e.hours ? e.hours+'h' : '—'}</td>
+                    <td style={{ padding:'11px 12px' }}>
+                      <span className="bdg bn" style={{ fontSize:11 }}>{e.method || 'Manual'}</span>
+                    </td>
+                    <td style={{ padding:'11px 12px' }}>
+                      <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:12, color:'var(--t2)' }}>
+                        <span style={{ width:8,height:8,borderRadius:'50%',background:e.outTime?'#64748b':'var(--ok)',flexShrink:0 }}/>
+                        {e.outTime ? 'Clocked Out' : 'Active'}
+                      </span>
+                    </td>
+                    <td style={{ padding:'9px 8px' }}>
+                      <div style={{ display:'flex', gap:5 }}>
+                        {e.inTime && e.outTime && !e.hours && (
+                          <button className="btn sec" style={{ fontSize:10, padding:'3px 8px', color:'var(--warn)' }}
+                            onClick={async()=>{ const h=calcHoursLocal(e.inTime,e.outTime); if(h){await supabase.from('timeentries').update({hours:parseFloat(h)}).eq('id',e.id);showToast('✅ Recalculated: '+h+'h');load()} }}>
+                            ↻
+                          </button>
+                        )}
+                        <button className="btn sec" style={{ fontSize:12, padding:'3px 8px' }} onClick={()=>openEditPunch(e)}>✏️</button>
+                        <button className="btn del" style={{ fontSize:12, padding:'3px 8px' }} onClick={()=>setDeletePunchId(e.id)}>🗑</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </>)}
         <div style={{ display:'flex', gap:8, marginBottom:12, flexWrap:'wrap', alignItems:'center' }}>
           <input value={teSearch} onChange={e=>setTeSearch(e.target.value)} placeholder="Search…"
             style={{ flex:1, minWidth:140, padding:'7px 12px', background:'var(--s2)', border:'1px solid var(--br)', borderRadius:6, color:'var(--tx)', fontSize:12 }}/>
@@ -574,7 +707,6 @@ export default function Payroll() {
             </table>
           )}
         </div>
-      </>)}
 
       {/* Edit Punch Modal */}
       {editPunch && (

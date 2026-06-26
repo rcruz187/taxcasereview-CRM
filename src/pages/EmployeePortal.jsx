@@ -201,7 +201,7 @@ export default function EmployeePortal() {
       const inTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
       const date = localDateStr(new Date())
       const { data, error } = await supabase.from('timeentries').insert([{
-        employee: emp.name, date, inTime, outTime: null, hours: null, notes: null
+        employee: emp.name, date, inTime, outTime: null, hours: null, notes: null, method: 'Employee Portal'
       }]).select().single()
       if (error) { setClockMsg('❌ ' + error.message); setClocking(false); return }
       setClockMsg(`✅ Clocked in at ${inTime}`)
