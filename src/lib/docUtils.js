@@ -1057,7 +1057,7 @@ export async function sendFullPackage(client, supabase) {
   const includeIRS   = irsOrState !== 'State'       // IRS Federal or Both
   const includeState = irsOrState !== 'IRS Federal'  // State or Both
 
-  const formTypes = includeIRS ? getPackageFormTypes(clientType) : ['cc_auth']
+  const formTypes = includeIRS ? getPackageFormTypes(clientType) : []
 
   const pdfAttachments = []
 
