@@ -56,65 +56,24 @@ const BLANK = {
 function Bdg({s,c,style}) { return <span className={`bdg ${c||'bn'}`} style={style}>{s}</span> }
 function PhoneLink({val, name}) {
   const nav = useNavigate()
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-
-  useEffect(() => {
-    if (!open) return
-    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
-  }, [open])
-
   if (!val) return <span style={{color:'var(--t3)'}}>—</span>
   const digits = val.replace(/\D/g,'')
-
-  function callNow() {
+  function dial(e) {
+    e.stopPropagation()
     sessionStorage.setItem('dialerNumber', digits)
     sessionStorage.setItem('dialerName', name||'')
     nav('/dialer')
-    setOpen(false)
   }
-
-  function addToQueue() {
-    const queue = JSON.parse(sessionStorage.getItem('dialerQueue')||'[]')
-    queue.push({ name: name||'', phone: digits })
-    sessionStorage.setItem('dialerQueue', JSON.stringify(queue))
-    setOpen(false)
-  }
-
-  function copyNumber() {
-    navigator.clipboard?.writeText(val)
-    setOpen(false)
-  }
-
   return (
-    <div ref={ref} style={{position:'relative',display:'inline-block'}}>
-      <span
-        onClick={() => setOpen(o=>!o)}
-        style={{color:'var(--blue)',textDecoration:'none',fontWeight:600,display:'inline-flex',alignItems:'center',gap:5,cursor:'pointer'}}
-        onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
-        onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.18 1h3a2 2 0 012 1.72 12.05 12.05 0 00.7 2.81 2 2 0 01-.45 2.11L4.91 8.15a16 16 0 006.29 6.29l1.51-1.52a2 2 0 012.11-.45 12.05 12.05 0 002.81.7A2 2 0 0122 16.92z"/></svg>
-        {val}
-      </span>
-      {open && (
-        <div style={{
-          position:'absolute', top:'calc(100% + 4px)', left:0, zIndex:50,
-          background:'var(--s2)', border:'1px solid var(--br)', borderRadius:8,
-          boxShadow:'0 6px 20px rgba(0,0,0,.35)', minWidth:180, overflow:'hidden'
-        }}>
-          <button onClick={callNow} style={menuBtnStyle}>📞 Call via Dialer</button>
-          <button onClick={addToQueue} style={menuBtnStyle}>➕ Add to Call Queue</button>
-          <button onClick={copyNumber} style={menuBtnStyle}>📋 Copy Number</button>
-        </div>
-      )}
-    </div>
+    <span onClick={dial}
+      style={{color:'var(--blue)',fontWeight:600,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}
+      onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
+      onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}
+      title="Click to dial">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.18 1h3a2 2 0 012 1.72 12.05 12.05 0 00.7 2.81 2 2 0 01-.45 2.11L4.91 8.15a16 16 0 006.29 6.29l1.51-1.52a2 2 0 012.11-.45 12.05 12.05 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+      {val}
+    </span>
   )
-}
-const menuBtnStyle = {
-  display:'block', width:'100%', textAlign:'left', padding:'9px 14px', fontSize:12.5,
-  background:'none', border:'none', color:'var(--tx)', cursor:'pointer'
 }
 function DR({label,val,name,entityId,onLogged,showToast}) {
   const isPhone = label==='Phone'||label==='Phone 2'||label==='Phone2'

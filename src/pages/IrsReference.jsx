@@ -1,4 +1,5 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import PhoneNumber from '../components/PhoneNumber'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
@@ -287,24 +288,13 @@ function EntryCard({ entry, showState, onCopy, onEdit, onDelete }) {
             const isPhone = /^[\d\s\-().\/+]+$/.test(entry.content.trim()) && entry.content.replace(/\D/g,'').length >= 7
             if (isPhone) {
               const parts = entry.content.split(/\s*[\/\n]\s*/)
-              const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
               return (
-                <div style={{ fontSize: 14, color: 'var(--blue)', marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                <div style={{ fontSize: 14, marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                   {parts.map((p, i) => {
                     const digits = p.replace(/\D/g,'')
-                    if (digits.length < 7) return <span key={i} style={{ color: 'var(--t2)' }}>{p.trim()}</span>
-                    return isMobile ? (
-                      <a key={i} href={`tel:${digits}`} style={{ color: 'var(--blue)', textDecoration: 'none', fontWeight: 600, fontFamily: 'monospace' }}>
-                        📞 {p.trim()}
-                      </a>
-                    ) : (
-                      <span key={i}
-                        onClick={() => { navigator.clipboard.writeText(p.trim()); onCopy(p.trim()) }}
-                        style={{ color: 'var(--blue)', fontWeight: 600, fontFamily: 'monospace', cursor: 'pointer' }}
-                        title="Click to copy">
-                        📞 {p.trim()}
-                      </span>
-                    )
+                    return digits.length >= 7
+                      ? <PhoneNumber key={i} val={p.trim()} name={entry.title} />
+                      : <span key={i} style={{ color: 'var(--t2)' }}>{p.trim()}</span>
                   })}
                 </div>
               )

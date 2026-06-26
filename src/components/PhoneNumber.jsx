@@ -1,36 +1,27 @@
-// PhoneNumber — smart phone display component.
-// On mobile: taps open the native dialer (tel: link).
-// On desktop: click copies the number to clipboard + shows a toast.
-// Use this everywhere a raw phone number is displayed.
+// PhoneNumber — click any phone number to dial it immediately via CRM dialer.
+// No popup, no picker, no copy. Just dial.
+import { useNavigate } from 'react-router-dom'
 
-import { useState } from 'react'
+export default function PhoneNumber({ val, name = '' }) {
+  const nav = useNavigate()
+  if (!val) return <span style={{color:'var(--t3)'}}>—</span>
+  const digits = val.replace(/\D/g,'')
 
-const isMobile = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-
-export default function PhoneNumber({ val, style = {} }) {
-  const [copied, setCopied] = useState(false)
-  if (!val) return <span style={{ color: 'var(--t3)' }}>—</span>
-  const digits = val.replace(/\D/g, '')
-
-  const baseStyle = {
-    color: 'var(--blue)', fontWeight: 600, fontFamily: 'monospace',
-    textDecoration: 'none', cursor: 'pointer', ...style
-  }
-
-  if (isMobile()) {
-    return <a href={`tel:${digits}`} style={baseStyle}>📞 {val}</a>
+  function dial(e) {
+    e.stopPropagation()
+    sessionStorage.setItem('dialerNumber', digits)
+    sessionStorage.setItem('dialerName', name)
+    nav('/dialer')
   }
 
   return (
-    <span
-      onClick={() => {
-        navigator.clipboard?.writeText(val)
-        setCopied(true)
-        setTimeout(() => setCopied(false), 1500)
-      }}
-      style={baseStyle}
-      title="Click to copy">
-      📞 {copied ? '✓ Copied!' : val}
+    <span onClick={dial}
+      style={{color:'var(--blue)',fontWeight:600,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5,fontFamily:'monospace'}}
+      onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
+      onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}
+      title="Click to dial">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.18 1h3a2 2 0 012 1.72 12.05 12.05 0 00.7 2.81 2 2 0 01-.45 2.11L4.91 8.15a16 16 0 006.29 6.29l1.51-1.52a2 2 0 012.11-.45 12.05 12.05 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+      {val}
     </span>
   )
 }
