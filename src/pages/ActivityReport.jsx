@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import { ICONS } from '../lib/activityLog'
+import { exportCSV, exportPDF, exportExcel } from '../lib/exportUtils'
 
 const CATEGORY_COLORS = {
   lead:     '#a855f7', client:  '#3b82f6', call:   '#22c55e',
@@ -101,7 +102,25 @@ export default function ActivityReport() {
             ))}
           </div>
         )}
-        <button className="btn sec" onClick={load} style={{ marginLeft: 'auto', fontSize: 12, padding: '6px 14px' }}>↻ Refresh</button>
+        <button className="btn sec" style={{ fontSize: 12, padding: '6px 14px' }} onClick={load}>↻ Refresh</button>
+        <button className="btn sec" style={{ fontSize: 12, padding: '6px 14px' }}
+          onClick={() => exportCSV(
+            [['Employee','Time','Action','Category','Description','Entity'],
+             ...filteredLogs.map(l => [l.employee_name, new Date(l.created_at).toLocaleString(), l.action, l.category, l.description||'', l.entity_name||''])],
+            `activity-report-${date}`
+          )}>⬇ CSV</button>
+        <button className="btn sec" style={{ fontSize: 12, padding: '6px 14px' }}
+          onClick={() => exportExcel(
+            [['Employee','Time','Action','Category','Description','Entity'],
+             ...filteredLogs.map(l => [l.employee_name, new Date(l.created_at).toLocaleString(), l.action, l.category, l.description||'', l.entity_name||''])],
+            `activity-report-${date}`
+          )}>📊 Excel</button>
+        <button className="btn sec" style={{ fontSize: 12, padding: '6px 14px' }}
+          onClick={() => exportPDF(`Activity Report — ${date}`, [{
+            heading: selEmp === 'All' ? 'All Staff Activity' : `${selEmp} — Activity`,
+            headers: ['Employee','Time','Category','Description'],
+            rows: filteredLogs.map(l => [l.employee_name, new Date(l.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}), l.category, l.description||''])
+          }])}>🖨️ PDF</button>
       </div>
 
       {/* Stat cards */}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { exportPDF, exportExcel } from '../lib/exportUtils'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 const PIPELINE_STAGES = ['investigation','transcripts','analysis','proposal','negotiation','resolution','closed']
@@ -166,8 +167,12 @@ export default function Reports() {
     )
   }
 
-  const ExportBtn = ({rows,name}) => (
-    <button className="btn sec" style={{fontSize:10,padding:'3px 10px'}} onClick={()=>exportCSV(rows,name)}>⬇ Export CSV</button>
+  const ExportBtn = ({rows, name, pdfSections}) => (
+    <div style={{display:'flex',gap:4}}>
+      <button className="btn sec" style={{fontSize:10,padding:'3px 10px'}} onClick={()=>exportCSV(rows,name)}>⬇ CSV</button>
+      <button className="btn sec" style={{fontSize:10,padding:'3px 10px'}} onClick={()=>exportExcel(rows, name)}>📊 Excel</button>
+      {pdfSections && <button className="btn sec" style={{fontSize:10,padding:'3px 10px'}} onClick={()=>exportPDF(name, pdfSections)}>🖨️ PDF</button>}
+    </div>
   )
 
   const Empty = ({msg='No data yet.'}) => (
@@ -182,7 +187,15 @@ export default function Reports() {
       {/* Header */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:8}}>
         <h2 style={{fontSize:15,fontWeight:700,margin:0}}>📊 Reports & Analytics</h2>
-        <div style={{display:'flex',gap:6,alignItems:'center'}}>
+        <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
+          <button className="btn sec" style={{fontSize:11,padding:'5px 12px'}}
+            onClick={()=>exportPDF('Reports — Tax Case Review',[{heading:'Revenue Summary',headers:['Month','Revenue'],rows:MONTHS.map((m,i)=>[m,'$'+Math.round(revByMonth[i])])}])}>
+            🖨️ PDF
+          </button>
+          <button className="btn sec" style={{fontSize:11,padding:'5px 12px'}}
+            onClick={()=>exportExcel([['Month','Revenue'],...MONTHS.map((m,i)=>[m,'$'+Math.round(revByMonth[i])])],'Reports')}>
+            📊 Excel
+          </button>
           <span style={{fontSize:11,color:'var(--t3)'}}>Range:</span>
           {[['all','All Time'],['30d','30 Days'],['60d','60 Days'],['90d','90 Days'],['6mo','6 Months'],['ytd','YTD']].map(([k,l])=>(
             <button key={k} className={`btn ${dateRange===k?'pri':'sec'}`}

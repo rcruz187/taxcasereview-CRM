@@ -330,15 +330,89 @@ export default function Payroll() {
     )
   }
 
+  const [periodOffset, setPeriodOffset] = useState(0) // 0 = current, -1 = prev, etc.
+
+  // Navigate to an offset period from today
+  function getPeriodByOffset(offset) {
+    const d = new Date()
+    // Each offset = half-month step
+    let month = d.getMonth(), year = d.getFullYear()
+    let isFirst = d.getDate() <= 15
+    let steps = isFirst ? 0 : 1  // 0=first half of current month, 1=second half
+    steps += offset
+    // Normalize
+    let totalHalves = year * 24 + month * 2 + steps
+    const newYear = Math.floor(totalHalves / 24)
+    const rem = totalHalves % 24
+    const newMonth = Math.floor(rem / 2)
+    const newIsFirst = rem % 2 === 0
+    const start = new Date(newYear, newMonth, newIsFirst ? 1 : 16)
+    const end = new Date(newYear, newMonth, newIsFirst ? 15 : new Date(newYear, newMonth + 1, 0).getDate())
+    const fmt = dt => dt.toISOString().slice(0,10)
+    const label = `${start.toLocaleString('default',{month:'short'})} ${start.getDate()} – ${end.toLocaleString('default',{month:'short'})} ${end.getDate()}, ${newYear}`
+    return { start: fmt(start), end: fmt(end), label }
+  }
+
+  const navPeriod = getPeriodByOffset(periodOffset)
+
+  function exportCSV() {
+    const filtered = timeEntries.filter(e => e.date >= navPeriod.start && e.date <= navPeriod.end)
+    const rows = [['Employee','Date','Clock In','Clock Out','Hours','Method'], ...filtered.map(e=>[e.employee||'',e.date||'',e.inTime||'',e.outTime||'',e.hours||'',e.method||'Manual'])]
+    const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], {type:'text/csv'})
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
+    a.download = `payroll-${navPeriod.start}-to-${navPeriod.end}.csv`; a.click()
+  }
+
+  function printAllStubs() {
+    const lines = buildLineItems(employees, timeEntries.filter(e=>e.date>=navPeriod.start&&e.date<=navPeriod.end), navPeriod.start, navPeriod.end)
+    if (!lines.length) { showToast('No data for this period'); return }
+    const w = window.open('','_blank')
+    w.document.write(`<!DOCTYPE html><html><head><title>Pay Stubs — ${navPeriod.label}</title>
+      <style>body{font-family:Arial,sans-serif;margin:0;padding:0}
+      .stub{border:1px solid #ccc;padding:24px 32px;margin:20px auto;max-width:680px;page-break-after:always}
+      h2{color:#1e3a8a;margin:0 0 4px}h3{margin:0 0 16px;color:#64748b;font-weight:400}
+      table{width:100%;border-collapse:collapse;margin-top:12px}
+      td,th{padding:7px 10px;border:1px solid #e2e8f0;font-size:13px}th{background:#f1f5f9;font-size:11px;text-transform:uppercase}
+      .total{font-weight:700;font-size:15px;color:#16a34a}.net{font-size:18px;font-weight:800;color:#16a34a}
+      @media print{.stub{page-break-after:always;margin:0;border:none}}</style></head><body>
+      ${lines.map(l=>`<div class="stub">
+        <h2>Tax Case Review</h2><h3>Pay Stub — ${navPeriod.label}</h3>
+        <table><tr><th>Employee</th><th>Pay Type</th><th>Hours</th><th>Rate</th><th>Gross</th></tr>
+        <tr><td>${l.name}</td><td>${l.payType}</td><td>${l.hours}</td><td>$${l.rate||'—'}/hr</td><td>$${parseFloat(l.gross||0).toFixed(2)}</td></tr></table>
+        <table style="margin-top:12px"><tr><th>Federal Tax</th><th>State Tax</th><th>SS</th><th>Medicare</th><th>Total Deductions</th></tr>
+        <tr><td>-$${parseFloat(l.fedTax||0).toFixed(2)}</td><td>-$${parseFloat(l.stateTax||0).toFixed(2)}</td>
+        <td>-$${parseFloat(l.ss||0).toFixed(2)}</td><td>-$${parseFloat(l.medicare||0).toFixed(2)}</td>
+        <td>-$${parseFloat(l.totalTaxes||0).toFixed(2)}</td></tr></table>
+        <div style="text-align:right;margin-top:16px;padding-top:12px;border-top:2px solid #1e3a8a">
+          <span class="net">Net Pay: $${parseFloat(l.net||0).toFixed(2)}</span></div>
+      </div>`).join('')}
+      </body></html>`)
+    w.document.close(); setTimeout(()=>w.print(), 300)
+  }
+
   return (
-    <div style={{padding:'20px 24px',maxWidth:1100,margin:'0 auto'}}>
+    <div style={{padding:'20px 24px', maxWidth:1100, margin:'0 auto'}}>
       {toast && <div className="toast show">{toast}</div>}
 
+      {/* PHL-style header: period nav + Export CSV + Print All Stubs */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, flexWrap:'wrap', gap:8 }}>
-        <h2 style={{ fontSize:15, fontWeight:700, margin:0 }}>💼 Payroll</h2>
-        <button className="btn pri" onClick={openNewRun} disabled={employees.length===0}>
-          {employees.length===0 ? 'Add Employees First' : '+ Process Payroll'}
-        </button>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <button onClick={()=>setPeriodOffset(o=>o-1)} className="btn sec" style={{ padding:'5px 10px', fontSize:14 }}>‹</button>
+          <span style={{ fontSize:13, color:'var(--t2)', minWidth:160, textAlign:'center', fontWeight:600 }}>{navPeriod.label}</span>
+          <button onClick={()=>setPeriodOffset(o=>Math.min(o+1,0))} className="btn sec" style={{ padding:'5px 10px', fontSize:14 }} disabled={periodOffset>=0}>›</button>
+        </div>
+        <div style={{ display:'flex', gap:8 }}>
+          <button className="btn sec" onClick={exportCSV} style={{ fontSize:12, display:'flex', alignItems:'center', gap:5 }}>
+            🗂 Export CSV
+          </button>
+          <button className="btn ok" onClick={printAllStubs} style={{ fontSize:12, display:'flex', alignItems:'center', gap:5 }}>
+            🖨️ Print All Stubs
+          </button>
+          <button className="btn pri" onClick={openNewRun} disabled={employees.length===0} style={{ fontSize:12 }}>
+            {employees.length===0 ? 'Add Employees First' : '+ Process Payroll'}
+          </button>
+        </div>
       </div>
 
       <PayrollStatCards employees={employees} timeEntries={timeEntries} />
