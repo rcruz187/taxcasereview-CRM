@@ -526,9 +526,7 @@ export default function Dialer() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 700, fontSize: 12.5, color: 'var(--tx)' }}>{name}</div>
                         <div style={{ fontSize: 11, color: 'var(--t3)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
-                          <span style={{ fontFamily: 'monospace' }}>
-                            <PhoneNumber val={lead.phone} />
-                          </span>
+                          <span style={{ fontFamily: 'monospace' }}>{lead.phone}</span>
                           {lead.source && <><span>·</span><span>{lead.source}</span></>}
                         </div>
                       </div>
@@ -608,9 +606,7 @@ export default function Dialer() {
                   onMouseLeave={e => e.currentTarget.style.background = ''}>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{cl.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--t3)', fontFamily: 'monospace' }}>
-                      <PhoneNumber val={cl.phone} />
-                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--t3)', fontFamily: 'monospace' }}>{cl.phone}</div>
                   </div>
                   <span style={{ fontSize: 12, color: 'var(--blue)', fontWeight: 600 }}>{attaching ? 'Attaching…' : 'Attach →'}</span>
                 </div>
