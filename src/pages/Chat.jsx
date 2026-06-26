@@ -21,7 +21,7 @@ const QUICK_EMOJIS = ['👍','✅','🔥','💯','😊','🎉','👀','⚠️','
 const ALL_EMOJIS   = ['👍','👎','❤️','🔥','✅','❌','⚠️','📌','📋','💯','🎉','😊','😂','🙏','💪','🤝','⏰','🕐','📞','📧','💬','🗒️','📁','💰','🏦','⚖️','📊','📈','📉','🔑','🔒','✉️','📨','📩','🚀','⭐','💡','🔔','🔕','👀','🤔','😅','🥳']
 
 function colorFor(name) {
-  if (!name) return '#64748b'
+  if (!name) return 'var(--t3)'
   const palette = ['#4f8ef7','#a855f7','#22c55e','#f59e0b','#ec4899','#06b6d4','#ef4444','#8b5cf6','#f97316','#14b8a6']
   let h = 0; for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h)
   return palette[Math.abs(h) % palette.length]
@@ -307,16 +307,16 @@ export default function Chat() {
   }
 
   const s = {
-    sidebar: { width: 240, flexShrink: 0, background: '#0d1526', borderRight: '1px solid #1e293b', display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden' },
-    sectionHeader: { padding: '8px 16px 4px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-    chanRow: (active) => ({ padding: '4px 12px 4px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, borderRadius: 6, margin: '1px 6px', background: active ? 'rgba(79,142,247,.18)' : 'transparent', color: active ? '#e2e8f0' : '#94a3b8', fontWeight: active ? 600 : 400, fontSize: 14, transition: 'background .1s' }),
+    sidebar: { width: 240, flexShrink: 0, background: 'var(--nav)', borderRight: '1px solid var(--br)', display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden' },
+    sectionHeader: { padding: '8px 16px 4px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--t3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+    chanRow: (active) => ({ padding: '4px 12px 4px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, borderRadius: 6, margin: '1px 6px', background: active ? 'rgba(79,142,247,.18)' : 'transparent', color: active ? 'var(--tx)' : 'var(--t2)', fontWeight: active ? 600 : 400, fontSize: 14, transition: 'background .1s' }),
   }
 
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', background: '#0a0f1a', overflow: 'hidden', flexDirection: 'column' }}>
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', background: 'var(--bg)', overflow: 'hidden', flexDirection: 'column' }}>
 
       {chatToast && (
-        <div style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', background: '#1e293b', border: '1px solid #f87171', color: '#fca5a5', padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, zIndex: 1100, boxShadow: '0 8px 24px rgba(0,0,0,.4)' }}>{chatToast}</div>
+        <div style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', background: 'var(--s2)', border: '1px solid #f87171', color: '#fca5a5', padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, zIndex: 1100, boxShadow: '0 8px 24px rgba(0,0,0,.4)' }}>{chatToast}</div>
       )}
 
       {/* ── Incoming Huddle Alert ── */}
@@ -343,10 +343,10 @@ export default function Chat() {
         <button onClick={() => setShowChannelsMobile(false)} className="chat-sidebar-close-btn" aria-label="Close">×</button>
 
         {/* Workspace header */}
-        <div style={{ padding: '14px 14px 12px', borderBottom: '1px solid #1e293b', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        <div style={{ padding: '14px 14px 12px', borderBottom: '1px solid var(--br)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           <div style={{ width: 32, height: 32, borderRadius: 8, background: '#1d4ed8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#fff', flexShrink: 0 }}>TC</div>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 14, color: '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Tax Case Review</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Tax Case Review</div>
             <div style={{ fontSize: 11, color: '#22c55e', display: 'flex', alignItems: 'center', gap: 4 }}>
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }}/>
               {myName}
@@ -357,9 +357,9 @@ export default function Chat() {
         {/* Huddle button */}
         <div style={{ padding: '10px 10px 6px', flexShrink: 0 }}>
           {!huddle ? (
-            <button onClick={startHuddle} style={{ width: '100%', padding: '7px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', background: '#1e293b', color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 13, transition: 'background .15s' }}
-              onMouseEnter={e => e.currentTarget.style.background='#2d3f55'}
-              onMouseLeave={e => e.currentTarget.style.background='#1e293b'}>
+            <button onClick={startHuddle} style={{ width: '100%', padding: '7px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--s2)', color: 'var(--tx)', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 13, transition: 'background .15s' }}
+              onMouseEnter={e => e.currentTarget.style.background='var(--s3)'}
+              onMouseLeave={e => e.currentTarget.style.background='var(--s2)'}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.18 1h3a2 2 0 012 1.72 12.05 12.05 0 00.7 2.81 2 2 0 01-.45 2.11L4.91 8.15a16 16 0 006.29 6.29l1.51-1.52a2 2 0 012.11-.45 12.05 12.05 0 002.81.7A2 2 0 0122 16.92z"/>
               </svg>
@@ -392,17 +392,17 @@ export default function Chat() {
                 <button onClick={() => setShowHuddleInvite(h => !h)} style={{ width: 24, height: 24, borderRadius: '50%', border: '1px dashed #16a34a', background: 'none', color: '#4ade80', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
               </div>
               {showHuddleInvite && (
-                <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 6, overflow: 'hidden' }}>
+                <div style={{ background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: 6, overflow: 'hidden' }}>
                   {TEAM.filter(t => !huddleMembers.includes(t.name)).map(t => (
-                    <div key={t.id} onClick={() => inviteToHuddle(t.name)} style={{ padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#cbd5e1' }}
-                      onMouseEnter={e => e.currentTarget.style.background='#1e293b'}
+                    <div key={t.id} onClick={() => inviteToHuddle(t.name)} style={{ padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--t2)' }}
+                      onMouseEnter={e => e.currentTarget.style.background='var(--s2)'}
                       onMouseLeave={e => e.currentTarget.style.background='transparent'}>
                       <Avatar name={t.name} size={20} color={t.color}/>
                       {t.name}
                     </div>
                   ))}
                   {TEAM.every(t => huddleMembers.includes(t.name)) && (
-                    <div style={{ padding: '6px 10px', fontSize: 12, color: '#64748b' }}>Everyone's in!</div>
+                    <div style={{ padding: '6px 10px', fontSize: 12, color: 'var(--t3)' }}>Everyone's in!</div>
                   )}
                 </div>
               )}
@@ -414,13 +414,13 @@ export default function Chat() {
         <div style={{ marginTop: 8, flexShrink: 0 }}>
           <div style={s.sectionHeader}>
             <span>Channels</span>
-            <span onClick={() => setShowNewChan(v => !v)} style={{ fontSize: 17, cursor: 'pointer', color: '#64748b', lineHeight: 1, padding: '0 2px' }} title="Add channel">+</span>
+            <span onClick={() => setShowNewChan(v => !v)} style={{ fontSize: 17, cursor: 'pointer', color: 'var(--t3)', lineHeight: 1, padding: '0 2px' }} title="Add channel">+</span>
           </div>
           {showNewChan && (
             <div style={{ display: 'flex', gap: 4, padding: '4px 10px 4px' }}>
               <input value={newChanName} onChange={e => setNewChanName(e.target.value)}
                 onKeyDown={e => e.key==='Enter' && addChannel()}
-                placeholder="channel-name" style={{ flex: 1, background: '#1e293b', border: '1px solid #334155', borderRadius: 5, color: '#f1f5f9', fontSize: 12, padding: '4px 8px', outline: 'none' }}/>
+                placeholder="channel-name" style={{ flex: 1, background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 5, color: 'var(--tx)', fontSize: 12, padding: '4px 8px', outline: 'none' }}/>
               <button onClick={addChannel} style={{ background: '#1d4ed8', border: 'none', color: '#fff', borderRadius: 5, padding: '4px 8px', fontSize: 11, cursor: 'pointer', fontWeight: 700 }}>Add</button>
             </div>
           )}
@@ -428,16 +428,16 @@ export default function Chat() {
             const isAct = active.id === ch.id
             return (
               <div key={ch.id} onClick={() => switchTo(ch)} style={s.chanRow(isAct)}
-                onMouseEnter={e => { if (!isAct) e.currentTarget.style.background = '#1e293b' }}
+                onMouseEnter={e => { if (!isAct) e.currentTarget.style.background = 'var(--s2)' }}
                 onMouseLeave={e => { if (!isAct) e.currentTarget.style.background = 'transparent' }}>
-                <span style={{ fontSize: 16, color: isAct ? '#93c5fd' : '#475569', lineHeight: 1 }}>#</span>
+                <span style={{ fontSize: 16, color: isAct ? '#93c5fd' : 'var(--t3)', lineHeight: 1 }}>#</span>
                 <span style={{ flex: 1 }}>{ch.label}</span>
               </div>
             )
           })}
         </div>
 
-        <div style={{ height: 1, background: '#1e293b', margin: '10px 0', flexShrink: 0 }}/>
+        <div style={{ height: 1, background: 'var(--s2)', margin: '10px 0', flexShrink: 0 }}/>
 
         {/* Direct Messages */}
         <div style={{ flexShrink: 0 }}>
@@ -448,7 +448,7 @@ export default function Chat() {
             const isAct = active.id === dm.id
             return (
               <div key={dm.id} onClick={() => switchTo(dm)} style={{ ...s.chanRow(isAct), gap: 10 }}
-                onMouseEnter={e => { if (!isAct) e.currentTarget.style.background = '#1e293b' }}
+                onMouseEnter={e => { if (!isAct) e.currentTarget.style.background = 'var(--s2)' }}
                 onMouseLeave={e => { if (!isAct) e.currentTarget.style.background = 'transparent' }}>
                 <div style={{ position: 'relative', flexShrink: 0 }}>
                   <Avatar name={dm.name} size={26} color={dm.color}/>
@@ -462,7 +462,7 @@ export default function Chat() {
       </div>
 
       {/* ── MAIN AREA ── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: '#0f172a' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: 'var(--sf)' }}>
 
         {/* Huddle banner */}
         {huddle && (
@@ -477,15 +477,15 @@ export default function Chat() {
             <button onClick={() => setShowHuddleInvite(h=>!h)} style={{ marginLeft: 4, padding: '2px 10px', borderRadius: 5, border: '1px solid #16a34a', background: 'rgba(255,255,255,.1)', color: '#dcfce7', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>+ Invite</button>
             {showHuddleInvite && (
               <div style={{ position: 'relative' }}>
-                <div style={{ position: 'absolute', top: 24, left: 0, background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, padding: 4, zIndex: 50, minWidth: 180, boxShadow: '0 8px 24px rgba(0,0,0,.5)' }}>
+                <div style={{ position: 'absolute', top: 24, left: 0, background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: 8, padding: 4, zIndex: 50, minWidth: 180, boxShadow: '0 8px 24px rgba(0,0,0,.5)' }}>
                   {TEAM.filter(t => !huddleMembers.includes(t.name)).map(t => (
-                    <div key={t.id} onClick={() => inviteToHuddle(t.name)} style={{ padding: '7px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#e2e8f0', borderRadius: 5 }}
-                      onMouseEnter={e => e.currentTarget.style.background='#1e293b'}
+                    <div key={t.id} onClick={() => inviteToHuddle(t.name)} style={{ padding: '7px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--tx)', borderRadius: 5 }}
+                      onMouseEnter={e => e.currentTarget.style.background='var(--s2)'}
                       onMouseLeave={e => e.currentTarget.style.background='transparent'}>
                       <Avatar name={t.name} size={24} color={t.color}/>{t.name}
                     </div>
                   ))}
-                  {TEAM.every(t => huddleMembers.includes(t.name)) && <div style={{ padding: '7px 12px', fontSize: 12, color: '#64748b' }}>Everyone's in!</div>}
+                  {TEAM.every(t => huddleMembers.includes(t.name)) && <div style={{ padding: '7px 12px', fontSize: 12, color: 'var(--t3)' }}>Everyone's in!</div>}
                 </div>
               </div>
             )}
@@ -510,7 +510,7 @@ export default function Chat() {
               onSelect={handleHuddleBgSelect}
             />
           )}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: 14, background: '#0a0f1a', borderBottom: '1px solid #1e293b', maxHeight: 340, overflowY: 'auto', flexShrink: 0 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: 14, background: 'var(--bg)', borderBottom: '1px solid var(--br)', maxHeight: 340, overflowY: 'auto', flexShrink: 0 }}>
             <div className="chat-huddle-tile" style={{ width: 340, flexShrink: 0 }}>
               <VideoTile stream={huddleProcessedStream || webrtc.localStreamRef.current} name={myName} label={`${myName} (you)`} muted mirror videoEnabled={cameraOn} />
             </div>
@@ -524,16 +524,16 @@ export default function Chat() {
         )}
 
         {/* Channel header */}
-        <div style={{ height: 52, borderBottom: '1px solid #1e293b', display: 'flex', alignItems: 'center', padding: '0 20px', gap: 12, flexShrink: 0, background: '#0f172a' }}>
+        <div style={{ height: 52, borderBottom: '1px solid var(--br)', display: 'flex', alignItems: 'center', padding: '0 20px', gap: 12, flexShrink: 0, background: 'var(--sf)' }}>
           <button onClick={() => setShowChannelsMobile(true)} title="Channels" className="chat-channel-toggle-btn"
-            style={{ width: 32, height: 32, background: '#1e293b', border: '1px solid #334155', borderRadius: 6, color: '#94a3b8', cursor: 'pointer', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            style={{ width: 32, height: 32, background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 6, color: 'var(--t2)', cursor: 'pointer', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 16, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: 6 }}>
-              {isChannel ? <><span style={{ color: '#475569', fontWeight: 400, fontSize: 18 }}>#</span>{active.label}</> : active.name}
+            <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--tx)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              {isChannel ? <><span style={{ color: 'var(--t3)', fontWeight: 400, fontSize: 18 }}>#</span>{active.label}</> : active.name}
             </div>
-            {isChannel && active.desc && <div style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>{active.desc}</div>}
+            {isChannel && active.desc && <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 1 }}>{active.desc}</div>}
           </div>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
             {/* Search */}
@@ -541,18 +541,18 @@ export default function Chat() {
               <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                 <input value={searchQ} onChange={e => setSearchQ(e.target.value)} autoFocus
                   placeholder="Search messages…"
-                  style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 6, color: '#f1f5f9', fontSize: 12, padding: '5px 10px', outline: 'none', width: 180 }}/>
-                <button onClick={() => { setShowSearch(false); setSearchQ('') }} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 16 }}>×</button>
+                  style={{ background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 6, color: 'var(--tx)', fontSize: 12, padding: '5px 10px', outline: 'none', width: 180 }}/>
+                <button onClick={() => { setShowSearch(false); setSearchQ('') }} style={{ background: 'none', border: 'none', color: 'var(--t3)', cursor: 'pointer', fontSize: 16 }}>×</button>
               </div>
             ) : (
-              <button onClick={() => setShowSearch(true)} title="Search" style={{ width: 32, height: 32, background: '#1e293b', border: '1px solid #334155', borderRadius: 6, color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button onClick={() => setShowSearch(true)} title="Search" style={{ width: 32, height: 32, background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 6, color: 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
               </button>
             )}
-            <button onClick={() => setShowMembers(m => !m)} title="Members" style={{ width: 32, height: 32, background: showMembers ? '#1d4ed8' : '#1e293b', border: '1px solid #334155', borderRadius: 6, color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button onClick={() => setShowMembers(m => !m)} title="Members" style={{ width: 32, height: 32, background: showMembers ? '#1d4ed8' : 'var(--s2)', border: '1px solid var(--br)', borderRadius: 6, color: 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
             </button>
-            <button onClick={() => loadMessages()} title="Refresh" style={{ width: 32, height: 32, background: '#1e293b', border: '1px solid #334155', borderRadius: 6, color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>⟳</button>
+            <button onClick={() => loadMessages()} title="Refresh" style={{ width: 32, height: 32, background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 6, color: 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>⟳</button>
           </div>
         </div>
 
@@ -561,28 +561,28 @@ export default function Chat() {
 
           {/* Messages */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px 4px', display: 'flex', flexDirection: 'column' }}>
-            {loading && <div style={{ textAlign: 'center', color: '#64748b', padding: 40, fontSize: 14 }}>Loading…</div>}
+            {loading && <div style={{ textAlign: 'center', color: 'var(--t3)', padding: 40, fontSize: 14 }}>Loading…</div>}
             {!loading && messages.length === 0 && (
-              <div style={{ textAlign: 'center', color: '#64748b', padding: '60px 20px', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, marginBottom: 16 }}>
+              <div style={{ textAlign: 'center', color: 'var(--t3)', padding: '60px 20px', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--s2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, marginBottom: 16 }}>
                   {isChannel ? '#' : '💬'}
                 </div>
-                <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 6, color: '#e2e8f0' }}>{isChannel ? `Welcome to #${active.label}` : `DM with ${active.name}`}</div>
+                <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 6, color: 'var(--tx)' }}>{isChannel ? `Welcome to #${active.label}` : `DM with ${active.name}`}</div>
                 <div style={{ fontSize: 14 }}>{isChannel ? active.desc + ' — be the first to say something!' : 'Send a direct message.'}</div>
               </div>
             )}
 
             {!loading && grouped.map((item, i) => {
               if (item.type === 'divider') return (
-                <div key={'div'+i} style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0 10px', color: '#475569', fontSize: 12 }}>
-                  <div style={{ flex: 1, height: 1, background: '#1e293b' }}/>
-                  <span style={{ fontWeight: 600, background: '#0f172a', padding: '2px 10px', borderRadius: 20, border: '1px solid #1e293b' }}>{item.label}</span>
-                  <div style={{ flex: 1, height: 1, background: '#1e293b' }}/>
+                <div key={'div'+i} style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0 10px', color: 'var(--t3)', fontSize: 12 }}>
+                  <div style={{ flex: 1, height: 1, background: 'var(--s2)' }}/>
+                  <span style={{ fontWeight: 600, background: 'var(--sf)', padding: '2px 10px', borderRadius: 20, border: '1px solid var(--br)' }}>{item.label}</span>
+                  <div style={{ flex: 1, height: 1, background: 'var(--s2)' }}/>
                 </div>
               )
               if (item.isSystem) return (
-                <div key={item.id} style={{ background: '#1e293b', borderRadius: 8, padding: '12px 16px', margin: '4px 0', border: '1px solid #334155' }}>
-                  <pre style={{ fontSize: 12, color: '#94a3b8', whiteSpace: 'pre-wrap', margin: 0, fontFamily: 'monospace' }}>{item.text}</pre>
+                <div key={item.id} style={{ background: 'var(--s2)', borderRadius: 8, padding: '12px 16px', margin: '4px 0', border: '1px solid var(--br)' }}>
+                  <pre style={{ fontSize: 12, color: 'var(--t2)', whiteSpace: 'pre-wrap', margin: 0, fontFamily: 'monospace' }}>{item.text}</pre>
                 </div>
               )
 
@@ -600,18 +600,18 @@ export default function Chat() {
 
                   {/* Hover toolbar */}
                   {isHovered && (
-                    <div style={{ position: 'absolute', right: 0, top: -4, display: 'flex', gap: 2, background: '#1e293b', border: '1px solid #334155', borderRadius: 8, padding: '3px 4px', zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,.4)' }}>
+                    <div style={{ position: 'absolute', right: 0, top: -4, display: 'flex', gap: 2, background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 8, padding: '3px 4px', zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,.4)' }}>
                       {QUICK_EMOJIS.slice(0,5).map(e => (
                         <span key={e} onClick={() => addReaction(item.id, e)} style={{ fontSize: 16, cursor: 'pointer', padding: '2px 4px', borderRadius: 4, transition: 'background .1s' }}
-                          onMouseEnter={ev => ev.target.style.background='#334155'}
+                          onMouseEnter={ev => ev.target.style.background='var(--b2c)'}
                           onMouseLeave={ev => ev.target.style.background='transparent'}>{e}</span>
                       ))}
-                      <span onClick={() => setReacting(id => id === item.id ? null : item.id)} style={{ fontSize: 14, cursor: 'pointer', padding: '2px 6px', borderRadius: 4, color: '#94a3b8', display: 'flex', alignItems: 'center' }}
-                        onMouseEnter={ev => ev.target.style.background='#334155'}
+                      <span onClick={() => setReacting(id => id === item.id ? null : item.id)} style={{ fontSize: 14, cursor: 'pointer', padding: '2px 6px', borderRadius: 4, color: 'var(--t2)', display: 'flex', alignItems: 'center' }}
+                        onMouseEnter={ev => ev.target.style.background='var(--b2c)'}
                         onMouseLeave={ev => ev.target.style.background='transparent'}>＋</span>
-                      <div style={{ width: 1, background: '#334155', margin: '2px 2px' }}/>
-                      <span onClick={() => setThread(item)} title="Reply in thread" style={{ fontSize: 13, cursor: 'pointer', padding: '2px 6px', borderRadius: 4, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 3 }}
-                        onMouseEnter={ev => ev.target.style.background='#334155'}
+                      <div style={{ width: 1, background: 'var(--b2c)', margin: '2px 2px' }}/>
+                      <span onClick={() => setThread(item)} title="Reply in thread" style={{ fontSize: 13, cursor: 'pointer', padding: '2px 6px', borderRadius: 4, color: 'var(--t2)', display: 'flex', alignItems: 'center', gap: 3 }}
+                        onMouseEnter={ev => ev.target.style.background='var(--b2c)'}
                         onMouseLeave={ev => ev.target.style.background='transparent'}>
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg>
                         Reply
@@ -625,18 +625,18 @@ export default function Chat() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {!cont && (
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 3 }}>
-                        <span style={{ fontWeight: 700, fontSize: 14, color: '#f1f5f9' }}>{item.sender}</span>
-                        <span style={{ fontSize: 11, color: '#475569' }}>{fmtTime(item.created_at)}</span>
+                        <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--tx)' }}>{item.sender}</span>
+                        <span style={{ fontSize: 11, color: 'var(--t3)' }}>{fmtTime(item.created_at)}</span>
                       </div>
                     )}
                     {item.reply_to && (
-                      <div style={{ fontSize: 12, color: '#64748b', marginBottom: 3, paddingLeft: 8, borderLeft: '2px solid #334155' }}>↩ Reply</div>
+                      <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 3, paddingLeft: 8, borderLeft: '2px solid #334155' }}>↩ Reply</div>
                     )}
                     {item.text && (
-                      <div style={{ fontSize: 14, lineHeight: 1.6, color: '#e2e8f0', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{item.text}</div>
+                      <div style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--tx)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{item.text}</div>
                     )}
                     {item.attachment_url && (
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: '#1e293b', border: '1px solid #334155', borderRadius: 8, padding: '8px 14px', marginTop: 4, maxWidth: 340 }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 8, padding: '8px 14px', marginTop: 4, maxWidth: 340 }}>
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4f8ef7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                         <a href={item.attachment_url} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: '#4f8ef7', fontWeight: 600, textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.attachment_name || 'Attachment'}</a>
                       </div>
@@ -653,10 +653,10 @@ export default function Chat() {
                     )}
                     {/* Full emoji picker */}
                     {reacting === item.id && (
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', background: '#1e293b', border: '1px solid #334155', borderRadius: 10, padding: '8px 10px', marginTop: 6, maxWidth: 320 }}>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 10, padding: '8px 10px', marginTop: 6, maxWidth: 320 }}>
                         {ALL_EMOJIS.map(e => (
                           <span key={e} onClick={() => addReaction(item.id, e)} style={{ fontSize: 18, cursor: 'pointer', padding: '2px 3px', borderRadius: 4 }}
-                            onMouseEnter={ev => ev.target.style.background='#334155'}
+                            onMouseEnter={ev => ev.target.style.background='var(--b2c)'}
                             onMouseLeave={ev => ev.target.style.background='transparent'}>{e}</span>
                         ))}
                       </div>
@@ -670,19 +670,19 @@ export default function Chat() {
 
           {/* Members panel */}
           {showMembers && (
-            <div className="chat-members-panel" style={{ width: 220, flexShrink: 0, borderLeft: '1px solid #1e293b', background: '#0d1526', padding: '16px 0', overflowY: 'auto' }}>
-              <div style={{ padding: '0 16px 10px', fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.07em' }}>Members — {TEAM.length}</div>
+            <div className="chat-members-panel" style={{ width: 220, flexShrink: 0, borderLeft: '1px solid var(--br)', background: 'var(--nav)', padding: '16px 0', overflowY: 'auto' }}>
+              <div style={{ padding: '0 16px 10px', fontSize: 12, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.07em' }}>Members — {TEAM.length}</div>
               {TEAM.map(m => (
                 <div key={m.id} onClick={() => { switchTo(m); setShowMembers(false) }} style={{ padding: '7px 16px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
-                  onMouseEnter={e => e.currentTarget.style.background='#1e293b'}
+                  onMouseEnter={e => e.currentTarget.style.background='var(--s2)'}
                   onMouseLeave={e => e.currentTarget.style.background='transparent'}>
                   <div style={{ position: 'relative', flexShrink: 0 }}>
                     <Avatar name={m.name} size={30} color={m.color}/>
                     <span style={{ position: 'absolute', bottom: 0, right: 0, width: 8, height: 8, borderRadius: '50%', background: '#22c55e', border: '2px solid #0d1526' }}/>
                   </div>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>{m.name}</div>
-                    <div style={{ fontSize: 11, color: '#64748b' }}>{m.role}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--tx)' }}>{m.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>{m.role}</div>
                   </div>
                 </div>
               ))}
@@ -692,42 +692,42 @@ export default function Chat() {
 
         {/* Thread reply notice */}
         {thread && (
-          <div style={{ padding: '6px 20px', background: '#0f172a', borderTop: '1px solid #1e293b', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#94a3b8', flexShrink: 0 }}>
+          <div style={{ padding: '6px 20px', background: 'var(--sf)', borderTop: '1px solid var(--br)', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--t2)', flexShrink: 0 }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg>
-            Replying to <strong style={{ color: '#e2e8f0' }}>{thread.sender}</strong>: <span style={{ color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 300 }}>{thread.text?.slice(0, 60)}{thread.text?.length > 60 ? '…' : ''}</span>
-            <button onClick={() => setThread(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#64748b', fontSize: 16, cursor: 'pointer', lineHeight: 1 }}>×</button>
+            Replying to <strong style={{ color: 'var(--tx)' }}>{thread.sender}</strong>: <span style={{ color: 'var(--t3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 300 }}>{thread.text?.slice(0, 60)}{thread.text?.length > 60 ? '…' : ''}</span>
+            <button onClick={() => setThread(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--t3)', fontSize: 16, cursor: 'pointer', lineHeight: 1 }}>×</button>
           </div>
         )}
 
         {/* Input bar */}
-        <div style={{ padding: '10px 16px 14px', borderTop: '1px solid #1e293b', background: '#0f172a', flexShrink: 0 }}>
+        <div style={{ padding: '10px 16px 14px', borderTop: '1px solid var(--br)', background: 'var(--sf)', flexShrink: 0 }}>
           {showEmoji && (
-            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', background: '#1e293b', border: '1px solid #334155', borderRadius: 10, padding: '8px 10px', marginBottom: 8 }}>
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 10, padding: '8px 10px', marginBottom: 8 }}>
               {ALL_EMOJIS.map(e => (
                 <span key={e} onClick={() => { setInput(i => i+e); setShowEmoji(false); inputRef.current?.focus() }}
                   style={{ fontSize: 18, cursor: 'pointer', padding: '2px 3px', borderRadius: 4 }}
-                  onMouseEnter={ev => ev.target.style.background='#334155'}
+                  onMouseEnter={ev => ev.target.style.background='var(--b2c)'}
                   onMouseLeave={ev => ev.target.style.background='transparent'}>{e}</span>
               ))}
             </div>
           )}
-          <div style={{ display: 'flex', gap: 0, alignItems: 'flex-end', background: '#1e293b', border: '1px solid #334155', borderRadius: 12, overflow: 'hidden' }}>
-            <button onClick={() => fileRef.current?.click()} title="Attach file" style={{ padding: '0 12px', height: 44, background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', flexShrink: 0 }}
-              onMouseEnter={e => e.currentTarget.style.color='#94a3b8'}
-              onMouseLeave={e => e.currentTarget.style.color='#64748b'}>
+          <div style={{ display: 'flex', gap: 0, alignItems: 'flex-end', background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 12, overflow: 'hidden' }}>
+            <button onClick={() => fileRef.current?.click()} title="Attach file" style={{ padding: '0 12px', height: 44, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--t3)', display: 'flex', alignItems: 'center', flexShrink: 0 }}
+              onMouseEnter={e => e.currentTarget.style.color='var(--t2)'}
+              onMouseLeave={e => e.currentTarget.style.color='var(--t3)'}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
             </button>
             <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={sendFile}/>
             <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKey}
               placeholder={`Message ${isChannel ? '#'+active.label : active.name}…`}
               rows={1}
-              style={{ flex: 1, resize: 'none', border: 'none', outline: 'none', background: 'transparent', color: '#f1f5f9', fontSize: 14, lineHeight: 1.5, padding: '12px 8px', fontFamily: 'inherit', minHeight: 44, maxHeight: 160 }}/>
+              style={{ flex: 1, resize: 'none', border: 'none', outline: 'none', background: 'transparent', color: 'var(--tx)', fontSize: 14, lineHeight: 1.5, padding: '12px 8px', fontFamily: 'inherit', minHeight: 44, maxHeight: 160 }}/>
             <button onClick={() => setShowEmoji(s => !s)} style={{ padding: '0 10px', height: 44, background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', flexShrink: 0 }}>😊</button>
-            <button onClick={send} disabled={sending || !input.trim()} style={{ padding: '0 16px', height: 44, background: input.trim() ? '#1d4ed8' : 'transparent', color: input.trim() ? '#fff' : '#64748b', border: 'none', cursor: input.trim() ? 'pointer' : 'default', fontSize: 16, transition: 'all .15s', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '0 10px 10px 0' }}>
+            <button onClick={send} disabled={sending || !input.trim()} style={{ padding: '0 16px', height: 44, background: input.trim() ? '#1d4ed8' : 'transparent', color: input.trim() ? '#fff' : 'var(--t3)', border: 'none', cursor: input.trim() ? 'pointer' : 'default', fontSize: 16, transition: 'all .15s', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '0 10px 10px 0' }}>
               {sending ? '…' : <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>}
             </button>
           </div>
-          <div style={{ fontSize: 11, color: '#475569', marginTop: 5, paddingLeft: 4 }}>Enter to send · Shift+Enter for new line · 📎 to attach</div>
+          <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 5, paddingLeft: 4 }}>Enter to send · Shift+Enter for new line · 📎 to attach</div>
         </div>
       </div>
       </div>

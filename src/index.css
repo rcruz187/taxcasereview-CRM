@@ -1022,3 +1022,17 @@ tbody tr:hover td { background: var(--s2); cursor: pointer; }
   input, select, textarea { font-size: 15px !important; }
   .btn { min-height: 38px; }
 }
+
+/* ── Light Mode: Chat & Calendar class overrides ── */
+html.light .chat-channel-sidebar {
+  background: var(--nav) !important;
+  border-right-color: var(--br) !important;
+}
+html.light .chat-members-panel {
+  background: var(--nav) !important;
+  border-left-color: var(--br) !important;
+}
+html.light .cal-unscheduled-panel {
+  background: var(--nav) !important;
+  border-left-color: var(--br) !important;
+}
