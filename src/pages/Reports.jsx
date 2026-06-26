@@ -137,11 +137,11 @@ export default function Reports() {
 
   // ── REUSABLE COMPONENTS ──
   const StatCard = ({icon,label,value,sub,color,small}) => (
-    <div className="card" style={{padding:'14px 16px'}}>
-      <div style={{fontSize:small?18:22,marginBottom:4}}>{icon}</div>
-      <div style={{fontSize:small?20:26,fontWeight:800,color:color||'var(--tx)',lineHeight:1,marginBottom:4}}>{value}</div>
-      <div style={{fontSize:11,fontWeight:600,color:'var(--t2)',marginBottom:sub?2:0}}>{label}</div>
-      {sub&&<div style={{fontSize:10,color:'var(--t3)'}}>{sub}</div>}
+    <div className="card" style={{padding:'18px 16px'}}>
+      <div style={{fontSize:22,marginBottom:6}}>{icon}</div>
+      <div style={{fontSize:24,fontWeight:800,color:color||'var(--tx)',lineHeight:1,marginBottom:6}}>{value}</div>
+      <div style={{fontSize:12,fontWeight:600,color:'var(--t2)',marginBottom:sub?3:0}}>{label}</div>
+      {sub&&<div style={{fontSize:11,color:'var(--t3)'}}>{sub}</div>}
     </div>
   )
 
@@ -222,15 +222,16 @@ export default function Reports() {
       {tab==='overview'&&(
         <div>
           <SectionTitle title="Key Metrics"/>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:10,marginBottom:20}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(9,1fr)',gap:10,marginBottom:20}}>
             <StatCard icon="👥" label="Total Clients"    value={clients.length}   sub={`+${fClients.length} in range`} color="var(--blue)"/>
             <StatCard icon="📋" label="Total Leads"      value={leads.length}     sub={`${conversionRate}% conversion`} color="var(--warn)"/>
             <StatCard icon="📁" label="Active Cases"     value={openCases}        sub={`of ${cases.length} total`} color={openCases>0?'var(--warn)':'var(--ok)'}/>
             <StatCard icon="💰" label="Revenue Collected" value={'$'+Math.round(totalRevenue).toLocaleString()} color="var(--ok)"/>
-            <StatCard icon="⏳" label="Pending Billing"  value={'$'+Math.round(pendingRevenue).toLocaleString()} color="var(--warn)" small/>
-            <StatCard icon="🧾" label="Tax Returns"      value={taxReturns.length} color="var(--blue)" small/>
-            <StatCard icon="✍️" label="E-Sign Awaiting"  value={esigns.filter(e=>e.status==='Awaiting').length} color="var(--warn)" small/>
-            <StatCard icon="⚠️" label="Overdue Deadlines" value={overdueDl} color={overdueDl>0?'var(--bad)':'var(--ok)'} small/>
+            <StatCard icon="⏳" label="AR Outstanding"   value={'$'+Math.round(pendingRevenue).toLocaleString()} color="var(--warn)"/>
+            <StatCard icon="💳" label="Invoices Paid"    value={invoices.filter(i=>i.status==='Paid').length} sub={`of ${invoices.length} total`} color="var(--ok)"/>
+            <StatCard icon="🧾" label="Tax Returns"      value={taxReturns.length} color="var(--blue)"/>
+            <StatCard icon="✍️" label="E-Sign Awaiting"  value={esigns.filter(e=>e.status==='Awaiting').length} color="var(--warn)"/>
+            <StatCard icon="⚠️" label="Overdue Deadlines" value={overdueDl} color={overdueDl>0?'var(--bad)':'var(--ok)'}/>
           </div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:12}}>
             <div className="card">
@@ -251,23 +252,24 @@ export default function Reports() {
           </div>
           <div className="card" style={{marginTop:12}}>
             <SectionTitle title="Firm Summary"/>
-            <table style={{width:'100%',fontSize:12,borderCollapse:'collapse'}}>
+            <table style={{width:'100%',fontSize:14,borderCollapse:'collapse'}}>
               <tbody>
                 {[
                   ['👥 Total Clients',clients.length,'📋 Total Leads',leads.length],
                   ['🆕 New Leads',leads.filter(l=>l.status==='New Lead').length,'🔄 Lead→Client Rate',conversionRate+'%'],
                   ['📁 Total Cases',cases.length,'🔓 Open/Pending',openCases],
                   ['✅ Tasks Completed',tasks.filter(t=>t.done).length,'📌 Tasks Open',tasks.filter(t=>!t.done).length],
-                  ['💰 Revenue Collected','$'+Math.round(totalRevenue).toLocaleString(),'⏳ Pending','$'+Math.round(pendingRevenue).toLocaleString()],
-                  ['🧾 Tax Returns',taxReturns.length,'✍️ E-Signs Awaiting',esigns.filter(e=>e.status==='Awaiting').length],
-                  ['🏢 FormaCorp Filings',formacorp.length,'📒 Bookkeeping Entries',bookkeeping.length],
-                  ['⚠️ Overdue Deadlines',overdueDl,'📅 Total Deadlines',deadlines.length],
+                  ['💰 Revenue Collected','$'+Math.round(totalRevenue).toLocaleString(),'⏳ AR Outstanding','$'+Math.round(pendingRevenue).toLocaleString()],
+                  ['💳 Invoices Paid',invoices.filter(i=>i.status==='Paid').length,'✍️ E-Signs Awaiting',esigns.filter(e=>e.status==='Awaiting').length],
+                  ['🧾 Tax Returns',taxReturns.length,'🏢 FormaCorp Filings',formacorp.length],
+                  ['📒 Bookkeeping Entries',bookkeeping.length,'⚠️ Overdue Deadlines',overdueDl],
+                  ['📅 Total Deadlines',deadlines.length,'',''],
                 ].map(([l1,v1,l2,v2],i)=>(
                   <tr key={i} style={{borderBottom:'1px solid var(--br)'}}>
-                    <td style={{padding:'7px 6px',color:'var(--t2)'}}>{l1}</td>
-                    <td style={{padding:'7px 6px',fontWeight:700,textAlign:'right',paddingRight:24}}>{v1}</td>
-                    <td style={{padding:'7px 6px',color:'var(--t2)'}}>{l2}</td>
-                    <td style={{padding:'7px 6px',fontWeight:700,textAlign:'right'}}>{v2}</td>
+                    <td style={{padding:'11px 8px',color:'var(--t2)',fontWeight:500}}>{l1}</td>
+                    <td style={{padding:'11px 8px',fontWeight:700,fontSize:15,textAlign:'right',paddingRight:32}}>{v1}</td>
+                    <td style={{padding:'11px 8px',color:'var(--t2)',fontWeight:500}}>{l2}</td>
+                    <td style={{padding:'11px 8px',fontWeight:700,fontSize:15,textAlign:'right'}}>{v2}</td>
                   </tr>
                 ))}
               </tbody>
