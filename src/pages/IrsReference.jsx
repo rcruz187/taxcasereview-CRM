@@ -283,11 +283,31 @@ function EntryCard({ entry, showState, onCopy, onEdit, onDelete }) {
               }}>{entry.state}</span>
             )}
           </div>
-          {entry.content && (
-            <div style={{ fontSize: 14, color: 'var(--t2)', marginTop: 6, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-              {entry.content}
-            </div>
-          )}
+          {entry.content && (() => {
+            // Detect if content is a phone number (digits, dashes, spaces, slashes, parens)
+            const isPhone = /^[\d\s\-().\/+]+$/.test(entry.content.trim()) && entry.content.replace(/\D/g,'').length >= 7
+            if (isPhone) {
+              // May contain multiple numbers separated by / or newlines
+              const parts = entry.content.split(/\s*[\/\n]\s*/)
+              return (
+                <div style={{ fontSize: 14, color: 'var(--blue)', marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {parts.map((p, i) => {
+                    const digits = p.replace(/\D/g,'')
+                    return digits.length >= 7 ? (
+                      <a key={i} href={`tel:${digits}`} style={{ color: 'var(--blue)', textDecoration: 'none', fontWeight: 600, fontFamily: 'monospace' }}>
+                        📞 {p.trim()}
+                      </a>
+                    ) : <span key={i} style={{ color: 'var(--t2)' }}>{p.trim()}</span>
+                  })}
+                </div>
+              )
+            }
+            return (
+              <div style={{ fontSize: 14, color: 'var(--t2)', marginTop: 6, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                {entry.content}
+              </div>
+            )
+          })()}
           {entry.notes && (
             <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 6, lineHeight: 1.5 }}>
               {entry.notes}
