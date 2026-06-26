@@ -167,9 +167,11 @@ export function CallProvider({ children }) {
         if (n.type !== 'callUpdate') return
         const call = n.call
         console.log('[RELAY] callUpdate — direction:', call.direction, '| state:', call.state, '| from:', call.options?.remoteCallerNumber)
+        if (call.state === 'active') {
+          activeCallRef.current = call  // always update ref so DTMF works
+        }
         if (call.state === 'active' && !uiStartedRef.current) {
           uiStartedRef.current = true
-          activeCallRef.current = call  // store for DTMF
           setIncomingCall(null)
           stopRing()
           setCalling(true)
@@ -588,9 +590,10 @@ export function CallProvider({ children }) {
     answerIncoming, declineIncoming, startCall, endCall, cancelCall,
     sendDTMF: (digit) => {
       if (activeCallRef.current?.dtmf) {
+        console.log('[DTMF] sending digit:', digit, 'via call object:', activeCallRef.current)
         activeCallRef.current.dtmf(digit)
       } else {
-        console.warn('[DTMF] no active call or dtmf not available')
+        console.warn('[DTMF] no active call ref — call object:', activeCallRef.current)
       }
     },
     saveCallLog, closeLogModalWithoutSaving,
