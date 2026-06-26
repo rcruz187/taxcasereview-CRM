@@ -185,6 +185,18 @@ export default function Calendar() {
     const actorCal = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
     if (!form.id) await triggerWorkflow('lead_appointment_set', form.clientName ? 'client' : 'lead', form.clientName || '', actorCal).catch(()=>{})
     if (form.status === 'completed') await triggerWorkflow('lead_appointment_completed', 'client', form.clientName || '', actorCal).catch(()=>{})
+
+    // Log appointment to lead/client notes
+    if (form.clientName) {
+      const fmtTime = form.time ? new Date(`2000-01-01T${form.time}`).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}) : ''
+      const noteText = `📅 Appointment ${form.id ? 'updated' : 'scheduled'}: ${form.title || form.eventType} on ${form.date}${fmtTime ? ' at ' + fmtTime : ''} — by ${actorCal}${form.notes ? '\nNotes: ' + form.notes : ''}`
+      const { data: leadRow } = await supabase.from('leads').select('id').eq('name', form.clientName).maybeSingle().catch(()=>({data:null}))
+      if (leadRow?.id) {
+        await supabase.from('lead_notes').insert({ lead_id: leadRow.id, lead_name: form.clientName, text: noteText, type: 'System', author: actorCal, created_at: new Date().toISOString() }).catch(()=>{})
+      } else {
+        await supabase.from('client_notes').insert({ client_name: form.clientName, content: noteText, created_by: actorCal, visible_to_client: false }).catch(()=>{})
+      }
+    }
     setShowForm(false); setForm({ title:'',clientName:'',assignedTo:'',date:'',time:'',endTime:'',eventType:'Consultation Call',color:'bb',notes:'',recurring:'none',status:'scheduled' })
     load()
   }

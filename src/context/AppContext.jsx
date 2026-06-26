@@ -201,20 +201,17 @@ export function AppProvider({ children }) {
   }, [user])
 
   // Appointment reminders — browser notification + sound ~30 min before a
-  // scheduled appointment, for whoever has the CRM open (same audience as
-  // the existing "new appointment booked online" toast above, not filtered
-  // by assignee). This is independent of the reminder_sent flag the
-  // send-appointment-reminders Edge Function uses for emails — that's a
-  // separate, server-side, once-only email; this is a client-side popup
-  // that re-checks every minute and just remembers what it's already shown
-  // this session so it doesn't repeat.
+  // scheduled appointment. notifiedIds lives outside the effect so it
+  // persists across re-renders and doesn't re-fire the same notification.
   const REMINDER_MINUTES_BEFORE = 30
+  const notifiedIdsRef = useRef(new Set())
+  const snoozedIdsRef  = useRef({}) // id → snooze-until timestamp
+
   useEffect(() => {
     if (!user) return
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission()
     }
-    const notifiedIds = new Set()
 
     async function checkUpcoming() {
       const now = new Date()
@@ -226,17 +223,31 @@ export function AppProvider({ children }) {
         .eq('date', now.toISOString().slice(0, 10))
       if (error || !data) return
       for (const ev of data) {
-        if (!ev.time || notifiedIds.has(ev.id)) continue
+        if (!ev.time || notifiedIdsRef.current.has(ev.id)) continue
+        // Check snooze
+        const snoozedUntil = snoozedIdsRef.current[ev.id]
+        if (snoozedUntil && now < new Date(snoozedUntil)) continue
         const evTime = new Date(`${ev.date}T${ev.time}:00`)
         if (evTime < now || evTime > windowEnd) continue
-        notifiedIds.add(ev.id)
+        notifiedIdsRef.current.add(ev.id)
         playSound('reminder')
-        const who = ev.clientName || ev.title || 'Appointment'
+        const who  = ev.clientName || ev.title || 'Appointment'
+        const type = ev.eventType ? ` — ${ev.eventType}` : ''
+        // Format time in 12-hour
+        const fmtTime = evTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
         if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification('📅 Upcoming Appointment', {
-            body: `${who} at ${ev.time}${ev.eventType ? ` — ${ev.eventType}` : ''} (in ~${REMINDER_MINUTES_BEFORE} min)`,
+          const n = new Notification('📅 Upcoming Appointment', {
+            body: `${who} at ${fmtTime}${type} (in ~${REMINDER_MINUTES_BEFORE} min)\nClick to snooze 10 min`,
             icon: '/taxcasereview-CRM/icon-192.png',
+            tag: `appt-${ev.id}`, // prevents duplicate OS-level popups
+            requireInteraction: false,
           })
+          n.onclick = () => {
+            // Snooze: allow re-notification in 10 minutes, reset the fired flag
+            snoozedIdsRef.current[ev.id] = new Date(Date.now() + 10 * 60000).toISOString()
+            notifiedIdsRef.current.delete(ev.id)
+            n.close()
+          }
         }
       }
     }
