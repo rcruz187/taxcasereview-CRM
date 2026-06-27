@@ -19,6 +19,11 @@ const STATE_FORMS = [
   { num: 'MO-149',         state: 'MO', label: 'Sales and Use Tax Exemption Certificate',             url: `${BASE}/state-forms/Form_149_MO.pdf` },
   { num: 'OR-150-800-005', state: 'OR', label: 'Tax Information Authorization and POA',               url: `${BASE}/state-forms/OR_POA.pdf` },
   { num: 'TN-RV-F0103801', state: 'TN', label: 'Power of Attorney',                                   url: `${BASE}/state-forms/TN_POA.pdf` },
+  { num: 'NC-GEN-58',      state: 'NC', label: 'Power of Attorney and Declaration of Representative', url: `${BASE}/state-forms/NC_POA.pdf` },
+  { num: 'NY-POA-1',       state: 'NY', label: 'Power of Attorney (NYS & NYC)',                         url: `${BASE}/state-forms/NY_POA.pdf` },
+  { num: 'OH-SPOA',        state: 'OH', label: 'Ohio Statutory Form Power of Attorney',                 url: `${BASE}/state-forms/OH_POA.pdf` },
+  { num: 'PA-PSRS-248',    state: 'PA', label: 'Power of Attorney (PSERS)',                             url: `${BASE}/state-forms/PA_POA.pdf` },
+  { num: 'TX-85-272',      state: 'TX', label: 'Texas Statutory Durable Power of Attorney',             url: `${BASE}/state-forms/TX_POA.pdf` },
   { num: 'WA-42-2446',     state: 'WA', label: 'Power of Attorney', url: `${BASE}/state-forms/Washington_POA.pdf` },
   { num: 'WY-POA',         state: 'WY', label: 'Power of Attorney', url: `${BASE}/state-forms/Wyoming.pdf` },
 ]
