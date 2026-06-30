@@ -23,16 +23,20 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('avatars', 'avatars', true)
 ON CONFLICT (id) DO NOTHING;
 
--- Explicit policies — public buckets still need these for authenticated
--- uploads/updates to actually succeed (don't rely on project-level defaults).
+-- This app's Supabase client only ever uses the anon key (no Supabase Auth
+-- session login flow) — every request authenticates as Postgres role
+-- 'anon', never 'authenticated'. Matches the existing firm-assets bucket,
+-- which works today with no restrictive policy at all. Open access here,
+-- same as everywhere else in this single-tenant app.
 DROP POLICY IF EXISTS "avatars_public_read" ON storage.objects;
-CREATE POLICY "avatars_public_read" ON storage.objects
+DROP POLICY IF EXISTS "avatars_authenticated_upload" ON storage.objects;
+DROP POLICY IF EXISTS "avatars_authenticated_update" ON storage.objects;
+
+CREATE POLICY "avatars_anon_read" ON storage.objects
   FOR SELECT USING (bucket_id = 'avatars');
 
-DROP POLICY IF EXISTS "avatars_authenticated_upload" ON storage.objects;
-CREATE POLICY "avatars_authenticated_upload" ON storage.objects
-  FOR INSERT WITH CHECK (bucket_id = 'avatars' AND auth.role() = 'authenticated');
+CREATE POLICY "avatars_anon_upload" ON storage.objects
+  FOR INSERT WITH CHECK (bucket_id = 'avatars');
 
-DROP POLICY IF EXISTS "avatars_authenticated_update" ON storage.objects;
-CREATE POLICY "avatars_authenticated_update" ON storage.objects
-  FOR UPDATE USING (bucket_id = 'avatars' AND auth.role() = 'authenticated');
+CREATE POLICY "avatars_anon_update" ON storage.objects
+  FOR UPDATE USING (bucket_id = 'avatars');
