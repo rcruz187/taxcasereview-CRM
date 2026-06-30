@@ -47,6 +47,14 @@ export default function Email() {
   const [signature, setSignature] = useState({ text: '', logoUrl: '' })
   const { lastSyncAt, syncing, lastError, syncNow } = useGmailSync()
   const { user } = useApp()
+  // Display-only tick — re-renders the "Synced Xs ago" text once a
+  // second so it doesn't look frozen between real sync updates. Purely
+  // local state, no Supabase calls.
+  const [, forceTick] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => forceTick(n => n + 1), 1000)
+    return () => clearInterval(t)
+  }, [])
 
   // Multi-select for bulk archive. checkedIds = the actual selection;
   // focusIndex/anchorIndex track keyboard navigation within the currently

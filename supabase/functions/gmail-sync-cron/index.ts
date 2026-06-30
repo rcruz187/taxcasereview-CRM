@@ -208,11 +208,11 @@ serve(async () => {
       await importIds(supabase, token, newIds, clients || [])
 
       if (nextPageToken) {
-        await supabase.from('settings').update({ gmail_backfill_page_token: nextPageToken }).eq('id', settings.id)
+        await supabase.from('settings').update({ gmail_backfill_page_token: nextPageToken, gmail_last_sync_at: new Date().toISOString(), gmail_last_error: null }).eq('id', settings.id)
       } else if (phase === 'inbox') {
-        await supabase.from('settings').update({ gmail_backfill_phase: 'sent', gmail_backfill_page_token: null }).eq('id', settings.id)
+        await supabase.from('settings').update({ gmail_backfill_phase: 'sent', gmail_backfill_page_token: null, gmail_last_sync_at: new Date().toISOString(), gmail_last_error: null }).eq('id', settings.id)
       } else {
-        await supabase.from('settings').update({ gmail_backfill_phase: 'done', gmail_backfill_page_token: null, gmail_last_sync_at: new Date().toISOString() }).eq('id', settings.id)
+        await supabase.from('settings').update({ gmail_backfill_phase: 'done', gmail_backfill_page_token: null, gmail_last_sync_at: new Date().toISOString(), gmail_last_error: null }).eq('id', settings.id)
       }
     } else {
       for (const label of ['INBOX', 'SENT']) {
