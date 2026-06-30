@@ -17,6 +17,11 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const LIST_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/messages'
 const RETENTION_DAYS = 365
@@ -178,7 +183,9 @@ async function importIds(supabase: any, token: string, ids: string[], clients: a
   }
 }
 
-serve(async () => {
+serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   let settingsId: number | null = null
 
@@ -188,7 +195,7 @@ serve(async () => {
       .limit(1).maybeSingle()
 
     if (!settings?.gmail_refresh_token) {
-      return new Response(JSON.stringify({ ok: true, skipped: 'Gmail not connected' }), { status: 200 })
+      return new Response(JSON.stringify({ ok: true, skipped: 'Gmail not connected' }), { status: 200, headers: corsHeaders })
     }
     settingsId = settings.id
 
@@ -230,12 +237,12 @@ serve(async () => {
       }
     }
 
-    return new Response(JSON.stringify({ ok: true }), { status: 200 })
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: corsHeaders })
   } catch (e) {
     console.error('gmail-sync-cron error:', e)
     if (settingsId != null) {
       await supabase.from('settings').update({ gmail_last_error: String((e as Error).message || e) }).eq('id', settingsId)
     }
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500 })
+    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: corsHeaders })
   }
 })
