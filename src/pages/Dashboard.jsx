@@ -626,8 +626,8 @@ export default function Dashboard() {
       </div>
       </div>
 
-      {/* TAS Sidebar — right side, Admin/SuperAdmin only */}
-      {!isTaxAdvisor && !isTaxAssociate && !isManager && (
+      {/* TAS Sidebar — right side, all roles */}
+      {(
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: 230, flexShrink: 0 }}>
           <TASWidget />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 28 }}>
