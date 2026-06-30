@@ -123,7 +123,7 @@ export default function TopBar({ onNew }) {
         <div style={{width:1,height:14,background:'var(--br)'}}/>
         <div style={{display:'flex',alignItems:'center',gap:5,fontSize:12,color:'var(--t2)',whiteSpace:'nowrap'}}>
           <span style={{fontSize:13}}>📠</span>
-          <span style={{fontWeight:700,letterSpacing:'.02em'}}>(239) 526-2666</span>
+          <span style={{fontWeight:700,letterSpacing:'.02em'}}>(561) 420-6999</span>
         </div>
       </div>
       <button

@@ -4,7 +4,7 @@ import { getPackageFormTypes, FORM_LABELS, FORM_USES_EIN, fillForm, generateCcAu
 const LOGO_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo'
 
 const FIRM_PHONE = '(888) 334-5052'
-const FIRM_FAX = '(239) 526-2666'
+const FIRM_FAX = '(561) 420-6999'
 
 function printHeader(title, phone = FIRM_PHONE) {
   return `
@@ -409,7 +409,7 @@ export function generatePOACoverLetter(c = null) {
       <div style="font-size:12px;font-weight:700">Authorized Representative</div>
       <div style="font-size:11.5px;margin-top:4px">Tax Case Review</div>
       <div style="font-size:11px;color:#555;margin-top:2px">631 US Highway One Ste 304, North Palm Beach, FL 33408</div>
-      <div style="font-size:11px;color:#555">info@taxcasereview.com &nbsp;·&nbsp; (888) 334-5052 &nbsp;·&nbsp; Fax (239) 526-2666</div>
+      <div style="font-size:11px;color:#555">info@taxcasereview.com &nbsp;·&nbsp; (888) 334-5052 &nbsp;·&nbsp; Fax (561) 420-6999</div>
       <div style="font-size:11px;color:#888;margin-top:6px">Date: _______________________</div>
     </div>
   `)

@@ -452,12 +452,12 @@ export default function Settings() {
                   <input type="password" value={firm.sw_api_token || ''} onChange={set('sw_api_token')} placeholder="PT..." />
                 </div>
                 <div className="field"><label>Inbound DID (Fax / Inbound-only Number)</label>
-                  <input value={firm.sw_inbound_did || ''} onChange={set('sw_inbound_did')} placeholder="+12395262666" />
+                  <input value={firm.sw_inbound_did || ''} onChange={set('sw_inbound_did')} placeholder="+15614206999" />
                   <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Used for fax reception and inbound-only numbers. Do not use for outbound SMS.</div>
                 </div>
-                <div className="field"><label>Outbound SMS Number (Toll-Free)</label>
-                  <input value={firm.sw_outbound_did || ''} onChange={set('sw_outbound_did')} placeholder="+18883345052" />
-                  <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>All outbound text messages send from this number. Use your toll-free line.</div>
+                <div className="field"><label>Outbound SMS Number</label>
+                  <input value={firm.sw_outbound_did || ''} onChange={set('sw_outbound_did')} placeholder="+15614206665" />
+                  <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>All outbound text messages send from this number. Local numbers work immediately — toll-free numbers require SignalWire verification first.</div>
                 </div>
               </div>
               <div className="fg2">

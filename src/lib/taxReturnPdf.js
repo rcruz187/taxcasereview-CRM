@@ -44,7 +44,7 @@ export async function generateTaxReturnPdf(form, totals, preparer = {}) {
     // Top bar
     page.drawRectangle({ x: 0, y: H - 52, width: W, height: 52, color: COLORS.blue })
     page.drawText('TAX CASE REVIEW', { x: ML, y: H - 28, size: 14, font: boldFont, color: COLORS.white })
-    page.drawText('(888) 334-5052  |  Fax: (239) 526-2666', { x: ML, y: H - 43, size: 8, font: regularFont, color: rgb(0.7, 0.8, 1) })
+    page.drawText('(888) 334-5052  |  Fax: (561) 420-6999', { x: ML, y: H - 43, size: 8, font: regularFont, color: rgb(0.7, 0.8, 1) })
 
     const returnLabel = form.returnType || 'Tax Return'
     const labelW = boldFont.widthOfTextAtSize(returnLabel, 10)
@@ -381,7 +381,7 @@ export async function generateTaxReturnPdf(form, totals, preparer = {}) {
   const pages = pdfDoc.getPages()
   pages.forEach((p, i) => {
     p.drawLine({ start: { x: ML, y: 36 }, end: { x: MR, y: 36 }, thickness: 0.5, color: COLORS.divider })
-    p.drawText('TAX CASE REVIEW  |  (888) 334-5052  |  Fax: (239) 526-2666', { x: ML, y: 24, size: 7, font: regularFont, color: COLORS.gray })
+    p.drawText('TAX CASE REVIEW  |  (888) 334-5052  |  Fax: (561) 420-6999', { x: ML, y: 24, size: 7, font: regularFont, color: COLORS.gray })
     p.drawText(`CONFIDENTIAL — PREPARER WORKSHEET  |  Page ${i + 1} of ${pages.length}`, { x: MR - regularFont.widthOfTextAtSize(`CONFIDENTIAL — PREPARER WORKSHEET  |  Page ${i + 1} of ${pages.length}`, 7) , y: 24, size: 7, font: regularFont, color: COLORS.gray })
   })
 

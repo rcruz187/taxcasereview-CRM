@@ -374,7 +374,7 @@ export async function generateCcAuthPdf(client) {
 
   // Footer
   page.drawText('Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408', { x: margin, y: 40, size: 8, font, color: rgb(0.5,0.5,0.5) });
-  page.drawText('info@taxcasereview.org · (888) 334-5052 · Fax (239) 526-2666', { x: margin, y: 28, size: 8, font, color: rgb(0.5,0.5,0.5) });
+  page.drawText('info@taxcasereview.org · (888) 334-5052 · Fax (561) 420-6999', { x: margin, y: 28, size: 8, font, color: rgb(0.5,0.5,0.5) });
 
   return pdfDoc.save();
 }
@@ -462,7 +462,7 @@ export async function generatePOACoverLetterPdf(c = null) {
   y -= 13;
   page.drawText('631 US Highway One Ste 304, North Palm Beach, FL 33408', { x: margin, y, size: 10, font });
   y -= 13;
-  page.drawText('info@taxcasereview.com  ·  (888) 334-5052  ·  Fax (239) 526-2666', { x: margin, y, size: 10, font });
+  page.drawText('info@taxcasereview.com  ·  (888) 334-5052  ·  Fax (561) 420-6999', { x: margin, y, size: 10, font });
   y -= 16;
   page.drawText('Date: _______________________', { x: margin, y, size: 10, font });
 
@@ -1228,7 +1228,7 @@ export async function generateAddendumPdf(c = null, opts = {}) {
   // ── Header ──
   page.drawText('Tax Case Review', { x: margin, y, size: 16, font: bold });
   y -= 16;
-  page.drawText('631 US Highway One Ste 304, North Palm Beach, FL 33408 · info@taxcasereview.com · (888) 334-5052 · Fax (239) 526-2666', { x: margin, y, size: 8.5, font, color: rgb(0.4, 0.4, 0.4) });
+  page.drawText('631 US Highway One Ste 304, North Palm Beach, FL 33408 · info@taxcasereview.com · (888) 334-5052 · Fax (561) 420-6999', { x: margin, y, size: 8.5, font, color: rgb(0.4, 0.4, 0.4) });
   y -= 22;
   page.drawText('SERVICE ADDENDUM — ADDITIONAL SERVICES AGREEMENT', { x: margin, y, size: 12.5, font: bold });
   y -= 20;
@@ -1387,7 +1387,7 @@ export async function generateFinancialIntakePdf(clientName, answers = {}, submi
 
   page.drawText('Tax Case Review', { x: margin, y, size: 16, font: bold });
   y -= 16;
-  page.drawText('631 US Highway One Ste 304, North Palm Beach, FL 33408 · info@taxcasereview.com · (888) 334-5052 · Fax (239) 526-2666', { x: margin, y, size: 8.5, font, color: rgb(0.4, 0.4, 0.4) });
+  page.drawText('631 US Highway One Ste 304, North Palm Beach, FL 33408 · info@taxcasereview.com · (888) 334-5052 · Fax (561) 420-6999', { x: margin, y, size: 8.5, font, color: rgb(0.4, 0.4, 0.4) });
   y -= 22;
   page.drawText('FINANCIAL INTAKE — SUBMITTED SUMMARY', { x: margin, y, size: 12.5, font: bold });
   y -= 18;
