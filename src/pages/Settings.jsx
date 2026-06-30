@@ -916,6 +916,8 @@ function StorageTab() {
   const [docs,    setDocs]    = useState([])
   const [esigns,  setEsigns]  = useState([])
   const [loading, setLoading] = useState(true)
+  const [usage,   setUsage]   = useState(null)
+  const [usageLoading, setUsageLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
@@ -928,6 +930,18 @@ function StorageTab() {
       setLoading(false)
     }
     load()
+
+    async function loadUsage() {
+      const { data } = await supabase
+        .from('usage_metrics')
+        .select('*')
+        .order('snapshot_date', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      setUsage(data || null)
+      setUsageLoading(false)
+    }
+    loadUsage()
   }, [])
 
   const FREE_LIMIT = 1024 * 1024 * 1024  // 1 GB Supabase free tier
@@ -959,6 +973,51 @@ function StorageTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Supabase project usage (Cached Egress + real Storage) — pulled
+          daily via Management API by the fetch-usage-metrics edge
+          function. Separate from the "Storage Usage" card below, which
+          only tracks our own documents table, not the actual Supabase
+          project limits. */}
+      {!usageLoading && (
+        <div className="card">
+          <div className="card-header"><span className="card-title">📊 Supabase Usage Monitor</span></div>
+          <div style={{ padding: '0 20px 20px' }}>
+            {!usage ? (
+              <div style={{ fontSize: 13, color: 'var(--t3)' }}>
+                No usage snapshot yet — the daily monitor hasn't run yet, or isn't deployed.
+              </div>
+            ) : (
+              <>
+                {(() => {
+                  const egressPct = usage.cached_egress_gb != null && usage.egress_limit_gb
+                    ? Math.min(100, (usage.cached_egress_gb / usage.egress_limit_gb) * 100) : null
+                  const egressColor = egressPct > 80 ? 'var(--bad)' : egressPct > 60 ? 'var(--warn)' : 'var(--green)'
+                  return egressPct != null ? (
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+                        <span style={{ fontSize: 22, fontWeight: 900, color: egressColor }}>{usage.cached_egress_gb.toFixed(2)} GB</span>
+                        <span style={{ fontSize: 13, color: 'var(--t3)' }}>Cached Egress of {usage.egress_limit_gb} GB limit</span>
+                      </div>
+                      <div style={{ height: 10, background: 'var(--s2)', borderRadius: 99, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: egressPct + '%', background: egressColor, borderRadius: 99, transition: 'width .4s' }} />
+                      </div>
+                      {egressPct > 80 && (
+                        <div style={{ marginTop: 10, padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, fontSize: 13, color: 'var(--bad)' }}>
+                          ⚠️ Cached Egress is {egressPct.toFixed(0)}% of plan limit — check Supabase billing before this triggers overage charges.
+                        </div>
+                      )}
+                    </div>
+                  ) : null
+                })()}
+                <div style={{ fontSize: 11, color: 'var(--t3)' }}>
+                  Last updated: {new Date(usage.fetched_at).toLocaleString()}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Usage bar */}
       <div className="card">
         <div className="card-header"><span className="card-title">💾 Storage Usage</span></div>
