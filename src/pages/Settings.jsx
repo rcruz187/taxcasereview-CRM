@@ -261,7 +261,7 @@ export default function Settings() {
   // Tax Advisor / Tax Associate / Manager only ever see their own signature
   // editor + the live status page (read-only) — nothing firm-wide.
   const tabs = isPrivileged
-    ? ['firm', 'integrations', 'branding', 'users', 'security', 'storage', 'uptime']
+    ? ['firm', 'integrations', 'branding', 'import', 'users', 'security', 'storage', 'uptime']
     : ['mysignature', 'uptime']
 
   return (
@@ -269,7 +269,7 @@ export default function Settings() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
         {tabs.map(t => (
           <button key={t} className={`btn${tab === t ? ' pri' : ''}`} onClick={() => setTab(t)}>
-            {t === 'firm' ? '🏢 Firm Info' : t === 'integrations' ? '🔌 Integrations' : t === 'branding' ? '🎨 Branding' : t === 'users' ? '👥 Users' : t === 'security' ? '🔒 Security' : t === 'storage' ? '💾 Storage' : t === 'mysignature' ? '✍️ My Signature' : '🟢 Uptime'}
+            {t === 'firm' ? '🏢 Firm Info' : t === 'integrations' ? '🔌 Integrations' : t === 'branding' ? '🎨 Branding' : t === 'import' ? '📥 Import Data' : t === 'users' ? '👥 Users' : t === 'security' ? '🔒 Security' : t === 'storage' ? '💾 Storage' : t === 'mysignature' ? '✍️ My Signature' : '🟢 Uptime'}
           </button>
         ))}
       </div>
@@ -903,6 +903,7 @@ export default function Settings() {
         </div>
       )}
 
+      {tab === 'import' && isPrivileged && <ImportTab />}
       {tab === 'storage' && isPrivileged && <StorageTab />}
       {tab === 'uptime' && <UptimeTab />}
     </div>
@@ -1206,6 +1207,249 @@ function UptimeTab() {
 
       <div style={{ fontSize: 11, color: 'var(--t3)', textAlign: 'center', marginTop: 4 }}>
         SignalWire and Gmail don't provide a public status API — click their status page links to check manually.
+      </div>
+    </div>
+  )
+}
+
+// ── Import Data Tab — businesses bring in existing clients/leads from a
+// spreadsheet. Parses CSV/XLSX client-side with SheetJS, lets the admin map
+// columns to CRM fields, previews the first rows, then bulk-inserts.
+function ImportTab() {
+  const { showToast } = useApp()
+  const [step, setStep] = useState(1) // 1=upload, 2=map, 3=preview, 4=done
+  const [importTarget, setImportTarget] = useState('clients') // 'clients' or 'leads'
+  const [fileName, setFileName] = useState('')
+  const [headers, setHeaders] = useState([])
+  const [rows, setRows] = useState([])
+  const [mapping, setMapping] = useState({})
+  const [importing, setImporting] = useState(false)
+  const [result, setResult] = useState(null)
+  const fileRef = useRef()
+
+  // CRM fields available to map spreadsheet columns onto. Matches the real
+  // clients/leads schema — see BLANK at the top of this file (clients) and
+  // the equivalent in Leads.jsx.
+  const CRM_FIELDS = [
+    { key: '', label: '— Skip this column —' },
+    { key: 'name', label: 'Full Name' },
+    { key: 'phone', label: 'Phone' },
+    { key: 'phone2', label: 'Phone 2' },
+    { key: 'email', label: 'Email' },
+    { key: 'street', label: 'Street Address' },
+    { key: 'city', label: 'City' },
+    { key: 'state', label: 'State' },
+    { key: 'zip', label: 'Zip' },
+    { key: 'ssn', label: 'SSN' },
+    { key: 'ein', label: 'EIN' },
+    { key: 'spouseName', label: 'Spouse Name' },
+    { key: 'spouseSsn', label: 'Spouse SSN' },
+    { key: 'filingStatus', label: 'Filing Status' },
+    { key: 'irsBalance', label: 'IRS Balance' },
+    { key: 'stateBalance', label: 'State Balance' },
+    { key: 'issueType', label: 'Issue Type' },
+    { key: 'irsOrState', label: 'IRS / State' },
+    { key: 'taxYears', label: 'Tax Years' },
+    { key: 'notes', label: 'Notes' },
+    { key: 'assignedTo', label: 'Assigned To' },
+    { key: 'status', label: 'Status' },
+  ]
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setFileName(file.name)
+    const XLSX = await import('xlsx')
+    const buf = await file.arrayBuffer()
+    const wb = XLSX.read(buf, { type: 'array' })
+    const sheet = wb.Sheets[wb.SheetNames[0]]
+    const json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+    if (json.length < 2) { showToast('That file has no data rows', 'err'); return }
+    const hdrs = json[0].map(h => String(h || '').trim())
+    const dataRows = json.slice(1).filter(r => r.some(c => String(c).trim() !== ''))
+    setHeaders(hdrs)
+    setRows(dataRows)
+
+    // Auto-guess mapping by matching header text to CRM field labels
+    const guessed = {}
+    hdrs.forEach((h, i) => {
+      const norm = h.toLowerCase().replace(/[^a-z0-9]/g, '')
+      const match = CRM_FIELDS.find(f => f.key && (
+        f.key.toLowerCase() === norm ||
+        f.label.toLowerCase().replace(/[^a-z0-9]/g, '') === norm ||
+        (norm.includes('name') && f.key === 'name' && !norm.includes('spouse')) ||
+        (norm.includes('phone') && !norm.includes('2') && f.key === 'phone') ||
+        (norm === 'phone2' && f.key === 'phone2') ||
+        (norm.includes('email') && f.key === 'email') ||
+        (norm.includes('ssn') && !norm.includes('spouse') && f.key === 'ssn') ||
+        (norm.includes('address') && f.key === 'street') ||
+        (norm === 'city' && f.key === 'city') ||
+        (norm === 'state' && f.key === 'state') ||
+        (norm.includes('zip') && f.key === 'zip')
+      ))
+      guessed[i] = match ? match.key : ''
+    })
+    setMapping(guessed)
+    setStep(2)
+  }
+
+  function buildPreviewRows() {
+    return rows.slice(0, 8).map(r => {
+      const obj = {}
+      headers.forEach((h, i) => { if (mapping[i]) obj[mapping[i]] = r[i] })
+      return obj
+    })
+  }
+
+  async function runImport() {
+    if (!mapping || Object.values(mapping).every(v => !v)) { showToast('Map at least one column first', 'err'); return }
+    setImporting(true)
+    const table = importTarget === 'clients' ? 'clients' : 'leads'
+    const records = rows.map(r => {
+      const obj = {}
+      headers.forEach((h, i) => { if (mapping[i]) obj[mapping[i]] = String(r[i] ?? '').trim() })
+      if (importTarget === 'clients') {
+        obj.clientType = obj.clientType || 'Individual'
+        obj.status = obj.status || 'Active'
+        obj.pipelineStage = obj.pipelineStage || 'investigation'
+        obj.filingStatus = obj.filingStatus || 'Single'
+        obj.issueType = obj.issueType || 'OIC'
+        obj.irsOrState = obj.irsOrState || 'IRS Federal'
+      } else {
+        obj.status = obj.status || 'New Lead'
+      }
+      return obj
+    }).filter(r => r.name) // must at least have a name to be a valid record
+
+    const { data, error } = await supabase.from(table).insert(records).select('id')
+    setImporting(false)
+    if (error) {
+      setResult({ ok: false, message: error.message })
+      showToast('Import failed: ' + error.message, 'err')
+      return
+    }
+    setResult({ ok: true, count: data?.length || records.length })
+    setStep(4)
+    showToast(`Imported ${data?.length || records.length} ${importTarget}!`)
+  }
+
+  function reset() {
+    setStep(1); setFileName(''); setHeaders([]); setRows([]); setMapping({}); setResult(null)
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  return (
+    <div className="card">
+      <div className="card-header"><span className="card-title">📥 Import Data</span></div>
+      <div style={{ padding: '0 20px 20px' }}>
+        <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 18, lineHeight: 1.6 }}>
+          Bring in existing clients or leads from a spreadsheet (CSV or Excel). Upload your file, match each column to the right CRM field, preview, then import.
+        </div>
+
+        {/* Step indicator */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
+          {['Upload', 'Map columns', 'Preview', 'Done'].map((label, i) => (
+            <div key={label} style={{
+              flex: 1, textAlign: 'center', padding: '6px 4px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+              background: step === i+1 ? 'var(--blue)' : step > i+1 ? 'var(--ok)' : 'var(--s2)',
+              color: step >= i+1 ? '#fff' : 'var(--t3)',
+            }}>{label}</div>
+          ))}
+        </div>
+
+        {/* Step 1: Upload */}
+        {step === 1 && (
+          <div>
+            <div className="field" style={{ maxWidth: 320, marginBottom: 14 }}>
+              <label>Importing into</label>
+              <select value={importTarget} onChange={e => setImportTarget(e.target.value)}>
+                <option value="clients">Clients</option>
+                <option value="leads">Leads</option>
+              </select>
+            </div>
+            <div onClick={() => fileRef.current.click()} style={{
+              border: '2px dashed var(--br)', borderRadius: 10, padding: '40px 20px', textAlign: 'center', cursor: 'pointer', background: 'var(--s1)',
+            }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
+              <div style={{ fontWeight: 700, color: 'var(--tx)', marginBottom: 4 }}>Click to upload a CSV or Excel file</div>
+              <div style={{ fontSize: 12, color: 'var(--t3)' }}>.csv, .xlsx, .xls — first row must be column headers</div>
+            </div>
+            <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" style={{ display: 'none' }} onChange={handleFile}/>
+          </div>
+        )}
+
+        {/* Step 2: Map columns */}
+        {step === 2 && (
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--tx)', marginBottom: 4 }}>{fileName}</div>
+            <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 14 }}>{rows.length} rows found. Match each spreadsheet column to a CRM field — we've guessed where we could.</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 360, overflowY: 'auto', marginBottom: 16 }}>
+              {headers.map((h, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 10px', background: 'var(--s1)', borderRadius: 8 }}>
+                  <div style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h || `Column ${i+1}`}</div>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  <select value={mapping[i] || ''} onChange={e => setMapping(m => ({ ...m, [i]: e.target.value }))} style={{ flex: 1 }}>
+                    {CRM_FIELDS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+                  </select>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <button className="btn sec" onClick={reset}>← Start over</button>
+              <button className="btn pri" onClick={() => setStep(3)}>Preview →</button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Preview */}
+        {step === 3 && (
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--tx)', marginBottom: 10 }}>Preview — first 8 of {rows.length} rows</div>
+            <div style={{ overflowX: 'auto', marginBottom: 16, border: '1px solid var(--br)', borderRadius: 8 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: 'var(--s2)' }}>
+                    {Object.values(mapping).filter(Boolean).map(k => (
+                      <th key={k} style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: 'var(--t2)', whiteSpace: 'nowrap' }}>
+                        {CRM_FIELDS.find(f => f.key === k)?.label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {buildPreviewRows().map((r, i) => (
+                    <tr key={i} style={{ borderTop: '1px solid var(--br)' }}>
+                      {Object.values(mapping).filter(Boolean).map(k => (
+                        <td key={k} style={{ padding: '7px 10px', color: 'var(--tx)', whiteSpace: 'nowrap' }}>{r[k] || '—'}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--warn)', marginBottom: 16 }}>
+              ⚠️ This will create {rows.length} new {importTarget} records. This can't be undone automatically — review the preview carefully first.
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <button className="btn sec" onClick={() => setStep(2)}>← Back to mapping</button>
+              <button className="btn pri" onClick={runImport} disabled={importing}>
+                {importing ? 'Importing…' : `Import ${rows.length} ${importTarget}`}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Done */}
+        {step === 4 && result && (
+          <div style={{ textAlign: 'center', padding: '30px 0' }}>
+            <div style={{ fontSize: 40, marginBottom: 10 }}>{result.ok ? '✅' : '⚠️'}</div>
+            <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--tx)', marginBottom: 6 }}>
+              {result.ok ? `Imported ${result.count} ${importTarget}!` : 'Import failed'}
+            </div>
+            {!result.ok && <div style={{ fontSize: 12, color: 'var(--bad)', marginBottom: 16 }}>{result.message}</div>}
+            <button className="btn pri" onClick={reset}>Import another file</button>
+          </div>
+        )}
       </div>
     </div>
   )
