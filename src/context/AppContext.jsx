@@ -165,69 +165,57 @@ export function AppProvider({ children }) {
   //
   // Realtime websockets can silently drop after a backgrounded/idle tab,
   // laptop sleep, or brief network blip — Supabase doesn't always
-  // reconnect cleanly on its own. Two safety nets here: (1) each channel's
-  // own subscribe() status callback re-subscribes itself if it reports
-  // CLOSED or CHANNEL_ERROR, and (2) a visibility-change listener forces a
-  // fresh subscribe whenever the tab becomes active again, since that's
-  // the most common moment a stale connection goes unnoticed.
+  // reconnect cleanly on its own. Each channel watches its own subscribe()
+  // status and rebuilds itself (only itself) if it reports CLOSED or
+  // CHANNEL_ERROR. We deliberately do NOT tear down/rebuild all channels
+  // together on tab-focus — reusing the same channel name before the old
+  // one finishes closing causes the realtime client to silently drop the
+  // new subscription, which is worse than doing nothing. Each channel
+  // manages its own lifecycle independently.
   useEffect(() => {
     if (!user) return
     const myName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'You'
-    let channels = {}
+    const channels = []
 
-    function subscribeAll() {
-      // Tear down any existing channels first so re-subscribing on
-      // visibility change doesn't leak duplicate listeners.
-      Object.values(channels).forEach(ch => { try { supabase.removeChannel(ch) } catch (_) {} })
-      channels = {}
-
-      function withReconnect(name, table, handler) {
+    function withReconnect(name, table, handler) {
+      function create() {
         const ch = supabase.channel(name)
         ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table }, handler)
           .subscribe(status => {
             if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-              setTimeout(() => { if (channels[name] === ch) subscribeAll() }, 1500)
+              supabase.removeChannel(ch)
+              setTimeout(create, 1500)
             }
           })
-        channels[name] = ch
+        channels.push(ch)
       }
-
-      withReconnect('global-chat-notify', 'chat_messages', ({ new: msg }) => {
-        if (msg.huddle_id && msg.sender === '🔔 System') {
-          playSound('huddle')
-        } else if (msg.sender === '🔔 System') {
-          playSound('lead') // new lead / appointment / payment notifications from LeadFlow etc.
-        } else if (msg.sender !== myName) {
-          playSound('message')
-        }
-      })
-
-      withReconnect('global-email-notify', 'emails', ({ new: row }) => {
-        if ((row.triage || 'Inbox') === 'Inbox' && row.status !== 'Sent') playSound('email')
-      })
-
-      withReconnect('global-sms-notify', 'sms_messages', ({ new: row }) => {
-        if (row.direction === 'inbound') playSound('sms')
-      })
-
-      withReconnect('global-fax-notify', 'fax_logs', ({ new: row }) => {
-        if (row.direction === 'inbound') playSound('fax')
-      })
+      create()
     }
 
-    subscribeAll()
+    withReconnect('global-chat-notify', 'chat_messages', ({ new: msg }) => {
+      if (msg.huddle_id && msg.sender === '🔔 System') {
+        playSound('huddle')
+      } else if (msg.sender === '🔔 System') {
+        playSound('lead') // new lead / appointment / payment notifications from LeadFlow etc.
+      } else if (msg.sender !== myName) {
+        playSound('message')
+      }
+    })
 
-    // Force a fresh subscribe when the tab becomes visible again — this is
-    // the most common moment a stale websocket goes unnoticed, since the
-    // browser may have suspended the connection while backgrounded.
-    function onVisible() {
-      if (document.visibilityState === 'visible') subscribeAll()
-    }
-    document.addEventListener('visibilitychange', onVisible)
+    withReconnect('global-email-notify', 'emails', ({ new: row }) => {
+      if ((row.triage || 'Inbox') === 'Inbox' && row.status !== 'Sent') playSound('email')
+    })
+
+    withReconnect('global-sms-notify', 'sms_messages', ({ new: row }) => {
+      if (row.direction === 'inbound') playSound('sms')
+    })
+
+    withReconnect('global-fax-notify', 'fax_logs', ({ new: row }) => {
+      if (row.direction === 'inbound') playSound('fax')
+    })
 
     return () => {
-      document.removeEventListener('visibilitychange', onVisible)
-      Object.values(channels).forEach(ch => { try { supabase.removeChannel(ch) } catch (_) {} })
+      channels.forEach(ch => { try { supabase.removeChannel(ch) } catch (_) {} })
     }
   }, [user])
 
