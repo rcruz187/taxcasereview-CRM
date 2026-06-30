@@ -1,165 +1,74 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { listGmailMessages, getAndParseGmailMessage } from '../lib/gmailUtils'
 
 // ──────────────────────────────────────────────────────────────────────
-// Mounted once at the Shell level (same pattern as CallContext) so it
-// keeps running no matter which page is open — not just the Email page.
+// Gmail sync used to run independently in EVERY logged-in employee's
+// browser tab, polling every 30 seconds — meaning N employees logged in
+// meant N redundant copies of the same sync work, all hitting Supabase
+// with the same queries (including re-fetching the entire clients table)
+// at the same time, all day. That was a real, sustained contributor to
+// the Supabase Cached Egress overage.
 //
-// Polling interval is 30 seconds, not "every couple seconds": Gmail's API
-// has a quota, and checking that aggressively buys nothing in practice
-// (mail arriving 30s later vs 3s later makes no real difference) while
-// running the account toward rate limits over a full day of use. 30s
-// still feels instant in normal use. Easy to change — just POLL_MS below.
-//
-// First-ever run backfills the last 12 months (Inbox, then Sent) a page
-// at a time across multiple ticks so it doesn't try to pull a year of
-// mail in one go. After that it's steady-state: every tick checks the
-// newest ~20 Inbox + ~20 Sent messages and imports anything not already
-// known (de-duped on gmail_message_id). Once a day it also prunes
-// anything in the `emails` table older than 12 months.
+// The actual sync work now lives in a single shared scheduled edge
+// function (supabase/functions/gmail-sync-cron), running once on a
+// schedule no matter how many people are logged in. This context is now
+// just a thin, cheap status reader: it reads the `settings` row once on
+// mount, then listens for changes via Realtime (push-based — only
+// transmits when something actually changes, not on a timer) so the
+// Email page's "Synced Xs ago" indicator stays live without polling.
+// "Sync now" just invokes the edge function directly instead of
+// duplicating its logic in the browser.
 // ──────────────────────────────────────────────────────────────────────
-
-const POLL_MS = 30000
-const RETENTION_DAYS = 365
-const BACKFILL_MONTHS = 12
 
 const GmailSyncContext = createContext(null)
 export function useGmailSync() { return useContext(GmailSyncContext) }
-
-function monthsAgoGmailDate(months) {
-  const d = new Date()
-  d.setMonth(d.getMonth() - months)
-  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
-}
 
 export function GmailSyncProvider({ children }) {
   const [lastSyncAt, setLastSyncAt] = useState(null)
   const [syncing, setSyncing] = useState(false)
   const [lastError, setLastError] = useState(null)
-  const runningRef = useRef(false)
-  const timerRef = useRef(null)
 
-  async function filterUnknownIds(ids) {
-    if (!ids.length) return []
-    const { data } = await supabase.from('emails').select('gmail_message_id').in('gmail_message_id', ids)
-    const known = new Set((data || []).map(r => r.gmail_message_id))
-    return ids.filter(id => !known.has(id))
-  }
+  useEffect(() => {
+    let cancelled = false
 
-  async function importIds(ids, clients) {
-    for (const id of ids) {
-      try {
-        const parsed = await getAndParseGmailMessage(supabase, id, clients)
-        if (parsed) {
-          // filterUnknownIds already removed anything we have — plain insert is safe.
-          // If a race condition produces a duplicate the error is caught and skipped.
-          await supabase.from('emails').insert([parsed])
-
-          // Auto-log every email (inbound and outbound) to the client's activity history
-          if (parsed.clientName && parsed.clientName !== parsed.recipient) {
-            const direction = parsed.triage === 'Sent' ? 'Sent' : 'Received'
-            const preview = (parsed.body || '').slice(0, 120).replace(/\n/g, ' ').trim()
-            const noteContent = `📧 Email ${direction} — "${parsed.subject}"${preview ? `\n${preview}${parsed.body?.length > 120 ? '…' : ''}` : ''}`
-            await supabase.from('client_notes').insert({
-              client_name: parsed.clientName,
-              content: noteContent,
-              note_type: 'Email',
-              created_by: direction === 'Sent' ? 'Tax Case Review' : parsed.clientName,
-              created_at: parsed.created_at || new Date().toISOString(),
-            })
-          }
-        }
-      } catch (e) {
-        console.error('Gmail import error for', id, e)
-      }
+    async function loadInitial() {
+      const { data } = await supabase.from('settings')
+        .select('id, gmail_last_sync_at, gmail_last_error')
+        .limit(1).maybeSingle()
+      if (cancelled || !data) return
+      if (data.gmail_last_sync_at) setLastSyncAt(new Date(data.gmail_last_sync_at))
+      if (data.gmail_last_error) setLastError(data.gmail_last_error)
     }
-  }
+    loadInitial()
 
-  async function runBackfillStep(settings, clients) {
-    const phase = settings.gmail_backfill_phase || 'inbox'
-    if (phase === 'done') return false
+    // Push-based update instead of polling — only fires when the cron
+    // function actually finishes a sync and writes the new timestamp.
+    const ch = supabase.channel('gmail-sync-status')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings' }, ({ new: row }) => {
+        if (row.gmail_last_sync_at) setLastSyncAt(new Date(row.gmail_last_sync_at))
+        setLastError(row.gmail_last_error || null)
+      })
+      .subscribe()
 
-    const label = phase === 'inbox' ? 'INBOX' : 'SENT'
-    const { ids, nextPageToken } = await listGmailMessages(supabase, {
-      labelIds: label,
-      query: `after:${monthsAgoGmailDate(BACKFILL_MONTHS)}`,
-      pageToken: settings.gmail_backfill_page_token || undefined,
-      maxResults: 25,
-    })
-    const newIds = await filterUnknownIds(ids)
-    await importIds(newIds, clients)
+    return () => { cancelled = true; supabase.removeChannel(ch) }
+  }, [])
 
-    if (nextPageToken) {
-      await supabase.from('settings').update({ gmail_backfill_page_token: nextPageToken }).eq('id', settings.id)
-    } else if (phase === 'inbox') {
-      // Inbox done, move on to Sent.
-      await supabase.from('settings').update({ gmail_backfill_phase: 'sent', gmail_backfill_page_token: null }).eq('id', settings.id)
-    } else {
-      // Sent done too — backfill complete, switch to steady-state.
-      await supabase.from('settings').update({
-        gmail_backfill_phase: 'done', gmail_backfill_page_token: null, gmail_last_sync_at: new Date().toISOString(),
-      }).eq('id', settings.id)
-    }
-    return true
-  }
-
-  async function runSteadyStateStep(settings, clients) {
-    for (const label of ['INBOX', 'SENT']) {
-      const { ids } = await listGmailMessages(supabase, { labelIds: label, maxResults: 20 })
-      const newIds = await filterUnknownIds(ids)
-      await importIds(newIds.slice(0, 15), clients) // gentle cap per tick per label
-    }
-    await supabase.from('settings').update({ gmail_last_sync_at: new Date().toISOString() }).eq('id', settings.id)
-  }
-
-  async function maybeRunRetentionCleanup(settings) {
-    const last = settings.gmail_last_cleanup_at ? new Date(settings.gmail_last_cleanup_at).getTime() : 0
-    if (Date.now() - last < 24 * 60 * 60 * 1000) return
-    const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString()
-    await supabase.from('emails').delete().lt('created_at', cutoff)
-    await supabase.from('settings').update({ gmail_last_cleanup_at: new Date().toISOString() }).eq('id', settings.id)
-  }
-
-  async function tick() {
-    if (runningRef.current) return
-    runningRef.current = true
+  // Manual "Sync now" — invokes the shared edge function directly instead
+  // of running the sync logic in this browser tab.
+  async function syncNow() {
     setSyncing(true)
     try {
-      const { data: settings } = await supabase.from('settings')
-        .select('id, gmail_refresh_token, gmail_backfill_phase, gmail_backfill_page_token, gmail_last_sync_at, gmail_last_cleanup_at')
-        .limit(1).maybeSingle()
-
-      if (!settings?.gmail_refresh_token) { setSyncing(false); runningRef.current = false; return } // not connected, nothing to do
-
-      const { data: clients } = await supabase.from('clients').select('id,name,email')
-
-      if ((settings.gmail_backfill_phase || 'inbox') !== 'done') {
-        await runBackfillStep(settings, clients || [])
-      } else {
-        await runSteadyStateStep(settings, clients || [])
-        await maybeRunRetentionCleanup(settings)
-      }
-      setLastSyncAt(new Date())
-      setLastError(null)
+      const { error } = await supabase.functions.invoke('gmail-sync-cron')
+      if (error) setLastError(error.message || String(error))
     } catch (e) {
-      console.error('Gmail sync error:', e)
       setLastError(e.message || String(e))
     } finally {
       setSyncing(false)
-      runningRef.current = false
     }
   }
 
-  useEffect(() => {
-    tick() // run immediately on load, then every POLL_MS
-    timerRef.current = setInterval(tick, POLL_MS)
-    return () => clearInterval(timerRef.current)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   return (
-    <GmailSyncContext.Provider value={{ lastSyncAt, syncing, lastError, syncNow: tick }}>
+    <GmailSyncContext.Provider value={{ lastSyncAt, syncing, lastError, syncNow }}>
       {children}
     </GmailSyncContext.Provider>
   )
