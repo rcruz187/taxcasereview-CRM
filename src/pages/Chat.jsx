@@ -63,7 +63,8 @@ function Avatar({ name, size = 36, color, avatarUrl }) {
 }
 
 export default function Chat() {
-  const { user } = useApp()
+  const { user, role } = useApp()
+  const canManageChannels = ['Super Admin','Admin'].includes(role)
   const [active, setActive]       = useState(CHANNELS[0])
   const [messages, setMessages]   = useState([])
   const [input, setInput]         = useState('')
@@ -98,6 +99,22 @@ export default function Chat() {
   const [repMenu, setRepMenu]   = useState(null)   // { rep, x, y } — right-click context menu
   const [repPrefs, setRepPrefs] = useState({})     // { repName: { hidden, vip } } — per-viewer
   const [threadPanel, setThreadPanel] = useState(null) // parent message shown in thread side panel
+  const [chanMenu, setChanMenu] = useState(null)   // { conv, convType, x, y } — channel/DM context menu
+  const [convPrefs, setConvPrefs] = useState({})   // { convId: { starred, muted, section } } — per-viewer
+  const [detailsPanel, setDetailsPanel] = useState(null) // { conv, convType } — shows Conversation/Channel details
+  const [searchInConv, setSearchInConv] = useState(false)
+  const [searchInConvQuery, setSearchInConvQuery] = useState('')
+  function promptMoveToSection(convId, convType) {
+    const section = window.prompt('Move to which section? (leave blank to remove from any custom section)')
+    if (section === null) return
+    const current = convPrefs[convId] || { starred: false, muted: false, section: null }
+    const next = { ...current, section: section.trim() || null }
+    setConvPrefs(p => ({ ...p, [convId]: next }))
+    supabase.from('chat_conv_prefs').upsert(
+      { viewer_name: myName, conv_id: convId, conv_type: convType, starred: next.starred, muted: next.muted, section: next.section },
+      { onConflict: 'viewer_name,conv_id' }
+    )
+  }
   const [searchQ, setSearchQ]   = useState('')
   const [showSearch, setShowSearch] = useState(false)
   const [TEAM, setTEAM] = useState([])
@@ -171,6 +188,41 @@ export default function Chat() {
     window.addEventListener('click', close)
     return () => window.removeEventListener('click', close)
   }, [repMenu])
+
+  // ── per-viewer conversation prefs (star / mute / section) ──
+  useEffect(() => {
+    if (!myName) return
+    supabase.from('chat_conv_prefs').select('conv_id, starred, muted, section').eq('viewer_name', myName)
+      .then(({ data }) => {
+        if (!data) return
+        const map = {}
+        data.forEach(r => { map[r.conv_id] = { starred: r.starred, muted: r.muted, section: r.section } })
+        setConvPrefs(map)
+      })
+  }, [myName])
+
+  async function toggleConvPref(convId, convType, key) {
+    const current = convPrefs[convId] || { starred: false, muted: false, section: null }
+    const next = { ...current, [key]: !current[key] }
+    setConvPrefs(p => ({ ...p, [convId]: next }))
+    await supabase.from('chat_conv_prefs').upsert(
+      { viewer_name: myName, conv_id: convId, conv_type: convType, starred: next.starred, muted: next.muted, section: next.section },
+      { onConflict: 'viewer_name,conv_id' }
+    )
+    setChanMenu(null)
+  }
+
+  function openChanMenu(e, conv, convType) {
+    e.preventDefault()
+    setChanMenu({ conv, convType, x: e.clientX, y: e.clientY })
+  }
+
+  useEffect(() => {
+    if (!chanMenu) return
+    const close = () => setChanMenu(null)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [chanMenu])
 
   const loadMessages = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -336,6 +388,7 @@ export default function Chat() {
   }, [])
 
   function addChannel() {
+    if (!canManageChannels) return
     const name = newChanName.trim().toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
     if (!name) return
     setExtraChans(c => [...c, { id: 'ch_'+name, label: name, desc: '' }])
@@ -487,9 +540,11 @@ export default function Chat() {
         <div style={{ marginTop: 8, flexShrink: 0 }}>
           <div style={s.sectionHeader}>
             <span>Channels</span>
-            <span onClick={() => setShowNewChan(v => !v)} style={{ fontSize: 17, cursor: 'pointer', color: 'var(--t3)', lineHeight: 1, padding: '0 2px' }} title="Add channel">+</span>
+            {canManageChannels && (
+              <span onClick={() => setShowNewChan(v => !v)} style={{ fontSize: 17, cursor: 'pointer', color: 'var(--t3)', lineHeight: 1, padding: '0 2px' }} title="Add channel">+</span>
+            )}
           </div>
-          {showNewChan && (
+          {showNewChan && canManageChannels && (
             <div style={{ display: 'flex', gap: 4, padding: '4px 10px 4px' }}>
               <input value={newChanName} onChange={e => setNewChanName(e.target.value)}
                 onKeyDown={e => e.key==='Enter' && addChannel()}
@@ -499,12 +554,16 @@ export default function Chat() {
           )}
           {allChannels.map(ch => {
             const isAct = active.id === ch.id
+            const isMuted = convPrefs[ch.id]?.muted
+            const isStarred = convPrefs[ch.id]?.starred
             return (
-              <div key={ch.id} onClick={() => switchTo(ch)} style={s.chanRow(isAct)}
+              <div key={ch.id} onClick={() => switchTo(ch)} onContextMenu={e => openChanMenu(e, ch, 'channel')} style={s.chanRow(isAct)}
                 onMouseEnter={e => { if (!isAct) e.currentTarget.style.background = 'var(--s2)' }}
                 onMouseLeave={e => { if (!isAct) e.currentTarget.style.background = 'transparent' }}>
                 <span style={{ fontSize: 16, color: isAct ? '#93c5fd' : 'var(--t3)', lineHeight: 1 }}>#</span>
-                <span style={{ flex: 1 }}>{ch.label}</span>
+                <span style={{ flex: 1, opacity: isMuted ? 0.5 : 1 }}>{ch.label}</span>
+                {isStarred && <span style={{ fontSize: 11, color: '#f59e0b' }}>★</span>}
+                {isMuted && <span style={{ fontSize: 11, color: 'var(--t3)' }}>🔕</span>}
               </div>
             )
           })}
@@ -833,30 +892,120 @@ export default function Chat() {
 
       {/* Right-click context menu on a rep — visible to all employees, same as Slack's per-user Hide/VIP */}
       {repMenu && (
-        <div onClick={e => e.stopPropagation()} style={{
-          position: 'fixed', top: repMenu.y, left: repMenu.x, zIndex: 2000,
-          background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 10,
-          boxShadow: '0 12px 32px rgba(0,0,0,.5)', minWidth: 200, overflow: 'hidden', padding: '6px 0',
-        }}>
-          <div style={{ padding: '8px 14px', fontSize: 12, fontWeight: 700, color: 'var(--t3)', borderBottom: '1px solid var(--br)' }}>{repMenu.rep.name}</div>
-          <div onClick={() => { switchTo(repMenu.rep); setRepMenu(null) }} style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', color: 'var(--tx)' }}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--s3)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-            💬 Open conversation
-          </div>
-          <div onClick={() => toggleRepPref(repMenu.rep.name, 'vip')} style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', color: 'var(--tx)' }}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--s3)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+        <ContextMenu pos={repMenu}>
+          <MenuHeader>{repMenu.rep.name}</MenuHeader>
+          <MenuItem onClick={() => { setDetailsPanel({ conv: repMenu.rep, convType: 'dm' }); setRepMenu(null) }}>Conversation details</MenuItem>
+          <MenuItem onClick={() => { navigator.clipboard.writeText(repMenu.rep.name); setRepMenu(null); showToast('Copied') }}>Copy name</MenuItem>
+          <MenuItem onClick={() => toggleConvPref(repMenu.rep.id, 'dm', 'starred')}>
+            {convPrefs[repMenu.rep.id]?.starred ? '★ Unstar conversation' : '☆ Star conversation'}
+          </MenuItem>
+          <MenuItem onClick={() => { setRepMenu(null); promptMoveToSection(repMenu.rep.id, 'dm') }}>Move to new section</MenuItem>
+          <MenuDivider/>
+          <MenuItem disabled title="Coming soon">Summarize conversation</MenuItem>
+          <MenuDivider/>
+          <MenuItem onClick={() => toggleRepPref(repMenu.rep.name, 'vip')}>
             {repPrefs[repMenu.rep.name]?.vip ? '★ Remove from VIP' : '☆ Add to VIP'}
-          </div>
-          <div style={{ height: 1, background: 'var(--br)', margin: '4px 0' }}/>
-          <div onClick={() => toggleRepPref(repMenu.rep.name, 'hidden')} style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', color: '#f87171' }}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--s3)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-            Hide {repMenu.rep.name}
+          </MenuItem>
+          <MenuItem onClick={() => toggleConvPref(repMenu.rep.id, 'dm', 'muted')}>
+            {convPrefs[repMenu.rep.id]?.muted ? '🔔 Unmute' : '🔕 Mute'}
+          </MenuItem>
+          <MenuItem danger onClick={() => toggleRepPref(repMenu.rep.name, 'hidden')}>Hide {repMenu.rep.name}</MenuItem>
+        </ContextMenu>
+      )}
+
+      {chanMenu && (
+        <ContextMenu pos={chanMenu}>
+          <MenuHeader>#{chanMenu.conv.label}</MenuHeader>
+          <MenuItem onClick={() => { setDetailsPanel({ conv: chanMenu.conv, convType: 'channel' }); setChanMenu(null) }}>Channel details</MenuItem>
+          <MenuItem onClick={() => { navigator.clipboard.writeText(chanMenu.conv.label); setChanMenu(null); showToast('Copied') }}>Copy channel name</MenuItem>
+          <MenuItem onClick={() => toggleConvPref(chanMenu.conv.id, 'channel', 'starred')}>
+            {convPrefs[chanMenu.conv.id]?.starred ? '★ Unstar channel' : '☆ Star channel'}
+          </MenuItem>
+          <MenuItem onClick={() => { setChanMenu(null); promptMoveToSection(chanMenu.conv.id, 'channel') }}>Move to new section</MenuItem>
+          <MenuDivider/>
+          <MenuItem disabled title="Coming soon">Summarize channel</MenuItem>
+          <MenuDivider/>
+          <MenuItem onClick={() => toggleConvPref(chanMenu.conv.id, 'channel', 'muted')}>
+            {convPrefs[chanMenu.conv.id]?.muted ? '🔔 Notify: All new posts' : '🔕 Mute and hide'}
+          </MenuItem>
+          {canManageChannels && !CHANNELS.find(c => c.id === chanMenu.conv.id) && (
+            <>
+              <MenuDivider/>
+              <MenuItem danger onClick={() => { setExtraChans(c => c.filter(ch => ch.id !== chanMenu.conv.id)); if (active.id === chanMenu.conv.id) switchTo(CHANNELS[0]); setChanMenu(null) }}>
+                Delete #{chanMenu.conv.label}
+              </MenuItem>
+            </>
+          )}
+        </ContextMenu>
+      )}
+
+      {detailsPanel && (
+        <DetailsPanel detailsPanel={detailsPanel} convPrefs={convPrefs} onClose={() => setDetailsPanel(null)}/>
+      )}
+    </div>
+  )
+}
+
+// ── Small shared context-menu building blocks ──
+function ContextMenu({ pos, children }) {
+  return (
+    <div onClick={e => e.stopPropagation()} style={{
+      position: 'fixed', top: pos.y, left: pos.x, zIndex: 2000,
+      background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 10,
+      boxShadow: '0 12px 32px rgba(0,0,0,.5)', minWidth: 220, overflow: 'hidden', padding: '6px 0',
+    }}>{children}</div>
+  )
+}
+function MenuHeader({ children }) {
+  return <div style={{ padding: '8px 14px', fontSize: 12, fontWeight: 700, color: 'var(--t3)', borderBottom: '1px solid var(--br)' }}>{children}</div>
+}
+function MenuItem({ onClick, danger, disabled, title, children }) {
+  return (
+    <div onClick={disabled ? undefined : onClick} title={title} style={{
+      padding: '8px 14px', fontSize: 13, cursor: disabled ? 'default' : 'pointer',
+      color: disabled ? 'var(--t3)' : danger ? '#f87171' : 'var(--tx)', opacity: disabled ? 0.6 : 1,
+    }}
+      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = 'var(--s3)' }}
+      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+      {children}
+    </div>
+  )
+}
+function MenuDivider() {
+  return <div style={{ height: 1, background: 'var(--br)', margin: '4px 0' }}/>
+}
+
+// ── Conversation/Channel details side panel ──
+function DetailsPanel({ detailsPanel, convPrefs, onClose }) {
+  const { conv, convType } = detailsPanel
+  const isChannel = convType === 'channel'
+  return (
+    <div onClick={e => e.stopPropagation()} style={{
+      position: 'fixed', top: 0, right: 0, bottom: 0, width: 320, background: 'var(--sf)',
+      borderLeft: '1px solid var(--br)', zIndex: 1500, boxShadow: '-8px 0 24px rgba(0,0,0,.4)',
+      display: 'flex', flexDirection: 'column', padding: '18px 20px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--tx)' }}>{isChannel ? 'Channel details' : 'Conversation details'}</span>
+        <span onClick={onClose} style={{ cursor: 'pointer', fontSize: 18, color: 'var(--t3)' }}>×</span>
+      </div>
+      {isChannel ? (
+        <>
+          <div style={{ fontSize: 22, marginBottom: 6 }}>#{conv.label}</div>
+          <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 16 }}>{conv.desc || 'No description set.'}</div>
+        </>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+          <Avatar name={conv.name} size={48} color={conv.color} avatarUrl={conv.avatarUrl}/>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--tx)' }}>{conv.name}</div>
+            <div style={{ fontSize: 12, color: 'var(--t3)' }}>{conv.role || 'Team member'}</div>
           </div>
         </div>
       )}
+      <div style={{ fontSize: 12, color: 'var(--t3)', borderTop: '1px solid var(--br)', paddingTop: 12 }}>
+        {convPrefs[conv.id]?.starred ? '★ Starred' : 'Not starred'} · {convPrefs[conv.id]?.muted ? '🔕 Muted' : '🔔 Notifications on'}
+      </div>
     </div>
   )
 }
