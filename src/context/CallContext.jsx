@@ -279,7 +279,7 @@ export function CallProvider({ children }) {
         setIncomingMatch(null)
         stopRing()
       }, 15000)
-    }, 2000)
+    }, 4000)
 
     return () => { cancelled = true; clearInterval(poll); stopRing() }
   }, [relayStatus, calling])
