@@ -2,6 +2,7 @@ import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import PayrollStatCards from '../components/PayrollStatCards'
+import { useApp } from '../context/AppContext'
 
 const BLANK = { employee:'', date:'', inTime:'', outTime:'', hours:'', notes:'' }
 
@@ -50,6 +51,9 @@ function elapsedStr(inTime, now) {
 }
 
 export default function TimeClock() {
+  const { role, employeeName } = useApp()
+  const isPrivileged = ['Super Admin','Admin','Manager'].includes(role)
+
   const [items,      setItems]      = useState([])
   const [employees,  setEmployees]  = useState([])
   const [modal,      setModal]      = useState(false)
@@ -102,7 +106,7 @@ export default function TimeClock() {
     const inTime = now2.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
     const date = now2.toISOString().slice(0, 10)
     const { data, error } = await supabase.from('timeentries').insert([{
-      employee: empName, date, inTime, outTime: null, hours: null, notes: null
+      employee: empName, date, inTime, outTime: null, hours: null, notes: null, method: 'CRM'
     }]).select().single()
     if (error) { showToast('Error: ' + error.message); return }
     setOpenEntries(prev => ({
@@ -201,6 +205,83 @@ export default function TimeClock() {
     const a = document.createElement('a')
     a.href = url; a.download = `timeclock-${today}.csv`; a.click()
     URL.revokeObjectURL(url)
+  }
+
+  // ── Self-service view for non-privileged employees ──
+  // Everyone can clock in/out right here in the CRM — no Employee Portal
+  // login required. Only their own status + recent punches are visible.
+  if (!isPrivileged) {
+    const myOpen = openEntries[employeeName] || []
+    const isClockedIn = myOpen.length > 0
+    const myEntries = items
+      .filter(t => (t.employee||'').trim().toLowerCase() === (employeeName||'').trim().toLowerCase())
+      .sort((a,b) => (b.date||'').localeCompare(a.date||'') || (b.created_at||'').localeCompare(a.created_at||''))
+      .slice(0, 15)
+
+    return (
+      <div style={{padding:'20px 24px',maxWidth:560,margin:'0 auto'}}>
+        {toast && <div className="toast show">{toast}</div>}
+
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+          <h2 style={{ fontSize:15, fontWeight:700, margin:0 }}>⏱️ Time Clock</h2>
+          <div style={{ fontSize:12, color:'var(--t3)', padding:'6px 10px', background:'var(--s2)', borderRadius:6, fontVariantNumeric:'tabular-nums' }}>
+            {now.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' })}
+          </div>
+        </div>
+
+        <div className="card" style={{ padding:'28px 20px', textAlign:'center', marginBottom:16 }}>
+          {isClockedIn ? (
+            <>
+              <div style={{ fontSize:13, color:'var(--ok)', marginBottom:6 }}>🟢 Clocked in since {fmt12(myOpen[myOpen.length-1].inTime)}</div>
+              <div style={{ fontSize:28, fontWeight:800, fontVariantNumeric:'tabular-nums', marginBottom:18 }}>
+                {elapsedStr(myOpen[myOpen.length-1].inTime, now)}
+              </div>
+              <button className="btn" style={{ background:'var(--bad)', color:'#fff', padding:'12px 32px', fontSize:14, fontWeight:700 }}
+                onClick={() => clockOut(employeeName)}>
+                ⏹ Clock Out
+              </button>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize:13, color:'var(--t3)', marginBottom:18 }}>Not clocked in</div>
+              <button className="btn" style={{ background:'var(--ok)', color:'#fff', padding:'12px 32px', fontSize:14, fontWeight:700 }}
+                onClick={() => clockIn(employeeName)}>
+                ▶ Clock In
+              </button>
+            </>
+          )}
+        </div>
+
+        <div className="card">
+          <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'.06em', color:'var(--t3)', padding:'12px 14px 8px' }}>
+            My Recent Punches
+          </div>
+          {myEntries.length === 0 ? (
+            <div style={{ padding:24, textAlign:'center', color:'var(--t3)', fontSize:13 }}>No punches on file yet.</div>
+          ) : (
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+              <thead>
+                <tr style={{ borderBottom:'1px solid var(--br)' }}>
+                  {['Date','Clock In','Clock Out','Hours'].map(h=>(
+                    <th key={h} style={{ textAlign:'left', padding:'6px 14px', color:'var(--t3)', fontWeight:600, fontSize:10, textTransform:'uppercase' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {myEntries.map(e => (
+                  <tr key={e.id} style={{ borderBottom:'1px solid var(--br)' }}>
+                    <td style={{ padding:'8px 14px' }}>{e.date}</td>
+                    <td style={{ padding:'8px 14px', color:'var(--ok)' }}>{fmt12(e.inTime)}</td>
+                    <td style={{ padding:'8px 14px', color:e.outTime?'var(--bad)':'var(--t3)' }}>{e.outTime?fmt12(e.outTime):'—'}</td>
+                    <td style={{ padding:'8px 14px', fontWeight:600 }}>{e.hours?`${e.hours}h`:'—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    )
   }
 
   return (

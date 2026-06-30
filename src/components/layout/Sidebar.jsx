@@ -74,7 +74,7 @@ const SECTIONS = [
     items: [
       { path: '/kiosk',     icon: KioskIcon,   label: 'Time Kiosk',    section: null },
       { path: '/employee',  icon: PortalIcon,  label: 'Employee Portal', section: null },
-      { path: '/timeclock',       icon: ClockIcon,    label: 'Time Clock',       section: 'timeclock' },
+      { path: '/timeclock',       icon: ClockIcon,    label: 'Time Clock',       section: null },
       { path: '/timeoff',         icon: TimeOffIcon,  label: 'Time Off',         badge: 'timeoff', section: 'timeoff' },
       { path: '/payroll',         icon: PayrollIcon,  label: 'Payroll',          section: 'payroll' },
       { path: '/activity-report', icon: ActivityIcon, label: 'Activity Report',  section: 'employees' },

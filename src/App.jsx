@@ -151,7 +151,7 @@ function Shell() {
             <Route path="/email"       element={<Guard section="email"><Email /></Guard>} />
             <Route path="/documents"   element={<Guard section="documents"><Documents /></Guard>} />
             <Route path="/esign"       element={<Guard section="esign"><Esign /></Guard>} />
-            <Route path="/timeclock"   element={<Guard section="timeclock"><TimeClock /></Guard>} />
+            <Route path="/timeclock"   element={<TimeClock />} />
             <Route path="/payroll"     element={<Guard section="payroll"><Payroll /></Guard>} />
             <Route path="/timeoff"     element={<Guard section="timeoff"><TimeOff /></Guard>} />
             <Route path="/employees"   element={<Guard section="employees"><Employees /></Guard>} />
