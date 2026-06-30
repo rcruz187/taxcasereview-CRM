@@ -679,6 +679,10 @@ function SafeHtmlEmail({ html }) {
   const ref = useRef(null)
   const [height, setHeight] = useState(200)
 
+  // Force every link to open in a real new tab instead of trying to
+  // navigate the sandboxed iframe itself (which the sandbox blocks).
+  const docWithBaseTarget = `<base target="_blank">${html || ''}`
+
   function resize() {
     const doc = ref.current?.contentDocument
     if (doc?.body) setHeight(doc.body.scrollHeight + 24)
@@ -688,8 +692,12 @@ function SafeHtmlEmail({ html }) {
     <div style={{ background: '#fff', border: '1px solid var(--br)', borderRadius: 10, overflow: 'hidden' }}>
       <iframe
         ref={ref}
-        srcDoc={html}
-        sandbox="allow-same-origin"
+        srcDoc={docWithBaseTarget}
+        // allow-same-origin: needed to read scrollHeight for auto-resize
+        // allow-popups + allow-popups-to-escape-sandbox: required for link
+        // clicks to actually open — without these, clicking any link inside
+        // a sandboxed iframe is silently swallowed by the browser.
+        sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         onLoad={resize}
         title="Email content"
         style={{ width: '100%', height, border: 'none', display: 'block' }}
