@@ -67,7 +67,7 @@ export default function Settings() {
   useEffect(() => { loadFirm(); loadLogo(); loadEmployees() }, [])
 
   async function loadEmployees() {
-    const { data } = await supabase.from('employees').select('id,name,email,role,status,created_at,avatar_url').order('created_at', { ascending: true })
+    const { data } = await supabase.from('employees').select('id,name,email,role,access,status,created_at,avatar_url').order('created_at', { ascending: true })
     if (data) setEmployees(data)
   }
 
@@ -861,7 +861,8 @@ export default function Settings() {
             {employees.length === 0
               ? <div style={{ color:'var(--t3)', fontSize:13, padding:'20px 0' }}>No employees found.</div>
               : employees.map(m => {
-                const roleColor = m.role === 'Super Admin' ? 'br' : m.role === 'Admin' ? 'bb' : m.role === 'Manager' ? 'bg' : 'bn'
+                const displayRole = m.access || m.role || 'Staff'
+                const roleColor = displayRole === 'Super Admin' ? 'br' : displayRole === 'Admin' ? 'bb' : displayRole === 'Manager' ? 'bg' : 'bn'
                 const isYou = m.email === user?.email
                 const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase()
                 const inactive = m.status && m.status !== 'Active'
@@ -878,7 +879,7 @@ export default function Settings() {
                       </div>
                       <div style={{ color:'var(--t2)', fontSize:12, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.email || '—'}</div>
                     </div>
-                    <span className={`bdg ${roleColor}`} style={{ fontSize:11, flexShrink:0 }}>{m.role || 'Staff'}</span>
+                    <span className={`bdg ${roleColor}`} style={{ fontSize:11, flexShrink:0 }}>{displayRole}</span>
                   </div>
                 )
               })
