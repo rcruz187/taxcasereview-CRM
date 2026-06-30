@@ -122,7 +122,7 @@ export default function Chat() {
 
   // ── fetch all employees for DM list ──
   useEffect(() => {
-    supabase.from('employees').select('id, name, role, avatar_url').order('name').then(({ data }) => {
+    supabase.from('employees').select('id, name, role, avatar_url, email').order('name').then(({ data }) => {
       if (!data) return
       setTEAM(data.map(e => ({
         id: 'dm_' + e.id,
@@ -131,6 +131,7 @@ export default function Chat() {
         role: e.role || '',
         color: colorFor(e.name),
         avatarUrl: e.avatar_url || null,
+        email: e.email || '',
       })))
     })
   }, [])
@@ -552,10 +553,10 @@ export default function Chat() {
       ) : active.id === 'drafts' ? (
         <DraftsView TEAM={TEAM} myName={myName} channels={allChannels} />
       ) : active.id === 'directories' ? (
-        <DirectoriesView TEAM={TEAM} myName={myName} onUpdated={() => {
-          supabase.from('employees').select('id, name, role, avatar_url').order('name').then(({ data }) => {
+        <DirectoriesView TEAM={TEAM} myName={myName} myEmail={user?.email} onUpdated={() => {
+          supabase.from('employees').select('id, name, role, avatar_url, email').order('name').then(({ data }) => {
             if (!data) return
-            setTEAM(data.map(e => ({ id: 'dm_' + e.id, empId: e.id, name: e.name, role: e.role || '', color: colorFor(e.name), avatarUrl: e.avatar_url || null })))
+            setTEAM(data.map(e => ({ id: 'dm_' + e.id, empId: e.id, name: e.name, role: e.role || '', color: colorFor(e.name), avatarUrl: e.avatar_url || null, email: e.email || '' })))
           })
         }} />
       ) : (
@@ -1023,21 +1024,32 @@ function DraftsView({ TEAM, myName, channels }) {
 }
 
 // ── Directories View — every employee, with self-serve photo upload ──
-function DirectoriesView({ TEAM, myName, onUpdated }) {
+function DirectoriesView({ TEAM, myName, myEmail, onUpdated }) {
   const [search, setSearch] = useState('')
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef()
-  const me = TEAM.find(t => t.name === myName)
+  // Match by email first (reliable — comes straight from auth), fall back
+  // to name match (works if metadata name happens to line up), then to no
+  // match at all — in which case we still show an upload card below using
+  // whatever empId we can find, so the button is never just silently gone.
+  const me = TEAM.find(t => myEmail && t.email && t.email.toLowerCase() === myEmail.toLowerCase())
+    || TEAM.find(t => t.name === myName)
+
+  // selfPick lets someone manually claim their own card if auto-match
+  // (by email or name) didn't find them — covers cases where the employee
+  // record's email differs slightly from the login email.
+  const [selfPick, setSelfPick] = useState(null)
+  const effectiveMe = me || selfPick
 
   async function uploadMyPhoto(e) {
     const file = e.target.files?.[0]
-    if (!file || !me?.empId) return
+    if (!file || !effectiveMe?.empId) return
     setUploading(true)
-    const path = `${me.empId}-${Date.now()}-${file.name}`
+    const path = `${effectiveMe.empId}-${Date.now()}-${file.name}`
     const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
     if (!error) {
       const { data } = supabase.storage.from('avatars').getPublicUrl(path)
-      await supabase.from('employees').update({ avatar_url: data.publicUrl }).eq('id', me.empId)
+      await supabase.from('employees').update({ avatar_url: data.publicUrl }).eq('id', effectiveMe.empId)
       onUpdated()
     }
     setUploading(false)
@@ -1050,17 +1062,26 @@ function DirectoriesView({ TEAM, myName, onUpdated }) {
       <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--tx)', marginBottom: 4 }}>Directories</h2>
       <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 16 }}>Everyone at the firm. Upload your own photo below — it'll show across Chat, Huddles, and Threads.</div>
 
-      {me && (
+      {effectiveMe ? (
         <div className="card" style={{ padding: '14px 16px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 14 }}>
-          <Avatar name={me.name} size={48} avatarUrl={me.avatarUrl}/>
+          <Avatar name={effectiveMe.name} size={48} avatarUrl={effectiveMe.avatarUrl}/>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--tx)' }}>{me.name}</div>
-            <div style={{ fontSize: 12, color: 'var(--t3)' }}>{me.role || 'Team member'}</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--tx)' }}>{effectiveMe.name}</div>
+            <div style={{ fontSize: 12, color: 'var(--t3)' }}>{effectiveMe.role || 'Team member'}</div>
           </div>
           <button className="btn sec" onClick={() => fileRef.current.click()} disabled={uploading} style={{ fontSize: 12 }}>
             {uploading ? 'Uploading…' : '📤 Upload my photo'}
           </button>
           <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={uploadMyPhoto}/>
+        </div>
+      ) : (
+        <div className="card" style={{ padding: '14px 16px', marginBottom: 20 }}>
+          <div style={{ fontSize: 13, color: 'var(--t2)', marginBottom: 10 }}>We couldn't automatically match your login to an employee record. Tap your name below to set up your photo:</div>
+          <select onChange={e => setSelfPick(TEAM.find(t => t.empId === e.target.value) || null)} defaultValue=""
+            style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--tx)', fontSize: 13 }}>
+            <option value="" disabled>Select your name…</option>
+            {TEAM.map(t => <option key={t.empId} value={t.empId}>{t.name}</option>)}
+          </select>
         </div>
       )}
 
