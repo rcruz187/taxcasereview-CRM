@@ -932,13 +932,28 @@ function StorageTab() {
     load()
 
     async function loadUsage() {
-      const { data } = await supabase
-        .from('usage_metrics')
-        .select('*')
-        .order('snapshot_date', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      setUsage(data || null)
+      // Real, self-contained usage tracking — computed from the CRM's own
+      // tables instead of Supabase's billing API. This is what makes it
+      // work for any future tenant in the multi-tenant SaaS build too:
+      // each firm's usage comes from their own rows, no external account
+      // access required, nothing that breaks if Supabase changes their API.
+      const now = new Date()
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+
+      const [{ count: callCount }, { count: smsCount }, { count: faxCount }, { count: emailCount }] = await Promise.all([
+        supabase.from('calllog').select('id', { count: 'exact', head: true }).gte('created_at', monthStart),
+        supabase.from('sms_messages').select('id', { count: 'exact', head: true }).gte('created_at', monthStart),
+        supabase.from('fax_logs').select('id', { count: 'exact', head: true }).gte('created_at', monthStart),
+        supabase.from('emails').select('id', { count: 'exact', head: true }).gte('created_at', monthStart),
+      ])
+
+      setUsage({
+        period: now.toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+        calls: callCount || 0,
+        sms: smsCount || 0,
+        faxes: faxCount || 0,
+        emails: emailCount || 0,
+      })
       setUsageLoading(false)
     }
     loadUsage()
@@ -980,37 +995,33 @@ function StorageTab() {
           project limits. */}
       {!usageLoading && (
         <div className="card">
-          <div className="card-header"><span className="card-title">📊 Supabase Usage Monitor</span></div>
+          <div className="card-header"><span className="card-title">📊 Activity This Month</span></div>
           <div style={{ padding: '0 20px 20px' }}>
             {!usage ? (
-              <div style={{ fontSize: 13, color: 'var(--t3)' }}>
-                No usage snapshot yet — the daily monitor hasn't run yet, or isn't deployed.
-              </div>
+              <div style={{ fontSize: 13, color: 'var(--t3)' }}>Couldn't load activity counts.</div>
             ) : (
               <>
-                {(() => {
-                  const egressPct = usage.cached_egress_gb != null && usage.egress_limit_gb
-                    ? Math.min(100, (usage.cached_egress_gb / usage.egress_limit_gb) * 100) : null
-                  const egressColor = egressPct > 80 ? 'var(--bad)' : egressPct > 60 ? 'var(--warn)' : 'var(--green)'
-                  return egressPct != null ? (
-                    <div style={{ marginBottom: 16 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-                        <span style={{ fontSize: 22, fontWeight: 900, color: egressColor }}>{usage.cached_egress_gb.toFixed(2)} GB</span>
-                        <span style={{ fontSize: 13, color: 'var(--t3)' }}>Cached Egress of {usage.egress_limit_gb} GB limit</span>
-                      </div>
-                      <div style={{ height: 10, background: 'var(--s2)', borderRadius: 99, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: egressPct + '%', background: egressColor, borderRadius: 99, transition: 'width .4s' }} />
-                      </div>
-                      {egressPct > 80 && (
-                        <div style={{ marginTop: 10, padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, fontSize: 13, color: 'var(--bad)' }}>
-                          ⚠️ Cached Egress is {egressPct.toFixed(0)}% of plan limit — check Supabase billing before this triggers overage charges.
-                        </div>
-                      )}
-                    </div>
-                  ) : null
-                })()}
-                <div style={{ fontSize: 11, color: 'var(--t3)' }}>
-                  Last updated: {new Date(usage.fetched_at).toLocaleString()}
+                <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 12 }}>{usage.period}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                  <div style={{ background: 'var(--s2)', borderRadius: 8, padding: '10px 12px' }}>
+                    <div style={{ fontSize: 20, fontWeight: 900 }}>{usage.calls}</div>
+                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>Calls</div>
+                  </div>
+                  <div style={{ background: 'var(--s2)', borderRadius: 8, padding: '10px 12px' }}>
+                    <div style={{ fontSize: 20, fontWeight: 900 }}>{usage.sms}</div>
+                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>Texts</div>
+                  </div>
+                  <div style={{ background: 'var(--s2)', borderRadius: 8, padding: '10px 12px' }}>
+                    <div style={{ fontSize: 20, fontWeight: 900 }}>{usage.faxes}</div>
+                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>Faxes</div>
+                  </div>
+                  <div style={{ background: 'var(--s2)', borderRadius: 8, padding: '10px 12px' }}>
+                    <div style={{ fontSize: 20, fontWeight: 900 }}>{usage.emails}</div>
+                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>Emails</div>
+                  </div>
+                </div>
+                <div style={{ marginTop: 12, fontSize: 11, color: 'var(--t3)' }}>
+                  This is activity volume, not a billing dollar figure — it's an early-warning signal: a sudden spike here (especially in calls) is usually what drives a Supabase usage overage, so a jump worth noticing shows up here first.
                 </div>
               </>
             )}
