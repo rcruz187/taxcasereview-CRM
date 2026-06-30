@@ -56,7 +56,8 @@ function findBodyPart(payload: any, mimeType: string): string | null {
   return null
 }
 function stripHtml(html: string) {
-  return html.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
+  const noStyle = html.replace(new RegExp('<style[^]*?<' + '/style>', 'gi'), '')
+  return noStyle.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
 }
 function findAttachments(payload: any, out: any[] = []) {
   if (!payload) return out
