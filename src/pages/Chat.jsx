@@ -44,8 +44,15 @@ function fmtDate(ts) {
   return d.toLocaleDateString([], { weekday:'long', month:'short', day:'numeric' })
 }
 
-function Avatar({ name, size = 36, color }) {
+function Avatar({ name, size = 36, color, avatarUrl }) {
   const bg = color || colorFor(name)
+  if (avatarUrl) {
+    return (
+      <div style={{ width: size, height: size, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: bg }}>
+        <img src={avatarUrl} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }}/>
+      </div>
+    )
+  }
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%', background: bg,
@@ -88,6 +95,9 @@ export default function Chat() {
   const [showNewChan, setShowNewChan] = useState(false)
   const [extraChans, setExtraChans]   = useState([])
   const [thread, setThread]     = useState(null)  // message being replied to
+  const [repMenu, setRepMenu]   = useState(null)   // { rep, x, y } — right-click context menu
+  const [repPrefs, setRepPrefs] = useState({})     // { repName: { hidden, vip } } — per-viewer
+  const [threadPanel, setThreadPanel] = useState(null) // parent message shown in thread side panel
   const [searchQ, setSearchQ]   = useState('')
   const [showSearch, setShowSearch] = useState(false)
   const [TEAM, setTEAM] = useState([])
@@ -112,16 +122,54 @@ export default function Chat() {
 
   // ── fetch all employees for DM list ──
   useEffect(() => {
-    supabase.from('employees').select('id, name, role').order('name').then(({ data }) => {
+    supabase.from('employees').select('id, name, role, avatar_url').order('name').then(({ data }) => {
       if (!data) return
       setTEAM(data.map(e => ({
         id: 'dm_' + e.id,
+        empId: e.id,
         name: e.name,
         role: e.role || '',
         color: colorFor(e.name),
+        avatarUrl: e.avatar_url || null,
       })))
     })
   }, [])
+
+  // ── per-viewer rep prefs (hidden / VIP) ──
+  useEffect(() => {
+    if (!myName) return
+    supabase.from('chat_rep_prefs').select('rep_name, hidden, vip').eq('viewer_name', myName)
+      .then(({ data }) => {
+        if (!data) return
+        const map = {}
+        data.forEach(r => { map[r.rep_name] = { hidden: r.hidden, vip: r.vip } })
+        setRepPrefs(map)
+      })
+  }, [myName])
+
+  async function toggleRepPref(repName, key) {
+    const current = repPrefs[repName] || { hidden: false, vip: false }
+    const next = { ...current, [key]: !current[key] }
+    setRepPrefs(p => ({ ...p, [repName]: next }))
+    await supabase.from('chat_rep_prefs').upsert(
+      { viewer_name: myName, rep_name: repName, hidden: next.hidden, vip: next.vip },
+      { onConflict: 'viewer_name,rep_name' }
+    )
+    setRepMenu(null)
+  }
+
+  function openRepMenu(e, rep) {
+    e.preventDefault()
+    setRepMenu({ rep, x: e.clientX, y: e.clientY })
+  }
+
+  // Close context menu on any outside click
+  useEffect(() => {
+    if (!repMenu) return
+    const close = () => setRepMenu(null)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [repMenu])
 
   const loadMessages = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -410,6 +458,30 @@ export default function Chat() {
           )}
         </div>
 
+        {/* Quick nav — Threads / Huddles / Drafts / Directories */}
+        <div style={{ padding: '4px 6px', flexShrink: 0 }}>
+          {[
+            { id: 'threads',     label: 'Threads',      icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 12h6M9 16h4"/></svg> },
+            { id: 'huddles',     label: 'Huddles',       icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 14a8 8 0 0116 0v1a3 3 0 01-3 3h-1v-5h4M3 14v1a3 3 0 003 3h1v-5H3"/></svg> },
+            { id: 'drafts',      label: 'Drafts & sent', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8l9 6 9-6M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg> },
+            { id: 'directories', label: 'Directories',   icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2M16 3.13a4 4 0 010 7.75M21 21v-2a4 4 0 00-3-3.85"/></svg> },
+          ].map(item => {
+            const isAct = active.id === item.id
+            return (
+              <div key={item.id} onClick={() => switchTo({ id: item.id, name: item.label })} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 6, cursor: 'pointer',
+                color: isAct ? '#fff' : 'var(--t2)', background: isAct ? 'var(--blue)' : 'transparent', fontSize: 13, fontWeight: 600,
+              }}
+                onMouseEnter={e => { if (!isAct) e.currentTarget.style.background = 'var(--s2)' }}
+                onMouseLeave={e => { if (!isAct) e.currentTarget.style.background = 'transparent' }}>
+                {item.icon}{item.label}
+              </div>
+            )
+          })}
+        </div>
+
+        <div style={{ height: 1, background: 'var(--s2)', margin: '6px 0', flexShrink: 0 }}/>
+
         {/* Channels */}
         <div style={{ marginTop: 8, flexShrink: 0 }}>
           <div style={s.sectionHeader}>
@@ -444,17 +516,26 @@ export default function Chat() {
           <div style={s.sectionHeader}>
             <span>Direct Messages</span>
           </div>
-          {TEAM.map(dm => {
+          {TEAM
+            .filter(dm => !repPrefs[dm.name]?.hidden)
+            .sort((a, b) => {
+              const aVip = repPrefs[a.name]?.vip ? 1 : 0
+              const bVip = repPrefs[b.name]?.vip ? 1 : 0
+              return bVip - aVip
+            })
+            .map(dm => {
             const isAct = active.id === dm.id
+            const isVip = repPrefs[dm.name]?.vip
             return (
-              <div key={dm.id} onClick={() => switchTo(dm)} style={{ ...s.chanRow(isAct), gap: 10 }}
+              <div key={dm.id} onClick={() => switchTo(dm)} onContextMenu={e => openRepMenu(e, dm)} style={{ ...s.chanRow(isAct), gap: 10 }}
                 onMouseEnter={e => { if (!isAct) e.currentTarget.style.background = 'var(--s2)' }}
                 onMouseLeave={e => { if (!isAct) e.currentTarget.style.background = 'transparent' }}>
                 <div style={{ position: 'relative', flexShrink: 0 }}>
-                  <Avatar name={dm.name} size={26} color={dm.color}/>
+                  <Avatar name={dm.name} size={26} color={dm.color} avatarUrl={dm.avatarUrl}/>
                   <span style={{ position: 'absolute', bottom: -1, right: -1, width: 8, height: 8, borderRadius: '50%', background: '#22c55e', border: '2px solid #0d1526' }}/>
                 </div>
-                <span style={{ fontSize: 14 }}>{dm.name}</span>
+                <span style={{ fontSize: 14, flex: 1 }}>{dm.name}</span>
+                {isVip && <span style={{ fontSize: 11, color: '#f59e0b' }} title="VIP">★</span>}
               </div>
             )
           })}
@@ -464,6 +545,21 @@ export default function Chat() {
       {/* ── MAIN AREA ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: 'var(--sf)' }}>
 
+      {active.id === 'threads' ? (
+        <ThreadsView TEAM={TEAM} myName={myName} switchToThread={setThreadPanel} />
+      ) : active.id === 'huddles' ? (
+        <HuddlesView TEAM={TEAM} />
+      ) : active.id === 'drafts' ? (
+        <DraftsView TEAM={TEAM} myName={myName} channels={allChannels} />
+      ) : active.id === 'directories' ? (
+        <DirectoriesView TEAM={TEAM} myName={myName} onUpdated={() => {
+          supabase.from('employees').select('id, name, role, avatar_url').order('name').then(({ data }) => {
+            if (!data) return
+            setTEAM(data.map(e => ({ id: 'dm_' + e.id, empId: e.id, name: e.name, role: e.role || '', color: colorFor(e.name), avatarUrl: e.avatar_url || null })))
+          })
+        }} />
+      ) : (
+      <>
         {/* Huddle banner */}
         {huddle && (
           <div>
@@ -620,7 +716,7 @@ export default function Chat() {
                   )}
 
                   {/* Avatar */}
-                  {!cont && <Avatar name={item.sender} size={36}/>}
+                  {!cont && <Avatar name={item.sender} size={36} avatarUrl={TEAM.find(t => t.name === item.sender)?.avatarUrl}/>}
 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {!cont && (
@@ -729,9 +825,257 @@ export default function Chat() {
           </div>
           <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 5, paddingLeft: 4 }}>Enter to send · Shift+Enter for new line · 📎 to attach</div>
         </div>
+      </>
+      )}
       </div>
       </div>
+
+      {/* Right-click context menu on a rep — visible to all employees, same as Slack's per-user Hide/VIP */}
+      {repMenu && (
+        <div onClick={e => e.stopPropagation()} style={{
+          position: 'fixed', top: repMenu.y, left: repMenu.x, zIndex: 2000,
+          background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 10,
+          boxShadow: '0 12px 32px rgba(0,0,0,.5)', minWidth: 200, overflow: 'hidden', padding: '6px 0',
+        }}>
+          <div style={{ padding: '8px 14px', fontSize: 12, fontWeight: 700, color: 'var(--t3)', borderBottom: '1px solid var(--br)' }}>{repMenu.rep.name}</div>
+          <div onClick={() => { switchTo(repMenu.rep); setRepMenu(null) }} style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', color: 'var(--tx)' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--s3)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            💬 Open conversation
+          </div>
+          <div onClick={() => toggleRepPref(repMenu.rep.name, 'vip')} style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', color: 'var(--tx)' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--s3)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            {repPrefs[repMenu.rep.name]?.vip ? '★ Remove from VIP' : '☆ Add to VIP'}
+          </div>
+          <div style={{ height: 1, background: 'var(--br)', margin: '4px 0' }}/>
+          <div onClick={() => toggleRepPref(repMenu.rep.name, 'hidden')} style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', color: '#f87171' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--s3)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            Hide {repMenu.rep.name}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
+
+// ── Threads View — every message in the workspace that has replies ──
+function ThreadsView({ TEAM, myName }) {
+  const [parents, setParents] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setLoading(true)
+      const { data: all } = await supabase.from('chat_messages').select('*').order('created_at', { ascending: false }).limit(500)
+      if (cancelled || !all) { setLoading(false); return }
+      const repliesByParent = {}
+      all.forEach(m => { if (m.reply_to) { (repliesByParent[m.reply_to] = repliesByParent[m.reply_to] || []).push(m) } })
+      const parentIds = Object.keys(repliesByParent)
+      const parentMsgs = all.filter(m => parentIds.includes(String(m.id)))
+        .map(m => ({ ...m, replies: repliesByParent[m.id].sort((a,b) => new Date(a.created_at) - new Date(b.created_at)) }))
+        .sort((a, b) => new Date(b.replies[b.replies.length-1].created_at) - new Date(a.replies[a.replies.length-1].created_at))
+      setParents(parentMsgs)
+      setLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', maxWidth: 720, margin: '0 auto', width: '100%' }}>
+      <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--tx)', marginBottom: 4 }}>Threads</h2>
+      <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 20 }}>Every conversation with replies, across all channels and DMs.</div>
+      {loading ? (
+        <div style={{ color: 'var(--t3)', fontSize: 13 }}>Loading…</div>
+      ) : parents.length === 0 ? (
+        <div style={{ color: 'var(--t3)', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>No threads yet. Hover a message and click Reply to start one.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {parents.map(p => (
+            <div key={p.id} className="card" style={{ padding: '14px 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
+                <Avatar name={p.sender} size={24} avatarUrl={TEAM.find(t => t.name === p.sender)?.avatarUrl}/>
+                <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)' }}>{p.sender}</span>
+                <span style={{ fontSize: 11, color: 'var(--t3)' }}>{fmtDate(p.created_at)} · {fmtTime(p.created_at)}</span>
+              </div>
+              <div style={{ fontSize: 14, color: 'var(--tx)', marginBottom: 8, paddingLeft: 32 }}>{p.text}</div>
+              <div style={{ fontSize: 12, color: 'var(--t3)', paddingLeft: 32 }}>
+                💬 {p.replies.length} repl{p.replies.length === 1 ? 'y' : 'ies'} — last by <strong style={{ color: 'var(--t2)' }}>{p.replies[p.replies.length-1].sender}</strong>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Huddles View — call history log ──
+function HuddlesView({ TEAM }) {
+  const [huddles, setHuddles] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setLoading(true)
+      // Huddle starts are logged as chat_messages with a huddle_id and the
+      // "started a Huddle" text — group by huddle_id to build a session log.
+      const { data } = await supabase.from('chat_messages').select('*').not('huddle_id', 'is', null).order('created_at', { ascending: false }).limit(300)
+      if (cancelled || !data) { setLoading(false); return }
+      const byId = {}
+      data.forEach(m => {
+        if (!byId[m.huddle_id]) byId[m.huddle_id] = { id: m.huddle_id, started_at: m.created_at, starter: null, participants: new Set() }
+        const entry = byId[m.huddle_id]
+        if (new Date(m.created_at) < new Date(entry.started_at)) entry.started_at = m.created_at
+        const name = m.text?.match(/^📞 (.+?) (started|invited)/)?.[1]
+        if (name) {
+          if (m.text.includes('started')) entry.starter = name
+          entry.participants.add(name)
+        }
+      })
+      const list = Object.values(byId).map(h => ({ ...h, participants: Array.from(h.participants) }))
+        .sort((a, b) => new Date(b.started_at) - new Date(a.started_at))
+      setHuddles(list)
+      setLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', maxWidth: 720, margin: '0 auto', width: '100%' }}>
+      <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--tx)', marginBottom: 4 }}>Huddles</h2>
+      <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 20 }}>Recent huddle calls across the workspace.</div>
+      {loading ? (
+        <div style={{ color: 'var(--t3)', fontSize: 13 }}>Loading…</div>
+      ) : huddles.length === 0 ? (
+        <div style={{ color: 'var(--t3)', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>No huddles yet. Click "Start Huddle" in the sidebar to begin one.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {huddles.map(h => (
+            <div key={h.id} className="card" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 14a8 8 0 0116 0v1a3 3 0 01-3 3h-1v-5h4M3 14v1a3 3 0 003 3h1v-5H3"/></svg>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--tx)' }}>{h.starter || 'Huddle'}</div>
+                <div style={{ fontSize: 12, color: 'var(--t3)' }}>{fmtDate(h.started_at)} · {fmtTime(h.started_at)}</div>
+              </div>
+              <div style={{ display: 'flex', gap: -6 }}>
+                {h.participants.slice(0, 4).map(n => (
+                  <Avatar key={n} name={n} size={22} avatarUrl={TEAM.find(t => t.name === n)?.avatarUrl}/>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Drafts & Sent View — composed messages this employee has sent, keyed by them ──
+function DraftsView({ TEAM, myName, channels }) {
+  const [sent, setSent] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setLoading(true)
+      const { data } = await supabase.from('chat_messages').select('*').eq('sender', myName).order('created_at', { ascending: false }).limit(200)
+      if (!cancelled) setSent(data || [])
+      setLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [myName])
+
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', maxWidth: 720, margin: '0 auto', width: '100%' }}>
+      <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--tx)', marginBottom: 4 }}>Drafts & sent</h2>
+      <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 20 }}>Every message you've sent, most recent first.</div>
+      {loading ? (
+        <div style={{ color: 'var(--t3)', fontSize: 13 }}>Loading…</div>
+      ) : sent.length === 0 ? (
+        <div style={{ color: 'var(--t3)', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>Nothing sent yet.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {sent.map(m => {
+            const chan = channels.find(c => c.id === m.channel)
+            return (
+              <div key={m.id} className="card" style={{ padding: '12px 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--blue)' }}>{chan ? '#'+chan.label : m.channel}</span>
+                  <span style={{ fontSize: 11, color: 'var(--t3)' }}>{fmtDate(m.created_at)} · {fmtTime(m.created_at)}</span>
+                </div>
+                {m.text && <div style={{ fontSize: 14, color: 'var(--tx)' }}>{m.text}</div>}
+                {m.attachment_name && <div style={{ fontSize: 12, color: 'var(--t3)' }}>📎 {m.attachment_name}</div>}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Directories View — every employee, with self-serve photo upload ──
+function DirectoriesView({ TEAM, myName, onUpdated }) {
+  const [search, setSearch] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef()
+  const me = TEAM.find(t => t.name === myName)
+
+  async function uploadMyPhoto(e) {
+    const file = e.target.files?.[0]
+    if (!file || !me?.empId) return
+    setUploading(true)
+    const path = `${me.empId}-${Date.now()}-${file.name}`
+    const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
+    if (!error) {
+      const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+      await supabase.from('employees').update({ avatar_url: data.publicUrl }).eq('id', me.empId)
+      onUpdated()
+    }
+    setUploading(false)
+  }
+
+  const filtered = TEAM.filter(t => t.name.toLowerCase().includes(search.toLowerCase()) || t.role.toLowerCase().includes(search.toLowerCase()))
+
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', maxWidth: 760, margin: '0 auto', width: '100%' }}>
+      <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--tx)', marginBottom: 4 }}>Directories</h2>
+      <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 16 }}>Everyone at the firm. Upload your own photo below — it'll show across Chat, Huddles, and Threads.</div>
+
+      {me && (
+        <div className="card" style={{ padding: '14px 16px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 14 }}>
+          <Avatar name={me.name} size={48} avatarUrl={me.avatarUrl}/>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--tx)' }}>{me.name}</div>
+            <div style={{ fontSize: 12, color: 'var(--t3)' }}>{me.role || 'Team member'}</div>
+          </div>
+          <button className="btn sec" onClick={() => fileRef.current.click()} disabled={uploading} style={{ fontSize: 12 }}>
+            {uploading ? 'Uploading…' : '📤 Upload my photo'}
+          </button>
+          <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={uploadMyPhoto}/>
+        </div>
+      )}
+
+      <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search people..."
+        style={{ width: '100%', marginBottom: 16, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--tx)', fontSize: 13, outline: 'none' }}/>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+        {filtered.map(t => (
+          <div key={t.id} className="card" style={{ padding: '16px 12px', textAlign: 'center' }}>
+            <Avatar name={t.name} size={56} color={t.color} avatarUrl={t.avatarUrl}/>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--tx)', marginTop: 10 }}>{t.name}</div>
+            <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>{t.role || 'Team member'}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
