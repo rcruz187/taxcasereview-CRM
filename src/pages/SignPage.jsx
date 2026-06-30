@@ -172,6 +172,49 @@ export default function SignPage() {
       await advanceLeadStatus(supabase, doc.client_name, targetStatus).catch(()=>{})
     }
 
+    // ── Fee-already-paid case ───────────────────────────────────────────
+    // If the investigation fee was paid BEFORE the agreement got signed
+    // (lead already sitting at 'Tax Inv Fee Paid'), this signature is the
+    // second half of the combo — auto-advance straight to Tax Investigation
+    // Active and create the same call-IRS tasks the manual status change
+    // and the Stripe webhook both create. If fee isn't paid yet, this is a
+    // no-op; the webhook side handles it when the fee comes in later.
+    if (targetStatus === 'Tax Inv Agreement Signed') {
+      try {
+        const { data: leadRow2 } = await supabase.from('leads').select('id,name,status,assignedTo').eq('name', doc.client_name).maybeSingle()
+        if (leadRow2 && leadRow2.status === 'Tax Inv Fee Paid') {
+          await supabase.from('leads').update({ status: 'Tax Investigation Active' }).eq('id', leadRow2.id)
+
+          const dueDate2 = new Date(); dueDate2.setDate(dueDate2.getDate() + 1)
+          const dueDateStr2 = dueDate2.toISOString().slice(0, 10)
+          const assignee2 = leadRow2.assignedTo || 'Unassigned'
+
+          await supabase.from('tasks').insert([
+            {
+              title: `📞 Call IRS — gather tax investigation info for ${leadRow2.name}`,
+              clientName: leadRow2.name, priority: 'High', dueDate: dueDateStr2, done: false,
+              assignedTo: assignee2,
+              notes: 'Call IRS with POA to pull transcripts, balances, lien info, assessment dates, and filing history. Enter results into the Compliance tab on this lead.',
+              created_at: new Date().toISOString(),
+            },
+            {
+              title: `🧾 Review financial intake — build resolution plan for ${leadRow2.name}`,
+              clientName: leadRow2.name, priority: 'High', dueDate: dueDateStr2, done: false,
+              assignedTo: assignee2,
+              notes: "Review the Financial Profile (I&E, Assets & Equity tabs) populated from the client's intake submission. Cross-reference with IRS results to determine the best resolution path (OIC, IA, CNC, etc.).",
+              created_at: new Date().toISOString(),
+            },
+          ])
+
+          await supabase.from('lead_notes').insert([{
+            lead_id: leadRow2.id, lead_name: leadRow2.name,
+            text: `✍️ Agreement signed — fee already paid, auto-advanced to Tax Investigation Active. 2 tasks created for ${assignee2}.`,
+            type: 'System', author: 'System (E-Sign)', created_at: new Date().toISOString(),
+          }])
+        }
+      } catch (e) { /* best-effort, same as everything else in this try block */ }
+    }
+
     // ── Log note on lead/client file ──────────────────────────────────────
     const noteText = `✅ ${doc.doc_type} signed — by: ${fullname} | IP: ${ip} | ${signedAt}`
     // Try lead first, then client

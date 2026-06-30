@@ -70,15 +70,15 @@ const ROLE_DEFAULTS = {
   // post-conversion work), no Billing/IRS/HR/Reports/Settings. Row-level
   // scoping to "my own assigned leads" is handled in Leads.jsx, not here.
   'Tax Advisor': {
-    canView: ['dashboard','leads','calendar','sms','email','dialer','documents','esign','chat'],
-    canEdit: ['leads','calendar','sms','email','dialer','documents','esign','chat'],
+    canView: ['dashboard','leads','calendar','sms','email','dialer','documents','esign','chat','tasks'],
+    canEdit: ['leads','calendar','sms','email','dialer','documents','esign','chat','tasks'],
   },
   // Sales manager — oversees Tax Advisors, sees every rep's leads (no
   // my-leads-only lock, that only applies to the 'Tax Advisor' role),
   // plus Reports for team performance.
   'Manager': {
-    canView: ['dashboard','leads','calendar','sms','email','dialer','documents','esign','chat','reports'],
-    canEdit: ['leads','calendar','sms','email','dialer','documents','esign','chat'],
+    canView: ['dashboard','leads','calendar','sms','email','dialer','documents','esign','chat','reports','tasks'],
+    canEdit: ['leads','calendar','sms','email','dialer','documents','esign','chat','tasks'],
   },
 }
 

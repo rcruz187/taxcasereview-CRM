@@ -92,12 +92,58 @@ serve(async (req) => {
       'Resolution Fee Paid', 'Converted to Client',
     ]
     if (recordType === 'lead' && purpose === 'investigation_fee' && recordId) {
-      const { data: lead } = await supabase.from('leads').select('status').eq('id', recordId).maybeSingle()
+      const { data: lead } = await supabase.from('leads').select('id,name,status,assignedTo').eq('id', recordId).maybeSingle()
       if (lead) {
-        const curIdx = STATUS_ORDER.indexOf(lead.status)
-        const targetIdx = STATUS_ORDER.indexOf('Tax Inv Fee Paid')
-        if (curIdx < targetIdx) {
+        const curIdx       = STATUS_ORDER.indexOf(lead.status)
+        const feePaidIdx   = STATUS_ORDER.indexOf('Tax Inv Fee Paid')
+        const signedIdx    = STATUS_ORDER.indexOf('Tax Inv Agreement Signed')
+        const activeIdx    = STATUS_ORDER.indexOf('Tax Investigation Active')
+
+        if (curIdx < feePaidIdx) {
           await supabase.from('leads').update({ status: 'Tax Inv Fee Paid' }).eq('id', recordId)
+        }
+
+        // Both conditions met (agreement already signed + fee now paid) —
+        // auto-advance straight to Tax Investigation Active and fire the
+        // same call-IRS task creation the manual status change does in
+        // Leads.jsx. curIdx >= signedIdx covers leads that were already
+        // sitting at "Tax Inv Agreement Signed" (or anywhere past it) the
+        // moment this webhook fires.
+        if (curIdx >= signedIdx && curIdx < activeIdx) {
+          await supabase.from('leads').update({ status: 'Tax Investigation Active' }).eq('id', recordId)
+
+          const dueDate = new Date(); dueDate.setDate(dueDate.getDate() + 1)
+          const dueDateStr = dueDate.toISOString().slice(0, 10)
+          const assignee = lead.assignedTo || 'Unassigned'
+
+          await supabase.from('tasks').insert([
+            {
+              title: `📞 Call IRS — gather tax investigation info for ${lead.name}`,
+              clientName: lead.name,
+              priority: 'High',
+              dueDate: dueDateStr,
+              done: false,
+              assignedTo: assignee,
+              notes: 'Call IRS with POA to pull transcripts, balances, lien info, assessment dates, and filing history. Enter results into the Compliance tab on this lead.',
+              created_at: new Date().toISOString(),
+            },
+            {
+              title: `🧾 Review financial intake — build resolution plan for ${lead.name}`,
+              clientName: lead.name,
+              priority: 'High',
+              dueDate: dueDateStr,
+              done: false,
+              assignedTo: assignee,
+              notes: 'Review the Financial Profile (I&E, Assets & Equity tabs) populated from the client\'s intake submission. Cross-reference with IRS results to determine the best resolution path (OIC, IA, CNC, etc.).',
+              created_at: new Date().toISOString(),
+            },
+          ])
+
+          await supabase.from('lead_notes').insert([{
+            lead_id: recordId, lead_name: lead.name,
+            text: `💳 Investigation fee paid — agreement already signed, auto-advanced to Tax Investigation Active. 2 tasks created for ${assignee}.`,
+            type: 'System', author: 'System (Stripe)', created_at: new Date().toISOString(),
+          }])
         }
       }
     }
