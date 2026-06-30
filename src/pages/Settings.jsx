@@ -5,14 +5,52 @@ import { useApp } from '../context/AppContext'
 const BUCKET = 'firm-assets'
 
 export default function Settings() {
-  const { showToast, user } = useApp()
-  const [tab, setTab] = useState('firm')
+  const { showToast, user, role } = useApp()
+  const isPrivileged = ['Super Admin','Admin'].includes(role)
+  const [tab, setTab] = useState(isPrivileged ? 'firm' : 'mysignature')
   const [saving, setSaving] = useState(false)
   const [logoUrl, setLogoUrl] = useState('')
   const [uploading, setUploading] = useState(false)
   const [sigLogoUploading, setSigLogoUploading] = useState(false)
   const fileRef = useRef()
   const sigLogoFileRef = useRef()
+
+  // ── Personal email signature (every employee has their own) ──
+  const [mySig, setMySig] = useState({ text: '', logoUrl: '' })
+  const [mySigSaving, setMySigSaving] = useState(false)
+  const [mySigLogoUploading, setMySigLogoUploading] = useState(false)
+  const mySigLogoFileRef = useRef()
+
+  useEffect(() => {
+    if (!user?.email) return
+    supabase.from('employees').select('email_signature,email_signature_logo_url')
+      .eq('email', user.email).maybeSingle()
+      .then(({ data }) => setMySig({ text: data?.email_signature || '', logoUrl: data?.email_signature_logo_url || '' }))
+  }, [user?.email])
+
+  async function saveMySignature() {
+    if (!user?.email) return
+    setMySigSaving(true)
+    await supabase.from('employees').update({
+      email_signature: mySig.text,
+      email_signature_logo_url: mySig.logoUrl,
+    }).eq('email', user.email)
+    setMySigSaving(false)
+    showToast('Signature saved!')
+  }
+
+  async function uploadMySignatureLogo(e) {
+    const file = e.target.files?.[0]
+    if (!file || !user?.email) return
+    setMySigLogoUploading(true)
+    const path = `signatures/${user.email.replace(/[^a-zA-Z0-9]/g,'-')}-${Date.now()}-${file.name}`
+    const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true })
+    if (!error) {
+      const { data } = supabase.storage.from(BUCKET).getPublicUrl(path)
+      setMySig(s => ({ ...s, logoUrl: data.publicUrl }))
+    }
+    setMySigLogoUploading(false)
+  }
 
   const [firm, setFirm] = useState({
     name: '', tagline: '', phone: '', email: '',
@@ -220,19 +258,23 @@ export default function Settings() {
   }
 
   const set = k => e => setFirm(f => ({ ...f, [k]: e.target.value }))
-  const tabs = ['firm', 'integrations', 'branding', 'users', 'security', 'storage', 'uptime']
+  // Tax Advisor / Tax Associate / Manager only ever see their own signature
+  // editor + the live status page (read-only) — nothing firm-wide.
+  const tabs = isPrivileged
+    ? ['firm', 'integrations', 'branding', 'users', 'security', 'storage', 'uptime']
+    : ['mysignature', 'uptime']
 
   return (
     <div style={{ padding: '20px 24px', maxWidth: 860, margin: '0 auto' }}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
         {tabs.map(t => (
           <button key={t} className={`btn${tab === t ? ' pri' : ''}`} onClick={() => setTab(t)}>
-            {t === 'firm' ? '🏢 Firm Info' : t === 'integrations' ? '🔌 Integrations' : t === 'branding' ? '🎨 Branding' : t === 'users' ? '👥 Users' : t === 'security' ? '🔒 Security' : t === 'storage' ? '💾 Storage' : '🟢 Uptime'}
+            {t === 'firm' ? '🏢 Firm Info' : t === 'integrations' ? '🔌 Integrations' : t === 'branding' ? '🎨 Branding' : t === 'users' ? '👥 Users' : t === 'security' ? '🔒 Security' : t === 'storage' ? '💾 Storage' : t === 'mysignature' ? '✍️ My Signature' : '🟢 Uptime'}
           </button>
         ))}
       </div>
 
-      {tab === 'firm' && (
+      {tab === 'firm' && isPrivileged && (
         <div className="card">
           <div className="card-header"><span className="card-title">Firm Information</span></div>
           <div style={{ padding: '0 20px 20px' }}>
@@ -262,7 +304,7 @@ export default function Settings() {
       )}
 
 
-      {tab === 'integrations' && (
+      {tab === 'integrations' && isPrivileged && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           {/* IRS Preparer Credentials */}
@@ -617,7 +659,7 @@ export default function Settings() {
         </div>
       )}
 
-      {tab === 'branding' && (
+      {tab === 'branding' && isPrivileged && (
         <div className="card">
           <div className="card-header"><span className="card-title">Branding</span></div>
           <div style={{ padding: '0 20px 20px' }}>
@@ -762,7 +804,57 @@ export default function Settings() {
         </div>
       )}
 
-      {tab === 'users' && (
+      {tab === 'mysignature' && (
+        <div className="card">
+          <div className="card-header"><span className="card-title">✍️ My Email Signature</span></div>
+          <div style={{ padding: '0 20px 20px' }}>
+            <div className="field" style={{ maxWidth: 420 }}>
+              <label>Signature Text</label>
+              <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 10, lineHeight: 1.6 }}>
+                Added automatically to the bottom of emails you personally send from the Email page.
+              </div>
+              <textarea value={mySig.text} onChange={e => setMySig(s => ({ ...s, text: e.target.value }))} rows={4}
+                placeholder={"Best Regards,\nYour Name\nYour Title"} />
+            </div>
+
+            <div className="field" style={{ maxWidth: 420 }}>
+              <label>Signature Logo (optional)</label>
+              <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 10, lineHeight: 1.6 }}>
+                Shows above your signature text. PNG with a transparent background works best.
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{
+                  width: 120, height: 60, borderRadius: 8, border: '1px dashed var(--br)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--s2)', overflow: 'hidden', flexShrink: 0,
+                }}>
+                  {mySig.logoUrl
+                    ? <img src={mySig.logoUrl} alt="Signature logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                    : <span style={{ fontSize: 11, color: 'var(--t3)' }}>No logo</span>}
+                </div>
+                <button className="btn sec" onClick={() => mySigLogoFileRef.current.click()} disabled={mySigLogoUploading}>
+                  {mySigLogoUploading ? 'Uploading…' : '📤 Upload Logo'}
+                </button>
+                <input ref={mySigLogoFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={uploadMySignatureLogo} />
+              </div>
+
+              {(mySig.logoUrl || mySig.text) && (
+                <div style={{ marginTop: 14, padding: 14, borderRadius: 8, border: '1px solid var(--br)', background: 'var(--s1)' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>Preview</div>
+                  {mySig.logoUrl && (
+                    <img src={mySig.logoUrl} alt="" style={{ maxHeight: 60, maxWidth: 240, display: 'block', marginBottom: 8 }} />
+                  )}
+                  <div style={{ fontSize: 13, color: 'var(--t2)', whiteSpace: 'pre-wrap', fontFamily: 'Arial, sans-serif' }}>{mySig.text}</div>
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+              <button className="btn pri" onClick={saveMySignature} disabled={mySigSaving}>{mySigSaving ? 'Saving…' : 'Save Signature'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'users' && isPrivileged && (
         <div className="card">
           <div className="card-header"><span className="card-title">Team Members</span></div>
           <div style={{ padding: '0 20px 20px' }}>
@@ -798,7 +890,7 @@ export default function Settings() {
         </div>
       )}
 
-      {tab === 'security' && (
+      {tab === 'security' && isPrivileged && (
         <div className="card">
           <div className="card-header"><span className="card-title">Change Password</span></div>
           <div style={{ padding: '0 20px 20px', maxWidth: 400 }}>
@@ -811,7 +903,7 @@ export default function Settings() {
         </div>
       )}
 
-      {tab === 'storage' && <StorageTab />}
+      {tab === 'storage' && isPrivileged && <StorageTab />}
       {tab === 'uptime' && <UptimeTab />}
     </div>
   )

@@ -59,8 +59,8 @@ const ROLE_DEFAULTS = {
               'documents','esign','timeclock','reports','dialer','chat','books','irs'],
   },
   'Tax Associate': {
-    canView: ['dashboard','leads','clients','cases','tasks','calendar','deadlines','documents','chat','irsforms','irsreference'],
-    canEdit: ['tasks','chat'],
+    canView: ['dashboard','leads','clients','cases','tasks','calendar','deadlines','documents','chat','irsforms','irsreference','settings'],
+    canEdit: ['tasks','chat','settings'],
   },
   'View Only': {
     canView: ['dashboard','leads','clients','cases','tasks','calendar','deadlines','documents','irsforms','irsreference'],
@@ -70,15 +70,15 @@ const ROLE_DEFAULTS = {
   // post-conversion work), no Billing/IRS/HR/Reports/Settings. Row-level
   // scoping to "my own assigned leads" is handled in Leads.jsx, not here.
   'Tax Advisor': {
-    canView: ['dashboard','leads','calendar','sms','email','dialer','documents','esign','chat','tasks'],
-    canEdit: ['leads','calendar','sms','email','dialer','documents','esign','chat','tasks'],
+    canView: ['dashboard','leads','calendar','sms','email','dialer','documents','esign','chat','tasks','settings'],
+    canEdit: ['leads','calendar','sms','email','dialer','documents','esign','chat','tasks','settings'],
   },
   // Sales manager — oversees Tax Advisors, sees every rep's leads (no
   // my-leads-only lock, that only applies to the 'Tax Advisor' role),
   // plus Reports for team performance.
   'Manager': {
-    canView: ['dashboard','leads','calendar','sms','email','dialer','documents','esign','chat','reports','tasks'],
-    canEdit: ['leads','calendar','sms','email','dialer','documents','esign','chat','tasks'],
+    canView: ['dashboard','leads','calendar','sms','email','dialer','documents','esign','chat','reports','tasks','settings'],
+    canEdit: ['leads','calendar','sms','email','dialer','documents','esign','chat','tasks','settings'],
   },
 }
 

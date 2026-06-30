@@ -94,7 +94,19 @@ export default function Email() {
     const { data } = await supabase.from('settings').select('gmail_client_id,gmail_refresh_token,email_signature,email_signature_logo_url').limit(1).maybeSingle()
     if (data?.gmail_client_id) setGmailClientId(data.gmail_client_id)
     if (data?.gmail_refresh_token) setGmailConnected(true)
-    setSignature({ text: data?.email_signature || '', logoUrl: data?.email_signature_logo_url || '' })
+
+    // Each employee has their own signature now — fall back to the firm
+    // default only if they haven't set a personal one yet.
+    let sigText = data?.email_signature || ''
+    let sigLogo = data?.email_signature_logo_url || ''
+    if (user?.email) {
+      const { data: emp } = await supabase.from('employees')
+        .select('email_signature,email_signature_logo_url')
+        .eq('email', user.email).maybeSingle()
+      if (emp?.email_signature) sigText = emp.email_signature
+      if (emp?.email_signature_logo_url) sigLogo = emp.email_signature_logo_url
+    }
+    setSignature({ text: sigText, logoUrl: sigLogo })
   }
 
   async function load() {
@@ -160,7 +172,7 @@ export default function Email() {
         setSaving(false); showToast('Recipient email address required to send'); return
       }
       try {
-        await sendGmailEmail(supabase, { to: form.recipient, subject: form.subject, body: form.body })
+        await sendGmailEmail(supabase, { to: form.recipient, subject: form.subject, body: form.body, senderEmployeeEmail: user?.email })
         status = 'Sent'
       } catch (e) {
         setSaving(false)

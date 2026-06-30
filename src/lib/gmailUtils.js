@@ -115,11 +115,27 @@ function textToHtml(text) {
 // Sends an email via the Gmail API. Returns the Gmail message id.
 // attachments (optional): [{ filename, mimeType, base64Data }] — base64Data
 // is the standard (non-url) base64 encoding of the raw file bytes.
-export async function sendGmailEmail(supabase, { to, subject, body, fromName, attachments = [] }) {
+export async function sendGmailEmail(supabase, { to, subject, body, fromName, attachments = [], senderEmployeeEmail }) {
   const token = await getValidGmailToken(supabase)
 
   const { data: settings } = await supabase.from('settings')
     .select('email,name,email_signature,email_signature_logo_url').limit(1).maybeSingle()
+
+  // If a specific employee is sending (Email compose page), use THEIR own
+  // signature instead of the firm-wide default — this is the one path
+  // where a real person is personally writing the email. Every other
+  // caller (invoices, deadlines, estimates, calendar reminders — all
+  // system-triggered, no specific sender) keeps using the firm default.
+  let sig = { text: settings?.email_signature, logo: settings?.email_signature_logo_url }
+  if (senderEmployeeEmail) {
+    const { data: emp } = await supabase.from('employees')
+      .select('email_signature,email_signature_logo_url')
+      .eq('email', senderEmployeeEmail).maybeSingle()
+    if (emp?.email_signature || emp?.email_signature_logo_url) {
+      sig = { text: emp.email_signature, logo: emp.email_signature_logo_url }
+    }
+  }
+
   const fromDisplayName = fromName || settings?.name || 'Tax Case Review'
   // A bare display name with no email address is malformed per the email
   // spec, and can get a message silently spam-filtered even when Gmail's
@@ -135,11 +151,11 @@ export async function sendGmailEmail(supabase, { to, subject, body, fromName, at
   // embedding, at the cost of the image needing internet access to load
   // (true for basically every modern mail client anyway).
   let signatureHtml = ''
-  if (settings?.email_signature_logo_url) {
-    signatureHtml += `<img src="${settings.email_signature_logo_url}" alt="" style="max-height:60px;max-width:240px;display:block;margin-bottom:8px;" />`
+  if (sig.logo) {
+    signatureHtml += `<img src="${sig.logo}" alt="" style="max-height:60px;max-width:240px;display:block;margin-bottom:8px;" />`
   }
-  if (settings?.email_signature) {
-    signatureHtml += `<div style="font-size:13px;color:#444;white-space:pre-wrap;font-family:Arial,sans-serif;">${textToHtml(settings.email_signature)}</div>`
+  if (sig.text) {
+    signatureHtml += `<div style="font-size:13px;color:#444;white-space:pre-wrap;font-family:Arial,sans-serif;">${textToHtml(sig.text)}</div>`
   }
 
   const bodyHtml = `<div style="font-size:14px;color:#222;font-family:Arial,sans-serif;line-height:1.6;">${textToHtml(body)}</div>` +
