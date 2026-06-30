@@ -62,6 +62,7 @@ const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL'
 
 const BLANK = {
   clientType:'Individual', name:'', first:'', mi:'', last:'', phone:'', phone2:'', email:'',
+  smsConsent:false, smsConsentDate:null,
   ssn:'', ein:'', dob:'',
   spouseName:'', spouseSsn:'', spouseDob:'', filingStatus:'Single',
   street:'', city:'', state:'', zip:'', county:'', source:'Referral',
@@ -1206,6 +1207,7 @@ export default function Leads() {
       name: l.name, clientType: l.clientType || 'Individual',
       first: l.first, mi: l.mi, last: l.last,
       phone: l.phone, phone2: l.phone2, email: l.email,
+      smsConsent: l.smsConsent || false, smsConsentDate: l.smsConsentDate || null,
       ssn: l.ssn, ein: l.ein, dob: l.dob,
       spouseName: l.spouseName, spouseSsn: l.spouseSsn, spouseDob: l.spouseDob, filingStatus: l.filingStatus,
       stripe_customer_id: l.stripe_customer_id,
@@ -1392,6 +1394,22 @@ export default function Leads() {
               <div className="field"><label>Phone</label><input value={form.phone} onChange={e=>fld('phone',fmtPhone(e.target.value))} placeholder="(305) 555-0000" maxLength={14}/></div>
               <div className="field"><label>Phone 2 <span style={{color:'var(--t3)',fontWeight:400}}>(optional)</span></label><input value={form.phone2||''} onChange={e=>fld('phone2',fmtPhone(e.target.value))} placeholder="(305) 555-0000" maxLength={14}/></div>
               <div className="field"><label>Email</label><input value={form.email} onChange={e=>fld('email',e.target.value)}/></div>
+            </div>
+            <div className="field" style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 0' }}>
+              <input
+                type="checkbox"
+                id="smsConsentCheck"
+                checked={!!form.smsConsent}
+                onChange={e=>{
+                  const checked = e.target.checked
+                  fld('smsConsent', checked)
+                  fld('smsConsentDate', checked ? new Date().toISOString() : null)
+                }}
+                style={{ width:16, height:16 }}
+              />
+              <label htmlFor="smsConsentCheck" style={{ fontSize:13, fontWeight:400, color:'var(--t2)' }}>
+                Client has verbally or in writing consented to receive text message updates about their case (required before sending SMS — TCR compliance)
+              </label>
             </div>
             <div className="fg3">
               <div className="field"><label>SSN</label><input value={form.ssn} onChange={e=>fld('ssn',fmtSsn(e.target.value))} placeholder="XXX-XX-XXXX" maxLength={11}/></div>

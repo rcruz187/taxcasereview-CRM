@@ -82,7 +82,7 @@ export default function Sms() {
   async function load(){
     const [{data:sms},{data:cls},{data:s}]=await Promise.all([
       supabase.from('sms_messages').select('*').order('created_at',{ascending:false}),
-      supabase.from('clients').select('id,name,phone'),
+      supabase.from('clients').select('id,name,phone,smsConsent'),
       supabase.from('settings').select('sw_space_url,sw_inbound_did').limit(1).maybeSingle(),
     ])
     if(sms)setSent(sms)
@@ -211,6 +211,18 @@ export default function Sms() {
               <input value={form.phone} onChange={e=>fld('phone',e.target.value)} placeholder="(305) 555-0000"
                 style={{fontSize:14,padding:'10px 14px'}}/>
             </div>
+
+            {(() => {
+              const matched = clients.find(c => c.name === form.clientName)
+              if (matched && !matched.smsConsent) {
+                return (
+                  <div style={{ marginBottom: 14, padding: '10px 14px', background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 8, fontSize: 12, color: 'var(--warn)' }}>
+                    ⚠️ No SMS consent on file for {matched.name}. Confirm consent and check the box on their client record before texting (TCR compliance).
+                  </div>
+                )
+              }
+              return null
+            })()}
 
             <div className="field">
               <label style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>

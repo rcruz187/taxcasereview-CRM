@@ -2649,6 +2649,22 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
           <div className="field"><label>Phone 2</label><input value={form.phone2||''} onChange={e=>fld('phone2',fmtPhone(e.target.value))} placeholder="(305) 555-0000" maxLength={14}/></div>
           <div className="field"><label>Email</label><input value={form.email||''} onChange={e=>fld('email',e.target.value)}/></div>
         </div>
+        <div className="field" style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 0' }}>
+          <input
+            type="checkbox"
+            id="clientSmsConsentCheck"
+            checked={!!form.smsConsent}
+            onChange={e=>{
+              const checked = e.target.checked
+              fld('smsConsent', checked)
+              fld('smsConsentDate', checked ? new Date().toISOString() : null)
+            }}
+            style={{ width:16, height:16 }}
+          />
+          <label htmlFor="clientSmsConsentCheck" style={{ fontSize:13, fontWeight:400, color:'var(--t2)' }}>
+            Client has verbally or in writing consented to receive text message updates about their case (required before sending SMS — TCR compliance)
+          </label>
+        </div>
         <div className="field"><label>Street Address</label><input value={form.street||''} onChange={e=>fld('street',e.target.value)}/></div>
         <div className="fg3">
           <div className="field"><label>City</label><input value={form.city||''} onChange={e=>fld('city',e.target.value)}/></div>
