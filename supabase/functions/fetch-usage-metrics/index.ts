@@ -12,7 +12,7 @@
 // adjust the `cachedEgressGb` / `storageMb` / `dbSizeMb` extraction lines
 // to match reality, then redeploy.
 //
-// Requires secret: SUPABASE_MANAGEMENT_TOKEN (account-level personal
+// Requires secret: TCR_MANAGEMENT_TOKEN (account-level personal
 // access token from https://supabase.com/dashboard/account/tokens — NOT
 // the same as SUPABASE_SERVICE_ROLE_KEY, which is project-scoped).
 //
@@ -29,9 +29,9 @@ const STORAGE_LIMIT_MB = 1024
 
 serve(async () => {
   try {
-    const mgmtToken = Deno.env.get('SUPABASE_MANAGEMENT_TOKEN')
+    const mgmtToken = Deno.env.get('TCR_MANAGEMENT_TOKEN')
     if (!mgmtToken) {
-      return new Response(JSON.stringify({ error: 'SUPABASE_MANAGEMENT_TOKEN secret not set' }), { status: 500 })
+      return new Response(JSON.stringify({ error: 'TCR_MANAGEMENT_TOKEN secret not set' }), { status: 500 })
     }
 
     const res = await fetch(`https://api.supabase.com/v1/projects/${PROJECT_REF}/usage`, {
