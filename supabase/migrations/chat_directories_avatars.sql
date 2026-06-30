@@ -22,3 +22,17 @@ ALTER TABLE chat_rep_prefs DISABLE ROW LEVEL SECURITY;
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('avatars', 'avatars', true)
 ON CONFLICT (id) DO NOTHING;
+
+-- Explicit policies — public buckets still need these for authenticated
+-- uploads/updates to actually succeed (don't rely on project-level defaults).
+DROP POLICY IF EXISTS "avatars_public_read" ON storage.objects;
+CREATE POLICY "avatars_public_read" ON storage.objects
+  FOR SELECT USING (bucket_id = 'avatars');
+
+DROP POLICY IF EXISTS "avatars_authenticated_upload" ON storage.objects;
+CREATE POLICY "avatars_authenticated_upload" ON storage.objects
+  FOR INSERT WITH CHECK (bucket_id = 'avatars' AND auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "avatars_authenticated_update" ON storage.objects;
+CREATE POLICY "avatars_authenticated_update" ON storage.objects
+  FOR UPDATE USING (bucket_id = 'avatars' AND auth.role() = 'authenticated');

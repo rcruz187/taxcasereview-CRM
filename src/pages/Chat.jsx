@@ -1027,7 +1027,17 @@ function DraftsView({ TEAM, myName, channels }) {
 function DirectoriesView({ TEAM, myName, myEmail, onUpdated }) {
   const [search, setSearch] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [bucketMissing, setBucketMissing] = useState(false)
   const fileRef = useRef()
+
+  // Actually check the avatars bucket exists, instead of assuming the SQL
+  // migration was run. Lists it with a 0-byte limit query — cheap, and
+  // tells us definitively rather than guessing from upload behavior.
+  useEffect(() => {
+    supabase.storage.from('avatars').list('', { limit: 1 }).then(({ error }) => {
+      if (error) setBucketMissing(true)
+    })
+  }, [])
   // Match by email first (reliable — comes straight from auth), fall back
   // to name match (works if metadata name happens to line up), then to no
   // match at all — in which case we still show an upload card below using
@@ -1043,16 +1053,27 @@ function DirectoriesView({ TEAM, myName, myEmail, onUpdated }) {
 
   async function uploadMyPhoto(e) {
     const file = e.target.files?.[0]
-    if (!file || !effectiveMe?.empId) return
+    if (!file) return
+    if (!effectiveMe?.empId) {
+      alert('Could not identify your employee record — pick your name from the dropdown above first.')
+      return
+    }
     setUploading(true)
     const path = `${effectiveMe.empId}-${Date.now()}-${file.name}`
-    const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
-    if (!error) {
-      const { data } = supabase.storage.from('avatars').getPublicUrl(path)
-      await supabase.from('employees').update({ avatar_url: data.publicUrl }).eq('id', effectiveMe.empId)
-      onUpdated()
+    const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
+    if (upErr) {
+      setUploading(false)
+      alert('Photo upload failed: ' + upErr.message + (upErr.message?.includes('not found') ? '\n\nThe avatars storage bucket may not exist yet — run the chat_directories_avatars.sql migration in Supabase.' : ''))
+      return
     }
+    const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
+    const { error: dbErr } = await supabase.from('employees').update({ avatar_url: urlData.publicUrl }).eq('id', effectiveMe.empId)
     setUploading(false)
+    if (dbErr) {
+      alert('Photo uploaded but saving to your profile failed: ' + dbErr.message)
+      return
+    }
+    onUpdated()
   }
 
   const filtered = TEAM.filter(t => t.name.toLowerCase().includes(search.toLowerCase()) || t.role.toLowerCase().includes(search.toLowerCase()))
@@ -1061,6 +1082,12 @@ function DirectoriesView({ TEAM, myName, myEmail, onUpdated }) {
     <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', maxWidth: 760, margin: '0 auto', width: '100%' }}>
       <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--tx)', marginBottom: 4 }}>Directories</h2>
       <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 16 }}>Everyone at the firm. Upload your own photo below — it'll show across Chat, Huddles, and Threads.</div>
+
+      {bucketMissing && (
+        <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, padding: '12px 16px', marginBottom: 18, fontSize: 13, color: '#fca5a5' }}>
+          ⚠️ Photo uploads aren't set up yet — the storage bucket is missing. Run <code style={{ background: 'rgba(0,0,0,.3)', padding: '1px 6px', borderRadius: 4 }}>chat_directories_avatars.sql</code> in Supabase SQL Editor, then refresh this page.
+        </div>
+      )}
 
       {effectiveMe ? (
         <div className="card" style={{ padding: '14px 16px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 14 }}>
