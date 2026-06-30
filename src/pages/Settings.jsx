@@ -67,7 +67,7 @@ export default function Settings() {
   useEffect(() => { loadFirm(); loadLogo(); loadEmployees() }, [])
 
   async function loadEmployees() {
-    const { data } = await supabase.from('employees').select('id,name,email,role,status,created_at').order('created_at', { ascending: true })
+    const { data } = await supabase.from('employees').select('id,name,email,role,status,created_at,avatar_url').order('created_at', { ascending: true })
     if (data) setEmployees(data)
   }
 
@@ -867,8 +867,8 @@ export default function Settings() {
                 const inactive = m.status && m.status !== 'Active'
                 return (
                   <div key={m.id} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 0', borderBottom:'1px solid var(--br)', opacity: inactive ? 0.5 : 1 }}>
-                    <div style={{ width:40, height:40, borderRadius:'50%', background:'var(--blue)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:15, color:'#fff', flexShrink:0 }}>
-                      {initials}
+                    <div style={{ width:40, height:40, borderRadius:'50%', background:'var(--blue)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:15, color:'#fff', flexShrink:0, overflow:'hidden' }}>
+                      {m.avatar_url ? <img src={m.avatar_url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/> : initials}
                     </div>
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ fontWeight:700, fontSize:14, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>

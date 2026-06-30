@@ -322,9 +322,11 @@ export default function Employees() {
                   width: 48, height: 48, borderRadius: '50%',
                   background: ROLE_COLORS[emp.access] || '#64748b',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 16, fontWeight: 800, color: '#fff', flexShrink: 0
+                  fontSize: 16, fontWeight: 800, color: '#fff', flexShrink: 0, overflow: 'hidden'
                 }}>
-                  {(emp.name || '?').split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase()}
+                  {emp.avatar_url
+                    ? <img src={emp.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/>
+                    : (emp.name || '?').split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase()}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--tx)' }}>{emp.name}</div>
