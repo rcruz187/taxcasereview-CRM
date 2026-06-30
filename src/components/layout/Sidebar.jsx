@@ -229,8 +229,13 @@ export default function Sidebar() {
     }
     if (!user) return
     loadEmailTaskCounts()
-    // Poll every 30s as fallback in case realtime misses an event
-    const poll = setInterval(loadEmailTaskCounts, 30000)
+    // Realtime channel below does the actual live updating. This poll is
+    // only a safety net for the rare case realtime misses an event — 5min
+    // is plenty for a fallback; it doesn't need to run every 30s when the
+    // channel already covers normal operation, and the previous 30s
+    // interval was fetching the full emails table for every logged-in
+    // user constantly, which adds up over a full day across a team.
+    const poll = setInterval(loadEmailTaskCounts, 300000)
     const ch = supabase.channel('sidebar-email-tasks-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'emails' }, loadEmailTaskCounts)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, loadEmailTaskCounts)
