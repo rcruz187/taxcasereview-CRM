@@ -38,6 +38,7 @@ serve(async (req) => {
 
       const status = params.get('FaxStatus') || 'unknown'
       await supabase.from('fax_logs').insert({
+      tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a',
         from_number:        params.get('From') || '',
         to_number:          params.get('To') || '',
         file_url:           params.get('MediaUrl') || null,

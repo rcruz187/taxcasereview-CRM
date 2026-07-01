@@ -72,7 +72,8 @@ serve(async (req) => {
       source: 'resolution_fee',
       enrolled_by: intent.metadata?.enrolled_by || null,
       created_at: new Date().toISOString(),
-    }])
+    ,
+      tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a'}])
 
     return new Response(JSON.stringify({ success: true, status: intent.status }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

@@ -42,6 +42,7 @@ serve(async (req) => {
     }
 
     await supabase.from('sms_messages').insert({
+    tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a',
       clientName: clientName || from,
       phone: from,
       body,

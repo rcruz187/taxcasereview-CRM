@@ -83,7 +83,8 @@ serve(async (req) => {
       exp_month: display.exp_month, exp_year: display.exp_year,
       cardholder_name: cardholderName,
       is_default: makeDefault,
-    }]).select().single()
+    ,
+      tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a'}]).select().single()
     if (insErr) throw new Error(insErr.message)
 
     if (makeDefault) {
