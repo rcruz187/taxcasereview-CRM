@@ -191,25 +191,41 @@ export default function Sidebar() {
 
   useEffect(() => {
     async function loadCommsCounts() {
-      // All queries match the exact tables/fields the pages themselves use
-      const [vmRes, esignRes] = await Promise.all([
-        supabase.from('voicemails').select('id,is_read'),           // matches Dialer.jsx
-        supabase.from('esigns').select('id,status'),                // matches Esign.jsx
+      const faxLastSeen = localStorage.getItem('tcr_fax_last_seen') || new Date(0).toISOString()
+      const smsLastSeen = localStorage.getItem('tcr_sms_last_seen') || new Date(0).toISOString()
+      const [vmRes, esignRes, faxRes, smsRes] = await Promise.all([
+        supabase.from('voicemails').select('id,is_read'),
+        supabase.from('esigns').select('id,status'),
+        supabase.from('fax_logs').select('id', { count: 'exact', head: true }).eq('direction', 'inbound').gt('created_at', faxLastSeen),
+        supabase.from('sms_messages').select('id', { count: 'exact', head: true }).eq('direction', 'inbound').gt('created_at', smsLastSeen),
       ])
-      // Voicemails: count !is_read in JS (catches NULL) — matches Dialer.jsx line 383
       setUnreadVoicemails((vmRes.data || []).filter(v => !v.is_read).length)
-      // Esigns: status === 'Awaiting' — matches Esign.jsx line 183
       setPendingEsign((esignRes.data || []).filter(e => e.status === 'Awaiting').length)
-      // Fax/SMS have no read field — badges handled via localStorage timestamps
+      setUnreadFax(faxRes.count || 0)
+      setUnreadSms(smsRes.count || 0)
     }
     if (!user) return
     loadCommsCounts()
     const ch = supabase.channel('sidebar-comms-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'voicemails' }, loadCommsCounts)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'esigns' }, loadCommsCounts)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'fax_logs' }, loadCommsCounts)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sms_messages' }, loadCommsCounts)
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [user])
+
+  // Clear fax/SMS badges when user visits those pages
+  useEffect(() => {
+    if (location.pathname.startsWith('/fax')) {
+      localStorage.setItem('tcr_fax_last_seen', new Date().toISOString())
+      setUnreadFax(0)
+    }
+    if (location.pathname.startsWith('/sms')) {
+      localStorage.setItem('tcr_sms_last_seen', new Date().toISOString())
+      setUnreadSms(0)
+    }
+  }, [location.pathname])
 
   useEffect(() => {
     async function loadEmailTaskCounts() {
