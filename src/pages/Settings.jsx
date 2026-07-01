@@ -266,9 +266,9 @@ export default function Settings() {
 
   return (
     <div style={{ padding: '20px 24px', maxWidth: 860, margin: '0 auto' }}>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'nowrap', overflowX: 'auto', paddingBottom: 6 }}>
         {tabs.map(t => (
-          <button key={t} className={`btn${tab === t ? ' pri' : ''}`} onClick={() => setTab(t)}>
+          <button key={t} className={`btn${tab === t ? ' pri' : ''}`} onClick={() => setTab(t)} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
             {t === 'firm' ? '🏢 Firm Info' : t === 'integrations' ? '🔌 Integrations' : t === 'branding' ? '🎨 Branding' : t === 'import' ? '📥 Import Data' : t === 'users' ? '👥 Users' : t === 'security' ? '🔒 Security' : t === 'storage' ? '💾 Storage' : t === 'mysignature' ? '✍️ My Signature' : '🟢 Uptime'}
           </button>
         ))}
@@ -1109,13 +1109,27 @@ function StorageTab() {
 // ── Uptime Tab ─────────────────────────────────────────────────────────────
 const SERVICES = [
   {
-    name: 'Supabase',
-    description: 'Database, storage, edge functions',
-    statusUrl: 'https://status.supabase.com/',
-    apiUrl: 'https://status.supabase.com/api/v2/status.json',
-    indicatorPath: ['status', 'indicator'],    // green | yellow | red | none
+    name: 'Anthropic',
+    description: 'AI document parsing (parse-tax-doc)',
+    statusUrl: 'https://status.anthropic.com/',
+    apiUrl: 'https://status.anthropic.com/api/v2/status.json',
+    indicatorPath: ['status', 'indicator'],
     descriptionPath: ['status', 'description'],
-    logo: '⚡',
+    logo: '🤖',
+  },
+  {
+    name: 'Gmail / Google',
+    description: 'Email sending and sync',
+    statusUrl: 'https://www.google.com/appsstatus/dashboard/',
+    apiUrl: null, // Google status has no public JSON API
+    logo: '📧',
+  },
+  {
+    name: 'SignalWire',
+    description: 'Phone calls, SMS, fax, IVR',
+    statusUrl: 'https://signalwire.trust.pagerduty.com/posts/dashboard',
+    apiUrl: null, // PagerDuty dashboard — no public JSON API, link only
+    logo: '📞',
   },
   {
     name: 'Stripe',
@@ -1127,27 +1141,13 @@ const SERVICES = [
     logo: '💳',
   },
   {
-    name: 'SignalWire',
-    description: 'Phone calls, SMS, fax, IVR',
-    statusUrl: 'https://signalwire.trust.pagerduty.com/posts/dashboard',
-    apiUrl: null, // PagerDuty dashboard — no public JSON API, link only
-    logo: '📞',
-  },
-  {
-    name: 'Gmail / Google',
-    description: 'Email sending and sync',
-    statusUrl: 'https://www.google.com/appsstatus/dashboard/',
-    apiUrl: null, // Google status has no public JSON API
-    logo: '📧',
-  },
-  {
-    name: 'Anthropic',
-    description: 'AI document parsing (parse-tax-doc)',
-    statusUrl: 'https://status.anthropic.com/',
-    apiUrl: 'https://status.anthropic.com/api/v2/status.json',
+    name: 'Supabase',
+    description: 'Database, storage, edge functions',
+    statusUrl: 'https://status.supabase.com/',
+    apiUrl: 'https://status.supabase.com/api/v2/status.json',
     indicatorPath: ['status', 'indicator'],
     descriptionPath: ['status', 'description'],
-    logo: '🤖',
+    logo: '⚡',
   },
 ]
 
@@ -1168,29 +1168,23 @@ function UptimeTab() {
     setLoading(true)
     const results = {}
 
-    // Fetch each status API directly from the browser — avoids edge function
-    // network restrictions. All three use Statuspage.io's public JSON API
-    // which has CORS enabled.
-    const STATUS_APIS = [
-      { name: 'Supabase',  url: 'https://status.supabase.com/api/v2/status.json' },
-      { name: 'Stripe',    url: 'https://status.stripe.com/api/v2/status.json' },
-      { name: 'Anthropic', url: 'https://status.anthropic.com/api/v2/status.json' },
-    ]
-
-    await Promise.all(STATUS_APIS.map(async ({ name, url }) => {
-      try {
-        const res = await fetch(url, { signal: AbortSignal.timeout(6000) })
-        if (!res.ok) { results[name] = { error: 'HTTP ' + res.status }; return }
-        const data = await res.json()
-        results[name] = {
-          ok: true,
-          indicator: data?.status?.indicator,
-          description: data?.status?.description,
-        }
-      } catch (e) {
-        results[name] = { error: 'Could not reach status API' }
+    // Fetch via the check-service-status edge function — Supabase's own status
+    // page happens to allow direct browser CORS, but Stripe's and Anthropic's
+    // do not, so a direct browser fetch to those two silently fails every
+    // time. Routing all three through the edge function (server-side, no CORS)
+    // fixes that for good.
+    const NAME_MAP = { supabase: 'Supabase', stripe: 'Stripe', anthropic: 'Anthropic' }
+    try {
+      const { data, error } = await supabase.functions.invoke('check-service-status')
+      if (error) throw error
+      for (const [key, label] of Object.entries(NAME_MAP)) {
+        const d = data?.[key]
+        if (!d || d.error) { results[label] = { error: d?.error || 'Could not reach status API' }; continue }
+        results[label] = { ok: true, indicator: d?.status?.indicator, description: d?.status?.description }
       }
-    }))
+    } catch (e) {
+      Object.values(NAME_MAP).forEach(label => { results[label] = { error: 'Could not reach status check service' } })
+    }
 
     // Link-only services
     results['SignalWire']     = { type: 'link-only' }
