@@ -15,7 +15,7 @@ const SECTIONS = [
       { path: '/',          icon: GridIcon,    label: 'Home',     section: null },
       { path: '/email',     icon: EmailIcon,   label: 'Email',         badge: 'email',    section: 'email' },
       { path: '/chat',      icon: ChatIcon,    label: 'Team Chat',     badge: 'chat',     section: 'chat' },
-      { path: '/calendar',  icon: CalIcon,     label: 'Calendar',      section: 'calendar' },
+      { path: '/calendar',  icon: CalIcon,     label: 'Calendar',      badge: 'calendar', section: 'calendar' },
       { path: '/tasks',     icon: TaskIcon,    label: 'Tasks',         badge: 'tasks',    section: 'tasks' },
     ]
   },
@@ -127,6 +127,7 @@ export default function Sidebar() {
   const [newClients, setNewClients] = useState(0)
   const [openCases, setOpenCases] = useState(0)
   const [dueSoonDeadlines, setDueSoonDeadlines] = useState(0)
+  const [upcomingEvents, setUpcomingEvents] = useState(0)
   const [unreadFax, setUnreadFax] = useState(0)
   const [unreadSms, setUnreadSms] = useState(0)
   const [unreadVoicemails, setUnreadVoicemails] = useState(0)
@@ -187,7 +188,7 @@ export default function Sidebar() {
     return () => { supabase.removeChannel(ch) }
   }, [user])
 
-  const BADGE_COUNTS = { leads: newLeads, clients: newClients, cases: openCases, deadlines: dueSoonDeadlines, fax: unreadFax, sms: unreadSms, voicemails: unreadVoicemails, esign: pendingEsign, email: unreadInbox, tasks: openTasks, chat: unreadChat }
+  const BADGE_COUNTS = { leads: newLeads, clients: newClients, cases: openCases, deadlines: dueSoonDeadlines, fax: unreadFax, sms: unreadSms, voicemails: unreadVoicemails, esign: pendingEsign, email: unreadInbox, tasks: openTasks, chat: unreadChat, calendar: upcomingEvents }
 
   useEffect(() => {
     async function loadCommsCounts() {
@@ -211,6 +212,23 @@ export default function Sidebar() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'esigns' }, loadCommsCounts)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'fax_logs' }, loadCommsCounts)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sms_messages' }, loadCommsCounts)
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [user])
+
+  // Calendar badge — events starting today or in the next 24 hours
+  useEffect(() => {
+    async function loadCalendarBadge() {
+      const now = new Date().toISOString()
+      const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      const { count } = await supabase.from('calevents').select('id', { count: 'exact', head: true })
+        .gte('start', now).lte('start', tomorrow)
+      setUpcomingEvents(count || 0)
+    }
+    if (!user) return
+    loadCalendarBadge()
+    const ch = supabase.channel('sidebar-calendar-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'calevents' }, loadCalendarBadge)
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [user])
