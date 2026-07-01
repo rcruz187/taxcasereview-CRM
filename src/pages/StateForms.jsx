@@ -93,6 +93,34 @@ export default function StateForms() {
     : []
   const autoForm = clientStateForms[0] || null
 
+  const [prefilling, setPrefilling] = useState(null)
+
+  // Pre-fills the state POA cover page with the selected client's info and
+  // downloads it (form + blank cover attached) — same generator used when
+  // sending for e-signature, just without the email/SMS step. Mirrors the
+  // "Pre-fill PDF" button on the IRS Forms tab.
+  async function downloadPrefilledStatePOA(form) {
+    if (!selectedClient) { showToast('Select a client first'); return }
+    setPrefilling(form.num)
+    try {
+      const pdfRes = await fetch(form.url)
+      if (!pdfRes.ok) throw new Error('Could not load state form PDF')
+      const rawBytes = new Uint8Array(await pdfRes.arrayBuffer())
+      const { generateStatePOAWithCover } = await import('../lib/irsFormUtils')
+      const mergedBytes = await generateStatePOAWithCover(selectedClient, rawBytes)
+      const blob = new Blob([mergedBytes], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${form.state}_POA_${(selectedClient.name || 'client').replace(/\s+/g, '_')}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      showToast('Error: ' + e.message)
+    }
+    setPrefilling(null)
+  }
+
   async function sendStatePOA(form) {
     if (!selectedClient) { showToast('Select a client first'); return }
     if (!form) { showToast('No state form available for this client\'s state'); return }
@@ -213,14 +241,14 @@ export default function StateForms() {
 
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>🏛️ State Forms & Documents</h2>
-        <p style={{ fontSize: 12, color: 'var(--t3)', margin: '4px 0 0' }}>Official state POA forms — download blank or send for e-signature.</p>
+        <p style={{ fontSize: 12, color: 'var(--t3)', margin: '4px 0 0' }}>Official state POA forms — download blank, pre-fill, or send for e-signature.</p>
       </div>
 
       {/* ── Pre-fill & Send Section ── */}
       <div className="card" style={{ marginBottom: 20 }} ref={prefillRef}>
         <div className="ch">
-          <span className="ct">✍️ Send State POA for E-Signature</span>
-          <span style={{ fontSize: 12, color: 'var(--t2)' }}>Select client → auto-matches their state → send just like any other e-sign doc</span>
+          <span className="ct">✍️ Pre-fill &amp; Send State POA</span>
+          <span style={{ fontSize: 12, color: 'var(--t2)' }}>Select client → auto-matches their state → download pre-filled or send for e-signature</span>
         </div>
 
         {/* Client picker */}
@@ -294,6 +322,14 @@ export default function StateForms() {
                     <a href={form.url} target="_blank" rel="noreferrer">
                       <button className="btn sec" style={{ fontSize: 12, padding: '6px 14px', whiteSpace: 'nowrap' }}>⬇ Download</button>
                     </a>
+                    <button
+                      className="btn sec"
+                      style={{ fontSize: 12, padding: '6px 14px', whiteSpace: 'nowrap' }}
+                      disabled={prefilling === form.num}
+                      onClick={() => downloadPrefilledStatePOA(form)}
+                    >
+                      {prefilling === form.num ? '⏳' : '✏️'} Pre-fill &amp; Download
+                    </button>
                     <button
                       className="btn pri"
                       style={{ fontSize: 12, padding: '6px 16px', whiteSpace: 'nowrap' }}

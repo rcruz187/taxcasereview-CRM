@@ -346,8 +346,8 @@ export default function IrsForms() {
       {/* ── Pre-fill Section ────────────────────────────────────────────── */}
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="ch">
-          <span className="ct">✏️ Pre-fill IRS Forms</span>
-          <span style={{ fontSize: 12, color: 'var(--t2)' }}>Fills your exact templates with client taxpayer info only</span>
+          <span className="ct">✏️ Pre-fill &amp; Send IRS Forms</span>
+          <span style={{ fontSize: 12, color: 'var(--t2)' }}>Fills your exact templates with client taxpayer info — download or send for e-signature</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0', flexWrap: 'wrap' }}>
           <div style={{ position: 'relative', flex: 1, maxWidth: 320 }}>
