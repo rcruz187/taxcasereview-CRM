@@ -160,21 +160,24 @@ async function filterUnknownIds(supabase: any, ids: string[]) {
   return ids.filter((id) => !known.has(id))
 }
 
-async function importIds(supabase: any, token: string, ids: string[], clients: any[]) {
+async function importIds(supabase: any, token: string, ids: string[], clients: any[], tenantId: string) {
   for (const id of ids) {
     try {
       const parsed = await getAndParseGmailMessage(token, id, clients)
       if (parsed) {
-        await supabase.from('emails').insert([parsed])
+        const { error: insertError } = await supabase.from('emails').insert([{ ...parsed, tenant_id: tenantId }])
+        if (insertError) console.error('Gmail emails insert error for', id, insertError)
         if (parsed.clientName && parsed.clientName !== parsed.recipient) {
           const direction = parsed.triage === 'Sent' ? 'Sent' : 'Received'
           const preview = (parsed.body || '').slice(0, 120).replace(/\n/g, ' ').trim()
           const noteContent = `📧 Email ${direction} — "${parsed.subject}"${preview ? `\n${preview}${parsed.body?.length > 120 ? '…' : ''}` : ''}`
-          await supabase.from('client_notes').insert({
+          const { error: noteError } = await supabase.from('client_notes').insert({
             client_name: parsed.clientName, content: noteContent, note_type: 'Email',
             created_by: direction === 'Sent' ? 'Tax Case Review' : parsed.clientName,
             created_at: parsed.created_at || new Date().toISOString(),
+            tenant_id: tenantId,
           })
+          if (noteError) console.error('Gmail client_notes insert error for', id, noteError)
         }
       }
     } catch (e) {
@@ -191,7 +194,7 @@ serve(async (req) => {
 
   try {
     const { data: settings } = await supabase.from('settings')
-      .select('id, gmail_refresh_token, gmail_client_id, gmail_client_secret, gmail_access_token, gmail_token_expiry, gmail_backfill_phase, gmail_backfill_page_token, gmail_last_sync_at, gmail_last_cleanup_at')
+      .select('id, tenant_id, gmail_refresh_token, gmail_client_id, gmail_client_secret, gmail_access_token, gmail_token_expiry, gmail_backfill_phase, gmail_backfill_page_token, gmail_last_sync_at, gmail_last_cleanup_at')
       .limit(1).maybeSingle()
 
     if (!settings?.gmail_refresh_token) {
@@ -212,7 +215,7 @@ serve(async (req) => {
         maxResults: 25,
       })
       const newIds = await filterUnknownIds(supabase, ids)
-      await importIds(supabase, token, newIds, clients || [])
+      await importIds(supabase, token, newIds, clients || [], settings.tenant_id)
 
       if (nextPageToken) {
         await supabase.from('settings').update({ gmail_backfill_page_token: nextPageToken, gmail_last_sync_at: new Date().toISOString(), gmail_last_error: null }).eq('id', settings.id)
@@ -225,7 +228,7 @@ serve(async (req) => {
       for (const label of ['INBOX', 'SENT']) {
         const { ids } = await listGmailMessages(token, { labelIds: label, maxResults: 20 })
         const newIds = await filterUnknownIds(supabase, ids)
-        await importIds(supabase, token, newIds.slice(0, 15), clients || [])
+        await importIds(supabase, token, newIds.slice(0, 15), clients || [], settings.tenant_id)
       }
       await supabase.from('settings').update({ gmail_last_sync_at: new Date().toISOString(), gmail_last_error: null }).eq('id', settings.id)
 
