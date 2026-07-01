@@ -214,6 +214,14 @@ export function AppProvider({ children }) {
       if (row.direction === 'inbound') playSound('fax')
     })
 
+    withReconnect('global-task-notify', 'tasks', ({ new: row }) => {
+      playSound('task')
+    })
+
+    withReconnect('global-esign-notify', 'esigns', ({ new: row }) => {
+      if (row.status === 'Awaiting') playSound('esign')
+    })
+
     return () => {
       channels.forEach(ch => { try { supabase.removeChannel(ch) } catch (_) {} })
     }
