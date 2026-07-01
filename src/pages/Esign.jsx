@@ -155,15 +155,24 @@ export default function Esign() {
   async function resendLink(item) {
     const url = signingUrl(item.id)
     await navigator.clipboard.writeText(url).catch(() => {})
-    await supabase.from('esigns').update({ status: 'Awaiting', sent_at: new Date().toISOString() }).eq('id', item.id)
-    const { smsSent, emailSent } = await sendLink(url, { ...item, sendVia: item.send_via || 'both' })
+    const { error: updErr } = await supabase.from('esigns').update({ status: 'Awaiting', sent_at: new Date().toISOString() }).eq('id', item.id)
+    if (updErr) { showToast('Error: ' + updErr.message); return }
+    // esigns rows come back snake_case (client_email/client_phone/client_name) —
+    // sendLink expects camelCase, same shape as the New Signing Request form.
+    const { smsSent, emailSent } = await sendLink(url, {
+      sendVia: item.send_via || 'both',
+      clientEmail: item.client_email,
+      clientPhone: item.client_phone,
+      clientName: item.client_name,
+    })
     const sent = [smsSent && 'SMS', emailSent && 'Email'].filter(Boolean)
-    showToast(sent.length ? `✅ Resent via ${sent.join(' & ')}` : '✅ Link copied to clipboard')
+    showToast(sent.length ? `✅ Resent via ${sent.join(' & ')}` : '⚠️ No email/phone on file to resend to — link copied to clipboard')
     load()
   }
 
   async function updateStatus(id, status) {
-    await supabase.from('esigns').update({ status, updated_at: new Date().toISOString() }).eq('id', id)
+    const { error } = await supabase.from('esigns').update({ status }).eq('id', id)
+    if (error) { showToast('Error: ' + error.message); return }
     showToast(`✅ Marked as ${status}`); load()
   }
 
