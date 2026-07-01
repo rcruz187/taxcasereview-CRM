@@ -6,27 +6,27 @@ import IRSFormFiller from '../components/IRSFormFiller'
 const BLANK = { formNumber: '2848', status: 'Not Filed', client: '', caseNum: '', filedDate: '', notes: '' }
 
 const IRS_FORMS = [
-  { num: 'SS-4',   label: 'Apply for EIN',               url: 'https://www.irs.gov/pub/irs-pdf/fss4.pdf' },
+  { num: '12153',  label: 'CDP Hearing Request',          url: 'https://www.irs.gov/pub/irs-pdf/f12153.pdf' },
+  { num: '12661',  label: 'Disputed Issue Verification',  url: 'https://www.irs.gov/pub/irs-pdf/f12661.pdf' },
+  { num: '2553',   label: 'S-Corp Election',              url: 'https://www.irs.gov/pub/irs-pdf/f2553.pdf' },
+  { num: '2848',   label: 'Power of Attorney',            url: 'https://www.irs.gov/pub/irs-pdf/f2848.pdf' },
   { num: '433-A',  label: 'Collection Info (Individual)', url: 'https://www.irs.gov/pub/irs-pdf/f433a.pdf' },
   { num: '433-B',  label: 'Collection Info (Business)',   url: 'https://www.irs.gov/pub/irs-pdf/f433b.pdf' },
-  { num: '433-F',  label: 'Collection Info (General)',    url: 'https://www.irs.gov/pub/irs-pdf/f433f.pdf' },
   { num: '433-D',  label: 'Installment Agreement',          url: 'https://www.irs.gov/pub/irs-pdf/f433d.pdf' },
+  { num: '433-F',  label: 'Collection Info (General)',    url: 'https://www.irs.gov/pub/irs-pdf/f433f.pdf' },
   { num: '433-H',  label: 'Installment Agreement Request & CIS', url: 'https://www.irs.gov/pub/irs-pdf/f433h.pdf' },
+  { num: '4506-T', label: 'Request for Transcript',       url: 'https://www.irs.gov/pub/irs-pdf/f4506t.pdf' },
+  { num: '4549',   label: 'Exam Changes (Audit)',         url: 'https://www.irs.gov/pub/irs-pdf/f4549.pdf' },
   { num: '656',    label: 'Offer in Compromise',          url: 'https://www.irs.gov/pub/irs-pdf/f656.pdf' },
   { num: '656-L',  label: 'OIC — Doubt as to Liability', url: 'https://www.irs.gov/pub/irs-pdf/f656l.pdf' },
   { num: '843',    label: 'Penalty Abatement',            url: 'https://www.irs.gov/pub/irs-pdf/f843.pdf' },
-  { num: '911',    label: 'Taxpayer Advocate',            url: 'https://www.irs.gov/pub/irs-pdf/f911.pdf' },
-  { num: '2553',   label: 'S-Corp Election',              url: 'https://www.irs.gov/pub/irs-pdf/f2553.pdf' },
-  { num: '2848',   label: 'Power of Attorney',            url: 'https://www.irs.gov/pub/irs-pdf/f2848.pdf' },
-  { num: '4506-T', label: 'Request for Transcript',       url: 'https://www.irs.gov/pub/irs-pdf/f4506t.pdf' },
-  { num: '4549',   label: 'Exam Changes (Audit)',         url: 'https://www.irs.gov/pub/irs-pdf/f4549.pdf' },
   { num: '8821',   label: 'Tax Info Authorization',       url: 'https://www.irs.gov/pub/irs-pdf/f8821.pdf' },
   { num: '8822',   label: 'Change of Address (Individual)', url: 'https://www.irs.gov/pub/irs-pdf/f8822.pdf' },
   { num: '8822-B', label: 'Change of Address (Business)', url: 'https://www.irs.gov/pub/irs-pdf/f8822b.pdf' },
   { num: '8832',   label: 'Entity Classification',        url: 'https://www.irs.gov/pub/irs-pdf/f8832.pdf' },
+  { num: '911',    label: 'Taxpayer Advocate',            url: 'https://www.irs.gov/pub/irs-pdf/f911.pdf' },
   { num: '9465',   label: 'Installment Agreement',        url: 'https://www.irs.gov/pub/irs-pdf/f9465.pdf' },
-  { num: '12153',  label: 'CDP Hearing Request',          url: 'https://www.irs.gov/pub/irs-pdf/f12153.pdf' },
-  { num: '12661',  label: 'Disputed Issue Verification',  url: 'https://www.irs.gov/pub/irs-pdf/f12661.pdf' },
+  { num: 'SS-4',   label: 'Apply for EIN',               url: 'https://www.irs.gov/pub/irs-pdf/fss4.pdf' },
 ]
 
 const LOGO_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo'
