@@ -1168,35 +1168,29 @@ function UptimeTab() {
     setLoading(true)
     const results = {}
 
-    try {
-      const { data, error } = await supabase.functions.invoke('check-service-status')
-      console.log('[Uptime] edge function response:', { data, error })
-      if (!error && data) {
-        // All three use Statuspage.io format: { page: {...}, status: { indicator, description } }
-        for (const [key, name] of [['supabase','Supabase'],['stripe','Stripe'],['anthropic','Anthropic']]) {
-          const svc = data[key]
-          if (svc && !svc.error) {
-            results[name] = {
-              ok: true,
-              indicator: svc?.status?.indicator || svc?.page?.status?.indicator,
-              description: svc?.status?.description || svc?.page?.status?.description,
-            }
-          } else {
-            results[name] = { error: svc?.error || 'No data' }
-          }
+    // Fetch each status API directly from the browser — avoids edge function
+    // network restrictions. All three use Statuspage.io's public JSON API
+    // which has CORS enabled.
+    const STATUS_APIS = [
+      { name: 'Supabase',  url: 'https://status.supabase.com/api/v2/status.json' },
+      { name: 'Stripe',    url: 'https://status.stripe.com/api/v2/status.json' },
+      { name: 'Anthropic', url: 'https://status.anthropic.com/api/v2/status.json' },
+    ]
+
+    await Promise.all(STATUS_APIS.map(async ({ name, url }) => {
+      try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(6000) })
+        if (!res.ok) { results[name] = { error: 'HTTP ' + res.status }; return }
+        const data = await res.json()
+        results[name] = {
+          ok: true,
+          indicator: data?.status?.indicator,
+          description: data?.status?.description,
         }
-      } else {
-        console.log('[Uptime] error from edge function:', error)
-        results['Supabase']  = { error: error?.message || 'Function error' }
-        results['Stripe']    = { error: error?.message || 'Function error' }
-        results['Anthropic'] = { error: error?.message || 'Function error' }
+      } catch (e) {
+        results[name] = { error: 'Could not reach status API' }
       }
-    } catch(e) {
-      console.log('[Uptime] caught exception:', e)
-      results['Supabase'] = { error: 'Edge function unreachable' }
-      results['Stripe']   = { error: 'Edge function unreachable' }
-      results['Anthropic']= { error: 'Edge function unreachable' }
-    }
+    }))
 
     // Link-only services
     results['SignalWire']     = { type: 'link-only' }
