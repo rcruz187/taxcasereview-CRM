@@ -413,6 +413,15 @@ export default function Sidebar() {
                   to={item.path}
                   end={item.path === '/'}
                   className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+                  onClick={() => {
+                    if (item.path === '/email') setUnreadInbox(0)
+                    if (item.path === '/tasks') setOpenTasks(0)
+                    if (item.path === '/esign') setPendingEsign(0)
+                    if (item.path === '/fax') { localStorage.setItem('tcr_fax_last_seen', new Date().toISOString()); setUnreadFax(0) }
+                    if (item.path === '/sms') { localStorage.setItem('tcr_sms_last_seen', new Date().toISOString()); setUnreadSms(0) }
+                    if (item.path === '/dialer') setUnreadVoicemails(0)
+                    if (item.path === '/calendar') setUpcomingEvents(0)
+                  }}
                 >
                   <Icon />
                   {item.label}
