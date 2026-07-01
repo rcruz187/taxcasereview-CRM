@@ -68,6 +68,7 @@ serve(async (req) => {
       call_sid: callSid,
       is_read: false,
       created_at: new Date().toISOString(),
+      tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a',
     })
 
     return new Response(emptyXml, { headers: { 'Content-Type': 'text/xml' } })

@@ -50,6 +50,7 @@ serve(async (req) => {
       recording_url: storedUrl,
       duration_seconds: duration ? Number(duration) : null,
       created_at: new Date().toISOString(),
+      tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a',
     })
 
     return new Response('ok', { status: 200 })

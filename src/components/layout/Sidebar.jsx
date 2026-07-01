@@ -233,7 +233,7 @@ export default function Sidebar() {
     return () => { supabase.removeChannel(ch) }
   }, [user])
 
-  // Clear fax/SMS badges when user visits those pages
+  // Clear badges when user visits those pages (instant — no refresh needed)
   useEffect(() => {
     if (location.pathname.startsWith('/fax')) {
       localStorage.setItem('tcr_fax_last_seen', new Date().toISOString())
@@ -242,6 +242,21 @@ export default function Sidebar() {
     if (location.pathname.startsWith('/sms')) {
       localStorage.setItem('tcr_sms_last_seen', new Date().toISOString())
       setUnreadSms(0)
+    }
+    if (location.pathname.startsWith('/email')) {
+      setUnreadInbox(0)
+    }
+    if (location.pathname.startsWith('/tasks')) {
+      setOpenTasks(0)
+    }
+    if (location.pathname.startsWith('/esign')) {
+      setPendingEsign(0)
+    }
+    if (location.pathname.startsWith('/voicemail') || location.pathname.startsWith('/dialer')) {
+      setUnreadVoicemails(0)
+    }
+    if (location.pathname.startsWith('/calendar')) {
+      setUpcomingEvents(0)
     }
   }, [location.pathname])
 

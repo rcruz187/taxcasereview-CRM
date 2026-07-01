@@ -43,7 +43,7 @@ serve(async (req) => {
 
     const { data: settings, error: sErr } = await supabase
       .from('settings')
-      .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did')
+      .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did,tenant_id')
       .limit(1)
       .maybeSingle()
 
@@ -60,6 +60,7 @@ serve(async (req) => {
       conference_name: conferenceName,
       destination_number: destinationNumber,
       status: 'pending',
+      tenant_id: settings.tenant_id,
     })
     if (insErr) {
       console.error('outbound_calls insert error:', insErr)

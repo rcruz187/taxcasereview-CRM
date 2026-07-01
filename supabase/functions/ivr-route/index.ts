@@ -66,6 +66,7 @@ serve(async (req) => {
           from_number: from,
           department,
           status: 'ringing',
+          tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a',
         })
         if (insErr) console.error('incoming_calls insert error:', insErr)
       }

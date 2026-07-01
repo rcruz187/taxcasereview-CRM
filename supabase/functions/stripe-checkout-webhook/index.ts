@@ -121,7 +121,8 @@ serve(async (req) => {
               title: `📞 Call IRS — gather tax investigation info for ${lead.name}`,
               clientName: lead.name,
               priority: 'High',
-              dueDate: dueDateStr,
+              dueDate: dueDate,
+              tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a'Str,
               done: false,
               assignedTo: assignee,
               notes: 'Call IRS with POA to pull transcripts, balances, lien info, assessment dates, and filing history. Enter results into the Compliance tab on this lead.',
@@ -131,7 +132,8 @@ serve(async (req) => {
               title: `🧾 Review financial intake — build resolution plan for ${lead.name}`,
               clientName: lead.name,
               priority: 'High',
-              dueDate: dueDateStr,
+              dueDate: dueDate,
+              tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a'Str,
               done: false,
               assignedTo: assignee,
               notes: 'Review the Financial Profile (I&E, Assets & Equity tabs) populated from the client\'s intake submission. Cross-reference with IRS results to determine the best resolution path (OIC, IA, CNC, etc.).',
@@ -140,7 +142,7 @@ serve(async (req) => {
           ])
 
           await supabase.from('lead_notes').insert([{
-            lead_id: recordId, lead_name: lead.name,
+            lead_id: recordId, lead_name: lead.name, tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a',
             text: `💳 Investigation fee paid — agreement already signed, auto-advanced to Tax Investigation Active. 2 tasks created for ${assignee}.`,
             type: 'System', author: 'System (Stripe)', created_at: new Date().toISOString(),
           }])
@@ -155,6 +157,7 @@ serve(async (req) => {
         amount,
         method: 'Stripe Checkout',
         status: 'Cleared',
+        tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a',
         date: new Date().toISOString().slice(0, 10),
         notes: 'Paid via Stripe Checkout link',
         stripe_payment_intent_id: session.payment_intent || null,
