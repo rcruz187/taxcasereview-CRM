@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { fillForm433F, fillForm433A, fillForm433D, fillForm433H, fillForm433B, fillForm433AOIC } from '../lib/irsFormUtils'
+import { fillForm433F, fillForm433A, fillForm433D, fillForm433H, fillForm433B, fillForm433AOIC, fillForm656L } from '../lib/irsFormUtils'
 
 function n(v) { const x = parseFloat(v); return isNaN(x) ? 0 : x }
 function fmt(v) { return '$' + n(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
@@ -62,6 +62,7 @@ export default function F433FTab({ profile, set, client, totalHousehold, income,
     '433h': fillForm433H,
     '433b': fillForm433B,
     '433a_oic': fillForm433AOIC,
+    '656l': (client) => fillForm656L(client),
   }
 
   async function handleFillPdf(formType) {
@@ -87,6 +88,9 @@ export default function F433FTab({ profile, set, client, totalHousehold, income,
         </button>
         <button className="btn sec" disabled={!!filling} onClick={()=>handleFillPdf('433a_oic')}>
           {filling==='433a_oic'?'⏳':'📄'}&nbsp; 433-A (OIC)
+        </button>
+        <button className="btn sec" disabled={!!filling} onClick={()=>handleFillPdf('656l')}>
+          {filling==='656l'?'⏳':'📄'}&nbsp; 656-L (OIC Doubt as to Liability)
         </button>
         <button className="btn sec" disabled={!!filling} onClick={()=>handleFillPdf('433f')}>
           {filling==='433f'?'⏳':'📄'}&nbsp; 433-F

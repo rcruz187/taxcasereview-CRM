@@ -1613,3 +1613,62 @@ export async function appendPdfPages(baseBytes, appendBytes) {
   copied.forEach(p => base.addPage(p))
   return await base.save()
 }
+
+// ─── Form 656-L (Offer in Compromise — Doubt as to Liability) ────────────────
+
+F433_TEMPLATE_PATHS['656l'] = '656L_Blank.pdf';
+F433_LABELS['656l'] = 'Form 656-L — Offer in Compromise (Doubt as to Liability)';
+
+export async function fillForm656L(client) {
+  const templateBytes = await fetchTemplate(F433_TEMPLATE_PATHS['656l']);
+  const pdfDoc = await PDFDocument.load(templateBytes, { ignoreEncryption: true });
+  const form = pdfDoc.getForm();
+
+  const setText = (fieldName, value) => {
+    try {
+      const field = form.getTextField(fieldName);
+      try { field.acroField.dict.set(PDFName.of('DA'), PDFString.of('/Helv 9 Tf 0 g')); } catch (_) {}
+      field.setText(value != null ? String(value) : '');
+    } catch (_) {}
+  };
+
+  // Split SSN: 123-45-6789 → ['123','45','6789']
+  const ssnParts = (client?.ssn || '').replace(/\D/g, '');
+  const ssn1 = ssnParts.slice(0, 3);
+  const ssn2 = ssnParts.slice(3, 5);
+  const ssn3 = ssnParts.slice(5);
+
+  // Split phone: (561) 420-1234 → area=561, p1=420, p2=1234
+  const phoneDigits = (client?.phone || '').replace(/\D/g, '');
+  const pArea = phoneDigits.slice(0, 3);
+  const p1    = phoneDigits.slice(3, 6);
+  const p2    = phoneDigits.slice(6);
+
+  const address = [client?.street, [client?.city, client?.state, client?.zip].filter(Boolean).join(', ')].filter(Boolean).join('\n');
+
+  const p6 = 'topmostSubform[0].Page_6[0]';
+
+  // Section 1 — Individual
+  setText(`${p6}.Your_First_Middle_Last_Name[0]`, client?.name || '');
+  setText(`${p6}.YourSSN[0].Your_SSN_1[0]`, ssn1);
+  setText(`${p6}.YourSSN[0].Your_SSN_2[0]`, ssn2);
+  setText(`${p6}.YourSSN[0].Your_SSN_3[0]`, ssn3);
+  setText(`${p6}.Spouse_First_Middle_Last_Name[0]`, client?.spouseName || '');
+  const spouseSsnParts = (client?.spouseSsn || '').replace(/\D/g, '');
+  setText(`${p6}.SpouseSSN[0].Spouse_SSN_1[0]`, spouseSsnParts.slice(0, 3));
+  setText(`${p6}.SpouseSSN[0].Spouse_SSN_2[0]`, spouseSsnParts.slice(3, 5));
+  setText(`${p6}.SpouseSSN[0].Spouse_SSN_3[0]`, spouseSsnParts.slice(5));
+  setText(`${p6}.Your_Home_Address[0]`, address);
+  setText(`${p6}.Phone[0].Area_Code[0]`, pArea);
+  setText(`${p6}.Phone[0].Phone1[0]`, p1);
+  setText(`${p6}.Phone[0].Phone2[0]`, p2);
+
+  // Section 7 — Preparer (Tax Case Review)
+  const p8 = 'topmostSubform[0].page_8[0]';
+  setText(`${p8}.Address[0]`, 'Tax Case Review Org · 631 US Highway 1 Ste 304 · North Palm Beach, FL 33408');
+  setText(`${p8}.Phone[1].Area_Code[0]`, '888');
+  setText(`${p8}.Phone[1].Phone1[0]`, '334');
+  setText(`${p8}.Phone[1].Phone2[0]`, '5052');
+
+  return await pdfDoc.save();
+}
