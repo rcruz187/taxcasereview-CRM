@@ -10,6 +10,8 @@ const IRS_FORMS = [
   { num: '433-A',  label: 'Collection Info (Individual)', url: 'https://www.irs.gov/pub/irs-pdf/f433a.pdf' },
   { num: '433-B',  label: 'Collection Info (Business)',   url: 'https://www.irs.gov/pub/irs-pdf/f433b.pdf' },
   { num: '433-F',  label: 'Collection Info (General)',    url: 'https://www.irs.gov/pub/irs-pdf/f433f.pdf' },
+  { num: '433-D',  label: 'Installment Agreement',          url: 'https://www.irs.gov/pub/irs-pdf/f433d.pdf' },
+  { num: '433-H',  label: 'Installment Agreement Request & CIS', url: 'https://www.irs.gov/pub/irs-pdf/f433h.pdf' },
   { num: '656',    label: 'Offer in Compromise',          url: 'https://www.irs.gov/pub/irs-pdf/f656.pdf' },
   { num: '656-L',  label: 'OIC — Doubt as to Liability', url: 'https://www.irs.gov/pub/irs-pdf/f656l.pdf' },
   { num: '843',    label: 'Penalty Abatement',            url: 'https://www.irs.gov/pub/irs-pdf/f843.pdf' },
