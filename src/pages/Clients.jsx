@@ -208,7 +208,7 @@ function InlineFaxForm({ client, onClose, showToast, onLogged }) {
     const { data: { user } } = await supabase.auth.getUser()
     const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
     const noteContent = `📠 Fax ${sent?'sent':'logged'} to ${toFull}${subject?' — '+subject:''}${file?.name?' (' + file.name + ')':''}`
-    await supabase.from('client_notes').insert({ client_name: client?.name, content: noteContent, created_by: actor })
+    await supabase.from('client_notes').insert({ client_name: client?.name, content: noteContent, created_by: actor, created_at: new Date().toISOString() })
 
     setSending(false)
     showToast('📠 Fax '+(sent?'sent':'logged')+'!')
@@ -965,7 +965,7 @@ export default function Clients() {
   async function load() {
     const [{ data:cl },{ data:em }] = await Promise.all([
       supabase.from('clients').select('*').order('created_at',{ascending:false}),
-      supabase.from('employees').select('id,name')
+      supabase.from('employees').select('id,name,avatar_url')
     ])
     if (cl) setClients(cl)
     if (em) setEmployees(em)
@@ -1176,7 +1176,7 @@ export default function Clients() {
 
     // Auto-log to Notes, same pattern as pipeline stage changes.
     const noteContent = `💬 Text sent: "${smsBody.length > 120 ? smsBody.slice(0,120)+'…' : smsBody}"`
-    await supabase.from('client_notes').insert({ client_name: c.name, content: noteContent, created_by: actor })
+    await supabase.from('client_notes').insert({ client_name: c.name, content: noteContent, created_by: actor, created_at: new Date().toISOString() })
 
     setSmsBody('')
     loadRelated(c.name)
@@ -1286,7 +1286,7 @@ export default function Clients() {
         const { data:cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
         if (cfg?.signalwire_backend) { try { await fetch(cfg.signalwire_backend+'/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:client.phone,body:`Tax Case Review: sign your ${formDef.state} POA here: ${sigUrl}`})}); smsSent=true } catch(_){} }
       }
-      await supabase.from('client_notes').insert({ client_name:client.name, content:`🏛️ ${formDef.state} State POA sent for e-signature (${formDef.num})${emailSent?' via email':''}${smsSent?' via SMS':''}`, created_by:actor, visible_to_client:false })
+      await supabase.from('client_notes').insert({ client_name:client.name, content:`🏛️ ${formDef.state} State POA sent for e-signature (${formDef.num})${emailSent?' via email':''}${smsSent?' via SMS':''}`, created_by:actor, visible_to_client:false, created_at:new Date().toISOString() })
       setPoaModal(false)
       showToast(emailSent||smsSent ? `✅ ${formDef.state} POA sent for signature!` : '✅ Signing link copied to clipboard')
     } catch(e) { showToast('Error: '+e.message) }
@@ -1388,7 +1388,7 @@ export default function Clients() {
     const feeText = `$${Number(addForm.resolutionFee).toLocaleString()}`
     const channels = [emailSent&&'email', smsSent&&'sms'].filter(Boolean).join(' + ')
     const noteContent = `📋 Service Addendum sent for e-signature — Resolution Fee ${feeText}${channels?` (${channels})`:''}`
-    await supabase.from('client_notes').insert({ client_name: c.name, content: noteContent, created_by: actor })
+    await supabase.from('client_notes').insert({ client_name: c.name, content: noteContent, created_by: actor, created_at: new Date().toISOString() })
 
     setAddendumSending(false)
     setAddModal(false)
@@ -1563,7 +1563,7 @@ export default function Clients() {
                       // Log the stage change as a note
                       const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
                       const noteContent = `📊 Pipeline stage changed: ${prevStage?.label||'—'} → ${s.label}`
-                      const {error:noteErr} = await supabase.from('client_notes').insert({client_name:c.name,content:noteContent,created_by:actor})
+                      const {error:noteErr} = await supabase.from('client_notes').insert({client_name:c.name,content:noteContent,created_by:actor,created_at:new Date().toISOString()})
                       if(!noteErr && detail?.id===c.id){
                         const{data:notesData}=await supabase.from('client_notes').select('*').eq('client_name',c.name).order('created_at',{ascending:false})
                         if(notesData)setRelNotes(notesData)
@@ -1644,21 +1644,21 @@ export default function Clients() {
                 {/* ── Tabbed Detail Section ─────────────────────────── */}
         <div className="card" style={{padding:0,overflow:'hidden'}}>
           {/* Tab Bar */}
-          <div style={{display:'flex',flexWrap:'wrap',borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
+          <div style={{display:'flex',flexWrap:'nowrap',overflowX:'auto',borderBottom:'1px solid var(--br)',background:'var(--s2)',paddingBottom:2}}>
             {[
-              {key:'overview', icon:'📋', text:'Overview'},
-              {key:'sms',      icon:'💬', text:'SMS'},
-              {key:'notes',    icon:'📝', text:'Notes'},
-              {key:'tasks',    icon:'✅', text:'Tasks'},
-              {key:'docs',     icon:'📁', text:'Docs'},
-              {key:'invoices', icon:'🧾', text:'Invoices'},
-              {key:'payments', icon:'💳', text:'Payments'},
-              {key:'cases',    icon:'📁', text:'Cases'},
+              {key:'overview',   icon:'📋', text:'Overview'},
+              {key:'notes',      icon:'📝', text:'Notes'},
+              {key:'tasks',      icon:'✅', text:'Tasks'},
+              {key:'docs',       icon:'📁', text:'Docs'},
               {key:'finprofile', icon:'🧮', text:'Financial Profile'},
-              {key:'organizer', icon:'🧾', text:'Tax-Org'},
+              {key:'sms',        icon:'💬', text:'SMS'},
+              {key:'invoices',   icon:'🧾', text:'Invoices'},
+              {key:'payments',   icon:'💳', text:'Payments'},
+              {key:'cases',      icon:'📁', text:'Cases'},
+              {key:'organizer',  icon:'🧾', text:'Tax-Organizer'},
             ].map(t=>(
               <button key={t.key} onClick={()=>setDetailTab(t.key)}
-                style={{display:'inline-flex',alignItems:'center',gap:5,padding:'12px 7px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
+                style={{display:'inline-flex',alignItems:'center',gap:5,padding:'12px 9px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
                   background:'none',cursor:'pointer',fontWeight:detailTab===t.key?700:500,
                   color:detailTab===t.key?'var(--blue)':'var(--t2)',whiteSpace:'nowrap',transition:'all .15s',flexShrink:0}}>
                 <span style={{fontSize:22,lineHeight:1}}>{t.icon}</span>
@@ -1784,7 +1784,7 @@ export default function Clients() {
                     disabled={!newNote.trim()||addingNote}
                     onClick={async()=>{
                       setAddingNote(true)
-                      const {error}=await supabase.from('client_notes').insert({client_name:c.name,content:newNote.trim(),created_by:user?.email||'Staff',visible_to_client:noteVisibleToClient})
+                      const {error}=await supabase.from('client_notes').insert({client_name:c.name,content:newNote.trim(),created_by:user?.email||'Staff',visible_to_client:noteVisibleToClient,created_at:new Date().toISOString()})
                       if(!error){setNewNote('');setNoteVisibleToClient(false);const{data}=await supabase.from('client_notes').select('*').eq('client_name',c.name).order('created_at',{ascending:false});if(data)setRelNotes(data)}
                       setAddingNote(false)
                     }}>
@@ -1793,7 +1793,7 @@ export default function Clients() {
                 </div>
               </div>
               {relNotes.length===0&&<div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No notes yet.</div>}
-              {relNotes.map((n,i)=>{
+              {relNotes.length>0 && (() => {
                 const typeConfig = {
                   'Email':  { icon: '📧', color: '#2563eb', bg: 'rgba(37,99,235,.12)' },
                   'SMS':    { icon: '💬', color: '#0891b2', bg: 'rgba(8,145,178,.12)' },
@@ -1802,24 +1802,68 @@ export default function Clients() {
                   'System': { icon: '⚙️', color: '#6b7280', bg: 'rgba(107,114,128,.12)' },
                   'Note':   { icon: '📝', color: '#d97706', bg: 'rgba(217,119,6,.12)' },
                 }
-                const tc = typeConfig[n.note_type] || typeConfig['Note']
-                return (
-                  <div key={n.id||i} style={{padding:'10px 0',borderBottom:'1px solid var(--br)'}}>
-                    <div style={{display:'flex',alignItems:'flex-start',gap:8,marginBottom:4}}>
-                      {n.note_type && (
-                        <span style={{fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:99,background:tc.bg,color:tc.color,flexShrink:0,marginTop:1}}>
-                          {tc.icon} {n.note_type}
-                        </span>
-                      )}
-                    </div>
-                    <div style={{fontSize:13,lineHeight:1.6,color:'var(--tx)',whiteSpace:'pre-wrap'}}>{n.content}</div>
-                    <div style={{fontSize:11,color:'var(--t3)',marginTop:4,display:'flex',alignItems:'center',gap:8}}>
-                      <span>{n.created_by||'Staff'} · {n.created_at?new Date(n.created_at).toLocaleDateString():''}</span>
-                      {n.visible_to_client && <span style={{fontSize:10,fontWeight:700,color:'var(--ok)',background:'rgba(34,197,94,.12)',padding:'1px 7px',borderRadius:99}}>👁 Client can see this</span>}
+                const AVATAR_PALETTE = ['#e8590c','#2563eb','#16a34a','#9333ea','#d97706','#0891b2','#dc2626','#4f46e5']
+                function avatarColor(name){
+                  const s = name || '?'
+                  let hash = 0
+                  for (let i=0;i<s.length;i++) hash = s.charCodeAt(i) + ((hash<<5)-hash)
+                  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length]
+                }
+                function initials(name){ return (name||'?').trim().split(/\s+/).filter(Boolean).map(p=>p[0]).join('').slice(0,2).toUpperCase() || '?' }
+
+                // Group notes the same way Karbon's activity feed does: Today,
+                // This Week, then by month for anything older — newest group first.
+                const now = new Date()
+                const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+                const startOfWeek = new Date(startOfToday); startOfWeek.setDate(startOfWeek.getDate() - 7)
+                const todayNotes = [], weekNotes = [], monthMap = new Map()
+                relNotes.forEach(n => {
+                  const d = n.created_at ? new Date(n.created_at) : null
+                  if (d && d >= startOfToday) todayNotes.push(n)
+                  else if (d && d >= startOfWeek) weekNotes.push(n)
+                  else {
+                    const label = d ? d.toLocaleDateString('en-US', { month:'long', ...(d.getFullYear()!==now.getFullYear() ? {year:'numeric'} : {}) }) : 'Earlier'
+                    if (!monthMap.has(label)) monthMap.set(label, [])
+                    monthMap.get(label).push(n)
+                  }
+                })
+                const sections = []
+                if (todayNotes.length) sections.push({ label:'Today', notes:todayNotes })
+                if (weekNotes.length) sections.push({ label:'This Week', notes:weekNotes })
+                monthMap.forEach((notes,label) => sections.push({ label, notes }))
+
+                return sections.map(sec => (
+                  <div key={sec.label} style={{marginBottom:20}}>
+                    <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:8}}>{sec.label}</div>
+                    <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                      {sec.notes.map((n,i) => {
+                        const tc = typeConfig[n.note_type] || typeConfig['Note']
+                        const emp = employees.find(e => e.name && n.created_by && e.name.toLowerCase()===n.created_by.toLowerCase())
+                        return (
+                          <div key={n.id||i} style={{display:'flex',gap:10,padding:'12px 14px',borderRadius:10,border:'1px solid var(--br)',background:'var(--s2)'}}>
+                            <div style={{width:34,height:34,borderRadius:'50%',flexShrink:0,overflow:'hidden',background:avatarColor(n.created_by),display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:800,color:'#fff'}}>
+                              {emp?.avatar_url
+                                ? <img src={emp.avatar_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                                : initials(n.created_by)}
+                            </div>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:4}}>
+                                <span style={{fontWeight:700,fontSize:13,color:'var(--tx)'}}>{n.created_by||'Staff'}</span>
+                                {n.note_type && (
+                                  <span style={{fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:99,background:tc.bg,color:tc.color}}>{tc.icon} {n.note_type}</span>
+                                )}
+                                <span style={{fontSize:11,color:'var(--t3)'}}>{n.created_at ? new Date(n.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : ''}</span>
+                                {n.visible_to_client && <span style={{fontSize:10,fontWeight:700,color:'var(--ok)',background:'rgba(34,197,94,.12)',padding:'1px 7px',borderRadius:99}}>👁 Client can see this</span>}
+                              </div>
+                              <div style={{fontSize:13,lineHeight:1.6,color:'var(--tx)',whiteSpace:'pre-wrap'}}>{n.content}</div>
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
-                )
-              })}
+                ))
+              })()}
             </div>
           )}
 
