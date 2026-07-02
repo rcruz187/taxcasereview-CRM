@@ -1750,9 +1750,9 @@ export default function Leads() {
           <div className="detail-tabs" style={{display:'flex',flexWrap:'nowrap',overflowX:'auto',borderBottom:'1px solid var(--br)',background:'var(--s2)',scrollbarWidth:'none'}}>
             {[
               {key:'overview', icon:'📋', text:'Overview'},
-              {key:'sms', icon:'💬', text:'SMS'},
               {key:'notes', icon:'📝', text:`Notes & Activity (${leadNotes.length})`},
               {key:'tasks', icon:'✅', text:`Tasks (${leadTasks.length})`},
+              {key:'sms', icon:'💬', text:'SMS'},
               {key:'payments', icon:'💳', text:'Payments'},
               {key:'finintake', icon:'💰', text:'Financial Intake'},
               {key:'finprofile', icon:'🧮', text:'Financial Profile'},
