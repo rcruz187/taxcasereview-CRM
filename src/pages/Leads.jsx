@@ -887,11 +887,12 @@ export default function Leads() {
       : willRestore
         ? `📊 Status changed: ${prevStatus} → ${status} (auto-restored from archive)`
         : `📊 Status changed: ${prevStatus} → ${status}`
-    await supabase.from('lead_notes').insert([{
+    const { error: noteErr } = await supabase.from('lead_notes').insert([{
       lead_id: l.id, lead_name: l.name,
       text: noteText,
       type: 'System', author: actor, created_at: new Date().toISOString()
     }])
+    if (noteErr) showToast('Status updated, but failed to log note: ' + noteErr.message)
 
     // ── Pipeline trigger tasks ──────────────────────────────────────────
     // When a lead moves to "Tax Investigation Active", assign tasks to the

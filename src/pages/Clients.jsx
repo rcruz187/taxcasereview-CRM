@@ -1563,9 +1563,7 @@ export default function Clients() {
                       // Try to update pipelineStage (run SQL: alter table clients add column if not exists "pipelineStage" text default 'investigation')
                       const {error}=await supabase.from('clients').update({pipelineStage:s.key}).eq('id',c.id)
                       if(error){
-                        // Column missing - update local state only
-                        setClients(prev=>prev.map(cl=>cl.id===c.id?{...cl,pipelineStage:s.key}:cl))
-                        if(detail?.id===c.id) setDetail({...c,pipelineStage:s.key})
+                        showToast('Error updating pipeline stage: '+error.message)
                         return
                       }
                       const {data}=await supabase.from('clients').select('*').eq('id',c.id).single()
@@ -1574,7 +1572,9 @@ export default function Clients() {
                       const actor = resolveActorName(user, employees)
                       const noteContent = `📊 Pipeline stage changed: ${prevStage?.label||'—'} → ${s.label}`
                       const {error:noteErr} = await supabase.from('client_notes').insert({client_name:c.name,content:noteContent,created_by:actor,created_at:new Date().toISOString()})
-                      if(!noteErr && detail?.id===c.id){
+                      if(noteErr){
+                        showToast('Stage updated, but failed to log note: '+noteErr.message)
+                      } else if(detail?.id===c.id){
                         const{data:notesData}=await supabase.from('client_notes').select('*').eq('client_name',c.name).order('created_at',{ascending:false})
                         if(notesData)setRelNotes(notesData)
                       }
