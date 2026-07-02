@@ -23,9 +23,69 @@ function fmtDuration(a, b) {
 }
 function today() { return new Date().toISOString().slice(0,10) }
 
+// ── Period helpers — Day / Week / Month, each supporting a From→To range ──
+// Week inputs use the native <input type="week"> value format "YYYY-Www"
+// (ISO 8601 week numbering, Monday–Sunday). Month inputs use "YYYY-MM".
+function isoWeekStart(weekStr) {
+  const [yearStr, weekPart] = weekStr.split('-W')
+  const year = parseInt(yearStr, 10)
+  const week = parseInt(weekPart, 10)
+  const simple = new Date(Date.UTC(year, 0, 1 + (week - 1) * 7))
+  const dow = simple.getUTCDay() || 7 // Mon=1 .. Sun=7
+  const monday = new Date(simple)
+  monday.setUTCDate(simple.getUTCDate() - dow + 1)
+  return monday
+}
+function isoWeekEnd(weekStr) {
+  const monday = isoWeekStart(weekStr)
+  const sunday = new Date(monday)
+  sunday.setUTCDate(monday.getUTCDate() + 6)
+  return sunday
+}
+function currentIsoWeekString(d = new Date()) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+  const dayNum = date.getUTCDay() || 7
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum)
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1))
+  const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7)
+  return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`
+}
+function monthStart(monthStr) {
+  const [y, m] = monthStr.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, 1))
+}
+function monthEnd(monthStr) {
+  const [y, m] = monthStr.split('-').map(Number)
+  return new Date(Date.UTC(y, m, 0, 23, 59, 59, 999))
+}
+function currentMonthString(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+// Computes the ISO datetime bounds + a human label for the selected period.
+// fromVal/toVal being equal means a single day/week/month; different means
+// a multi-period range (e.g. 3 weeks spanning fromVal through toVal).
+function computeRange(periodType, fromVal, toVal) {
+  if (periodType === 'week') {
+    const start = isoWeekStart(fromVal)
+    const end = isoWeekEnd(toVal)
+    end.setUTCHours(23, 59, 59, 999)
+    const s = start.toISOString().slice(0, 10), e = end.toISOString().slice(0, 10)
+    return { startISO: start.toISOString(), endISO: end.toISOString(), label: fromVal === toVal ? `Week of ${s}` : `${s} → ${e}` }
+  }
+  if (periodType === 'month') {
+    const start = monthStart(fromVal)
+    const end = monthEnd(toVal)
+    return { startISO: start.toISOString(), endISO: end.toISOString(), label: fromVal === toVal ? fromVal : `${fromVal} → ${toVal}` }
+  }
+  // day
+  return { startISO: fromVal + 'T00:00:00.000Z', endISO: toVal + 'T23:59:59.999Z', label: fromVal === toVal ? fromVal : `${fromVal} → ${toVal}` }
+}
+
 export default function ActivityReport() {
   const { role } = useApp()
-  const [date,       setDate]       = useState(today())
+  const [periodType, setPeriodType] = useState('day') // day | week | month
+  const [fromVal,    setFromVal]    = useState(today())
+  const [toVal,      setToVal]      = useState(today())
   const [employees,  setEmployees]  = useState([])
   const [selEmp,     setSelEmp]     = useState('All')
   const [logs,       setLogs]       = useState([])
@@ -33,20 +93,26 @@ export default function ActivityReport() {
   const [view,       setView]       = useState('summary') // summary | timeline
 
   const canView = ['Super Admin','Admin','Manager'].includes(role)
+  const { startISO, endISO, label: rangeLabel } = computeRange(periodType, fromVal, toVal)
+
+  function changePeriodType(pt) {
+    setPeriodType(pt)
+    if (pt === 'day')   { setFromVal(today()); setToVal(today()) }
+    if (pt === 'week')  { const w = currentIsoWeekString(); setFromVal(w); setToVal(w) }
+    if (pt === 'month') { const m = currentMonthString(); setFromVal(m); setToVal(m) }
+  }
 
   useEffect(() => {
     supabase.from('employees').select('id,name,role,status').eq('status','Active').order('name')
       .then(({ data }) => setEmployees(data || []))
   }, [])
 
-  useEffect(() => { load() }, [date, selEmp])
+  useEffect(() => { load() }, [periodType, fromVal, toVal, selEmp])
 
   async function load() {
     setLoading(true)
-    const start = date + 'T00:00:00.000Z'
-    const end   = date + 'T23:59:59.999Z'
     let q = supabase.from('activity_log').select('*')
-      .gte('created_at', start).lte('created_at', end)
+      .gte('created_at', startISO).lte('created_at', endISO)
       .order('created_at', { ascending: true })
     if (selEmp !== 'All') q = q.eq('employee_name', selEmp)
     const { data } = await q
@@ -88,8 +154,28 @@ export default function ActivityReport() {
     <div>
       {/* Header controls */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input type="date" value={date} onChange={e => setDate(e.target.value)}
-          style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--tx)', fontSize: 13 }} />
+        <div style={{ display: 'flex', gap: 4 }}>
+          {['day','week','month'].map(pt => (
+            <span key={pt} className={`chip${periodType === pt ? ' on' : ''}`} onClick={() => changePeriodType(pt)} style={{ textTransform: 'capitalize' }}>{pt}</span>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <label style={{ fontSize: 11, color: 'var(--t3)' }}>From</label>
+          <input type={periodType === 'week' ? 'week' : periodType === 'month' ? 'month' : 'date'}
+            value={fromVal}
+            onChange={e => { const v = e.target.value; setFromVal(v); if (v > toVal) setToVal(v) }}
+            style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--tx)', fontSize: 13 }} />
+          <label style={{ fontSize: 11, color: 'var(--t3)' }}>To</label>
+          <input type={periodType === 'week' ? 'week' : periodType === 'month' ? 'month' : 'date'}
+            value={toVal}
+            onChange={e => { const v = e.target.value; setToVal(v); if (v < fromVal) setFromVal(v) }}
+            style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--tx)', fontSize: 13 }} />
+          <span style={{ fontSize: 11, color: 'var(--t3)' }} title="Set From and To to different periods to export/view multiple weeks or months at once">
+            {fromVal !== toVal ? `📅 ${rangeLabel}` : ''}
+          </span>
+        </div>
+
         <select value={selEmp} onChange={e => { setSelEmp(e.target.value); setView(e.target.value === 'All' ? 'summary' : 'timeline') }}
           style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--tx)', fontSize: 13 }}>
           <option value="All">All Employees</option>
@@ -107,16 +193,16 @@ export default function ActivityReport() {
           onClick={() => exportCSV(
             [['Employee','Time','Action','Category','Description','Entity'],
              ...filteredLogs.map(l => [l.employee_name, new Date(l.created_at).toLocaleString(), l.action, l.category, l.description||'', l.entity_name||''])],
-            `activity-report-${date}`
+            `activity-report-${rangeLabel.replace(/[^0-9a-zA-Z-]+/g,'_')}`
           )}>⬇ CSV</button>
         <button className="btn sec" style={{ fontSize: 12, padding: '6px 14px' }}
           onClick={() => exportExcel(
             [['Employee','Time','Action','Category','Description','Entity'],
              ...filteredLogs.map(l => [l.employee_name, new Date(l.created_at).toLocaleString(), l.action, l.category, l.description||'', l.entity_name||''])],
-            `activity-report-${date}`
+            `activity-report-${rangeLabel.replace(/[^0-9a-zA-Z-]+/g,'_')}`
           )}>📊 Excel</button>
         <button className="btn sec" style={{ fontSize: 12, padding: '6px 14px' }}
-          onClick={() => exportPDF(`Activity Report — ${date}`, [{
+          onClick={() => exportPDF(`Activity Report — ${rangeLabel}`, [{
             heading: selEmp === 'All' ? 'All Staff Activity' : `${selEmp} — Activity`,
             headers: ['Employee','Time','Category','Description'],
             rows: filteredLogs.map(l => [l.employee_name, new Date(l.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}), l.category, l.description||''])
@@ -204,13 +290,13 @@ export default function ActivityReport() {
           <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--br)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <span style={{ fontWeight: 700, fontSize: 15 }}>{selEmp}</span>
-              <span style={{ fontSize: 12, color: 'var(--t3)', marginLeft: 8 }}>{filteredLogs.length} actions on {date}</span>
+              <span style={{ fontSize: 12, color: 'var(--t3)', marginLeft: 8 }}>{filteredLogs.length} actions in {rangeLabel}</span>
             </div>
             <button className="btn sec" style={{ fontSize: 12 }} onClick={() => { setSelEmp('All'); setView('summary') }}>← All staff</button>
           </div>
 
           {filteredLogs.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--t3)', fontSize: 13 }}>No activity for {selEmp} on this date.</div>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--t3)', fontSize: 13 }}>No activity for {selEmp} in this period.</div>
           ) : (
             <div style={{ padding: '8px 0' }}>
               {filteredLogs.map((l, i) => {
