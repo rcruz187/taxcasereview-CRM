@@ -402,14 +402,14 @@ export default function Leads() {
     if (!urlLeadId || detail) return
     let cancelled = false
     supabase.from('leads').select('*').eq('id', urlLeadId).single().then(({ data }) => {
-      if (!cancelled && data) setDetail(data)
+      if (!cancelled && data) { setDetail(data); loadLeadNotes(data.id) }
     })
     return () => { cancelled = true }
   }, [urlLeadId])
   useEffect(() => {
     if (urlLeadId && leads.length > 0 && !detail) {
       const found = leads.find(l => String(l.id) === String(urlLeadId))
-      if (found) setDetail(found)
+      if (found) { setDetail(found); loadLeadNotes(found.id) }
     }
   }, [urlLeadId, leads])
   // If the URL no longer points at the lead currently being shown (e.g.
