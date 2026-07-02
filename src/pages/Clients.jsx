@@ -55,6 +55,16 @@ const BLANK = {
 }
 
 function Bdg({s,c,style}) { return <span className={`bdg ${c||'bn'}`} style={style}>{s}</span> }
+// Resolves the logged-in user's display name against the employees table by
+// email first (the one identifier that's always reliable), so notes/logs are
+// attributed with the same name Team Chat uses ("Romy Cruz") instead of
+// falling back to an email-prefix guess ("romy") that avatar matching can't
+// find. Falls back to auth metadata / email prefix only if no employee row matches.
+function resolveActorName(user, employees) {
+  const email = user?.email?.toLowerCase()
+  const emp = email ? employees.find(e => e.email && e.email.toLowerCase() === email) : null
+  return emp?.name || resolveActorName(user, employees)
+}
 function PhoneLink({val, name}) {
   const { startCall, relayStatus } = useCall()
   if (!val) return <span style={{color:'var(--t3)'}}>—</span>
@@ -206,7 +216,7 @@ function InlineFaxForm({ client, onClose, showToast, onLogged }) {
     // Auto-log to Notes -- every outbound fax shows in the client's activity
     // timeline, same pattern as the SMS tab, including what was actually faxed.
     const { data: { user } } = await supabase.auth.getUser()
-    const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    const actor = resolveActorName(user, employees)
     const noteContent = `📠 Fax ${sent?'sent':'logged'} to ${toFull}${subject?' — '+subject:''}${file?.name?' (' + file.name + ')':''}`
     await supabase.from('client_notes').insert({ client_name: client?.name, content: noteContent, created_by: actor, created_at: new Date().toISOString() })
 
@@ -965,7 +975,7 @@ export default function Clients() {
   async function load() {
     const [{ data:cl },{ data:em }] = await Promise.all([
       supabase.from('clients').select('*').order('created_at',{ascending:false}),
-      supabase.from('employees').select('id,name,avatar_url')
+      supabase.from('employees').select('id,name,avatar_url,email')
     ])
     if (cl) setClients(cl)
     if (em) setEmployees(em)
@@ -1065,7 +1075,7 @@ export default function Clients() {
     setSaving(false)
     if (error){showToast('Error: '+error.message);return}
     showToast(skipped.length ? `✅ Client added — but skipped fields not in the database yet: ${skipped.join(', ')}` : '✅ Client added!')
-    const actorC = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    const actorC = resolveActorName(user, employees)
     await triggerWorkflow('client_created', 'client', form.name, actorC).catch(()=>{})
     await logActivity(supabase,{employeeName:actorC,action:'client_created',category:'client',description:`Added client: ${form.name}`,entityName:form.name}).catch(()=>{})
     setModal(false); setForm(BLANK)
@@ -1110,7 +1120,7 @@ export default function Clients() {
     const {id,name} = confirmArchive; setConfirmArchive(null)
     const { error } = await supabase.from('clients').update({ archived: true }).eq('id',id)
     if (error) { showToast('Error: '+error.message); return }
-    const actorA = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    const actorA = resolveActorName(user, employees)
     await triggerWorkflow('client_archived', 'client', name || '', actorA).catch(()=>{})
     // Update local state immediately — no refresh needed
     setClients(prev => prev.map(c => c.id === id ? { ...c, archived: true } : c))
@@ -1161,7 +1171,7 @@ export default function Clients() {
       status = 'Logged (not sent)'
     }
 
-    const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    const actor = resolveActorName(user, employees)
     const { error } = await supabase.from('sms_messages').insert([{
       clientName: c.name, phone: toNum, body: smsBody, status,
       signalwire_sms_id: swId, sent_by: actor, error_msg: errMsg,
@@ -1170,7 +1180,7 @@ export default function Clients() {
     setSmsSending(false)
     if (error) { showToast('Error: '+error.message); return }
 
-    if (status === 'Sent') { showToast('✅ Text sent!'); const actorS = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'; await triggerWorkflow('client_email_sent', 'client', c?.name || '', actorS).catch(()=>{}) }
+    if (status === 'Sent') { showToast('✅ Text sent!'); const actorS = resolveActorName(user, employees); await triggerWorkflow('client_email_sent', 'client', c?.name || '', actorS).catch(()=>{}) }
     else if (status === 'Failed') showToast('SignalWire error: ' + (errMsg||'send failed'))
     else showToast('Logged — add SignalWire credentials in Settings to actually send')
 
@@ -1206,7 +1216,7 @@ export default function Clients() {
     setAddingNote(true)
     const {error}=await supabase.from('client_notes').insert([{
       client_name:detail.name, content:newNote.trim(),
-      created_by:user?.email||'Staff', visible_to_client: visibleToClient,
+      created_by:resolveActorName(user, employees), visible_to_client: visibleToClient,
       created_at:new Date().toISOString()
     }])
     setAddingNote(false)
@@ -1254,7 +1264,7 @@ export default function Clients() {
   async function sendStatePOA(client, formDef, via) {
     setPoaSending(true)
     try {
-      const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+      const actor = resolveActorName(user, employees)
       const base = import.meta.env.BASE_URL.replace(/\/$/, '')
       const pdfRes = await fetch(`${base}/state-forms/${formDef.file}`)
       if (!pdfRes.ok) throw new Error('Could not load ' + formDef.state + ' POA PDF')
@@ -1302,7 +1312,7 @@ export default function Clients() {
     if (via !== 'sms' && !c.email) { showToast('Client has no email on file'); return }
     if (via !== 'email' && !c.phone) { showToast('Client has no phone on file'); return }
     setAddendumSending(true)
-    const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    const actor = resolveActorName(user, employees)
     const res = await sendAddendumForSignature(c, addForm, supabase, actor)
     if (res.error) { setAddendumSending(false); showToast('Error: '+res.error); return }
 
@@ -1456,7 +1466,7 @@ export default function Clients() {
         client_name: detail.name,
         content: `💳 2nd Trade Installment Plan Created — $${parseFloat(installmentForm.totalFee).toLocaleString()} over ${installmentForm.months} months ($${monthlyAmt.toFixed(2)}/mo)${data.mode === 'checkout' ? '\nCheckout link sent to collect card.' : '\nSubscription started on saved card.'}`,
         note_type: 'System',
-        created_by: user?.email || 'Staff',
+        created_by: resolveActorName(user, employees),
         created_at: new Date().toISOString(),
       })
 
@@ -1561,7 +1571,7 @@ export default function Clients() {
                       const {data}=await supabase.from('clients').select('*').eq('id',c.id).single()
                       if(data)setDetail(data)
                       // Log the stage change as a note
-                      const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+                      const actor = resolveActorName(user, employees)
                       const noteContent = `📊 Pipeline stage changed: ${prevStage?.label||'—'} → ${s.label}`
                       const {error:noteErr} = await supabase.from('client_notes').insert({client_name:c.name,content:noteContent,created_by:actor,created_at:new Date().toISOString()})
                       if(!noteErr && detail?.id===c.id){
@@ -1784,7 +1794,7 @@ export default function Clients() {
                     disabled={!newNote.trim()||addingNote}
                     onClick={async()=>{
                       setAddingNote(true)
-                      const {error}=await supabase.from('client_notes').insert({client_name:c.name,content:newNote.trim(),created_by:user?.email||'Staff',visible_to_client:noteVisibleToClient,created_at:new Date().toISOString()})
+                      const {error}=await supabase.from('client_notes').insert({client_name:c.name,content:newNote.trim(),created_by:resolveActorName(user, employees),visible_to_client:noteVisibleToClient,created_at:new Date().toISOString()})
                       if(!error){setNewNote('');setNoteVisibleToClient(false);const{data}=await supabase.from('client_notes').select('*').eq('client_name',c.name).order('created_at',{ascending:false});if(data)setRelNotes(data)}
                       setAddingNote(false)
                     }}>
@@ -1838,7 +1848,12 @@ export default function Clients() {
                     <div style={{display:'flex',flexDirection:'column',gap:8}}>
                       {sec.notes.map((n,i) => {
                         const tc = typeConfig[n.note_type] || typeConfig['Note']
-                        const emp = employees.find(e => e.name && n.created_by && e.name.toLowerCase()===n.created_by.toLowerCase())
+                        // Exact name match first; fall back to first-name-only match for
+                        // older notes saved before resolveActorName (e.g. "romy" instead
+                        // of "Romy Cruz") so their avatar still resolves correctly.
+                        const authorLower = (n.created_by||'').toLowerCase().trim()
+                        const emp = employees.find(e => e.name && e.name.toLowerCase()===authorLower)
+                          || employees.find(e => e.name && e.name.toLowerCase().split(' ')[0]===authorLower)
                         return (
                           <div key={n.id||i} style={{display:'flex',gap:10,padding:'12px 14px',borderRadius:10,border:'1px solid var(--br)',background:'var(--s2)'}}>
                             <div style={{width:34,height:34,borderRadius:'50%',flexShrink:0,overflow:'hidden',background:avatarColor(n.created_by),display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:800,color:'#fff'}}>

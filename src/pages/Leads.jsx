@@ -76,6 +76,14 @@ const BLANK = {
 const IRS_STATUS_OPTIONS = ['ACS','Notice Status','Queue for ACS','Currently Not Collectible','Installment Agreement','Garnishment','Levy Issued','Levied','Lien Filed','Appeals','Litigation','Released','Other']
 
 function Bdg({s,style}) { return <span className={`bdg ${STATUS_C[s]||'bn'}`} style={style}>{s}</span> }
+// Resolves the logged-in user's display name against the employees table by
+// email first, so notes are attributed as "Romy Cruz" (matching Team Chat)
+// instead of an email-prefix guess like "romy" that avatar matching can't find.
+function resolveActorName(user, employees) {
+  const email = user?.email?.toLowerCase()
+  const emp = email ? employees.find(e => e.email && e.email.toLowerCase() === email) : null
+  return emp?.name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+}
 
 function TypeBdg({t,style}) {
   const m = {'OIC':'bb','Installment Agreement':'bg','CNC':'bn','Penalty Abatement':'bb','Appeals':'bn','Payroll Tax':'br','Audit':'br','Liens/Levies':'br'}
@@ -416,7 +424,7 @@ export default function Leads() {
   async function load() {
     const [{ data }, { data: emp }] = await Promise.all([
       supabase.from('leads').select('*').order('created_at', { ascending: false }),
-      supabase.from('employees').select('id,name,avatar_url').order('name'),
+      supabase.from('employees').select('id,name,avatar_url,email').order('name'),
     ])
     if (emp) setEmployees(emp)
     if (data) {
@@ -504,7 +512,7 @@ export default function Leads() {
   async function sendLeadStatePOA(lead, formDef, via) {
     setPoaSending(true)
     try {
-      const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+      const actor = resolveActorName(user, employees)
       const base = import.meta.env.BASE_URL.replace(/\/$/, '')
       const pdfRes = await fetch(`${base}/state-forms/${formDef.file}`)
       if (!pdfRes.ok) throw new Error('Could not load ' + formDef.state + ' POA PDF')
@@ -550,7 +558,7 @@ export default function Leads() {
     if (via !== 'sms' && !l.email) { showToast('Lead has no email on file'); return }
     if (via !== 'email' && !l.phone) { showToast('Lead has no phone on file'); return }
     setAddendumSending(true)
-    const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    const actor = resolveActorName(user, employees)
     const res = await sendAddendumForSignature(l, addForm, supabase, actor)
     if (res.error) { setAddendumSending(false); showToast('Error: '+res.error); return }
 
@@ -676,7 +684,7 @@ export default function Leads() {
       status = 'Logged (not sent)'
     }
 
-    const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    const actor = resolveActorName(user, employees)
     const { error } = await supabase.from('sms_messages').insert([{
       clientName: l.name, phone: toNum, body: leadSmsBody, status,
       signalwire_sms_id: swId, sent_by: actor, error_msg: errMsg,
@@ -704,7 +712,7 @@ export default function Leads() {
       lead_name: detail.name,
       text: newLeadNote.trim(),
       type: noteType,
-      author: user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff',
+      author: resolveActorName(user, employees),
       created_at: new Date().toISOString()
     }])
     setAddingLeadNote(false)
@@ -873,7 +881,7 @@ export default function Leads() {
     if (willRestore) payload.archived = false
     const { error } = await supabase.from('leads').update(payload).eq('id', l.id)
     if (error) { showToast('Error: ' + error.message); return }
-    const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    const actor = resolveActorName(user, employees)
     const noteText = willArchive
       ? `📊 Status changed: ${prevStatus} → ${status} (auto-archived)`
       : willRestore
@@ -1348,7 +1356,7 @@ export default function Leads() {
       : (l.email ? '' : ', financial intake created but no email on file to send it to')
     showToast(count ? `✅ ${l.name} converted to Client! 3 onboarding tasks created${intakeMsg}, compliance data (${count} records) carried over.` : `✅ ${l.name} converted to Client! 3 onboarding tasks created${intakeMsg}.`)
     // ── Workflow engine — lead converted trigger ──
-    const convActor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    const convActor = resolveActorName(user, employees)
     await triggerWorkflow('lead_converted', 'lead', l.name, convActor)
     const _ca=getActor(user); await logActivity(supabase,{employeeName:_ca.name,employeeEmail:_ca.email,action:'lead_converted',category:'lead',description:`Converted to client: ${l.name}`,entityName:l.name})
     setDetail(null); load()
@@ -1881,7 +1889,9 @@ export default function Leads() {
                     <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:8}}>{sec.label}</div>
                     <div style={{display:'flex',flexDirection:'column',gap:8}}>
                       {sec.notes.map((n,i) => {
-                        const emp = employees.find(e => e.name && n.author && e.name.toLowerCase()===n.author.toLowerCase())
+                        const authorLower = (n.author||'').toLowerCase().trim()
+                        const emp = employees.find(e => e.name && e.name.toLowerCase()===authorLower)
+                          || employees.find(e => e.name && e.name.toLowerCase().split(' ')[0]===authorLower)
                         return (
                           <div key={n.id||i} style={{display:'flex',gap:10,padding:'12px 14px',borderRadius:10,border:'1px solid var(--br)',background:'var(--s2)'}}>
                             <div style={{width:34,height:34,borderRadius:'50%',flexShrink:0,overflow:'hidden',background:avatarColor(n.author),display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:800,color:'#fff'}}>
