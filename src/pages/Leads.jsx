@@ -85,6 +85,30 @@ function resolveActorName(user, employees) {
   return emp?.name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
 }
 
+const LEAD_FIELD_LABELS = {
+  name:'Name', email:'Email', phone:'Phone', phone2:'Phone 2', address:'Address',
+  city:'City', state:'State', zip:'Zip', ssn:'SSN', ein:'EIN', dob:'DOB',
+  filingStatus:'Filing Status', maritalStatus:'Marital Status', occupation:'Occupation',
+  employer:'Employer', spouseName:'Spouse Name', taxFee:'Tax Fee', source:'Source',
+  assignedTo:'Assigned To', businessName:'Business Name', business_name:'Business Name',
+  clientType:'Client Type', irsOrState:'IRS or State',
+}
+const LEAD_SKIP_DIFF_FIELDS = new Set(['id','created_at','updated_at','tenant_id','status','archived','dobM','dobD','dobY'])
+function summarizeLeadFieldChanges(before, after) {
+  if (!before || !after) return []
+  const changes = []
+  for (const key of Object.keys(after)) {
+    if (LEAD_SKIP_DIFF_FIELDS.has(key)) continue
+    const oldVal = before[key], newVal = after[key]
+    if ((oldVal ?? '') === (newVal ?? '')) continue
+    if (typeof newVal === 'object') continue
+    const label = LEAD_FIELD_LABELS[key] || key
+    const fmt = v => (v===null||v===undefined||v==='') ? '(empty)' : String(v).slice(0,60)
+    changes.push(`${label}: ${fmt(oldVal)} → ${fmt(newVal)}`)
+  }
+  return changes
+}
+
 function TypeBdg({t,style}) {
   const m = {'OIC':'bb','Installment Agreement':'bg','CNC':'bn','Penalty Abatement':'bb','Appeals':'bn','Payroll Tax':'br','Audit':'br','Liens/Levies':'br'}
   return <span className={`bdg ${m[t]||'bn'}`} style={style}>{t}</span>
@@ -439,6 +463,20 @@ export default function Leads() {
     setLeadNotes(data || [])
   }
 
+  // Single shared entry point for auto-logging an action as a lead note —
+  // same pattern as Clients.jsx's logAction, kept consistent so error
+  // handling doesn't get hand-rolled (and silently swallowed) per call site.
+  async function logAction(leadId, leadName, text) {
+    if (!leadId) return
+    const actor = resolveActorName(user, employees)
+    const { error } = await supabase.from('lead_notes').insert({
+      lead_id: leadId, lead_name: leadName, text, type: 'System',
+      author: actor, created_at: new Date().toISOString()
+    })
+    if (error) showToast('Action completed, but failed to log note: ' + error.message)
+    return !error
+  }
+
   // Scoped strictly to this lead's name — sms_messages.clientName is the
   // shared text key receive-sms already matches against both leads and
   // clients by phone number, so a lead's inbound replies were already
@@ -468,7 +506,10 @@ export default function Leads() {
 
   async function toggleLeadTask(task) {
     const { error } = await supabase.from('tasks').update({ done: !task.done }).eq('id', task.id)
-    if (!error && detail) loadLeadTasks(detail.name)
+    if (!error && detail) {
+      loadLeadTasks(detail.name)
+      await logAction(detail.id, detail.name, `${!task.done ? '✅' : '↩️'} Task ${!task.done ? 'completed' : 'reopened'}: "${task.title}"`)
+    }
   }
 
   async function addQuickLeadTask() {
@@ -480,9 +521,11 @@ export default function Leads() {
     }])
     setAddingLeadTask(false)
     if (error) { showToast('Task error: ' + error.message); return }
+    const loggedTitle = leadQuickTask.trim()
     setLeadQuickTask('')
     loadLeadTasks(detail.name)
     showToast('✅ Task added!')
+    await logAction(detail.id, detail.name, `📌 Task created: "${loggedTitle}"`)
   }
 
   // Sends the Service Addendum for e-signature (vs. the print-only path,
@@ -793,6 +836,7 @@ export default function Leads() {
   async function save() {
     if (!form.name.trim()) { showToast('Name is required'); return }
     setSaving(true)
+    const beforeEdit = modal === 'edit' ? leads.find(l=>l.id===form.id) : null
     let payload = { ...form, taxYears: JSON.stringify(form.taxYears), filingRequirements: JSON.stringify(form.filingRequirements||[]) }
     // Empty-string values blow up non-text columns (date, numeric) with
     // "invalid input syntax" — Postgres wants null for "no value", not ''.
@@ -840,6 +884,10 @@ export default function Leads() {
       const { data } = await supabase.from('leads').select('*').eq('id', form.id).single()
       if (data) setDetail(data)
       load()
+      if (data && beforeEdit) {
+        const changes = summarizeLeadFieldChanges(beforeEdit, data)
+        if (changes.length) await logAction(data.id, data.name, `✏️ Updated: ${changes.join(', ')}`)
+      }
     } else {
       // New lead — reload then navigate straight into the detail view
       const { data: allLeads } = await supabase.from('leads').select('*').order('created_at', { ascending: false })
@@ -856,6 +904,7 @@ export default function Leads() {
     const l = confirmArchive; setConfirmArchive(null)
     const { error } = await supabase.from('leads').update({ archived: true }).eq('id', l.id)
     if (error) { showToast('Error: ' + error.message); return }
+    await logAction(l.id, l.name, '🗄️ Lead archived')
     // Update local state immediately — no refresh needed
     setLeads(prev => prev.map(lead => lead.id === l.id ? { ...lead, archived: true } : lead))
     setDetail(null)
@@ -868,6 +917,7 @@ export default function Leads() {
   async function restoreLead(l) {
     const { error } = await supabase.from('leads').update({ archived: false }).eq('id', l.id)
     if (error) { showToast('Error: ' + error.message); return }
+    await logAction(l.id, l.name, '📤 Lead restored from archive')
     showToast('Lead restored'); load()
   }
 

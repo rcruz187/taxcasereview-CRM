@@ -63,7 +63,36 @@ function Bdg({s,c,style}) { return <span className={`bdg ${c||'bn'}`} style={sty
 function resolveActorName(user, employees) {
   const email = user?.email?.toLowerCase()
   const emp = email ? employees.find(e => e.email && e.email.toLowerCase() === email) : null
-  return emp?.name || resolveActorName(user, employees)
+  return emp?.name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+}
+
+// Human-readable labels for the field-diff audit log. Anything not listed
+// here still logs, just with its raw key as the label.
+const FIELD_LABELS = {
+  name:'Name', email:'Email', phone:'Phone', phone2:'Phone 2', address:'Address',
+  city:'City', state:'State', zip:'Zip', ssn:'SSN', ein:'EIN', dob:'DOB',
+  filingStatus:'Filing Status', maritalStatus:'Marital Status', occupation:'Occupation',
+  employer:'Employer', spouseName:'Spouse Name', spouseSsn:'Spouse SSN', spouseDob:'Spouse DOB',
+  taxFee:'Tax Fee', source:'Source', assignedTo:'Assigned To', businessName:'Business Name',
+  business_name:'Business Name', clientType:'Client Type', irsOrState:'IRS or State', dependents:'Dependents',
+}
+// Fields that either change automatically as a side-effect of other actions
+// (so logging them here would be noisy/redundant with their own dedicated
+// log line) or are internal bookkeeping never worth showing to a human.
+const SKIP_DIFF_FIELDS = new Set(['id','created_at','updated_at','tenant_id','pipelineStage','status','archived','dobM','dobD','dobY'])
+function summarizeFieldChanges(before, after) {
+  if (!before || !after) return []
+  const changes = []
+  for (const key of Object.keys(after)) {
+    if (SKIP_DIFF_FIELDS.has(key)) continue
+    const oldVal = before[key], newVal = after[key]
+    if ((oldVal ?? '') === (newVal ?? '')) continue
+    if (typeof newVal === 'object') continue // skip nested objects/arrays — not worth diffing here
+    const label = FIELD_LABELS[key] || key
+    const fmt = v => (v===null||v===undefined||v==='') ? '(empty)' : String(v).slice(0,60)
+    changes.push(`${label}: ${fmt(oldVal)} → ${fmt(newVal)}`)
+  }
+  return changes
 }
 function PhoneLink({val, name}) {
   const { startCall, relayStatus } = useCall()
@@ -624,7 +653,7 @@ export const DOC_FOLDERS = ['IRS Docs','Tax Returns','Agreements','POA & Forms',
 const FILE_EXT_ICON = n => { const e=(n||'').split('.').pop().toLowerCase(); return {pdf:'📄',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',jpg:'🖼️',jpeg:'🖼️',png:'🖼️',tiff:'🖼️'}[e]||'📎' }
 const fmt = b => b<1024?b+'B':b<1048576?(b/1024).toFixed(1)+'KB':(b/1048576).toFixed(1)+'MB'
 
-export function ClientDocs({ clientName, supabase, showToast }) {
+export function ClientDocs({ clientName, supabase, showToast, onLogged }) {
   const [docs,       setDocs]       = useState([])
   const [folder,     setFolder]     = useState('All')
   const [uploading,  setUploading]  = useState(false)
@@ -661,7 +690,9 @@ export function ClientDocs({ clientName, supabase, showToast }) {
     setSaving(false)
     if (error) { showToast('Error: '+error.message); return }
     showToast('✅ Document saved!')
+    const loggedName = form.name, loggedType = form.docType
     setForm({ name:'', docType:'IRS Docs', notes:'' }); setFile(null); setUploading(false); loadDocs()
+    if (onLogged) await onLogged(`📁 Document added: "${loggedName}" (${loggedType})`)
   }
 
   async function delDoc(doc) {
@@ -671,6 +702,7 @@ export function ClientDocs({ clientName, supabase, showToast }) {
     }
     await supabase.from('documents').delete().eq('id', doc.id)
     showToast('Deleted'); loadDocs()
+    if (onLogged) await onLogged(`🗑️ Document deleted: "${doc.name}"`)
   }
 
   // Group by folder
@@ -981,6 +1013,22 @@ export default function Clients() {
     if (em) setEmployees(em)
   }
 
+  // Single shared entry point for auto-logging an action as a client note.
+  // Every action-logging call in this file should go through this instead of
+  // hand-writing its own insert, so error handling (and the note format) is
+  // consistent in exactly one place — a hand-written insert with a silently
+  // swallowed error is what caused the pipeline-stage bug.
+  async function logAction(clientName, text) {
+    if (!clientName) return
+    const actor = resolveActorName(user, employees)
+    const { error } = await supabase.from('client_notes').insert({
+      client_name: clientName, content: text, note_type: 'System',
+      created_by: actor, created_at: new Date().toISOString()
+    })
+    if (error) showToast('Action completed, but failed to log note: ' + error.message)
+    return !error
+  }
+
   async function loadRelated(clientName) {
     setLoadingRel(true)
     const [{ data:cases },{ data:tasks },{ data:invoices },{ data:docs },{ data:clientNotes },{ data:payments },{ data:sms },{ data:deadlines }] = await Promise.all([
@@ -1088,6 +1136,7 @@ export default function Clients() {
 
   async function saveEdit() {
     setSaving(true)
+    const before = clients.find(cl=>cl.id===form.id) || detail
     let payload = buildPayload(form)
     let error
     const skipped = []
@@ -1111,6 +1160,10 @@ export default function Clients() {
     const {data}=await supabase.from('clients').select('*').eq('id',form.id).single()
     if (data){setDetail(data);loadRelated(data.name)}
     load()
+    if (data) {
+      const changes = summarizeFieldChanges(before, data)
+      if (changes.length) { await logAction(data.name, `✏️ Updated: ${changes.join(', ')}`); loadRelated(data.name) }
+    }
   }
 
   // Clients are archived, never permanently deleted — this hides them from
@@ -1122,6 +1175,7 @@ export default function Clients() {
     if (error) { showToast('Error: '+error.message); return }
     const actorA = resolveActorName(user, employees)
     await triggerWorkflow('client_archived', 'client', name || '', actorA).catch(()=>{})
+    await logAction(name, '🗄️ Client archived')
     // Update local state immediately — no refresh needed
     setClients(prev => prev.map(c => c.id === id ? { ...c, archived: true } : c))
     setDetail(null)
@@ -1131,9 +1185,11 @@ export default function Clients() {
   }
 
   async function restoreClient(id) {
+    const client = clients.find(c=>c.id===id)
     const { error } = await supabase.from('clients').update({ archived: false }).eq('id',id)
     if (error) { showToast('Error: '+error.message); return }
     showToast('Client restored');load()
+    if (client) await logAction(client.name, '📤 Client restored from archive')
   }
 
   // Sends an SMS to this client right from their file -- same send-sms
@@ -1194,7 +1250,10 @@ export default function Clients() {
 
   async function toggleTask(task) {
     const {error}=await supabase.from('tasks').update({done:!task.done}).eq('id',task.id)
-    if (!error && detail) loadRelated(detail.name)
+    if (!error && detail) {
+      loadRelated(detail.name)
+      await logAction(detail.name, `${!task.done ? '✅' : '↩️'} Task ${!task.done ? 'completed' : 'reopened'}: "${task.title}"`)
+    }
   }
 
   async function addQuickTask() {
@@ -1209,6 +1268,8 @@ export default function Clients() {
     setQuickTask('')
     loadRelated(detail.name)
     showToast('✅ Task added!')
+    await logAction(detail.name, `📌 Task created: "${quickTask.trim()}"`)
+    loadRelated(detail.name)
   }
 
   async function addClientNote(visibleToClient = false) {
@@ -1235,10 +1296,13 @@ export default function Clients() {
     }])
     setAddingTask(false)
     if(error){showToast('Task error: '+error.message);return}
+    const loggedTitle = taskTitle.trim()
     setTaskTitle('');setTaskPriority('Normal');setTaskDueDate('')
     setTaskModal(false)
     loadRelated(detail.name)
     showToast('✅ Task added!')
+    await logAction(detail.name, `📌 Task created: "${loggedTitle}"`)
+    loadRelated(detail.name)
   }
 
   const STATE_POA_FORMS = [
@@ -1417,9 +1481,12 @@ export default function Clients() {
     }])
     setSavingPay(false)
     if(error){showToast('Payment error: '+error.message);return}
+    const loggedAmount = payForm.amount, loggedMethod = payForm.method
     setPayForm({amount:'',method:'Credit Card',date:'',notes:''})
     setPayModal(false)
     showToast('✅ Payment recorded!')
+    await logAction(detail.name, `💵 Payment recorded: $${loggedAmount} (${loggedMethod})`)
+    loadRelated(detail.name)
   }
 
   async function createInstallmentPlan() {
@@ -1771,7 +1838,7 @@ export default function Clients() {
           {/* Docs Tab */}
           {detailTab==='docs'&&(
             <div style={{padding:0}}>
-              <ClientDocs clientName={c.name} supabase={supabase} showToast={showToast}/>
+              <ClientDocs clientName={c.name} supabase={supabase} showToast={showToast} onLogged={(text)=>logAction(c.name, text)}/>
             </div>
           )}
 
