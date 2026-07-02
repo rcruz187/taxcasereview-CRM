@@ -416,7 +416,7 @@ export default function Leads() {
   async function load() {
     const [{ data }, { data: emp }] = await Promise.all([
       supabase.from('leads').select('*').order('created_at', { ascending: false }),
-      supabase.from('employees').select('id,name').order('name'),
+      supabase.from('employees').select('id,name,avatar_url').order('name'),
     ])
     if (emp) setEmployees(emp)
     if (data) {
@@ -1847,13 +1847,63 @@ export default function Leads() {
                 </div>
               </div>
               {leadNotes.length===0&&<div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No notes yet.</div>}
-              {leadNotes.map((n,i)=>(
-                <div key={n.id||i} style={{padding:'10px 0',borderBottom:'1px solid var(--br)'}}>
-                  {n.type&&n.type!=='System'&&<Bdg s={n.type} c="bn"/>}
-                  <div style={{fontSize:13,lineHeight:1.6,color:'var(--tx)',whiteSpace:'pre-wrap',marginTop:n.type&&n.type!=='System'?4:0}}>{n.text}</div>
-                  <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>{n.author||'Staff'} · {n.created_at?new Date(n.created_at).toLocaleString():''}</div>
-                </div>
-              ))}
+              {leadNotes.length>0 && (() => {
+                const AVATAR_PALETTE = ['#e8590c','#2563eb','#16a34a','#9333ea','#d97706','#0891b2','#dc2626','#4f46e5']
+                function avatarColor(name){
+                  const s = name || '?'
+                  let hash = 0
+                  for (let i=0;i<s.length;i++) hash = s.charCodeAt(i) + ((hash<<5)-hash)
+                  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length]
+                }
+                function initials(name){ return (name||'?').trim().split(/\s+/).filter(Boolean).map(p=>p[0]).join('').slice(0,2).toUpperCase() || '?' }
+
+                const now = new Date()
+                const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+                const startOfWeek = new Date(startOfToday); startOfWeek.setDate(startOfWeek.getDate() - 7)
+                const todayNotes = [], weekNotes = [], monthMap = new Map()
+                leadNotes.forEach(n => {
+                  const d = n.created_at ? new Date(n.created_at) : null
+                  if (d && d >= startOfToday) todayNotes.push(n)
+                  else if (d && d >= startOfWeek) weekNotes.push(n)
+                  else {
+                    const label = d ? d.toLocaleDateString('en-US', { month:'long', ...(d.getFullYear()!==now.getFullYear() ? {year:'numeric'} : {}) }) : 'Earlier'
+                    if (!monthMap.has(label)) monthMap.set(label, [])
+                    monthMap.get(label).push(n)
+                  }
+                })
+                const sections = []
+                if (todayNotes.length) sections.push({ label:'Today', notes:todayNotes })
+                if (weekNotes.length) sections.push({ label:'This Week', notes:weekNotes })
+                monthMap.forEach((notes,label) => sections.push({ label, notes }))
+
+                return sections.map(sec => (
+                  <div key={sec.label} style={{marginBottom:20}}>
+                    <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:8}}>{sec.label}</div>
+                    <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                      {sec.notes.map((n,i) => {
+                        const emp = employees.find(e => e.name && n.author && e.name.toLowerCase()===n.author.toLowerCase())
+                        return (
+                          <div key={n.id||i} style={{display:'flex',gap:10,padding:'12px 14px',borderRadius:10,border:'1px solid var(--br)',background:'var(--s2)'}}>
+                            <div style={{width:34,height:34,borderRadius:'50%',flexShrink:0,overflow:'hidden',background:avatarColor(n.author),display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:800,color:'#fff'}}>
+                              {emp?.avatar_url
+                                ? <img src={emp.avatar_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                                : initials(n.author)}
+                            </div>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:4}}>
+                                <span style={{fontWeight:700,fontSize:13,color:'var(--tx)'}}>{n.author||'Staff'}</span>
+                                {n.type && n.type!=='System' && <Bdg s={n.type} c="bn"/>}
+                                <span style={{fontSize:11,color:'var(--t3)'}}>{n.created_at ? new Date(n.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : ''}</span>
+                              </div>
+                              <div style={{fontSize:13,lineHeight:1.6,color:'var(--tx)',whiteSpace:'pre-wrap'}}>{n.text}</div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))
+              })()}
             </div>
           )}
 
