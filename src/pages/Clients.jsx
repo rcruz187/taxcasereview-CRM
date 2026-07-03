@@ -1882,8 +1882,11 @@ export default function Clients() {
                     onClick={async()=>{
                       setAddingNote(true)
                       const {error}=await supabase.from('client_notes').insert({client_name:c.name,content:newNote.trim(),created_by:resolveActorName(user, employees),visible_to_client:noteVisibleToClient,created_at:new Date().toISOString()})
-                      if(!error){setNewNote('');setNoteVisibleToClient(false);const{data}=await supabase.from('client_notes').select('*').eq('client_name',c.name).order('created_at',{ascending:false});if(data)setRelNotes(data)}
                       setAddingNote(false)
+                      if(error){showToast('Error: '+error.message);return}
+                      setNewNote('');setNoteVisibleToClient(false)
+                      const{data}=await supabase.from('client_notes').select('*').eq('client_name',c.name).order('created_at',{ascending:false})
+                      if(data)setRelNotes(data)
                     }}>
                     {addingNote?'…':'+ Add'}
                   </button>
