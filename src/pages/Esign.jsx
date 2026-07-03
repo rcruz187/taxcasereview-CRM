@@ -177,7 +177,8 @@ export default function Esign() {
   }
 
   async function del(id) {
-    await supabase.from('esigns').delete().eq('id', id)
+    const { error } = await supabase.from('esigns').delete().eq('id', id)
+    if (error) { showToast('Error: ' + error.message); setConfirmDel(null); return }
     setItems(prev => prev.filter(i => i.id !== id)); setConfirmDel(null); showToast('Deleted')
   }
 

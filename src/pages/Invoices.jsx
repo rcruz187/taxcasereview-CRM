@@ -198,7 +198,8 @@ Please contact our office with any questions.`
 
   async function deleteItem(id) { setConfirmDel(id) }
   async function confirmDeleteInvoice() {
-    await supabase.from('invoices').delete().eq('id', confirmDel)
+    const { error } = await supabase.from('invoices').delete().eq('id', confirmDel)
+    if (error) { showToast('Error: ' + error.message); setConfirmDel(null); return }
     setItems(prev => prev.filter(i => i.id !== confirmDel)); setConfirmDel(null); showToast('Deleted')
   }
 

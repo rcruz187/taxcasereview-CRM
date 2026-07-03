@@ -133,8 +133,9 @@ export default function FormaCorp() {
   }
 
   async function del(id) {
-    await supabase.from('formacorp').delete().eq('id', id)
-    setItems(prev => prev.filter(i => i.id !== id)); setCD(null); showToast('Deleted')
+    const { error } = await supabase.from('formacorp').delete().eq('id', id)
+    if (error) { showToast('Error: ' + error.message); setCD(null); return }
+    setCases(prev => prev.filter(i => i.id !== id)); setCD(null); showToast('Deleted')
     if (detail?.id === id) setDetail(null)
   }
 

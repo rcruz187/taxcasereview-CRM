@@ -98,7 +98,8 @@ export default function Estimates() {
 
   async function del(id) { setConfirmDel(id) }
   async function confirmDelEstimate() {
-    await supabase.from('estimates').delete().eq('id', confirmDel)
+    const { error } = await supabase.from('estimates').delete().eq('id', confirmDel)
+    if (error) { showToast('Error: ' + error.message); setConfirmDel(null); return }
     setItems(prev => prev.filter(i => i.id !== confirmDel)); setConfirmDel(null); showToast('Deleted')
   }
 

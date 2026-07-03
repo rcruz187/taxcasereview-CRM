@@ -700,7 +700,8 @@ export function ClientDocs({ clientName, supabase, showToast, onLogged }) {
       const path = doc.file_url?.split('/documents/')[1]
       if (path) await supabase.storage.from('documents').remove([path]).catch(()=>{})
     }
-    await supabase.from('documents').delete().eq('id', doc.id)
+    const { error } = await supabase.from('documents').delete().eq('id', doc.id)
+    if (error) { showToast('Error: ' + error.message); return }
     showToast('Deleted'); loadDocs()
     if (onLogged) await onLogged(`🗑️ Document deleted: "${doc.name}"`)
   }

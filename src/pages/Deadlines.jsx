@@ -78,7 +78,8 @@ export default function Deadlines() {
   }
 
   async function deleteItem(id) {
-    await supabase.from('deadlines').delete().eq('id',id)
+    const { error } = await supabase.from('deadlines').delete().eq('id',id)
+    if (error) { showToast('❌ '+error.message); return }
     setItems(prev => prev.filter(i => i.id !== id)); showToast('Deleted')
   }
 

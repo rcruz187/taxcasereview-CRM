@@ -221,7 +221,8 @@ export default function Employees() {
   async function remove(id) {
     if (confirmDel !== id) { setConfirmDel(id); return }
     setConfirmDel(null)
-    await supabase.from('employees').delete().eq('id', id)
+    const { error } = await supabase.from('employees').delete().eq('id', id)
+    if (error) { showToast('Error: ' + error.message, 'err'); return }
     setEmployees(prev => prev.filter(e => e.id !== id))
     showToast('Employee removed')
     load()
@@ -255,7 +256,8 @@ export default function Employees() {
       const path = doc.file_url?.split('/documents/')[1]
       if (path) await supabase.storage.from('documents').remove([path]).catch(()=>{})
     }
-    await supabase.from('documents').delete().eq('id', doc.id)
+    const { error } = await supabase.from('documents').delete().eq('id', doc.id)
+    if (error) { showToast('Error: ' + error.message, 'err'); return }
     setEmpDocs(prev => prev.filter(d => d.id !== doc.id))
   }
 

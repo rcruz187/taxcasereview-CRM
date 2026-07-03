@@ -61,7 +61,7 @@ export default function StateForms() {
 
   const [leads, setLeads] = useState([])
   async function saveStateItem() { setStateSaving(true); await supabase.from('state_form_tracker').insert([{...stateForm,created_at:new Date().toISOString()}]); const {data}=await supabase.from('state_form_tracker').select('*').order('created_at',{ascending:false}); setStateItems(data||[]); setStateForm(SBLANK); setStateModal(false); setStateSaving(false) }
-  async function deleteStateItem(id) { await supabase.from('state_form_tracker').delete().eq('id',id); setStateItems(s=>s.filter(x=>x.id!==id)) }
+  async function deleteStateItem(id) { const { error } = await supabase.from('state_form_tracker').delete().eq('id',id); if (error) { showToast('Error: ' + error.message); return } setStateItems(s=>s.filter(x=>x.id!==id)) }
 
   useEffect(() => {
     supabase.from('state_form_tracker').select('*').order('created_at',{ascending:false}).then(({data})=>setStateItems(data||[]))

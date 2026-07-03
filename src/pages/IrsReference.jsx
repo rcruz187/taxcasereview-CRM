@@ -81,10 +81,9 @@ export default function IrsReference() {
   }
 
   async function remove(id) {
-    await supabase.from('irs_reference').delete().eq('id', id)
-    showToast('Entry removed')
-    setConfirmDel(null)
-    setItems(prev => prev.filter(i => i.id !== id)); setConfirmDel(null); showToast('Deleted')
+    const { error } = await supabase.from('irs_reference').delete().eq('id', id)
+    if (error) { showToast('Error: ' + error.message); setConfirmDel(null); return }
+    setEntries(prev => prev.filter(i => i.id !== id)); setConfirmDel(null); showToast('Deleted')
   }
 
   function copyToClipboard(text) {

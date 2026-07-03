@@ -68,7 +68,8 @@ export default function Books() {
 
   async function deleteEntry(id) { setConfirmDel(id) }
   async function confirmDeleteEntry() {
-    await supabase.from('bookkeeping').delete().eq('id', confirmDel)
+    const { error } = await supabase.from('bookkeeping').delete().eq('id', confirmDel)
+    if (error) { showToast('Error: ' + error.message); setConfirmDel(null); return }
     setEntries(prev => prev.filter(e => e.id !== confirmDel))
     setConfirmDel(null); showToast('Deleted')
     loadAll()

@@ -112,7 +112,8 @@ export default function Tasks() {
   async function softDelete(id) {
     const {error} = await supabase.from('tasks').update({deleted:true, deleted_at:new Date().toISOString()}).eq('id',id)
     if (error) {
-      await supabase.from('tasks').delete().eq('id',id)
+      const { error: hardErr } = await supabase.from('tasks').delete().eq('id',id)
+      if (hardErr) { showToast('❌ ' + hardErr.message); return }
       setTasks(prev => prev.filter(t => t.id !== id))
       showToast('Task deleted')
     } else {
@@ -133,7 +134,8 @@ export default function Tasks() {
   async function permDelete(id) {
     if (!window._confirmDel) { setConfirmDelId(id); return }
     window._confirmDel = false
-    await supabase.from('tasks').delete().eq('id',id)
+    const { error } = await supabase.from('tasks').delete().eq('id',id)
+    if (error) { showToast('❌ ' + error.message); return }
     setTasks(prev => prev.filter(t => t.id !== id)); showToast('Permanently deleted')
   }
 

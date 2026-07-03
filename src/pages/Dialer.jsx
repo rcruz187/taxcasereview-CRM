@@ -190,7 +190,8 @@ export default function Dialer() {
     setConfirmDel({ type: 'voicemail', item: vm })
   }
   async function confirmDeleteVoicemail(vm) {
-    await supabase.from('voicemails').delete().eq('id', vm.id)
+    const { error } = await supabase.from('voicemails').delete().eq('id', vm.id)
+    if (error) { showToast('Error: ' + error.message); setConfirmDel(null); return }
     if (vm.recording_url?.includes('/storage/v1/object/public/voicemails/')) {
       const fileName = vm.recording_url.split('/voicemails/').pop()
       if (fileName) await supabase.storage.from('voicemails').remove([fileName]).catch(() => {})
@@ -204,11 +205,12 @@ export default function Dialer() {
     setConfirmDel({ type: 'recording', item: rec })
   }
   async function confirmDeleteRecording(rec) {
+    const { error } = await supabase.from('call_recordings').delete().eq('id', rec.id)
+    if (error) { showToast('Error: ' + error.message); setConfirmDel(null); return }
     if (rec.recording_url?.includes('/documents/')) {
       const path = rec.recording_url.split('/documents/')[1]
       if (path) await supabase.storage.from('documents').remove([path]).catch(() => {})
     }
-    await supabase.from('call_recordings').delete().eq('id', rec.id)
     setRecordings(rs => rs.filter(r => r.id !== rec.id))
     setConfirmDel(null); showToast('Recording deleted.')
   }

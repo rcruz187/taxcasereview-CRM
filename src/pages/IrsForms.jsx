@@ -285,7 +285,8 @@ export default function IrsForms() {
   }
 
   async function deleteItem(id) {
-    await supabase.from('irsforms').delete().eq('id', id)
+    const { error } = await supabase.from('irsforms').delete().eq('id', id)
+    if (error) { showToast('Error: ' + error.message); return }
     showToast('Deleted')
     load()
   }

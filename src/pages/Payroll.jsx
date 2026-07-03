@@ -115,7 +115,8 @@ export default function Payroll() {
     setEditPunch(null); load()
   }
   async function deleteEditPunch(id) {
-    await supabase.from('timeentries').delete().eq('id', id)
+    const { error } = await supabase.from('timeentries').delete().eq('id', id)
+    if (error) { showToast('Error: ' + error.message); setDeletePunchId(null); return }
     setDeletePunchId(null); showToast('Deleted'); load()
   }
 
@@ -181,7 +182,8 @@ export default function Payroll() {
 
   async function del(id) { setConfirmDel(id) }
   async function confirmDel2() {
-    await supabase.from('payrollruns').delete().eq('id', confirmDel)
+    const { error } = await supabase.from('payrollruns').delete().eq('id', confirmDel)
+    if (error) { showToast('Error: ' + error.message); setConfirmDel(null); return }
     setConfirmDel(null); showToast('Deleted'); load()
   }
 

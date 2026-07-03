@@ -232,22 +232,26 @@ export default function Workflows() {
     try {
       let templateId = editId
       if (editId) {
-        await supabase.from('workflow_templates').update({
+        const { error: updErr } = await supabase.from('workflow_templates').update({
           name: form.name, trigger_event: form.trigger_event, entity_type: form.entity_type,
           trigger_value: form.trigger_value || null, active: form.active,
         }).eq('id', editId)
-        await supabase.from('workflow_steps').delete().eq('template_id', editId)
+        if (updErr) throw updErr
+        const { error: delErr } = await supabase.from('workflow_steps').delete().eq('template_id', editId)
+        if (delErr) throw delErr
       } else {
-        const { data } = await supabase.from('workflow_templates').insert({
+        const { data, error: insTplErr } = await supabase.from('workflow_templates').insert({
           name: form.name, trigger_event: form.trigger_event, entity_type: form.entity_type,
           trigger_value: form.trigger_value || null, active: form.active,
           created_by: 'Admin',
         }).select('id').single()
+        if (insTplErr) throw insTplErr
         templateId = data.id
       }
-      await supabase.from('workflow_steps').insert(
+      const { error: stepsErr } = await supabase.from('workflow_steps').insert(
         steps.map((s, i) => ({ template_id: templateId, title: s.title, assigned_role: s.assigned_role, due_in_days: s.due_in_days, notes: s.notes, step_order: i }))
       )
+      if (stepsErr) throw stepsErr
       showToast(editId ? '✅ Workflow updated' : '✅ Workflow created')
       setShowForm(false)
       load()
@@ -267,7 +271,8 @@ export default function Workflows() {
   }
   async function confirmDeleteTemplate() {
     if (!confirmDel) return
-    await supabase.from('workflow_templates').delete().eq('id', confirmDel.id)
+    const { error } = await supabase.from('workflow_templates').delete().eq('id', confirmDel.id)
+    if (error) { showToast('Error: ' + error.message, 'err'); setConfirmDel(null); return }
     setConfirmDel(null); showToast('Workflow deleted'); load()
   }
 

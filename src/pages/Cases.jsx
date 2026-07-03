@@ -158,7 +158,8 @@ export default function Cases() {
   async function confirmDeleteCase() {
     const id = confirmDel
     setConfirmDel(null)
-    await supabase.from('cases').delete().eq('id', id)
+    const { error } = await supabase.from('cases').delete().eq('id', id)
+    if (error) { showToast('Error: ' + error.message); return }
     setCases(prev => prev.filter(c => c.id !== id)); showToast('Deleted'); setDetail(null); navigate('/cases', { replace: true })
   }
 
@@ -324,7 +325,7 @@ export default function Cases() {
                   </div>
                   <div style={{ fontSize: 13, color: 'var(--tx)', lineHeight: 1.5 }}>{n.text}</div>
                 </div>
-                <button onClick={async () => { await supabase.from('case_notes').delete().eq('id', n.id); loadCaseNotes(detail.id) }}
+                <button onClick={async () => { const { error } = await supabase.from('case_notes').delete().eq('id', n.id); if (error) { showToast('Error: ' + error.message); return } loadCaseNotes(detail.id) }}
                   style={{ background: 'none', border: 'none', color: 'var(--t3)', cursor: 'pointer', fontSize: 16, flexShrink: 0, lineHeight: 1, padding: '0 2px' }}>×</button>
               </div>
             ))
