@@ -125,7 +125,8 @@ export default function Fax() {
   }
 
   async function del(id) {
-    await supabase.from('fax_logs').delete().eq('id', id)
+    const { error } = await supabase.from('fax_logs').delete().eq('id', id)
+    if (error) { showToast('Error: ' + error.message); setConfirmDel(null); return }
     setFaxes(prev => prev.filter(f => f.id !== id)); setConfirmDel(null); showToast('Deleted')
   }
 
@@ -223,7 +224,7 @@ export default function Fax() {
                     <td style={{padding:'12px 14px',color:'var(--t2)',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:13}}>{l.subject||'—'}</td>
                     <td style={{padding:'12px 14px'}}>
                       {l.file_url ? (
-                        <a href={l.file_url} target="_blank" rel="noreferrer"
+                        <a href={l.file_url} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}
                           style={{fontSize:13,color:'var(--blue)',textDecoration:'none',display:'flex',alignItems:'center',gap:5,fontWeight:600}}>
                           📄 View
                         </a>
@@ -238,7 +239,7 @@ export default function Fax() {
                     </td>
                     <td style={{padding:'12px 14px',fontSize:12,color:'var(--t3)'}}>{l.sent_by?.split('@')[0]||'—'}</td>
                     <td style={{padding:'12px 14px'}}>
-                      <button className="btn del" style={{fontSize:11,padding:'4px 10px'}} onClick={()=>setConfirmDel(l.id)}>Del</button>
+                      <button className="btn del" style={{fontSize:11,padding:'4px 10px'}} onClick={e=>{e.stopPropagation();setConfirmDel(l.id)}}>Del</button>
                     </td>
                   </tr>
                 ))}
