@@ -398,6 +398,21 @@ export default function Leads() {
     return () => { supabase.removeChannel(ch) }
   }, [])
 
+  // Live-update the currently-open lead's related data (notes, tasks, docs)
+  // — same reasoning and same pattern as the equivalent addition in
+  // Clients.jsx. Scoped to only run while a specific lead is open.
+  useEffect(() => {
+    if (!detail?.id) return
+    const id = detail.id, name = detail.name
+    function reloadNotes() { loadLeadNotes(id) }
+    function reloadTasks() { loadLeadTasks(name) }
+    const ch = supabase.channel('lead-detail-rt-' + id)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_notes' }, reloadNotes)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, reloadTasks)
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [detail?.id, detail?.name])
+
   // Save scroll position before refresh/navigation away, restore once the
   // lead loads back in — keyed to .page-content, the element that actually scrolls.
   useEffect(() => {

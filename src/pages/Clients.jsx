@@ -947,6 +947,25 @@ export default function Clients() {
     return () => { supabase.removeChannel(ch) }
   }, [])
 
+  // Live-update the currently-open client's related data (notes, tasks,
+  // payments, documents, cases) — these previously only loaded once when the
+  // client was opened, with no way to see changes from another staff member
+  // or an automated process without a manual refresh. Scoped to only run
+  // while a specific client is open, and re-subscribes if you switch clients.
+  useEffect(() => {
+    if (!detail?.name) return
+    const name = detail.name
+    function reload() { loadRelated(name) }
+    const ch = supabase.channel('client-detail-rt-' + (detail.id || name))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'client_notes' }, reload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, reload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, reload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, reload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cases' }, reload)
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [detail?.id, detail?.name])
+
   // Save scroll position before refresh/navigation away, restore after detail (+ related data) loads.
   // Note: this targets .page-content, the element with overflow-y:auto — the
   // window itself never scrolls (.app-shell is height:100vh + overflow:hidden),
