@@ -206,6 +206,14 @@ export default function Sidebar() {
         supabase.from('fax_logs').select('id', { count: 'exact', head: true }).eq('direction', 'inbound').gt('created_at', faxLastSeen),
         supabase.from('sms_messages').select('id', { count: 'exact', head: true }).eq('direction', 'inbound').gt('created_at', smsLastSeen),
       ])
+      // These used to fail completely silently — a schema-cache or RLS error
+      // on any one of them would just default the badge to 0 with zero
+      // indication anything was wrong. Logging now so a broken badge shows
+      // up in the browser console instead of just looking like "no new items".
+      if (vmRes.error)    console.error('[badge] voicemails query failed:', vmRes.error.message)
+      if (esignRes.error) console.error('[badge] esigns query failed:', esignRes.error.message)
+      if (faxRes.error)   console.error('[badge] fax_logs query failed:', faxRes.error.message)
+      if (smsRes.error)   console.error('[badge] sms_messages query failed:', smsRes.error.message)
       setUnreadVoicemails((vmRes.data || []).filter(v => !v.is_read).length)
       setPendingEsign((esignRes.data || []).filter(e => e.status === 'Awaiting').length)
       setUnreadFax(faxRes.count || 0)
