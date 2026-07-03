@@ -127,7 +127,7 @@ export default function Fax() {
   async function del(id) {
     const { error } = await supabase.from('fax_logs').delete().eq('id', id)
     if (error) { showToast('Error: ' + error.message); setConfirmDel(null); return }
-    setFaxes(prev => prev.filter(f => f.id !== id)); setConfirmDel(null); showToast('Deleted')
+    setLogs(prev => prev.filter(f => f.id !== id)); setConfirmDel(null); showToast('Deleted')
   }
 
   const filtered = logs.filter(l => {
