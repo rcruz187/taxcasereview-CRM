@@ -836,6 +836,7 @@ export default function Leads() {
   async function save() {
     if (!form.name.trim()) { showToast('Name is required'); return }
     setSaving(true)
+    const actor = resolveActorName(user, employees)
     const beforeEdit = modal === 'edit' ? leads.find(l=>l.id===form.id) : null
     let payload = { ...form, taxYears: JSON.stringify(form.taxYears), filingRequirements: JSON.stringify(form.filingRequirements||[]) }
     // Empty-string values blow up non-text columns (date, numeric) with
@@ -902,6 +903,7 @@ export default function Leads() {
   async function archiveLead(l) { setConfirmArchive(l) }
   async function confirmArchiveLead() {
     const l = confirmArchive; setConfirmArchive(null)
+    const actor = resolveActorName(user, employees)
     const { error } = await supabase.from('leads').update({ archived: true }).eq('id', l.id)
     if (error) { showToast('Error: ' + error.message); return }
     await logAction(l.id, l.name, '🗄️ Lead archived')
