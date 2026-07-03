@@ -144,10 +144,13 @@ export default function Sidebar() {
       setPendingTimeOff(count || 0)
     }
     loadPendingTimeOff()
+    const poll = setInterval(loadPendingTimeOff, 180000)
+    function onVisible() { if (document.visibilityState === 'visible') loadPendingTimeOff() }
+    document.addEventListener('visibilitychange', onVisible)
     const ch = supabase.channel('sidebar-timeoff-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'time_off_requests' }, loadPendingTimeOff)
       .subscribe()
-    return () => { supabase.removeChannel(ch) }
+    return () => { supabase.removeChannel(ch); clearInterval(poll); document.removeEventListener('visibilitychange', onVisible) }
   }, [])
 
   // Leads/Clients/Cases/Deadlines badges used to be hardcoded to "0" here,
@@ -179,13 +182,16 @@ export default function Sidebar() {
     }
     if (!user) return
     loadCounts()
+    const poll = setInterval(loadCounts, 180000)
+    function onVisible() { if (document.visibilityState === 'visible') loadCounts() }
+    document.addEventListener('visibilitychange', onVisible)
     const ch = supabase.channel('sidebar-counts-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, loadCounts)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, loadCounts)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cases' }, loadCounts)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deadlines' }, loadCounts)
       .subscribe()
-    return () => { supabase.removeChannel(ch) }
+    return () => { supabase.removeChannel(ch); clearInterval(poll); document.removeEventListener('visibilitychange', onVisible) }
   }, [user])
 
   const BADGE_COUNTS = { leads: newLeads, clients: newClients, cases: openCases, deadlines: dueSoonDeadlines, fax: unreadFax, sms: unreadSms, voicemails: unreadVoicemails, esign: pendingEsign, email: unreadInbox, tasks: openTasks, chat: unreadChat, calendar: upcomingEvents }
@@ -207,13 +213,22 @@ export default function Sidebar() {
     }
     if (!user) return
     loadCommsCounts()
+    // Realtime is the primary path, but its websocket can silently die after
+    // the tab sits idle/backgrounded for a while with no automatic recovery —
+    // so two safety nets: a periodic fallback poll, and an immediate reload
+    // the moment the tab becomes visible again (covers the common "left it
+    // open overnight, came back, nothing updated" case instantly instead of
+    // waiting for the next poll).
+    const poll = setInterval(loadCommsCounts, 180000)
+    function onVisible() { if (document.visibilityState === 'visible') loadCommsCounts() }
+    document.addEventListener('visibilitychange', onVisible)
     const ch = supabase.channel('sidebar-comms-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'voicemails' }, loadCommsCounts)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'esigns' }, loadCommsCounts)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'fax_logs' }, loadCommsCounts)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sms_messages' }, loadCommsCounts)
       .subscribe()
-    return () => { supabase.removeChannel(ch) }
+    return () => { supabase.removeChannel(ch); clearInterval(poll); document.removeEventListener('visibilitychange', onVisible) }
   }, [user])
 
   // Calendar badge — events starting today or in the next 24 hours
@@ -227,10 +242,13 @@ export default function Sidebar() {
     }
     if (!user) return
     loadCalendarBadge()
+    const poll = setInterval(loadCalendarBadge, 180000)
+    function onVisible() { if (document.visibilityState === 'visible') loadCalendarBadge() }
+    document.addEventListener('visibilitychange', onVisible)
     const ch = supabase.channel('sidebar-calendar-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'calevents' }, loadCalendarBadge)
       .subscribe()
-    return () => { supabase.removeChannel(ch) }
+    return () => { supabase.removeChannel(ch); clearInterval(poll); document.removeEventListener('visibilitychange', onVisible) }
   }, [user])
 
   // Clear badges when user visits those pages (instant — no refresh needed)
@@ -285,11 +303,13 @@ export default function Sidebar() {
     // interval was fetching the full emails table for every logged-in
     // user constantly, which adds up over a full day across a team.
     const poll = setInterval(loadEmailTaskCounts, 300000)
+    function onVisible() { if (document.visibilityState === 'visible') loadEmailTaskCounts() }
+    document.addEventListener('visibilitychange', onVisible)
     const ch = supabase.channel('sidebar-email-tasks-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'emails' }, loadEmailTaskCounts)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, loadEmailTaskCounts)
       .subscribe()
-    return () => { supabase.removeChannel(ch); clearInterval(poll) }
+    return () => { supabase.removeChannel(ch); clearInterval(poll); document.removeEventListener('visibilitychange', onVisible) }
   }, [user])
 
   // Chat badge — count messages (rebuild) newer than when this user last had /chat open
@@ -311,6 +331,9 @@ export default function Sidebar() {
       localStorage.setItem(storageKey, new Date().toISOString())
       setUnreadChat(0)
     }
+    const poll = setInterval(countUnreadChat, 180000)
+    function onVisible() { if (document.visibilityState === 'visible') countUnreadChat() }
+    document.addEventListener('visibilitychange', onVisible)
     // Realtime — new chat message arrives
     const ch = supabase.channel('sidebar-chat-badge')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
@@ -324,7 +347,7 @@ export default function Sidebar() {
         }
       })
       .subscribe()
-    return () => { supabase.removeChannel(ch) }
+    return () => { supabase.removeChannel(ch); clearInterval(poll); document.removeEventListener('visibilitychange', onVisible) }
   }, [user?.email, location.pathname])
 
   const [tagline,  setTagline]  = useState('IRS Resolution Services')
