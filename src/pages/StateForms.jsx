@@ -218,8 +218,8 @@ export default function StateForms() {
       // Log note on client
       await supabase.from('client_notes').insert({
         clientname: selectedClient.name,
-        content: `🏛️ ${form.state} State POA sent for e-signature (${form.num})${emailSent ? ' via email' : ''}${smsSent ? ' via SMS' : ''}`,
-        created_by: actor,
+        text: `🏛️ ${form.state} State POA sent for e-signature (${form.num})${emailSent ? ' via email' : ''}${smsSent ? ' via SMS' : ''}`,
+        author: actor,
         visible_to_client: false,
       })
 

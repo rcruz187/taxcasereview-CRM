@@ -222,7 +222,7 @@ export default function SignPage() {
     if (leadRow?.id) {
       await supabase.from('lead_notes').insert({ lead_id: leadRow.id, lead_name: doc.client_name, text: noteText, type: 'E-Sign', author: 'System', created_at: signedAt }).catch(()=>{})
     } else {
-      await supabase.from('client_notes').insert({ clientname: doc.client_name, content: noteText, created_by: 'System', visible_to_client: false, created_at: signedAt }).catch(()=>{})
+      await supabase.from('client_notes').insert({ clientname: doc.client_name, text: noteText, author: 'System', visible_to_client: false, created_at: signedAt }).catch(()=>{})
     }
 
     // Service Addendum is a contract — files under the Agreements folder

@@ -197,9 +197,9 @@ export default function Email() {
       const preview = (form.body || '').slice(0, 120).replace(/\n/g, ' ').trim()
       await supabase.from('client_notes').insert({
         clientname: form.clientName,
-        content: `📧 Email Sent — "${form.subject}"\n${preview}${form.body?.length > 120 ? '…' : ''}`,
+        text: `📧 Email Sent — "${form.subject}"\n${preview}${form.body?.length > 120 ? '…' : ''}`,
         note_type: 'Email',
-        created_by: user?.email || 'Staff',
+        author: user?.email || 'Staff',
         created_at: new Date().toISOString(),
       })
     }

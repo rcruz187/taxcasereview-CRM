@@ -261,8 +261,8 @@ export default function Cases() {
                     const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
                     await supabase.from('client_notes').insert({
                       clientname: c.clientName,
-                      content: `📁 Case status changed: ${prevStatus} → ${s} (${c.caseType}, ${c.caseNum})`,
-                      created_by: actor,
+                      text: `📁 Case status changed: ${prevStatus} → ${s} (${c.caseType}, ${c.caseNum})`,
+                      author: actor,
                       visible_to_client: false,
                     })
                     await triggerWorkflow('case_status_changed', 'case', c.clientName, actor, s)

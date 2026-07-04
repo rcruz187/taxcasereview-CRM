@@ -194,7 +194,7 @@ export default function Calendar() {
       if (leadRow?.id) {
         await supabase.from('lead_notes').insert({ lead_id: leadRow.id, lead_name: form.clientName, text: noteText, type: 'System', author: actorCal, created_at: new Date().toISOString() }).catch(()=>{})
       } else {
-        await supabase.from('client_notes').insert({ clientname: form.clientName, content: noteText, created_by: actorCal, visible_to_client: false }).catch(()=>{})
+        await supabase.from('client_notes').insert({ clientname: form.clientName, text: noteText, author: actorCal, visible_to_client: false }).catch(()=>{})
       }
     }
     setShowForm(false); setForm({ title:'',clientName:'',assignedTo:'',date:'',time:'',endTime:'',eventType:'Consultation Call',color:'bb',notes:'',recurring:'none',status:'scheduled' })

@@ -1315,7 +1315,7 @@ export default function Leads() {
     const { data: oldNotes } = await supabase.from('lead_notes').select('*').eq('lead_id', l.id)
     if (oldNotes && oldNotes.length) {
       await supabase.from('client_notes').insert(
-        oldNotes.map(n => ({ clientname: l.name, content: n.text, created_by: n.author || 'Staff', created_at: n.created_at }))
+        oldNotes.map(n => ({ clientname: l.name, text: n.text, author: n.author || 'Staff', created_at: n.created_at }))
       )
     }
     // Auto-create the 3 onboarding tasks now that contracts are signed
@@ -1411,8 +1411,8 @@ export default function Leads() {
         // Just log a note confirming the transfer.
         await supabase.from('client_notes').insert({
           clientname: l.name,
-          content: `📁 ${leadDocs.length} document(s) from lead file carried over to client record.`,
-          created_by: 'System', visible_to_client: false, created_at: new Date().toISOString()
+          text: `📁 ${leadDocs.length} document(s) from lead file carried over to client record.`,
+          author: 'System', visible_to_client: false, created_at: new Date().toISOString()
         })
       }
     } catch (e) { console.error('Document transfer error:', e) }

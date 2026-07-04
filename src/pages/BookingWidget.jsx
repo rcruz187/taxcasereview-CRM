@@ -93,7 +93,7 @@ export default function BookingWidget({ contact, onClose, mode = 'lead' }) {
     if (mode === 'lead' && contact?.id) {
       await supabase.from('lead_notes').insert({ lead_id: contact.id, lead_name: contact.name, text: noteText, type: 'Appointment', author: 'System', created_at: new Date().toISOString() }).catch(()=>{})
     } else if (contact?.name) {
-      await supabase.from('client_notes').insert({ clientname: contact.name, content: noteText, created_by: 'System', visible_to_client: false }).catch(()=>{})
+      await supabase.from('client_notes').insert({ clientname: contact.name, text: noteText, author: 'System', visible_to_client: false }).catch(()=>{})
     }
 
     setConfirmed(true)

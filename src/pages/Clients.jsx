@@ -247,7 +247,8 @@ function InlineFaxForm({ client, onClose, showToast, onLogged }) {
     const { data: { user } } = await supabase.auth.getUser()
     const actor = resolveActorName(user, employees)
     const noteContent = `📠 Fax ${sent?'sent':'logged'} to ${toFull}${subject?' — '+subject:''}${file?.name?' (' + file.name + ')':''}`
-    await supabase.from('client_notes').insert({ clientname: client?.name, content: noteContent, created_by: actor, created_at: new Date().toISOString() })
+    const { error: noteErr } = await supabase.from('client_notes').insert({ clientname: client?.name, text: noteContent, author: actor, created_at: new Date().toISOString() })
+    if (noteErr) console.error('[client_notes] insert failed (InlineFaxForm):', noteErr)
 
     setSending(false)
     showToast('📠 Fax '+(sent?'sent':'logged')+'!')
@@ -1038,26 +1039,18 @@ export default function Clients() {
   // hand-writing its own insert, so error handling (and the note format) is
   // consistent in exactly one place — a hand-written insert with a silently
   // swallowed error is what caused the pipeline-stage bug.
-  // client_notes' real column names don't match what the rest of the app
-  // assumes (already found clientname vs client_name the hard way) — rather
-  // than guess again, this tries a few real candidates for the "note text"
-  // column and locks onto whichever one Postgres actually accepts, so it
-  // stops failing regardless of what the column turns out to be named.
+  // client_notes' real columns, confirmed directly from the schema:
+  // id, clientname, text, author, type, created_at, visible_to_client,
+  // note_type, tenant_id. There is no 'content' column and no 'created_by'
+  // column — the note text goes in 'text', the creator goes in 'author'.
   async function insertClientNote({ clientname, content, created_by, created_at, note_type, visible_to_client }) {
-    const candidates = insertClientNote._field ? [insertClientNote._field] : ['content', 'text', 'note', 'notes', 'message']
-    let lastError = null
-    for (const field of candidates) {
-      const payload = { clientname, created_by, created_at }
-      payload[field] = content
-      if (note_type !== undefined) payload.note_type = note_type
-      if (visible_to_client !== undefined) payload.visible_to_client = visible_to_client
-      const { error } = await supabase.from('client_notes').insert(payload)
-      if (!error) { insertClientNote._field = field; return { error: null } }
-      if (!error.message?.includes(`Could not find the '${field}' column`)) return { error }
-      lastError = error
-      console.error(`[client_notes] '${field}' column not found, trying next candidate...`)
-    }
-    return { error: lastError }
+    const payload = { clientname, text: content, author: created_by }
+    if (created_at !== undefined) payload.created_at = created_at
+    if (note_type !== undefined) payload.note_type = note_type
+    if (visible_to_client !== undefined) payload.visible_to_client = visible_to_client
+    const { error } = await supabase.from('client_notes').insert(payload)
+    if (error) console.error('[client_notes] insert failed:', error)
+    return { error }
   }
 
   async function logAction(clientName, text) {

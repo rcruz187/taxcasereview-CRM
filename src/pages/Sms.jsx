@@ -68,9 +68,9 @@ export default function Sms() {
           const preview = (msg.body || '').slice(0, 120).trim()
           supabase.from('client_notes').insert({
             clientname: msg.clientName,
-            content: `💬 SMS Received — ${preview}${msg.body?.length > 120 ? '…' : ''}`,
+            text: `💬 SMS Received — ${preview}${msg.body?.length > 120 ? '…' : ''}`,
             note_type: 'SMS',
-            created_by: msg.clientName,
+            author: msg.clientName,
             created_at: msg.created_at || new Date().toISOString(),
           })
         }
@@ -145,9 +145,9 @@ export default function Sms() {
       const preview = (form.body || '').slice(0, 120).trim()
       await supabase.from('client_notes').insert({
         clientname: form.clientName,
-        content: `💬 SMS Sent — ${preview}${form.body?.length > 120 ? '…' : ''}`,
+        text: `💬 SMS Sent — ${preview}${form.body?.length > 120 ? '…' : ''}`,
         note_type: 'SMS',
-        created_by: user?.email || 'Staff',
+        author: user?.email || 'Staff',
         created_at: new Date().toISOString(),
       })
     }

@@ -532,7 +532,7 @@ export function CallProvider({ children }) {
       const noteLine = `[${record.outcome}, ${record.duration}] ${record.notes.trim()}`
       if (active.entityType === 'client') {
         await supabase.from('client_notes').insert({
-          client_name: record.clientName, content: noteLine, created_by: author,
+          clientname: record.clientName, text: noteLine, author,
         }).then(({ error: e }) => e && console.error('client_notes insert error:', e))
       } else if (active.entityType === 'lead' && active.id) {
         await supabase.from('lead_notes').insert([{
