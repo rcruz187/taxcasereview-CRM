@@ -198,12 +198,11 @@ export default function Sidebar() {
 
   useEffect(() => {
     async function loadCommsCounts() {
-      const faxLastSeen = localStorage.getItem('tcr_fax_last_seen') || new Date(0).toISOString()
       const smsLastSeen = localStorage.getItem('tcr_sms_last_seen') || new Date(0).toISOString()
       const [vmRes, esignRes, faxRes, smsRes] = await Promise.all([
         supabase.from('voicemails').select('id,is_read'),
         supabase.from('esigns').select('id,status'),
-        supabase.from('fax_logs').select('id', { count: 'exact', head: true }).eq('direction', 'inbound').gt('created_at', faxLastSeen),
+        supabase.from('fax_logs').select('id,is_read,direction'),
         supabase.from('sms_messages').select('id', { count: 'exact', head: true }).eq('direction', 'inbound').gt('created_at', smsLastSeen),
       ])
       // These used to fail completely silently — a schema-cache or RLS error
@@ -216,7 +215,7 @@ export default function Sidebar() {
       if (smsRes.error)   console.error('[badge] sms_messages query failed:', smsRes.error.message)
       setUnreadVoicemails((vmRes.data || []).filter(v => !v.is_read).length)
       setPendingEsign((esignRes.data || []).filter(e => e.status === 'Awaiting').length)
-      setUnreadFax(faxRes.count || 0)
+      setUnreadFax((faxRes.data || []).filter(f => f.direction === 'inbound' && !f.is_read).length)
       setUnreadSms(smsRes.count || 0)
     }
     if (!user) return

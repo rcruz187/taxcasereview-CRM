@@ -36,7 +36,13 @@ export default function Fax() {
   const [showSug,  setShowSug]  = useState(false)
   const [sugg,     setSugg]     = useState([])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    // Mark inbound faxes as read in the database (not just a local timestamp)
+    // the moment this page loads — mirrors how email/voicemail track read
+    // state, so the badge count is reliable across browsers/devices.
+    supabase.from('fax_logs').update({ is_read: true }).eq('direction', 'inbound').eq('is_read', false).then(()=>{})
+  }, [])
 
   async function load() {
     const [{ data:f },{ data:c },{ data:s }] = await Promise.all([
