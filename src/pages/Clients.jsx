@@ -1038,13 +1038,32 @@ export default function Clients() {
   // hand-writing its own insert, so error handling (and the note format) is
   // consistent in exactly one place — a hand-written insert with a silently
   // swallowed error is what caused the pipeline-stage bug.
+  // client_notes' real column names don't match what the rest of the app
+  // assumes (already found clientname vs client_name the hard way) — rather
+  // than guess again, this tries a few real candidates for the "note text"
+  // column and locks onto whichever one Postgres actually accepts, so it
+  // stops failing regardless of what the column turns out to be named.
+  async function insertClientNote({ clientname, content, created_by, created_at, note_type, visible_to_client }) {
+    const candidates = insertClientNote._field ? [insertClientNote._field] : ['content', 'text', 'note', 'notes', 'message']
+    let lastError = null
+    for (const field of candidates) {
+      const payload = { clientname, created_by, created_at }
+      payload[field] = content
+      if (note_type !== undefined) payload.note_type = note_type
+      if (visible_to_client !== undefined) payload.visible_to_client = visible_to_client
+      const { error } = await supabase.from('client_notes').insert(payload)
+      if (!error) { insertClientNote._field = field; return { error: null } }
+      if (!error.message?.includes(`Could not find the '${field}' column`)) return { error }
+      lastError = error
+      console.error(`[client_notes] '${field}' column not found, trying next candidate...`)
+    }
+    return { error: lastError }
+  }
+
   async function logAction(clientName, text) {
     if (!clientName) return
     const actor = resolveActorName(user, employees)
-    const { error } = await supabase.from('client_notes').insert({
-      clientname: clientName, content: text, note_type: 'System',
-      created_by: actor, created_at: new Date().toISOString()
-    })
+    const { error } = await insertClientNote({ clientname: clientName, content: text, note_type: 'System', created_by: actor, created_at: new Date().toISOString() })
     if (error) showToast('Action completed, but failed to log note: ' + error.message)
     return !error
   }
@@ -1272,7 +1291,7 @@ export default function Clients() {
 
     // Auto-log to Notes, same pattern as pipeline stage changes.
     const noteContent = `💬 Text sent: "${smsBody.length > 120 ? smsBody.slice(0,120)+'…' : smsBody}"`
-    await supabase.from('client_notes').insert({ clientname: c.name, content: noteContent, created_by: actor, created_at: new Date().toISOString() })
+    await insertClientNote({ clientname: c.name, content: noteContent, created_by: actor, created_at: new Date().toISOString() })
 
     setSmsBody('')
     loadRelated(c.name)
@@ -1305,11 +1324,11 @@ export default function Clients() {
   async function addClientNote(visibleToClient = false) {
     if (!newNote.trim()||!detail) return
     setAddingNote(true)
-    const {error}=await supabase.from('client_notes').insert([{
+    const {error}=await insertClientNote({
       clientname:detail.name, content:newNote.trim(),
       created_by:resolveActorName(user, employees), visible_to_client: visibleToClient,
       created_at:new Date().toISOString()
-    }])
+    })
     setAddingNote(false)
     if(error){showToast('Error: '+error.message);return}
     setNewNote('');loadRelated(detail.name)
@@ -1390,7 +1409,7 @@ export default function Clients() {
         const { data:cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
         if (cfg?.signalwire_backend) { try { await fetch(cfg.signalwire_backend+'/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:client.phone,body:`Tax Case Review: sign your ${formDef.state} POA here: ${sigUrl}`})}); smsSent=true } catch(_){} }
       }
-      await supabase.from('client_notes').insert({ clientname:client.name, content:`🏛️ ${formDef.state} State POA sent for e-signature (${formDef.num})${emailSent?' via email':''}${smsSent?' via SMS':''}`, created_by:actor, visible_to_client:false, created_at:new Date().toISOString() })
+      await insertClientNote({ clientname:client.name, content:`🏛️ ${formDef.state} State POA sent for e-signature (${formDef.num})${emailSent?' via email':''}${smsSent?' via SMS':''}`, created_by:actor, visible_to_client:false, created_at:new Date().toISOString() })
       setPoaModal(false)
       showToast(emailSent||smsSent ? `✅ ${formDef.state} POA sent for signature!` : '✅ Signing link copied to clipboard')
     } catch(e) { showToast('Error: '+e.message) }
@@ -1492,7 +1511,7 @@ export default function Clients() {
     const feeText = `$${Number(addForm.resolutionFee).toLocaleString()}`
     const channels = [emailSent&&'email', smsSent&&'sms'].filter(Boolean).join(' + ')
     const noteContent = `📋 Service Addendum sent for e-signature — Resolution Fee ${feeText}${channels?` (${channels})`:''}`
-    await supabase.from('client_notes').insert({ clientname: c.name, content: noteContent, created_by: actor, created_at: new Date().toISOString() })
+    await insertClientNote({ clientname: c.name, content: noteContent, created_by: actor, created_at: new Date().toISOString() })
 
     setAddendumSending(false)
     setAddModal(false)
@@ -1559,7 +1578,7 @@ export default function Clients() {
       await supabase.from('payments').insert(arRows)
 
       // Log to client notes
-      await supabase.from('client_notes').insert({
+      await insertClientNote({
         clientname: detail.name,
         content: `💳 2nd Trade Installment Plan Created — $${parseFloat(installmentForm.totalFee).toLocaleString()} over ${installmentForm.months} months ($${monthlyAmt.toFixed(2)}/mo)${data.mode === 'checkout' ? '\nCheckout link sent to collect card.' : '\nSubscription started on saved card.'}`,
         note_type: 'System',
@@ -1668,7 +1687,7 @@ export default function Clients() {
                       // Log the stage change as a note
                       const actor = resolveActorName(user, employees)
                       const noteContent = `📊 Pipeline stage changed: ${prevStage?.label||'—'} → ${s.label}`
-                      const {error:noteErr} = await supabase.from('client_notes').insert({clientname:c.name,content:noteContent,created_by:actor,created_at:new Date().toISOString()})
+                      const {error:noteErr} = await insertClientNote({clientname:c.name,content:noteContent,created_by:actor,created_at:new Date().toISOString()})
                       if(noteErr){
                         showToast('Stage updated, but failed to log note: '+noteErr.message)
                       } else if(detail?.id===c.id){
@@ -1891,7 +1910,7 @@ export default function Clients() {
                     disabled={!newNote.trim()||addingNote}
                     onClick={async()=>{
                       setAddingNote(true)
-                      const {error}=await supabase.from('client_notes').insert({clientname:c.name,content:newNote.trim(),created_by:resolveActorName(user, employees),visible_to_client:noteVisibleToClient,created_at:new Date().toISOString()})
+                      const {error}=await insertClientNote({clientname:c.name,content:newNote.trim(),created_by:resolveActorName(user, employees),visible_to_client:noteVisibleToClient,created_at:new Date().toISOString()})
                       setAddingNote(false)
                       if(error){
                         console.error('client_notes insert error (full):', error)
