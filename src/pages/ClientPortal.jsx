@@ -857,7 +857,7 @@ export default function ClientPortal() {
             {notes.length === 0 ? <Empty msg="No updates yet — your representative will post updates here." /> : (
               notes.map(n => (
                 <div key={n.id} style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
-                  <div style={{ fontSize: 13.5, lineHeight: 1.6, color: '#f1f5f9', whiteSpace: 'pre-wrap' }}>{n.content}</div>
+                  <div style={{ fontSize: 13.5, lineHeight: 1.6, color: '#f1f5f9', whiteSpace: 'pre-wrap' }}>{n.text}</div>
                   <div style={{ fontSize: 11, color: '#64748b', marginTop: 5 }}>{n.created_at ? new Date(n.created_at).toLocaleDateString() : ''}</div>
                 </div>
               ))

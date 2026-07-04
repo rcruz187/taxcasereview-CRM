@@ -1794,8 +1794,8 @@ export default function Clients() {
                   <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:6}}>Case Notes</div>
                   {relNotes.length>0?(
                     <>
-                      <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.7,whiteSpace:'pre-wrap'}}>{relNotes[0].content}</div>
-                      <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>{relNotes[0].created_by||'Staff'} · {relNotes[0].created_at?new Date(relNotes[0].created_at).toLocaleString():''}</div>
+                      <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.7,whiteSpace:'pre-wrap'}}>{relNotes[0].text}</div>
+                      <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>{relNotes[0].author||'Staff'} · {relNotes[0].created_at?new Date(relNotes[0].created_at).toLocaleString():''}</div>
                     </>
                   ):(
                     <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.7,whiteSpace:'pre-wrap'}}>{c.notes}</div>
@@ -1967,26 +1967,26 @@ export default function Clients() {
                         // Exact name match first; fall back to first-name-only match for
                         // older notes saved before resolveActorName (e.g. "romy" instead
                         // of "Romy Cruz") so their avatar still resolves correctly.
-                        const authorLower = (n.created_by||'').toLowerCase().trim()
+                        const authorLower = (n.author||'').toLowerCase().trim()
                         const emp = employees.find(e => e.name && e.name.toLowerCase()===authorLower)
                           || employees.find(e => e.name && e.name.toLowerCase().split(' ')[0]===authorLower)
                         return (
                           <div key={n.id||i} style={{display:'flex',gap:10,padding:'12px 14px',borderRadius:10,border:'1px solid var(--br)',background:'var(--s2)'}}>
-                            <div style={{width:34,height:34,borderRadius:'50%',flexShrink:0,overflow:'hidden',background:avatarColor(n.created_by),display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:800,color:'#fff'}}>
+                            <div style={{width:34,height:34,borderRadius:'50%',flexShrink:0,overflow:'hidden',background:avatarColor(n.author),display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:800,color:'#fff'}}>
                               {emp?.avatar_url
                                 ? <img src={emp.avatar_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                                : initials(n.created_by)}
+                                : initials(n.author)}
                             </div>
                             <div style={{flex:1,minWidth:0}}>
                               <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:4}}>
-                                <span style={{fontWeight:700,fontSize:13,color:'var(--tx)'}}>{n.created_by||'Staff'}</span>
+                                <span style={{fontWeight:700,fontSize:13,color:'var(--tx)'}}>{n.author||'Staff'}</span>
                                 {n.note_type && (
                                   <span style={{fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:99,background:tc.bg,color:tc.color}}>{tc.icon} {n.note_type}</span>
                                 )}
                                 <span style={{fontSize:11,color:'var(--t3)'}}>{n.created_at ? new Date(n.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : ''}</span>
                                 {n.visible_to_client && <span style={{fontSize:10,fontWeight:700,color:'var(--ok)',background:'rgba(34,197,94,.12)',padding:'1px 7px',borderRadius:99}}>👁 Client can see this</span>}
                               </div>
-                              <div style={{fontSize:13,lineHeight:1.6,color:'var(--tx)',whiteSpace:'pre-wrap'}}>{n.content}</div>
+                              <div style={{fontSize:13,lineHeight:1.6,color:'var(--tx)',whiteSpace:'pre-wrap'}}>{n.text}</div>
                             </div>
                           </div>
                         )
