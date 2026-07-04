@@ -247,7 +247,7 @@ function InlineFaxForm({ client, onClose, showToast, onLogged }) {
     const { data: { user } } = await supabase.auth.getUser()
     const actor = resolveActorName(user, employees)
     const noteContent = `📠 Fax ${sent?'sent':'logged'} to ${toFull}${subject?' — '+subject:''}${file?.name?' (' + file.name + ')':''}`
-    await supabase.from('client_notes').insert({ client_name: client?.name, content: noteContent, created_by: actor, created_at: new Date().toISOString() })
+    await supabase.from('client_notes').insert({ clientname: client?.name, content: noteContent, created_by: actor, created_at: new Date().toISOString() })
 
     setSending(false)
     showToast('📠 Fax '+(sent?'sent':'logged')+'!')
@@ -1042,7 +1042,7 @@ export default function Clients() {
     if (!clientName) return
     const actor = resolveActorName(user, employees)
     const { error } = await supabase.from('client_notes').insert({
-      client_name: clientName, content: text, note_type: 'System',
+      clientname: clientName, content: text, note_type: 'System',
       created_by: actor, created_at: new Date().toISOString()
     })
     if (error) showToast('Action completed, but failed to log note: ' + error.message)
@@ -1056,7 +1056,7 @@ export default function Clients() {
       supabase.from('tasks').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('invoices').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('documents').select('*').eq('client', clientName).order('created_at',{ascending:false}),
-      supabase.from('client_notes').select('*').eq('client_name', clientName).order('created_at',{ascending:false}),
+      supabase.from('client_notes').select('*').eq('clientname', clientName).order('created_at',{ascending:false}),
       supabase.from('payments').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('sms_messages').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('deadlines').select('*').eq('clientName', clientName).order('dueDate',{ascending:true}),
@@ -1272,7 +1272,7 @@ export default function Clients() {
 
     // Auto-log to Notes, same pattern as pipeline stage changes.
     const noteContent = `💬 Text sent: "${smsBody.length > 120 ? smsBody.slice(0,120)+'…' : smsBody}"`
-    await supabase.from('client_notes').insert({ client_name: c.name, content: noteContent, created_by: actor, created_at: new Date().toISOString() })
+    await supabase.from('client_notes').insert({ clientname: c.name, content: noteContent, created_by: actor, created_at: new Date().toISOString() })
 
     setSmsBody('')
     loadRelated(c.name)
@@ -1306,7 +1306,7 @@ export default function Clients() {
     if (!newNote.trim()||!detail) return
     setAddingNote(true)
     const {error}=await supabase.from('client_notes').insert([{
-      client_name:detail.name, content:newNote.trim(),
+      clientname:detail.name, content:newNote.trim(),
       created_by:resolveActorName(user, employees), visible_to_client: visibleToClient,
       created_at:new Date().toISOString()
     }])
@@ -1390,7 +1390,7 @@ export default function Clients() {
         const { data:cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
         if (cfg?.signalwire_backend) { try { await fetch(cfg.signalwire_backend+'/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:client.phone,body:`Tax Case Review: sign your ${formDef.state} POA here: ${sigUrl}`})}); smsSent=true } catch(_){} }
       }
-      await supabase.from('client_notes').insert({ client_name:client.name, content:`🏛️ ${formDef.state} State POA sent for e-signature (${formDef.num})${emailSent?' via email':''}${smsSent?' via SMS':''}`, created_by:actor, visible_to_client:false, created_at:new Date().toISOString() })
+      await supabase.from('client_notes').insert({ clientname:client.name, content:`🏛️ ${formDef.state} State POA sent for e-signature (${formDef.num})${emailSent?' via email':''}${smsSent?' via SMS':''}`, created_by:actor, visible_to_client:false, created_at:new Date().toISOString() })
       setPoaModal(false)
       showToast(emailSent||smsSent ? `✅ ${formDef.state} POA sent for signature!` : '✅ Signing link copied to clipboard')
     } catch(e) { showToast('Error: '+e.message) }
@@ -1492,7 +1492,7 @@ export default function Clients() {
     const feeText = `$${Number(addForm.resolutionFee).toLocaleString()}`
     const channels = [emailSent&&'email', smsSent&&'sms'].filter(Boolean).join(' + ')
     const noteContent = `📋 Service Addendum sent for e-signature — Resolution Fee ${feeText}${channels?` (${channels})`:''}`
-    await supabase.from('client_notes').insert({ client_name: c.name, content: noteContent, created_by: actor, created_at: new Date().toISOString() })
+    await supabase.from('client_notes').insert({ clientname: c.name, content: noteContent, created_by: actor, created_at: new Date().toISOString() })
 
     setAddendumSending(false)
     setAddModal(false)
@@ -1560,7 +1560,7 @@ export default function Clients() {
 
       // Log to client notes
       await supabase.from('client_notes').insert({
-        client_name: detail.name,
+        clientname: detail.name,
         content: `💳 2nd Trade Installment Plan Created — $${parseFloat(installmentForm.totalFee).toLocaleString()} over ${installmentForm.months} months ($${monthlyAmt.toFixed(2)}/mo)${data.mode === 'checkout' ? '\nCheckout link sent to collect card.' : '\nSubscription started on saved card.'}`,
         note_type: 'System',
         created_by: resolveActorName(user, employees),
@@ -1668,11 +1668,11 @@ export default function Clients() {
                       // Log the stage change as a note
                       const actor = resolveActorName(user, employees)
                       const noteContent = `📊 Pipeline stage changed: ${prevStage?.label||'—'} → ${s.label}`
-                      const {error:noteErr} = await supabase.from('client_notes').insert({client_name:c.name,content:noteContent,created_by:actor,created_at:new Date().toISOString()})
+                      const {error:noteErr} = await supabase.from('client_notes').insert({clientname:c.name,content:noteContent,created_by:actor,created_at:new Date().toISOString()})
                       if(noteErr){
                         showToast('Stage updated, but failed to log note: '+noteErr.message)
                       } else if(detail?.id===c.id){
-                        const{data:notesData}=await supabase.from('client_notes').select('*').eq('client_name',c.name).order('created_at',{ascending:false})
+                        const{data:notesData}=await supabase.from('client_notes').select('*').eq('clientname',c.name).order('created_at',{ascending:false})
                         if(notesData)setRelNotes(notesData)
                       }
                     }}
@@ -1891,7 +1891,7 @@ export default function Clients() {
                     disabled={!newNote.trim()||addingNote}
                     onClick={async()=>{
                       setAddingNote(true)
-                      const {error}=await supabase.from('client_notes').insert({client_name:c.name,content:newNote.trim(),created_by:resolveActorName(user, employees),visible_to_client:noteVisibleToClient,created_at:new Date().toISOString()})
+                      const {error}=await supabase.from('client_notes').insert({clientname:c.name,content:newNote.trim(),created_by:resolveActorName(user, employees),visible_to_client:noteVisibleToClient,created_at:new Date().toISOString()})
                       setAddingNote(false)
                       if(error){
                         console.error('client_notes insert error (full):', error)
@@ -1899,7 +1899,7 @@ export default function Clients() {
                         return
                       }
                       setNewNote('');setNoteVisibleToClient(false)
-                      const{data}=await supabase.from('client_notes').select('*').eq('client_name',c.name).order('created_at',{ascending:false})
+                      const{data}=await supabase.from('client_notes').select('*').eq('clientname',c.name).order('created_at',{ascending:false})
                       if(data)setRelNotes(data)
                     }}>
                     {addingNote?'…':'+ Add'}

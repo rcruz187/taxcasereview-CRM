@@ -260,7 +260,7 @@ export default function Cases() {
                     if (error) { showToast('❌ ' + error.message); return }
                     const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
                     await supabase.from('client_notes').insert({
-                      client_name: c.clientName,
+                      clientname: c.clientName,
                       content: `📁 Case status changed: ${prevStatus} → ${s} (${c.caseType}, ${c.caseNum})`,
                       created_by: actor,
                       visible_to_client: false,

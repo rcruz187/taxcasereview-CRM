@@ -67,7 +67,7 @@ export default function Sms() {
         if (msg.direction === 'inbound' && msg.clientName) {
           const preview = (msg.body || '').slice(0, 120).trim()
           supabase.from('client_notes').insert({
-            client_name: msg.clientName,
+            clientname: msg.clientName,
             content: `💬 SMS Received — ${preview}${msg.body?.length > 120 ? '…' : ''}`,
             note_type: 'SMS',
             created_by: msg.clientName,
@@ -144,7 +144,7 @@ export default function Sms() {
     if (form.clientName && status !== 'Failed') {
       const preview = (form.body || '').slice(0, 120).trim()
       await supabase.from('client_notes').insert({
-        client_name: form.clientName,
+        clientname: form.clientName,
         content: `💬 SMS Sent — ${preview}${form.body?.length > 120 ? '…' : ''}`,
         note_type: 'SMS',
         created_by: user?.email || 'Staff',

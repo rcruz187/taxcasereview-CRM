@@ -156,7 +156,7 @@ export default function ClientPortal() {
       supabase.from('documents').select('*').eq('client', client.name).order('created_at', { ascending: false }),
       supabase.from('bookkeeping').select('*').eq('client_name', client.name).order('date', { ascending: false }),
       supabase.from('payments').select('*').eq('clientName', client.name).order('created_at', { ascending: false }),
-      supabase.from('client_notes').select('*').eq('client_name', client.name).eq('visible_to_client', true).order('created_at', { ascending: false }),
+      supabase.from('client_notes').select('*').eq('clientname', client.name).eq('visible_to_client', true).order('created_at', { ascending: false }),
       supabase.from('tax_organizer_responses').select('id,tax_year,status,updated_at').eq('client_name', client.name).order('tax_year', { ascending: false }),
       supabase.from('invoices').select('*').eq('clientName', client.name).neq('status', 'Paid').order('created_at', { ascending: false }),
       supabase.from('sms_messages').select('*').eq('clientName', client.name).order('created_at', { ascending: true }),
@@ -181,7 +181,7 @@ export default function ClientPortal() {
   async function refreshPaymentsAndInvoices() {
     const [{ data: pays }, { data: notesData }, { data: invs }] = await Promise.all([
       supabase.from('payments').select('*').eq('clientName', client.name).order('created_at', { ascending: false }),
-      supabase.from('client_notes').select('*').eq('client_name', client.name).eq('visible_to_client', true).order('created_at', { ascending: false }),
+      supabase.from('client_notes').select('*').eq('clientname', client.name).eq('visible_to_client', true).order('created_at', { ascending: false }),
       supabase.from('invoices').select('*').eq('clientName', client.name).neq('status', 'Paid').order('created_at', { ascending: false }),
     ])
     setPayments(pays || [])
