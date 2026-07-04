@@ -176,29 +176,36 @@ export function AppProvider({ children }) {
     if (!user) return
     const myName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'You'
     const channels = []
+    let cancelled = false
+    const pendingTimeouts = []
 
     function withReconnect(name, table, handler) {
+      let attempt = 0
       function create() {
-        // Reusing the exact same channel name on every rebuild can collide
-        // with the previous instance if it hasn't fully finished tearing
-        // down yet — Supabase then throws "cannot add postgres_changes
-        // callbacks after subscribe()" and this channel silently stops
-        // reconnecting forever. A unique name per rebuild avoids the
-        // collision outright; try/catch means even an unexpected failure
-        // retries instead of permanently going dark.
+        if (cancelled) return
         try {
           const ch = supabase.channel(`${name}-${Date.now()}`)
           ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table }, handler)
             .subscribe(status => {
+              if (cancelled) return
               if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
                 supabase.removeChannel(ch)
-                setTimeout(create, 1500)
+                attempt = 0 // successful subscribe happened before this drop — reset backoff
+                pendingTimeouts.push(setTimeout(create, 1500))
+              } else if (status === 'SUBSCRIBED') {
+                attempt = 0
               }
             })
           channels.push(ch)
         } catch (e) {
-          console.error(`[realtime] ${name} failed to (re)subscribe, retrying:`, e.message)
-          setTimeout(create, 3000)
+          attempt += 1
+          if (attempt > 10) {
+            console.error(`[realtime] ${name} failed ${attempt} times in a row, giving up until next page load:`, e.message)
+            return
+          }
+          const delay = Math.min(3000 * attempt, 30000) // back off up to 30s between attempts
+          console.error(`[realtime] ${name} failed to (re)subscribe (attempt ${attempt}), retrying in ${delay}ms:`, e.message)
+          pendingTimeouts.push(setTimeout(create, delay))
         }
       }
       create()
@@ -235,6 +242,8 @@ export function AppProvider({ children }) {
     })
 
     return () => {
+      cancelled = true
+      pendingTimeouts.forEach(t => clearTimeout(t))
       channels.forEach(ch => { try { supabase.removeChannel(ch) } catch (_) {} })
     }
   }, [user])
