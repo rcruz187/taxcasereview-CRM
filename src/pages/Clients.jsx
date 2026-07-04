@@ -1051,7 +1051,7 @@ export default function Clients() {
 
   async function loadRelated(clientName) {
     setLoadingRel(true)
-    const [{ data:cases },{ data:tasks },{ data:invoices },{ data:docs },{ data:clientNotes },{ data:payments },{ data:sms },{ data:deadlines }] = await Promise.all([
+    const [casesRes,tasksRes,invoicesRes,docsRes,clientNotesRes,paymentsRes,smsRes,deadlinesRes] = await Promise.all([
       supabase.from('cases').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('tasks').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('invoices').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
@@ -1061,6 +1061,16 @@ export default function Clients() {
       supabase.from('sms_messages').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('deadlines').select('*').eq('clientName', clientName).order('dueDate',{ascending:true}),
     ])
+    // These 8 queries used to only look at .data, silently discarding any
+    // .error — a table failing here (RLS, schema cache, anything) looked
+    // identical to "genuinely has zero records", with no way to tell the
+    // difference. Logging now so a real failure shows up in the console.
+    const named = { cases:casesRes, tasks:tasksRes, invoices:invoicesRes, documents:docsRes, client_notes:clientNotesRes, payments:paymentsRes, sms_messages:smsRes, deadlines:deadlinesRes }
+    Object.entries(named).forEach(([table, res]) => {
+      if (res.error) console.error(`[loadRelated] ${table} query failed:`, res.error.message, res.error.hint || '', res.error.details || '')
+    })
+    const cases = casesRes.data, tasks = tasksRes.data, invoices = invoicesRes.data, docs = docsRes.data,
+          clientNotes = clientNotesRes.data, payments = paymentsRes.data, sms = smsRes.data, deadlines = deadlinesRes.data
     setRelCases(cases||[])
     setRelTasks(tasks||[])
     setRelInvoices(invoices||[])
@@ -1883,7 +1893,11 @@ export default function Clients() {
                       setAddingNote(true)
                       const {error}=await supabase.from('client_notes').insert({client_name:c.name,content:newNote.trim(),created_by:resolveActorName(user, employees),visible_to_client:noteVisibleToClient,created_at:new Date().toISOString()})
                       setAddingNote(false)
-                      if(error){showToast('Error: '+error.message);return}
+                      if(error){
+                        console.error('client_notes insert error (full):', error)
+                        showToast('Error: '+error.message+(error.hint?' | Hint: '+error.hint:'')+(error.details?' | Details: '+error.details:''))
+                        return
+                      }
                       setNewNote('');setNoteVisibleToClient(false)
                       const{data}=await supabase.from('client_notes').select('*').eq('client_name',c.name).order('created_at',{ascending:false})
                       if(data)setRelNotes(data)
