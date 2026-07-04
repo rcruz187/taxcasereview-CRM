@@ -179,15 +179,27 @@ export function AppProvider({ children }) {
 
     function withReconnect(name, table, handler) {
       function create() {
-        const ch = supabase.channel(name)
-        ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table }, handler)
-          .subscribe(status => {
-            if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-              supabase.removeChannel(ch)
-              setTimeout(create, 1500)
-            }
-          })
-        channels.push(ch)
+        // Reusing the exact same channel name on every rebuild can collide
+        // with the previous instance if it hasn't fully finished tearing
+        // down yet — Supabase then throws "cannot add postgres_changes
+        // callbacks after subscribe()" and this channel silently stops
+        // reconnecting forever. A unique name per rebuild avoids the
+        // collision outright; try/catch means even an unexpected failure
+        // retries instead of permanently going dark.
+        try {
+          const ch = supabase.channel(`${name}-${Date.now()}`)
+          ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table }, handler)
+            .subscribe(status => {
+              if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                supabase.removeChannel(ch)
+                setTimeout(create, 1500)
+              }
+            })
+          channels.push(ch)
+        } catch (e) {
+          console.error(`[realtime] ${name} failed to (re)subscribe, retrying:`, e.message)
+          setTimeout(create, 3000)
+        }
       }
       create()
     }
