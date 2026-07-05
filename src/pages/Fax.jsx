@@ -3,6 +3,7 @@ import PhoneNumber from '../components/PhoneNumber'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import { useLocation } from 'react-router-dom'
+import { DOC_FOLDERS } from './Clients'
 
 const BLANK = { to_number:'', from_number:'', client_name:'', subject:'', notes:'' }
 
@@ -38,6 +39,7 @@ export default function Fax() {
   const [sugg,     setSugg]     = useState([])
   const [attachPickerFor, setAttachPickerFor] = useState(null)
   const [attachSearch, setAttachSearch] = useState('')
+  const [attachFolder, setAttachFolder] = useState('Correspondence')
   const [attaching, setAttaching] = useState(null)
 
   useEffect(() => {
@@ -85,14 +87,14 @@ export default function Fax() {
   // Copies a received fax straight into a lead/client's Docs tab. Stores the
   // SignalWire-hosted file URL directly (same approach as inbound SMS/MMS
   // attachments) rather than re-hosting the file ourselves.
-  async function attachFaxToFile(faxRow, targetName) {
+  async function attachFaxToFile(faxRow, targetName, folder) {
     if (!targetName) { showToast('Pick who this belongs to first'); return }
     if (!faxRow.file_url) { showToast('This fax has no file attached', 'err'); return }
     setAttaching(faxRow.id)
     const { error } = await supabase.from('documents').insert([{
       name: `Fax — ${faxRow.from_number || 'Unknown number'}`,
       client: targetName,
-      docType: 'Fax',
+      docType: folder || 'Correspondence',
       notes: `Received via fax on ${faxRow.created_at ? new Date(faxRow.created_at).toLocaleString() : 'unknown date'}`,
       file_url: faxRow.file_url,
       file_name: `fax_${faxRow.id}.pdf`,
@@ -101,8 +103,8 @@ export default function Fax() {
     }])
     setAttaching(null)
     if (error) { showToast('Error attaching: ' + error.message, 'err'); return }
-    showToast(`✅ Attached to ${targetName}'s file`)
-    setAttachPickerFor(null); setAttachSearch('')
+    showToast(`✅ Attached to ${targetName}'s ${folder} folder`)
+    setAttachPickerFor(null); setAttachSearch(''); setAttachFolder('Correspondence')
   }
 
   function searchClient(val) {
@@ -298,15 +300,10 @@ export default function Fax() {
                     <td style={{padding:'12px 14px',fontSize:12,color:'var(--t3)'}}>{l.sent_by?.split('@')[0]||'—'}</td>
                     <td style={{padding:'12px 14px',display:'flex',gap:6,alignItems:'center'}} onClick={e=>e.stopPropagation()}>
                       {l.direction==='inbound' && l.file_url && (
-                        match
-                          ? <button className="btn sec" style={{fontSize:11,padding:'4px 10px'}} disabled={attaching===l.id}
-                              onClick={()=>attachFaxToFile(l, match.name)}>
-                              📎 Attach to {match.name}'s file
-                            </button>
-                          : <button className="btn sec" style={{fontSize:11,padding:'4px 10px'}}
-                              onClick={()=>{ setAttachPickerFor(pickerOpen ? null : l.id); setAttachSearch('') }}>
-                              📎 Attach to file
-                            </button>
+                        <button className="btn sec" style={{fontSize:11,padding:'4px 10px'}}
+                          onClick={()=>{ setAttachPickerFor(pickerOpen ? null : l.id); setAttachSearch(''); setAttachFolder('Correspondence') }}>
+                          📎 {match ? `Attach to ${match.name}'s file` : 'Attach to file'}
+                        </button>
                       )}
                       <button className="btn del" style={{fontSize:11,padding:'4px 10px'}} onClick={()=>setConfirmDel(l.id)}>Del</button>
                     </td>
@@ -315,18 +312,35 @@ export default function Fax() {
                     <tr style={{borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
                       <td colSpan={9} style={{padding:'10px 14px'}}>
                         <div style={{display:'flex',flexDirection:'column',gap:6,maxWidth:360}}>
-                          <input autoFocus placeholder="Search client or lead name…" value={attachSearch}
-                            onChange={e=>setAttachSearch(e.target.value)}
-                            style={{fontSize:13,padding:'6px 10px',borderRadius:6,border:'1px solid var(--br)',background:'var(--bg)',color:'var(--tx)'}}/>
-                          {pickerResults.map(p=>(
-                            <div key={p._type+p.id} onClick={()=>attachFaxToFile(l, p.name)}
-                              style={{fontSize:13,padding:'6px 10px',cursor:'pointer',borderRadius:6}}
-                              onMouseEnter={e=>e.currentTarget.style.background='var(--br)'}
-                              onMouseLeave={e=>e.currentTarget.style.background=''}>
-                              {p.name} <span style={{color:'var(--t3)',fontSize:11}}>({p._type})</span>
-                            </div>
-                          ))}
-                          <button className="btn sec" style={{fontSize:11,padding:'4px 10px',alignSelf:'flex-start'}} onClick={()=>{setAttachPickerFor(null);setAttachSearch('')}}>Cancel</button>
+                          {match ? (
+                            <div style={{fontSize:13,fontWeight:600}}>Attaching to: {match.name} <span style={{color:'var(--t3)',fontWeight:400,fontSize:11}}>({match._type}, matched by phone)</span></div>
+                          ) : (
+                            <>
+                              <input autoFocus placeholder="Search client or lead name…" value={attachSearch}
+                                onChange={e=>setAttachSearch(e.target.value)}
+                                style={{fontSize:13,padding:'6px 10px',borderRadius:6,border:'1px solid var(--br)',background:'var(--bg)',color:'var(--tx)'}}/>
+                              {pickerResults.map(p=>(
+                                <div key={p._type+p.id} onClick={()=>setAttachSearch(p.name)}
+                                  style={{fontSize:13,padding:'6px 10px',cursor:'pointer',borderRadius:6,background:attachSearch===p.name?'var(--br)':'transparent'}}
+                                  onMouseEnter={e=>e.currentTarget.style.background='var(--br)'}
+                                  onMouseLeave={e=>e.currentTarget.style.background=attachSearch===p.name?'var(--br)':''}>
+                                  {p.name} <span style={{color:'var(--t3)',fontSize:11}}>({p._type})</span>
+                                </div>
+                              ))}
+                            </>
+                          )}
+                          <div className="field"><label style={{fontSize:11}}>Folder</label>
+                            <select value={attachFolder} onChange={e=>setAttachFolder(e.target.value)} style={{fontSize:13,padding:'6px 10px'}}>
+                              {DOC_FOLDERS.map(f=><option key={f}>{f}</option>)}
+                            </select>
+                          </div>
+                          <div style={{display:'flex',gap:8}}>
+                            <button className="btn pri" style={{fontSize:12,padding:'5px 12px'}} disabled={attaching===l.id || (!match && !attachSearch)}
+                              onClick={()=>attachFaxToFile(l, match ? match.name : attachSearch, attachFolder)}>
+                              Confirm Attach
+                            </button>
+                            <button className="btn sec" style={{fontSize:12,padding:'5px 12px'}} onClick={()=>{setAttachPickerFor(null);setAttachSearch('');setAttachFolder('Correspondence')}}>Cancel</button>
+                          </div>
                         </div>
                       </td>
                     </tr>

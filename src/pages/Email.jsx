@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { sendGmailEmail, downloadGmailAttachment, fetchGmailAttachmentBlob } from '../lib/gmailUtils'
 import { useGmailSync } from '../context/GmailSyncContext'
 import { useApp } from '../context/AppContext'
+import { DOC_FOLDERS } from './Clients'
 
 const TEMPLATES = [
   { label:'Welcome Letter',         subject:'Welcome to Tax Case Review', body:"Dear {name},\n\nWelcome to Tax Case Review — we're glad to have you on board. Your case has been assigned to a dedicated representative who will be reaching out shortly to walk you through the next steps and what to expect along the way.\n\nIn the meantime, if anything comes up or you have questions, don't hesitate to reach out. We're here to help." },
@@ -30,6 +31,7 @@ export default function Email() {
   const [leads, setLeads]       = useState([])
   const [attachPickerFor, setAttachPickerFor] = useState(null) // attachmentId currently showing the manual picker
   const [attachSearch, setAttachSearch] = useState('')
+  const [attachFolder, setAttachFolder] = useState('Correspondence')
   const [attaching, setAttaching] = useState(null) // attachmentId currently being attached
   const [form, setForm]         = useState(BLANK)
   const [sug, setSug]           = useState([])
@@ -151,7 +153,7 @@ export default function Email() {
   // straight into a lead/client's Docs tab — unlike fax/SMS attachments,
   // this one re-hosts the file in our own storage since we have to fetch
   // the real bytes from Gmail anyway (no persistent public URL otherwise).
-  async function attachEmailAttachmentToFile(email, att, targetName) {
+  async function attachEmailAttachmentToFile(email, att, targetName, folder) {
     if (!targetName) { showToast('Pick who this belongs to first'); return }
     setAttaching(att.attachmentId)
     try {
@@ -163,14 +165,14 @@ export default function Email() {
       if (upErr) throw upErr
       const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
       const { error } = await supabase.from('documents').insert([{
-        name: att.filename, client: targetName, docType: 'Email',
+        name: att.filename, client: targetName, docType: folder || 'Correspondence',
         notes: `Received via email from ${email.recipient || email.clientName || 'unknown sender'} on ${email.created_at ? new Date(email.created_at).toLocaleString() : 'unknown date'}`,
         file_url: urlData.publicUrl, file_name: att.filename, file_size: att.size || null,
         created_at: new Date().toISOString(),
       }])
       if (error) throw error
-      showToast(`✅ Attached to ${targetName}'s file`)
-      setAttachPickerFor(null); setAttachSearch('')
+      showToast(`✅ Attached to ${targetName}'s ${folder} folder`)
+      setAttachPickerFor(null); setAttachSearch(''); setAttachFolder('Correspondence')
     } catch (e) {
       showToast('Error attaching: ' + e.message)
     }
@@ -618,35 +620,46 @@ export default function Email() {
                               }}>
                               📎 {att.filename} {att.size ? `(${Math.round(att.size / 1024)}KB)` : ''}
                             </button>
-                            {match
-                              ? <button className="btn sec" style={{ fontSize: 11, padding: '5px 10px' }} disabled={attaching === att.attachmentId}
-                                  onClick={() => attachEmailAttachmentToFile(selected, att, match.name)}>
-                                  📁 Attach to {match.name}'s file
-                                </button>
-                              : <button className="btn sec" style={{ fontSize: 11, padding: '5px 10px' }}
-                                  onClick={() => { setAttachPickerFor(attachPickerFor === att.attachmentId ? null : att.attachmentId); setAttachSearch('') }}>
-                                  📁 Attach to file
-                                </button>
-                            }
+                            <button className="btn sec" style={{ fontSize: 11, padding: '5px 10px' }}
+                              onClick={() => { setAttachPickerFor(attachPickerFor === att.attachmentId ? null : att.attachmentId); setAttachSearch(''); setAttachFolder('Correspondence') }}>
+                              📁 {match ? `Attach to ${match.name}'s file` : 'Attach to file'}
+                            </button>
                           </div>
                         ))}
                       </div>
                       {selected.attachments.map((att, i) => attachPickerFor === att.attachmentId && (
                         <div key={'picker-'+i} style={{ background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 8, padding: 10, display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 360 }}>
-                          <input autoFocus placeholder="Search client or lead name…" value={attachSearch}
-                            onChange={e => setAttachSearch(e.target.value)}
-                            style={{ fontSize: 13, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--br)', background: 'var(--bg)', color: 'var(--tx)' }}/>
-                          {attachSearch.length >= 2 && [...clients.map(c=>({...c,_type:'Client'})), ...leads.map(l=>({...l,_type:'Lead'}))]
-                            .filter(p => p.name.toLowerCase().includes(attachSearch.toLowerCase())).slice(0, 6)
-                            .map(p => (
-                              <div key={p._type+p.id} onClick={() => attachEmailAttachmentToFile(selected, att, p.name)}
-                                style={{ fontSize: 13, padding: '6px 10px', cursor: 'pointer', borderRadius: 6 }}
-                                onMouseEnter={e => e.currentTarget.style.background = 'var(--br)'}
-                                onMouseLeave={e => e.currentTarget.style.background = ''}>
-                                {p.name} <span style={{ color: 'var(--t3)', fontSize: 11 }}>({p._type})</span>
-                              </div>
-                          ))}
-                          <button className="btn sec" style={{ fontSize: 11, padding: '4px 10px', alignSelf: 'flex-start' }} onClick={() => { setAttachPickerFor(null); setAttachSearch('') }}>Cancel</button>
+                          {match ? (
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>Attaching to: {match.name} <span style={{ color: 'var(--t3)', fontWeight: 400, fontSize: 11 }}>({match._type}, matched by email)</span></div>
+                          ) : (
+                            <>
+                              <input autoFocus placeholder="Search client or lead name…" value={attachSearch}
+                                onChange={e => setAttachSearch(e.target.value)}
+                                style={{ fontSize: 13, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--br)', background: 'var(--bg)', color: 'var(--tx)' }}/>
+                              {attachSearch.length >= 2 && [...clients.map(c=>({...c,_type:'Client'})), ...leads.map(l=>({...l,_type:'Lead'}))]
+                                .filter(p => p.name.toLowerCase().includes(attachSearch.toLowerCase())).slice(0, 6)
+                                .map(p => (
+                                  <div key={p._type+p.id} onClick={() => setAttachSearch(p.name)}
+                                    style={{ fontSize: 13, padding: '6px 10px', cursor: 'pointer', borderRadius: 6, background: attachSearch===p.name?'var(--br)':'transparent' }}
+                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--br)'}
+                                    onMouseLeave={e => e.currentTarget.style.background = attachSearch===p.name?'var(--br)':''}>
+                                    {p.name} <span style={{ color: 'var(--t3)', fontSize: 11 }}>({p._type})</span>
+                                  </div>
+                              ))}
+                            </>
+                          )}
+                          <div className="field"><label style={{fontSize:11}}>Folder</label>
+                            <select value={attachFolder} onChange={e=>setAttachFolder(e.target.value)} style={{fontSize:13,padding:'6px 10px'}}>
+                              {DOC_FOLDERS.map(f=><option key={f}>{f}</option>)}
+                            </select>
+                          </div>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button className="btn pri" style={{ fontSize: 12, padding: '5px 12px' }} disabled={attaching === att.attachmentId || (!match && !attachSearch)}
+                              onClick={() => attachEmailAttachmentToFile(selected, att, match ? match.name : attachSearch, attachFolder)}>
+                              Confirm Attach
+                            </button>
+                            <button className="btn sec" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => { setAttachPickerFor(null); setAttachSearch(''); setAttachFolder('Correspondence') }}>Cancel</button>
+                          </div>
                         </div>
                       ))}
                     </div>

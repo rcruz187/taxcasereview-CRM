@@ -2,6 +2,7 @@ import { useState, useEffect, Fragment } from 'react'
 import PhoneNumber from '../components/PhoneNumber'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
+import { DOC_FOLDERS } from './Clients'
 
 const TEMPLATES = [
   {
@@ -61,6 +62,7 @@ export default function Sms() {
   const [leads,   setLeads]   = useState([])
   const [attachPickerFor, setAttachPickerFor] = useState(null) // sms_messages.id currently showing the manual picker
   const [attachSearch, setAttachSearch] = useState('')
+  const [attachFolder, setAttachFolder] = useState('Correspondence')
   const [attaching, setAttaching] = useState(null) // id of the media item currently being attached (disables button)
 
   useEffect(()=>{
@@ -104,14 +106,14 @@ export default function Sms() {
   // it — same approach already used for inbound faxes. If SignalWire ever
   // expires these URLs this would need revisiting, but it matches the
   // existing pattern rather than introducing a second one.
-  async function attachMediaToFile(msg, mediaItem, targetName) {
+  async function attachMediaToFile(msg, mediaItem, targetName, folder) {
     if (!targetName) { showToast('Pick who this belongs to first'); return }
     setAttaching(mediaItem.url)
     const ext = (mediaItem.content_type || '').split('/')[1] || 'jpg'
     const { error } = await supabase.from('documents').insert([{
       name: `SMS attachment — ${msg.phone}`,
       client: targetName,
-      docType: 'SMS',
+      docType: folder || 'Correspondence',
       notes: `Received via SMS on ${msg.created_at ? new Date(msg.created_at).toLocaleString() : 'unknown date'}`,
       file_url: mediaItem.url,
       file_name: `sms_attachment.${ext}`,
@@ -120,8 +122,8 @@ export default function Sms() {
     }])
     setAttaching(null)
     if (error) { showToast('Error attaching: ' + error.message); return }
-    showToast(`✅ Attached to ${targetName}'s file`)
-    setAttachPickerFor(null); setAttachSearch('')
+    showToast(`✅ Attached to ${targetName}'s ${folder} folder`)
+    setAttachPickerFor(null); setAttachSearch(''); setAttachFolder('Correspondence')
   }
 
   function searchClient(val){
@@ -331,15 +333,10 @@ export default function Sms() {
                       <td style={{padding:'12px 14px'}}><span className="bdg bg" style={{fontSize:12,padding:'3px 10px',fontWeight:700}}>{s.status||'Sent'}</span></td>
                       <td style={{padding:'12px 14px',display:'flex',gap:6,alignItems:'center'}}>
                         {hasMedia && (
-                          isMatched
-                            ? <button className="btn sec" style={{fontSize:11,padding:'4px 10px'}} disabled={attaching}
-                                onClick={()=>s.media.forEach(m=>attachMediaToFile(s, m, s.clientName))}>
-                                📎 Attach to {s.clientName}'s file
-                              </button>
-                            : <button className="btn sec" style={{fontSize:11,padding:'4px 10px'}}
-                                onClick={()=>{ setAttachPickerFor(pickerOpen ? null : s.id); setAttachSearch('') }}>
-                                📎 Attach to file
-                              </button>
+                          <button className="btn sec" style={{fontSize:11,padding:'4px 10px'}}
+                            onClick={()=>{ setAttachPickerFor(pickerOpen ? null : s.id); setAttachSearch(''); setAttachFolder('Correspondence') }}>
+                            📎 {isMatched ? `Attach to ${s.clientName}'s file` : 'Attach to file'}
+                          </button>
                         )}
                         <button className="btn del" style={{fontSize:11,padding:'4px 10px'}} onClick={()=>del(s.id)}>Del</button>
                       </td>
@@ -348,18 +345,35 @@ export default function Sms() {
                       <tr key={s.id+'-picker'} style={{borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
                         <td colSpan={7} style={{padding:'10px 14px'}}>
                           <div style={{display:'flex',flexDirection:'column',gap:6,maxWidth:360}}>
-                            <input autoFocus placeholder="Search client or lead name…" value={attachSearch}
-                              onChange={e=>setAttachSearch(e.target.value)}
-                              style={{fontSize:13,padding:'6px 10px',borderRadius:6,border:'1px solid var(--br)',background:'var(--bg)',color:'var(--tx)'}}/>
-                            {pickerResults.map(p=>(
-                              <div key={p._type+p.id} onClick={()=>s.media.forEach(m=>attachMediaToFile(s, m, p.name))}
-                                style={{fontSize:13,padding:'6px 10px',cursor:'pointer',borderRadius:6}}
-                                onMouseEnter={e=>e.currentTarget.style.background='var(--br)'}
-                                onMouseLeave={e=>e.currentTarget.style.background=''}>
-                                {p.name} <span style={{color:'var(--t3)',fontSize:11}}>({p._type})</span>
-                              </div>
-                            ))}
-                            <button className="btn sec" style={{fontSize:11,padding:'4px 10px',alignSelf:'flex-start'}} onClick={()=>{setAttachPickerFor(null);setAttachSearch('')}}>Cancel</button>
+                            {isMatched ? (
+                              <div style={{fontSize:13,fontWeight:600}}>Attaching to: {s.clientName} <span style={{color:'var(--t3)',fontWeight:400,fontSize:11}}>(matched by phone)</span></div>
+                            ) : (
+                              <>
+                                <input autoFocus placeholder="Search client or lead name…" value={attachSearch}
+                                  onChange={e=>setAttachSearch(e.target.value)}
+                                  style={{fontSize:13,padding:'6px 10px',borderRadius:6,border:'1px solid var(--br)',background:'var(--bg)',color:'var(--tx)'}}/>
+                                {pickerResults.map(p=>(
+                                  <div key={p._type+p.id} onClick={()=>setAttachSearch(p.name)}
+                                    style={{fontSize:13,padding:'6px 10px',cursor:'pointer',borderRadius:6,background:attachSearch===p.name?'var(--br)':'transparent'}}
+                                    onMouseEnter={e=>e.currentTarget.style.background='var(--br)'}
+                                    onMouseLeave={e=>e.currentTarget.style.background=attachSearch===p.name?'var(--br)':''}>
+                                    {p.name} <span style={{color:'var(--t3)',fontSize:11}}>({p._type})</span>
+                                  </div>
+                                ))}
+                              </>
+                            )}
+                            <div className="field"><label style={{fontSize:11}}>Folder</label>
+                              <select value={attachFolder} onChange={e=>setAttachFolder(e.target.value)} style={{fontSize:13,padding:'6px 10px'}}>
+                                {DOC_FOLDERS.map(f=><option key={f}>{f}</option>)}
+                              </select>
+                            </div>
+                            <div style={{display:'flex',gap:8}}>
+                              <button className="btn pri" style={{fontSize:12,padding:'5px 12px'}} disabled={!!attaching || (!isMatched && !attachSearch)}
+                                onClick={()=>s.media.forEach(m=>attachMediaToFile(s, m, isMatched ? s.clientName : attachSearch, attachFolder))}>
+                                Confirm Attach
+                              </button>
+                              <button className="btn sec" style={{fontSize:12,padding:'5px 12px'}} onClick={()=>{setAttachPickerFor(null);setAttachSearch('');setAttachFolder('Correspondence')}}>Cancel</button>
+                            </div>
                           </div>
                         </td>
                       </tr>
