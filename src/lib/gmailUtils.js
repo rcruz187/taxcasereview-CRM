@@ -352,9 +352,10 @@ export async function getAndParseGmailMessage(supabase, id, clients = []) {
   }
 }
 
-// Downloads one attachment from Gmail and triggers a browser save-as —
-// fetched on demand so we never have to store attachment bytes ourselves.
-export async function downloadGmailAttachment(supabase, { gmailMessageId, attachmentId, filename, mimeType }) {
+// Fetches one Gmail attachment's raw bytes as a Blob. Shared by the
+// download-to-computer action and the "attach to client/lead file" action —
+// same fetch, different destination for the resulting bytes.
+export async function fetchGmailAttachmentBlob(supabase, { gmailMessageId, attachmentId, mimeType }) {
   const token = await getValidGmailToken(supabase)
   const res = await fetch(
     `https://gmail.googleapis.com/gmail/v1/users/me/messages/${gmailMessageId}/attachments/${attachmentId}`,
@@ -367,7 +368,13 @@ export async function downloadGmailAttachment(supabase, { gmailMessageId, attach
   const binary = atob(b64)
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-  const blob = new Blob([bytes], { type: mimeType || 'application/octet-stream' })
+  return new Blob([bytes], { type: mimeType || 'application/octet-stream' })
+}
+
+// Downloads one attachment from Gmail and triggers a browser save-as —
+// fetched on demand so we never have to store attachment bytes ourselves.
+export async function downloadGmailAttachment(supabase, { gmailMessageId, attachmentId, filename, mimeType }) {
+  const blob = await fetchGmailAttachmentBlob(supabase, { gmailMessageId, attachmentId, mimeType })
 
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

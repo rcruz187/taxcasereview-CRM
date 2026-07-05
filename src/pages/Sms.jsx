@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import PhoneNumber from '../components/PhoneNumber'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
@@ -58,6 +58,10 @@ export default function Sms() {
   const [toast,   setToast]   = useState('')
   const [view,    setView]    = useState('compose')
   const [settings, setSettings] = useState({})
+  const [leads,   setLeads]   = useState([])
+  const [attachPickerFor, setAttachPickerFor] = useState(null) // sms_messages.id currently showing the manual picker
+  const [attachSearch, setAttachSearch] = useState('')
+  const [attaching, setAttaching] = useState(null) // id of the media item currently being attached (disables button)
 
   useEffect(()=>{
     load()
@@ -80,18 +84,45 @@ export default function Sms() {
   },[] )
 
   async function load(){
-    const [{data:sms},{data:cls},{data:s}]=await Promise.all([
+    const [{data:sms},{data:cls},{data:lds},{data:s}]=await Promise.all([
       supabase.from('sms_messages').select('*').order('created_at',{ascending:false}),
       supabase.from('clients').select('id,name,phone,smsConsent'),
+      supabase.from('leads').select('id,name,phone'),
       supabase.from('settings').select('sw_space_url,sw_inbound_did').limit(1).maybeSingle(),
     ])
     if(sms)setSent(sms)
     if(cls)setClients(cls)
+    if(lds)setLeads(lds)
     if(s)setSettings(s)
   }
 
   function showToast(msg){setToast(msg);setTimeout(()=>setToast(''),3500)}
   function fld(k,v){setForm(f=>({...f,[k]:v}))}
+
+  // Copies an inbound MMS attachment straight into a lead/client's Docs tab.
+  // Stores the SignalWire-hosted media URL directly rather than re-hosting
+  // it — same approach already used for inbound faxes. If SignalWire ever
+  // expires these URLs this would need revisiting, but it matches the
+  // existing pattern rather than introducing a second one.
+  async function attachMediaToFile(msg, mediaItem, targetName) {
+    if (!targetName) { showToast('Pick who this belongs to first'); return }
+    setAttaching(mediaItem.url)
+    const ext = (mediaItem.content_type || '').split('/')[1] || 'jpg'
+    const { error } = await supabase.from('documents').insert([{
+      name: `SMS attachment — ${msg.phone}`,
+      client: targetName,
+      docType: 'SMS',
+      notes: `Received via SMS on ${msg.created_at ? new Date(msg.created_at).toLocaleString() : 'unknown date'}`,
+      file_url: mediaItem.url,
+      file_name: `sms_attachment.${ext}`,
+      file_size: null,
+      created_at: new Date().toISOString(),
+    }])
+    setAttaching(null)
+    if (error) { showToast('Error attaching: ' + error.message); return }
+    showToast(`✅ Attached to ${targetName}'s file`)
+    setAttachPickerFor(null); setAttachSearch('')
+  }
 
   function searchClient(val){
     fld('clientName',val)
@@ -277,19 +308,65 @@ export default function Sms() {
               <tbody>
                 {sent.length===0
                   ?<tr><td colSpan={7} style={{textAlign:'center',color:'var(--t3)',padding:'40px 20px'}}><div style={{fontSize:32,marginBottom:8}}>💬</div><div style={{fontWeight:600,fontSize:14,color:'var(--tx)',marginBottom:4}}>No messages yet</div><div style={{fontSize:12}}>Send an SMS to see it here.</div></td></tr>
-                  :sent.map(s=>(
-                    <tr key={s.id} style={{borderBottom:'1px solid var(--br)'}}
+                  :sent.map(s=>{
+                    const hasMedia = s.direction==='inbound' && s.media?.length > 0
+                    const isMatched = hasMedia && s.clientName && s.clientName !== s.phone
+                    const pickerOpen = attachPickerFor === s.id
+                    const pickerResults = attachSearch.length >= 2
+                      ? [...clients.map(c=>({...c,_type:'Client'})), ...leads.map(l=>({...l,_type:'Lead'}))]
+                          .filter(p=>p.name.toLowerCase().includes(attachSearch.toLowerCase())).slice(0,6)
+                      : []
+                    return (
+                    <Fragment key={s.id}>
+                    <tr key={s.id} style={{borderBottom: pickerOpen ? 'none' : '1px solid var(--br)'}}
                       onMouseEnter={e=>e.currentTarget.style.background='var(--s2)'}
                       onMouseLeave={e=>e.currentTarget.style.background=''}>
                       <td style={{padding:'12px 14px',fontSize:18}}>{s.direction==='inbound'?<span style={{color:'var(--blue)'}}>📥</span>:<span style={{color:'var(--t3)'}}>📤</span>}</td>
                       <td style={{padding:'12px 14px',fontWeight:700,fontSize:14}}>{s.clientName}</td>
                       <td style={{padding:'12px 14px'}}><PhoneNumber val={s.phone} /></td>
-                      <td style={{padding:'12px 14px',fontSize:13,maxWidth:240,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'var(--t2)'}}>{s.body}</td>
+                      <td style={{padding:'12px 14px',fontSize:13,maxWidth:240,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'var(--t2)'}}>
+                        {s.body}{hasMedia && <span title={`${s.media.length} attachment(s)`} style={{marginLeft:6}}>📎 {s.media.length}</span>}
+                      </td>
                       <td style={{padding:'12px 14px',fontSize:12,color:'var(--t3)',whiteSpace:'nowrap'}}>{s.created_at?.slice(0,10)}</td>
                       <td style={{padding:'12px 14px'}}><span className="bdg bg" style={{fontSize:12,padding:'3px 10px',fontWeight:700}}>{s.status||'Sent'}</span></td>
-                      <td style={{padding:'12px 14px'}}><button className="btn del" style={{fontSize:11,padding:'4px 10px'}} onClick={()=>del(s.id)}>Del</button></td>
+                      <td style={{padding:'12px 14px',display:'flex',gap:6,alignItems:'center'}}>
+                        {hasMedia && (
+                          isMatched
+                            ? <button className="btn sec" style={{fontSize:11,padding:'4px 10px'}} disabled={attaching}
+                                onClick={()=>s.media.forEach(m=>attachMediaToFile(s, m, s.clientName))}>
+                                📎 Attach to {s.clientName}'s file
+                              </button>
+                            : <button className="btn sec" style={{fontSize:11,padding:'4px 10px'}}
+                                onClick={()=>{ setAttachPickerFor(pickerOpen ? null : s.id); setAttachSearch('') }}>
+                                📎 Attach to file
+                              </button>
+                        )}
+                        <button className="btn del" style={{fontSize:11,padding:'4px 10px'}} onClick={()=>del(s.id)}>Del</button>
+                      </td>
                     </tr>
-                  ))
+                    {pickerOpen && (
+                      <tr key={s.id+'-picker'} style={{borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
+                        <td colSpan={7} style={{padding:'10px 14px'}}>
+                          <div style={{display:'flex',flexDirection:'column',gap:6,maxWidth:360}}>
+                            <input autoFocus placeholder="Search client or lead name…" value={attachSearch}
+                              onChange={e=>setAttachSearch(e.target.value)}
+                              style={{fontSize:13,padding:'6px 10px',borderRadius:6,border:'1px solid var(--br)',background:'var(--bg)',color:'var(--tx)'}}/>
+                            {pickerResults.map(p=>(
+                              <div key={p._type+p.id} onClick={()=>s.media.forEach(m=>attachMediaToFile(s, m, p.name))}
+                                style={{fontSize:13,padding:'6px 10px',cursor:'pointer',borderRadius:6}}
+                                onMouseEnter={e=>e.currentTarget.style.background='var(--br)'}
+                                onMouseLeave={e=>e.currentTarget.style.background=''}>
+                                {p.name} <span style={{color:'var(--t3)',fontSize:11}}>({p._type})</span>
+                              </div>
+                            ))}
+                            <button className="btn sec" style={{fontSize:11,padding:'4px 10px',alignSelf:'flex-start'}} onClick={()=>{setAttachPickerFor(null);setAttachSearch('')}}>Cancel</button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
+                    )
+                  })
                 }
               </tbody>
             </table>

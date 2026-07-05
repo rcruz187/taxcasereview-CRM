@@ -17,7 +17,19 @@ serve(async (req) => {
     const body = form.get('Body')?.toString() || ''
     const sid = form.get('MessageSid')?.toString() || form.get('sid')?.toString() || null
 
-    if (!from || !body) {
+    // MMS: SignalWire (Twilio-compatible) sends NumMedia plus MediaUrl0/
+    // MediaContentType0, MediaUrl1/MediaContentType1, etc. Previously none
+    // of this was captured at all, so a client texting a photo of a
+    // document just vanished — the text body (if any) was all that saved.
+    const numMedia = parseInt(form.get('NumMedia')?.toString() || '0') || 0
+    const media = []
+    for (let i = 0; i < numMedia; i++) {
+      const url = form.get(`MediaUrl${i}`)?.toString()
+      const contentType = form.get(`MediaContentType${i}`)?.toString() || null
+      if (url) media.push({ url, content_type: contentType })
+    }
+
+    if (!from || (!body && media.length === 0)) {
       return new Response(emptyXml, { headers: { 'Content-Type': 'text/xml' } })
     }
 
@@ -41,16 +53,18 @@ serve(async (req) => {
       }
     }
 
-    await supabase.from('sms_messages').insert({
+    const { error: insertError } = await supabase.from('sms_messages').insert({
     tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a',
       clientName: clientName || from,
       phone: from,
       body,
+      media: media.length > 0 ? media : null,
       status: 'Received',
       direction: 'inbound',
       signalwire_sms_id: sid,
       created_at: new Date().toISOString(),
     })
+    if (insertError) console.error('[receive-sms] sms_messages insert FAILED:', insertError.message)
 
     return new Response(emptyXml, { headers: { 'Content-Type': 'text/xml' } })
 

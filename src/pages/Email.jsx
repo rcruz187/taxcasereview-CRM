@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { sendGmailEmail, downloadGmailAttachment } from '../lib/gmailUtils'
+import { sendGmailEmail, downloadGmailAttachment, fetchGmailAttachmentBlob } from '../lib/gmailUtils'
 import { useGmailSync } from '../context/GmailSyncContext'
 import { useApp } from '../context/AppContext'
 
@@ -27,6 +27,10 @@ const BLANK = { recipient:'', clientName:'', subject:'', body:'', triage:'Sent',
 export default function Email() {
   const [emails, setEmails]     = useState([])
   const [clients, setClients]   = useState([])
+  const [leads, setLeads]       = useState([])
+  const [attachPickerFor, setAttachPickerFor] = useState(null) // attachmentId currently showing the manual picker
+  const [attachSearch, setAttachSearch] = useState('')
+  const [attaching, setAttaching] = useState(null) // attachmentId currently being attached
   const [form, setForm]         = useState(BLANK)
   const [sug, setSug]           = useState([])
   const [saving, setSaving]     = useState(false)
@@ -118,15 +122,60 @@ export default function Email() {
   }
 
   async function load() {
-    const [{ data: e }, { data: c }] = await Promise.all([
+    const [{ data: e }, { data: c }, { data: l }] = await Promise.all([
       supabase.from('emails').select('*').order('created_at', { ascending: false }),
-      supabase.from('clients').select('id,name,email')
+      supabase.from('clients').select('id,name,email'),
+      supabase.from('leads').select('id,name,email'),
     ])
     if (e) setEmails(e)
     if (c) setClients(c)
+    if (l) setLeads(l)
   }
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3500) }
+
+  // Match an inbound email's sender address against known clients/leads by
+  // email, purely to suggest who an attachment probably belongs to —
+  // attaching still always requires a click either way.
+  function matchByEmail(address) {
+    if (!address) return null
+    const addr = address.toLowerCase()
+    const c = clients.find(c => c.email && c.email.toLowerCase() === addr)
+    if (c) return { ...c, _type: 'Client' }
+    const l = leads.find(l => l.email && l.email.toLowerCase() === addr)
+    if (l) return { ...l, _type: 'Lead' }
+    return null
+  }
+
+  // Fetches an email attachment's actual bytes from Gmail and copies it
+  // straight into a lead/client's Docs tab — unlike fax/SMS attachments,
+  // this one re-hosts the file in our own storage since we have to fetch
+  // the real bytes from Gmail anyway (no persistent public URL otherwise).
+  async function attachEmailAttachmentToFile(email, att, targetName) {
+    if (!targetName) { showToast('Pick who this belongs to first'); return }
+    setAttaching(att.attachmentId)
+    try {
+      const blob = await fetchGmailAttachmentBlob(supabase, {
+        gmailMessageId: email.gmail_message_id, attachmentId: att.attachmentId, mimeType: att.mimeType,
+      })
+      const path = `docs/${targetName.replace(/\s+/g,'-')}/${Date.now()}_${att.filename}`
+      const { error: upErr } = await supabase.storage.from('documents').upload(path, blob, { upsert: true, contentType: att.mimeType })
+      if (upErr) throw upErr
+      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+      const { error } = await supabase.from('documents').insert([{
+        name: att.filename, client: targetName, docType: 'Email',
+        notes: `Received via email from ${email.recipient || email.clientName || 'unknown sender'} on ${email.created_at ? new Date(email.created_at).toLocaleString() : 'unknown date'}`,
+        file_url: urlData.publicUrl, file_name: att.filename, file_size: att.size || null,
+        created_at: new Date().toISOString(),
+      }])
+      if (error) throw error
+      showToast(`✅ Attached to ${targetName}'s file`)
+      setAttachPickerFor(null); setAttachSearch('')
+    } catch (e) {
+      showToast('Error attaching: ' + e.message)
+    }
+    setAttaching(null)
+  }
   function setLayout(l) { setReadLayout(l); localStorage.setItem('tcr_email_layout', l) }
   function startResize(e) {
     e.preventDefault()
@@ -551,23 +600,58 @@ export default function Email() {
                       {selected.body}
                     </div>
                   )}
-                  {selected.attachments?.length > 0 && (
-                    <div style={{ marginTop: 14, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      {selected.attachments.map((att, i) => (
-                        <button key={i} className="btn sec" style={{ fontSize: 12, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 6 }}
-                          onClick={async () => {
-                            try {
-                              await downloadGmailAttachment(supabase, {
-                                gmailMessageId: selected.gmail_message_id, attachmentId: att.attachmentId,
-                                filename: att.filename, mimeType: att.mimeType,
-                              })
-                            } catch (e) { showToast('Could not download: ' + e.message) }
-                          }}>
-                          📎 {att.filename} {att.size ? `(${Math.round(att.size / 1024)}KB)` : ''}
-                        </button>
+                  {selected.attachments?.length > 0 && (() => {
+                    const match = matchByEmail(selected.from_address || selected.recipient)
+                    return (
+                    <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {selected.attachments.map((att, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <button className="btn sec" style={{ fontSize: 12, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 6 }}
+                              onClick={async () => {
+                                try {
+                                  await downloadGmailAttachment(supabase, {
+                                    gmailMessageId: selected.gmail_message_id, attachmentId: att.attachmentId,
+                                    filename: att.filename, mimeType: att.mimeType,
+                                  })
+                                } catch (e) { showToast('Could not download: ' + e.message) }
+                              }}>
+                              📎 {att.filename} {att.size ? `(${Math.round(att.size / 1024)}KB)` : ''}
+                            </button>
+                            {match
+                              ? <button className="btn sec" style={{ fontSize: 11, padding: '5px 10px' }} disabled={attaching === att.attachmentId}
+                                  onClick={() => attachEmailAttachmentToFile(selected, att, match.name)}>
+                                  📁 Attach to {match.name}'s file
+                                </button>
+                              : <button className="btn sec" style={{ fontSize: 11, padding: '5px 10px' }}
+                                  onClick={() => { setAttachPickerFor(attachPickerFor === att.attachmentId ? null : att.attachmentId); setAttachSearch('') }}>
+                                  📁 Attach to file
+                                </button>
+                            }
+                          </div>
+                        ))}
+                      </div>
+                      {selected.attachments.map((att, i) => attachPickerFor === att.attachmentId && (
+                        <div key={'picker-'+i} style={{ background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 8, padding: 10, display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 360 }}>
+                          <input autoFocus placeholder="Search client or lead name…" value={attachSearch}
+                            onChange={e => setAttachSearch(e.target.value)}
+                            style={{ fontSize: 13, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--br)', background: 'var(--bg)', color: 'var(--tx)' }}/>
+                          {attachSearch.length >= 2 && [...clients.map(c=>({...c,_type:'Client'})), ...leads.map(l=>({...l,_type:'Lead'}))]
+                            .filter(p => p.name.toLowerCase().includes(attachSearch.toLowerCase())).slice(0, 6)
+                            .map(p => (
+                              <div key={p._type+p.id} onClick={() => attachEmailAttachmentToFile(selected, att, p.name)}
+                                style={{ fontSize: 13, padding: '6px 10px', cursor: 'pointer', borderRadius: 6 }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'var(--br)'}
+                                onMouseLeave={e => e.currentTarget.style.background = ''}>
+                                {p.name} <span style={{ color: 'var(--t3)', fontSize: 11 }}>({p._type})</span>
+                              </div>
+                          ))}
+                          <button className="btn sec" style={{ fontSize: 11, padding: '4px 10px', alignSelf: 'flex-start' }} onClick={() => { setAttachPickerFor(null); setAttachSearch('') }}>Cancel</button>
+                        </div>
                       ))}
                     </div>
-                  )}
+                    )
+                  })()}
                 </>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--t3)' }}>

@@ -172,8 +172,8 @@ async function importIds(supabase: any, token: string, ids: string[], clients: a
           const preview = (parsed.body || '').slice(0, 120).replace(/\n/g, ' ').trim()
           const noteContent = `📧 Email ${direction} — "${parsed.subject}"${preview ? `\n${preview}${parsed.body?.length > 120 ? '…' : ''}` : ''}`
           const { error: noteError } = await supabase.from('client_notes').insert({
-            client_name: parsed.clientName, content: noteContent, note_type: 'Email',
-            created_by: direction === 'Sent' ? 'Tax Case Review' : parsed.clientName,
+            clientname: parsed.clientName, text: noteContent, note_type: 'Email',
+            author: direction === 'Sent' ? 'Tax Case Review' : parsed.clientName,
             created_at: parsed.created_at || new Date().toISOString(),
             tenant_id: tenantId,
           })
