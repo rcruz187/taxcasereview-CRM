@@ -2015,23 +2015,37 @@ export default function Leads() {
                   }
                   byKey.get(key).tasks.push(t)
                 })
-                const renderTask = t => (
-                  <div key={t.id} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'8px 0',borderBottom:'1px solid var(--br)'}}>
+                const TASK_AVATAR_PALETTE = ['#e8590c','#2563eb','#16a34a','#9333ea','#d97706','#0891b2','#dc2626','#4f46e5']
+                function taskAvatarColor(name){
+                  const s = name || '?'
+                  let hash = 0
+                  for (let i=0;i<s.length;i++) hash = s.charCodeAt(i) + ((hash<<5)-hash)
+                  return TASK_AVATAR_PALETTE[Math.abs(hash) % TASK_AVATAR_PALETTE.length]
+                }
+                function taskInitials(name){ return (name||'?').trim().split(/\s+/).filter(Boolean).map(p=>p[0]).join('').slice(0,2).toUpperCase() || '?' }
+                const renderTask = t => {
+                  const emp = employees.find(e => e.name && t.assignedTo && e.name.toLowerCase()===t.assignedTo.toLowerCase())
+                  const overdue = t.dueDate && new Date(t.dueDate)<new Date() && !t.done
+                  return (
+                  <div key={t.id} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--br)'}}>
                     <div
                       onClick={()=>toggleLeadTask(t)}
-                      style={{width:18,height:18,borderRadius:4,border:'1.5px solid var(--b2c)',background:t.done?'var(--ok)':'var(--s2)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,marginTop:1,color:'#fff',fontSize:11}}
+                      style={{width:18,height:18,borderRadius:4,border:'1.5px solid var(--b2c)',background:t.done?'var(--ok)':'var(--s2)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,color:'#fff',fontSize:11}}
                     >{t.done?'✓':''}</div>
-                    <div style={{flex:1}}>
+                    <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:13,fontWeight:t.done?400:600,textDecoration:t.done?'line-through':'none',color:t.done?'var(--t3)':'var(--tx)'}}>{t.title}</div>
-                      <div style={{fontSize:10,color:'var(--t3)',marginTop:2,display:'flex',gap:8}}>
-                        {t.priority&&<span className={`bdg ${t.priority==='High'?'br':t.priority==='Low'?'bn':'ba'}`} style={{fontSize:9}}>{t.priority}</span>}
-                        {t.dueDate&&<span>Due: {t.dueDate}</span>}
-                        {t.assignedTo&&<span>→ {t.assignedTo}</span>}
-                      </div>
+                      {t.priority&&<div style={{marginTop:2}}><span className={`bdg ${t.priority==='High'?'br':t.priority==='Low'?'bn':'ba'}`} style={{fontSize:9}}>{t.priority}</span></div>}
                     </div>
+                    <span style={{fontSize:9,fontWeight:700,padding:'3px 9px',borderRadius:20,flexShrink:0,background:t.done?'rgba(22,163,74,.15)':'rgba(148,163,184,.15)',color:t.done?'var(--ok)':'var(--t3)'}}>{t.done?'Completed':'Ready to Start'}</span>
+                    <span style={{fontSize:10,color:overdue?'var(--bad)':'var(--t3)',flexShrink:0,width:72,textAlign:'center'}}>{t.dueDate || '—'}</span>
+                    {t.assignedTo && (
+                      <div style={{width:22,height:22,borderRadius:'50%',flexShrink:0,overflow:'hidden',background:taskAvatarColor(t.assignedTo),display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:800,color:'#fff'}} title={t.assignedTo}>
+                        {emp?.avatar_url ? <img src={emp.avatar_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : taskInitials(t.assignedTo)}
+                      </div>
+                    )}
                     <button className="btn sec" style={{fontSize:10,padding:'3px 8px',flexShrink:0}} onClick={()=>addLeadSubtask(t)}>+ Sub</button>
                   </div>
-                )
+                )}
                 return groups.map(g => g.section_title ? (
                   <div key={g.key} style={{marginBottom:10,borderRadius:8,overflow:'hidden',border:'1px solid var(--br)'}}>
                     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:'var(--s2)'}}>
