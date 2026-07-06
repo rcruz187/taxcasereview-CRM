@@ -261,11 +261,16 @@ export default function Email() {
     // Auto-log to client activity history
     if (form.clientName) {
       const preview = (form.body || '').slice(0, 120).replace(/\n/g, ' ').trim()
+      let authorName = user?.email || 'Staff'
+      if (user?.email) {
+        const { data: empRec } = await supabase.from('employees').select('name').eq('email', user.email).maybeSingle()
+        if (empRec?.name) authorName = empRec.name
+      }
       await supabase.from('client_notes').insert({
         clientname: form.clientName,
         text: `📧 Email Sent — "${form.subject}"\n${preview}${form.body?.length > 120 ? '…' : ''}`,
         note_type: 'Email',
-        author: user?.email || 'Staff',
+        author: authorName,
         created_at: new Date().toISOString(),
       })
     }
