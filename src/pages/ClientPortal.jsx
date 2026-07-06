@@ -74,6 +74,28 @@ function fmt(v) {
 }
 
 export default function ClientPortal() {
+  // ── EMERGENCY LOCKDOWN ──────────────────────────────────────────────
+  // Taken offline: the portal's "PIN" check ran entirely in the browser
+  // after the client record (including SSN) had already been fetched
+  // unauthenticated, and several tables it reads (bookkeeping, financial
+  // profile, tax organizer, compliance records, documents, payments,
+  // invoices, notes, SMS, email) had wide-open RLS policies with no real
+  // per-client restriction. Anyone with the public anon key could read
+  // any client's full file directly via the API, bypassing the PIN
+  // entirely. Do not remove this without a real server-side PIN-verified
+  // access mechanism in place first.
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0b0f19', color: '#e2e8f0', textAlign: 'center', padding: 24 }}>
+      <div style={{ maxWidth: 420 }}>
+        <div style={{ fontSize: 40, marginBottom: 16 }}>🔧</div>
+        <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 10 }}>Client Portal temporarily unavailable</div>
+        <div style={{ fontSize: 14, color: '#94a3b8', lineHeight: 1.6 }}>
+          We're performing scheduled maintenance on the client portal. Please contact your representative directly in the meantime.
+        </div>
+      </div>
+    </div>
+  )
+  // ── END EMERGENCY LOCKDOWN — original component below is unreachable ──
   const { id } = useParams()
   const [client, setClient] = useState(null)
   const [loading, setLoading] = useState(true)
