@@ -72,7 +72,7 @@ export default function Tasks() {
       supabase.from('tasks').select('*').eq('deleted', false).order('created_at',{ascending:false}),
       supabase.from('tasks').select('*').eq('deleted', true).order('deleted_at',{ascending:false}),
       supabase.from('clients').select('id,name'),
-      supabase.from('employees').select('id,name')
+      supabase.from('employees').select('id,name,avatar_url')
     ])
     // Handle case where 'deleted' column may not exist yet — fall back gracefully
     if (t) setTasks(t)
@@ -205,14 +205,25 @@ export default function Tasks() {
   }
   const openGroups = groupTasks(open)
 
+  const AVATAR_PALETTE = ['#e8590c','#2563eb','#16a34a','#9333ea','#d97706','#0891b2','#dc2626','#4f46e5']
+  function avatarColor(name){
+    const s = name || '?'
+    let hash = 0
+    for (let i=0;i<s.length;i++) hash = s.charCodeAt(i) + ((hash<<5)-hash)
+    return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length]
+  }
+  function initials(name){ return (name||'?').trim().split(/\s+/).filter(Boolean).map(p=>p[0]).join('').slice(0,2).toUpperCase() || '?' }
+
   function TaskItem({t, showRestore=false, onAddSub}) {
+    const emp = employees.find(e => e.name && t.assignedTo && e.name.toLowerCase()===t.assignedTo.toLowerCase())
+    const overdue = t.dueDate && new Date(t.dueDate)<new Date() && !t.done
     return (
-      <div style={{display:'flex',gap:10,alignItems:'flex-start',padding:'9px 0',borderBottom:'1px solid var(--br)'}}>
+      <div style={{display:'flex',gap:10,alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--br)'}}>
         {/* Checkbox */}
         <div
           onClick={()=>!showRestore&&toggleDone(t)}
           style={{
-            width:20,height:20,borderRadius:5,flexShrink:0,marginTop:1,cursor:showRestore?'default':'pointer',
+            width:20,height:20,borderRadius:5,flexShrink:0,cursor:showRestore?'default':'pointer',
             border:'1.5px solid var(--b2c)',
             background:t.done?'var(--ok)':'var(--s2)',
             display:'flex',alignItems:'center',justifyContent:'center',
@@ -230,13 +241,37 @@ export default function Tasks() {
             overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'
           }}>{t.title}</div>
           <div style={{fontSize:11,color:'var(--t3)',marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
-            {t.assignedTo&&<span>👤 {t.assignedTo}</span>}
-            {t.dueDate&&<span style={{color:new Date(t.dueDate)<new Date()&&!t.done?'var(--bad)':'inherit'}}>📅 {t.dueDate}</span>}
             {t.clientName&&<span>🏢 {t.clientName}</span>}
             {t.priority&&<span className={`bdg ${pc(t.priority)}`} style={{fontSize:9}}>{t.priority}</span>}
             {showRestore&&t.deleted_at&&<span style={{color:'var(--bad)'}}>Deleted {t.deleted_at?.slice(0,10)}</span>}
           </div>
           {t.notes&&<div style={{fontSize:11,color:'var(--t2)',marginTop:3,lineHeight:1.5}}>{t.notes}</div>}
+        </div>
+
+        {/* Status pill */}
+        <div style={{width:92,flexShrink:0,textAlign:'center'}}>
+          <span style={{
+            fontSize:10,fontWeight:700,padding:'3px 10px',borderRadius:20,
+            background:t.done?'rgba(22,163,74,.15)':'rgba(148,163,184,.15)',
+            color:t.done?'var(--ok)':'var(--t3)'
+          }}>{t.done?'Completed':'Ready to Start'}</span>
+        </div>
+
+        {/* Due date */}
+        <div style={{width:100,flexShrink:0,fontSize:11,color:overdue?'var(--bad)':'var(--t3)',textAlign:'center'}}>
+          {t.dueDate || 'No due date'}
+        </div>
+
+        {/* Assignee + avatar */}
+        <div style={{width:130,flexShrink:0,display:'flex',alignItems:'center',gap:6,justifyContent:'flex-end'}}>
+          {t.assignedTo && (
+            <>
+              <span style={{fontSize:11,color:'var(--t3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.assignedTo}</span>
+              <div style={{width:24,height:24,borderRadius:'50%',flexShrink:0,overflow:'hidden',background:avatarColor(t.assignedTo),display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,color:'#fff'}}>
+                {emp?.avatar_url ? <img src={emp.avatar_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : initials(t.assignedTo)}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Actions */}
