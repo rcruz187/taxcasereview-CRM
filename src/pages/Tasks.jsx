@@ -15,6 +15,10 @@ export default function Tasks() {
   const [employees, setEmployees] = useState([])
   const [modal,     setModal]     = useState(false)
   const [form,      setForm]      = useState(BLANK)
+  // Additional sub-task titles being built in the same Add Task session —
+  // lets someone create a whole section (main task + N sub-tasks) in one
+  // go, instead of reopening the modal repeatedly (Karbon-style).
+  const [subtasks,  setSubtasks]  = useState([])
   const [qtForm,    setQt]        = useState(QT_BLANK)
   const [sug,       setSug]       = useState([])
   const [qtSug,     setQtSug]     = useState([])
@@ -94,12 +98,21 @@ export default function Tasks() {
   async function save(data) {
     if (!data.title.trim()){showToast('Title required');return}
     setSaving(true)
-    const payload = { ...data, done:false, deleted:false, created_at:new Date().toISOString() }
-    const {error} = await supabase.from('tasks').insert([payload])
+    const sectionTitle = data.section_title?.trim() || null
+    const extraTitles = subtasks.map(s=>s.trim()).filter(Boolean)
+    // If there are extra sub-tasks but no section name was given, use the
+    // main task's own title as the section heading so they still group.
+    const effectiveSection = extraTitles.length && !sectionTitle ? data.title.trim() : sectionTitle
+    const base = { clientName:data.clientName, caseNum:data.caseNum, assignedTo:data.assignedTo, dueDate:data.dueDate, priority:data.priority, done:false, deleted:false, created_at:new Date().toISOString() }
+    const rows = [
+      { ...base, title:data.title, notes:data.notes, section_title:effectiveSection },
+      ...extraTitles.map(t => ({ ...base, title:t, notes:'', section_title:effectiveSection })),
+    ]
+    const {error} = await supabase.from('tasks').insert(rows)
     setSaving(false)
     if (error){showToast('❌ '+error.message);return}
-    showToast('✅ Task added!')
-    setModal(false); setForm(BLANK); setQt(QT_BLANK); load()
+    showToast(rows.length>1 ? `✅ ${rows.length} tasks added!` : '✅ Task added!')
+    setModal(false); setForm(BLANK); setQt(QT_BLANK); setSubtasks([]); load()
     const _ta=getActor(user); await logActivity(supabase,{employeeName:_ta.name,employeeEmail:_ta.email,action:'task_created',category:'task',description:`Created task: ${form.title}`,entityName:form.clientName,meta:{assignedTo:form.assignedTo,priority:form.priority}}).catch(()=>{})
   }
 
@@ -438,9 +451,9 @@ export default function Tasks() {
 
       {/* Full add modal */}
       {modal&&(
-        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setModal(false)}>
+        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&(setModal(false),setSubtasks([]))}>
           <div className="modal" style={{width:540}}>
-            <div className="mh"><span className="mt">Add Task</span><button className="xbtn" onClick={()=>setModal(false)}>&times;</button></div>
+            <div className="mh"><span className="mt">Add Task</span><button className="xbtn" onClick={()=>{setModal(false);setSubtasks([])}}>&times;</button></div>
             <div className="field"><label>Title *</label><input value={form.title} onChange={e=>fld('title',e.target.value)} placeholder="Task description"/></div>
             <div className="field" style={{position:'relative'}}>
               <label>Client / Lead</label>
@@ -454,6 +467,19 @@ export default function Tasks() {
             <div className="fg2">
               <div className="field"><label>Section</label><input value={form.section_title||''} onChange={e=>fld('section_title',e.target.value)} placeholder="Optional — groups with other sub-tasks"/></div>
               <div className="field"><label>Case #</label><input value={form.caseNum} onChange={e=>fld('caseNum',e.target.value)}/></div>
+            </div>
+            <div style={{margin:'2px 0 4px'}}>
+              <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--t3)',marginBottom:6,textTransform:'uppercase',letterSpacing:'.04em'}}>Add More Tasks To This Section</label>
+              {subtasks.map((s,i)=>(
+                <div key={i} style={{display:'flex',gap:6,marginBottom:6}}>
+                  <input value={s} onChange={e=>setSubtasks(arr=>arr.map((x,idx)=>idx===i?e.target.value:x))}
+                    placeholder="Another task title…"
+                    style={{flex:1,padding:'8px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:13}}/>
+                  <button onClick={()=>setSubtasks(arr=>arr.filter((_,idx)=>idx!==i))}
+                    style={{background:'none',border:'none',color:'var(--bad)',cursor:'pointer',fontSize:18,padding:'0 6px'}}>×</button>
+                </div>
+              ))}
+              <button className="btn sec" style={{fontSize:11,padding:'5px 12px',fontWeight:600}} onClick={()=>setSubtasks(arr=>[...arr,''])}>+ Add Another Task</button>
             </div>
             <div className="fg2">
               <div className="field"><label>Assigned To</label>
