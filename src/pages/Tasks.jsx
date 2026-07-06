@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 
-const BLANK = { title:'', clientName:'', caseNum:'', assignedTo:'', dueDate:'', priority:'Normal', notes:'', done:false }
+const BLANK = { title:'', clientName:'', caseNum:'', assignedTo:'', dueDate:'', priority:'Normal', notes:'', done:false, section_title:'' }
 const QT_BLANK = { title:'', dueDate:'', priority:'Normal', clientName:'', assignedTo:'' }
 
 export default function Tasks() {
@@ -108,6 +108,20 @@ export default function Tasks() {
     load()
   }
 
+  // Add a sub-task under an existing task/group. If the parent task doesn't
+  // have a section yet, this promotes it (uses its own title as the section
+  // heading) so it and the new sibling now group together. Existing
+  // standalone tasks are otherwise completely unaffected until this is used.
+  async function addSubtask(parent) {
+    const sectionTitle = parent.section_title || parent.title
+    if (parent.id && !parent.section_title) {
+      await supabase.from('tasks').update({ section_title: sectionTitle }).eq('id', parent.id)
+      setTasks(prev => prev.map(x => x.id === parent.id ? { ...x, section_title: sectionTitle } : x))
+    }
+    setForm({ ...BLANK, clientName: parent.clientName || '', section_title: sectionTitle })
+    setModal(true)
+  }
+
   // Soft delete — sets deleted=true, records timestamp
   async function softDelete(id) {
     const {error} = await supabase.from('tasks').update({deleted:true, deleted_at:new Date().toISOString()}).eq('id',id)
@@ -159,7 +173,26 @@ export default function Tasks() {
   const assignees = [...new Set(tasks.filter(t=>t.assignedTo).map(t=>t.assignedTo))].sort()
   const pc = p => p==='Urgent'?'br':p==='High'?'ba':'bn'
 
-  function TaskItem({t, showRestore=false}) {
+  // Group tasks sharing a client + section_title (Karbon-style grouped
+  // sub-tasks). Tasks with no section_title each remain their own group of
+  // one and render exactly as before -- no visual change for existing data.
+  function groupTasks(list) {
+    const groups = []
+    const byKey = new Map()
+    list.forEach(t => {
+      const key = t.section_title ? `${t.clientName||''}::${t.section_title}` : `t-${t.id}`
+      if (!byKey.has(key)) {
+        const g = { key, section_title: t.section_title || null, clientName: t.clientName, tasks: [] }
+        byKey.set(key, g)
+        groups.push(g)
+      }
+      byKey.get(key).tasks.push(t)
+    })
+    return groups
+  }
+  const openGroups = groupTasks(open)
+
+  function TaskItem({t, showRestore=false, onAddSub}) {
     return (
       <div style={{display:'flex',gap:10,alignItems:'flex-start',padding:'9px 0',borderBottom:'1px solid var(--br)'}}>
         {/* Checkbox */}
@@ -198,6 +231,7 @@ export default function Tasks() {
           {!showRestore ? (
             <>
               {!t.done&&<button className="btn sec" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>toggleDone(t)}>✓ Done</button>}
+              {onAddSub&&<button className="btn sec" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>onAddSub(t)}>+ Sub</button>}
               <button className="btn del" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>softDelete(t.id)}>Del</button>
             </>
           ) : isSuperAdmin ? (
@@ -282,7 +316,22 @@ export default function Tasks() {
               </div>
               {open.length===0
                 ?<div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>🎉 No open tasks!</div>
-                :open.map(t=><TaskItem key={t.id} t={t}/>)
+                :openGroups.map(g => g.section_title ? (
+                    <div key={g.key} style={{marginBottom:8}}>
+                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 0 4px'}}>
+                        <div style={{fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em'}}>
+                          📋 {g.section_title}{g.clientName?` · ${g.clientName}`:''}
+                        </div>
+                        <button className="btn sec" style={{fontSize:11,padding:'3px 10px'}} onClick={()=>addSubtask({clientName:g.clientName, section_title:g.section_title})}>+ Sub-task</button>
+                      </div>
+                      <div style={{paddingLeft:14,borderLeft:'2px solid var(--br)'}}>
+                        {g.tasks.map(t=><TaskItem key={t.id} t={t} onAddSub={addSubtask}/>)}
+                      </div>
+                    </div>
+                  ) : (
+                    g.tasks.map(t=><TaskItem key={t.id} t={t} onAddSub={addSubtask}/>)
+                  )
+                )
               }
             </div>
           )}
@@ -393,6 +442,7 @@ export default function Tasks() {
           <div className="modal" style={{width:540}}>
             <div className="mh"><span className="mt">Add Task</span><button className="xbtn" onClick={()=>setModal(false)}>&times;</button></div>
             <div className="field"><label>Title *</label><input value={form.title} onChange={e=>fld('title',e.target.value)} placeholder="Task description"/></div>
+            <div className="field"><label>Section (optional) — groups this with other sub-tasks under one heading</label><input value={form.section_title||''} onChange={e=>fld('section_title',e.target.value)} placeholder="e.g. Complete Federal POA"/></div>
             <div className="field" style={{position:'relative'}}>
               <label>Client / Lead</label>
               <input value={form.clientName} onChange={e=>searchClient(e.target.value)} placeholder="Search clients..." autoComplete="off"/>
