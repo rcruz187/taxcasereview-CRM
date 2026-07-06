@@ -2,6 +2,19 @@
 // All file uploads in the CRM go through validateFile() before hitting
 // Supabase storage. This keeps storage usage lean on the free tier.
 
+// Converts a File to a plain base64 string (no data: prefix) — used by
+// unauthenticated flows (Client Portal, standalone Tax Organizer link)
+// that upload via an edge function instead of a direct anon storage call,
+// since those no longer have anon-role storage/table access.
+export function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result.split(',')[1])
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
 const MAX_FILE_MB   = 10           // hard reject anything over 10 MB
 const WARN_FILE_MB  = 5            // warn (but allow) 5–10 MB
 const MAX_BYTES     = MAX_FILE_MB  * 1024 * 1024

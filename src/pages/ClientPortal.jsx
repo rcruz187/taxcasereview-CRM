@@ -1,4 +1,4 @@
-import { validateFile, maybeCompressImage } from '../lib/uploadUtils'
+import { validateFile, maybeCompressImage, fileToBase64 } from '../lib/uploadUtils'
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -74,36 +74,20 @@ function fmt(v) {
 }
 
 export default function ClientPortal() {
-  // ── EMERGENCY LOCKDOWN ──────────────────────────────────────────────
-  // Taken offline: the portal's "PIN" check ran entirely in the browser
-  // after the client record (including SSN) had already been fetched
-  // unauthenticated, and several tables it reads (bookkeeping, financial
-  // profile, tax organizer, compliance records, documents, payments,
-  // invoices, notes, SMS, email) had wide-open RLS policies with no real
-  // per-client restriction. Anyone with the public anon key could read
-  // any client's full file directly via the API, bypassing the PIN
-  // entirely. Do not remove this without a real server-side PIN-verified
-  // access mechanism in place first.
-  return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0b0f19', color: '#e2e8f0', textAlign: 'center', padding: 24 }}>
-      <div style={{ maxWidth: 420 }}>
-        <div style={{ fontSize: 40, marginBottom: 16 }}>🔧</div>
-        <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 10 }}>Client Portal temporarily unavailable</div>
-        <div style={{ fontSize: 14, color: '#94a3b8', lineHeight: 1.6 }}>
-          We're performing scheduled maintenance on the client portal. Please contact your representative directly in the meantime.
-        </div>
-      </div>
-    </div>
-  )
-  // ── END EMERGENCY LOCKDOWN — original component below is unreachable ──
   const { id } = useParams()
   const [client, setClient] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [notFound, setNotFound] = useState(false)
   const [unlocked, setUnlocked] = useState(false)
   const [emailInput, setEmailInput] = useState('')
   const [pin, setPin] = useState('')
   const [authError, setAuthError] = useState('')
+  const [checkingAuth, setCheckingAuth] = useState(false)
+  // Session token from portal-login — kept in sessionStorage (survives a
+  // refresh within the same tab, cleared on tab close) so every
+  // subsequent read/write proves who this is server-side, instead of the
+  // old model where the browser held the real SSN and self-certified.
+  const [portalToken, setPortalToken] = useState(() => sessionStorage.getItem('tcr_portal_token_' + id) || '')
 
   const [section, setSection] = useState(() => new URLSearchParams(window.location.search).get('section') || 'compliance')
 
@@ -144,80 +128,73 @@ export default function ClientPortal() {
   const [ieEdits, setIeEdits] = useState({})
   const [ieSaving, setIeSaving] = useState(false)
 
-  useEffect(() => { load() }, [id])
+  // If a token from a previous login this tab is already stashed, try it
+  // immediately instead of showing the PIN screen again.
+  useEffect(() => {
+    if (portalToken) loadAllData(portalToken)
+  }, [id])
 
-  async function load() {
-    setLoading(true)
-    let { data: c } = await supabase.from('clients')
-      .select('id,name,ssn,email,autopay_enabled,autopay_amount,autopay_frequency,autopay_next_charge,default_payment_method_id,payment_method_brand,payment_method_last4,payment_plan_changes')
-      .eq('id', id).maybeSingle()
-    let isLead = false
-    if (!c) {
-      const { data: l } = await supabase.from('leads').select('id,name,ssn,email').eq('id', id).maybeSingle()
-      if (l) { c = l; isLead = true }
-    }
-    if (!c) { setNotFound(true); setLoading(false); return }
-    setClient({ ...c, isLead })
-    setLoading(false)
-  }
-
-  function checkAuth() {
-    const last4 = (client.ssn || '').replace(/\D/g, '').slice(-4)
-    const emailOnFile = (client.email || '').trim().toLowerCase()
-    if (!last4 || !emailOnFile) { setAuthError("We don't have enough information on file to verify you — contact your representative."); return }
-    if (emailInput.trim().toLowerCase() !== emailOnFile) { setAuthError("That email doesn't match what we have on file."); return }
-    if (pin.trim() !== last4) { setAuthError("That doesn't match the last 4 of your SSN on file."); return }
+  async function checkAuth() {
+    setCheckingAuth(true)
     setAuthError('')
+    const { data, error } = await supabase.functions.invoke('portal-login', {
+      body: { id, email: emailInput, pin },
+    })
+    setCheckingAuth(false)
+    if (error || data?.error) {
+      setAuthError(data?.error || 'Something went wrong — try again.')
+      return
+    }
+    sessionStorage.setItem('tcr_portal_token_' + id, data.token)
+    setPortalToken(data.token)
     setUnlocked(true)
-    loadAllData()
+    loadAllData(data.token)
   }
 
-  async function loadAllData() {
-    const [{ data: comp }, { data: docsData }, { data: books }, { data: pays }, { data: notesData }, { data: orgs }, { data: invs }, { data: sms }, { data: fp }, { data: emailsData }] = await Promise.all([
-      supabase.from('client_compliance_records').select('*').eq('client_name', client.name),
-      supabase.from('documents').select('*').eq('client', client.name).order('created_at', { ascending: false }),
-      supabase.from('bookkeeping').select('*').eq('client_name', client.name).order('date', { ascending: false }),
-      supabase.from('payments').select('*').eq('clientName', client.name).order('created_at', { ascending: false }),
-      supabase.from('client_notes').select('*').eq('clientname', client.name).eq('visible_to_client', true).order('created_at', { ascending: false }),
-      supabase.from('tax_organizer_responses').select('id,tax_year,status,updated_at').eq('client_name', client.name).order('tax_year', { ascending: false }),
-      supabase.from('invoices').select('*').eq('clientName', client.name).neq('status', 'Paid').order('created_at', { ascending: false }),
-      supabase.from('sms_messages').select('*').eq('clientName', client.name).order('created_at', { ascending: true }),
-      supabase.from('emails').select('*').eq('clientName', client.name).order('created_at', { ascending: false }),
-      supabase.from('client_financial_profiles').select('*').eq('client_name', client.name).maybeSingle(),
-    ])
-    setRecords(comp || [])
-    setDocs(docsData || [])
-    setBookEntries(books || [])
-    setPayments(pays || [])
-    setNotes(notesData || [])
-    setOrganizers(orgs || [])
-    setOpenInvoices(invs || [])
-    setSmsMessages(sms || [])
-    setClientEmails(emailsData || [])
-    setFinancialProfile(fp || null)
-    setIeEdits(fp?.expenses || {})
-    const firstWithData = FORM_TABS.find(t => (comp || []).some(r => r.form_type === t.key))
+  async function loadAllData(token) {
+    setLoading(true)
+    const { data, error } = await supabase.functions.invoke('portal-get-data', { body: { token } })
+    setLoading(false)
+    if (error || data?.error) {
+      // Token expired or invalid — clear it and fall back to the login screen
+      sessionStorage.removeItem('tcr_portal_token_' + id)
+      setPortalToken('')
+      setUnlocked(false)
+      if (data?.error && !data.error.includes('Session expired')) setAuthError(data.error)
+      return
+    }
+    setClient({ ...data.client, isLead: data.isLead })
+    setUnlocked(true)
+    setRecords(data.compliance || [])
+    setDocs(data.documents || [])
+    setBookEntries(data.bookkeeping || [])
+    setPayments(data.payments || [])
+    setNotes(data.notes || [])
+    setOrganizers(data.organizers || [])
+    setOpenInvoices(data.invoices || [])
+    setSmsMessages(data.sms || [])
+    setClientEmails(data.emails || [])
+    setFinancialProfile(data.financialProfile || null)
+    setIeEdits(data.financialProfile?.expenses || {})
+    const firstWithData = FORM_TABS.find(t => (data.compliance || []).some(r => r.form_type === t.key))
     setActiveForm(firstWithData?.key || '1040')
   }
 
   async function refreshPaymentsAndInvoices() {
-    const [{ data: pays }, { data: notesData }, { data: invs }] = await Promise.all([
-      supabase.from('payments').select('*').eq('clientName', client.name).order('created_at', { ascending: false }),
-      supabase.from('client_notes').select('*').eq('clientname', client.name).eq('visible_to_client', true).order('created_at', { ascending: false }),
-      supabase.from('invoices').select('*').eq('clientName', client.name).neq('status', 'Paid').order('created_at', { ascending: false }),
-    ])
-    setPayments(pays || [])
-    setNotes(notesData || [])
-    setOpenInvoices(invs || [])
+    if (!portalToken) return
+    const { data } = await supabase.functions.invoke('portal-get-data', { body: { token: portalToken } })
+    if (!data || data.error) return
+    setPayments(data.payments || [])
+    setNotes(data.notes || [])
+    setOpenInvoices(data.invoices || [])
   }
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3500) }
 
   async function refreshClientAutopay() {
-    const { data: c } = await supabase.from('clients')
-      .select('id,name,ssn,email,autopay_enabled,autopay_amount,autopay_frequency,autopay_next_charge,default_payment_method_id,payment_method_brand,payment_method_last4,payment_plan_changes')
-      .eq('id', client.id).maybeSingle()
-    if (c) setClient(prev => ({ ...prev, ...c }))
+    if (!portalToken) return
+    const { data } = await supabase.functions.invoke('portal-get-data', { body: { token: portalToken } })
+    if (data?.client) setClient(prev => ({ ...prev, ...data.client }))
   }
 
   async function lockInPlan() {
@@ -233,7 +210,7 @@ export default function ClientPortal() {
     })
     if (error || data?.error) { showToast('❌ ' + (data?.error || error?.message || 'Error setting plan')); setPlanLocking(false); return }
     // Track the change count
-    await supabase.from('clients').update({ payment_plan_changes: changes + 1 }).eq('id', client.id)
+    await supabase.functions.invoke('portal-action', { body: { token: portalToken, type: 'increment_payment_plan_changes' } })
     setPlanLocking(false)
     setPlanEditing(false)
     showToast(`✅ Payment plan set — ${fmt(monthlyAmount)}/month for ${planMonths} months`)
@@ -250,14 +227,11 @@ export default function ClientPortal() {
 
   async function saveIE() {
     setIeSaving(true)
-    const profileData = {
-      client_name: client.name,
-      expenses: ieEdits,
-      updated_at: new Date().toISOString(),
-    }
-    const { error } = await supabase.from('client_financial_profiles').upsert(profileData, { onConflict: 'client_name', ignoreDuplicates: false })
+    const { error, data } = await supabase.functions.invoke('portal-action', {
+      body: { token: portalToken, type: 'save_financial_profile', expenses: ieEdits },
+    })
     setIeSaving(false)
-    if (error) { showToast('❌ Error saving: ' + error.message); return }
+    if (error || data?.error) { showToast('❌ Error saving: ' + (data?.error || error.message)); return }
     showToast('✅ Income & Expenses saved!')
     setFinancialProfile(prev => ({ ...(prev || {}), expenses: ieEdits }))
   }
@@ -270,14 +244,13 @@ export default function ClientPortal() {
       return
     }
     setCreatingOrg(true)
-    const { data, error } = await supabase.from('tax_organizer_responses').insert([{
-      client_name: client.name, client_email: client.email || '', tax_year: year,
-      answers: {}, status: 'In Progress', created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-    }]).select().single()
+    const { data, error } = await supabase.functions.invoke('portal-action', {
+      body: { token: portalToken, type: 'create_tax_organizer', year, clientEmail: client.email || '' },
+    })
     setCreatingOrg(false)
-    if (error) return
-    setOrganizers(prev => [data, ...prev])
-    setActiveOrganizerId(data.id)
+    if (error || data?.error || !data?.organizer) return
+    setOrganizers(prev => [data.organizer, ...prev])
+    setActiveOrganizerId(data.organizer.id)
     setNewOrgYear('')
   }
 
@@ -288,19 +261,12 @@ export default function ClientPortal() {
     if (!file) return
     setUploading(true)
     try {
-      const path = `docs/${client.name.replace(/\s+/g, '-')}/${Date.now()}_${file.name}`
-      const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
-      if (upErr) throw upErr
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
-      const { error } = await supabase.from('documents').insert([{
-        name: file.name, client: client.name, docType: uploadFolder,
-        notes: 'Uploaded by client via portal',
-        file_url: urlData.publicUrl, file_name: file.name, file_size: file.size,
-        created_at: new Date().toISOString(),
-      }])
-      if (error) throw error
-      const { data: docsData } = await supabase.from('documents').select('*').eq('client', client.name).order('created_at', { ascending: false })
-      setDocs(docsData || [])
+      const fileBase64 = await fileToBase64(file)
+      const { data, error } = await supabase.functions.invoke('portal-action', {
+        body: { token: portalToken, type: 'upload_document', fileName: file.name, fileType: file.type, fileBase64, docType: uploadFolder },
+      })
+      if (error || data?.error) throw new Error(data?.error || error.message)
+      setDocs(data.documents || [])
       if (fileRef.current) fileRef.current.value = ''
     } catch (e) {
       alert('Upload failed: ' + e.message)
@@ -315,18 +281,6 @@ export default function ClientPortal() {
   }
 
   if (loading) return <div style={styles.page}><div style={{ color: '#94a3b8', fontSize: 13 }}>Loading…</div></div>
-
-  if (notFound) return (
-    <div style={styles.page}>
-      <div style={styles.card}>
-        <div style={{ textAlign: 'center', padding: 24 }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: '#f1f5f9' }}>Link not found</div>
-          <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 6 }}>This portal link may have expired or is incorrect. Contact your representative for a new one.</div>
-        </div>
-      </div>
-    </div>
-  )
 
   if (!unlocked) return (
     <div style={styles.page}>
@@ -348,7 +302,7 @@ export default function ClientPortal() {
         </div>
         {/* Welcome message */}
         <div style={{background:'rgba(59,130,246,.08)',border:'1px solid rgba(59,130,246,.2)',borderRadius:12,padding:'14px 16px',marginBottom:20,textAlign:'center'}}>
-          <div style={{fontSize:15,fontWeight:700,color:'#f1f5f9',marginBottom:4}}>Welcome back, {client?.name}</div>
+          <div style={{fontSize:15,fontWeight:700,color:'#f1f5f9',marginBottom:4}}>Welcome back</div>
           <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.5}}>Please verify your identity to securely access your account.</div>
         </div>
         <div style={{ marginBottom: 12 }}>
@@ -358,12 +312,12 @@ export default function ClientPortal() {
         <div style={{ marginBottom: 4 }}>
           <label style={styles.label}>Last 4 Digits of SSN</label>
           <input value={pin} onChange={e => { setPin(e.target.value.replace(/\D/g, '').slice(0, 4)); setAuthError('') }}
-            onKeyDown={e => e.key === 'Enter' && checkAuth()} placeholder="••••" maxLength={4} inputMode="numeric"
+            onKeyDown={e => e.key === 'Enter' && !checkingAuth && checkAuth()} placeholder="••••" maxLength={4} inputMode="numeric"
             style={{ ...styles.textInput, fontSize: 20, letterSpacing: 6, textAlign: 'center' }} />
         </div>
         {authError && <div style={{ color: '#f87171', fontSize: 12, textAlign: 'center', marginTop: 10 }}>{authError}</div>}
-        <button onClick={checkAuth} disabled={pin.length !== 4 || !emailInput.trim()} style={{ ...styles.bigBtn, opacity: pin.length === 4 && emailInput.trim() ? 1 : 0.5 }}>
-          View My Information
+        <button onClick={checkAuth} disabled={pin.length !== 4 || !emailInput.trim() || checkingAuth} style={{ ...styles.bigBtn, opacity: (pin.length === 4 && emailInput.trim() && !checkingAuth) ? 1 : 0.5 }}>
+          {checkingAuth ? 'Verifying…' : 'View My Information'}
         </button>
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', textAlign: 'center', marginTop: 16 }}>
           Your information is private and only visible with this verification.

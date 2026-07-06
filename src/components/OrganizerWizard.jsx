@@ -1,4 +1,4 @@
-import { validateFile } from '../lib/uploadUtils'
+import { validateFile, fileToBase64 } from '../lib/uploadUtils'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { ORGANIZER_STEPS, shouldShow } from '../lib/organizerSchema'
@@ -21,11 +21,11 @@ export default function OrganizerWizard({ organizerId, embedded = false, onCompl
 
   useEffect(() => {
     async function load() {
-      const { data, error } = await supabase.from('tax_organizer_responses').select('*').eq('id', organizerId).maybeSingle()
-      if (error || !data) { setError('Organizer not found or expired.'); setLoading(false); return }
-      setRecord(data)
-      setAnswers(data.answers || {})
-      if (data.status === 'Submitted') setSubmitted(true)
+      const { data, error } = await supabase.functions.invoke('organizer-action', { body: { type: 'get', organizerId } })
+      if (error || data?.error || !data?.record) { setError('Organizer not found or expired.'); setLoading(false); return }
+      setRecord(data.record)
+      setAnswers(data.record.answers || {})
+      if (data.record.status === 'Submitted') setSubmitted(true)
       setLoading(false)
     }
     if (organizerId) load()
@@ -46,10 +46,7 @@ export default function OrganizerWizard({ organizerId, embedded = false, onCompl
 
   async function doSave(next) {
     setSaving(true)
-    await supabase.from('tax_organizer_responses').update({
-      answers: next,
-      updated_at: new Date().toISOString(),
-    }).eq('id', organizerId)
+    await supabase.functions.invoke('organizer-action', { body: { type: 'save_answers', organizerId, answers: next } })
     setSaving(false)
   }
 
@@ -58,22 +55,19 @@ export default function OrganizerWizard({ organizerId, embedded = false, onCompl
     const key = entryIdx !== null ? `${questionId}_${entryIdx}` : questionId
     setUploadingKey(key)
     try {
-      const safeClient = (record?.client_name || 'client').replace(/[^a-zA-Z0-9]+/g, '-')
-      const path = `organizer/${safeClient}/${record?.tax_year || 'na'}/${key}-${Date.now()}-${file.name}`
-      const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
-      if (upErr) throw upErr
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
-      // Also register in the shared documents table so it shows up in CRM Documents tab
-      await supabase.from('documents').insert([{
-        name: file.name, client: record?.client_name || '', docType: 'Tax Organizer',
-        notes: `Uploaded via Tax Organizer (${record?.tax_year || ''})`,
-        file_url: urlData.publicUrl, file_name: file.name, file_size: file.size,
-        created_at: new Date().toISOString(),
-      }])
+      const fileBase64 = await fileToBase64(file)
+      const { data, error } = await supabase.functions.invoke('organizer-action', {
+        body: {
+          type: 'upload_document', organizerId,
+          fileName: file.name, fileType: file.type, fileBase64,
+          clientName: record?.client_name || '', taxYear: record?.tax_year || '',
+        },
+      })
+      if (error || data?.error) throw new Error(data?.error || error.message)
       if (entryIdx !== null) {
-        updateEntry(questionId, entryIdx, '_uploadUrl', urlData.publicUrl)
+        updateEntry(questionId, entryIdx, '_uploadUrl', data.url)
       } else {
-        setAnswer(questionId, urlData.publicUrl)
+        setAnswer(questionId, data.url)
       }
     } catch (e) {
       setError('Upload failed: ' + e.message)
@@ -101,10 +95,7 @@ export default function OrganizerWizard({ organizerId, embedded = false, onCompl
 
   async function submit() {
     setSaving(true)
-    await supabase.from('tax_organizer_responses').update({
-      answers, status: 'Submitted', submitted_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }).eq('id', organizerId)
+    await supabase.functions.invoke('organizer-action', { body: { type: 'submit', organizerId, answers } })
     setSaving(false)
     setSubmitted(true)
     if (onComplete) onComplete()
