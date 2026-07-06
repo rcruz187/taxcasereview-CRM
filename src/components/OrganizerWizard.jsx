@@ -1,4 +1,4 @@
-import { validateFile, fileToBase64 } from '../lib/uploadUtils'
+import { validateFile } from '../lib/uploadUtils'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { ORGANIZER_STEPS, shouldShow } from '../lib/organizerSchema'
@@ -21,11 +21,11 @@ export default function OrganizerWizard({ organizerId, embedded = false, onCompl
 
   useEffect(() => {
     async function load() {
-      const { data, error } = await supabase.functions.invoke('organizer-action', { body: { type: 'get', organizerId } })
-      if (error || data?.error || !data?.record) { setError('Organizer not found or expired.'); setLoading(false); return }
-      setRecord(data.record)
-      setAnswers(data.record.answers || {})
-      if (data.record.status === 'Submitted') setSubmitted(true)
+      const { data, error } = await supabase.rpc('organizer_get', { p_id: organizerId })
+      if (error || !data) { setError('Organizer not found or expired.'); setLoading(false); return }
+      setRecord(data)
+      setAnswers(data.answers || {})
+      if (data.status === 'Submitted') setSubmitted(true)
       setLoading(false)
     }
     if (organizerId) load()
@@ -46,7 +46,7 @@ export default function OrganizerWizard({ organizerId, embedded = false, onCompl
 
   async function doSave(next) {
     setSaving(true)
-    await supabase.functions.invoke('organizer-action', { body: { type: 'save_answers', organizerId, answers: next } })
+    await supabase.rpc('organizer_save_answers', { p_id: organizerId, p_answers: next })
     setSaving(false)
   }
 
@@ -55,19 +55,14 @@ export default function OrganizerWizard({ organizerId, embedded = false, onCompl
     const key = entryIdx !== null ? `${questionId}_${entryIdx}` : questionId
     setUploadingKey(key)
     try {
-      const fileBase64 = await fileToBase64(file)
-      const { data, error } = await supabase.functions.invoke('organizer-action', {
-        body: {
-          type: 'upload_document', organizerId,
-          fileName: file.name, fileType: file.type, fileBase64,
-          clientName: record?.client_name || '', taxYear: record?.tax_year || '',
-        },
-      })
-      if (error || data?.error) throw new Error(data?.error || error.message)
+      const path = `organizer-docs/${organizerId}/${Date.now()}_${file.name}`
+      const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
+      if (upErr) throw upErr
+      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
       if (entryIdx !== null) {
-        updateEntry(questionId, entryIdx, '_uploadUrl', data.url)
+        updateEntry(questionId, entryIdx, '_uploadUrl', urlData.publicUrl)
       } else {
-        setAnswer(questionId, data.url)
+        setAnswer(questionId, urlData.publicUrl)
       }
     } catch (e) {
       setError('Upload failed: ' + e.message)
@@ -95,7 +90,7 @@ export default function OrganizerWizard({ organizerId, embedded = false, onCompl
 
   async function submit() {
     setSaving(true)
-    await supabase.functions.invoke('organizer-action', { body: { type: 'submit', organizerId, answers } })
+    await supabase.rpc('organizer_submit', { p_id: organizerId, p_answers: answers })
     setSaving(false)
     setSubmitted(true)
     if (onComplete) onComplete()
