@@ -920,6 +920,10 @@ export default function Clients() {
   const [taskTitle,   setTaskTitle]   = useState('')
   const [taskPriority,setTaskPriority]= useState('Normal')
   const [taskDueDate, setTaskDueDate] = useState('')
+  const [taskSectionTitle, setTaskSectionTitle] = useState('')
+  // When set, the quick-add box below the Tasks list is adding a sub-task
+  // into this existing section instead of creating a new standalone task.
+  const [pendingSection, setPendingSection] = useState('')
   // Add payment modal
   const [payModal,    setPayModal]    = useState(false)
   const [faxModal,    setFaxModal]    = useState(false)
@@ -1298,16 +1302,28 @@ export default function Clients() {
     }
   }
 
+  // Promotes an existing task into a named section (if it isn't one already)
+  // and arms the quick-add box to drop the next task into that same section.
+  async function addSubtask(task) {
+    const sectionTitle = task.section_title || task.title
+    if (!task.section_title) {
+      await supabase.from('tasks').update({ section_title: sectionTitle }).eq('id', task.id)
+      loadRelated(detail.name)
+    }
+    setPendingSection(sectionTitle)
+  }
+
   async function addQuickTask() {
     if (!quickTask.trim()||!detail) return
     setAddingTask(true)
     const {error}=await supabase.from('tasks').insert([{
       title:quickTask.trim(), clientName:detail.name, priority:'Normal',
-      done:false, created_at:new Date().toISOString()
+      done:false, section_title: pendingSection || null, created_at:new Date().toISOString()
     }])
     setAddingTask(false)
     if (error){showToast('Task error: '+error.message);return}
     setQuickTask('')
+    setPendingSection('')
     loadRelated(detail.name)
     showToast('✅ Task added!')
     await logAction(detail.name, `📌 Task created: "${quickTask.trim()}"`)
@@ -1334,12 +1350,13 @@ export default function Clients() {
     const {error}=await supabase.from('tasks').insert([{
       title:taskTitle.trim(), clientName:detail.name,
       priority:taskPriority, dueDate:taskDueDate||null,
+      section_title: taskSectionTitle.trim() || null,
       done:false, created_at:new Date().toISOString()
     }])
     setAddingTask(false)
     if(error){showToast('Task error: '+error.message);return}
     const loggedTitle = taskTitle.trim()
-    setTaskTitle('');setTaskPriority('Normal');setTaskDueDate('')
+    setTaskTitle('');setTaskPriority('Normal');setTaskDueDate('');setTaskSectionTitle('')
     setTaskModal(false)
     loadRelated(detail.name)
     showToast('✅ Task added!')
@@ -2097,29 +2114,59 @@ export default function Clients() {
               {!loadingRel&&relTasks.length===0&&(
                 <div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No tasks yet for this client.</div>
               )}
-              {relTasks.map(t=>(
-                <div key={t.id} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'8px 0',borderBottom:'1px solid var(--br)'}}>
-                  <div
-                    onClick={()=>toggleTask(t)}
-                    style={{width:18,height:18,borderRadius:4,border:'1.5px solid var(--b2c)',background:t.done?'var(--ok)':'var(--s2)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,marginTop:1,color:'#fff',fontSize:11}}
-                  >{t.done?'✓':''}</div>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:13,fontWeight:t.done?400:600,textDecoration:t.done?'line-through':'none',color:t.done?'var(--t3)':'var(--tx)'}}>{t.title}</div>
-                    <div style={{fontSize:10,color:'var(--t3)',marginTop:2,display:'flex',gap:8}}>
-                      {t.priority&&<span className={`bdg ${t.priority==='High'?'br':t.priority==='Low'?'bn':'ba'}`} style={{fontSize:9}}>{t.priority}</span>}
-                      {t.dueDate&&<span>Due: {t.dueDate}</span>}
-                      {t.assignedTo&&<span>→ {t.assignedTo}</span>}
+              {(() => {
+                // Group tasks sharing a section_title under one heading
+                // (same pattern as the main Tasks page). Tasks with no
+                // section render individually exactly as before.
+                const groups = []
+                const byKey = new Map()
+                relTasks.forEach(t => {
+                  const key = t.section_title || `t-${t.id}`
+                  if (!byKey.has(key)) {
+                    const g = { key, section_title: t.section_title || null, tasks: [] }
+                    byKey.set(key, g); groups.push(g)
+                  }
+                  byKey.get(key).tasks.push(t)
+                })
+                const renderTask = t => (
+                  <div key={t.id} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'8px 0',borderBottom:'1px solid var(--br)'}}>
+                    <div
+                      onClick={()=>toggleTask(t)}
+                      style={{width:18,height:18,borderRadius:4,border:'1.5px solid var(--b2c)',background:t.done?'var(--ok)':'var(--s2)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,marginTop:1,color:'#fff',fontSize:11}}
+                    >{t.done?'✓':''}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:t.done?400:600,textDecoration:t.done?'line-through':'none',color:t.done?'var(--t3)':'var(--tx)'}}>{t.title}</div>
+                      <div style={{fontSize:10,color:'var(--t3)',marginTop:2,display:'flex',gap:8}}>
+                        {t.priority&&<span className={`bdg ${t.priority==='High'?'br':t.priority==='Low'?'bn':'ba'}`} style={{fontSize:9}}>{t.priority}</span>}
+                        {t.dueDate&&<span>Due: {t.dueDate}</span>}
+                        {t.assignedTo&&<span>→ {t.assignedTo}</span>}
+                      </div>
+                    </div>
+                    <button className="btn sec" style={{fontSize:10,padding:'3px 8px',flexShrink:0}} onClick={()=>addSubtask(t)}>+ Sub</button>
+                  </div>
+                )
+                return groups.map(g => g.section_title ? (
+                  <div key={g.key} style={{marginBottom:8}}>
+                    <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em',padding:'6px 0 2px'}}>📋 {g.section_title}</div>
+                    <div style={{paddingLeft:12,borderLeft:'2px solid var(--br)'}}>
+                      {g.tasks.map(renderTask)}
                     </div>
                   </div>
-                </div>
-              ))}
+                ) : g.tasks.map(renderTask))
+              })()}
               {/* Quick add task */}
-              <div style={{display:'flex',gap:6,marginTop:12}}>
+              {pendingSection && (
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:11,color:'var(--t3)',marginTop:10}}>
+                  <span>Adding to section: <strong style={{color:'var(--tx)'}}>{pendingSection}</strong></span>
+                  <button onClick={()=>setPendingSection('')} style={{background:'none',border:'none',color:'var(--bad)',cursor:'pointer',fontSize:11}}>Cancel</button>
+                </div>
+              )}
+              <div style={{display:'flex',gap:6,marginTop:pendingSection?4:12}}>
                 <input
                   value={quickTask}
                   onChange={e=>setQuickTask(e.target.value)}
                   onKeyDown={e=>e.key==='Enter'&&addQuickTask()}
-                  placeholder="Add a task…"
+                  placeholder={pendingSection ? 'Add a sub-task…' : 'Add a task…'}
                   style={{flex:1,padding:'8px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12}}
                 />
                 <button className="btn pri" style={{fontSize:11,padding:'7px 14px'}} onClick={addQuickTask} disabled={addingTask}>
@@ -2356,6 +2403,10 @@ export default function Clients() {
                   placeholder="e.g. Request transcripts, Follow up on offer..."
                   onKeyDown={e=>e.key==='Enter'&&addTaskFromModal()}
                   autoFocus/>
+              </div>
+              <div className="field"><label>Section</label>
+                <input value={taskSectionTitle} onChange={e=>setTaskSectionTitle(e.target.value)}
+                  placeholder="Optional — groups with other sub-tasks"/>
               </div>
               <div className="fg2">
                 <div className="field"><label>Priority</label>
