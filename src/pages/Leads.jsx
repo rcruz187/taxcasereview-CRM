@@ -2033,9 +2033,12 @@ export default function Leads() {
                   </div>
                 )
                 return groups.map(g => g.section_title ? (
-                  <div key={g.key} style={{marginBottom:8}}>
-                    <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em',padding:'6px 0 2px'}}>📋 {g.section_title}</div>
-                    <div style={{paddingLeft:12,borderLeft:'2px solid var(--br)'}}>
+                  <div key={g.key} style={{marginBottom:10,borderRadius:8,overflow:'hidden',border:'1px solid var(--br)'}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:'var(--s2)'}}>
+                      <div style={{fontSize:12,fontWeight:700,color:'var(--tx)'}}>📋 {g.section_title}</div>
+                      <button className="btn pri" style={{fontSize:10,padding:'3px 10px',fontWeight:600}} onClick={()=>setPendingLeadSection(g.section_title)}>+ Add Task</button>
+                    </div>
+                    <div style={{padding:'2px 12px 2px'}}>
                       {g.tasks.map(renderTask)}
                     </div>
                   </div>
