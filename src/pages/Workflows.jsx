@@ -179,7 +179,7 @@ const CASE_STATUSES = ['Open','Pending IRS','Active Plan','Docs Needed','POA Sen
 const ROLES = ['Admin','Super Admin','Tax Advisor','Tax Associate','Manager']
 
 const BLANK_TEMPLATE = { name: '', trigger_event: '', entity_type: 'lead', trigger_value: '', active: true }
-const BLANK_STEP = { title: '', assigned_role: 'Admin', due_in_days: 1, notes: '', step_order: 0 }
+const BLANK_STEP = { title: '', assigned_role: 'Admin', due_in_days: 1, notes: '', step_order: 0, section_title: '' }
 
 export default function Workflows() {
   const { role, showToast } = useApp()
@@ -249,7 +249,7 @@ export default function Workflows() {
         templateId = data.id
       }
       const { error: stepsErr } = await supabase.from('workflow_steps').insert(
-        steps.map((s, i) => ({ template_id: templateId, title: s.title, assigned_role: s.assigned_role, due_in_days: s.due_in_days, notes: s.notes, step_order: i }))
+        steps.map((s, i) => ({ template_id: templateId, title: s.title, assigned_role: s.assigned_role, due_in_days: s.due_in_days, notes: s.notes, step_order: i, section_title: s.section_title?.trim() || null }))
       )
       if (stepsErr) throw stepsErr
       showToast(editId ? '✅ Workflow updated' : '✅ Workflow created')
@@ -340,15 +340,42 @@ export default function Workflows() {
                     <div style={{ fontSize:12, color:'var(--t3)' }}>No steps defined.</div>
                   ) : (
                     <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                      {t.steps.map((s, i) => (
-                        <div key={s.id} style={{ display:'flex', gap:12, alignItems:'flex-start' }}>
-                          <div style={{ width:22, height:22, borderRadius:'50%', background:'var(--blue)', color:'#fff', fontSize:11, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:1 }}>{i+1}</div>
-                          <div>
-                            <div style={{ fontSize:13, fontWeight:600 }}>{s.title}</div>
-                            <div style={{ fontSize:11, color:'var(--t3)' }}>Assign to {s.assigned_role} · Due in {s.due_in_days} day{s.due_in_days !== 1 ? 's' : ''}{s.notes ? ` · ${s.notes.slice(0,60)}${s.notes.length>60?'…':''}` : ''}</div>
+                      {(() => {
+                        // Group consecutive steps sharing a section_title under one
+                        // heading (Karbon-style). Steps with no section_title render
+                        // individually exactly as before -- no visual change for them.
+                        const groups = []
+                        t.steps.forEach(s => {
+                          const last = groups[groups.length - 1]
+                          if (s.section_title && last && last.section_title === s.section_title) {
+                            last.items.push(s)
+                          } else {
+                            groups.push({ section_title: s.section_title || null, items: [s] })
+                          }
+                        })
+                        let counter = 0
+                        return groups.map((g, gi) => (
+                          <div key={gi}>
+                            {g.section_title && (
+                              <div style={{ fontSize:11, fontWeight:700, color:'var(--blue)', textTransform:'uppercase', letterSpacing:'.05em', margin:'6px 0 6px' }}>📋 {g.section_title}</div>
+                            )}
+                            <div style={{ display:'flex', flexDirection:'column', gap:8, paddingLeft: g.section_title ? 14 : 0, borderLeft: g.section_title ? '2px solid var(--br)' : 'none' }}>
+                              {g.items.map(s => {
+                                counter++
+                                return (
+                                  <div key={s.id} style={{ display:'flex', gap:12, alignItems:'flex-start' }}>
+                                    <div style={{ width:22, height:22, borderRadius:'50%', background:'var(--blue)', color:'#fff', fontSize:11, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:1 }}>{counter}</div>
+                                    <div>
+                                      <div style={{ fontSize:13, fontWeight:600 }}>{s.title}</div>
+                                      <div style={{ fontSize:11, color:'var(--t3)' }}>Assign to {s.assigned_role} · Due in {s.due_in_days} day{s.due_in_days !== 1 ? 's' : ''}{s.notes ? ` · ${s.notes.slice(0,60)}${s.notes.length>60?'…':''}` : ''}</div>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))
+                      })()}
                     </div>
                   )}
                 </div>
@@ -459,6 +486,10 @@ export default function Workflows() {
                         {steps.length > 1 && (
                           <button onClick={()=>removeStep(i)} style={{ background:'none', border:'none', color:'var(--bad)', cursor:'pointer', fontSize:20, padding:'0 6px', lineHeight:1 }}>×</button>
                         )}
+                      </div>
+                      <div style={{ marginBottom:12 }}>
+                        <label style={{ display:'block', fontSize:11, fontWeight:600, color:'var(--t3)', marginBottom:6 }}>Section (optional) — group with other steps under this heading</label>
+                        <input className="inp" value={s.section_title||''} onChange={e=>updateStep(i,'section_title',e.target.value)} placeholder="e.g. Complete Federal POA" style={{ width:'100%', boxSizing:'border-box', fontSize:13, padding:'9px 13px' }}/>
                       </div>
                       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
                         <div>
