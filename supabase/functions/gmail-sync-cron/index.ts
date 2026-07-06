@@ -1,13 +1,11 @@
 // gmail-sync-cron
-// Single shared Gmail sync job — runs on a schedule (Supabase Cron), once,
-// no matter how many employees are logged into the CRM. Replaces the old
-// approach of every browser tab independently polling every 30 seconds,
-// which meant N employees logged in = N redundant copies of the same sync
-// work, all hitting Supabase with the same queries at the same time. This
-// is a straight port of the logic that used to live in
-// src/context/GmailSyncContext.jsx (tick / runBackfillStep /
-// runSteadyStateStep / maybeRunRetentionCleanup) — same behavior, one
-// execution instead of one-per-tab.
+// Runs on a schedule (Supabase Cron), once, no matter how many employees
+// are logged into the CRM — but now loops through EVERY employee's own
+// connected Gmail account and syncs each one separately (previously this
+// synced one single shared firm account, and every employee saw the exact
+// same inbox regardless of who they were — a real data-exposure bug, not
+// just a UX quirk). Each employee's backfill progress, sync status, and
+// tokens now live in `employee_gmail_accounts`, one row per employee.
 //
 // JWT Verification must be OFF — Supabase Cron calls this with no user
 // auth token.
@@ -78,22 +76,25 @@ function findAttachments(payload: any, out: any[] = []) {
   return out
 }
 
-async function getValidGmailToken(supabase: any, settings: any) {
-  const expiry = settings.gmail_token_expiry ? new Date(settings.gmail_token_expiry).getTime() : 0
-  if (settings.gmail_access_token && expiry > Date.now() + 60000) {
-    return settings.gmail_access_token
+// Refreshes THIS employee's own access token, using the shared app
+// credentials (client_id/secret — the app's identity, not a personal
+// secret) but this account's own refresh token.
+async function getValidGmailToken(supabase: any, acct: any, appCreds: any) {
+  const expiry = acct.gmail_token_expiry ? new Date(acct.gmail_token_expiry).getTime() : 0
+  if (acct.gmail_access_token && expiry > Date.now() + 60000) {
+    return acct.gmail_access_token
   }
   const body = new URLSearchParams({
-    refresh_token: settings.gmail_refresh_token,
-    client_id: settings.gmail_client_id,
-    client_secret: settings.gmail_client_secret,
+    refresh_token: acct.gmail_refresh_token,
+    client_id: appCreds.gmail_client_id,
+    client_secret: appCreds.gmail_client_secret,
     grant_type: 'refresh_token',
   })
   const res = await fetch(TOKEN_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error_description || data.error || 'Token refresh failed')
   const expiresAt = new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString()
-  await supabase.from('settings').update({ gmail_access_token: data.access_token, gmail_token_expiry: expiresAt }).eq('id', settings.id)
+  await supabase.from('employee_gmail_accounts').update({ gmail_access_token: data.access_token, gmail_token_expiry: expiresAt }).eq('employee_email', acct.employee_email)
   return data.access_token
 }
 
@@ -160,12 +161,12 @@ async function filterUnknownIds(supabase: any, ids: string[]) {
   return ids.filter((id) => !known.has(id))
 }
 
-async function importIds(supabase: any, token: string, ids: string[], clients: any[], tenantId: string) {
+async function importIds(supabase: any, token: string, ids: string[], clients: any[], tenantId: string, mailboxOwner: string) {
   for (const id of ids) {
     try {
       const parsed = await getAndParseGmailMessage(token, id, clients)
       if (parsed) {
-        const { error: insertError } = await supabase.from('emails').insert([{ ...parsed, tenant_id: tenantId }])
+        const { error: insertError } = await supabase.from('emails').insert([{ ...parsed, tenant_id: tenantId, mailbox_owner: mailboxOwner }])
         if (insertError) console.error('Gmail emails insert error for', id, insertError)
         if (parsed.clientName && parsed.clientName !== parsed.recipient) {
           const direction = parsed.triage === 'Sent' ? 'Sent' : 'Received'
@@ -173,7 +174,7 @@ async function importIds(supabase: any, token: string, ids: string[], clients: a
           const noteContent = `📧 Email ${direction} — "${parsed.subject}"${preview ? `\n${preview}${parsed.body?.length > 120 ? '…' : ''}` : ''}`
           const { error: noteError } = await supabase.from('client_notes').insert({
             clientname: parsed.clientName, text: noteContent, note_type: 'Email',
-            author: direction === 'Sent' ? 'Tax Case Review' : parsed.clientName,
+            author: direction === 'Sent' ? mailboxOwner : parsed.clientName,
             created_at: parsed.created_at || new Date().toISOString(),
             tenant_id: tenantId,
           })
@@ -186,66 +187,87 @@ async function importIds(supabase: any, token: string, ids: string[], clients: a
   }
 }
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-
-  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
-  let settingsId: number | null = null
-
+// Runs the full sync (backfill-or-steady-state, plus retention cleanup)
+// for ONE employee's connected mailbox. Isolated in its own try/catch so
+// one broken/revoked connection can't stop everyone else's sync from
+// running in the same pass.
+async function syncOneAccount(supabase: any, acct: any, appCreds: any, tenantId: string, clients: any[]) {
   try {
-    const { data: settings } = await supabase.from('settings')
-      .select('id, tenant_id, gmail_refresh_token, gmail_client_id, gmail_client_secret, gmail_access_token, gmail_token_expiry, gmail_backfill_phase, gmail_backfill_page_token, gmail_last_sync_at, gmail_last_cleanup_at')
-      .limit(1).maybeSingle()
+    const token = await getValidGmailToken(supabase, acct, appCreds)
 
-    if (!settings?.gmail_refresh_token) {
-      return new Response(JSON.stringify({ ok: true, skipped: 'Gmail not connected' }), { status: 200, headers: corsHeaders })
-    }
-    settingsId = settings.id
-
-    const token = await getValidGmailToken(supabase, settings)
-    const { data: clients } = await supabase.from('clients').select('id,name,email')
-
-    const phase = settings.gmail_backfill_phase || 'inbox'
+    const phase = acct.gmail_backfill_phase || 'inbox'
     if (phase !== 'done') {
       const label = phase === 'inbox' ? 'INBOX' : 'SENT'
       const { ids, nextPageToken } = await listGmailMessages(token, {
         labelIds: label,
         query: `after:${monthsAgoGmailDate(BACKFILL_MONTHS)}`,
-        pageToken: settings.gmail_backfill_page_token || undefined,
+        pageToken: acct.gmail_backfill_page_token || undefined,
         maxResults: 25,
       })
       const newIds = await filterUnknownIds(supabase, ids)
-      await importIds(supabase, token, newIds, clients || [], settings.tenant_id)
+      await importIds(supabase, token, newIds, clients, tenantId, acct.employee_email)
 
       if (nextPageToken) {
-        await supabase.from('settings').update({ gmail_backfill_page_token: nextPageToken, gmail_last_sync_at: new Date().toISOString(), gmail_last_error: null }).eq('id', settings.id)
+        await supabase.from('employee_gmail_accounts').update({ gmail_backfill_page_token: nextPageToken, gmail_last_sync_at: new Date().toISOString(), gmail_last_error: null }).eq('employee_email', acct.employee_email)
       } else if (phase === 'inbox') {
-        await supabase.from('settings').update({ gmail_backfill_phase: 'sent', gmail_backfill_page_token: null, gmail_last_sync_at: new Date().toISOString(), gmail_last_error: null }).eq('id', settings.id)
+        await supabase.from('employee_gmail_accounts').update({ gmail_backfill_phase: 'sent', gmail_backfill_page_token: null, gmail_last_sync_at: new Date().toISOString(), gmail_last_error: null }).eq('employee_email', acct.employee_email)
       } else {
-        await supabase.from('settings').update({ gmail_backfill_phase: 'done', gmail_backfill_page_token: null, gmail_last_sync_at: new Date().toISOString(), gmail_last_error: null }).eq('id', settings.id)
+        await supabase.from('employee_gmail_accounts').update({ gmail_backfill_phase: 'done', gmail_backfill_page_token: null, gmail_last_sync_at: new Date().toISOString(), gmail_last_error: null }).eq('employee_email', acct.employee_email)
       }
     } else {
       for (const label of ['INBOX', 'SENT']) {
         const { ids } = await listGmailMessages(token, { labelIds: label, maxResults: 20 })
         const newIds = await filterUnknownIds(supabase, ids)
-        await importIds(supabase, token, newIds.slice(0, 15), clients || [], settings.tenant_id)
+        await importIds(supabase, token, newIds.slice(0, 15), clients, tenantId, acct.employee_email)
       }
-      await supabase.from('settings').update({ gmail_last_sync_at: new Date().toISOString(), gmail_last_error: null }).eq('id', settings.id)
+      await supabase.from('employee_gmail_accounts').update({ gmail_last_sync_at: new Date().toISOString(), gmail_last_error: null }).eq('employee_email', acct.employee_email)
 
-      const last = settings.gmail_last_cleanup_at ? new Date(settings.gmail_last_cleanup_at).getTime() : 0
+      const last = acct.gmail_last_cleanup_at ? new Date(acct.gmail_last_cleanup_at).getTime() : 0
       if (Date.now() - last >= 24 * 60 * 60 * 1000) {
         const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString()
-        await supabase.from('emails').delete().lt('created_at', cutoff)
-        await supabase.from('settings').update({ gmail_last_cleanup_at: new Date().toISOString() }).eq('id', settings.id)
+        await supabase.from('emails').delete().lt('created_at', cutoff).eq('mailbox_owner', acct.employee_email)
+        await supabase.from('employee_gmail_accounts').update({ gmail_last_cleanup_at: new Date().toISOString() }).eq('employee_email', acct.employee_email)
       }
     }
+  } catch (e) {
+    console.error('gmail-sync-cron error for', acct.employee_email, e)
+    await supabase.from('employee_gmail_accounts').update({ gmail_last_error: String((e as Error).message || e) }).eq('employee_email', acct.employee_email)
+  }
+}
 
-    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: corsHeaders })
+serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+
+  try {
+    const { data: settings } = await supabase.from('settings')
+      .select('tenant_id, gmail_client_id, gmail_client_secret').limit(1).maybeSingle()
+
+    if (!settings?.gmail_client_id || !settings?.gmail_client_secret) {
+      return new Response(JSON.stringify({ ok: true, skipped: 'Gmail app credentials not configured' }), { status: 200, headers: corsHeaders })
+    }
+
+    const { data: accounts } = await supabase.from('employee_gmail_accounts')
+      .select('employee_email, gmail_refresh_token, gmail_access_token, gmail_token_expiry, gmail_backfill_phase, gmail_backfill_page_token, gmail_last_cleanup_at')
+      .not('gmail_refresh_token', 'is', null)
+
+    if (!accounts || accounts.length === 0) {
+      return new Response(JSON.stringify({ ok: true, skipped: 'No employees have connected Gmail yet' }), { status: 200, headers: corsHeaders })
+    }
+
+    const { data: clients } = await supabase.from('clients').select('id,name,email')
+
+    // Sequential, not parallel — these all share the same Gmail API rate
+    // limits, and running N employees' syncs at once would just make all
+    // of them more likely to hit rate-limit errors together.
+    for (const acct of accounts) {
+      await syncOneAccount(supabase, acct, settings, settings.tenant_id, clients || [])
+    }
+
+    return new Response(JSON.stringify({ ok: true, synced: accounts.length }), { status: 200, headers: corsHeaders })
   } catch (e) {
     console.error('gmail-sync-cron error:', e)
-    if (settingsId != null) {
-      await supabase.from('settings').update({ gmail_last_error: String((e as Error).message || e) }).eq('id', settingsId)
-    }
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: corsHeaders })
   }
 })

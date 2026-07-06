@@ -1,6 +1,10 @@
 // ─── Gmail OAuth + Send utilities ────────────────────────────────────────────
 // Uses Google's token endpoint directly from the browser (no backend needed).
-// Tokens are stored in the `settings` table.
+// Each employee's own tokens live in `employee_gmail_accounts`, keyed by
+// their own employees.email — NOT the old single shared `settings` row.
+// This is what makes "Connect Gmail" actually mean "connect MY Gmail"
+// instead of silently overwriting one firm-wide connection that everyone
+// then saw regardless of who they were.
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const SEND_URL  = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send'
@@ -10,8 +14,13 @@ export function getRedirectUri() {
   return window.location.origin + '/taxcasereview-CRM/auth/callback'
 }
 
-// Exchange an authorization code for access + refresh tokens, store in settings.
-export async function exchangeCodeForTokens(supabase, code) {
+// Exchange an authorization code for access + refresh tokens, store against
+// THIS employee's own row in employee_gmail_accounts. The OAuth app's own
+// client_id/client_secret (the app's identity, not a personal secret) still
+// comes from the shared `settings` row — that part is fine to stay shared.
+export async function exchangeCodeForTokens(supabase, code, employeeEmail) {
+  if (!employeeEmail) throw new Error('No logged-in employee to connect this Gmail account to')
+
   const { data: settings } = await supabase.from('settings').select('*').limit(1).maybeSingle()
   if (!settings?.gmail_client_id || !settings?.gmail_client_secret) {
     throw new Error('Gmail Client ID/Secret not configured in Settings')
@@ -33,29 +42,90 @@ export async function exchangeCodeForTokens(supabase, code) {
   const data = await res.json()
   if (!res.ok) throw new Error(data.error_description || data.error || 'Token exchange failed')
 
+  // Look up which actual Gmail address this token is for, so the UI can
+  // show "connected as you@gmail.com" per employee.
+  let connectedEmail = null
+  try {
+    const profileRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
+      headers: { Authorization: `Bearer ${data.access_token}` },
+    })
+    const profile = await profileRes.json()
+    connectedEmail = profile.emailAddress || null
+  } catch (_) { /* non-fatal — connection still works without this label */ }
+
   const expiresAt = new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString()
   const payload = {
+    employee_email: employeeEmail,
     gmail_access_token: data.access_token,
     gmail_token_expiry: expiresAt,
+    gmail_connected_email: connectedEmail,
   }
   // refresh_token is only returned on first consent — don't overwrite with null on re-auth
   if (data.refresh_token) payload.gmail_refresh_token = data.refresh_token
 
-  await supabase.from('settings').update(payload).eq('id', settings.id)
+  const { data: existing } = await supabase.from('employee_gmail_accounts')
+    .select('gmail_refresh_token').eq('employee_email', employeeEmail).maybeSingle()
+  if (!data.refresh_token && existing?.gmail_refresh_token) {
+    payload.gmail_refresh_token = existing.gmail_refresh_token
+  }
+
+  await supabase.from('employee_gmail_accounts').upsert(payload, { onConflict: 'employee_email' })
   return data
 }
 
-// Returns a valid access token, refreshing it first if expired.
-export async function getValidGmailToken(supabase) {
-  const { data: settings } = await supabase.from('settings').select('*').limit(1).maybeSingle()
-  if (!settings?.gmail_refresh_token) throw new Error('Gmail not connected')
+// Returns a valid access token for a SPECIFIC employee's own connected
+// Gmail account, refreshing it first if expired.
+export async function getValidGmailToken(supabase, employeeEmail) {
+  if (!employeeEmail) throw new Error('No employee specified for Gmail token lookup')
 
+  const { data: acct } = await supabase.from('employee_gmail_accounts')
+    .select('*').eq('employee_email', employeeEmail).maybeSingle()
+  if (!acct?.gmail_refresh_token) throw new Error('Gmail not connected for this account')
+
+  const { data: settings } = await supabase.from('settings')
+    .select('gmail_client_id,gmail_client_secret').limit(1).maybeSingle()
+  if (!settings?.gmail_client_id || !settings?.gmail_client_secret) {
+    throw new Error('Gmail Client ID/Secret not configured in Settings')
+  }
+
+  const expiry = acct.gmail_token_expiry ? new Date(acct.gmail_token_expiry).getTime() : 0
+  if (acct.gmail_access_token && expiry > Date.now() + 60000) {
+    return acct.gmail_access_token
+  }
+
+  // Refresh
+  const body = new URLSearchParams({
+    refresh_token: acct.gmail_refresh_token,
+    client_id: settings.gmail_client_id,
+    client_secret: settings.gmail_client_secret,
+    grant_type: 'refresh_token',
+  })
+  const res = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error_description || data.error || 'Token refresh failed')
+
+  const expiresAt = new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString()
+  await supabase.from('employee_gmail_accounts').update({
+    gmail_access_token: data.access_token,
+    gmail_token_expiry: expiresAt,
+  }).eq('employee_email', employeeEmail)
+
+  return data.access_token
+}
+
+// The old shared-firm-account token refresh logic, preserved as-is for
+// automated system emails (Deadlines/Calendar/Invoices/Estimates) that
+// intentionally have no specific human sender and should keep coming from
+// one consistent firm-wide address.
+async function getValidFirmGmailToken(supabase, settings) {
   const expiry = settings.gmail_token_expiry ? new Date(settings.gmail_token_expiry).getTime() : 0
   if (settings.gmail_access_token && expiry > Date.now() + 60000) {
     return settings.gmail_access_token
   }
-
-  // Refresh
   const body = new URLSearchParams({
     refresh_token: settings.gmail_refresh_token,
     client_id: settings.gmail_client_id,
@@ -112,37 +182,45 @@ function textToHtml(text) {
   return escaped.replace(/\r\n|\r|\n/g, '<br>')
 }
 
-// Sends an email via the Gmail API. Returns the Gmail message id.
+// Sends an email via the Gmail API.
+// If senderEmployeeEmail is given (Email compose page — a real person
+// writing), sends from THEIR OWN connected Gmail account with their own
+// signature. If not given (Deadlines/Calendar/Invoices/Estimates —
+// automated, system-triggered, no specific human sender), falls back to
+// the one shared firm-wide account in `settings`, same as before this
+// per-employee rework — those should keep coming from one consistent
+// firm address regardless of who's logged in when the automation fires.
 // attachments (optional): [{ filename, mimeType, base64Data }] — base64Data
 // is the standard (non-url) base64 encoding of the raw file bytes.
 export async function sendGmailEmail(supabase, { to, subject, body, fromName, attachments = [], senderEmployeeEmail }) {
-  const token = await getValidGmailToken(supabase)
+  let token, senderAddress, sig, fromDisplayName
 
-  const { data: settings } = await supabase.from('settings')
-    .select('email,name,email_signature,email_signature_logo_url').limit(1).maybeSingle()
-
-  // If a specific employee is sending (Email compose page), use THEIR own
-  // signature instead of the firm-wide default — this is the one path
-  // where a real person is personally writing the email. Every other
-  // caller (invoices, deadlines, estimates, calendar reminders — all
-  // system-triggered, no specific sender) keeps using the firm default.
-  let sig = { text: settings?.email_signature, logo: settings?.email_signature_logo_url }
   if (senderEmployeeEmail) {
-    const { data: emp } = await supabase.from('employees')
-      .select('email_signature,email_signature_logo_url')
-      .eq('email', senderEmployeeEmail).maybeSingle()
-    if (emp?.email_signature || emp?.email_signature_logo_url) {
-      sig = { text: emp.email_signature, logo: emp.email_signature_logo_url }
-    }
+    token = await getValidGmailToken(supabase, senderEmployeeEmail)
+    const [{ data: acct }, { data: emp }] = await Promise.all([
+      supabase.from('employee_gmail_accounts').select('gmail_connected_email').eq('employee_email', senderEmployeeEmail).maybeSingle(),
+      supabase.from('employees').select('name,email_signature,email_signature_logo_url').eq('email', senderEmployeeEmail).maybeSingle(),
+    ])
+    sig = { text: emp?.email_signature, logo: emp?.email_signature_logo_url }
+    fromDisplayName = fromName || emp?.name || 'Tax Case Review'
+    senderAddress = acct?.gmail_connected_email || senderEmployeeEmail
+  } else {
+    const { data: settings } = await supabase.from('settings')
+      .select('email,name,email_signature,email_signature_logo_url,gmail_refresh_token,gmail_client_id,gmail_client_secret,gmail_access_token,gmail_token_expiry')
+      .limit(1).maybeSingle()
+    if (!settings?.gmail_refresh_token) throw new Error('Gmail not connected (firm-wide account)')
+    token = await getValidFirmGmailToken(supabase, settings)
+    sig = { text: settings?.email_signature, logo: settings?.email_signature_logo_url }
+    fromDisplayName = fromName || settings?.name || 'Tax Case Review'
+    senderAddress = settings?.email
   }
 
-  const fromDisplayName = fromName || settings?.name || 'Tax Case Review'
   // A bare display name with no email address is malformed per the email
   // spec, and can get a message silently spam-filtered even when Gmail's
   // API reports success. Use a proper "Name <email>" format when we have
   // a real address on file; Gmail will still send as the authenticated
   // account either way, but a well-formed header improves deliverability.
-  const from = settings?.email ? `${encodeHeaderValue(fromDisplayName)} <${settings.email}>` : encodeHeaderValue(fromDisplayName)
+  const from = senderAddress ? `${encodeHeaderValue(fromDisplayName)} <${senderAddress}>` : encodeHeaderValue(fromDisplayName)
   const encodedSubject = encodeHeaderValue(subject)
 
   // Build the signature block as real HTML so the logo can actually show.
@@ -355,8 +433,8 @@ export async function getAndParseGmailMessage(supabase, id, clients = []) {
 // Fetches one Gmail attachment's raw bytes as a Blob. Shared by the
 // download-to-computer action and the "attach to client/lead file" action —
 // same fetch, different destination for the resulting bytes.
-export async function fetchGmailAttachmentBlob(supabase, { gmailMessageId, attachmentId, mimeType }) {
-  const token = await getValidGmailToken(supabase)
+export async function fetchGmailAttachmentBlob(supabase, { gmailMessageId, attachmentId, mimeType, employeeEmail }) {
+  const token = await getValidGmailToken(supabase, employeeEmail)
   const res = await fetch(
     `https://gmail.googleapis.com/gmail/v1/users/me/messages/${gmailMessageId}/attachments/${attachmentId}`,
     { headers: { Authorization: `Bearer ${token}` } }
@@ -373,8 +451,8 @@ export async function fetchGmailAttachmentBlob(supabase, { gmailMessageId, attac
 
 // Downloads one attachment from Gmail and triggers a browser save-as —
 // fetched on demand so we never have to store attachment bytes ourselves.
-export async function downloadGmailAttachment(supabase, { gmailMessageId, attachmentId, filename, mimeType }) {
-  const blob = await fetchGmailAttachmentBlob(supabase, { gmailMessageId, attachmentId, mimeType })
+export async function downloadGmailAttachment(supabase, { gmailMessageId, attachmentId, filename, mimeType, employeeEmail }) {
+  const blob = await fetchGmailAttachmentBlob(supabase, { gmailMessageId, attachmentId, mimeType, employeeEmail })
 
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

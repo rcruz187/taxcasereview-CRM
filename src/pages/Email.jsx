@@ -49,6 +49,7 @@ export default function Email() {
   const [dragOverFolder, setDragOverFolder] = useState(null)
   const [search, setSearch]     = useState('')
   const [gmailConnected, setGmailConnected] = useState(false)
+  const [gmailConnectedEmail, setGmailConnectedEmail] = useState('')
   const [gmailClientId, setGmailClientId] = useState('')
   const [signature, setSignature] = useState({ text: '', logoUrl: '' })
   const { lastSyncAt, syncing, lastError, syncNow } = useGmailSync()
@@ -84,7 +85,7 @@ export default function Email() {
     const onFocus = () => loadGmailConfig()
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
-  }, [])
+  }, [user?.email])
 
   // Global Delete/Backspace key — archive selected email from anywhere on the page
   useEffect(() => {
@@ -105,9 +106,17 @@ export default function Email() {
   useEffect(() => { if (lastSyncAt) load() }, [lastSyncAt])
 
   async function loadGmailConfig() {
-    const { data } = await supabase.from('settings').select('gmail_client_id,gmail_refresh_token,email_signature,email_signature_logo_url').limit(1).maybeSingle()
+    // gmail_client_id stays shared (the app's own OAuth registration, not a
+    // personal secret) — but whether GMAIL IS CONNECTED is now per-employee,
+    // not the old single shared settings.gmail_refresh_token check.
+    const { data } = await supabase.from('settings').select('gmail_client_id,email_signature,email_signature_logo_url').limit(1).maybeSingle()
     if (data?.gmail_client_id) setGmailClientId(data.gmail_client_id)
-    if (data?.gmail_refresh_token) setGmailConnected(true)
+    if (user?.email) {
+      const { data: acct } = await supabase.from('employee_gmail_accounts')
+        .select('gmail_refresh_token,gmail_connected_email').eq('employee_email', user.email).maybeSingle()
+      setGmailConnected(!!acct?.gmail_refresh_token)
+      setGmailConnectedEmail(acct?.gmail_connected_email || '')
+    }
 
     // Each employee has their own signature now — fall back to the firm
     // default only if they haven't set a personal one yet.
@@ -124,8 +133,13 @@ export default function Email() {
   }
 
   async function load() {
+    if (!user?.email) return
     const [{ data: e }, { data: c }, { data: l }] = await Promise.all([
-      supabase.from('emails').select('*').order('created_at', { ascending: false }),
+      // Each employee now has their own separate Gmail connection — this
+      // used to load every email ever synced regardless of whose mailbox
+      // it came from, which is exactly the leak Romy caught (logging in as
+      // one account and seeing another employee's personal correspondence).
+      supabase.from('emails').select('*').eq('mailbox_owner', user.email).order('created_at', { ascending: false }),
       supabase.from('clients').select('id,name,email'),
       supabase.from('leads').select('id,name,email'),
     ])
@@ -159,6 +173,7 @@ export default function Email() {
     try {
       const blob = await fetchGmailAttachmentBlob(supabase, {
         gmailMessageId: email.gmail_message_id, attachmentId: att.attachmentId, mimeType: att.mimeType,
+        employeeEmail: email.mailbox_owner || user?.email,
       })
       const path = `docs/${targetName.replace(/\s+/g,'-')}/${Date.now()}_${att.filename}`
       const { error: upErr } = await supabase.storage.from('documents').upload(path, blob, { upsert: true, contentType: att.mimeType })
@@ -375,7 +390,7 @@ export default function Email() {
         {/* Gmail connect banner */}
         {gmailConnected ? (
           <div style={{ margin: '0 10px 10px', padding: '8px 12px', background: 'rgba(34,197,94,.12)', borderRadius: 8, border: '1px solid rgba(34,197,94,.3)', fontSize: 11, fontWeight: 700, color: 'var(--ok)' }}>
-            ✅ Gmail Connected
+            ✅ Gmail Connected{gmailConnectedEmail ? ` — ${gmailConnectedEmail}` : ''}
             <div style={{ marginTop: 4, fontSize: 10, fontWeight: 400, color: 'var(--t3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
               <span>
                 {syncing ? '🔄 Syncing…' : lastSyncAt ? `Synced ${Math.max(0, Math.round((Date.now() - lastSyncAt.getTime()) / 1000))}s ago` : 'Starting sync…'}
@@ -615,6 +630,7 @@ export default function Email() {
                                   await downloadGmailAttachment(supabase, {
                                     gmailMessageId: selected.gmail_message_id, attachmentId: att.attachmentId,
                                     filename: att.filename, mimeType: att.mimeType,
+                                    employeeEmail: selected.mailbox_owner || user?.email,
                                   })
                                 } catch (e) { showToast('Could not download: ' + e.message) }
                               }}>

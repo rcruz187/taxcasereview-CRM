@@ -24,7 +24,9 @@ export default function AuthCallback() {
       }
 
       try {
-        await exchangeCodeForTokens(supabase, code)
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user?.email) throw new Error('You must be logged into the CRM to connect your Gmail account.')
+        await exchangeCodeForTokens(supabase, code, user.email)
         setStatus('success')
         setMessage('Gmail connected successfully! You can close this window.')
         setTimeout(() => { try { window.close() } catch (_) {} }, 2000)

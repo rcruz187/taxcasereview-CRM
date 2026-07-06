@@ -52,6 +52,7 @@ export default function Settings() {
     setMySigLogoUploading(false)
   }
 
+  const [connectedGmailCount, setConnectedGmailCount] = useState(0)
   const [firm, setFirm] = useState({
     name: '', tagline: '', phone: '', email: '',
     address: '', city: '', state: '', zip: '',
@@ -121,6 +122,9 @@ export default function Settings() {
       setFirm(f => ({ ...f, ...data }))
       if (data.primary_color) applyBrandColor(data.primary_color)
     }
+    const { count } = await supabase.from('employee_gmail_accounts')
+      .select('employee_email', { count: 'exact', head: true }).not('gmail_refresh_token', 'is', null)
+    setConnectedGmailCount(count || 0)
   }
 
   async function loadLogo() {
@@ -374,17 +378,17 @@ export default function Settings() {
           <div className="card">
             <div className="card-header"><span className="card-title">📧 Gmail OAuth Integration</span></div>
             <div style={{ padding: '0 20px 20px' }}>
-              {firm.gmail_refresh_token ? (
+              {connectedGmailCount > 0 ? (
                 <div style={{background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.25)",borderRadius:8,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10,fontSize:12,color:"var(--ok)"}}>
-                  <span>✅</span><span>Gmail is connected{firm.gmail_connected_email ? ` as ${firm.gmail_connected_email}` : ''}. Emails will send from this account.</span>
+                  <span>✅</span><span>{connectedGmailCount} employee{connectedGmailCount === 1 ? ' has' : 's have'} connected their own Gmail account.</span>
                 </div>
               ) : (
                 <div style={{background:"rgba(250,204,21,.08)",border:"1px solid rgba(250,204,21,.25)",borderRadius:8,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10,fontSize:12,color:"var(--warn)"}}>
-                  <span>⚠️</span><span>Not connected yet — emails won't send until you authorize below.</span>
+                  <span>⚠️</span><span>No employees have connected Gmail yet.</span>
                 </div>
               )}
               <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.7 }}>
-                Connect Gmail to send emails directly from the Email page. Follow the setup steps below.
+                Each employee connects their OWN Gmail account individually, from the "Connect Gmail" button on the Email page — this section is only for the app-level setup below (done once, by an admin), not for connecting any specific person's account.
               </div>
 
               {/* Step by step */}
@@ -395,7 +399,7 @@ export default function Settings() {
                   ['3', 'Go to APIs & Services → Credentials → Create OAuth 2.0 Client ID'],
                   ['4', 'Set Application Type to "Web application"'],
                   ['5', `Add Authorized Redirect URI: ${window.location.origin}/taxcasereview-CRM/auth/callback`],
-                  ['6', 'Copy your Client ID and Client Secret below, then save'],
+                  ['6', 'Copy your Client ID and Client Secret below, then save. After that, each employee connects their own account from the Email page.'],
                 ].map(([step, text]) => (
                   <div key={step} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                     <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--blue)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, flexShrink: 0 }}>{step}</div>
@@ -417,18 +421,7 @@ export default function Settings() {
               </div>
               <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 14 }}>Click the Redirect URI field to copy it.</div>
 
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Gmail Config'}</button>
-                {firm.gmail_client_id && (
-                  <button className="btn sec" onClick={() => {
-                    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${firm.gmail_client_id}&redirect_uri=${encodeURIComponent(window.location.origin + '/taxcasereview-CRM/auth/callback')}&response_type=code&scope=https://mail.google.com/&access_type=offline&prompt=consent`
-                    window.open(url, '_blank')
-                  }}>🔗 Authorize Gmail Account</button>
-                )}
-                {!firm.gmail_client_id && (
-                  <span style={{ fontSize: 12, color: 'var(--t3)' }}>Enter your Client ID first to enable authorization</span>
-                )}
-              </div>
+              <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Gmail Config'}</button>
             </div>
           </div>
 
