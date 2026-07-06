@@ -363,6 +363,7 @@ export default function Leads() {
   const [leadSmsSending, setLeadSmsSending] = useState(false)
   const [leadTasks, setLeadTasks]     = useState([])
   const [leadQuickTask, setLeadQuickTask] = useState('')
+  const [pendingLeadSection, setPendingLeadSection] = useState('')
   const [addingLeadTask, setAddingLeadTask] = useState(false)
   const [addModal, setAddModal] = useState(false)
   const [poaLead, setPoaLead] = useState(null)
@@ -527,17 +528,27 @@ export default function Leads() {
     }
   }
 
+  async function addLeadSubtask(task) {
+    const sectionTitle = task.section_title || task.title
+    if (!task.section_title) {
+      await supabase.from('tasks').update({ section_title: sectionTitle }).eq('id', task.id)
+      loadLeadTasks(detail.name)
+    }
+    setPendingLeadSection(sectionTitle)
+  }
+
   async function addQuickLeadTask() {
     if (!leadQuickTask.trim() || !detail) return
     setAddingLeadTask(true)
     const { error } = await supabase.from('tasks').insert([{
       title: leadQuickTask.trim(), clientName: detail.name, priority: 'Normal',
-      done: false, created_at: new Date().toISOString()
+      done: false, section_title: pendingLeadSection || null, created_at: new Date().toISOString()
     }])
     setAddingLeadTask(false)
     if (error) { showToast('Task error: ' + error.message); return }
     const loggedTitle = leadQuickTask.trim()
     setLeadQuickTask('')
+    setPendingLeadSection('')
     loadLeadTasks(detail.name)
     showToast('✅ Task added!')
     await logAction(detail.id, detail.name, `📌 Task created: "${loggedTitle}"`)
@@ -1993,28 +2004,55 @@ export default function Leads() {
               {leadTasks.length===0&&(
                 <div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No tasks yet for this lead.</div>
               )}
-              {leadTasks.map(t=>(
-                <div key={t.id} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'8px 0',borderBottom:'1px solid var(--br)'}}>
-                  <div
-                    onClick={()=>toggleLeadTask(t)}
-                    style={{width:18,height:18,borderRadius:4,border:'1.5px solid var(--b2c)',background:t.done?'var(--ok)':'var(--s2)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,marginTop:1,color:'#fff',fontSize:11}}
-                  >{t.done?'✓':''}</div>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:13,fontWeight:t.done?400:600,textDecoration:t.done?'line-through':'none',color:t.done?'var(--t3)':'var(--tx)'}}>{t.title}</div>
-                    <div style={{fontSize:10,color:'var(--t3)',marginTop:2,display:'flex',gap:8}}>
-                      {t.priority&&<span className={`bdg ${t.priority==='High'?'br':t.priority==='Low'?'bn':'ba'}`} style={{fontSize:9}}>{t.priority}</span>}
-                      {t.dueDate&&<span>Due: {t.dueDate}</span>}
-                      {t.assignedTo&&<span>→ {t.assignedTo}</span>}
+              {(() => {
+                const groups = []
+                const byKey = new Map()
+                leadTasks.forEach(t => {
+                  const key = t.section_title || `t-${t.id}`
+                  if (!byKey.has(key)) {
+                    const g = { key, section_title: t.section_title || null, tasks: [] }
+                    byKey.set(key, g); groups.push(g)
+                  }
+                  byKey.get(key).tasks.push(t)
+                })
+                const renderTask = t => (
+                  <div key={t.id} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'8px 0',borderBottom:'1px solid var(--br)'}}>
+                    <div
+                      onClick={()=>toggleLeadTask(t)}
+                      style={{width:18,height:18,borderRadius:4,border:'1.5px solid var(--b2c)',background:t.done?'var(--ok)':'var(--s2)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,marginTop:1,color:'#fff',fontSize:11}}
+                    >{t.done?'✓':''}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:t.done?400:600,textDecoration:t.done?'line-through':'none',color:t.done?'var(--t3)':'var(--tx)'}}>{t.title}</div>
+                      <div style={{fontSize:10,color:'var(--t3)',marginTop:2,display:'flex',gap:8}}>
+                        {t.priority&&<span className={`bdg ${t.priority==='High'?'br':t.priority==='Low'?'bn':'ba'}`} style={{fontSize:9}}>{t.priority}</span>}
+                        {t.dueDate&&<span>Due: {t.dueDate}</span>}
+                        {t.assignedTo&&<span>→ {t.assignedTo}</span>}
+                      </div>
+                    </div>
+                    <button className="btn sec" style={{fontSize:10,padding:'3px 8px',flexShrink:0}} onClick={()=>addLeadSubtask(t)}>+ Sub</button>
+                  </div>
+                )
+                return groups.map(g => g.section_title ? (
+                  <div key={g.key} style={{marginBottom:8}}>
+                    <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em',padding:'6px 0 2px'}}>📋 {g.section_title}</div>
+                    <div style={{paddingLeft:12,borderLeft:'2px solid var(--br)'}}>
+                      {g.tasks.map(renderTask)}
                     </div>
                   </div>
+                ) : g.tasks.map(renderTask))
+              })()}
+              {pendingLeadSection && (
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:11,color:'var(--t3)',marginTop:10}}>
+                  <span>Adding to section: <strong style={{color:'var(--tx)'}}>{pendingLeadSection}</strong></span>
+                  <button onClick={()=>setPendingLeadSection('')} style={{background:'none',border:'none',color:'var(--bad)',cursor:'pointer',fontSize:11}}>Cancel</button>
                 </div>
-              ))}
-              <div style={{display:'flex',gap:6,marginTop:12}}>
+              )}
+              <div style={{display:'flex',gap:6,marginTop:pendingLeadSection?4:12}}>
                 <input
                   value={leadQuickTask}
                   onChange={e=>setLeadQuickTask(e.target.value)}
                   onKeyDown={e=>e.key==='Enter'&&addQuickLeadTask()}
-                  placeholder="Add a task…"
+                  placeholder={pendingLeadSection ? 'Add a sub-task…' : 'Add a task…'}
                   style={{flex:1,padding:'8px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12}}
                 />
                 <button className="btn pri" style={{fontSize:11,padding:'7px 14px'}} onClick={addQuickLeadTask} disabled={addingLeadTask}>
