@@ -317,14 +317,14 @@ export default function Tasks() {
               {open.length===0
                 ?<div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>🎉 No open tasks!</div>
                 :openGroups.map(g => g.section_title ? (
-                    <div key={g.key} style={{marginBottom:8}}>
-                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 0 4px'}}>
-                        <div style={{fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em'}}>
-                          📋 {g.section_title}{g.clientName?` · ${g.clientName}`:''}
+                    <div key={g.key} style={{marginBottom:12,borderRadius:9,overflow:'hidden',border:'1px solid var(--br)'}}>
+                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'11px 14px',background:'var(--s2)'}}>
+                        <div style={{fontSize:13,fontWeight:700,color:'var(--tx)'}}>
+                          📋 {g.section_title}{g.clientName?<span style={{fontWeight:400,color:'var(--t3)'}}> · {g.clientName}</span>:''}
                         </div>
-                        <button className="btn sec" style={{fontSize:11,padding:'3px 10px'}} onClick={()=>addSubtask({clientName:g.clientName, section_title:g.section_title})}>+ Sub-task</button>
+                        <button className="btn pri" style={{fontSize:11,padding:'5px 12px',fontWeight:600}} onClick={()=>addSubtask({clientName:g.clientName, section_title:g.section_title})}>+ Add Task</button>
                       </div>
-                      <div style={{paddingLeft:14,borderLeft:'2px solid var(--br)'}}>
+                      <div style={{padding:'2px 14px 4px'}}>
                         {g.tasks.map(t=><TaskItem key={t.id} t={t} onAddSub={addSubtask}/>)}
                       </div>
                     </div>
