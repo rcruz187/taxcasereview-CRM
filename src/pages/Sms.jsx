@@ -176,11 +176,16 @@ export default function Sms() {
     // Auto-log outbound SMS to client activity history
     if (form.clientName && status !== 'Failed') {
       const preview = (form.body || '').slice(0, 120).trim()
+      let authorName = user?.email || 'Staff'
+      if (user?.email) {
+        const { data: empRec } = await supabase.from('employees').select('name').eq('email', user.email).maybeSingle()
+        if (empRec?.name) authorName = empRec.name
+      }
       await supabase.from('client_notes').insert({
         clientname: form.clientName,
         text: `💬 SMS Sent — ${preview}${form.body?.length > 120 ? '…' : ''}`,
         note_type: 'SMS',
-        author: user?.email || 'Staff',
+        author: authorName,
         created_at: new Date().toISOString(),
       })
     }
