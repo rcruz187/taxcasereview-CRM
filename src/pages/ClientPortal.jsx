@@ -1,4 +1,4 @@
-import { validateFile, maybeCompressImage, fileToBase64 } from '../lib/uploadUtils'
+import { validateFile } from '../lib/uploadUtils'
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -80,14 +80,15 @@ export default function ClientPortal() {
   const [notFound, setNotFound] = useState(false)
   const [unlocked, setUnlocked] = useState(false)
   const [emailInput, setEmailInput] = useState('')
-  const [pin, setPin] = useState('')
   const [authError, setAuthError] = useState('')
   const [checkingAuth, setCheckingAuth] = useState(false)
-  // Session token from portal-login — kept in sessionStorage (survives a
-  // refresh within the same tab, cleared on tab close) so every
-  // subsequent read/write proves who this is server-side, instead of the
-  // old model where the browser held the real SSN and self-certified.
-  const [portalToken, setPortalToken] = useState(() => sessionStorage.getItem('tcr_portal_token_' + id) || '')
+  // Identity now comes from a real Supabase Auth session (magic link),
+  // never from anything the browser holds or self-certifies. RLS on every
+  // table enforces that a logged-in client can only ever read/write rows
+  // linked to their own auth.users id — there is no shared secret (like an
+  // SSN) touching the browser at all anymore.
+  const [magicLinkSent, setMagicLinkSent] = useState(false)
+  const [session, setSession] = useState(null)
 
   const [section, setSection] = useState(() => new URLSearchParams(window.location.search).get('section') || 'compliance')
 
@@ -128,73 +129,99 @@ export default function ClientPortal() {
   const [ieEdits, setIeEdits] = useState({})
   const [ieSaving, setIeSaving] = useState(false)
 
-  // If a token from a previous login this tab is already stashed, try it
-  // immediately instead of showing the PIN screen again.
+  // On mount, and whenever Supabase Auth's session changes (magic link
+  // redirect completing, tab refresh with an existing session, sign-out),
+  // react to the real auth state instead of a self-managed token.
   useEffect(() => {
-    if (portalToken) loadAllData(portalToken)
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session || null)
+      if (data.session) loadAllData()
+      else setCheckingAuth(false)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession || null)
+      if (newSession) loadAllData()
+      else { setUnlocked(false); setClient(null) }
+    })
+    return () => sub.subscription.unsubscribe()
   }, [id])
 
-  async function checkAuth() {
+  async function sendMagicLink() {
     setCheckingAuth(true)
     setAuthError('')
-    const { data, error } = await supabase.functions.invoke('portal-login', {
-      body: { id, email: emailInput, pin },
+    const { error } = await supabase.auth.signInWithOtp({
+      email: emailInput.trim(),
+      options: { emailRedirectTo: window.location.href },
     })
     setCheckingAuth(false)
-    if (error || data?.error) {
-      setAuthError(data?.error || 'Something went wrong — try again.')
-      return
-    }
-    sessionStorage.setItem('tcr_portal_token_' + id, data.token)
-    setPortalToken(data.token)
-    setUnlocked(true)
-    loadAllData(data.token)
+    if (error) { setAuthError('Something went wrong sending your login link — try again.'); return }
+    setMagicLinkSent(true)
   }
 
-  async function loadAllData(token) {
+  // Client identity is resolved purely by RLS: `clients` only ever returns
+  // the row where portal_auth_id = auth.uid(). The :id in the URL is kept
+  // for continuity but is no longer what grants access to anything.
+  async function loadAllData() {
     setLoading(true)
-    const { data, error } = await supabase.functions.invoke('portal-get-data', { body: { token } })
-    setLoading(false)
-    if (error || data?.error) {
-      // Token expired or invalid — clear it and fall back to the login screen
-      sessionStorage.removeItem('tcr_portal_token_' + id)
-      setPortalToken('')
+    const { data: c } = await supabase.from('clients')
+      .select('id,name,email,autopay_enabled,autopay_amount,autopay_frequency,autopay_next_charge,default_payment_method_id,payment_method_brand,payment_method_last4,payment_plan_changes')
+      .maybeSingle()
+    if (!c) {
+      setLoading(false)
+      setAuthError("We couldn't find a client record linked to this email. Contact your representative.")
       setUnlocked(false)
-      if (data?.error && !data.error.includes('Session expired')) setAuthError(data.error)
       return
     }
-    setClient({ ...data.client, isLead: data.isLead })
+    setClient(c)
     setUnlocked(true)
-    setRecords(data.compliance || [])
-    setDocs(data.documents || [])
-    setBookEntries(data.bookkeeping || [])
-    setPayments(data.payments || [])
-    setNotes(data.notes || [])
-    setOrganizers(data.organizers || [])
-    setOpenInvoices(data.invoices || [])
-    setSmsMessages(data.sms || [])
-    setClientEmails(data.emails || [])
-    setFinancialProfile(data.financialProfile || null)
-    setIeEdits(data.financialProfile?.expenses || {})
-    const firstWithData = FORM_TABS.find(t => (data.compliance || []).some(r => r.form_type === t.key))
+    const [{ data: comp }, { data: docsData }, { data: books }, { data: pays }, { data: notesData }, { data: orgs }, { data: invs }, { data: sms }, { data: fp }, { data: emailsData }] = await Promise.all([
+      supabase.from('client_compliance_records').select('*').eq('client_name', c.name),
+      supabase.from('documents').select('*').eq('client', c.name).order('created_at', { ascending: false }),
+      supabase.from('bookkeeping').select('*').eq('client_name', c.name).order('date', { ascending: false }),
+      supabase.from('payments').select('*').eq('clientName', c.name).order('created_at', { ascending: false }),
+      supabase.from('client_notes').select('*').eq('clientname', c.name).eq('visible_to_client', true).order('created_at', { ascending: false }),
+      supabase.from('tax_organizer_responses').select('id,tax_year,status,updated_at').eq('client_name', c.name).order('tax_year', { ascending: false }),
+      supabase.from('invoices').select('*').eq('clientName', c.name).neq('status', 'Paid').order('created_at', { ascending: false }),
+      supabase.from('sms_messages').select('*').eq('clientName', c.name).order('created_at', { ascending: true }),
+      supabase.from('client_financial_profiles').select('*').eq('client_name', c.name).maybeSingle(),
+      supabase.from('emails').select('*').eq('clientName', c.name).order('created_at', { ascending: false }),
+    ])
+    setLoading(false)
+    setRecords(comp || [])
+    setDocs(docsData || [])
+    setBookEntries(books || [])
+    setPayments(pays || [])
+    setNotes(notesData || [])
+    setOrganizers(orgs || [])
+    setOpenInvoices(invs || [])
+    setSmsMessages(sms || [])
+    setClientEmails(emailsData || [])
+    setFinancialProfile(fp || null)
+    setIeEdits(fp?.expenses || {})
+    const firstWithData = FORM_TABS.find(t => (comp || []).some(r => r.form_type === t.key))
     setActiveForm(firstWithData?.key || '1040')
   }
 
   async function refreshPaymentsAndInvoices() {
-    if (!portalToken) return
-    const { data } = await supabase.functions.invoke('portal-get-data', { body: { token: portalToken } })
-    if (!data || data.error) return
-    setPayments(data.payments || [])
-    setNotes(data.notes || [])
-    setOpenInvoices(data.invoices || [])
+    if (!client) return
+    const [{ data: pays }, { data: notesData }, { data: invs }] = await Promise.all([
+      supabase.from('payments').select('*').eq('clientName', client.name).order('created_at', { ascending: false }),
+      supabase.from('client_notes').select('*').eq('clientname', client.name).eq('visible_to_client', true).order('created_at', { ascending: false }),
+      supabase.from('invoices').select('*').eq('clientName', client.name).neq('status', 'Paid').order('created_at', { ascending: false }),
+    ])
+    setPayments(pays || [])
+    setNotes(notesData || [])
+    setOpenInvoices(invs || [])
   }
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3500) }
 
   async function refreshClientAutopay() {
-    if (!portalToken) return
-    const { data } = await supabase.functions.invoke('portal-get-data', { body: { token: portalToken } })
-    if (data?.client) setClient(prev => ({ ...prev, ...data.client }))
+    if (!client) return
+    const { data: c } = await supabase.from('clients')
+      .select('id,name,email,autopay_enabled,autopay_amount,autopay_frequency,autopay_next_charge,default_payment_method_id,payment_method_brand,payment_method_last4,payment_plan_changes')
+      .maybeSingle()
+    if (c) setClient(prev => ({ ...prev, ...c }))
   }
 
   async function lockInPlan() {
@@ -209,8 +236,10 @@ export default function ClientPortal() {
       body: { clientId: client.id, enabled: true, amount: monthlyAmount, frequency: 'monthly', nextChargeDate: nextChargeStr }
     })
     if (error || data?.error) { showToast('❌ ' + (data?.error || error?.message || 'Error setting plan')); setPlanLocking(false); return }
-    // Track the change count
-    await supabase.functions.invoke('portal-action', { body: { token: portalToken, type: 'increment_payment_plan_changes' } })
+    // Track the change count via a narrow RPC (security definer) instead of
+    // a general clients UPDATE grant — a client can only ever bump their
+    // own counter, nothing else on their row.
+    await supabase.rpc('portal_increment_payment_plan_changes')
     setPlanLocking(false)
     setPlanEditing(false)
     showToast(`✅ Payment plan set — ${fmt(monthlyAmount)}/month for ${planMonths} months`)
@@ -227,11 +256,12 @@ export default function ClientPortal() {
 
   async function saveIE() {
     setIeSaving(true)
-    const { error, data } = await supabase.functions.invoke('portal-action', {
-      body: { token: portalToken, type: 'save_financial_profile', expenses: ieEdits },
-    })
+    const { error } = await supabase.from('client_financial_profiles').upsert(
+      { client_name: client.name, expenses: ieEdits, updated_at: new Date().toISOString() },
+      { onConflict: 'client_name', ignoreDuplicates: false }
+    )
     setIeSaving(false)
-    if (error || data?.error) { showToast('❌ Error saving: ' + (data?.error || error.message)); return }
+    if (error) { showToast('❌ Error saving: ' + error.message); return }
     showToast('✅ Income & Expenses saved!')
     setFinancialProfile(prev => ({ ...(prev || {}), expenses: ieEdits }))
   }
@@ -244,13 +274,14 @@ export default function ClientPortal() {
       return
     }
     setCreatingOrg(true)
-    const { data, error } = await supabase.functions.invoke('portal-action', {
-      body: { token: portalToken, type: 'create_tax_organizer', year, clientEmail: client.email || '' },
-    })
+    const { data, error } = await supabase.from('tax_organizer_responses').insert([{
+      client_name: client.name, client_email: client.email || '', tax_year: year,
+      answers: {}, status: 'In Progress', created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }]).select().single()
     setCreatingOrg(false)
-    if (error || data?.error || !data?.organizer) return
-    setOrganizers(prev => [data.organizer, ...prev])
-    setActiveOrganizerId(data.organizer.id)
+    if (error || !data) return
+    setOrganizers(prev => [data, ...prev])
+    setActiveOrganizerId(data.id)
     setNewOrgYear('')
   }
 
@@ -261,12 +292,19 @@ export default function ClientPortal() {
     if (!file) return
     setUploading(true)
     try {
-      const fileBase64 = await fileToBase64(file)
-      const { data, error } = await supabase.functions.invoke('portal-action', {
-        body: { token: portalToken, type: 'upload_document', fileName: file.name, fileType: file.type, fileBase64, docType: uploadFolder },
-      })
-      if (error || data?.error) throw new Error(data?.error || error.message)
-      setDocs(data.documents || [])
+      const path = `docs/${client.name.replace(/\s+/g, '-')}/${Date.now()}_${file.name}`
+      const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
+      if (upErr) throw upErr
+      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+      const { error } = await supabase.from('documents').insert([{
+        name: file.name, client: client.name, docType: uploadFolder,
+        notes: 'Uploaded by client via portal',
+        file_url: urlData.publicUrl, file_name: file.name, file_size: file.size,
+        created_at: new Date().toISOString(),
+      }])
+      if (error) throw error
+      const { data: docsData } = await supabase.from('documents').select('*').eq('client', client.name).order('created_at', { ascending: false })
+      setDocs(docsData || [])
       if (fileRef.current) fileRef.current.value = ''
     } catch (e) {
       alert('Upload failed: ' + e.message)
@@ -303,22 +341,31 @@ export default function ClientPortal() {
         {/* Welcome message */}
         <div style={{background:'rgba(59,130,246,.08)',border:'1px solid rgba(59,130,246,.2)',borderRadius:12,padding:'14px 16px',marginBottom:20,textAlign:'center'}}>
           <div style={{fontSize:15,fontWeight:700,color:'#f1f5f9',marginBottom:4}}>Welcome back</div>
-          <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.5}}>Please verify your identity to securely access your account.</div>
+          <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.5}}>
+            {magicLinkSent
+              ? "Check your email — we've sent you a secure sign-in link."
+              : "Enter the email on file with your account and we'll send you a secure sign-in link. No password or SSN required."}
+          </div>
         </div>
-        <div style={{ marginBottom: 12 }}>
-          <label style={styles.label}>Email Address</label>
-          <input value={emailInput} onChange={e => { setEmailInput(e.target.value); setAuthError('') }} placeholder="you@email.com" type="email" style={styles.textInput} />
-        </div>
-        <div style={{ marginBottom: 4 }}>
-          <label style={styles.label}>Last 4 Digits of SSN</label>
-          <input value={pin} onChange={e => { setPin(e.target.value.replace(/\D/g, '').slice(0, 4)); setAuthError('') }}
-            onKeyDown={e => e.key === 'Enter' && !checkingAuth && checkAuth()} placeholder="••••" maxLength={4} inputMode="numeric"
-            style={{ ...styles.textInput, fontSize: 20, letterSpacing: 6, textAlign: 'center' }} />
-        </div>
+        {!magicLinkSent && (
+          <div style={{ marginBottom: 12 }}>
+            <label style={styles.label}>Email Address</label>
+            <input value={emailInput} onChange={e => { setEmailInput(e.target.value); setAuthError('') }}
+              onKeyDown={e => e.key === 'Enter' && !checkingAuth && emailInput.trim() && sendMagicLink()}
+              placeholder="you@email.com" type="email" style={styles.textInput} />
+          </div>
+        )}
         {authError && <div style={{ color: '#f87171', fontSize: 12, textAlign: 'center', marginTop: 10 }}>{authError}</div>}
-        <button onClick={checkAuth} disabled={pin.length !== 4 || !emailInput.trim() || checkingAuth} style={{ ...styles.bigBtn, opacity: (pin.length === 4 && emailInput.trim() && !checkingAuth) ? 1 : 0.5 }}>
-          {checkingAuth ? 'Verifying…' : 'View My Information'}
-        </button>
+        {!magicLinkSent && (
+          <button onClick={sendMagicLink} disabled={!emailInput.trim() || checkingAuth} style={{ ...styles.bigBtn, opacity: (emailInput.trim() && !checkingAuth) ? 1 : 0.5 }}>
+            {checkingAuth ? 'Sending…' : 'Send My Login Link'}
+          </button>
+        )}
+        {magicLinkSent && (
+          <button onClick={() => setMagicLinkSent(false)} style={{ ...styles.bigBtn, opacity: 0.7 }}>
+            Use a different email
+          </button>
+        )}
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', textAlign: 'center', marginTop: 16 }}>
           Your information is private and only visible with this verification.
         </div>
