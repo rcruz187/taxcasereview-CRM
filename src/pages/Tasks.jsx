@@ -442,7 +442,6 @@ export default function Tasks() {
           <div className="modal" style={{width:540}}>
             <div className="mh"><span className="mt">Add Task</span><button className="xbtn" onClick={()=>setModal(false)}>&times;</button></div>
             <div className="field"><label>Title *</label><input value={form.title} onChange={e=>fld('title',e.target.value)} placeholder="Task description"/></div>
-            <div className="field"><label>Section (optional) — groups this with other sub-tasks under one heading</label><input value={form.section_title||''} onChange={e=>fld('section_title',e.target.value)} placeholder="e.g. Complete Federal POA"/></div>
             <div className="field" style={{position:'relative'}}>
               <label>Client / Lead</label>
               <input value={form.clientName} onChange={e=>searchClient(e.target.value)} placeholder="Search clients..." autoComplete="off"/>
@@ -453,21 +452,22 @@ export default function Tasks() {
               )}
             </div>
             <div className="fg2">
+              <div className="field"><label>Section</label><input value={form.section_title||''} onChange={e=>fld('section_title',e.target.value)} placeholder="Optional — groups with other sub-tasks"/></div>
               <div className="field"><label>Case #</label><input value={form.caseNum} onChange={e=>fld('caseNum',e.target.value)}/></div>
+            </div>
+            <div className="fg2">
               <div className="field"><label>Assigned To</label>
                 <select value={form.assignedTo} onChange={e=>fld('assignedTo',e.target.value)}>
                   <option value="">Unassigned</option>
                   {reps.map(r=><option key={r}>{r}</option>)}
                 </select>
               </div>
-            </div>
-            <div className="fg2">
               <div className="field"><label>Due Date</label><input type="date" value={form.dueDate} onChange={e=>fld('dueDate',e.target.value)}/></div>
-              <div className="field"><label>Priority</label>
-                <select value={form.priority} onChange={e=>fld('priority',e.target.value)}>
-                  <option>Normal</option><option>High</option><option>Urgent</option>
-                </select>
-              </div>
+            </div>
+            <div className="field"><label>Priority</label>
+              <select value={form.priority} onChange={e=>fld('priority',e.target.value)}>
+                <option>Normal</option><option>High</option><option>Urgent</option>
+              </select>
             </div>
             <div className="field"><label>Notes</label><textarea value={form.notes} onChange={e=>fld('notes',e.target.value)} style={{minHeight:70}}/></div>
             <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:10}} onClick={()=>save(form)} disabled={saving}>
