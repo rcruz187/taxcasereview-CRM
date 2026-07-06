@@ -62,6 +62,7 @@ export async function triggerWorkflow(event, entityType, entityName, actorName, 
         dueDate: due.toISOString().slice(0, 10),
         done: false,
         notes: s.notes || '',
+        section_title: s.section_title || null,
         created_at: now.toISOString(),
       }
     })
