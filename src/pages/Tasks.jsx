@@ -263,15 +263,15 @@ export default function Tasks() {
         </div>
 
         {/* Status dropdown */}
-        <div style={{width:150,flexShrink:0}}>
+        <div style={{width:150,flexShrink:0,position:'relative'}}>
           <select
             value={t.status_category && t.status_label ? `${t.status_category}|||${t.status_label}` : ''}
             onChange={e=>updateTaskStatus(t, e.target.value)}
             style={{
-              width:'100%',fontSize:10,fontWeight:700,padding:'4px 6px',borderRadius:20,textAlign:'center',
-              border:'none',cursor:'pointer',appearance:'none',WebkitAppearance:'none',
+              width:'100%',fontSize:10,fontWeight:700,padding:'4px 20px 4px 6px',borderRadius:20,textAlign:'center',
+              border:'1px solid rgba(148,163,184,.35)',cursor:'pointer',appearance:'none',WebkitAppearance:'none',
               background:t.done?'rgba(22,163,74,.15)':'rgba(148,163,184,.15)',
-              color:t.done?'var(--ok)':'var(--t3)'
+              color:t.done?'var(--ok)':'var(--tx)'
             }}
           >
             <option value="">{t.done?'Completed':'Ready to Start'}</option>
@@ -283,6 +283,7 @@ export default function Tasks() {
               </optgroup>
             ))}
           </select>
+          <span style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',fontSize:9,color:t.done?'var(--ok)':'var(--tx)',pointerEvents:'none'}}>▾</span>
         </div>
 
         {/* Due date */}
