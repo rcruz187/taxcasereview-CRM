@@ -3,7 +3,7 @@ import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { triggerWorkflow } from '../lib/triggerWorkflow'
+import { triggerWorkflow, applyWorkflowTemplate } from '../lib/triggerWorkflow'
 import { useApp } from '../context/AppContext'
 import { useCall } from '../context/CallContext'
 import { useFirm } from '../lib/useFirm'
@@ -365,6 +365,10 @@ export default function Leads() {
   const [leadTasks, setLeadTasks]     = useState([])
   const [leadQuickTask, setLeadQuickTask] = useState('')
   const [pendingLeadSection, setPendingLeadSection] = useState('')
+  const [templateModal, setTemplateModal] = useState(false)
+  const [availableTemplates, setAvailableTemplates] = useState([])
+  const [templateSearch, setTemplateSearch] = useState('')
+  const [applyingTemplateId, setApplyingTemplateId] = useState('')
   const [addingLeadTask, setAddingLeadTask] = useState(false)
   const [addModal, setAddModal] = useState(false)
   const [poaLead, setPoaLead] = useState(null)
@@ -547,6 +551,24 @@ export default function Leads() {
       loadLeadTasks(detail.name)
     }
     setPendingLeadSection(sectionTitle)
+  }
+
+  async function openTemplatePicker() {
+    const { data } = await supabase.from('workflow_templates').select('id,name,description').eq('entity_type','lead').eq('active',true).order('name')
+    setAvailableTemplates(data || [])
+    setTemplateSearch('')
+    setTemplateModal(true)
+  }
+
+  async function pickTemplate(t) {
+    setApplyingTemplateId(t.id)
+    const actor = getActor(user)
+    const result = await applyWorkflowTemplate(t.id, detail.name, actor.name)
+    setApplyingTemplateId('')
+    if (result?.error) { showToast('❌ ' + result.error); return }
+    setTemplateModal(false)
+    showToast(`✅ Applied "${t.name}" — ${result.count} task(s) created`)
+    loadLeadTasks(detail.name)
   }
 
   async function addQuickLeadTask() {
@@ -2010,8 +2032,11 @@ export default function Leads() {
 
           {leadDetailTab==='tasks' && (
             <div style={{padding:16}}>
-              <div style={{fontSize:12,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:12}}>
-                ✅ Tasks ({leadTasks.length})
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                <div style={{fontSize:12,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>
+                  ✅ Tasks ({leadTasks.length})
+                </div>
+                <button className="btn sec" style={{fontSize:11,padding:'5px 12px'}} onClick={openTemplatePicker}>📋 Apply Work Template</button>
               </div>
               {leadTasks.length===0&&(
                 <div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No tasks yet for this lead.</div>
@@ -2277,6 +2302,41 @@ export default function Leads() {
             <div className="modal" style={{width:520}}>
               <div className="mh"><span className="mt">✍️ E-Signature — {inlineEsignLead.name}</span><button className="xbtn" onClick={()=>setShowEsignModal(false)}>&times;</button></div>
               <LeadInlineEsign lead={inlineEsignLead} onClose={()=>setShowEsignModal(false)}/>
+            </div>
+          </div>
+        )}
+
+        {/* Apply Work Template Modal */}
+        {templateModal&&(
+          <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setTemplateModal(false)}>
+            <div className="modal" style={{width:480,maxHeight:'80vh',display:'flex',flexDirection:'column'}}>
+              <div className="mh">
+                <span className="mt">📋 Apply Work Template — {detail?.name}</span>
+                <button className="xbtn" onClick={()=>setTemplateModal(false)}>&times;</button>
+              </div>
+              <div style={{padding:'0 4px 12px'}}>
+                <input
+                  value={templateSearch}
+                  onChange={e=>setTemplateSearch(e.target.value)}
+                  placeholder="Search templates..."
+                  style={{width:'100%',boxSizing:'border-box',padding:'9px 13px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:7,color:'var(--tx)',fontSize:13}}
+                />
+              </div>
+              <div style={{overflowY:'auto',flex:1}}>
+                {availableTemplates.length===0 && (
+                  <div style={{color:'var(--t3)',fontSize:12,textAlign:'center',padding:'20px 0'}}>No active workflow templates for leads yet. Build one in Workflows first.</div>
+                )}
+                {availableTemplates
+                  .filter(t => !templateSearch.trim() || t.name.toLowerCase().includes(templateSearch.toLowerCase()))
+                  .map(t => (
+                    <div key={t.id} onClick={()=>!applyingTemplateId && pickTemplate(t)}
+                      style={{padding:'12px 10px',borderBottom:'1px solid var(--br)',cursor:applyingTemplateId?'default':'pointer',opacity:applyingTemplateId&&applyingTemplateId!==t.id?0.5:1}}>
+                      <div style={{fontSize:13,fontWeight:700,color:'var(--tx)'}}>{t.name}{applyingTemplateId===t.id?' — applying…':''}</div>
+                      {t.description&&<div style={{fontSize:11,color:'var(--t3)',marginTop:3,lineHeight:1.5}}>{t.description}</div>}
+                    </div>
+                  ))
+                }
+              </div>
             </div>
           </div>
         )}
