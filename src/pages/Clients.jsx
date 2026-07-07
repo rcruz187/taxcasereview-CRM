@@ -14,7 +14,7 @@ import SplitPaymentModal from '../components/SplitPaymentModal'
 import FinancialProfile from './FinancialProfile'
 import OrganizerView from '../components/OrganizerView'
 import { supabase } from '../lib/supabase'
-import { triggerWorkflow } from '../lib/triggerWorkflow'
+import { triggerWorkflow, applyWorkflowTemplate } from '../lib/triggerWorkflow'
 import { useApp } from '../context/AppContext'
 import { useCall } from '../context/CallContext'
 import { generateAddendum, sendAddendumForSignature } from '../lib/docUtils'
@@ -925,6 +925,10 @@ export default function Clients() {
   // When set, the quick-add box below the Tasks list is adding a sub-task
   // into this existing section instead of creating a new standalone task.
   const [pendingSection, setPendingSection] = useState('')
+  const [templateModal, setTemplateModal] = useState(false)
+  const [availableTemplates, setAvailableTemplates] = useState([])
+  const [templateSearch, setTemplateSearch] = useState('')
+  const [applyingTemplateId, setApplyingTemplateId] = useState('')
   // Add payment modal
   const [payModal,    setPayModal]    = useState(false)
   const [faxModal,    setFaxModal]    = useState(false)
@@ -1323,6 +1327,24 @@ export default function Clients() {
       loadRelated(detail.name)
     }
     setPendingSection(sectionTitle)
+  }
+
+  async function openTemplatePicker() {
+    const { data } = await supabase.from('workflow_templates').select('id,name,description').eq('entity_type','client').eq('active',true).order('name')
+    setAvailableTemplates(data || [])
+    setTemplateSearch('')
+    setTemplateModal(true)
+  }
+
+  async function pickTemplate(t) {
+    setApplyingTemplateId(t.id)
+    const actor = getActor(user)
+    const result = await applyWorkflowTemplate(t.id, detail.name, actor.name)
+    setApplyingTemplateId('')
+    if (result?.error) { showToast('❌ ' + result.error); return }
+    setTemplateModal(false)
+    showToast(`✅ Applied "${t.name}" — ${result.count} task(s) created`)
+    loadRelated(detail.name)
   }
 
   async function addQuickTask() {
@@ -2121,6 +2143,7 @@ export default function Clients() {
                 <div style={{fontSize:12,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>
                   ✅ Tasks ({relTasks.length})
                 </div>
+                <button className="btn sec" style={{fontSize:11,padding:'5px 12px'}} onClick={openTemplatePicker}>📋 Apply Work Template</button>
               </div>
               {loadingRel&&<div style={{color:'var(--t3)',fontSize:12}}>Loading…</div>}
               {!loadingRel&&relTasks.length===0&&(
@@ -2469,6 +2492,41 @@ export default function Clients() {
               <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:10}} onClick={addTaskFromModal} disabled={addingTask}>
                 {addingTask?'Adding…':'✅ Add Task'}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Apply Work Template Modal ── */}
+        {templateModal&&(
+          <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setTemplateModal(false)}>
+            <div className="modal" style={{width:480,maxHeight:'80vh',display:'flex',flexDirection:'column'}}>
+              <div className="mh">
+                <span className="mt">📋 Apply Work Template — {detail?.name}</span>
+                <button className="xbtn" onClick={()=>setTemplateModal(false)}>&times;</button>
+              </div>
+              <div style={{padding:'0 4px 12px'}}>
+                <input
+                  value={templateSearch}
+                  onChange={e=>setTemplateSearch(e.target.value)}
+                  placeholder="Search templates..."
+                  style={{width:'100%',boxSizing:'border-box',padding:'9px 13px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:7,color:'var(--tx)',fontSize:13}}
+                />
+              </div>
+              <div style={{overflowY:'auto',flex:1}}>
+                {availableTemplates.length===0 && (
+                  <div style={{color:'var(--t3)',fontSize:12,textAlign:'center',padding:'20px 0'}}>No active workflow templates for clients yet. Build one in Workflows first.</div>
+                )}
+                {availableTemplates
+                  .filter(t => !templateSearch.trim() || t.name.toLowerCase().includes(templateSearch.toLowerCase()))
+                  .map(t => (
+                    <div key={t.id} onClick={()=>!applyingTemplateId && pickTemplate(t)}
+                      style={{padding:'12px 10px',borderBottom:'1px solid var(--br)',cursor:applyingTemplateId?'default':'pointer',opacity:applyingTemplateId&&applyingTemplateId!==t.id?0.5:1}}>
+                      <div style={{fontSize:13,fontWeight:700,color:'var(--tx)'}}>{t.name}{applyingTemplateId===t.id?' — applying…':''}</div>
+                      {t.description&&<div style={{fontSize:11,color:'var(--t3)',marginTop:3,lineHeight:1.5}}>{t.description}</div>}
+                    </div>
+                  ))
+                }
+              </div>
             </div>
           </div>
         )}
