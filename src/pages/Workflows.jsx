@@ -178,7 +178,7 @@ const CASE_STATUSES = ['Open','Pending IRS','Active Plan','Docs Needed','POA Sen
 
 const ROLES = ['Admin','Super Admin','Tax Advisor','Tax Associate','Manager']
 
-const BLANK_TEMPLATE = { name: '', trigger_event: '', entity_type: 'lead', trigger_value: '', active: true }
+const BLANK_TEMPLATE = { name: '', description: '', trigger_event: '', entity_type: 'lead', trigger_value: '', active: true }
 const BLANK_STEP = { title: '', assigned_role: 'Admin', due_in_days: 1, notes: '', step_order: 0, section_title: '' }
 
 export default function Workflows() {
@@ -219,7 +219,7 @@ export default function Workflows() {
 
   function openEdit(t) {
     setEditId(t.id)
-    setForm({ name: t.name, trigger_event: t.trigger_event, entity_type: t.entity_type, trigger_value: t.trigger_value || '', active: t.active })
+    setForm({ name: t.name, description: t.description || '', trigger_event: t.trigger_event, entity_type: t.entity_type, trigger_value: t.trigger_value || '', active: t.active })
     setSteps(t.steps.length ? t.steps.map(s => ({ ...s })) : [{ ...BLANK_STEP }])
     setShowForm(true)
   }
@@ -233,7 +233,7 @@ export default function Workflows() {
       let templateId = editId
       if (editId) {
         const { error: updErr } = await supabase.from('workflow_templates').update({
-          name: form.name, trigger_event: form.trigger_event, entity_type: form.entity_type,
+          name: form.name, description: form.description || null, trigger_event: form.trigger_event, entity_type: form.entity_type,
           trigger_value: form.trigger_value || null, active: form.active,
         }).eq('id', editId)
         if (updErr) throw updErr
@@ -241,7 +241,7 @@ export default function Workflows() {
         if (delErr) throw delErr
       } else {
         const { data, error: insTplErr } = await supabase.from('workflow_templates').insert({
-          name: form.name, trigger_event: form.trigger_event, entity_type: form.entity_type,
+          name: form.name, description: form.description || null, trigger_event: form.trigger_event, entity_type: form.entity_type,
           trigger_value: form.trigger_value || null, active: form.active,
           created_by: 'Admin',
         }).select('id').single()
@@ -406,6 +406,10 @@ export default function Workflows() {
               <div>
                 <label style={{ display:'block', fontSize:12, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:8 }}>Workflow Name *</label>
                 <input className="inp" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="e.g. New Lead Onboarding, Post-Signing Tasks…" style={{ width:'100%', boxSizing:'border-box', fontSize:15, padding:'10px 14px' }}/>
+              </div>
+              <div style={{ marginBottom:16 }}>
+                <label style={{ display:'block', fontSize:12, fontWeight:600, color:'var(--t3)', marginBottom:6 }}>Description (shown in the Work Template catalog)</label>
+                <input className="inp" value={form.description||''} onChange={e=>setForm(f=>({...f,description:e.target.value}))} placeholder="e.g. Client is onboarded and we must review, catch-up, and clean-up financials to perform tax work." style={{ width:'100%', boxSizing:'border-box', fontSize:13, padding:'9px 13px' }}/>
               </div>
 
               {/* Entity + Trigger */}
