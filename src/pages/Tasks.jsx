@@ -274,11 +274,11 @@ export default function Tasks() {
               color:t.done?'var(--ok)':'var(--tx)'
             }}
           >
-            <option value="">{t.done?'Completed':'Ready to Start'}</option>
+            <option value="" style={{color:'#000',background:'#fff'}}>{t.done?'Completed':'Ready to Start'}</option>
             {statusCategories.map(cat => (
-              <optgroup key={cat.id} label={cat.name}>
+              <optgroup key={cat.id} label={cat.name} style={{color:'#000',background:'#fff'}}>
                 {cat.statuses.map(s => (
-                  <option key={s.id} value={`${cat.name}|||${s.label}`}>{s.label}</option>
+                  <option key={s.id} value={`${cat.name}|||${s.label}`} style={{color:'#000',background:'#fff'}}>{s.label}</option>
                 ))}
               </optgroup>
             ))}
