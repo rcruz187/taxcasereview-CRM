@@ -1314,7 +1314,14 @@ export default function Clients() {
     if (!value) { await supabase.from('tasks').update({status_category:null, status_label:null}).eq('id',task.id); loadRelated(detail.name); return }
     const [category, label] = value.split('|||')
     const completed = statusCategories.find(c=>c.name===category)?.name?.toLowerCase() === 'completed'
+    const prevLabel = task.status_label || (task.done ? 'Completed' : 'Ready to Start')
     await supabase.from('tasks').update({status_category:category, status_label:label, done:completed}).eq('id',task.id)
+    const actor = resolveActorName(user, employees)
+    await insertClientNote({
+      clientname: detail.name,
+      content: `🔄 Task status changed: "${task.title}" — ${prevLabel} → ${label}`,
+      created_by: actor,
+    })
     loadRelated(detail.name)
   }
 

@@ -7,11 +7,18 @@ import { useApp } from '../context/AppContext'
 const BLANK = { title:'', clientName:'', caseNum:'', assignedTo:'', dueDate:'', priority:'Normal', notes:'', done:false, section_title:'' }
 const QT_BLANK = { title:'', dueDate:'', priority:'Normal', clientName:'', assignedTo:'' }
 
+function resolveActorName(user, employees) {
+  const email = user?.email?.toLowerCase()
+  const emp = email ? employees.find(e => e.email && e.email.toLowerCase() === email) : null
+  return emp?.name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+}
+
 export default function Tasks() {
   const { user } = useApp()
   const [tasks,     setTasks]     = useState([])
   const [deleted,   setDeleted]   = useState([])   // soft-deleted tasks
   const [clients,   setClients]   = useState([])
+  const [leads,     setLeads]     = useState([])
   const [employees, setEmployees] = useState([])
   const [statusCategories, setStatusCategories] = useState([]) // [{...category, statuses:[...]}]
   const [modal,     setModal]     = useState(false)
@@ -69,11 +76,12 @@ export default function Tasks() {
   }
 
   async function load() {
-    const [{ data:t },{ data:dt },{ data:c },{ data:e },{ data:cats },{ data:sts }] = await Promise.all([
+    const [{ data:t },{ data:dt },{ data:c },{ data:lds },{ data:e },{ data:cats },{ data:sts }] = await Promise.all([
       supabase.from('tasks').select('*').eq('deleted', false).order('created_at',{ascending:false}),
       supabase.from('tasks').select('*').eq('deleted', true).order('deleted_at',{ascending:false}),
       supabase.from('clients').select('id,name'),
-      supabase.from('employees').select('id,name,avatar_url'),
+      supabase.from('leads').select('id,name'),
+      supabase.from('employees').select('id,name,email,avatar_url'),
       supabase.from('workflow_status_categories').select('*').order('sort_order'),
       supabase.from('workflow_statuses').select('*').order('sort_order'),
     ])
@@ -85,6 +93,7 @@ export default function Tasks() {
     }
     if (dt) setDeleted(dt)
     if (c) setClients(c)
+    if (lds) setLeads(lds)
     if (e) setEmployees(e)
     if (cats) setStatusCategories(cats.map(cat => ({ ...cat, statuses: (sts||[]).filter(s => s.category_id === cat.id) })))
   }
@@ -131,7 +140,25 @@ export default function Tasks() {
     // "Completed" category also flips the done flag so existing done-based
     // logic elsewhere (dashboards, counts) stays correct.
     const completed = statusCategories.find(c=>c.name===category)?.name?.toLowerCase() === 'completed'
+    const prevLabel = t.status_label || (t.done ? 'Completed' : 'Ready to Start')
     await supabase.from('tasks').update({status_category:category, status_label:label, done:completed}).eq('id',t.id)
+
+    // Log a note on whichever entity this task is linked to.
+    if (t.clientName) {
+      const actor = resolveActorName(user, employees)
+      const noteText = `🔄 Task status changed: "${t.title}" — ${prevLabel} → ${label}`
+      const lead = leads.find(l => l.name === t.clientName)
+      if (lead) {
+        await supabase.from('lead_notes').insert([{
+          lead_id: lead.id, lead_name: lead.name,
+          text: noteText, type: 'System', author: actor, created_at: new Date().toISOString()
+        }])
+      } else if (clients.find(c => c.name === t.clientName)) {
+        await supabase.from('client_notes').insert({
+          clientname: t.clientName, text: noteText, author: actor, created_at: new Date().toISOString()
+        })
+      }
+    }
     load()
   }
 

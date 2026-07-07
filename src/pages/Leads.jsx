@@ -540,7 +540,14 @@ export default function Leads() {
     if (!value) { await supabase.from('tasks').update({status_category:null, status_label:null}).eq('id',task.id); loadLeadTasks(detail.name); return }
     const [category, label] = value.split('|||')
     const completed = statusCategories.find(c=>c.name===category)?.name?.toLowerCase() === 'completed'
+    const prevLabel = task.status_label || (task.done ? 'Completed' : 'Ready to Start')
     await supabase.from('tasks').update({status_category:category, status_label:label, done:completed}).eq('id',task.id)
+    const actor = resolveActorName(user, employees)
+    await supabase.from('lead_notes').insert([{
+      lead_id: detail.id, lead_name: detail.name,
+      text: `🔄 Task status changed: "${task.title}" — ${prevLabel} → ${label}`,
+      type: 'System', author: actor, created_at: new Date().toISOString()
+    }])
     loadLeadTasks(detail.name)
   }
 
