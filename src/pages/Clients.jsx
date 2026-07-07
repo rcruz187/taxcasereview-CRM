@@ -847,6 +847,7 @@ export default function Clients() {
   }, [searchParams])
   const [clients,   setClients]   = useState([])
   const [employees, setEmployees] = useState([])
+  const [statusCategories, setStatusCategories] = useState([])
   const [filter,    setFilter]    = useState('All')
   const [showArchived, setShowArchived] = useState(false)
   const [confirmArchive, setConfirmArchive] = useState(null)
@@ -1030,12 +1031,15 @@ export default function Clients() {
   }, [urlId, detail])
 
   async function load() {
-    const [{ data:cl },{ data:em }] = await Promise.all([
+    const [{ data:cl },{ data:em },{ data:cats },{ data:sts }] = await Promise.all([
       supabase.from('clients').select('*').order('created_at',{ascending:false}),
-      supabase.from('employees').select('id,name,avatar_url,email')
+      supabase.from('employees').select('id,name,avatar_url,email'),
+      supabase.from('workflow_status_categories').select('*').order('sort_order'),
+      supabase.from('workflow_statuses').select('*').order('sort_order'),
     ])
     if (cl) setClients(cl)
     if (em) setEmployees(em)
+    if (cats) setStatusCategories(cats.map(cat => ({ ...cat, statuses: (sts||[]).filter(s => s.category_id === cat.id) })))
   }
 
   // Single shared entry point for auto-logging an action as a client note.
@@ -1300,6 +1304,14 @@ export default function Clients() {
       loadRelated(detail.name)
       await logAction(detail.name, `${!task.done ? '✅' : '↩️'} Task ${!task.done ? 'completed' : 'reopened'}: "${task.title}"`)
     }
+  }
+
+  async function updateTaskStatus(task, value) {
+    if (!value) { await supabase.from('tasks').update({status_category:null, status_label:null}).eq('id',task.id); loadRelated(detail.name); return }
+    const [category, label] = value.split('|||')
+    const completed = statusCategories.find(c=>c.name===category)?.name?.toLowerCase() === 'completed'
+    await supabase.from('tasks').update({status_category:category, status_label:label, done:completed}).eq('id',task.id)
+    loadRelated(detail.name)
   }
 
   // Promotes an existing task into a named section (if it isn't one already)
@@ -2149,7 +2161,23 @@ export default function Clients() {
                       <div style={{fontSize:13,fontWeight:t.done?400:600,textDecoration:t.done?'line-through':'none',color:t.done?'var(--t3)':'var(--tx)'}}>{t.title}</div>
                       {t.priority&&<div style={{marginTop:2}}><span className={`bdg ${t.priority==='High'?'br':t.priority==='Low'?'bn':'ba'}`} style={{fontSize:9}}>{t.priority}</span></div>}
                     </div>
-                    <span style={{fontSize:9,fontWeight:700,padding:'3px 9px',borderRadius:20,flexShrink:0,background:t.done?'rgba(22,163,74,.15)':'rgba(148,163,184,.15)',color:t.done?'var(--ok)':'var(--t3)'}}>{t.done?'Completed':'Ready to Start'}</span>
+                    <select
+                      value={t.status_category && t.status_label ? `${t.status_category}|||${t.status_label}` : ''}
+                      onChange={e=>updateTaskStatus(t, e.target.value)}
+                      style={{
+                        width:110,flexShrink:0,fontSize:9,fontWeight:700,padding:'3px 6px',borderRadius:20,textAlign:'center',
+                        border:'none',cursor:'pointer',appearance:'none',WebkitAppearance:'none',
+                        background:t.done?'rgba(22,163,74,.15)':'rgba(148,163,184,.15)',
+                        color:t.done?'var(--ok)':'var(--t3)'
+                      }}
+                    >
+                      <option value="">{t.done?'Completed':'Ready to Start'}</option>
+                      {statusCategories.map(cat => (
+                        <optgroup key={cat.id} label={cat.name}>
+                          {cat.statuses.map(s => <option key={s.id} value={`${cat.name}|||${s.label}`}>{s.label}</option>)}
+                        </optgroup>
+                      ))}
+                    </select>
                     <span style={{fontSize:10,color:overdue?'var(--bad)':'var(--t3)',flexShrink:0,width:72,textAlign:'center'}}>{t.dueDate || '—'}</span>
                     {t.assignedTo && (
                       <div style={{width:22,height:22,borderRadius:'50%',flexShrink:0,overflow:'hidden',background:taskAvatarColor(t.assignedTo),display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:800,color:'#fff'}} title={t.assignedTo}>
