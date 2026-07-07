@@ -1071,7 +1071,7 @@ export default function Leads() {
       const { data: rec, error } = await supabase
         .from('financial_intake_responses')
         .select('answers')
-        .eq('lead_id', l.id)
+        .eq('client_name', l.name)
         .eq('status', 'Submitted')
         .order('submitted_at', { ascending: false })
         .limit(1)
