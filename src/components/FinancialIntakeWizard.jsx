@@ -379,7 +379,7 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
       <div>
         {visibleQuestions.map(q => (
           <Question key={q.id} q={q} answers={answers} setAnswer={setAnswer}
-            addEntry={addEntry} updateEntry={updateEntry} removeEntry={removeEntry}/>
+            addEntry={addEntry} updateEntry={updateEntry} removeEntry={removeEntry} leadState={leadState}/>
         ))}
       </div>
 
@@ -397,7 +397,7 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
   )
 }
 
-function Question({ q, answers, setAnswer, addEntry, updateEntry, removeEntry }) {
+function Question({ q, answers, setAnswer, addEntry, updateEntry, removeEntry, leadState }) {
   const val = answers[q.id]
 
   if (q.type === 'info') {
