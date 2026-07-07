@@ -2048,23 +2048,26 @@ export default function Leads() {
                       <div style={{fontSize:13,fontWeight:t.done?400:600,textDecoration:t.done?'line-through':'none',color:t.done?'var(--t3)':'var(--tx)'}}>{t.title}</div>
                       {t.priority&&<div style={{marginTop:2}}><span className={`bdg ${t.priority==='High'?'br':t.priority==='Low'?'bn':'ba'}`} style={{fontSize:9}}>{t.priority}</span></div>}
                     </div>
-                    <select
-                      value={t.status_category && t.status_label ? `${t.status_category}|||${t.status_label}` : ''}
-                      onChange={e=>updateLeadTaskStatus(t, e.target.value)}
-                      style={{
-                        width:110,flexShrink:0,fontSize:9,fontWeight:700,padding:'3px 6px',borderRadius:20,textAlign:'center',
-                        border:'none',cursor:'pointer',appearance:'none',WebkitAppearance:'none',
-                        background:t.done?'rgba(22,163,74,.15)':'rgba(148,163,184,.15)',
-                        color:t.done?'var(--ok)':'var(--t3)'
-                      }}
-                    >
-                      <option value="">{t.done?'Completed':'Ready to Start'}</option>
-                      {statusCategories.map(cat => (
-                        <optgroup key={cat.id} label={cat.name}>
-                          {cat.statuses.map(s => <option key={s.id} value={`${cat.name}|||${s.label}`}>{s.label}</option>)}
-                        </optgroup>
-                      ))}
-                    </select>
+                    <div style={{width:110,flexShrink:0,position:'relative'}}>
+                      <select
+                        value={t.status_category && t.status_label ? `${t.status_category}|||${t.status_label}` : ''}
+                        onChange={e=>updateLeadTaskStatus(t, e.target.value)}
+                        style={{
+                          width:'100%',fontSize:9,fontWeight:700,padding:'3px 16px 3px 6px',borderRadius:20,textAlign:'center',
+                          border:'1px solid rgba(148,163,184,.35)',cursor:'pointer',appearance:'none',WebkitAppearance:'none',
+                          background:t.done?'rgba(22,163,74,.15)':'rgba(148,163,184,.15)',
+                          color:t.done?'var(--ok)':'var(--tx)'
+                        }}
+                      >
+                        <option value="">{t.done?'Completed':'Ready to Start'}</option>
+                        {statusCategories.map(cat => (
+                          <optgroup key={cat.id} label={cat.name}>
+                            {cat.statuses.map(s => <option key={s.id} value={`${cat.name}|||${s.label}`}>{s.label}</option>)}
+                          </optgroup>
+                        ))}
+                      </select>
+                      <span style={{position:'absolute',right:6,top:'50%',transform:'translateY(-50%)',fontSize:8,color:t.done?'var(--ok)':'var(--tx)',pointerEvents:'none'}}>▾</span>
+                    </div>
                     <span style={{fontSize:10,color:overdue?'var(--bad)':'var(--t3)',flexShrink:0,width:72,textAlign:'center'}}>{t.dueDate || '—'}</span>
                     {t.assignedTo && (
                       <div style={{width:22,height:22,borderRadius:'50%',flexShrink:0,overflow:'hidden',background:taskAvatarColor(t.assignedTo),display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:800,color:'#fff'}} title={t.assignedTo}>
