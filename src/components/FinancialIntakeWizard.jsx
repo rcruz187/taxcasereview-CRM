@@ -77,46 +77,17 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
 
   useEffect(() => {
     async function load() {
-      // First try direct lookup by intake record ID
-      const { data, error } = await supabase.from('financial_intake_responses').select('*').eq('id', intakeId).maybeSingle()
-      if (data && !error) {
-        setRecord(data)
-        setAnswers(data.answers || {})
-        if (data.status === 'Submitted') setSubmitted(true)
+      const { data, error } = await supabase.rpc('financial_intake_load', { p_id: intakeId })
+      if (error || !data) {
+        setError('Financial intake form not found or expired.')
         setLoading(false)
-        // Load lead's state for state tax auto-calc
-        if (data.client_name) {
-          supabase.from('leads').select('state,irsOrState').eq('name', data.client_name).maybeSingle()
-            .then(({ data: lead }) => { if (lead?.state) setLeadState(lead.state) })
-        }
         return
       }
-      // Fallback: the URL might contain a lead ID (old emails sent before fix).
-      // Look up the lead by ID, then find or create their intake record by name.
-      const { data: lead } = await supabase.from('leads').select('id,name,email').eq('id', intakeId).maybeSingle()
-      if (lead) {
-        const { data: existing } = await supabase.from('financial_intake_responses')
-          .select('*').eq('client_name', lead.name).order('created_at', { ascending: false }).limit(1).maybeSingle()
-        if (existing) {
-          setRecord(existing)
-          setAnswers(existing.answers || {})
-          if (existing.status === 'Submitted') setSubmitted(true)
-          setLoading(false)
-          return
-        }
-        // Create a fresh intake record for this lead
-        const { data: created } = await supabase.from('financial_intake_responses').insert([{
-          client_name: lead.name, client_email: lead.email || '', status: 'Sent',
-          answers: {}, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-        }]).select().single()
-        if (created) {
-          setRecord(created)
-          setAnswers({})
-          setLoading(false)
-          return
-        }
-      }
-      setError('Financial intake form not found or expired.')
+      const rec = data.record
+      setRecord(rec)
+      setAnswers(rec.answers || {})
+      if (rec.status === 'Submitted') setSubmitted(true)
+      if (data.leadState) setLeadState(data.leadState)
       setLoading(false)
     }
     if (intakeId) load()
@@ -137,10 +108,7 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
 
   async function doSave(next) {
     setSaving(true)
-    await supabase.from('financial_intake_responses').update({
-      answers: next,
-      updated_at: new Date().toISOString(),
-    }).eq('id', intakeId)
+    await supabase.rpc('financial_intake_save', { p_id: intakeId, p_answers: next })
     setSaving(false)
   }
 
@@ -172,24 +140,16 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
 
   async function submit() {
     setSaving(true)
-    await supabase.from('financial_intake_responses').update({
-      answers, status: 'Submitted', submitted_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }).eq('id', intakeId)
 
-    // Sync core fields into the Lead record (same as before, unchanged).
-    try {
-      const { data: leadMatch } = await supabase.from('leads').select('id,dob,filingStatus,county').eq('name', record.client_name).maybeSingle()
-      if (leadMatch) {
-        const patch = {}
-        if (!leadMatch.dob && answers.dob) patch.dob = answers.dob
-        if (!leadMatch.filingStatus && answers.filing_status) {
-          patch.filingStatus = answers.filing_status === 'Widowed' ? 'Qualifying Widow(er)' : answers.filing_status
-        }
-        if (!leadMatch.county && answers.county) patch.county = answers.county
-        if (Object.keys(patch).length) await supabase.from('leads').update(patch).eq('id', leadMatch.id)
-      }
-    } catch (e) { console.error('Financial intake -> lead field sync error:', e) }
+    // Core lead fields to sync — the RPC applies these non-destructively
+    // (COALESCE keeps whatever's already on the lead record), same intent
+    // as the old "only fill blanks" check, just enforced server-side now.
+    const leadPatch = {}
+    if (answers.dob) leadPatch.dob = answers.dob
+    if (answers.filing_status) {
+      leadPatch.filingStatus = answers.filing_status === 'Widowed' ? 'Qualifying Widow(er)' : answers.filing_status
+    }
+    if (answers.county) leadPatch.county = answers.county
 
     // ── Comprehensive sync into client_financial_profiles ──────────────────
     // Maps all income, asset, expense, and debt answers into the structured
@@ -352,11 +312,14 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
         Object.entries(profileData).filter(([, v]) => v !== undefined)
       )
 
-      // Upsert by client_name -- inserts if no profile exists yet, updates
-      // (non-destructively by PostgreSQL's ON CONFLICT behavior) if one does.
-      await supabase.from('client_financial_profiles').upsert(cleanProfile, {
-        onConflict: 'client_name',
-        ignoreDuplicates: false,
+      // Single server-side call: marks the intake Submitted, applies the
+      // lead patch non-destructively, and upserts the financial profile —
+      // all inside one SECURITY DEFINER RPC instead of three direct writes.
+      await supabase.rpc('financial_intake_submit', {
+        p_id: intakeId,
+        p_answers: answers,
+        p_lead_patch: leadPatch,
+        p_profile: cleanProfile,
       })
     } catch (e) { console.error('Financial intake -> financial profile sync error:', e) }
 
