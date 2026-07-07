@@ -1079,52 +1079,61 @@ export default function Leads() {
       if (error || !rec) { showToast('No submitted intake found for this lead'); return }
       const a = rec.answers
       const n = v => parseFloat(v) || 0
+      // Intake collects display labels; the profile's Assets & Equity tab
+      // keys off specific internal type strings.
+      const assetTypeToProfile = label => ({
+        'Bank Account': 'bank_account',
+        'Retirement Account (401k/IRA)': 'retirement',
+        'Life Insurance (cash value)': 'life_insurance',
+        'Business Asset': 'business_asset',
+        'Other': 'additional_asset',
+      }[label] || 'additional_asset')
       const jobs = a.jobs_list || []
       const myJobs = jobs.filter(j => j.whose_job !== "My Spouse's")
       const spouseJobs = jobs.filter(j => j.whose_job === "My Spouse's")
       function mapJob(j) {
         if (!j) return {}
         return { employer: j.employer||'', position: j.position||'', length_employed: j.length_employed||'',
-          pay_frequency: j.pay_frequency||'', gross_monthly: n(j.gross_monthly),
+          pay_frequency: j.pay_frequency||'', gross_monthly_salary: n(j.gross_monthly),
           fed_withheld: n(j.fed_withheld), ss_med_withheld: n(j.ss_med_withheld), state_withheld: n(j.state_withheld) }
       }
       const businesses = a.business_list || []
       function mapBiz(b) {
         if (!b) return {}
-        return { business_name: b.business_name||'', ein: b.ein||'', structure: b.structure||'',
+        return { name: b.business_name||'', ein: b.ein||'', structure: b.structure||'',
           pct_ownership: b.pct_ownership||'', num_employees: b.num_employees||'',
-          net_income_monthly: n(b.net_income_monthly), notes: b.notes||'' }
+          net_income: n(b.net_income_monthly), notes: b.notes||'' }
       }
       const otherIncome = (a.other_income_list||[]).map(r => ({ source: r.source||'', amount: n(r.monthly_amount) }))
       const realEstate = (a.real_estate_list||[]).map(r => ({
         address: r.address||'', property_type: r.property_type||'',
-        estimated_value: n(r.estimated_value), mortgage_balance: n(r.mortgage_balance),
-        monthly_payment: n(r.monthly_payment), rental_income: n(r.rental_income)
+        zillow_value: n(r.estimated_value), mortgage_balance: n(r.mortgage_balance),
+        mortgage_1: n(r.monthly_payment), rental_income: n(r.rental_income)
       }))
       const vehicles = (a.vehicles_list||[]).map(v => ({
-        make_model: v.make_model||'', estimated_value: n(v.estimated_value),
+        make_model: v.make_model||'', kbb_value: n(v.estimated_value),
         remaining_balance: n(v.remaining_balance), monthly_payment: n(v.monthly_payment)
       }))
       const assets = (a.assets_list||[]).map(asset => ({
-        asset_type: asset.asset_type||'', description: asset.description||'',
+        type: assetTypeToProfile(asset.asset_type), description: asset.description||'',
         value: n(asset.value), loan_against: n(asset.loan_against)
       }))
       const creditCards = (a.credit_cards_list||[]).map(c => ({
-        card_name: c.card_name||'', balance: n(c.balance),
-        credit_limit: n(c.credit_limit), min_payment: n(c.min_payment)
+        name: c.card_name||'', balance: n(c.balance),
+        limit: n(c.credit_limit), min_payment: n(c.min_payment)
       }))
       const otherSecuredDebt = a.has_other_debt === 'Yes'
         ? { monthly_payment: n(a.other_debt_payment), remaining_balance: n(a.other_debt_balance) } : {}
       const expenses = {
         food_clothing: n(a.food_clothing), housing: n(a.housing_payment),
-        homeowners_renters_insurance: n(a.homeowners_renters_insurance), property_taxes: n(a.property_taxes),
+        homeowners_insurance: n(a.homeowners_renters_insurance), property_taxes: n(a.property_taxes),
         hoa_dues: n(a.hoa_dues), electricity: n(a.electricity), water_sewer_trash: n(a.water_sewer_trash),
         cell_phone: n(a.cell_phone), internet: n(a.internet), cable: n(a.cable),
         maintenance: n(a.maintenance), public_transportation: n(a.public_transportation),
-        car_misc: n(a.car_misc), health_insurance: n(a.health_insurance),
-        health_dental_vision: n(a.health_dental_vision), health_oop: n(a.health_oop),
+        car_misc: n(a.car_misc), health_major_medical: n(a.health_insurance),
+        health_dental: n(a.health_dental_vision), health_oop: n(a.health_oop),
         child_care: n(a.child_care), child_support: n(a.child_support),
-        court_judgment: n(a.court_judgment), life_insurance: n(a.life_insurance),
+        court_judgment: n(a.court_judgment), life_term: n(a.life_insurance),
         irs_installment: n(a.irs_installment), state_installment: n(a.state_installment),
       }
       const profileData = {

@@ -163,6 +163,15 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
     try {
       const a = answers
       const n = v => parseFloat(v) || 0
+      // Intake collects display labels; the profile's Assets & Equity tab
+      // keys off specific internal type strings.
+      const assetTypeToProfile = label => ({
+        'Bank Account': 'bank_account',
+        'Retirement Account (401k/IRA)': 'retirement',
+        'Life Insurance (cash value)': 'life_insurance',
+        'Business Asset': 'business_asset',
+        'Other': 'additional_asset',
+      }[label] || 'additional_asset')
 
       // Employment — wizard supports multiple jobs via `jobs_list` entries.
       // Map the first two taxpayer jobs and first two spouse jobs into the
@@ -210,23 +219,23 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
       const realEstate = (a.real_estate_list || []).map(r => ({
         address: r.address || '',
         property_type: r.property_type || '',
-        estimated_value: n(r.estimated_value),
+        zillow_value: n(r.estimated_value),   // profile uses zillow_value, not estimated_value
         mortgage_balance: n(r.mortgage_balance),
-        monthly_payment: n(r.monthly_payment),
+        mortgage_1: n(r.monthly_payment),     // profile reads mortgage_1/mortgage_2 for the housing expense calc
         rental_income: n(r.rental_income),
       }))
 
       // Vehicles rows
       const vehicles = (a.vehicles_list || []).map(v => ({
         make_model: v.make_model || '',
-        estimated_value: n(v.estimated_value),
+        kbb_value: n(v.estimated_value),      // profile uses kbb_value, not estimated_value
         remaining_balance: n(v.remaining_balance),
         monthly_payment: n(v.monthly_payment),
       }))
 
       // Financial assets (bank/retirement/insurance)
       const assets = (a.assets_list || []).map(asset => ({
-        asset_type: asset.asset_type || '',
+        type: assetTypeToProfile(asset.asset_type),  // profile uses 'type', not 'asset_type', with different value strings
         description: asset.description || '',
         value: n(asset.value),
         loan_against: n(asset.loan_against),
@@ -234,17 +243,22 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
 
       // Credit cards
       const creditCards = (a.credit_cards_list || []).map(c => ({
-        card_name: c.card_name || '',
+        name: c.card_name || '',        // profile uses 'name', not 'card_name'
         balance: n(c.balance),
-        credit_limit: n(c.credit_limit),
+        limit: n(c.credit_limit),       // profile uses 'limit', not 'credit_limit'
         min_payment: n(c.min_payment),
       }))
 
-      // Expenses -- direct 1:1 from schema IDs to profile expense object
+      // Expenses -- the intake only collects combined totals for a few
+      // categories the profile splits into sub-fields (e.g. one "health
+      // insurance" number vs. the profile's major-medical/dental/vision
+      // split). Since I&E totals are purely additive across sub-fields,
+      // mapping the combined intake number into one sub-field keeps the
+      // total correct; the breakdown itself can be refined manually later.
       const expenses = {
         food_clothing: n(a.food_clothing),
         housing: n(a.housing_payment),
-        homeowners_renters_insurance: n(a.homeowners_renters_insurance),
+        homeowners_insurance: n(a.homeowners_renters_insurance),
         property_taxes: n(a.property_taxes),
         hoa_dues: n(a.hoa_dues),
         electricity: n(a.electricity),
@@ -255,16 +269,17 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
         maintenance: n(a.maintenance),
         public_transportation: n(a.public_transportation),
         car_misc: n(a.car_misc),
-        health_insurance: n(a.health_insurance),
-        health_dental_vision: n(a.health_dental_vision),
+        health_major_medical: n(a.health_insurance),
+        health_dental: n(a.health_dental_vision),
         health_oop: n(a.health_oop),
         child_care: n(a.child_care),
         child_support: n(a.child_support),
         court_judgment: n(a.court_judgment),
-        life_insurance: n(a.life_insurance),
+        life_term: n(a.life_insurance),
         irs_installment: n(a.irs_installment),
         state_installment: n(a.state_installment),
       }
+
 
       // Other secured debt summary
       const otherSecuredDebt = a.has_other_debt === 'Yes' ? {
