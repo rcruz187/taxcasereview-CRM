@@ -265,7 +265,7 @@ export default function Settings() {
   // Tax Advisor / Tax Associate / Manager only ever see their own signature
   // editor + the live status page (read-only) — nothing firm-wide.
   const tabs = isPrivileged
-    ? ['firm', 'integrations', 'branding', 'import', 'users', 'security', 'storage', 'uptime']
+    ? ['firm', 'integrations', 'branding', 'import', 'users', 'security', 'storage', 'statuses', 'uptime']
     : ['mysignature', 'uptime']
 
   return (
@@ -273,7 +273,7 @@ export default function Settings() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'nowrap', overflowX: 'auto', paddingBottom: 6 }}>
         {tabs.map(t => (
           <button key={t} className={`btn${tab === t ? ' pri' : ''}`} onClick={() => setTab(t)} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-            {t === 'firm' ? '🏢 Firm Info' : t === 'integrations' ? '🔌 Integrations' : t === 'branding' ? '🎨 Branding' : t === 'import' ? '📥 Import Data' : t === 'users' ? '👥 Users' : t === 'security' ? '🔒 Security' : t === 'storage' ? '💾 Storage' : t === 'mysignature' ? '✍️ My Signature' : '🟢 Uptime'}
+            {t === 'firm' ? '🏢 Firm Info' : t === 'integrations' ? '🔌 Integrations' : t === 'branding' ? '🎨 Branding' : t === 'import' ? '📥 Import Data' : t === 'users' ? '👥 Users' : t === 'security' ? '🔒 Security' : t === 'storage' ? '💾 Storage' : t === 'statuses' ? '🏷️ Workflow Statuses' : t === 'mysignature' ? '✍️ My Signature' : '🟢 Uptime'}
           </button>
         ))}
       </div>
@@ -899,6 +899,7 @@ export default function Settings() {
 
       {tab === 'import' && isPrivileged && <ImportTab />}
       {tab === 'storage' && isPrivileged && <StorageTab />}
+      {tab === 'statuses' && isPrivileged && <StatusesTab />}
       {tab === 'uptime' && <UptimeTab />}
     </div>
   )
@@ -1502,6 +1503,115 @@ function ImportTab() {
             <button className="btn pri" onClick={reset}>Import another file</button>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+function StatusesTab() {
+  const [categories, setCategories] = useState([])
+  const [statuses,   setStatuses]   = useState([])
+  const [loading,    setLoading]    = useState(true)
+  const [newCatName, setNewCatName] = useState('')
+  const [newStatusText, setNewStatusText] = useState({})
+  const [toast, setToast] = useState('')
+
+  function showToast(m){ setToast(m); setTimeout(()=>setToast(''),3000) }
+
+  async function load() {
+    setLoading(true)
+    const [{ data: cats }, { data: sts }] = await Promise.all([
+      supabase.from('workflow_status_categories').select('*').order('sort_order'),
+      supabase.from('workflow_statuses').select('*').order('sort_order'),
+    ])
+    setCategories(cats || [])
+    setStatuses(sts || [])
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  async function addCategory() {
+    if (!newCatName.trim()) return
+    const sort_order = categories.length
+    const { error } = await supabase.from('workflow_status_categories').insert([{ name: newCatName.trim(), sort_order }])
+    if (error) { showToast('❌ ' + error.message); return }
+    setNewCatName('')
+    load()
+  }
+
+  async function deleteCategory(cat) {
+    if (!confirm(`Delete the "${cat.name}" column and all its statuses? Existing tasks already using these statuses keep their text label — this only removes them from the picker.`)) return
+    await supabase.from('workflow_status_categories').delete().eq('id', cat.id)
+    load()
+  }
+
+  async function addStatus(cat) {
+    const text = (newStatusText[cat.id] || '').trim()
+    if (!text) return
+    const sort_order = statuses.filter(s => s.category_id === cat.id).length
+    const { error } = await supabase.from('workflow_statuses').insert([{ category_id: cat.id, label: text, sort_order }])
+    if (error) { showToast('❌ ' + error.message); return }
+    setNewStatusText(prev => ({ ...prev, [cat.id]: '' }))
+    load()
+  }
+
+  async function deleteStatus(id) {
+    await supabase.from('workflow_statuses').delete().eq('id', id)
+    load()
+  }
+
+  if (loading) return <div style={{ padding: 20, color: 'var(--t3)' }}>Loading…</div>
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <span className="card-title">Workflow Statuses</span>
+      </div>
+      <div style={{ padding: '0 20px 20px' }}>
+        <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 16 }}>
+          This is your master set of task statuses. Each column is a category; the rows underneath are the specific statuses your team can pick on any task.
+        </div>
+        {toast && <div style={{ fontSize: 12, color: 'var(--ok)', marginBottom: 10 }}>{toast}</div>}
+
+        <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8 }}>
+          {categories.map(cat => (
+            <div key={cat.id} style={{ minWidth: 200, flexShrink: 0, border: '1px solid var(--br)', borderRadius: 8, overflow: 'hidden' }}>
+              <div style={{ background: 'var(--s2)', padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--tx)' }}>{cat.name}</span>
+                <button onClick={() => deleteCategory(cat)} style={{ background: 'none', border: 'none', color: 'var(--bad)', cursor: 'pointer', fontSize: 15, lineHeight: 1 }}>×</button>
+              </div>
+              <div style={{ padding: 8 }}>
+                {statuses.filter(s => s.category_id === cat.id).map(s => (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--s1)', borderRadius: 6, marginBottom: 6 }}>
+                    <span style={{ fontSize: 12, color: 'var(--tx)' }}>{s.label}</span>
+                    <button onClick={() => deleteStatus(s.id)} style={{ background: 'none', border: 'none', color: 'var(--t3)', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>×</button>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                  <input
+                    value={newStatusText[cat.id] || ''}
+                    onChange={e => setNewStatusText(prev => ({ ...prev, [cat.id]: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && addStatus(cat)}
+                    placeholder="Add status…"
+                    style={{ flex: 1, fontSize: 11, padding: '5px 8px', background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 5, color: 'var(--tx)' }}
+                  />
+                  <button className="btn sec" style={{ fontSize: 11, padding: '5px 8px' }} onClick={() => addStatus(cat)}>+</button>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          <div style={{ minWidth: 200, flexShrink: 0, border: '1px dashed var(--br)', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6 }}>
+            <input
+              value={newCatName}
+              onChange={e => setNewCatName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addCategory()}
+              placeholder="New category name…"
+              style={{ fontSize: 12, padding: '7px 10px', background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 6, color: 'var(--tx)' }}
+            />
+            <button className="btn pri" style={{ fontSize: 11, padding: '6px 10px' }} onClick={addCategory}>+ Add Category</button>
+          </div>
+        </div>
       </div>
     </div>
   )
