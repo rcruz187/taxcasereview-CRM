@@ -13,6 +13,7 @@ export default function Tasks() {
   const [deleted,   setDeleted]   = useState([])   // soft-deleted tasks
   const [clients,   setClients]   = useState([])
   const [employees, setEmployees] = useState([])
+  const [statusCategories, setStatusCategories] = useState([]) // [{...category, statuses:[...]}]
   const [modal,     setModal]     = useState(false)
   const [form,      setForm]      = useState(BLANK)
   // Additional sub-task titles being built in the same Add Task session —
@@ -68,11 +69,13 @@ export default function Tasks() {
   }
 
   async function load() {
-    const [{ data:t },{ data:dt },{ data:c },{ data:e }] = await Promise.all([
+    const [{ data:t },{ data:dt },{ data:c },{ data:e },{ data:cats },{ data:sts }] = await Promise.all([
       supabase.from('tasks').select('*').eq('deleted', false).order('created_at',{ascending:false}),
       supabase.from('tasks').select('*').eq('deleted', true).order('deleted_at',{ascending:false}),
       supabase.from('clients').select('id,name'),
-      supabase.from('employees').select('id,name,avatar_url')
+      supabase.from('employees').select('id,name,avatar_url'),
+      supabase.from('workflow_status_categories').select('*').order('sort_order'),
+      supabase.from('workflow_statuses').select('*').order('sort_order'),
     ])
     // Handle case where 'deleted' column may not exist yet — fall back gracefully
     if (t) setTasks(t)
@@ -83,6 +86,7 @@ export default function Tasks() {
     if (dt) setDeleted(dt)
     if (c) setClients(c)
     if (e) setEmployees(e)
+    if (cats) setStatusCategories(cats.map(cat => ({ ...cat, statuses: (sts||[]).filter(s => s.category_id === cat.id) })))
   }
 
   function showToast(msg){setToast(msg);setTimeout(()=>setToast(''),3500)}
@@ -118,6 +122,16 @@ export default function Tasks() {
 
   async function toggleDone(t) {
     await supabase.from('tasks').update({done:!t.done}).eq('id',t.id)
+    load()
+  }
+
+  async function updateTaskStatus(t, value) {
+    if (!value) { await supabase.from('tasks').update({status_category:null, status_label:null}).eq('id',t.id); load(); return }
+    const [category, label] = value.split('|||')
+    // "Completed" category also flips the done flag so existing done-based
+    // logic elsewhere (dashboards, counts) stays correct.
+    const completed = statusCategories.find(c=>c.name===category)?.name?.toLowerCase() === 'completed'
+    await supabase.from('tasks').update({status_category:category, status_label:label, done:completed}).eq('id',t.id)
     load()
   }
 
@@ -248,13 +262,27 @@ export default function Tasks() {
           {t.notes&&<div style={{fontSize:11,color:'var(--t2)',marginTop:3,lineHeight:1.5}}>{t.notes}</div>}
         </div>
 
-        {/* Status pill */}
-        <div style={{width:92,flexShrink:0,textAlign:'center'}}>
-          <span style={{
-            fontSize:10,fontWeight:700,padding:'3px 10px',borderRadius:20,
-            background:t.done?'rgba(22,163,74,.15)':'rgba(148,163,184,.15)',
-            color:t.done?'var(--ok)':'var(--t3)'
-          }}>{t.done?'Completed':'Ready to Start'}</span>
+        {/* Status dropdown */}
+        <div style={{width:150,flexShrink:0}}>
+          <select
+            value={t.status_category && t.status_label ? `${t.status_category}|||${t.status_label}` : ''}
+            onChange={e=>updateTaskStatus(t, e.target.value)}
+            style={{
+              width:'100%',fontSize:10,fontWeight:700,padding:'4px 6px',borderRadius:20,textAlign:'center',
+              border:'none',cursor:'pointer',appearance:'none',WebkitAppearance:'none',
+              background:t.done?'rgba(22,163,74,.15)':'rgba(148,163,184,.15)',
+              color:t.done?'var(--ok)':'var(--t3)'
+            }}
+          >
+            <option value="">{t.done?'Completed':'Ready to Start'}</option>
+            {statusCategories.map(cat => (
+              <optgroup key={cat.id} label={cat.name}>
+                {cat.statuses.map(s => (
+                  <option key={s.id} value={`${cat.name}|||${s.label}`}>{s.label}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
         </div>
 
         {/* Due date */}
