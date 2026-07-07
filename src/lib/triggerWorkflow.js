@@ -75,3 +75,43 @@ export async function triggerWorkflow(event, entityType, entityName, actorName, 
     console.error('[workflow] error:', err)
   }
 }
+
+/**
+ * Manually apply a single workflow template right now, regardless of its
+ * trigger_event — this powers the browsable "Work Template" catalog (pick a
+ * template, its steps become tasks immediately) as opposed to the automatic
+ * trigger-based instantiation above.
+ * @param {string} templateId - workflow_templates.id
+ * @param {string} entityName - the client/lead name (for task clientName)
+ * @param {string} actorName  - the employee applying the template (assignedTo default)
+ */
+export async function applyWorkflowTemplate(templateId, entityName, actorName) {
+  const { data: steps, error: stepsErr } = await supabase
+    .from('workflow_steps')
+    .select('*')
+    .eq('template_id', templateId)
+    .order('step_order')
+
+  if (stepsErr || !steps?.length) return { error: stepsErr?.message || 'This template has no steps defined.' }
+
+  const now = new Date()
+  const tasks = steps.map(s => {
+    const due = new Date(now)
+    due.setDate(due.getDate() + (s.due_in_days || 1))
+    return {
+      title: s.title,
+      clientName: entityName,
+      assignedTo: actorName,
+      priority: 'Normal',
+      dueDate: due.toISOString().slice(0, 10),
+      done: false,
+      notes: s.notes || '',
+      section_title: s.section_title || null,
+      created_at: now.toISOString(),
+    }
+  })
+
+  const { error } = await supabase.from('tasks').insert(tasks)
+  if (error) return { error: error.message }
+  return { count: tasks.length }
+}
