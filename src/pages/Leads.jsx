@@ -1076,11 +1076,7 @@ export default function Leads() {
         .order('submitted_at', { ascending: false })
         .limit(1)
         .maybeSingle()
-      if (error || !rec) {
-        console.error('[Import Financial Profile] no intake found. error:', error, 'lead name searched:', l.name)
-        alert('❌ No submitted intake found for this exact name:\n"' + l.name + '"\n\n(Check console for details)')
-        return
-      }
+      if (error || !rec) { showToast('No submitted intake found for this lead'); return }
       const a = rec.answers
       const n = v => parseFloat(v) || 0
       // Intake collects display labels; the profile's Assets & Equity tab
@@ -1163,22 +1159,12 @@ export default function Leads() {
         updated_at: new Date().toISOString(),
       }
       const cleanProfile = Object.fromEntries(Object.entries(profileData).filter(([,v]) => v !== undefined))
-      console.log('[Import Financial Profile] intake found:', rec)
-      console.log('[Import Financial Profile] about to upsert:', cleanProfile)
       const { error: upsertErr } = await supabase.from('client_financial_profiles').upsert(cleanProfile, {
         onConflict: 'client_name', ignoreDuplicates: false
       })
-      if (upsertErr) {
-        console.error('[Import Financial Profile] upsert FAILED:', upsertErr)
-        alert('❌ IMPORT FAILED:\n\n' + upsertErr.message + '\n\n(Full details in browser console)')
-      } else {
-        alert('✅ IMPORT SUCCEEDED\n\nSaved to client_name: "' + cleanProfile.client_name + '"\n\nDOB: ' + (cleanProfile.dob||'(blank)') + '\nCounty: ' + (cleanProfile.county||'(blank)') + '\nFiling Status: ' + (cleanProfile.filing_status||'(blank)') + '\nHousehold Under 65: ' + cleanProfile.household_under_65)
-        showToast('✅ Financial Profile populated from intake!')
-      }
-    } catch (e) {
-      console.error('[Import Financial Profile] threw an exception:', e)
-      alert('❌ IMPORT CRASHED:\n\n' + e.message + '\n\n(Full details in browser console)')
-    }
+      if (upsertErr) { showToast('Error syncing profile: ' + upsertErr.message) }
+      else { showToast('✅ Financial Profile populated from intake!') }
+    } catch (e) { showToast('Error: ' + e.message) }
     finally { setBackfillingIntake(false) }
   }
 
