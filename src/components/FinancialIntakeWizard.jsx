@@ -140,6 +140,7 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
 
   async function submit() {
     setSaving(true)
+    let submitResult = null
 
     // Core lead fields to sync — the RPC applies these non-destructively
     // (COALESCE keeps whatever's already on the lead record), same intent
@@ -313,15 +314,33 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
       )
 
       // Single server-side call: marks the intake Submitted, applies the
-      // lead patch non-destructively, and upserts the financial profile —
-      // all inside one SECURITY DEFINER RPC instead of three direct writes.
-      await supabase.rpc('financial_intake_submit', {
+      // lead patch non-destructively, upserts the financial profile, and
+      // creates a task + lead note — all inside one SECURITY DEFINER RPC.
+      // Returns the assigned rep's email (if any) so we can notify them.
+      const { data } = await supabase.rpc('financial_intake_submit', {
         p_id: intakeId,
         p_answers: answers,
         p_lead_patch: leadPatch,
         p_profile: cleanProfile,
       })
+      submitResult = data
     } catch (e) { console.error('Financial intake -> financial profile sync error:', e) }
+
+    // Notify the assigned rep that a client just submitted their intake.
+    try {
+      if (submitResult?.assigneeEmail) {
+        await supabase.functions.invoke('send-email', {
+          body: {
+            to: submitResult.assigneeEmail,
+            subject: `Financial Intake Submitted — ${record.client_name}`,
+            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px">
+              <p><strong>${record.client_name}</strong> just submitted their Financial Intake form.</p>
+              <p>A task has been created on your list to review it and build a resolution plan. Check the Financial Profile tab (I&E, Assets &amp; Equity) on their file for the full breakdown.</p>
+            </div>`
+          }
+        })
+      }
+    } catch (e) { console.error('Financial intake staff notification error:', e) }
 
     // Email a full copy of the submitted answers to the client.
     try { await sendIntakeCopyEmail(record, answers) } catch (e) { console.error('Financial intake copy email error:', e) }
