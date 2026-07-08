@@ -7,7 +7,7 @@
 -- ============================================================
 
 -- ── 1. Load the signing document (replaces direct esigns SELECT) ──
-CREATE OR REPLACE FUNCTION esign_load(p_id uuid)
+CREATE OR REPLACE FUNCTION esign_load(p_id text)
 RETURNS SETOF esigns
 LANGUAGE sql
 SECURITY DEFINER
@@ -19,7 +19,7 @@ $$;
 -- ── 2. Mark signed — the legally-binding write, kept isolated so it ──
 -- ── always lands even if everything downstream fails ──────────────
 CREATE OR REPLACE FUNCTION esign_mark_signed(
-  p_id uuid,
+  p_id text,
   p_signed_name text,
   p_signer_full_name text,
   p_signer_ip text,
@@ -52,7 +52,7 @@ $$;
 -- ── section is wrapped so one failure doesn't block the rest, ──────
 -- ── matching the original client-side .catch(()=>{}) behavior. ─────
 CREATE OR REPLACE FUNCTION esign_finalize(
-  p_id uuid,
+  p_id text,
   p_client_name text,
   p_doc_type text,
   p_signed_by text,
@@ -224,8 +224,8 @@ END;
 $$;
 
 -- ── Grants — anon must be able to call these (unauthenticated signer) ──
-GRANT EXECUTE ON FUNCTION esign_load(uuid) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION esign_mark_signed(uuid, text, text, text, text) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION esign_finalize(uuid, text, text, text, text, timestamptz, text, text, jsonb) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION esign_load(text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION esign_mark_signed(text, text, text, text, text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION esign_finalize(text, text, text, text, text, timestamptz, text, text, jsonb) TO anon, authenticated;
 
 SELECT 'E-Sign RPC conversion complete' AS status;
