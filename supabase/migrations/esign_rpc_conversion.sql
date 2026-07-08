@@ -69,12 +69,12 @@ SET search_path = public
 AS $$
 DECLARE
   v_entity_type   text;
-  v_lead_id       uuid;
+  v_lead_id       text;
   v_lead_status   text;
   v_lead_assigned text;
   v_target_status text;
   v_note_text     text;
-  v_due_date      date := (now() + interval '1 day')::date;
+  v_due_date      text := to_char(now() + interval '1 day', 'YYYY-MM-DD');
   v_assignee2     text;
   v_att           jsonb;
 BEGIN
@@ -90,7 +90,7 @@ BEGIN
     INSERT INTO tasks (title, "clientName", "assignedTo", priority, "dueDate", done, notes, section_title, created_at)
     SELECT
       ws.title, p_client_name, 'System', 'Normal',
-      (now() + make_interval(days => COALESCE(ws.due_in_days, 1)))::date,
+      to_char(now() + make_interval(days => COALESCE(ws.due_in_days, 1)), 'YYYY-MM-DD'),
       false, COALESCE(ws.notes, ''), ws.section_title, now()
     FROM workflow_templates wt
     JOIN workflow_steps ws ON ws.template_id = wt.id
