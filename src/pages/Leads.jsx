@@ -579,7 +579,7 @@ export default function Leads() {
     if (!selectedTemplateIds.length) return
     setApplyingTemplateId('__batch__')
     const actorName = resolveActorName(user, employees)
-    const result = await applyWorkflowTemplate(selectedTemplateIds, detail.name, actorName)
+    const result = await applyWorkflowTemplate(selectedTemplateIds, detail.name, actorName, 'lead')
     setApplyingTemplateId('')
     if (result?.error) { showToast('❌ ' + result.error); return }
     const names = availableTemplates.filter(t => selectedTemplateIds.includes(t.id)).map(t => t.name).join(', ')

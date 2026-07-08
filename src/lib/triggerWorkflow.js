@@ -90,8 +90,11 @@ export async function triggerWorkflow(event, entityType, entityName, actorName, 
  * @param {string|string[]} templateIds - workflow_templates.id (or array)
  * @param {string} entityName - the client/lead name (for task clientName)
  * @param {string} actorName  - the employee applying the template (assignedTo default)
+ * @param {string} [entityKind] - 'lead' | 'client' — which page this was applied
+ *                                from, so ADVISOR steps look up the right table.
+ *                                Defaults to 'lead' (original behavior).
  */
-export async function applyWorkflowTemplate(templateIds, entityName, actorName) {
+export async function applyWorkflowTemplate(templateIds, entityName, actorName, entityKind = 'lead') {
   const ids = Array.isArray(templateIds) ? templateIds : [templateIds]
 
   const { data: allSteps, error: stepsErr } = await supabase
@@ -108,13 +111,27 @@ export async function applyWorkflowTemplate(templateIds, entityName, actorName) 
     return ai !== bi ? ai - bi : a.step_order - b.step_order
   })
 
-  // 'ADVISOR' steps go to whoever the lead is permanently assigned to (the
-  // original pitching advisor) — falls back to the acting user if the lead
-  // has nobody assigned. 'ASSOCIATE' steps all go to the SAME round-robin-
-  // picked associate for this whole application (all templates included),
-  // not a fresh pick per step or per template.
-  const { data: leadRow } = await supabase.from('leads').select('assignedTo').eq('name', entityName).maybeSingle()
-  const advisorName = leadRow?.assignedTo || actorName
+  // 'ADVISOR' steps go to whoever the entity is permanently assigned to.
+  // Applied from the Clients page (entityKind='client'): check the client's
+  // own assignedTo first — converted clients live in `clients`, not `leads` —
+  // then fall back to a matching lead row (the original pitching advisor).
+  // Applied from the Leads page: check the lead row only (original behavior).
+  // Final fallback in both cases: the acting user.
+  // 'ASSOCIATE' steps all go to the SAME round-robin-picked associate for
+  // this whole application (all templates included), not a fresh pick per
+  // step or per template.
+  // Note: .limit(1) instead of .maybeSingle() so a duplicate-name row can
+  // never turn the lookup into a hard error — we just take the first match.
+  let advisorName = null
+  if (entityKind === 'client') {
+    const { data: cRows } = await supabase.from('clients').select('assignedTo').eq('name', entityName).limit(1)
+    advisorName = cRows?.[0]?.assignedTo || null
+  }
+  if (!advisorName) {
+    const { data: lRows } = await supabase.from('leads').select('assignedTo').eq('name', entityName).limit(1)
+    advisorName = lRows?.[0]?.assignedTo || null
+  }
+  advisorName = advisorName || actorName
 
   let associateName = null
   if (steps.some(s => s.assigned_role === 'ASSOCIATE')) {
