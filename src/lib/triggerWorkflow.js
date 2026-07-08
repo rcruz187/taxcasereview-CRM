@@ -95,9 +95,14 @@ export async function applyWorkflowTemplate(templateId, entityName, actorName) {
   if (stepsErr || !steps?.length) return { error: stepsErr?.message || 'This template has no steps defined.' }
 
   const now = new Date()
-  const tasks = steps.map(s => {
+  const tasks = steps.map((s, idx) => {
     const due = new Date(now)
     due.setDate(due.getDate() + (s.due_in_days || 1))
+    // Tasks lists sort by created_at descending (newest first). Giving every
+    // step the exact same timestamp made their relative order undefined —
+    // spacing them 1 second apart (first step = latest timestamp) makes the
+    // intended step_order survive that sort correctly.
+    const createdAt = new Date(now.getTime() - idx * 1000)
     return {
       title: s.title,
       clientName: entityName,
@@ -107,7 +112,7 @@ export async function applyWorkflowTemplate(templateId, entityName, actorName) {
       done: false,
       notes: s.notes || '',
       section_title: s.section_title || null,
-      created_at: now.toISOString(),
+      created_at: createdAt.toISOString(),
     }
   })
 
