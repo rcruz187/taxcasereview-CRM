@@ -931,6 +931,7 @@ export default function Clients() {
   const [availableTemplates, setAvailableTemplates] = useState([])
   const [templateSearch, setTemplateSearch] = useState('')
   const [applyingTemplateId, setApplyingTemplateId] = useState('')
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState([])
   // Add payment modal
   const [payModal,    setPayModal]    = useState(false)
   const [faxModal,    setFaxModal]    = useState(false)
@@ -1342,17 +1343,24 @@ export default function Clients() {
     const { data } = await supabase.from('workflow_templates').select('id,name,description').eq('entity_type','client').eq('active',true).order('name')
     setAvailableTemplates(data || [])
     setTemplateSearch('')
+    setSelectedTemplateIds([])
     setTemplateModal(true)
   }
 
-  async function pickTemplate(t) {
-    setApplyingTemplateId(t.id)
+  function toggleTemplateSelection(id) {
+    setSelectedTemplateIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  async function applySelectedTemplates() {
+    if (!selectedTemplateIds.length) return
+    setApplyingTemplateId('__batch__')
     const actorName = resolveActorName(user, employees)
-    const result = await applyWorkflowTemplate(t.id, detail.name, actorName)
+    const result = await applyWorkflowTemplate(selectedTemplateIds, detail.name, actorName)
     setApplyingTemplateId('')
     if (result?.error) { showToast('❌ ' + result.error); return }
+    const names = availableTemplates.filter(t => selectedTemplateIds.includes(t.id)).map(t => t.name).join(', ')
     setTemplateModal(false)
-    showToast(`✅ Applied "${t.name}" — ${result.count} task(s) created`)
+    showToast(`✅ Applied "${names}" — ${result.count} task(s) created`)
     loadRelated(detail.name)
   }
 
@@ -2557,13 +2565,21 @@ export default function Clients() {
                 {availableTemplates
                   .filter(t => !templateSearch.trim() || t.name.toLowerCase().includes(templateSearch.toLowerCase()))
                   .map(t => (
-                    <div key={t.id} onClick={()=>!applyingTemplateId && pickTemplate(t)}
-                      style={{padding:'12px 10px',borderBottom:'1px solid var(--br)',cursor:applyingTemplateId?'default':'pointer',opacity:applyingTemplateId&&applyingTemplateId!==t.id?0.5:1}}>
-                      <div style={{fontSize:13,fontWeight:700,color:'var(--tx)'}}>{t.name}{applyingTemplateId===t.id?' — applying…':''}</div>
-                      {t.description&&<div style={{fontSize:11,color:'var(--t3)',marginTop:3,lineHeight:1.5}}>{t.description}</div>}
+                    <div key={t.id} onClick={()=>!applyingTemplateId && toggleTemplateSelection(t.id)}
+                      style={{padding:'12px 10px',borderBottom:'1px solid var(--br)',cursor:applyingTemplateId?'default':'pointer',opacity:applyingTemplateId?0.5:1,display:'flex',gap:10,alignItems:'flex-start'}}>
+                      <input type="checkbox" checked={selectedTemplateIds.includes(t.id)} readOnly style={{marginTop:3}}/>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:700,color:'var(--tx)'}}>{t.name}</div>
+                        {t.description&&<div style={{fontSize:11,color:'var(--t3)',marginTop:3,lineHeight:1.5}}>{t.description}</div>}
+                      </div>
                     </div>
                   ))
                 }
+              </div>
+              <div style={{padding:'12px 4px 4px',borderTop:'1px solid var(--br)'}}>
+                <button className="btn pri" style={{width:'100%'}} disabled={!selectedTemplateIds.length||!!applyingTemplateId} onClick={applySelectedTemplates}>
+                  {applyingTemplateId ? 'Applying…' : selectedTemplateIds.length ? `Apply Selected (${selectedTemplateIds.length})` : 'Select a template to apply'}
+                </button>
               </div>
             </div>
           </div>

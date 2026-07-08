@@ -77,28 +77,42 @@ export async function triggerWorkflow(event, entityType, entityName, actorName, 
 }
 
 /**
- * Manually apply a single workflow template right now, regardless of its
- * trigger_event — this powers the browsable "Work Template" catalog (pick a
- * template, its steps become tasks immediately) as opposed to the automatic
- * trigger-based instantiation above.
- * @param {string} templateId - workflow_templates.id
+ * Manually apply one or more workflow templates right now, regardless of
+ * their trigger_event — this powers the browsable "Work Template" catalog.
+ * Accepts a single templateId or an array — when multiple are given (e.g.
+ * applying both the IRS and State modules to the same case), their steps
+ * are merged into one task batch: one shared advisor and one shared
+ * round-robin associate across ALL of them (not a fresh pick per
+ * template), so the client has one consistent point of contact even
+ * when both modules apply. Steps stay grouped by template and keep their
+ * own step_order within that group; templates apply in the order their
+ * IDs were passed in.
+ * @param {string|string[]} templateIds - workflow_templates.id (or array)
  * @param {string} entityName - the client/lead name (for task clientName)
  * @param {string} actorName  - the employee applying the template (assignedTo default)
  */
-export async function applyWorkflowTemplate(templateId, entityName, actorName) {
-  const { data: steps, error: stepsErr } = await supabase
+export async function applyWorkflowTemplate(templateIds, entityName, actorName) {
+  const ids = Array.isArray(templateIds) ? templateIds : [templateIds]
+
+  const { data: allSteps, error: stepsErr } = await supabase
     .from('workflow_steps')
     .select('*')
-    .eq('template_id', templateId)
+    .in('template_id', ids)
     .order('step_order')
 
-  if (stepsErr || !steps?.length) return { error: stepsErr?.message || 'This template has no steps defined.' }
+  if (stepsErr || !allSteps?.length) return { error: stepsErr?.message || 'This template has no steps defined.' }
+
+  // Preserve selection order across templates, step_order within each
+  const steps = allSteps.slice().sort((a, b) => {
+    const ai = ids.indexOf(a.template_id), bi = ids.indexOf(b.template_id)
+    return ai !== bi ? ai - bi : a.step_order - b.step_order
+  })
 
   // 'ADVISOR' steps go to whoever the lead is permanently assigned to (the
   // original pitching advisor) — falls back to the acting user if the lead
   // has nobody assigned. 'ASSOCIATE' steps all go to the SAME round-robin-
-  // picked associate for this one template application, not a fresh pick
-  // per step.
+  // picked associate for this whole application (all templates included),
+  // not a fresh pick per step or per template.
   const { data: leadRow } = await supabase.from('leads').select('assignedTo').eq('name', entityName).maybeSingle()
   const advisorName = leadRow?.assignedTo || actorName
 
