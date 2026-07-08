@@ -232,10 +232,14 @@ export default function SignPage() {
       p_saved_doc_type:  savedDocType,
       p_cert_url:        certUrl,
       p_attachments:     signedAttachments,
-    }).catch(() => {})
+    })
 
     // Notify the client a signed copy is on file
-      const { data: cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle().catch(() => ({ data: null }))
+      let cfg = null
+      try {
+        const res = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
+        cfg = res.data
+      } catch (e) { /* best-effort */ }
       const attachmentLinks = signedAttachments.map(a =>
         `<li><a href="${a.clientUrl || a.url}" style="color:#3b82f6">${a.label} — Your Signed Copy</a></li>`
       ).join('')
