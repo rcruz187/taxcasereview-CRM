@@ -571,8 +571,8 @@ export default function Leads() {
 
   async function pickTemplate(t) {
     setApplyingTemplateId(t.id)
-    const actor = getActor(user)
-    const result = await applyWorkflowTemplate(t.id, detail.name, actor.name)
+    const actorName = resolveActorName(user, employees)
+    const result = await applyWorkflowTemplate(t.id, detail.name, actorName)
     setApplyingTemplateId('')
     if (result?.error) { showToast('❌ ' + result.error); return }
     setTemplateModal(false)
