@@ -564,7 +564,7 @@ export default function Leads() {
   }
 
   async function openTemplatePicker() {
-    const { data } = await supabase.from('workflow_templates').select('id,name,description').eq('entity_type','lead').eq('active',true).order('name')
+    const { data } = await supabase.from('workflow_templates').select('id,name,description').in('entity_type',['lead','both']).eq('active',true).order('name')
     setAvailableTemplates(data || [])
     setTemplateSearch('')
     setSelectedTemplateIds([])
