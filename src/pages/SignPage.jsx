@@ -1,10 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { stampSignature, buildCertificatePage, addTearDropStamp, appendPdfPages } from '../lib/irsFormUtils'
 import { useFirm } from '../lib/useFirm'
-import { advanceLeadStatus } from '../lib/leadStatus'
 
 // IRS forms never get an IP/timestamp stamp — only firm documents (the
 // Tax Service Agreement, addenda, etc.) do.
@@ -64,7 +62,8 @@ export default function SignPage() {
 
   useEffect(() => {
     async function load() {
-      const { data, error } = await supabase.from('esigns').select('*').eq('id', id).maybeSingle()
+      const { data: rows, error } = await supabase.rpc('esign_load', { p_id: id })
+      const data = rows?.[0]
       if (error || !data) { setError('Signing request not found or expired.'); setLoading(false); return }
       if (data.status === 'Signed') { setDone(true); setDoc(data); setLoading(false); return }
       setDoc(data); setLoading(false)
@@ -136,94 +135,21 @@ export default function SignPage() {
       sigImage = canvasRef.current.toDataURL('image/png')
     }
 
-    const { error } = await supabase.from('esigns').update({
-      status:            'Signed',
-      signed_at:         signedAt,
-      signed_name:       mode === 'type' ? typedSig.trim() : fullname.trim(),
-      signer_full_name:  fullname.trim(),
-      signer_ip:         ip,
-      signed_timestamp:  signedAt,
-      signed_user_agent: navigator.userAgent.slice(0, 200),
-    }).eq('id', id)
+    const { error } = await supabase.rpc('esign_mark_signed', {
+      p_id:                id,
+      p_signed_name:       mode === 'type' ? typedSig.trim() : fullname.trim(),
+      p_signer_full_name:  fullname.trim(),
+      p_signer_ip:         ip,
+      p_signed_user_agent: navigator.userAgent.slice(0, 200),
+    })
 
     if (error) { setSigning(false); setError('Error saving signature: ' + error.message); return }
-
-    // Fire esign_signed workflow trigger
-    await triggerWorkflow('esign_signed', doc.lead_id ? 'lead' : 'client', doc.client_name, 'System').catch(()=>{})
 
     // Everything after the DB write is best-effort — pipeline advance, PDF
     // stamping, document inserts, email/SMS. If any of it hangs or throws the
     // client still sees the confirmation screen; nothing here affects whether
     // the signature is legally captured (that already happened above).
     try {
-
-    // ── Pipeline advance ──────────────────────────────────────────────────
-    // Map doc_type to the correct pipeline status. Forward-only — safe no-op
-    // once lead is converted or already past that stage.
-    const pipelineMap = {
-      'Full Investigation Package': 'Tax Inv Agreement Signed',
-      'Service Addendum':           'Addendum Signed',
-      'Tax Service Agreement':      'Tax Inv Agreement Signed',
-      'Service Agreement':          'Tax Inv Agreement Signed',
-    }
-    // State POA signed — doesn't change pipeline but logs a note
-    const targetStatus = pipelineMap[doc.doc_type] || null
-    if (targetStatus) {
-      await advanceLeadStatus(supabase, doc.client_name, targetStatus).catch(()=>{})
-    }
-
-    // ── Fee-already-paid case ───────────────────────────────────────────
-    // If the investigation fee was paid BEFORE the agreement got signed
-    // (lead already sitting at 'Tax Inv Fee Paid'), this signature is the
-    // second half of the combo — auto-advance straight to Tax Investigation
-    // Active and create the same call-IRS tasks the manual status change
-    // and the Stripe webhook both create. If fee isn't paid yet, this is a
-    // no-op; the webhook side handles it when the fee comes in later.
-    if (targetStatus === 'Tax Inv Agreement Signed') {
-      try {
-        const { data: leadRow2 } = await supabase.from('leads').select('id,name,status,assignedTo').eq('name', doc.client_name).maybeSingle()
-        if (leadRow2 && leadRow2.status === 'Tax Inv Fee Paid') {
-          await supabase.from('leads').update({ status: 'Tax Investigation Active' }).eq('id', leadRow2.id)
-
-          const dueDate2 = new Date(); dueDate2.setDate(dueDate2.getDate() + 1)
-          const dueDateStr2 = dueDate2.toISOString().slice(0, 10)
-          const assignee2 = leadRow2.assignedTo || 'Unassigned'
-
-          await supabase.from('tasks').insert([
-            {
-              title: `📞 Call IRS — gather tax investigation info for ${leadRow2.name}`,
-              clientName: leadRow2.name, priority: 'High', dueDate: dueDateStr2, done: false,
-              assignedTo: assignee2,
-              notes: 'Call IRS with POA to pull transcripts, balances, lien info, assessment dates, and filing history. Enter results into the Compliance tab on this lead.',
-              created_at: new Date().toISOString(),
-            },
-            {
-              title: `🧾 Review financial intake — build resolution plan for ${leadRow2.name}`,
-              clientName: leadRow2.name, priority: 'High', dueDate: dueDateStr2, done: false,
-              assignedTo: assignee2,
-              notes: "Review the Financial Profile (I&E, Assets & Equity tabs) populated from the client's intake submission. Cross-reference with IRS results to determine the best resolution path (OIC, IA, CNC, etc.).",
-              created_at: new Date().toISOString(),
-            },
-          ])
-
-          await supabase.from('lead_notes').insert([{
-            lead_id: leadRow2.id, lead_name: leadRow2.name,
-            text: `✍️ Agreement signed — fee already paid, auto-advanced to Tax Investigation Active. 2 tasks created for ${assignee2}.`,
-            type: 'System', author: 'System (E-Sign)', created_at: new Date().toISOString(),
-          }])
-        }
-      } catch (e) { /* best-effort, same as everything else in this try block */ }
-    }
-
-    // ── Log note on lead/client file ──────────────────────────────────────
-    const noteText = `✅ ${doc.doc_type} signed — by: ${fullname} | IP: ${ip} | ${signedAt}`
-    // Try lead first, then client
-    const { data: leadRow } = await supabase.from('leads').select('id').eq('name', doc.client_name).maybeSingle().catch(()=>({data:null}))
-    if (leadRow?.id) {
-      await supabase.from('lead_notes').insert({ lead_id: leadRow.id, lead_name: doc.client_name, text: noteText, type: 'E-Sign', author: 'System', created_at: signedAt }).catch(()=>{})
-    } else {
-      await supabase.from('client_notes').insert({ clientname: doc.client_name, text: noteText, author: 'System', visible_to_client: false, created_at: signedAt }).catch(()=>{})
-    }
 
     // Service Addendum is a contract — files under the Agreements folder
     // like the rest of the firm's signed agreements. Everything else (the
@@ -232,14 +158,12 @@ export default function SignPage() {
     // ('E-Signatures', plural) or it silently won't show under that folder.
     const savedDocType = doc.doc_type === 'Service Addendum' ? 'Agreements' : 'E-Signatures'
 
-    // Save signature certificate record to documents table
-    await supabase.from('documents').insert([{
-      client:     doc.client_name,
-      name:       `Signed ${doc.doc_type} — ${doc.client_name}`,
-      docType:    savedDocType,
-      notes:      `Signed by: ${fullname}\nIP: ${ip}\nDate: ${signedAt}`,
-      created_at: signedAt,
-    }]).catch(() => {})
+    // Pipeline advance, fee-check, note logging, and the generic signature
+    // document record all now happen server-side in esign_finalize (below,
+    // after PDF stamping/upload) via a SECURITY DEFINER RPC — this table
+    // access used to be direct anon calls to leads/tasks/lead_notes/
+    // client_notes/documents, which is no longer possible once those
+    // tables get locked down like the rest of the RLS work.
 
     // ── Build Certificate of Completion page ─────────────────────────────
     const certBytes = await buildCertificatePage({
@@ -275,40 +199,40 @@ export default function SignPage() {
           .upload(clientPath, new Blob([clientBytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
         const { data: clientUrlData } = supabase.storage.from('documents').getPublicUrl(clientPath)
 
-        signedAttachments.push({ formType: att.formType, label: att.label, url: urlData.publicUrl, clientUrl: clientUrlData?.publicUrl })
-        await supabase.from('documents').insert([{
-          client: doc.client_name,
-          name: `Signed ${att.label.split(' — ')[0]} — ${doc.client_name}`,
-          docType: savedDocType, file_url: urlData.publicUrl,
-          file_name: `${att.formType}_signed.pdf`, file_size: signedBytes.byteLength,
-          notes: `Signed by: ${fullname}\nIP: ${ip}\nDate: ${signedAt}\n✅ Certificate of completion appended`,
-          source: 'E-Signature', uploaded_by: 'System', created_at: signedAt,
-        }]).catch(() => {})
+        signedAttachments.push({
+          formType: att.formType, label: att.label,
+          url: urlData.publicUrl, clientUrl: clientUrlData?.publicUrl,
+          fileSize: signedBytes.byteLength,
+        })
       } catch (e) {
         console.error('Failed to stamp', att.formType, e)
       }
     }
 
     // Save certificate as standalone doc record
+    let certUrl = null
     if (certBytes) {
       const certPath = `docs/${safeName}/signed/certificate_${Date.now()}.pdf`
       await supabase.storage.from('documents')
         .upload(certPath, new Blob([certBytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
         .catch(() => {})
       const { data: certUrlData } = supabase.storage.from('documents').getPublicUrl(certPath)
-      await supabase.from('documents').insert([{
-        client: doc.client_name,
-        name: `Certificate of Completion — ${doc.doc_type} — ${doc.client_name}`,
-        docType: savedDocType, file_url: certUrlData?.publicUrl,
-        file_name: 'certificate_completion.pdf',
-        notes: `Signed by: ${fullname} | IP: ${ip} | ${signedAt}`,
-        source: 'E-Signature', uploaded_by: 'System', created_at: signedAt,
-      }]).catch(() => {})
+      certUrl = certUrlData?.publicUrl || null
     }
 
-    if (signedAttachments.length) {
-      await supabase.from('esigns').update({ signed_attachments: signedAttachments }).eq('id', id).catch(() => {})
-    }
+    // Everything that used to be scattered leads/tasks/lead_notes/
+    // client_notes/documents/esigns calls — one SECURITY DEFINER RPC.
+    await supabase.rpc('esign_finalize', {
+      p_id:              id,
+      p_client_name:     doc.client_name,
+      p_doc_type:        doc.doc_type,
+      p_signed_by:       fullname,
+      p_signer_ip:       ip,
+      p_signed_at:       signedAt,
+      p_saved_doc_type:  savedDocType,
+      p_cert_url:        certUrl,
+      p_attachments:     signedAttachments,
+    }).catch(() => {})
 
     // Notify the client a signed copy is on file
       const { data: cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle().catch(() => ({ data: null }))
