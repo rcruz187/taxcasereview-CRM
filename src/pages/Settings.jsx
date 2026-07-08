@@ -1573,9 +1573,9 @@ function StatusesTab() {
         </div>
         {toast && <div style={{ fontSize: 12, color: 'var(--ok)', marginBottom: 10 }}>{toast}</div>}
 
-        <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           {categories.map(cat => (
-            <div key={cat.id} style={{ minWidth: 200, flexShrink: 0, border: '1px solid var(--br)', borderRadius: 8, overflow: 'hidden' }}>
+            <div key={cat.id} style={{ minWidth: 200, width: 200, border: '1px solid var(--br)', borderRadius: 8, overflow: 'hidden' }}>
               <div style={{ background: 'var(--s2)', padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--tx)' }}>{cat.name}</span>
                 <button onClick={() => deleteCategory(cat)} style={{ background: 'none', border: 'none', color: 'var(--bad)', cursor: 'pointer', fontSize: 15, lineHeight: 1 }}>×</button>
