@@ -94,6 +94,20 @@ export async function applyWorkflowTemplate(templateId, entityName, actorName) {
 
   if (stepsErr || !steps?.length) return { error: stepsErr?.message || 'This template has no steps defined.' }
 
+  // 'ADVISOR' steps go to whoever the lead is permanently assigned to (the
+  // original pitching advisor) — falls back to the acting user if the lead
+  // has nobody assigned. 'ASSOCIATE' steps all go to the SAME round-robin-
+  // picked associate for this one template application, not a fresh pick
+  // per step.
+  const { data: leadRow } = await supabase.from('leads').select('assignedTo').eq('name', entityName).maybeSingle()
+  const advisorName = leadRow?.assignedTo || actorName
+
+  let associateName = null
+  if (steps.some(s => s.assigned_role === 'ASSOCIATE')) {
+    const { data: rr } = await supabase.rpc('get_next_tax_associate')
+    associateName = rr || actorName
+  }
+
   const now = new Date()
   const tasks = steps.map((s, idx) => {
     const due = new Date(now)
@@ -103,10 +117,13 @@ export async function applyWorkflowTemplate(templateId, entityName, actorName) {
     // spacing them 1 second apart (first step = latest timestamp) makes the
     // intended step_order survive that sort correctly.
     const createdAt = new Date(now.getTime() - idx * 1000)
+    const assignee = s.assigned_role === 'ADVISOR' ? advisorName
+                    : s.assigned_role === 'ASSOCIATE' ? associateName
+                    : actorName
     return {
       title: s.title,
       clientName: entityName,
-      assignedTo: actorName,
+      assignedTo: assignee,
       priority: 'Normal',
       dueDate: due.toISOString().slice(0, 10),
       done: false,
