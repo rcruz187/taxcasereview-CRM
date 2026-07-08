@@ -363,6 +363,8 @@ export default function Leads() {
   const [leadSmsBody, setLeadSmsBody] = useState('')
   const [leadSmsSending, setLeadSmsSending] = useState(false)
   const [leadTasks, setLeadTasks]     = useState([])
+  const [leadTaskFilter, setLeadTaskFilter] = useState('all') // 'all' | 'active' | 'completed'
+  const [leadSectionOverride, setLeadSectionOverride] = useState({}) // key -> true(expanded)/false(collapsed), only set once user manually toggles
   const [leadQuickTask, setLeadQuickTask] = useState('')
   const [pendingLeadSection, setPendingLeadSection] = useState('')
   const [templateModal, setTemplateModal] = useState(false)
@@ -2052,7 +2054,15 @@ export default function Leads() {
                 <div style={{fontSize:12,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>
                   ✅ Tasks ({leadTasks.length})
                 </div>
-                <button className="btn sec" style={{fontSize:11,padding:'5px 12px'}} onClick={openTemplatePicker}>📋 Apply Work Template</button>
+                <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                  <select value={leadTaskFilter} onChange={e=>setLeadTaskFilter(e.target.value)}
+                    style={{fontSize:11,padding:'5px 8px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)'}}>
+                    <option value="all" style={{color:'#000',background:'#fff'}}>Show: All</option>
+                    <option value="active" style={{color:'#000',background:'#fff'}}>Show: Active</option>
+                    <option value="completed" style={{color:'#000',background:'#fff'}}>Show: Completed</option>
+                  </select>
+                  <button className="btn sec" style={{fontSize:11,padding:'5px 12px'}} onClick={openTemplatePicker}>📋 Apply Work Template</button>
+                </div>
               </div>
               {leadTasks.length===0&&(
                 <div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No tasks yet for this lead.</div>
@@ -2119,17 +2129,37 @@ export default function Leads() {
                     <button className="btn sec" style={{fontSize:10,padding:'3px 8px',flexShrink:0}} onClick={()=>addLeadSubtask(t)}>+ Sub</button>
                   </div>
                 )}
-                return groups.map(g => g.section_title ? (
-                  <div key={g.key} style={{marginBottom:10,borderRadius:8,overflow:'hidden',border:'1px solid var(--br)'}}>
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:'var(--s2)'}}>
-                      <div style={{fontSize:12,fontWeight:700,color:'var(--tx)'}}>📋 {g.section_title}</div>
-                      <button className="btn pri" style={{fontSize:10,padding:'3px 10px',fontWeight:600}} onClick={()=>setPendingLeadSection(g.section_title)}>+ Add Task</button>
-                    </div>
-                    <div style={{padding:'2px 12px 2px'}}>
-                      {g.tasks.map(renderTask)}
-                    </div>
-                  </div>
-                ) : g.tasks.map(renderTask))
+                return groups.map(g => {
+                  const allDone = g.tasks.length > 0 && g.tasks.every(t => t.done)
+                  const visibleTasks = g.tasks.filter(t =>
+                    leadTaskFilter === 'all' || (leadTaskFilter === 'active' ? !t.done : t.done)
+                  )
+                  if (g.section_title) {
+                    const isExpanded = leadSectionOverride[g.key] !== undefined ? leadSectionOverride[g.key] : !allDone
+                    return (
+                      <div key={g.key} style={{marginBottom:10,borderRadius:8,overflow:'hidden',border:'1px solid var(--br)'}}>
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:'var(--s2)'}}>
+                          <div style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',flex:1}}
+                            onClick={()=>setLeadSectionOverride(prev=>({...prev,[g.key]:!isExpanded}))}>
+                            <span style={{fontSize:10,color:'var(--t3)',transform:isExpanded?'rotate(90deg)':'none',transition:'transform .15s',display:'inline-block'}}>▶</span>
+                            <div style={{fontSize:12,fontWeight:700,color:'var(--tx)'}}>
+                              📋 {g.section_title} {allDone && <span style={{color:'var(--ok)',fontWeight:600}}>· All done ✓</span>}
+                            </div>
+                          </div>
+                          <button className="btn pri" style={{fontSize:10,padding:'3px 10px',fontWeight:600}} onClick={()=>setPendingLeadSection(g.section_title)}>+ Add Task</button>
+                        </div>
+                        {isExpanded && (
+                          <div style={{padding:'2px 12px 2px'}}>
+                            {visibleTasks.length === 0
+                              ? <div style={{color:'var(--t3)',fontSize:12,padding:'10px 0',textAlign:'center'}}>No tasks match this filter.</div>
+                              : visibleTasks.map(renderTask)}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }
+                  return visibleTasks.map(renderTask)
+                })
               })()}
               {pendingLeadSection && (
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:11,color:'var(--t3)',marginTop:10}}>

@@ -879,6 +879,8 @@ export default function Clients() {
   const [noteVisibleToClient, setNoteVisibleToClient] = useState(false)
   const [addingNote,  setAddingNote]  = useState(false)
   const [relTasks,    setRelTasks]    = useState([])
+  const [clientTaskFilter, setClientTaskFilter] = useState('all') // 'all' | 'active' | 'completed'
+  const [clientSectionOverride, setClientSectionOverride] = useState({})
   const [relInvoices, setRelInvoices] = useState([])
   const [relPayments, setRelPayments] = useState([])
   const [relSms,      setRelSms]      = useState([])
@@ -2150,7 +2152,15 @@ export default function Clients() {
                 <div style={{fontSize:12,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>
                   ✅ Tasks ({relTasks.length})
                 </div>
-                <button className="btn sec" style={{fontSize:11,padding:'5px 12px'}} onClick={openTemplatePicker}>📋 Apply Work Template</button>
+                <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                  <select value={clientTaskFilter} onChange={e=>setClientTaskFilter(e.target.value)}
+                    style={{fontSize:11,padding:'5px 8px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)'}}>
+                    <option value="all" style={{color:'#000',background:'#fff'}}>Show: All</option>
+                    <option value="active" style={{color:'#000',background:'#fff'}}>Show: Active</option>
+                    <option value="completed" style={{color:'#000',background:'#fff'}}>Show: Completed</option>
+                  </select>
+                  <button className="btn sec" style={{fontSize:11,padding:'5px 12px'}} onClick={openTemplatePicker}>📋 Apply Work Template</button>
+                </div>
               </div>
               {loadingRel&&<div style={{color:'var(--t3)',fontSize:12}}>Loading…</div>}
               {!loadingRel&&relTasks.length===0&&(
@@ -2221,17 +2231,37 @@ export default function Clients() {
                     <button className="btn sec" style={{fontSize:10,padding:'3px 8px',flexShrink:0}} onClick={()=>addSubtask(t)}>+ Sub</button>
                   </div>
                 )}
-                return groups.map(g => g.section_title ? (
-                  <div key={g.key} style={{marginBottom:10,borderRadius:8,overflow:'hidden',border:'1px solid var(--br)'}}>
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:'var(--s2)'}}>
-                      <div style={{fontSize:12,fontWeight:700,color:'var(--tx)'}}>📋 {g.section_title}</div>
-                      <button className="btn pri" style={{fontSize:10,padding:'3px 10px',fontWeight:600}} onClick={()=>setPendingSection(g.section_title)}>+ Add Task</button>
-                    </div>
-                    <div style={{padding:'2px 12px 2px'}}>
-                      {g.tasks.map(renderTask)}
-                    </div>
-                  </div>
-                ) : g.tasks.map(renderTask))
+                return groups.map(g => {
+                  const allDone = g.tasks.length > 0 && g.tasks.every(t => t.done)
+                  const visibleTasks = g.tasks.filter(t =>
+                    clientTaskFilter === 'all' || (clientTaskFilter === 'active' ? !t.done : t.done)
+                  )
+                  if (g.section_title) {
+                    const isExpanded = clientSectionOverride[g.key] !== undefined ? clientSectionOverride[g.key] : !allDone
+                    return (
+                      <div key={g.key} style={{marginBottom:10,borderRadius:8,overflow:'hidden',border:'1px solid var(--br)'}}>
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:'var(--s2)'}}>
+                          <div style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',flex:1}}
+                            onClick={()=>setClientSectionOverride(prev=>({...prev,[g.key]:!isExpanded}))}>
+                            <span style={{fontSize:10,color:'var(--t3)',transform:isExpanded?'rotate(90deg)':'none',transition:'transform .15s',display:'inline-block'}}>▶</span>
+                            <div style={{fontSize:12,fontWeight:700,color:'var(--tx)'}}>
+                              📋 {g.section_title} {allDone && <span style={{color:'var(--ok)',fontWeight:600}}>· All done ✓</span>}
+                            </div>
+                          </div>
+                          <button className="btn pri" style={{fontSize:10,padding:'3px 10px',fontWeight:600}} onClick={()=>setPendingSection(g.section_title)}>+ Add Task</button>
+                        </div>
+                        {isExpanded && (
+                          <div style={{padding:'2px 12px 2px'}}>
+                            {visibleTasks.length === 0
+                              ? <div style={{color:'var(--t3)',fontSize:12,padding:'10px 0',textAlign:'center'}}>No tasks match this filter.</div>
+                              : visibleTasks.map(renderTask)}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }
+                  return visibleTasks.map(renderTask)
+                })
               })()}
               {/* Quick add task */}
               {pendingSection && (

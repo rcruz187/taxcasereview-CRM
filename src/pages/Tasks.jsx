@@ -34,6 +34,7 @@ export default function Tasks() {
   const [confirmDelId, setConfirmDelId] = useState(null)
   const [toast,     setToast]     = useState('')
   const [view,      setView]      = useState('open') // 'open' | 'completed' | 'deleted'
+  const [collapsedSections, setCollapsedSections] = useState({}) // key -> true when manually collapsed
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const [filterPri, setFilterPri] = useState('All')
   const [filterAssign, setFilterAssign] = useState('All')
@@ -424,14 +425,20 @@ export default function Tasks() {
                 :openGroups.map(g => g.section_title ? (
                     <div key={g.key} style={{marginBottom:12,borderRadius:9,overflow:'hidden',border:'1px solid var(--br)'}}>
                       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'11px 14px',background:'var(--s2)'}}>
-                        <div style={{fontSize:13,fontWeight:700,color:'var(--tx)'}}>
-                          📋 {g.section_title}{g.clientName?<span style={{fontWeight:400,color:'var(--t3)'}}> · {g.clientName}</span>:''}
+                        <div style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',flex:1}}
+                          onClick={()=>setCollapsedSections(prev=>({...prev,[g.key]:!prev[g.key]}))}>
+                          <span style={{fontSize:11,color:'var(--t3)',transform:collapsedSections[g.key]?'none':'rotate(90deg)',transition:'transform .15s',display:'inline-block'}}>▶</span>
+                          <div style={{fontSize:13,fontWeight:700,color:'var(--tx)'}}>
+                            📋 {g.section_title}{g.clientName?<span style={{fontWeight:400,color:'var(--t3)'}}> · {g.clientName}</span>:''}
+                          </div>
                         </div>
                         <button className="btn pri" style={{fontSize:11,padding:'5px 12px',fontWeight:600}} onClick={()=>addSubtask({clientName:g.clientName, section_title:g.section_title})}>+ Add Task</button>
                       </div>
-                      <div style={{padding:'2px 14px 4px'}}>
-                        {g.tasks.map(t=><TaskItem key={t.id} t={t} onAddSub={addSubtask}/>)}
-                      </div>
+                      {!collapsedSections[g.key] && (
+                        <div style={{padding:'2px 14px 4px'}}>
+                          {g.tasks.map(t=><TaskItem key={t.id} t={t} onAddSub={addSubtask}/>)}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     g.tasks.map(t=><TaskItem key={t.id} t={t} onAddSub={addSubtask}/>)
