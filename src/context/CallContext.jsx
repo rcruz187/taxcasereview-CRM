@@ -59,8 +59,7 @@ async function matchCallerToRecord(rawNumber) {
 
 export function CallProvider({ children }) {
   const { user } = useApp()
-  const [relayStatus, setRelayStatus] = useState('connecting')
-  const [incomingCall, setIncomingCall] = useState(null)
+  const [relayStatus, setRelayStatus] = useState('connecting')  const [incomingCall, setIncomingCall] = useState(null)
   const [incomingMatch, setIncomingMatch] = useState(null) // {entityType,id,name} while ringing, or null
   const [calling, setCalling] = useState(false)
   const [active, setActive] = useState(null)
@@ -100,6 +99,20 @@ export function CallProvider({ children }) {
   // later, so an effect watching `calling` would check the ref before it
   // was ever set). Cleared in finalizeCallEnd alongside everything else.
   const outboundPollRef = useRef(null)
+  // This agent's own extension (employees.extension), used to decide
+  // whether an "Extension NNN — Name" inbound call should ring this
+  // browser during the target-only stage. null = no extension on file or
+  // lookup not finished yet — in that case we FAIL OPEN and ring for
+  // everything (today's behavior); the failure mode is extra ringing,
+  // never a silent office.
+  const myExtensionRef = useRef(null)
+
+  useEffect(() => {
+    if (!user?.email) return
+    supabase.from('employees').select('extension').ilike('email', user.email).limit(1)
+      .then(({ data }) => { myExtensionRef.current = data?.[0]?.extension || null })
+      .catch(() => {})
+  }, [user?.email])
 
   function stopRing() {
     if (ringIntervalRef.current) { clearInterval(ringIntervalRef.current); ringIntervalRef.current = null }
@@ -229,15 +242,20 @@ export function CallProvider({ children }) {
     const poll = setInterval(async () => {
       if (cancelled) return
 
-      // If we have a pending inbound call, check if caller hung up (row flipped to missed)
+      // If we have a pending inbound call, check whether it's been resolved
+      // elsewhere: caller hung up (missed/completed) or ANOTHER AGENT
+      // ANSWERED it ('answered'). The answered case is the important fix —
+      // before this, a losing agent's browser kept ringing after a
+      // colleague picked up, and its 15s give-up timer would then yank the
+      // LIVE call into voicemail mid-conversation.
       if (pendingInboundRef.current && !calling) {
         const { data: check } = await supabase
           .from('incoming_calls')
           .select('status')
           .eq('callsid', pendingInboundRef.current.callsid)
           .maybeSingle()
-        if (check?.status === 'missed' || check?.status === 'completed') {
-          console.log('[poll] caller hung up — clearing banner, status:', check.status)
+        if (check?.status === 'missed' || check?.status === 'completed' || check?.status === 'answered') {
+          console.log('[poll] call resolved elsewhere — clearing banner, status:', check.status)
           if (inboundTimeoutRef.current) { clearTimeout(inboundTimeoutRef.current); inboundTimeoutRef.current = null }
           pendingInboundRef.current = null
           setIncomingCall(null)
@@ -256,6 +274,26 @@ export function CallProvider({ children }) {
         .limit(1)
         .maybeSingle()
       if (cancelled || error || !data) return
+
+      // ── Extension-aware ring stages ──
+      // Extension-targeted calls ("Extension NNN — Name" rows from
+      // ivr-extension) ring ONLY the target agent for the first 12s, then
+      // escalate to everyone until 22s, then voicemail. General IVR calls
+      // ring everyone immediately with the original 15s window.
+      // FAIL OPEN: if this browser doesn't know its own extension (none on
+      // file / lookup pending), it treats every call as general and rings —
+      // extra ringing beats a silent office. The eligibility check happens
+      // BEFORE marking the call handled, so a browser that stays quiet in
+      // the target-only stage still picks the call up when it escalates.
+      const TARGET_ONLY_MS = 12000
+      const EXT_DEADLINE_MS = 22000
+      const GENERAL_DEADLINE_MS = 15000
+      const extMatch = /^Extension (\d+)\b/.exec(data.department || '')
+      const ageMs = Math.max(0, Date.now() - new Date(data.created_at).getTime())
+      const myExt = myExtensionRef.current
+      if (extMatch && myExt && String(extMatch[1]) !== String(myExt) && ageMs < TARGET_ONLY_MS) {
+        return // targeted at someone else, still their exclusive window — stay quiet
+      }
       if (data.callsid === lastHandledInboundRef.current) return
 
       lastHandledInboundRef.current = data.callsid
@@ -270,6 +308,13 @@ export function CallProvider({ children }) {
       incomingMatchRef.current = null
       matchCallerToRecord(data.from_number).then(m => { incomingMatchRef.current = m; if (m) setIncomingMatch(m) })
 
+      // Give-up timer anchored to the row's created_at instead of "when
+      // this browser noticed" — so every agent's timer converges on the
+      // same wall-clock deadline regardless of poll skew. The server-side
+      // claim in redirect-to-voicemail is the hard guarantee; this just
+      // shrinks the race window.
+      const deadlineMs = extMatch ? EXT_DEADLINE_MS : GENERAL_DEADLINE_MS
+      const remainingMs = Math.min(deadlineMs, Math.max(1500, deadlineMs - ageMs))
       inboundTimeoutRef.current = setTimeout(() => {
         if (pendingInboundRef.current?.callsid !== data.callsid) return
         supabase.functions.invoke('redirect-to-voicemail', { body: { callsid: data.callsid } })
@@ -278,7 +323,7 @@ export function CallProvider({ children }) {
         setIncomingCall(null)
         setIncomingMatch(null)
         stopRing()
-      }, 15000)
+      }, remainingMs)
     }, 4000)
 
     return () => { cancelled = true; clearInterval(poll); stopRing() }

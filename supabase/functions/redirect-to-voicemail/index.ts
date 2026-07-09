@@ -31,6 +31,30 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
+    // ── Atomic claim BEFORE touching the live call ──
+    // Multiple agents' browsers each run their own give-up timer for the
+    // same ringing call, and Decline also lands here. Without this guard,
+    // a timer/decline firing AFTER a colleague answered would redirect the
+    // LIVE, in-progress call into voicemail mid-conversation. The
+    // conditional update below only succeeds while the row is still
+    // 'ringing' — if someone answered (or it already went to voicemail),
+    // zero rows match and we do nothing at all.
+    const { data: claimed, error: claimErr } = await supabase
+      .from('incoming_calls')
+      .update({ status: 'missed' })
+      .eq('callsid', callsid)
+      .eq('status', 'ringing')
+      .select('callsid')
+
+    if (claimErr) console.error('redirect-to-voicemail: claim error', claimErr)
+
+    if (!claimed || claimed.length === 0) {
+      console.log('redirect-to-voicemail: call', callsid, 'is no longer ringing (answered or already resolved) — skipping redirect')
+      return new Response(JSON.stringify({ ok: true, skipped: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     const { data: settings, error: sErr } = await supabase
       .from('settings')
       .select('sw_space_url,sw_project_id,sw_api_token')
