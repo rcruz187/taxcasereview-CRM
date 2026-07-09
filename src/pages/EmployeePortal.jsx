@@ -72,6 +72,7 @@ export default function EmployeePortal() {
   const [confirmPin, setConfirmPin] = useState('')
   const [pinMsg, setPinMsg] = useState('')
   const [emp, setEmp] = useState(null)
+  const [empToken, setEmpToken] = useState(null) // employee_portal_sessions token — auth for all portal RPCs
   const [loginErr, setLoginErr] = useState('')
   const [logging, setLogging] = useState(false)
   const [now, setNow] = useState(new Date())
@@ -102,31 +103,46 @@ export default function EmployeePortal() {
     return () => clearInterval(t)
   }, [])
 
-  useEffect(() => { if (emp) loadWeek(emp, weekOffset) }, [weekOffset])
-  useEffect(() => { if (emp) loadPeriod(emp, periodOffset) }, [periodOffset])
+  useEffect(() => { if (emp && empToken) loadWeek(empToken, weekOffset) }, [weekOffset])
+  useEffect(() => { if (emp && empToken) loadPeriod(empToken, periodOffset) }, [periodOffset])
 
   // Realtime — clock/task/calendar/time-off changes reflect without a manual refresh
   useEffect(() => {
     if (!emp) return
-    const ch = supabase.channel('emp-portal-tcr-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'timeentries' }, () => { loadWeek(emp, weekOffset); loadPeriod(emp, periodOffset) })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => loadTasks(emp))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'calevents' }, () => loadEvents(emp))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_off_requests' }, () => loadTimeOff(emp))
-      // Pay rate/type, balances, etc. — previously only ever loaded once at
-      // login, so an admin changing your rate while you're already logged
-      // in (e.g. testing in another tab) silently never showed up.
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'employees', filter: `id=eq.${emp.id}` }, payload => setEmp(e => e ? { ...e, ...payload.new } : e))
-      .subscribe()
-    return () => { supabase.removeChannel(ch) }
+    // Realtime postgres_changes subscriptions stopped working when the
+    // underlying tables were RLS-locked to anon (events are filtered by row
+    // access). Replaced with a 60s refresh + refresh on tab focus — well
+    // above the 3s guardrail in scripts/check-polling-intervals.cjs.
+    const refresh = () => {
+      loadWeek(empToken, weekOffset); loadPeriod(empToken, periodOffset)
+      loadTasks(empToken); loadEvents(empToken); loadTimeOff(empToken)
+      refreshEmployee(empToken)
+    }
+    const iv = setInterval(refresh, 60000)
+    const onFocus = () => { if (document.visibilityState === 'visible') refresh() }
+    document.addEventListener('visibilitychange', onFocus)
+    window.addEventListener('focus', onFocus)
+    return () => {
+      clearInterval(iv)
+      document.removeEventListener('visibilitychange', onFocus)
+      window.removeEventListener('focus', onFocus)
+    }
   }, [emp?.id])
+
+  // Pay rate/type, balances, etc. — refreshed periodically so an admin
+  // changing your rate/balances while you're logged in still shows up
+  // (this replaced the old realtime employees UPDATE subscription).
+  async function refreshEmployee(token) {
+    const { data } = await supabase.rpc('emp_refresh', { p_token: token })
+    if (data) setEmp(e => e ? { ...e, ...data } : e)
+  }
 
   async function changePin() {
     if (newPin.length < 4) { setPinMsg('PIN must be at least 4 digits.'); return }
     if (newPin !== confirmPin) { setPinMsg('PINs do not match.'); return }
-    const { error } = await supabase.from('employees').update({ portal_pin: newPin }).eq('id', emp.id)
+    const { error } = await supabase.rpc('emp_change_pin', { p_token: empToken, p_new_pin: newPin })
     if (error) { setPinMsg('Error saving PIN: ' + error.message); return }
-    setEmp(e => ({ ...e, portal_pin: newPin }))
+    setEmp(e => ({ ...e, has_pin: true }))
     setChangingPin(false); setNewPin(''); setConfirmPin(''); setPinMsg('')
     alert('✅ PIN updated successfully!')
   }
@@ -135,55 +151,57 @@ export default function EmployeePortal() {
     if (!loginEmail.trim()) return
     if (!pin.trim()) { setLoginErr('Please enter your PIN.'); return }
     setLogging(true); setLoginErr('')
-    const { data } = await supabase.from('employees').select('*').ilike('email', loginEmail.trim()).maybeSingle()
-    if (!data) { setLoginErr('Email not found. Check with your manager.'); setLogging(false); return }
-    if (data.portal_pin && data.portal_pin !== pin.trim()) {
-      setLoginErr('Incorrect PIN. Please try again.'); setLogging(false); return
+    // Server-side PIN verification via SECURITY DEFINER RPC. The old direct
+    // employees select pulled the full row (PIN, SSN, bank info) into the
+    // browser before checking the PIN client-side — never again.
+    const { data, error } = await supabase.rpc('emp_login', {
+      p_email: loginEmail.trim(), p_pin: pin.trim(),
+    })
+    if (error || !data?.token) {
+      setLoginErr(error?.message || 'Login failed. Check with your manager.')
+      setLogging(false); return
     }
-    setEmp(data)
-    await Promise.all([loadWeek(data, 0), loadPeriod(data, 0), loadTasks(data), loadEvents(data), loadTimeOff(data)])
+    setEmpToken(data.token)
+    setEmp(data.employee)
+    await Promise.all([
+      loadWeek(data.token, 0), loadPeriod(data.token, 0),
+      loadTasks(data.token), loadEvents(data.token), loadTimeOff(data.token),
+    ])
     setScreen('home')
     setLogging(false)
   }
 
-  async function loadWeek(e, wOffset = weekOffset) {
+  async function loadWeek(token, wOffset = weekOffset) {
     const start = getWeekStart(wOffset)
     const end = new Date(start.getTime() + 7 * 86400000)
-    const { data } = await supabase.from('timeentries').select('*')
-      .eq('employee', e.name).gte('date', localDateStr(start)).lt('date', localDateStr(end))
-      .order('date', { ascending: false })
+    const { data } = await supabase.rpc('emp_timeentries', {
+      p_token: token, p_from: localDateStr(start), p_to: localDateStr(end), p_end_inclusive: false,
+    })
     setEntries(data || [])
-    const { data: open } = await supabase.from('timeentries').select('*')
-      .eq('employee', e.name).is('outTime', null).is('hours', null)
-      .order('created_at', { ascending: false }).limit(1)
-    setOpenEntry(open?.[0] || null)
+    const { data: open } = await supabase.rpc('emp_open_entry', { p_token: token })
+    setOpenEntry(open || null)
   }
 
-  async function loadPeriod(e, pOffset = periodOffset) {
+  async function loadPeriod(token, pOffset = periodOffset) {
     const { start, end } = periodAtOffset(pOffset)
-    const { data } = await supabase.from('timeentries').select('*')
-      .eq('employee', e.name).gte('date', start).lte('date', end)
+    const { data } = await supabase.rpc('emp_timeentries', {
+      p_token: token, p_from: start, p_to: end, p_end_inclusive: true,
+    })
     setPeriodEntries(data || [])
   }
 
-  async function loadTasks(e) {
-    const { data } = await supabase.from('tasks').select('*')
-      .eq('assignedTo', e.name).eq('done', false).eq('deleted', false)
-      .order('dueDate', { ascending: true }).limit(20)
+  async function loadTasks(token) {
+    const { data } = await supabase.rpc('emp_tasks', { p_token: token })
     setTasks(data || [])
   }
 
-  async function loadEvents(e) {
-    const today = localDateStr(new Date())
-    const { data } = await supabase.from('calevents').select('*')
-      .eq('assignedTo', e.name).gte('date', today)
-      .order('date', { ascending: true }).order('time', { ascending: true }).limit(30)
+  async function loadEvents(token) {
+    const { data } = await supabase.rpc('emp_events', { p_token: token, p_from: localDateStr(new Date()) })
     setEvents(data || [])
   }
 
-  async function loadTimeOff(e) {
-    const { data } = await supabase.from('time_off_requests').select('*')
-      .eq('employee_id', e.id).order('created_at', { ascending: false })
+  async function loadTimeOff(token) {
+    const { data } = await supabase.rpc('emp_timeoff_list', { p_token: token })
     setTimeOffReqs(data || [])
   }
 
@@ -193,48 +211,48 @@ export default function EmployeePortal() {
     if (openEntry) {
       const outTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
       const hours = calcHours(openEntry.inTime, outTime) || '0'
-      const { error } = await supabase.from('timeentries').update({ outTime, hours: parseFloat(hours) }).eq('id', openEntry.id)
+      const { error } = await supabase.rpc('emp_clock_out', {
+        p_token: empToken, p_entry_id: openEntry.id, p_out_time: outTime, p_hours: parseFloat(hours),
+      })
       if (error) { setClockMsg('❌ ' + error.message); setClocking(false); return }
       setClockMsg(`✅ Clocked out at ${outTime} — ${hours}h logged`)
       setOpenEntry(null)
     } else {
       const inTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
       const date = localDateStr(new Date())
-      const { data, error } = await supabase.from('timeentries').insert([{
-        employee: emp.name, date, inTime, outTime: null, hours: null, notes: null, method: 'Employee Portal'
-      }]).select().single()
+      const { data, error } = await supabase.rpc('emp_clock_in', {
+        p_token: empToken, p_date: date, p_in_time: inTime,
+      })
       if (error) { setClockMsg('❌ ' + error.message); setClocking(false); return }
       setClockMsg(`✅ Clocked in at ${inTime}`)
       setOpenEntry(data)
     }
-    await loadWeek(emp, weekOffset)
-    await loadPeriod(emp, periodOffset)
+    await loadWeek(empToken, weekOffset)
+    await loadPeriod(empToken, periodOffset)
     setClocking(false)
     setTimeout(() => setClockMsg(''), 4000)
   }
 
   async function toggleTaskDone(t) {
-    await supabase.from('tasks').update({ done: true }).eq('id', t.id)
+    await supabase.rpc('emp_task_done', { p_token: empToken, p_task_id: t.id })
     setTasks(prev => prev.filter(x => x.id !== t.id))
   }
 
   // Best-effort notification to Super Admin/Admin users — never blocks the
-  // request from going through. If send-email isn't configured, this
-  // silently no-ops; the request itself is still saved and visible in the
-  // admin Time Off page either way.
-  async function notifyTimeOffSubmitted(e, type, start, end, days) {
+  // request from going through. Recipients now come back from the
+  // emp_timeoff_submit RPC (employees is RLS-locked to anon); if send-email
+  // isn't configured this silently no-ops and the request is still saved.
+  async function notifyTimeOffSubmitted(recipients, e, type, start, end, days) {
     try {
-      const { data: admins } = await supabase.from('employees')
-        .select('email').in('access', ['Super Admin', 'Admin']).not('email', 'is', null)
-      const recipients = [...new Set((admins || []).map(a => a.email).filter(Boolean))]
-      if (recipients.length === 0) return
+      const toList = [...new Set((recipients || []).filter(Boolean))]
+      if (toList.length === 0) return
       const subject = `Time off request — ${e.name}`
       const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">` +
         `<div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div>` +
         `<p><strong>${e.name}</strong> (${e.employee_id}) requested ${type.toUpperCase()} time off.</p>` +
         `<p>${start} to ${end} (${days} day${days === 1 ? '' : 's'})</p>` +
         `<p style="font-size:12px;color:#64748b">Review and approve/deny in the CRM under Time Off.</p></div>`
-      await Promise.all(recipients.map(to =>
+      await Promise.all(toList.map(to =>
         supabase.functions.invoke('send-email', { body: { to, subject, html } }).catch(() => {})
       ))
     } catch {
@@ -248,17 +266,18 @@ export default function EmployeePortal() {
     if (end < start) { setReqMsg('End date must be after start date.'); return }
     const days = Math.round((end.getTime() - start.getTime()) / 86400000) + 1
     setReqSaving(true); setReqMsg('')
-    const { error } = await supabase.from('time_off_requests').insert({
-      employee_id: emp.id, employee_name: emp.name, type: reqType,
-      start_date: reqStart, end_date: reqEnd, days, reason: reqReason.trim() || null, status: 'pending',
+    const { data, error } = await supabase.rpc('emp_timeoff_submit', {
+      p_token: empToken, p_type: reqType,
+      p_start_date: reqStart, p_end_date: reqEnd, p_days: days,
+      p_reason: reqReason.trim() || null,
     })
     if (error) {
       setReqMsg('❌ ' + error.message)
     } else {
       setReqMsg('✅ Request submitted — waiting on approval.')
-      notifyTimeOffSubmitted(emp, reqType, reqStart, reqEnd, days)
+      notifyTimeOffSubmitted(data?.admin_emails, emp, reqType, reqStart, reqEnd, days)
       setReqStart(''); setReqEnd(''); setReqReason(''); setShowRequestForm(false)
-      await loadTimeOff(emp)
+      await loadTimeOff(empToken)
     }
     setReqSaving(false)
     setTimeout(() => setReqMsg(''), 5000)

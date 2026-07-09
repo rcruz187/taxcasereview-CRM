@@ -52,13 +52,12 @@ export default function ClockIn() {
 
   async function load() {
     setLoading(true)
-    const [{ data: emp }, { data: entries }] = await Promise.all([
-      supabase.from('employees').select('id,name,title').order('name'),
-      supabase.from('timeentries').select('id,employee,inTime,date').is('outTime', null).is('hours', null),
-    ])
-    setEmployees(emp || [])
+    // RPC instead of direct table reads — employees/timeentries are RLS-locked
+    // to anon. kiosk_load returns only id/name/title + open entries.
+    const { data } = await supabase.rpc('kiosk_load')
+    setEmployees(data?.employees || [])
     const open = {}
-    ;(entries || []).forEach(e => {
+    ;(data?.open_entries || []).forEach(e => {
       if (!open[e.employee]) open[e.employee] = []
       open[e.employee].push({ id: e.id, inTime: e.inTime })
     })
@@ -77,9 +76,9 @@ export default function ClockIn() {
       const entry = entries[entries.length - 1]
       const outTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
       const hours = calcHours(entry.inTime, outTime) || '0'
-      const { error } = await supabase.from('timeentries').update({
-        outTime, hours: parseFloat(hours)
-      }).eq('id', entry.id)
+      const { error } = await supabase.rpc('kiosk_clock_out', {
+        p_entry_id: entry.id, p_out_time: outTime, p_hours: parseFloat(hours)
+      })
       setSaving(null)
       if (error) { setDone({ name: empName, action: 'error', error: error.message }); return }
       setDone({ name: empName, action: 'out', time: outTime, hours })
@@ -88,9 +87,9 @@ export default function ClockIn() {
       // Clock in
       const inTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
       const date = new Date().toISOString().slice(0, 10)
-      const { error } = await supabase.from('timeentries').insert([{
-        employee: empName, date, inTime, outTime: null, hours: null, notes: null, method: 'Kiosk'
-      }])
+      const { error } = await supabase.rpc('kiosk_clock_in', {
+        p_employee: empName, p_date: date, p_in_time: inTime
+      })
       setSaving(null)
       if (error) { setDone({ name: empName, action: 'error', error: error.message }); return }
       setDone({ name: empName, action: 'in', time: inTime })
@@ -103,19 +102,19 @@ export default function ClockIn() {
   }
 
   // Best-effort — never blocks the request from saving even if email isn't configured.
-  async function notifyTimeOffSubmitted(e, type, start, end, days) {
+  // Recipients now come back from the kiosk_timeoff_submit RPC (employees table
+  // is RLS-locked to anon), so this just fires the emails.
+  async function notifyTimeOffSubmitted(recipients, e, type, start, end, days) {
     try {
-      const { data: admins } = await supabase.from('employees')
-        .select('email').in('access', ['Super Admin', 'Admin']).not('email', 'is', null)
-      const recipients = [...new Set((admins || []).map(a => a.email).filter(Boolean))]
-      if (recipients.length === 0) return
+      const toList = [...new Set((recipients || []).filter(Boolean))]
+      if (toList.length === 0) return
       const subject = `Time off request — ${e.name}`
       const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">` +
         `<div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div>` +
         `<p><strong>${e.name}</strong> requested ${type.toUpperCase()} time off.</p>` +
         `<p>${start} to ${end} (${days} day${days === 1 ? '' : 's'})</p>` +
         `<p style="font-size:12px;color:#64748b">Submitted from the clock-in kiosk. Review and approve/deny in the CRM under Time Off.</p></div>`
-      await Promise.all(recipients.map(to =>
+      await Promise.all(toList.map(to =>
         supabase.functions.invoke('send-email', { body: { to, subject, html } }).catch(() => {})
       ))
     } catch {}
@@ -129,19 +128,17 @@ export default function ClockIn() {
     const days = Math.round((end.getTime() - start.getTime()) / 86400000) + 1
 
     setReqSaving(true); setReqMsg('')
-    const { error } = await supabase.from('time_off_requests').insert({
-      employee_id: reqEmp.id,
-      employee_name: reqEmp.name,
-      type: reqType,
-      start_date: reqStart,
-      end_date: reqEnd,
-      days,
-      reason: reqReason.trim() || null,
-      status: 'pending',
+    const { data, error } = await supabase.rpc('kiosk_timeoff_submit', {
+      p_employee_id: reqEmp.id,
+      p_type: reqType,
+      p_start_date: reqStart,
+      p_end_date: reqEnd,
+      p_days: days,
+      p_reason: reqReason.trim() || null,
     })
     setReqSaving(false)
     if (error) { setReqMsg('❌ ' + error.message); return }
-    notifyTimeOffSubmitted(reqEmp, reqType, reqStart, reqEnd, days)
+    notifyTimeOffSubmitted(data?.admin_emails, reqEmp, reqType, reqStart, reqEnd, days)
     setDone({ name: reqEmp.name, action: 'timeoff' })
     setReqEmp(null)
   }

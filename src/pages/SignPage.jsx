@@ -237,7 +237,8 @@ export default function SignPage() {
     // Notify the client a signed copy is on file
       let cfg = null
       try {
-        const res = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
+        // settings is RLS-locked to anon — read via SECURITY DEFINER RPC
+        const res = await supabase.rpc('esign_get_settings')
         cfg = res.data
       } catch (e) { /* best-effort */ }
       const attachmentLinks = signedAttachments.map(a =>
