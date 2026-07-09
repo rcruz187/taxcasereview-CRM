@@ -59,7 +59,8 @@ async function matchCallerToRecord(rawNumber) {
 
 export function CallProvider({ children }) {
   const { user } = useApp()
-  const [relayStatus, setRelayStatus] = useState('connecting')  const [incomingCall, setIncomingCall] = useState(null)
+  const [relayStatus, setRelayStatus] = useState('connecting')
+  const [incomingCall, setIncomingCall] = useState(null)
   const [incomingMatch, setIncomingMatch] = useState(null) // {entityType,id,name} while ringing, or null
   const [calling, setCalling] = useState(false)
   const [active, setActive] = useState(null)
