@@ -102,6 +102,23 @@ serve(async (req) => {
       if (heldErr) console.error('incoming_calls lookup error:', heldErr)
 
       if (held) {
+        // ── Backstop: stamp the row 'answered' at bridge time ──
+        // The browser is supposed to claim (status='answered') BEFORE
+        // self-dialing, but a stale tab running pre-claim code (SPA tabs
+        // keep their original JS for weeks — auto-logout doesn't reload
+        // it) can bridge without ever claiming. That leaves a LIVE call
+        // sitting in 'ringing', which the give-up timers then legitimately
+        // redirect to voicemail mid-conversation. Stamping here is
+        // server-side and immune to whatever code the browser runs.
+        // Conditional on 'ringing' so a modern tab's claim (which also
+        // sets claimed_by) is never clobbered.
+        const { error: stampErr } = await supabase
+          .from('incoming_calls')
+          .update({ status: 'answered' })
+          .eq('callsid', held.callsid)
+          .eq('status', 'ringing')
+        if (stampErr) console.error('bridge-time answered stamp error:', stampErr)
+
         console.log('agent joining inbound conference:', held.conference_name)
         const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Conference endConferenceOnExit="true">${held.conference_name}</Conference></Dial></Response>`
         return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
