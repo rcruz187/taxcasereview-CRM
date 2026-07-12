@@ -90,37 +90,58 @@ serve(async (req) => {
       // row older than this can no longer hijack a fresh agent-join.
       const cutoff = new Date(Date.now() - HELD_ROW_MAX_AGE_MINUTES * 60 * 1000).toISOString()
 
-      const { data: held, error: heldErr } = await supabase
-        .from('incoming_calls')
-        .select('conference_name, callsid')
-        .in('status', ['ringing', 'answered'])
-        .gte('created_at', cutoff)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+      // ── Claimed-FIFO handshake (wrong-conference fix) ──
+      // The old logic guessed "newest held row", so with two calls held at
+      // once, an agent answering the OLDER call got bridged into the NEWER
+      // caller's conference. bridge_pop_claimed atomically pops (in order):
+      //   1. oldest claimed-but-unbridged row (modern tabs claim before
+      //      self-dialing, so this pairs each agent with the call they
+      //      actually clicked, FIFO by claim time)
+      //   2. newest still-ringing row, stamped 'answered' (stale-tab backstop)
+      //   3. newest answered row (recovery/legacy — matches old behavior)
+      // FOR UPDATE SKIP LOCKED inside the RPC makes two simultaneous
+      // agent-joins take two different rows instead of the same one.
+      // If the RPC is missing or errors, fall back to the legacy lookup so
+      // this deploy can never make answering worse than yesterday.
+      let bridgeTarget = null
+      const { data: popped, error: popErr } = await supabase
+        .rpc('bridge_pop_claimed', { p_cutoff: cutoff })
+      if (popErr) console.error('bridge_pop_claimed RPC error (falling back to legacy lookup):', popErr)
+      if (popped?.conference_name) {
+        bridgeTarget = popped
+        console.log('bridge_pop_claimed matched via:', popped.via)
+      }
 
-      if (heldErr) console.error('incoming_calls lookup error:', heldErr)
-
-      if (held) {
-        // ── Backstop: stamp the row 'answered' at bridge time ──
-        // The browser is supposed to claim (status='answered') BEFORE
-        // self-dialing, but a stale tab running pre-claim code (SPA tabs
-        // keep their original JS for weeks — auto-logout doesn't reload
-        // it) can bridge without ever claiming. That leaves a LIVE call
-        // sitting in 'ringing', which the give-up timers then legitimately
-        // redirect to voicemail mid-conversation. Stamping here is
-        // server-side and immune to whatever code the browser runs.
-        // Conditional on 'ringing' so a modern tab's claim (which also
-        // sets claimed_by) is never clobbered.
-        const { error: stampErr } = await supabase
+      if (!bridgeTarget) {
+        // Legacy lookup — newest held row (also the path when the RPC
+        // hasn't been created yet).
+        const { data: held, error: heldErr } = await supabase
           .from('incoming_calls')
-          .update({ status: 'answered' })
-          .eq('callsid', held.callsid)
-          .eq('status', 'ringing')
-        if (stampErr) console.error('bridge-time answered stamp error:', stampErr)
+          .select('conference_name, callsid')
+          .in('status', ['ringing', 'answered'])
+          .gte('created_at', cutoff)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (heldErr) console.error('incoming_calls lookup error:', heldErr)
+        if (held) {
+          // Backstop: a bridged call must never sit in 'ringing' (stale
+          // pre-claim tabs) — otherwise give-up timers legitimately
+          // redirect the live call to voicemail. Conditional so a modern
+          // tab's claim is never clobbered.
+          const { error: stampErr } = await supabase
+            .from('incoming_calls')
+            .update({ status: 'answered' })
+            .eq('callsid', held.callsid)
+            .eq('status', 'ringing')
+          if (stampErr) console.error('bridge-time answered stamp error:', stampErr)
+          bridgeTarget = held
+        }
+      }
 
-        console.log('agent joining inbound conference:', held.conference_name)
-        const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Conference endConferenceOnExit="true">${held.conference_name}</Conference></Dial></Response>`
+      if (bridgeTarget) {
+        console.log('agent joining inbound conference:', bridgeTarget.conference_name)
+        const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Conference endConferenceOnExit="true">${bridgeTarget.conference_name}</Conference></Dial></Response>`
         return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
       }
 

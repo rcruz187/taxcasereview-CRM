@@ -342,9 +342,12 @@ export function CallProvider({ children }) {
     // flipped the row to 'answered'. If data comes back empty, we lost the
     // race — silently dismiss the banner and let the winner handle the call.
     const agentName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+    // claimed_at lets receive-call's bridge_pop_claimed RPC pair agent
+    // self-dials with claims in FIFO order — the fix for two simultaneous
+    // held calls bridging the agent into the wrong caller's conference.
     const { data: claimed, error: claimErr } = await supabase
       .from('incoming_calls')
-      .update({ status: 'answered', claimed_by: agentName })
+      .update({ status: 'answered', claimed_by: agentName, claimed_at: new Date().toISOString() })
       .eq('callsid', row.callsid)
       .eq('status', 'ringing')
       .select('callsid')
