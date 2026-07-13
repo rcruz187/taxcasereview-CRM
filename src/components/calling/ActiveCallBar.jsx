@@ -199,100 +199,97 @@ export default function ActiveCallBar() {
         <>
           <div style={{
             position: 'fixed', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 3500,
-            width: 'min(620px, 92vw)',
+            width: 'min(860px, 96vw)',
             background: 'linear-gradient(135deg, #0f6e2e, #25A25A)',
-            borderRadius: showTranscript ? '10px 10px 0 0' : 10,
-            padding: '14px 20px', boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12
+            borderRadius: showTranscript ? '12px 12px 0 0' : 12,
+            padding: '12px 18px', boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+            display: 'flex', flexDirection: 'column', gap: 10,
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{
-                width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.2)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18
-              }}>📞</div>
-              <div>
-                <div style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>
-                  {active?.name || `${active?.first || ''} ${active?.last || ''}`.trim()}
-                  {active.entityType && (
-                    <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, background: 'rgba(255,255,255,0.2)', borderRadius: 6, padding: '2px 8px' }}>
-                      {active.entityType === 'client' ? 'Client' : 'Lead'}
-                    </span>
-                  )}
+            {/* Row 1 — who you're talking to + End */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, flexShrink: 0
+                }}>📞</div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ color: '#fff', fontWeight: 700, fontSize: 15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {active?.name || `${active?.first || ''} ${active?.last || ''}`.trim()}
+                    {active.entityType && (
+                      <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, background: 'rgba(255,255,255,0.2)', borderRadius: 6, padding: '2px 8px', verticalAlign: 'middle' }}>
+                        {active.entityType === 'client' ? 'Client' : 'Lead'}
+                      </span>
+                    )}
+                    {onHold && (
+                      <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, background: '#B45309', borderRadius: 6, padding: '2px 8px', verticalAlign: 'middle' }}>
+                        ON HOLD
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, whiteSpace: 'nowrap' }}>
+                    {active.phone} <span style={{ opacity: 0.75, margin: '0 6px' }}>•</span> ⏱ {formatTime(elapsed)}
+                  </div>
                 </div>
-                <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>{active.phone}</div>
-                <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, marginTop: 2 }}>⏱ {formatTime(elapsed)}</div>
               </div>
-            </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              {/* Transcribe button */}
-              <button
-                onClick={toggleTranscription}
-                title={transcribing ? 'Stop transcription' : 'Start live transcription (Chrome only)'}
-                style={{
-                  background: transcribing ? 'rgba(239,68,68,0.85)' : 'rgba(255,255,255,0.15)',
-                  color: '#fff', border: 'none', borderRadius: 8,
-                  padding: '7px 12px', fontWeight: 700, cursor: 'pointer', fontSize: 12,
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  animation: transcribing ? 'pulse 1.5s infinite' : 'none',
-                }}>
-                {transcribing ? '⏹ Stop' : '🎙️ Transcribe'}
-              </button>
-              {active.id && (
-                <button onClick={() => openFile(active)} className="btn"
-                  style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none' }}>
-                  📂 File
-                </button>
-              )}
-              <button className="btn" onClick={cancelCall}
-                style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none' }}>
-                Cancel
-              </button>
-              <button onClick={toggleMute}
-                style={{
-                  background: muted ? '#C0202F' : 'rgba(255,255,255,0.15)',
-                  color: '#fff', border: 'none', borderRadius: 8,
-                  padding: '8px 12px', fontWeight: 700, cursor: 'pointer', fontSize: 12,
-                  display: 'flex', alignItems: 'center', gap: 5,
-                }}
-                title={muted ? 'Unmute microphone' : 'Mute microphone'}>
-                {muted ? '🔇 Unmute' : '🎤 Mute'}
-              </button>
-              <button onClick={toggleHold} disabled={holdBusy}
-                style={{
-                  background: onHold ? '#B45309' : 'rgba(255,255,255,0.15)',
-                  color: '#fff', border: 'none', borderRadius: 8,
-                  padding: '8px 12px', fontWeight: 700, cursor: holdBusy ? 'wait' : 'pointer', fontSize: 12,
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  opacity: holdBusy ? 0.7 : 1,
-                }}
-                title={onHold ? 'Take the caller off hold' : 'Put the caller on hold (they hear hold music)'}>
-                {onHold ? '▶ Resume' : '⏸ Hold'}
-              </button>
-              <button onClick={() => { setShowAddCaller(v => !v); setAddMsg('') }}
-                style={{
-                  background: showAddCaller ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)',
-                  color: '#fff', border: 'none', borderRadius: 8,
-                  padding: '8px 12px', fontWeight: 700, cursor: 'pointer', fontSize: 12,
-                }}
-                title="Conference another person into this call">
-                ➕ Add
-              </button>
-              <button onClick={() => setShowDialpad(d => !d)}
-                style={{
-                  background: showDialpad ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)',
-                  color: '#fff', border: 'none', borderRadius: 8,
-                  padding: '8px 12px', fontWeight: 700, cursor: 'pointer', fontSize: 13,
-                }}
-                title="Open dialpad for IRS prompts">
-                ⌨️
-              </button>
               <button onClick={endCall}
                 style={{
-                  background: '#C0202F', color: '#fff', border: 'none',
-                  borderRadius: 8, padding: '8px 16px', fontWeight: 700,
-                  cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6
+                  background: '#C0202F', color: '#fff', border: 'none', flexShrink: 0,
+                  borderRadius: 9, padding: '10px 22px', fontWeight: 800,
+                  cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 7,
+                  whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
                 }}>
-                🔴 End
+                🔴 End Call
+              </button>
+            </div>
+
+            {/* Row 2 — call controls, uniform sizing, never wrap labels */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              {[
+                { key: 'mute', onClick: toggleMute, on: muted, onBg: '#C0202F',
+                  label: muted ? '🔇 Unmute' : '🎤 Mute',
+                  title: muted ? 'Unmute microphone' : 'Mute microphone' },
+                { key: 'hold', onClick: toggleHold, on: onHold, onBg: '#B45309', disabled: holdBusy,
+                  label: holdBusy ? '⏳ Hold…' : (onHold ? '▶ Resume' : '⏸ Hold'),
+                  title: onHold ? 'Take the caller off hold' : 'Put the caller on hold (they hear hold music)' },
+                { key: 'add', onClick: () => { setShowAddCaller(v => !v); setAddMsg('') }, on: showAddCaller, onBg: 'rgba(255,255,255,0.35)',
+                  label: '➕ Add Caller', title: 'Conference another person into this call' },
+                { key: 'dialpad', onClick: () => setShowDialpad(d => !d), on: showDialpad, onBg: 'rgba(255,255,255,0.35)',
+                  label: '⌨️ Dialpad', title: 'Open dialpad for IRS prompts' },
+                { key: 'transcribe', onClick: toggleTranscription, on: transcribing, onBg: 'rgba(239,68,68,0.85)',
+                  label: transcribing ? '⏹ Stop' : '🎙️ Transcribe',
+                  title: transcribing ? 'Stop transcription' : 'Start live transcription (Chrome only)',
+                  pulse: transcribing },
+              ].map(b => (
+                <button key={b.key} onClick={b.onClick} disabled={b.disabled} title={b.title}
+                  style={{
+                    background: b.on ? b.onBg : 'rgba(255,255,255,0.15)',
+                    color: '#fff', border: 'none', borderRadius: 8,
+                    height: 34, padding: '0 14px', fontWeight: 700, fontSize: 12.5,
+                    cursor: b.disabled ? 'wait' : 'pointer', opacity: b.disabled ? 0.7 : 1,
+                    display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
+                    animation: b.pulse ? 'pulse 1.5s infinite' : 'none',
+                  }}>
+                  {b.label}
+                </button>
+              ))}
+              {active.id && (
+                <button onClick={() => openFile(active)}
+                  style={{
+                    background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none', borderRadius: 8,
+                    height: 34, padding: '0 14px', fontWeight: 700, fontSize: 12.5, cursor: 'pointer',
+                    display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
+                  }}>
+                  📂 Open File
+                </button>
+              )}
+              <div style={{ flex: 1 }} />
+              <button onClick={cancelCall} title="Abort this call attempt"
+                style={{
+                  background: 'transparent', color: 'rgba(255,255,255,0.75)', border: '1px solid rgba(255,255,255,0.35)',
+                  borderRadius: 8, height: 34, padding: '0 12px', fontWeight: 600, fontSize: 12,
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                }}>
+                Cancel
               </button>
             </div>
           </div>
