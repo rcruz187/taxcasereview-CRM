@@ -73,6 +73,26 @@ export function CallProvider({ children }) {
   const relayRef = useRef(null)
   const activeCallRef = useRef(null) // ref to the live RELAY call object for DTMF
   const liveCallRef = useRef(null)
+  // Mic mute for the live call — SDK muteAudio/unmuteAudio when available,
+  // plus directly toggling the local MediaStream audio track as a
+  // belt-and-suspenders (guaranteed to silence the mic regardless of SDK
+  // version quirks).
+  const [muted, setMuted] = useState(false)
+
+  function toggleMute() {
+    const call = liveCallRef.current
+    if (!call) return
+    const next = !muted
+    try {
+      if (next && typeof call.muteAudio === 'function') call.muteAudio()
+      else if (!next && typeof call.unmuteAudio === 'function') call.unmuteAudio()
+    } catch (e) { console.warn('SDK mute call failed:', e) }
+    try {
+      const stream = call.localStream || call.options?.localStream
+      stream?.getAudioTracks?.().forEach(t => { t.enabled = !next })
+    } catch (e) { console.warn('local track mute failed:', e) }
+    setMuted(next)
+  }
   const callerNumberRef = useRef(null)
   const activeConferenceRef = useRef(null)
   const activeInboundCallsidRef = useRef(null)
@@ -409,7 +429,7 @@ export function CallProvider({ children }) {
     relayRef.current?.newCall({
       destinationNumber: callerNumberRef.current,
       callerNumber: callerNumberRef.current,
-    }).then(call => { liveCallRef.current = call })
+    }).then(call => { liveCallRef.current = call; setMuted(false) })
       .catch(err => { showCallToast('Could not connect: ' + (err?.message || err)); cancelCall() })
 
     pendingInboundRef.current = null
@@ -506,7 +526,7 @@ export function CallProvider({ children }) {
           relayRef.current?.newCall({
             destinationNumber: callerNumberRef.current,
             callerNumber: callerNumberRef.current,
-          }).then(call => { liveCallRef.current = call })
+          }).then(call => { liveCallRef.current = call; setMuted(false) })
             .catch(err => { showCallToast('Could not connect: ' + (err?.message || err)); cancelCall() })
         }, 1500)
       })
@@ -527,6 +547,7 @@ export function CallProvider({ children }) {
     if (outboundPollRef.current) { clearInterval(outboundPollRef.current); outboundPollRef.current = null }
     if (!alreadyHungUp) liveCallRef.current?.hangup()
     liveCallRef.current = null
+    setMuted(false)
     const conf = activeConferenceRef.current
     activeConferenceRef.current = null
     if (conf) endConferenceWithRetry(conf)
@@ -640,6 +661,7 @@ export function CallProvider({ children }) {
     logForm, setLogForm, logModal, setLogModal, saving, callToast,
     OUTCOMES, formatTime,
     answerIncoming, declineIncoming, startCall, endCall, cancelCall,
+    muted, toggleMute,
     sendDTMF: (digit) => {
       if (activeCallRef.current?.dtmf) {
         console.log('[DTMF] sending digit:', digit, 'via call object:', activeCallRef.current)

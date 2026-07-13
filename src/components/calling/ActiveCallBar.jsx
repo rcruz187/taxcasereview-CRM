@@ -21,7 +21,7 @@ export default function ActiveCallBar() {
     incomingCall, incomingMatch, calling, active, elapsed, formatTime,
     answerIncoming, declineIncoming, cancelCall, endCall,
     logModal, logForm, setLogForm, saving, OUTCOMES, saveCallLog, closeLogModalWithoutSaving,
-    callToast, sendDTMF,
+    callToast, sendDTMF, muted, toggleMute,
   } = useCall()
 
   function openFile(entry) {
@@ -228,6 +228,16 @@ export default function ActiveCallBar() {
               <button className="btn" onClick={cancelCall}
                 style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none' }}>
                 Cancel
+              </button>
+              <button onClick={toggleMute}
+                style={{
+                  background: muted ? '#C0202F' : 'rgba(255,255,255,0.15)',
+                  color: '#fff', border: 'none', borderRadius: 8,
+                  padding: '8px 12px', fontWeight: 700, cursor: 'pointer', fontSize: 12,
+                  display: 'flex', alignItems: 'center', gap: 5,
+                }}
+                title={muted ? 'Unmute microphone' : 'Mute microphone'}>
+                {muted ? '🔇 Unmute' : '🎤 Mute'}
               </button>
               <button onClick={() => setShowDialpad(d => !d)}
                 style={{
