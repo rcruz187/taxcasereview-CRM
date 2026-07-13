@@ -292,37 +292,40 @@ export default function ActiveCallBar() {
                 Cancel
               </button>
             </div>
+
+            {/* Row 3 — conference-in input, only while Add Caller is open */}
+            {showAddCaller && (
+              <div style={{
+                background: 'rgba(0,0,0,0.22)', borderRadius: 10,
+                padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+              }}>
+                <span style={{ color: '#fff', fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap' }}>Conference in:</span>
+                <input
+                  autoFocus
+                  value={addNumber}
+                  onChange={e => setAddNumber(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleAddCaller() }}
+                  placeholder="(561) 555-0123"
+                  inputMode="tel"
+                  style={{
+                    background: 'rgba(255,255,255,0.95)', border: 'none', borderRadius: 8,
+                    padding: '8px 12px', fontSize: 13, width: 180,
+                  }}
+                />
+                <button onClick={handleAddCaller} disabled={addBusy}
+                  style={{
+                    background: '#15803D', color: '#fff', border: 'none', borderRadius: 8,
+                    height: 34, padding: '0 16px', fontWeight: 700, cursor: addBusy ? 'wait' : 'pointer', fontSize: 12.5,
+                    opacity: addBusy ? 0.7 : 1, whiteSpace: 'nowrap',
+                  }}>
+                  {addBusy ? 'Dialing…' : '📞 Dial in'}
+                </button>
+                {addMsg && <span style={{ color: '#fff', fontSize: 12.5 }}>{addMsg}</span>}
+              </div>
+            )}
           </div>
 
           {/* ── DTMF Dialpad — appears below call bar ── */}
-          {showAddCaller && (
-            <div style={{
-              marginTop: 8, background: 'rgba(0,0,0,0.25)', borderRadius: 10,
-              padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
-            }}>
-              <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>Conference in:</span>
-              <input
-                value={addNumber}
-                onChange={e => setAddNumber(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleAddCaller() }}
-                placeholder="(561) 555-0123"
-                inputMode="tel"
-                style={{
-                  background: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: 8,
-                  padding: '7px 10px', fontSize: 13, width: 160,
-                }}
-              />
-              <button onClick={handleAddCaller} disabled={addBusy}
-                style={{
-                  background: '#15803D', color: '#fff', border: 'none', borderRadius: 8,
-                  padding: '7px 14px', fontWeight: 700, cursor: addBusy ? 'wait' : 'pointer', fontSize: 12,
-                  opacity: addBusy ? 0.7 : 1,
-                }}>
-                {addBusy ? 'Dialing…' : 'Dial in'}
-              </button>
-              {addMsg && <span style={{ color: '#fff', fontSize: 12 }}>{addMsg}</span>}
-            </div>
-          )}
           {showDialpad && (
             <div style={{
               position: 'fixed', top: 82, left: '50%', transform: 'translateX(-50%)', zIndex: 3498,
