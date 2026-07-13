@@ -21,8 +21,26 @@ export default function ActiveCallBar() {
     incomingCall, incomingMatch, calling, active, elapsed, formatTime,
     answerIncoming, declineIncoming, cancelCall, endCall,
     logModal, logForm, setLogForm, saving, OUTCOMES, saveCallLog, closeLogModalWithoutSaving,
-    callToast, sendDTMF, muted, toggleMute,
+    callToast, sendDTMF, muted, toggleMute, onHold, holdBusy, toggleHold, addParticipant,
   } = useCall()
+
+  // Add-caller popover state
+  const [showAddCaller, setShowAddCaller] = useState(false)
+  const [addNumber, setAddNumber] = useState('')
+  const [addBusy, setAddBusy] = useState(false)
+  const [addMsg, setAddMsg] = useState('')
+
+  async function handleAddCaller() {
+    const digits = addNumber.replace(/\D/g, '')
+    if (digits.length < 10) { setAddMsg('Enter a full 10-digit number.'); return }
+    setAddBusy(true); setAddMsg('')
+    const res = await addParticipant(addNumber.trim())
+    setAddBusy(false)
+    if (res?.error) { setAddMsg('❌ ' + res.error); return }
+    setAddMsg('✅ Ringing them now — they\'ll join when they pick up.')
+    setAddNumber('')
+    setTimeout(() => { setShowAddCaller(false); setAddMsg('') }, 3500)
+  }
 
   function openFile(entry) {
     if (!entry?.id) return
@@ -239,6 +257,26 @@ export default function ActiveCallBar() {
                 title={muted ? 'Unmute microphone' : 'Mute microphone'}>
                 {muted ? '🔇 Unmute' : '🎤 Mute'}
               </button>
+              <button onClick={toggleHold} disabled={holdBusy}
+                style={{
+                  background: onHold ? '#B45309' : 'rgba(255,255,255,0.15)',
+                  color: '#fff', border: 'none', borderRadius: 8,
+                  padding: '8px 12px', fontWeight: 700, cursor: holdBusy ? 'wait' : 'pointer', fontSize: 12,
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  opacity: holdBusy ? 0.7 : 1,
+                }}
+                title={onHold ? 'Take the caller off hold' : 'Put the caller on hold (they hear hold music)'}>
+                {onHold ? '▶ Resume' : '⏸ Hold'}
+              </button>
+              <button onClick={() => { setShowAddCaller(v => !v); setAddMsg('') }}
+                style={{
+                  background: showAddCaller ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)',
+                  color: '#fff', border: 'none', borderRadius: 8,
+                  padding: '8px 12px', fontWeight: 700, cursor: 'pointer', fontSize: 12,
+                }}
+                title="Conference another person into this call">
+                ➕ Add
+              </button>
               <button onClick={() => setShowDialpad(d => !d)}
                 style={{
                   background: showDialpad ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)',
@@ -260,6 +298,34 @@ export default function ActiveCallBar() {
           </div>
 
           {/* ── DTMF Dialpad — appears below call bar ── */}
+          {showAddCaller && (
+            <div style={{
+              marginTop: 8, background: 'rgba(0,0,0,0.25)', borderRadius: 10,
+              padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+            }}>
+              <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>Conference in:</span>
+              <input
+                value={addNumber}
+                onChange={e => setAddNumber(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleAddCaller() }}
+                placeholder="(561) 555-0123"
+                inputMode="tel"
+                style={{
+                  background: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: 8,
+                  padding: '7px 10px', fontSize: 13, width: 160,
+                }}
+              />
+              <button onClick={handleAddCaller} disabled={addBusy}
+                style={{
+                  background: '#15803D', color: '#fff', border: 'none', borderRadius: 8,
+                  padding: '7px 14px', fontWeight: 700, cursor: addBusy ? 'wait' : 'pointer', fontSize: 12,
+                  opacity: addBusy ? 0.7 : 1,
+                }}>
+                {addBusy ? 'Dialing…' : 'Dial in'}
+              </button>
+              {addMsg && <span style={{ color: '#fff', fontSize: 12 }}>{addMsg}</span>}
+            </div>
+          )}
           {showDialpad && (
             <div style={{
               position: 'fixed', top: 82, left: '50%', transform: 'translateX(-50%)', zIndex: 3498,

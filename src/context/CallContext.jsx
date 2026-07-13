@@ -79,6 +79,42 @@ export function CallProvider({ children }) {
   // version quirks).
   const [muted, setMuted] = useState(false)
 
+  // ── Hold + conference-in ──
+  // Every call already lives in a conference, so Hold = "hold every
+  // non-agent participant" (they hear hold music, hear nothing from the
+  // room) and Add Caller = "dial a third leg into this same conference".
+  // Both are done server-side by edge functions using the SignalWire REST
+  // API, keyed off the active conference name.
+  const [onHold, setOnHold] = useState(false)
+  const [holdBusy, setHoldBusy] = useState(false)
+
+  async function toggleHold() {
+    const conf = activeConferenceRef.current
+    if (!conf || holdBusy) return
+    setHoldBusy(true)
+    const next = !onHold
+    const { data, error } = await supabase.functions.invoke('call-hold', {
+      body: { conference_name: conf, hold: next },
+    })
+    setHoldBusy(false)
+    if (error || data?.error) {
+      showCallToast('Hold failed: ' + (error?.message || data?.error || 'unknown error'))
+      return
+    }
+    setOnHold(next)
+  }
+
+  async function addParticipant(number) {
+    const conf = activeConferenceRef.current
+    if (!conf) return { error: 'No active call' }
+    const { data, error } = await supabase.functions.invoke('call-add-participant', {
+      body: { conference_name: conf, number },
+    })
+    if (error || data?.error) return { error: error?.message || data?.error || 'unknown error' }
+    showCallToast('📞 Dialing ' + number + ' into this call…')
+    return { ok: true }
+  }
+
   function toggleMute() {
     const call = liveCallRef.current
     if (!call) return
@@ -429,7 +465,7 @@ export function CallProvider({ children }) {
     relayRef.current?.newCall({
       destinationNumber: callerNumberRef.current,
       callerNumber: callerNumberRef.current,
-    }).then(call => { liveCallRef.current = call; setMuted(false) })
+    }).then(call => { liveCallRef.current = call; setMuted(false); setOnHold(false) })
       .catch(err => { showCallToast('Could not connect: ' + (err?.message || err)); cancelCall() })
 
     pendingInboundRef.current = null
@@ -526,7 +562,7 @@ export function CallProvider({ children }) {
           relayRef.current?.newCall({
             destinationNumber: callerNumberRef.current,
             callerNumber: callerNumberRef.current,
-          }).then(call => { liveCallRef.current = call; setMuted(false) })
+          }).then(call => { liveCallRef.current = call; setMuted(false); setOnHold(false) })
             .catch(err => { showCallToast('Could not connect: ' + (err?.message || err)); cancelCall() })
         }, 1500)
       })
@@ -548,6 +584,7 @@ export function CallProvider({ children }) {
     if (!alreadyHungUp) liveCallRef.current?.hangup()
     liveCallRef.current = null
     setMuted(false)
+    setOnHold(false)
     const conf = activeConferenceRef.current
     activeConferenceRef.current = null
     if (conf) endConferenceWithRetry(conf)
@@ -661,7 +698,7 @@ export function CallProvider({ children }) {
     logForm, setLogForm, logModal, setLogModal, saving, callToast,
     OUTCOMES, formatTime,
     answerIncoming, declineIncoming, startCall, endCall, cancelCall,
-    muted, toggleMute,
+    muted, toggleMute, onHold, holdBusy, toggleHold, addParticipant,
     sendDTMF: (digit) => {
       if (activeCallRef.current?.dtmf) {
         console.log('[DTMF] sending digit:', digit, 'via call object:', activeCallRef.current)
