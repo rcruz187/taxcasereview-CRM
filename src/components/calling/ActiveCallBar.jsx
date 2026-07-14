@@ -296,10 +296,11 @@ export default function ActiveCallBar() {
             {/* Row 3 — conference-in input, only while Add Caller is open */}
             {showAddCaller && (
               <div style={{
-                background: 'rgba(0,0,0,0.22)', borderRadius: 10,
-                padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                background: 'rgba(0,0,0,0.22)', borderRadius: 8,
+                padding: '6px 10px', display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+                alignSelf: 'flex-start',
               }}>
-                <span style={{ color: '#fff', fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap' }}>Conference in:</span>
+                <span style={{ color: '#fff', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>Conference in:</span>
                 <input
                   autoFocus
                   value={addNumber}
@@ -308,19 +309,19 @@ export default function ActiveCallBar() {
                   placeholder="(561) 555-0123"
                   inputMode="tel"
                   style={{
-                    background: 'rgba(255,255,255,0.95)', border: 'none', borderRadius: 8,
-                    padding: '8px 12px', fontSize: 13, width: 180,
+                    background: 'rgba(255,255,255,0.95)', border: 'none', borderRadius: 7,
+                    padding: '6px 10px', fontSize: 12.5, width: 145, height: 28, boxSizing: 'border-box',
                   }}
                 />
                 <button onClick={handleAddCaller} disabled={addBusy}
                   style={{
-                    background: '#15803D', color: '#fff', border: 'none', borderRadius: 8,
-                    height: 34, padding: '0 16px', fontWeight: 700, cursor: addBusy ? 'wait' : 'pointer', fontSize: 12.5,
+                    background: '#15803D', color: '#fff', border: 'none', borderRadius: 7,
+                    height: 28, padding: '0 12px', fontWeight: 700, cursor: addBusy ? 'wait' : 'pointer', fontSize: 12,
                     opacity: addBusy ? 0.7 : 1, whiteSpace: 'nowrap',
                   }}>
                   {addBusy ? 'Dialing…' : '📞 Dial in'}
                 </button>
-                {addMsg && <span style={{ color: '#fff', fontSize: 12.5 }}>{addMsg}</span>}
+                {addMsg && <span style={{ color: '#fff', fontSize: 12 }}>{addMsg}</span>}
               </div>
             )}
           </div>
