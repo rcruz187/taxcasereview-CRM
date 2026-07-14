@@ -108,7 +108,14 @@ serve(async (req) => {
       })
     }
 
-    return new Response(JSON.stringify({ ok: true, conferenceName }), {
+    // Purely additive: the create-call response includes the new client
+    // leg's sid — hand it to the browser so Transfer works on outbound
+    // calls too (transferring = redirecting the client's leg). Nothing
+    // about the call flow itself changes.
+    let clientCallsid = null
+    try { clientCallsid = JSON.parse(text)?.sid || null } catch { /* non-fatal */ }
+
+    return new Response(JSON.stringify({ ok: true, conferenceName, clientCallsid }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 

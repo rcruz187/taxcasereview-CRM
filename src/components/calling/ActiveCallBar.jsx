@@ -21,7 +21,7 @@ export default function ActiveCallBar() {
     incomingCall, incomingMatch, calling, active, elapsed, formatTime,
     answerIncoming, declineIncoming, cancelCall, endCall,
     logModal, logForm, setLogForm, saving, OUTCOMES, saveCallLog, closeLogModalWithoutSaving,
-    callToast, sendDTMF, muted, toggleMute, onHold, holdBusy, toggleHold, addParticipant, transferCall, inboundActive,
+    callToast, sendDTMF, muted, toggleMute, onHold, holdBusy, toggleHold, addParticipant, transferCall, canTransfer,
   } = useCall()
 
   // Add-caller popover state
@@ -277,9 +277,9 @@ export default function ActiveCallBar() {
                 { key: 'add', onClick: () => { setShowAddCaller(v => !v); setShowTransfer(false); setAddMsg('') }, on: showAddCaller, onBg: 'rgba(255,255,255,0.35)',
                   label: '➕ Add Caller', title: 'Conference another person into this call' },
                 { key: 'transfer', onClick: () => { setShowTransfer(v => !v); setShowAddCaller(false); setXferMsg('') },
-                  on: showTransfer, onBg: 'rgba(255,255,255,0.35)', disabled: !inboundActive,
+                  on: showTransfer, onBg: 'rgba(255,255,255,0.35)', disabled: !canTransfer,
                   label: '↪ Transfer',
-                  title: inboundActive ? 'Transfer this caller to a teammate or an outside number' : 'Transfer is available on inbound calls' },
+                  title: canTransfer ? 'Transfer this call to a teammate or an outside number' : 'Transfer becomes available once the call connects' },
                 { key: 'dialpad', onClick: () => setShowDialpad(d => !d), on: showDialpad, onBg: 'rgba(255,255,255,0.35)',
                   label: '⌨️ Dialpad', title: 'Open dialpad for IRS prompts' },
                 { key: 'transcribe', onClick: toggleTranscription, on: transcribing, onBg: 'rgba(239,68,68,0.85)',

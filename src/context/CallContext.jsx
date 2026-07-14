@@ -86,7 +86,10 @@ export function CallProvider({ children }) {
   // Both are done server-side by edge functions using the SignalWire REST
   // API, keyed off the active conference name.
   const [onHold, setOnHold] = useState(false)
-  const [inboundActive, setInboundActive] = useState(false)
+  const [canTransfer, setCanTransfer] = useState(false)
+  // Which far-end leg a transfer should redirect: the caller's leg on
+  // inbound, the client's leg on outbound.
+  const transferableCallsidRef = useRef(null)
   const [holdBusy, setHoldBusy] = useState(false)
 
   async function toggleHold() {
@@ -111,8 +114,8 @@ export function CallProvider({ children }) {
     // target agent's browser through the normal extension machinery
     // (12s target-only, then everyone, then voicemail). 'external' ->
     // dials the outside number directly, caller ID = business number.
-    const callsid = activeInboundCallsidRef.current
-    if (!callsid) return { error: 'Transfer is available on inbound calls for now.' }
+    const callsid = transferableCallsidRef.current
+    if (!callsid) return { error: 'Transfer isn\'t available for this call.' }
     const { data, error } = await supabase.functions.invoke('call-transfer', {
       body: {
         callsid,
@@ -463,7 +466,8 @@ export function CallProvider({ children }) {
 
     activeConferenceRef.current = row.conference_name || null
     activeInboundCallsidRef.current = row.callsid || null
-    setInboundActive(!!row.callsid)
+    transferableCallsidRef.current = row.callsid || null
+    setCanTransfer(!!row.callsid)
 
     // Server-side backup hangup detector for inbound calls — mirrors outboundPollRef.
     // When the caller hangs up, caller-hangup marks the row 'completed' or 'missed'.
@@ -558,6 +562,8 @@ export function CallProvider({ children }) {
           return
         }
         activeConferenceRef.current = data.conferenceName || null
+        transferableCallsidRef.current = data.clientCallsid || null
+        setCanTransfer(!!data.clientCallsid)
         // Server-confirmed backup for noticing this call has truly ended,
         // independent of the RELAY SDK's own (sometimes unreliable)
         // call.state events. outbound-call-status writes 'completed' here
@@ -611,7 +617,8 @@ export function CallProvider({ children }) {
     liveCallRef.current = null
     setMuted(false)
     setOnHold(false)
-    setInboundActive(false)
+    setCanTransfer(false)
+    transferableCallsidRef.current = null
     const conf = activeConferenceRef.current
     activeConferenceRef.current = null
     if (conf) endConferenceWithRetry(conf)
@@ -729,7 +736,7 @@ export function CallProvider({ children }) {
     logForm, setLogForm, logModal, setLogModal, saving, callToast,
     OUTCOMES, formatTime,
     answerIncoming, declineIncoming, startCall, endCall, cancelCall,
-    muted, toggleMute, onHold, holdBusy, toggleHold, addParticipant, transferCall, inboundActive,
+    muted, toggleMute, onHold, holdBusy, toggleHold, addParticipant, transferCall, canTransfer,
     sendDTMF: (digit) => {
       if (activeCallRef.current?.dtmf) {
         console.log('[DTMF] sending digit:', digit, 'via call object:', activeCallRef.current)
