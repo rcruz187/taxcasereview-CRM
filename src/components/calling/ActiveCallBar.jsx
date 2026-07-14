@@ -21,7 +21,7 @@ export default function ActiveCallBar() {
     incomingCall, incomingMatch, calling, active, elapsed, formatTime,
     answerIncoming, declineIncoming, cancelCall, endCall,
     logModal, logForm, setLogForm, saving, OUTCOMES, saveCallLog, closeLogModalWithoutSaving,
-    callToast, sendDTMF, muted, toggleMute, onHold, holdBusy, toggleHold, addParticipant,
+    callToast, sendDTMF, muted, toggleMute, onHold, holdBusy, toggleHold, addParticipant, transferCall, inboundActive,
   } = useCall()
 
   // Add-caller popover state
@@ -40,6 +40,29 @@ export default function ActiveCallBar() {
     setAddMsg('✅ Ringing them now — they\'ll join when they pick up.')
     setAddNumber('')
     setTimeout(() => { setShowAddCaller(false); setAddMsg('') }, 3500)
+  }
+
+  // Transfer panel state — employee directory loads when the panel opens
+  const [showTransfer, setShowTransfer] = useState(false)
+  const [xferEmployees, setXferEmployees] = useState([])
+  const [xferNumber, setXferNumber] = useState('')
+  const [xferBusy, setXferBusy] = useState(false)
+  const [xferMsg, setXferMsg] = useState('')
+
+  useEffect(() => {
+    if (!showTransfer) return
+    supabase.from('employees').select('name,title,extension')
+      .not('extension', 'is', null).neq('extension', '').order('name')
+      .then(({ data }) => setXferEmployees(data || []))
+  }, [showTransfer])
+
+  async function handleTransfer(target) {
+    if (xferBusy) return
+    setXferBusy(true); setXferMsg('')
+    const res = await transferCall(target)
+    setXferBusy(false)
+    if (res?.error) { setXferMsg('❌ ' + res.error); return }
+    // On success transferCall already ends our side; the bar closes itself.
   }
 
   function openFile(entry) {
@@ -251,8 +274,12 @@ export default function ActiveCallBar() {
                 { key: 'hold', onClick: toggleHold, on: onHold, onBg: '#B45309', disabled: holdBusy,
                   label: holdBusy ? '⏳ Hold…' : (onHold ? '▶ Resume' : '⏸ Hold'),
                   title: onHold ? 'Take the caller off hold' : 'Put the caller on hold (they hear hold music)' },
-                { key: 'add', onClick: () => { setShowAddCaller(v => !v); setAddMsg('') }, on: showAddCaller, onBg: 'rgba(255,255,255,0.35)',
+                { key: 'add', onClick: () => { setShowAddCaller(v => !v); setShowTransfer(false); setAddMsg('') }, on: showAddCaller, onBg: 'rgba(255,255,255,0.35)',
                   label: '➕ Add Caller', title: 'Conference another person into this call' },
+                { key: 'transfer', onClick: () => { setShowTransfer(v => !v); setShowAddCaller(false); setXferMsg('') },
+                  on: showTransfer, onBg: 'rgba(255,255,255,0.35)', disabled: !inboundActive,
+                  label: '↪ Transfer',
+                  title: inboundActive ? 'Transfer this caller to a teammate or an outside number' : 'Transfer is available on inbound calls' },
                 { key: 'dialpad', onClick: () => setShowDialpad(d => !d), on: showDialpad, onBg: 'rgba(255,255,255,0.35)',
                   label: '⌨️ Dialpad', title: 'Open dialpad for IRS prompts' },
                 { key: 'transcribe', onClick: toggleTranscription, on: transcribing, onBg: 'rgba(239,68,68,0.85)',
@@ -265,7 +292,7 @@ export default function ActiveCallBar() {
                     background: b.on ? b.onBg : 'rgba(255,255,255,0.15)',
                     color: '#fff', border: 'none', borderRadius: 8,
                     height: 29, padding: '0 11px', fontWeight: 700, fontSize: 12,
-                    cursor: b.disabled ? 'wait' : 'pointer', opacity: b.disabled ? 0.7 : 1,
+                    cursor: b.disabled ? 'not-allowed' : 'pointer', opacity: b.disabled ? 0.55 : 1,
                     display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
                     animation: b.pulse ? 'pulse 1.5s infinite' : 'none',
                   }}>
@@ -322,6 +349,61 @@ export default function ActiveCallBar() {
                   {addBusy ? 'Dialing…' : '📞 Dial in'}
                 </button>
                 {addMsg && <span style={{ color: '#fff', fontSize: 12 }}>{addMsg}</span>}
+              </div>
+            )}
+
+            {/* Transfer panel — employee directory + external number */}
+            {showTransfer && (
+              <div style={{
+                background: 'rgba(0,0,0,0.22)', borderRadius: 8,
+                padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 7,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <span style={{ color: '#fff', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', marginRight: 2 }}>Transfer to:</span>
+                  {xferEmployees.length === 0 && (
+                    <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12 }}>No teammates with extensions found.</span>
+                  )}
+                  {xferEmployees.map(e => (
+                    <button key={e.extension} disabled={xferBusy}
+                      onClick={() => handleTransfer({ type: 'extension', extension: e.extension, label: `${e.name} (x${e.extension})` })}
+                      title={e.title ? `${e.name} — ${e.title}` : e.name}
+                      style={{
+                        background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none', borderRadius: 7,
+                        height: 28, padding: '0 11px', fontWeight: 700, fontSize: 12,
+                        cursor: xferBusy ? 'wait' : 'pointer', whiteSpace: 'nowrap',
+                        opacity: xferBusy ? 0.7 : 1, display: 'inline-flex', alignItems: 'center', gap: 5,
+                      }}>
+                      👤 {e.name} <span style={{ opacity: 0.75, fontWeight: 600 }}>x{e.extension}</span>
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>Outside number:</span>
+                  <input
+                    value={xferNumber}
+                    onChange={e => setXferNumber(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && xferNumber.replace(/\D/g, '').length >= 10) handleTransfer({ type: 'external', number: xferNumber.trim(), label: xferNumber.trim() }) }}
+                    placeholder="(561) 555-0123"
+                    inputMode="tel"
+                    style={{
+                      background: 'rgba(255,255,255,0.95)', border: 'none', borderRadius: 7,
+                      padding: '6px 10px', fontSize: 12.5, width: 145, height: 28, boxSizing: 'border-box',
+                    }}
+                  />
+                  <button disabled={xferBusy}
+                    onClick={() => {
+                      if (xferNumber.replace(/\D/g, '').length < 10) { setXferMsg('Enter a full 10-digit number.'); return }
+                      handleTransfer({ type: 'external', number: xferNumber.trim(), label: xferNumber.trim() })
+                    }}
+                    style={{
+                      background: '#15803D', color: '#fff', border: 'none', borderRadius: 7,
+                      height: 28, padding: '0 12px', fontWeight: 700, cursor: xferBusy ? 'wait' : 'pointer', fontSize: 12,
+                      opacity: xferBusy ? 0.7 : 1, whiteSpace: 'nowrap',
+                    }}>
+                    {xferBusy ? 'Transferring…' : '↪ Transfer'}
+                  </button>
+                  {xferMsg && <span style={{ color: '#fff', fontSize: 12 }}>{xferMsg}</span>}
+                </div>
               </div>
             )}
           </div>

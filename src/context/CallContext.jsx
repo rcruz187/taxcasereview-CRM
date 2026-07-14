@@ -86,6 +86,7 @@ export function CallProvider({ children }) {
   // Both are done server-side by edge functions using the SignalWire REST
   // API, keyed off the active conference name.
   const [onHold, setOnHold] = useState(false)
+  const [inboundActive, setInboundActive] = useState(false)
   const [holdBusy, setHoldBusy] = useState(false)
 
   async function toggleHold() {
@@ -102,6 +103,30 @@ export function CallProvider({ children }) {
       return
     }
     setOnHold(next)
+  }
+
+  async function transferCall(target) {
+    // Blind transfer: redirect the CALLER's leg away from our conference.
+    // 'extension' -> re-parks them in a fresh conference and rings the
+    // target agent's browser through the normal extension machinery
+    // (12s target-only, then everyone, then voicemail). 'external' ->
+    // dials the outside number directly, caller ID = business number.
+    const callsid = activeInboundCallsidRef.current
+    if (!callsid) return { error: 'Transfer is available on inbound calls for now.' }
+    const { data, error } = await supabase.functions.invoke('call-transfer', {
+      body: {
+        callsid,
+        target_type: target.type,
+        extension: target.extension || null,
+        number: target.number || null,
+      },
+    })
+    if (error || data?.error) return { error: error?.message || data?.error || 'unknown error' }
+    showCallToast('↪ Transferred' + (target.label ? ' to ' + target.label : ''))
+    // Caller has left our conference — close out our side normally
+    // (opens the call log modal as usual).
+    endCall()
+    return { ok: true }
   }
 
   async function addParticipant(number) {
@@ -438,6 +463,7 @@ export function CallProvider({ children }) {
 
     activeConferenceRef.current = row.conference_name || null
     activeInboundCallsidRef.current = row.callsid || null
+    setInboundActive(!!row.callsid)
 
     // Server-side backup hangup detector for inbound calls — mirrors outboundPollRef.
     // When the caller hangs up, caller-hangup marks the row 'completed' or 'missed'.
@@ -585,13 +611,18 @@ export function CallProvider({ children }) {
     liveCallRef.current = null
     setMuted(false)
     setOnHold(false)
+    setInboundActive(false)
     const conf = activeConferenceRef.current
     activeConferenceRef.current = null
     if (conf) endConferenceWithRetry(conf)
     const inboundCallsid = activeInboundCallsidRef.current
     activeInboundCallsidRef.current = null
     if (inboundCallsid) {
-      supabase.from('incoming_calls').update({ status: 'completed' }).eq('callsid', inboundCallsid)
+      // Conditional on 'answered': after a transfer, this same callsid has
+      // a fresh 'ringing' row for the target agent — completing THAT row
+      // would kill the transfer. Only our own answered row gets closed.
+      supabase.from('incoming_calls').update({ status: 'completed' })
+        .eq('callsid', inboundCallsid).eq('status', 'answered')
         .then(({ error }) => error && console.error('incoming_calls completion update error:', error))
     }
   }
@@ -698,7 +729,7 @@ export function CallProvider({ children }) {
     logForm, setLogForm, logModal, setLogModal, saving, callToast,
     OUTCOMES, formatTime,
     answerIncoming, declineIncoming, startCall, endCall, cancelCall,
-    muted, toggleMute, onHold, holdBusy, toggleHold, addParticipant,
+    muted, toggleMute, onHold, holdBusy, toggleHold, addParticipant, transferCall, inboundActive,
     sendDTMF: (digit) => {
       if (activeCallRef.current?.dtmf) {
         console.log('[DTMF] sending digit:', digit, 'via call object:', activeCallRef.current)
