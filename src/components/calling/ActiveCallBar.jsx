@@ -199,21 +199,21 @@ export default function ActiveCallBar() {
         <>
           <div style={{
             position: 'fixed', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 3500,
-            width: 'min(860px, 96vw)',
+            width: 'min(720px, 96vw)',
             background: 'linear-gradient(135deg, #0f6e2e, #25A25A)',
             borderRadius: showTranscript ? '12px 12px 0 0' : 12,
-            padding: '12px 18px', boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
-            display: 'flex', flexDirection: 'column', gap: 10,
+            padding: '9px 14px', boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+            display: 'flex', flexDirection: 'column', gap: 7,
           }}>
             {/* Row 1 — who you're talking to + End */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                 <div style={{
-                  width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.2)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, flexShrink: 0
+                  width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0
                 }}>📞</div>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ color: '#fff', fontWeight: 700, fontSize: 15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ color: '#fff', fontWeight: 700, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {active?.name || `${active?.first || ''} ${active?.last || ''}`.trim()}
                     {active.entityType && (
                       <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, background: 'rgba(255,255,255,0.2)', borderRadius: 6, padding: '2px 8px', verticalAlign: 'middle' }}>
@@ -226,7 +226,7 @@ export default function ActiveCallBar() {
                       </span>
                     )}
                   </div>
-                  <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, whiteSpace: 'nowrap' }}>
+                  <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11.5, whiteSpace: 'nowrap' }}>
                     {active.phone} <span style={{ opacity: 0.75, margin: '0 6px' }}>•</span> ⏱ {formatTime(elapsed)}
                   </div>
                 </div>
@@ -234,8 +234,8 @@ export default function ActiveCallBar() {
               <button onClick={endCall}
                 style={{
                   background: '#C0202F', color: '#fff', border: 'none', flexShrink: 0,
-                  borderRadius: 9, padding: '10px 22px', fontWeight: 800,
-                  cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 7,
+                  borderRadius: 8, padding: '7px 16px', fontWeight: 800,
+                  cursor: 'pointer', fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 6,
                   whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
                 }}>
                 🔴 End Call
@@ -264,7 +264,7 @@ export default function ActiveCallBar() {
                   style={{
                     background: b.on ? b.onBg : 'rgba(255,255,255,0.15)',
                     color: '#fff', border: 'none', borderRadius: 8,
-                    height: 34, padding: '0 14px', fontWeight: 700, fontSize: 12.5,
+                    height: 29, padding: '0 11px', fontWeight: 700, fontSize: 12,
                     cursor: b.disabled ? 'wait' : 'pointer', opacity: b.disabled ? 0.7 : 1,
                     display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
                     animation: b.pulse ? 'pulse 1.5s infinite' : 'none',
@@ -276,7 +276,7 @@ export default function ActiveCallBar() {
                 <button onClick={() => openFile(active)}
                   style={{
                     background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none', borderRadius: 8,
-                    height: 34, padding: '0 14px', fontWeight: 700, fontSize: 12.5, cursor: 'pointer',
+                    height: 29, padding: '0 11px', fontWeight: 700, fontSize: 12, cursor: 'pointer',
                     display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
                   }}>
                   📂 Open File
@@ -286,7 +286,7 @@ export default function ActiveCallBar() {
               <button onClick={cancelCall} title="Abort this call attempt"
                 style={{
                   background: 'transparent', color: 'rgba(255,255,255,0.75)', border: '1px solid rgba(255,255,255,0.35)',
-                  borderRadius: 8, height: 34, padding: '0 12px', fontWeight: 600, fontSize: 12,
+                  borderRadius: 8, height: 29, padding: '0 10px', fontWeight: 600, fontSize: 11.5,
                   cursor: 'pointer', whiteSpace: 'nowrap',
                 }}>
                 Cancel
