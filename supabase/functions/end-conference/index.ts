@@ -65,6 +65,35 @@ serve(async (req) => {
       })
     }
 
+    // ── Explicitly hang up every participant leg ──
+    // Terminating the conference container alone has proven unreliable at
+    // actually ending the participant CALLS (observed: client cell stays
+    // connected after the agent ends, and outbound_calls rows sit in
+    // 'connected' forever because the leg's completed statusCallback never
+    // fires). Hanging up each leg directly is unambiguous.
+    try {
+      const partResp = await fetch(`${base}/Conferences/${conferenceSid}/Participants.json`, {
+        headers: { Authorization: auth },
+      })
+      const partData = await partResp.json()
+      const participants = partData?.participants || []
+      for (const p of participants) {
+        if (!p.call_sid) continue
+        const kill = await fetch(`${base}/Calls/${p.call_sid}.json`, {
+          method: 'POST',
+          headers: { Authorization: auth, 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ Status: 'completed' }),
+        })
+        if (!kill.ok) {
+          console.error('end-conference: participant hangup failed', p.call_sid, kill.status, await kill.text())
+        } else {
+          console.log('end-conference: hung up participant leg', p.call_sid)
+        }
+      }
+    } catch (e) {
+      console.error('end-conference: participant hangup sweep error (continuing to conference terminate)', e)
+    }
+
     const updResp = await fetch(`${base}/Conferences/${conferenceSid}.json`, {
       method: 'POST',
       headers: { Authorization: auth, 'Content-Type': 'application/x-www-form-urlencoded' },
