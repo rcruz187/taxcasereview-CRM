@@ -126,9 +126,13 @@ export function CallProvider({ children }) {
     })
     if (error || data?.error) return { error: error?.message || data?.error || 'unknown error' }
     showCallToast('↪ Transferred' + (target.label ? ' to ' + target.label : ''))
-    // Caller has left our conference — close out our side normally
-    // (opens the call log modal as usual).
-    endCall()
+    // Give SignalWire a moment to physically move the caller's leg out of
+    // our conference, then close our side WITHOUT the end-conference
+    // participant sweep — that sweep hangs up everyone still in the room,
+    // and firing it during the redirect kills the caller we just
+    // transferred. Our own leg leaving ends the empty conference anyway.
+    await new Promise(r => setTimeout(r, 1500))
+    endCall({ skipConferenceKill: true })
     return { ok: true }
   }
 
@@ -610,7 +614,7 @@ export function CallProvider({ children }) {
   // completed so a stale row can never hijack the next agent-join. Having
   // one shared function means these three paths can't drift out of sync
   // with each other again.
-  function finalizeCallEnd({ alreadyHungUp }) {
+  function finalizeCallEnd({ alreadyHungUp, skipConferenceKill = false }) {
     stopRingback()
     if (outboundPollRef.current) { clearInterval(outboundPollRef.current); outboundPollRef.current = null }
     if (!alreadyHungUp) liveCallRef.current?.hangup()
@@ -621,7 +625,12 @@ export function CallProvider({ children }) {
     transferableCallsidRef.current = null
     const conf = activeConferenceRef.current
     activeConferenceRef.current = null
-    if (conf) endConferenceWithRetry(conf)
+    // After a TRANSFER, end-conference must NOT run: its participant sweep
+    // hangs up everyone still in the conference, and the just-transferred
+    // caller's leg may not have physically moved out yet — the sweep would
+    // kill the caller mid-transfer. Our own RELAY leg hanging up ends the
+    // (now empty) conference naturally via endConferenceOnExit.
+    if (conf && !skipConferenceKill) endConferenceWithRetry(conf)
     const inboundCallsid = activeInboundCallsidRef.current
     activeInboundCallsidRef.current = null
     if (inboundCallsid) {
@@ -634,8 +643,8 @@ export function CallProvider({ children }) {
     }
   }
 
-  function endCall() {
-    finalizeCallEnd({ alreadyHungUp: false })
+  function endCall(opts = {}) {
+    finalizeCallEnd({ alreadyHungUp: false, skipConferenceKill: !!opts.skipConferenceKill })
     uiStartedRef.current = false
     clearInterval(timerRef.current)
     setCalling(false)
