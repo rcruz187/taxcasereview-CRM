@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { emailHtml } from '../lib/emailTemplate'
 
 // ── Public booking page (Calendly-style), served at #/book with no login ──
 // All data access goes through SECURITY DEFINER RPCs (booking_get_config,
@@ -75,6 +76,36 @@ export default function BookAppointment() {
       pickDate(date)
       return
     }
+
+    // Confirmation to the client + notification to the firm — best-effort,
+    // the booking stands even if email sending hiccups.
+    const whenLong = `${new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} at ${fmt12(time)} (Eastern)`
+    if (form.email.trim()) {
+      supabase.functions.invoke('send-email', { body: {
+        to: form.email.trim(),
+        subject: `Appointment Confirmed — ${type}, ${new Date(date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at ${fmt12(time)}`,
+        html: emailHtml({ body: `
+          <p>Hi <strong>${form.name.trim()}</strong>,</p>
+          <p>Your appointment is confirmed:</p>
+          <table cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;width:100%;margin:12px 0">
+            <tr><td style="padding:16px 20px;font-size:14px;color:#0f172a;line-height:1.9">
+              <strong>${type}</strong><br>${whenLong}
+            </td></tr>
+          </table>
+          <p>Need to reschedule or cancel? Just reply to this email or call us and we'll take care of it.</p>
+          <p style="margin-top:20px">Talk soon,<br><strong>Tax Case Review</strong></p>` }),
+      } }).catch(() => {})
+    }
+    supabase.functions.invoke('send-email', { body: {
+      to: 'info@taxcasereview.org',
+      subject: `📅 New online booking: ${form.name.trim()} — ${new Date(date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${fmt12(time)}`,
+      html: emailHtml({ body: `
+        <p><strong>${form.name.trim()}</strong> just booked online:</p>
+        <p style="line-height:1.9"><strong>${type}</strong><br>${whenLong}<br>
+        Email: ${form.email.trim() || '—'}<br>Phone: ${form.phone.trim() || '—'}${form.notes.trim() ? `<br>Notes: ${form.notes.trim()}` : ''}</p>
+        <p>The appointment is on the CRM calendar${form.email.trim() || form.phone.trim() ? '; a lead was created if they were new' : ''}.</p>` }),
+    } }).catch(() => {})
+
     setDone({ date, time, type })
   }
 
