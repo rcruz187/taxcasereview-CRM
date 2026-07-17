@@ -136,5 +136,21 @@ export async function storeTranscriptAnalysis(file, clientName, a) {
     file_url: fileUrl, file_path: filePath,
   }).select('id').single()
   if (error) throw new Error(error.message)
+
+  // File it in the client's Documents → Transcripts folder (best-effort;
+  // the analysis stands even if this insert fails)
+  try {
+    const title = ['IRS', a.transcript_type || 'Transcript', a.tax_year || ''].filter(Boolean).join(' ')
+    const bal = a.account_balance
+    await supabase.from('documents').insert([{
+      name: title,
+      client: clientName.trim(),
+      docType: 'Transcripts',
+      notes: bal !== null && bal !== undefined ? `Auto-imported. Balance: $${Number(bal).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : 'Auto-imported.',
+      file_url: fileUrl, file_name: file.name, file_size: file.size,
+      created_at: new Date().toISOString(),
+    }])
+  } catch { /* noop */ }
+
   return data?.id || null
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { parseIrsTranscript, extractPdfText } from '../lib/irsTranscriptParser'
+import { parseTranscriptFile, storeTranscriptAnalysis } from '../lib/transcriptPull'
 import TranscriptPull from '../components/TranscriptPull'
 
 // ── IRS Portal ──
@@ -70,40 +70,11 @@ export default function IRSPortal() {
     for (const file of files) {
       setParseStatus(`Analyzing ${file.name} (${done + 1} of ${files.length})…`)
       try {
-        // Deterministic in-browser parse: extract the PDF's text layer and
-        // pattern-match the rigid TDS layout. No AI, no API cost, and the
-        // transcript's contents never leave the browser.
-        const text = await extractPdfText(file)
-        if (!text || text.trim().length < 40) {
-          throw new Error('No text layer found — this looks like a scanned image, not a TDS download. Pull the PDF from e-Services directly.')
-        }
-        const a = parseIrsTranscript(text)
-
-        // Store the source PDF alongside the analysis
-        let fileUrl = null, filePath = null
-        try {
-          filePath = `transcripts/${uploadClient.trim().replace(/[^A-Za-z0-9 _-]/g, '')}/${Date.now()}-${file.name}`
-          const { error: upErr } = await supabase.storage.from('documents').upload(filePath, file, { upsert: true })
-          if (!upErr) {
-            const { data: u } = supabase.storage.from('documents').getPublicUrl(filePath)
-            fileUrl = u?.publicUrl || null
-          }
-        } catch { /* analysis still saves without the file */ }
-
-        const { error: insErr } = await supabase.from('transcript_analyses').insert({
-          client_name: uploadClient.trim(),
-          tax_year: a.tax_year || null,
-          transcript_type: a.transcript_type || null,
-          total_balance: a.account_balance ?? null,
-          accrued_penalty: a.accrued_penalty ?? null,
-          accrued_interest: a.accrued_interest ?? null,
-          assessment_date: a.assessment_date || null,
-          csed_estimate: a.csed_estimate || null,
-          flags: a.flags || {},
-          raw_analysis: a,
-          file_url: fileUrl, file_path: filePath,
-        })
-        if (insErr) throw new Error(insErr.message)
+        // Shared helper: deterministic in-browser parse, PDF stored to
+        // Storage, analysis row inserted, and the doc filed in the client's
+        // Documents → Transcripts folder.
+        const a = await parseTranscriptFile(file)
+        await storeTranscriptAnalysis(file, uploadClient, a)
         done++
       } catch (err) {
         setParseStatus(`❌ ${file.name}: ${err.message}`)
@@ -121,6 +92,7 @@ export default function IRSPortal() {
   async function deleteAnalysis(id) {
     const row = analyses.find(a => a.id === id)
     if (row?.file_path) await supabase.storage.from('documents').remove([row.file_path]).catch(() => {})
+    if (row?.file_url) await supabase.from('documents').delete().eq('file_url', row.file_url)
     await supabase.from('transcript_analyses').delete().eq('id', id)
     setTDel(null)
     loadAnalyses()
