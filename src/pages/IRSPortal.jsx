@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { parseIrsTranscript, extractPdfText } from '../lib/irsTranscriptParser'
+import TranscriptPull from '../components/TranscriptPull'
 
 // ── IRS Portal ──
 // Two tools that together close the POA -> transcripts loop:
@@ -230,7 +231,7 @@ export default function IRSPortal() {
       </div>
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
-        {[['transcripts', '📊 Transcript Analysis'], ['poa', '📝 POA / CAF Tracker']].map(([k, label]) => (
+        {[['transcripts', '📊 Transcript Analysis'], ['pull', '📡 Pull Transcripts'], ['poa', '📝 POA / CAF Tracker']].map(([k, label]) => (
           <button key={k} className={tab === k ? 'btn' : 'btn sec'} onClick={() => setTab(k)}>{label}</button>
         ))}
       </div>
@@ -359,6 +360,12 @@ export default function IRSPortal() {
             hearings, time outside the country — extend them. Verify before relying on any CSED.
           </div>
         </div>
+      )}
+
+      {/* ═══════════ PULL TRANSCRIPTS TAB ═══════════ */}
+      {tab === 'pull' && (
+        <TranscriptPull clientNames={clientNames} poas={poas}
+          onGoToPoa={() => setTab('poa')} onImported={loadAnalyses} />
       )}
 
       {/* ═══════════ POA TAB ═══════════ */}
