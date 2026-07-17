@@ -97,7 +97,7 @@ export default function BookAppointment() {
       } }).catch(() => {})
     }
     supabase.functions.invoke('send-email', { body: {
-      to: 'info@taxcasereview.org',
+      to: (data && data.notify_email) || 'info@taxcasereview.org',
       subject: `📅 New online booking: ${form.name.trim()} — ${new Date(date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${fmt12(time)}`,
       html: emailHtml({ body: `
         <p><strong>${form.name.trim()}</strong> just booked online:</p>

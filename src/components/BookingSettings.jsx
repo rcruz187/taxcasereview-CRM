@@ -21,7 +21,7 @@ export const DEFAULT_BOOKING_CONFIG = {
 
 const DAYS = [['mon', 'Monday'], ['tue', 'Tuesday'], ['wed', 'Wednesday'], ['thu', 'Thursday'], ['fri', 'Friday'], ['sat', 'Saturday'], ['sun', 'Sunday']]
 const TYPE_OPTIONS = ['Free Consultation', 'Case Discussion', 'Tax Investigation Review', 'Document Signing', 'Follow-Up Call', 'In-Person Meeting']
-const BOOK_URL = `${window.location.origin}${window.location.pathname}#/book`
+const BOOK_URL = `${window.location.origin}${import.meta.env.BASE_URL}book`
 
 export default function BookingSettings() {
   const [cfg, setCfg] = useState(DEFAULT_BOOKING_CONFIG)

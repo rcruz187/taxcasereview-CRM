@@ -33,7 +33,7 @@ export default function BookingWidget({ contact, onClose, mode = 'lead' }) {
   const [linkSent, setLinkSent] = useState(false)
 
   // Calendly-style: email them the public booking link and let THEM pick
-  const BOOK_URL = `${window.location.origin}${window.location.pathname}#/book`
+  const BOOK_URL = `${window.location.origin}${import.meta.env.BASE_URL}book`
   async function sendBookingLink() {
     if (!contact?.email) return
     setLinkSent('sending')
