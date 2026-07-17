@@ -34,6 +34,7 @@ const Cases         = lazy(() => import('./pages/Cases'))
 const Tasks         = lazy(() => import('./pages/Tasks'))
 const Calendar      = lazy(() => import('./pages/Calendar'))
 const Transcripts   = lazy(() => import('./pages/Transcripts'))
+const IRSPortal     = lazy(() => import('./pages/IRSPortal'))
 const IrsForms      = lazy(() => import('./pages/IrsForms'))
 const StateForms    = lazy(() => import('./pages/StateForms'))
 const IrsReference  = lazy(() => import('./pages/IrsReference'))
@@ -137,6 +138,7 @@ function Shell() {
             <Route path="/tasks"       element={<Guard section="tasks"><Tasks /></Guard>} />
             <Route path="/calendar"    element={<Guard section="calendar"><Calendar /></Guard>} />
             <Route path="/transcripts" element={<Guard section="transcripts"><Transcripts /></Guard>} />
+            <Route path="/irsportal" element={<Guard section="transcripts"><IRSPortal /></Guard>} />
             <Route path="/irsforms"    element={<Guard section="irsforms"><IrsForms /></Guard>} />
             <Route path="/stateforms"  element={<Guard section="stateforms"><StateForms /></Guard>} />
             <Route path="/irsreference" element={<Guard section="irsreference"><IrsReference /></Guard>} />
