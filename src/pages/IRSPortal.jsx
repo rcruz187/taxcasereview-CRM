@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { parseIrsTranscript, extractPdfText } from '../lib/irsTranscriptParser'
 
 // ── IRS Portal ──
 // Two tools that together close the POA -> transcripts loop:
@@ -29,15 +30,6 @@ const STATUS_COLORS = {
 function money(n) {
   if (n === null || n === undefined || n === '' || isNaN(Number(n))) return '—'
   return Number(n).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-}
-
-function fileToBase64(file) {
-  return new Promise((res, rej) => {
-    const r = new FileReader()
-    r.onload = () => res(String(r.result).split(',')[1])
-    r.onerror = () => rej(new Error('Could not read file'))
-    r.readAsDataURL(file)
-  })
 }
 
 export default function IRSPortal() {
@@ -77,10 +69,14 @@ export default function IRSPortal() {
     for (const file of files) {
       setParseStatus(`Analyzing ${file.name} (${done + 1} of ${files.length})…`)
       try {
-        const base64 = await fileToBase64(file)
-        const { data, error } = await supabase.functions.invoke('parse-transcript', { body: { base64 } })
-        if (error || data?.error) throw new Error(error?.message || data?.error || 'parse failed')
-        const a = data.analysis || {}
+        // Deterministic in-browser parse: extract the PDF's text layer and
+        // pattern-match the rigid TDS layout. No AI, no API cost, and the
+        // transcript's contents never leave the browser.
+        const text = await extractPdfText(file)
+        if (!text || text.trim().length < 40) {
+          throw new Error('No text layer found — this looks like a scanned image, not a TDS download. Pull the PDF from e-Services directly.')
+        }
+        const a = parseIrsTranscript(text)
 
         // Store the source PDF alongside the analysis
         let fileUrl = null, filePath = null
