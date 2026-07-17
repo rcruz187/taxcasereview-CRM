@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import BookingSettings from '../components/BookingSettings'
 import { useApp } from '../context/AppContext'
 
 const BUCKET = 'firm-assets'
@@ -265,7 +266,7 @@ export default function Settings() {
   // Tax Advisor / Tax Associate / Manager only ever see their own signature
   // editor + the live status page (read-only) — nothing firm-wide.
   const tabs = isPrivileged
-    ? ['firm', 'integrations', 'branding', 'import', 'users', 'security', 'storage', 'statuses', 'uptime']
+    ? ['firm', 'integrations', 'booking', 'branding', 'import', 'users', 'security', 'storage', 'statuses', 'uptime']
     : ['mysignature', 'uptime']
 
   return (
@@ -273,7 +274,7 @@ export default function Settings() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
         {tabs.map(t => (
           <button key={t} className={`btn${tab === t ? ' pri' : ''}`} onClick={() => setTab(t)} style={{ whiteSpace: 'nowrap' }}>
-            {t === 'firm' ? '🏢 Firm Info' : t === 'integrations' ? '🔌 Integrations' : t === 'branding' ? '🎨 Branding' : t === 'import' ? '📥 Import Data' : t === 'users' ? '👥 Users' : t === 'security' ? '🔒 Security' : t === 'storage' ? '💾 Storage' : t === 'statuses' ? '🏷️ Workflow Statuses' : t === 'mysignature' ? '✍️ My Signature' : '🟢 Uptime'}
+            {t === 'firm' ? '🏢 Firm Info' : t === 'integrations' ? '🔌 Integrations' : t === 'booking' ? '📅 Online Booking' : t === 'branding' ? '🎨 Branding' : t === 'import' ? '📥 Import Data' : t === 'users' ? '👥 Users' : t === 'security' ? '🔒 Security' : t === 'storage' ? '💾 Storage' : t === 'statuses' ? '🏷️ Workflow Statuses' : t === 'mysignature' ? '✍️ My Signature' : '🟢 Uptime'}
           </button>
         ))}
       </div>
@@ -651,6 +652,8 @@ export default function Settings() {
           </div>
         </div>
       )}
+
+      {tab === 'booking' && isPrivileged && <BookingSettings />}
 
       {tab === 'branding' && isPrivileged && (
         <div className="card">
