@@ -82,12 +82,17 @@ export function sendFirmNotification({ name, email, phone, notes, type, date, ti
 // Calendar's Send Booking Link modal and the lead/client scheduling strip.
 export const BOOK_URL = `${window.location.origin}${import.meta.env.BASE_URL}book`
 
-export async function sendBookingInvite({ name, email }) {
+export async function sendBookingInvite({ name, email, phone }) {
   const first = (name || '').trim().split(' ')[0] || 'there'
+  const q = new URLSearchParams()
+  if ((name || '').trim()) q.set('name', name.trim())
+  if ((email || '').trim()) q.set('email', email.trim())
+  if ((phone || '').trim()) q.set('phone', phone.trim())
+  const link = q.toString() ? `${BOOK_URL}?${q.toString()}` : BOOK_URL
   const { error } = await supabase.functions.invoke('send-email', { body: {
     to: email,
     subject: 'Schedule Your Appointment — Tax Case Review',
-    html: emailHtml({ body: `<p>Hi <strong>${first}</strong>,</p><p>Pick whichever time works best for you — it takes less than a minute:</p><p style="text-align:center;margin:24px 0"><a href="${BOOK_URL}" style="background:#1d4ed8;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:700;font-size:15px;display:inline-block">📅 Choose a Time</a></p><p>You'll see our live availability and get an instant confirmation. If nothing there works, just reply to this email or give us a call.</p><p style="margin-top:20px">Talk soon,<br><strong>Tax Case Review</strong></p>` }),
+    html: emailHtml({ body: `<p>Hi <strong>${first}</strong>,</p><p>Pick whichever time works best for you — it takes less than a minute:</p><p style="text-align:center;margin:24px 0"><a href="${link}" style="background:#1d4ed8;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:700;font-size:15px;display:inline-block">📅 Choose a Time</a></p><p>You'll see our live availability and get an instant confirmation. If nothing there works, just reply to this email or give us a call.</p><p style="margin-top:20px">Talk soon,<br><strong>Tax Case Review</strong></p>` }),
   }})
   return !error
 }

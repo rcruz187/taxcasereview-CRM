@@ -36,7 +36,7 @@ export default function BookingWidget({ contact, onClose, mode = 'lead' }) {
   async function sendBookingLink() {
     if (!contact?.email) return
     setLinkSent('sending')
-    const ok = await sendBookingInvite({ name: contact.name, email: contact.email })
+    const ok = await sendBookingInvite({ name: contact.name, email: contact.email, phone: contact.phone })
     if (ok && mode === 'lead' && contact?.id) {
       await supabase.from('lead_notes').insert({ lead_id: contact.id, lead_name: contact.name, text: `✉️ Booking link emailed to ${contact.email}`, type: 'Appointment', author: 'System', created_at: new Date().toISOString() }).catch(() => {})
     }

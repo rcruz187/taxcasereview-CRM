@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { sendClientConfirmation, sendFirmNotification } from '../lib/bookingEmails'
 import { etLabelInZone, visitorZone, zoneShort } from '../lib/timezones'
@@ -20,13 +21,14 @@ const fmt12 = (t) => {
 }
 
 export default function BookAppointment() {
+  const [params] = useSearchParams()
   const [cfg, setCfg] = useState(null)
   const [loadErr, setLoadErr] = useState('')
   const [type, setType] = useState('')
   const [date, setDate] = useState('')
   const [slots, setSlots] = useState(null)
   const [time, setTime] = useState('')
-  const [form, setForm] = useState({ name: '', email: '', phone: '', notes: '' })
+  const [form, setForm] = useState({ name: params.get('name') || '', email: params.get('email') || '', phone: params.get('phone') || '', notes: '' })
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const [done, setDone] = useState(null)
