@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { advanceLeadStatus } from '../lib/leadStatus'
 import { sendGmailEmail } from '../lib/gmailUtils'
+import InternalBooking from '../components/InternalBooking'
 
 const STATUS_COLORS = {
   scheduled:   { bg: '#1e3a5f', border: '#3b82f6', text: '#93c5fd' },
@@ -218,6 +219,7 @@ export default function Calendar() {
     }
   }
 
+  const [showBooking, setShowBooking] = useState(false)
   const goToday = () => setCurrentDate(new Date())
   const goPrev  = () => {
     const d = new Date(currentDate)
@@ -395,6 +397,7 @@ export default function Calendar() {
         <div style={{ background: 'var(--nav)', borderBottom: '1px solid var(--br)', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button onClick={goToday} style={{ padding: '7px 16px', background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: 8, color: 'var(--tx)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Today</button>
+            <button onClick={() => setShowBooking(true)} style={{ padding: '7px 16px', background: '#1d4ed8', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>📅 Book Appointment</button>
             <div style={{ display: 'flex', gap: 2 }}>
               <button onClick={goPrev} style={{ width: 32, height: 32, background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: 6, color: 'var(--tx)', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
               <button onClick={goNext} style={{ width: 32, height: 32, background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: 6, color: 'var(--tx)', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
@@ -687,6 +690,7 @@ export default function Calendar() {
       )}
 
       <DeleteConfirmModal open={!!confirmDel} label="event" onConfirm={() => deleteEvent(confirmDel)} onCancel={() => setConfirmDel(null)} />
+      {showBooking && <InternalBooking onClose={() => setShowBooking(false)} onBooked={load} />}
     </div>
   )
 }
