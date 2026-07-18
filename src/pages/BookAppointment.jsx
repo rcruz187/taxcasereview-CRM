@@ -64,8 +64,8 @@ export default function BookAppointment() {
   }
 
   async function book() {
-    if (!form.name.trim() || (!form.email.trim() && !form.phone.trim())) {
-      setErr('Please enter your name and at least an email or phone number.'); return
+    if (!form.name.trim() || !form.email.trim()) {
+      setErr('Please enter your name and email so we can send your confirmation.'); return
     }
     setSaving(true); setErr('')
     const { data, error } = await supabase.rpc('booking_create', {
@@ -156,7 +156,7 @@ export default function BookAppointment() {
                 <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 8 }}>Your details</div>
                 <div style={{ display: 'grid', gap: 10, marginBottom: 14 }}>
                   <input style={input} placeholder="Full name *" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-                  <input style={input} placeholder="Email" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+                  <input style={input} placeholder="Email *" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
                   <input style={input} placeholder="Phone" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
                   <textarea style={{ ...input, resize: 'vertical' }} rows={2} placeholder="Anything we should know? (optional)" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
                 </div>
