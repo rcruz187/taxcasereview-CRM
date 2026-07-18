@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { advanceLeadStatus } from '../lib/leadStatus'
-import { emailHtml } from '../lib/emailTemplate'
+import { sendBookingInvite } from '../lib/bookingEmails'
 
 const CLIENT_EVENT_TYPES = [
   { type: 'Case Discussion',          icon: '💬' },
@@ -33,20 +33,14 @@ export default function BookingWidget({ contact, onClose, mode = 'lead' }) {
   const [linkSent, setLinkSent] = useState(false)
 
   // Calendly-style: email them the public booking link and let THEM pick
-  const BOOK_URL = `${window.location.origin}${import.meta.env.BASE_URL}book`
   async function sendBookingLink() {
     if (!contact?.email) return
     setLinkSent('sending')
-    const first = (contact.name || '').split(' ')[0] || 'there'
-    const { error } = await supabase.functions.invoke('send-email', { body: {
-      to: contact.email,
-      subject: 'Schedule Your Appointment — Tax Case Review',
-      html: emailHtml({ body: `<p>Hi <strong>${first}</strong>,</p><p>Pick whichever time works best for you — it takes less than a minute:</p><p style="text-align:center;margin:24px 0"><a href="${BOOK_URL}" style="background:#1d4ed8;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:700;font-size:15px;display:inline-block">📅 Choose a Time</a></p><p>You'll see our live availability and get an instant confirmation. If nothing there works, just reply to this email or give us a call.</p><p style="margin-top:20px">Talk soon,<br><strong>Tax Case Review</strong></p>` }),
-    }})
-    if (!error && mode === 'lead' && contact?.id) {
+    const ok = await sendBookingInvite({ name: contact.name, email: contact.email })
+    if (ok && mode === 'lead' && contact?.id) {
       await supabase.from('lead_notes').insert({ lead_id: contact.id, lead_name: contact.name, text: `✉️ Booking link emailed to ${contact.email}`, type: 'Appointment', author: 'System', created_at: new Date().toISOString() }).catch(() => {})
     }
-    setLinkSent(error ? 'error' : true)
+    setLinkSent(ok ? true : 'error')
   }
 
   const today = new Date().toISOString().slice(0,10)
