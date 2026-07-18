@@ -290,8 +290,10 @@ export default function Sidebar() {
     async function loadEmailTaskCounts() {
       // Fetch rows in JS and count with !e.is_read — identical to Email.jsx line 272
       // so badge always matches inbox count exactly. DB count queries miss NULL is_read.
+      // Scoped to the logged-in user's own mailbox (mailbox_owner), same as
+      // Email.jsx — otherwise every user sees everyone's unread count.
       const [emailsRes, tasksRes] = await Promise.all([
-        supabase.from('emails').select('id,is_read,triage'),
+        supabase.from('emails').select('id,is_read,triage').eq('mailbox_owner', user.email),
         supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('done', false),
       ])
       const emails = emailsRes.data || []
