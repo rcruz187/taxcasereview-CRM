@@ -11,6 +11,7 @@ import { generateClientPackage, generateAddendum, generatePOACoverLetter, sendFu
 import { generatePOACoverLetterPdf, RESOLUTION_SERVICES, generateFinancialIntakePdf } from '../lib/irsFormUtils'
 import { advanceLeadStatus } from '../lib/leadStatus'
 import BookingWidget from '../components/BookingWidget'
+import QuickEmail from '../components/QuickEmail'
 import IRSFormFiller from '../components/IRSFormFiller'
 import ErrorBoundary from '../components/ErrorBoundary'
 import ComplianceGrids from './ComplianceGrids'
@@ -338,6 +339,7 @@ export default function Leads() {
     }
   }, [searchParams])
   const navigate = useNavigate()
+  const [quickEmail, setQuickEmail] = useState(null)
   const [leads, setLeads]   = useState([])
   const [filter, setFilter] = useState('All')
   const [repFilter, setRepFilter] = useState('All')
@@ -2270,6 +2272,8 @@ export default function Leads() {
               <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">
                 {(label==='Phone'||label==='Phone 2') && val
                   ? <InPlaceCaller phone={val} name={l.name} entityType="lead" entityId={l.id} supabase={supabase} showToast={showToast} onLogged={()=>loadLeadNotes(l.id)}/>
+                  : label==='Email' && val
+                  ? <span style={{color:'var(--blue)',cursor:'pointer',textDecoration:'underline'}} title="Send email" onClick={()=>setQuickEmail({ name:l.name, email:val, kind:'lead', id:l.id })}>{val} ✉️</span>
                   : label==='Address' && val
                   ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(val)}`} target="_blank" rel="noopener noreferrer" style={{color:'var(--blue)'}}>{val} ↗</a>
                   : (val||'—')}
@@ -2485,6 +2489,7 @@ export default function Leads() {
         {bookingLead && (
           <BookingWidget contact={{name:bookingLead.name, email:bookingLead.email, phone:bookingLead.phone}} onClose={()=>setBookingLead(null)} mode="lead"/>
         )}
+        {quickEmail && <QuickEmail contact={{ name: quickEmail.name, email: quickEmail.email }} kind="lead" leadId={quickEmail.id} onSent={() => loadLeadNotes(quickEmail.id)} onClose={() => setQuickEmail(null)} />}
         {resolutionFeeLead && (
           <ChargeResolutionFeeModal
             lead={resolutionFeeLead}

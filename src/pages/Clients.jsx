@@ -7,6 +7,7 @@ import IRSFormFiller from '../components/IRSFormFiller'
 import ErrorBoundary from '../components/ErrorBoundary'
 import InPlaceCaller from '../components/InPlaceCaller'
 import BookingWidget from '../components/BookingWidget'
+import QuickEmail from '../components/QuickEmail'
 import StripePaymentMethodModal from '../components/StripePaymentMethodModal'
 import SendPaymentLinkModal from '../components/SendPaymentLinkModal'
 import SavedCardsPanel from '../components/SavedCardsPanel'
@@ -845,6 +846,7 @@ export default function Clients() {
       setModal(true)
     }
   }, [searchParams])
+  const [quickEmail, setQuickEmail] = useState(null)
   const [clients,   setClients]   = useState([])
   const [employees, setEmployees] = useState([])
   const [statusCategories, setStatusCategories] = useState([])
@@ -2364,7 +2366,7 @@ export default function Clients() {
               <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>Contact Info</div>
               <DR label="Phone"   val={c.phone} name={c.name} entityId={c.id} showToast={showToast} onLogged={()=>{ loadRelated(c.name) }}/>
               <DR label="Phone 2" val={c.phone2} name={c.name} entityId={c.id} showToast={showToast} onLogged={()=>{ loadRelated(c.name) }}/>
-              <DR label="Email"   val={c.email}/>
+              <DR label="Email"   val={c.email ? <span style={{color:'var(--blue)',cursor:'pointer',textDecoration:'underline'}} title="Send email" onClick={()=>setQuickEmail({ name:c.name, email:c.email })}>{c.email} ✉️</span> : null}/>
               <DR label="Address" val={[c.street,c.city,c.state,c.zip].filter(Boolean).join(', ')}/>
               <DR label="County"  val={c.county}/>
             </div>
@@ -2506,6 +2508,7 @@ export default function Clients() {
         {bookingClient && (
           <BookingWidget contact={{name:bookingClient.name, email:bookingClient.email, phone:bookingClient.phone}} onClose={()=>setBookingClient(null)} mode="client"/>
         )}
+        {quickEmail && <QuickEmail contact={{ name: quickEmail.name, email: quickEmail.email }} kind="client" onSent={() => loadRelated(quickEmail.name)} onClose={() => setQuickEmail(null)} />}
 
         {/* ── Add Task Modal ── */}
         {taskModal&&(
