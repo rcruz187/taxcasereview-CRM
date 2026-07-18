@@ -45,17 +45,28 @@ export default function BookingSettings() {
   function set(k, v) { setCfg(c => ({ ...c, [k]: v })) }
   function setDay(day, val) { setCfg(c => ({ ...c, hours: { ...c.hours, [day]: val } })) }
 
-  async function save() {
+  async function persist(next) {
     setSaving(true); setMsg('')
     let error
-    if (rowId) ({ error } = await supabase.from('settings').update({ booking_config: cfg }).eq('id', rowId))
+    if (rowId) ({ error } = await supabase.from('settings').update({ booking_config: next }).eq('id', rowId))
     else {
-      const res = await supabase.from('settings').insert([{ booking_config: cfg }]).select('id').single()
+      const res = await supabase.from('settings').insert([{ booking_config: next }]).select('id').single()
       error = res.error; if (res.data) setRowId(res.data.id)
     }
     setSaving(false)
     setMsg(error ? '❌ ' + error.message : '✅ Saved')
     setTimeout(() => setMsg(''), 4000)
+    return !error
+  }
+
+  async function save() { await persist(cfg) }
+
+  // The master switch saves itself immediately — flipping it must never
+  // depend on remembering to hit Save.
+  async function toggleEnabled(on) {
+    const next = { ...cfg, enabled: on }
+    setCfg(next)
+    await persist(next)
   }
 
   function copyLink() {
@@ -77,8 +88,8 @@ export default function BookingSettings() {
         </div>
 
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 13, marginBottom: 14, cursor: 'pointer' }}>
-          <input type="checkbox" checked={cfg.enabled} onChange={e => set('enabled', e.target.checked)} />
-          Online booking is {cfg.enabled ? 'ON' : 'OFF'}
+          <input type="checkbox" checked={cfg.enabled} onChange={e => toggleEnabled(e.target.checked)} />
+          Online booking is {cfg.enabled ? 'ON' : 'OFF'} <span style={{ fontWeight: 400, color: 'var(--t3)', fontSize: 11 }}>(saves instantly)</span>
         </label>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
