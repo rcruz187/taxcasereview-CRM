@@ -14,8 +14,10 @@ export const whenShort = (date, time) =>
   `${new Date(date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at ${fmt12(time)}`
 
 // Confirmation to the person who booked. Best-effort — never blocks the booking.
-export function sendClientConfirmation({ name, email, type, date, time }) {
+// With a token, includes Calendly-style self-serve Reschedule / Cancel links.
+export function sendClientConfirmation({ name, email, type, date, time, token }) {
   if (!email) return
+  const manage = token ? `${window.location.origin}${import.meta.env.BASE_URL}book/manage/${token}` : null
   supabase.functions.invoke('send-email', { body: {
     to: email,
     subject: `Appointment Confirmed — ${type}, ${whenShort(date, time)}`,
@@ -27,8 +29,39 @@ export function sendClientConfirmation({ name, email, type, date, time }) {
           <strong>${type}</strong><br>${whenLong(date, time)}
         </td></tr>
       </table>
-      <p>Need to reschedule or cancel? Just reply to this email or call us and we'll take care of it.</p>
+      ${manage ? `<p style="text-align:center;margin:20px 0">
+        <a href="${manage}" style="background:#1d4ed8;color:#ffffff;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:700;font-size:13.5px;display:inline-block;margin:0 6px">🔁 Reschedule</a>
+        <a href="${manage}?cancel=1" style="background:#f1f5f9;color:#b91c1c;border:1px solid #e2e8f0;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:700;font-size:13.5px;display:inline-block;margin:0 6px">Cancel</a>
+      </p>` : `<p>Need to reschedule or cancel? Just reply to this email or call us and we'll take care of it.</p>`}
       <p style="margin-top:20px">Talk soon,<br><strong>Tax Case Review</strong></p>` }),
+  } }).catch(() => {})
+}
+
+// Cancellation notices (client + firm/rep). Best-effort.
+export function sendCancelEmails({ name, email, type, date, time, notifyEmail }) {
+  if (email) supabase.functions.invoke('send-email', { body: {
+    to: email,
+    subject: `Appointment Canceled — ${type}, ${whenShort(date, time)}`,
+    html: emailHtml({ body: `
+      <p>Hi <strong>${name}</strong>,</p>
+      <p>Your <strong>${type}</strong> on ${whenLong(date, time)} has been canceled.</p>
+      <p>Changed your mind? You can grab a new time any time:</p>
+      <p style="text-align:center;margin:20px 0"><a href="${BOOK_URL}" style="background:#1d4ed8;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;font-size:14px;display:inline-block">📅 Book Again</a></p>
+      <p style="margin-top:20px"><strong>Tax Case Review</strong></p>` }),
+  } }).catch(() => {})
+  supabase.functions.invoke('send-email', { body: {
+    to: notifyEmail || 'info@taxcasereview.org',
+    subject: `❌ Booking canceled: ${name} — ${whenShort(date, time)}`,
+    html: emailHtml({ body: `<p><strong>${name}</strong> canceled their <strong>${type}</strong> on ${whenLong(date, time)}. The slot is open again.</p>` }),
+  } }).catch(() => {})
+}
+
+// Reschedule notice to the firm/rep (client gets a fresh confirmation instead).
+export function sendRescheduleNotice({ name, type, oldDate, oldTime, date, time, notifyEmail }) {
+  supabase.functions.invoke('send-email', { body: {
+    to: notifyEmail || 'info@taxcasereview.org',
+    subject: `🔁 Rescheduled: ${name} — now ${whenShort(date, time)}`,
+    html: emailHtml({ body: `<p><strong>${name}</strong> moved their <strong>${type}</strong>:</p><p style="line-height:1.9">Was: ${whenLong(oldDate, oldTime)}<br>Now: <strong>${whenLong(date, time)}</strong></p><p>The calendar is already updated.</p>` }),
   } }).catch(() => {})
 }
 

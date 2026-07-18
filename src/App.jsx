@@ -15,6 +15,7 @@ import { Modal, Toast } from './components/ui'
 import Login      from './pages/Login'
 import Kiosk      from './pages/Kiosk'
 import BookAppointment from './pages/BookAppointment'
+import ManageBooking from './pages/ManageBooking'
 import SignPage     from './pages/SignPage'
 import MeetingRoom  from './pages/MeetingRoom'
 import ClockIn       from './pages/ClockIn'
@@ -195,6 +196,7 @@ function AuthRouter() {
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/kiosk" element={<Kiosk />} />
       <Route path="/book" element={<BookAppointment />} />
+      <Route path="/book/manage/:token" element={<ManageBooking />} />
       <Route path="/clockin" element={<ClockIn />} />
       <Route path="/employee" element={<EmployeePortal />} />
       <Route path="/sign/:id" element={<SignPage />} />

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { sendClientConfirmation, sendFirmNotification } from '../lib/bookingEmails'
+import { etLabelInZone, visitorZone, zoneShort } from '../lib/timezones'
 
 // ── Public booking page (Calendly-style), served at #/book with no login ──
 // All data access goes through SECURITY DEFINER RPCs (booking_get_config,
@@ -29,6 +30,7 @@ export default function BookAppointment() {
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const [done, setDone] = useState(null)
+  const zone = visitorZone()
 
   useEffect(() => {
     (async () => {
@@ -47,7 +49,8 @@ export default function BookAppointment() {
     for (let i = 0; i < (cfg.maxDaysOut || 30); i++) {
       const d = new Date(now); d.setDate(now.getDate() + i)
       const key = dayKeys[d.getDay()]
-      if (cfg.hours && cfg.hours[key]) {
+      const blocked = (cfg.blockedDates || []).includes(d.toISOString().slice(0, 10))
+      if (!blocked && cfg.hours && cfg.hours[key]) {
         days.push({ iso: d.toISOString().slice(0, 10), label: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) })
       }
       if (days.length >= 21) break
@@ -78,7 +81,7 @@ export default function BookAppointment() {
     }
 
     // Confirmation to the client + notification to the firm/rep — best-effort.
-    sendClientConfirmation({ name: form.name.trim(), email: form.email.trim(), type, date, time })
+    sendClientConfirmation({ name: form.name.trim(), email: form.email.trim(), type, date, time, token: data && data.booking_token })
     sendFirmNotification({
       name: form.name.trim(), email: form.email.trim(), phone: form.phone.trim(),
       notes: form.notes.trim(), type, date, time,
@@ -113,7 +116,7 @@ export default function BookAppointment() {
             <div style={{ fontWeight: 800, fontSize: 18, marginTop: 8 }}>You're booked!</div>
             <div style={{ color: C.dim, marginTop: 8, fontSize: 14 }}>
               {done.type}<br />
-              {new Date(done.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} at {fmt12(done.time)} (Eastern)
+              {new Date(done.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} at {fmt12(done.time)} (Eastern){zone !== 'America/New_York' && <> — {etLabelInZone(done.date, done.time, zone)} your time</>}
             </div>
             <div style={{ color: C.dim, marginTop: 12, fontSize: 12.5 }}>We'll reach out to confirm. If anything changes, just give us a call.</div>
           </div>
@@ -135,14 +138,14 @@ export default function BookAppointment() {
 
             {date && (
               <>
-                <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 8 }}>Pick a time <span style={{ color: C.dim, fontWeight: 400 }}>(Eastern)</span></div>
+                <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 8 }}>Pick a time <span style={{ color: C.dim, fontWeight: 400 }}>({zone === 'America/New_York' ? 'Eastern' : `your time — ${zoneShort(zone)}`})</span></div>
                 {slots === null ? (
                   <div style={{ color: C.dim, fontSize: 13, marginBottom: 18 }}>Checking availability…</div>
                 ) : slots.length === 0 ? (
                   <div style={{ color: C.dim, fontSize: 13, marginBottom: 18 }}>No open times that day — try another date.</div>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: 8, marginBottom: 18 }}>
-                    {slots.map(s => <div key={s} style={chip(time === s)} onClick={() => setTime(s)}>{fmt12(s)}</div>)}
+                    {slots.map(s => <div key={s} style={chip(time === s)} onClick={() => setTime(s)}>{etLabelInZone(date, s, zone)}</div>)}
                   </div>
                 )}
               </>
@@ -161,7 +164,7 @@ export default function BookAppointment() {
                 <button disabled={saving}
                   style={{ width: '100%', background: C.accent, color: '#fff', border: 'none', borderRadius: 8, padding: '12px 0', fontSize: 15, fontWeight: 700, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}
                   onClick={book}>
-                  {saving ? 'Booking…' : `Confirm — ${fmt12(time)} on ${new Date(date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                  {saving ? 'Booking…' : `Confirm — ${etLabelInZone(date, time, zone)} on ${new Date(date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
                 </button>
               </>
             )}

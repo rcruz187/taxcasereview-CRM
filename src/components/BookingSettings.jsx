@@ -13,6 +13,7 @@ export const DEFAULT_BOOKING_CONFIG = {
   leadHours: 4,
   maxDaysOut: 30,
   types: ['Free Consultation'],
+  blockedDates: [],
   hours: {
     mon: ['09:00', '17:00'], tue: ['09:00', '17:00'], wed: ['09:00', '17:00'],
     thu: ['09:00', '17:00'], fri: ['09:00', '17:00'], sat: null, sun: null,
@@ -36,7 +37,7 @@ export default function BookingSettings() {
       const { data } = await supabase.from('settings').select('id, booking_config').limit(1).maybeSingle()
       if (data) {
         setRowId(data.id)
-        if (data.booking_config) setCfg({ ...DEFAULT_BOOKING_CONFIG, ...data.booking_config, hours: { ...DEFAULT_BOOKING_CONFIG.hours, ...(data.booking_config.hours || {}) } })
+        if (data.booking_config) setCfg({ ...DEFAULT_BOOKING_CONFIG, ...data.booking_config, blockedDates: data.booking_config.blockedDates || [], hours: { ...DEFAULT_BOOKING_CONFIG.hours, ...(data.booking_config.hours || {}) } })
       }
       setLoading(false)
     })()
@@ -145,6 +146,24 @@ export default function BookingSettings() {
               </div>
             )
           })}
+        </div>
+
+        <div style={{ fontWeight: 700, fontSize: 12.5, marginBottom: 6 }}>Days off / blocked dates <span style={{ color: 'var(--t3)', fontWeight: 400 }}>(overrides weekly hours — holidays, vacation, court dates)</span></div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 }}>
+          <input type="date" id="bk-block-date" min={new Date().toISOString().slice(0, 10)} style={{ padding: '6px 8px' }} />
+          <button className="btn sec" onClick={() => {
+            const el = document.getElementById('bk-block-date')
+            if (el?.value && !cfg.blockedDates.includes(el.value)) { set('blockedDates', [...cfg.blockedDates, el.value].sort()); el.value = '' }
+          }}>+ Block Date</button>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+          {cfg.blockedDates.length === 0 ? <span style={{ color: 'var(--t3)', fontSize: 12 }}>None blocked</span> :
+            cfg.blockedDates.map(d => (
+              <span key={d} style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: 7, padding: '3px 9px', fontSize: 11.5, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                {new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => set('blockedDates', cfg.blockedDates.filter(x => x !== d))}>✕</span>
+              </span>
+            ))}
         </div>
 
         <div style={{ fontWeight: 700, fontSize: 12.5, marginBottom: 6 }}>Appointment types offered publicly</div>
