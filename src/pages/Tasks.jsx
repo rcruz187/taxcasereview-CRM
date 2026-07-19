@@ -316,8 +316,15 @@ export default function Tasks() {
         </div>
 
         {/* Due date */}
-        <div style={{width:100,flexShrink:0,fontSize:11,color:overdue?'var(--bad)':'var(--t3)',textAlign:'center'}}>
-          {t.dueDate || 'No due date'}
+        <div style={{width:112,flexShrink:0,textAlign:'center'}}>
+          {t.dueDate ? (
+            <span style={{
+              fontSize:10.5,fontWeight:600,padding:'3px 9px',borderRadius:6,whiteSpace:'nowrap',
+              background:overdue?'rgba(239,68,68,.12)':'rgba(148,163,184,.08)',
+              color:overdue?'var(--bad)':'var(--t3)',
+              border:`1px solid ${overdue?'rgba(239,68,68,.35)':'var(--br)'}`,
+            }}>{overdue?'⚠ ':''}{t.dueDate}</span>
+          ) : <span style={{fontSize:11,color:'var(--t3)',opacity:.5}}>—</span>}
         </div>
 
         {/* Assignee + avatar */}
@@ -357,7 +364,7 @@ export default function Tasks() {
   const totalDeleted   = deleted.length
 
   return (
-    <div style={{padding:'20px 24px',maxWidth:1000,margin:'0 auto'}}>
+    <div style={{padding:'20px 24px',maxWidth:1240,margin:'0 auto'}}>
       {toast&&<div className="toast show">{toast}</div>}
 
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:10}}>
@@ -368,25 +375,28 @@ export default function Tasks() {
         <button className="btn pri" onClick={()=>setModal(true)}>+ Add Task</button>
       </div>
 
-      {/* Stats */}
-      <div className="metrics" style={{marginBottom:12}}>
-        <div className="metric" style={{cursor:'pointer'}} onClick={()=>setView('open')}><div className="ml">Open</div><div className="mv" style={{color:'var(--b2)'}}>{open.length}</div></div>
-        <div className="metric" style={{cursor:'pointer'}} onClick={()=>setView('completed')}><div className="ml">Completed</div><div className="mv" style={{color:'var(--ok)'}}>{totalCompleted}</div></div>
-        <div className="metric"><div className="ml">Total Created</div><div className="mv">{totalCreated}</div></div>
-        {isSuperAdmin&&<div className="metric" style={{cursor:'pointer'}} onClick={()=>setView('deleted')}>
-          <div className="ml">Deleted</div>
-          <div className="mv" style={{color:totalDeleted>0?'var(--bad)':'var(--t3)'}}>{totalDeleted}</div>
-        </div>}
+      {/* One compact strip: counts double as the view switcher */}
+      <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
+        {[
+          ['open', 'Open', open.length, 'var(--b2)'],
+          ['completed', 'Completed', totalCompleted, 'var(--ok)'],
+          ...(isSuperAdmin ? [['deleted', '🗑 Deleted', totalDeleted, totalDeleted>0?'var(--bad)':'var(--t3)']] : []),
+        ].map(([key,lbl,count,color])=>(
+          <div key={key} onClick={()=>setView(key)}
+            style={{
+              display:'flex',alignItems:'center',gap:8,padding:'8px 14px',borderRadius:9,cursor:'pointer',
+              border:`1px solid ${view===key?color:'var(--br)'}`,
+              background:view===key?'var(--s2)':'transparent',
+              transition:'all .12s ease',
+            }}>
+            <span style={{fontSize:12.5,fontWeight:view===key?700:500,color:view===key?'var(--tx)':'var(--t3)'}}>{lbl}</span>
+            <span style={{fontSize:13,fontWeight:800,color}}>{count}</span>
+          </div>
+        ))}
+        <span style={{marginLeft:'auto',fontSize:11.5,color:'var(--t3)'}}>{totalCreated} created all-time</span>
       </div>
 
-      {/* View tabs */}
-      <div style={{display:'flex',gap:6,marginBottom:12}}>
-        <span className={`chip${view==='open'?' on':''}`} onClick={()=>setView('open')}>Open ({open.length})</span>
-        <span className={`chip${view==='completed'?' on':''}`} onClick={()=>setView('completed')}>Completed ({totalCompleted})</span>
-        {isSuperAdmin&&<span className={`chip${view==='deleted'?' on':''}`} onClick={()=>setView('deleted')} style={{color:totalDeleted>0?'var(--bad)':'',borderColor:totalDeleted>0?'var(--bad)':''}}>🗑 Deleted ({totalDeleted}) — Admin Only</span>}
-      </div>
-
-      <div className="g2" style={{alignItems:'start'}}>
+      <div className="tasksg">
         {/* Left: task list */}
         <div>
           {/* Open tasks */}
@@ -394,7 +404,6 @@ export default function Tasks() {
             <div className="card">
               <div className="ch">
                 <span className="ct">Open Tasks ({open.length}{allOpen.length !== open.length ? ` / ${allOpen.length}` : ''})</span>
-                <button className="btn pri" onClick={()=>setModal(true)}>+ Add Task</button>
               </div>
               {/* Filter + Sort bar */}
               <div style={{ display:'flex', gap:6, padding:'0 16px 12px', flexWrap:'wrap', alignItems:'center' }}>
@@ -432,7 +441,7 @@ export default function Tasks() {
                             📋 {g.section_title}{g.clientName?<span style={{fontWeight:400,color:'var(--t3)'}}> · {g.clientName}</span>:''}
                           </div>
                         </div>
-                        <button className="btn pri" style={{fontSize:11,padding:'5px 12px',fontWeight:600}} onClick={()=>addSubtask({clientName:g.clientName, section_title:g.section_title})}>+ Add Task</button>
+                        <button className="btn sec" style={{fontSize:10.5,padding:'4px 10px',fontWeight:600,opacity:.85}} onClick={()=>addSubtask({clientName:g.clientName, section_title:g.section_title})}>+ Task</button>
                       </div>
                       {!collapsedSections[g.key] && (
                         <div style={{padding:'2px 14px 4px'}}>
@@ -522,29 +531,7 @@ export default function Tasks() {
             {saving?'Adding…':'Add Task'}
           </button>
 
-          {/* Summary box */}
-          <div style={{marginTop:16,padding:12,background:'var(--s2)',borderRadius:8}}>
-            <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em',color:'var(--t3)',marginBottom:8}}>Summary</div>
-            <div style={{display:'flex',flexDirection:'column',gap:5}}>
-              {[
-                ['Open Tasks',      open.length,      'var(--b2)'],
-                ['Completed Today', completed.filter(t=>t.created_at?.slice(0,10)===new Date().toISOString().slice(0,10)).length, 'var(--ok)'],
-                ['Total Completed', totalCompleted,   'var(--ok)'],
-                ['Total Created',   totalCreated,     'var(--tx)'],
-              ].map(([label,val,color])=>(
-                <div key={label} style={{display:'flex',justifyContent:'space-between',fontSize:12}}>
-                  <span style={{color:'var(--t2)'}}>{label}</span>
-                  <span style={{fontWeight:700,color}}>{val}</span>
-                </div>
-              ))}
-              {isSuperAdmin&&(
-                <div style={{display:'flex',justifyContent:'space-between',fontSize:12}}>
-                  <span style={{color:'var(--t2)'}}>Deleted</span>
-                  <span style={{fontWeight:700,color:totalDeleted>0?'var(--bad)':'var(--t3)',cursor:'pointer'}} onClick={()=>setView('deleted')}>{totalDeleted} {totalDeleted>0?'— view →':''}</span>
-                </div>
-              )}
-            </div>
-          </div>
+
         </div>
       </div>
 
