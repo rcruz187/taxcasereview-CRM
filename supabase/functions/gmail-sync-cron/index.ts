@@ -109,7 +109,7 @@ async function listGmailMessages(token: string, { labelIds, query, pageToken, ma
   return { ids: (data.messages || []).map((m: any) => m.id), nextPageToken: data.nextPageToken || null }
 }
 
-async function getAndParseGmailMessage(token: string, id: string, clients: any[]) {
+async function getAndParseGmailMessage(token: string, id: string, clients: any[], leads: any[]) {
   const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`, { headers: { Authorization: `Bearer ${token}` } })
   const msg = await res.json()
   if (!res.ok) throw new Error(msg.error?.message || 'Gmail get failed')
@@ -137,11 +137,15 @@ async function getAndParseGmailMessage(token: string, id: string, clients: any[]
   const counterpartAddress = extractAddress(counterpartHeader)
   const counterpartName = extractDisplayName(counterpartHeader)
   const matchedClient = clients.find((c) => c.email && c.email.toLowerCase() === counterpartAddress.toLowerCase())
+  const matchedLead = matchedClient ? null : leads.find((l) => l.email && l.email.toLowerCase() === counterpartAddress.toLowerCase())
   const attachments = findAttachments(msg.payload)
 
   return {
+    matched_kind: matchedClient ? 'client' : matchedLead ? 'lead' : null,
+    matched_lead_id: matchedLead?.id ?? null,
+    matched_name: matchedClient?.name || matchedLead?.name || null,
     recipient: isSent ? counterpartAddress : extractAddress(fromHeader),
-    clientName: matchedClient?.name || counterpartName || counterpartAddress,
+    clientName: matchedClient?.name || matchedLead?.name || counterpartName || counterpartAddress,
     subject, body, body_html: bodyHtmlRaw,
     triage: isSent ? 'Sent' : 'Inbox',
     status: isSent ? 'Sent' : 'Received',
@@ -161,24 +165,38 @@ async function filterUnknownIds(supabase: any, ids: string[]) {
   return ids.filter((id) => !known.has(id))
 }
 
-async function importIds(supabase: any, token: string, ids: string[], clients: any[], tenantId: string, mailboxOwner: string) {
+async function importIds(supabase: any, token: string, ids: string[], clients: any[], leads: any[], tenantId: string, mailboxOwner: string) {
   for (const id of ids) {
     try {
-      const parsed = await getAndParseGmailMessage(token, id, clients)
+      const parsed = await getAndParseGmailMessage(token, id, clients, leads)
       if (parsed) {
-        const { error: insertError } = await supabase.from('emails').insert([{ ...parsed, tenant_id: tenantId, mailbox_owner: mailboxOwner }])
+        const { matched_kind, matched_lead_id, matched_name, ...emailRow } = parsed
+        const { error: insertError } = await supabase.from('emails').insert([{ ...emailRow, tenant_id: tenantId, mailbox_owner: mailboxOwner }])
         if (insertError) console.error('Gmail emails insert error for', id, insertError)
-        if (parsed.clientName && parsed.clientName !== parsed.recipient) {
+        // Note ONLY when the email row actually inserted — writing notes for
+        // failed inserts breaks gmail_message_id dedup and re-notes every
+        // sweep (the duplicate factory found on the Romy Cruz test client).
+        if (!insertError && matched_kind && matched_name) {
           const direction = parsed.triage === 'Sent' ? 'Sent' : 'Received'
           const preview = (parsed.body || '').slice(0, 120).replace(/\n/g, ' ').trim()
           const noteContent = `📧 Email ${direction} — "${parsed.subject}"${preview ? `\n${preview}${parsed.body?.length > 120 ? '…' : ''}` : ''}`
-          const { error: noteError } = await supabase.from('client_notes').insert({
-            clientname: parsed.clientName, text: noteContent, note_type: 'Email',
-            author: direction === 'Sent' ? mailboxOwner : parsed.clientName,
-            created_at: parsed.created_at || new Date().toISOString(),
-            tenant_id: tenantId,
-          })
-          if (noteError) console.error('Gmail client_notes insert error for', id, noteError)
+          if (matched_kind === 'client') {
+            const { error: noteError } = await supabase.from('client_notes').insert({
+              clientname: matched_name, text: noteContent, note_type: 'Email',
+              author: direction === 'Sent' ? mailboxOwner : matched_name,
+              created_at: parsed.created_at || new Date().toISOString(),
+              tenant_id: tenantId,
+            })
+            if (noteError) console.error('Gmail client_notes insert error for', id, noteError)
+          } else {
+            const { error: noteError } = await supabase.from('lead_notes').insert({
+              lead_id: matched_lead_id, lead_name: matched_name, text: noteContent, type: 'Email',
+              author: direction === 'Sent' ? mailboxOwner : matched_name,
+              created_at: parsed.created_at || new Date().toISOString(),
+              tenant_id: tenantId,
+            })
+            if (noteError) console.error('Gmail lead_notes insert error for', id, noteError)
+          }
         }
       }
     } catch (e) {
@@ -191,7 +209,7 @@ async function importIds(supabase: any, token: string, ids: string[], clients: a
 // for ONE employee's connected mailbox. Isolated in its own try/catch so
 // one broken/revoked connection can't stop everyone else's sync from
 // running in the same pass.
-async function syncOneAccount(supabase: any, acct: any, appCreds: any, tenantId: string, clients: any[]) {
+async function syncOneAccount(supabase: any, acct: any, appCreds: any, tenantId: string, clients: any[], leads: any[]) {
   try {
     const token = await getValidGmailToken(supabase, acct, appCreds)
 
@@ -205,7 +223,7 @@ async function syncOneAccount(supabase: any, acct: any, appCreds: any, tenantId:
         maxResults: 25,
       })
       const newIds = await filterUnknownIds(supabase, ids)
-      await importIds(supabase, token, newIds, clients, tenantId, acct.employee_email)
+      await importIds(supabase, token, newIds, clients, leads, tenantId, acct.employee_email)
 
       if (nextPageToken) {
         await supabase.from('employee_gmail_accounts').update({ gmail_backfill_page_token: nextPageToken, gmail_last_sync_at: new Date().toISOString(), gmail_last_error: null }).eq('employee_email', acct.employee_email)
@@ -218,7 +236,7 @@ async function syncOneAccount(supabase: any, acct: any, appCreds: any, tenantId:
       for (const label of ['INBOX', 'SENT']) {
         const { ids } = await listGmailMessages(token, { labelIds: label, maxResults: 20 })
         const newIds = await filterUnknownIds(supabase, ids)
-        await importIds(supabase, token, newIds.slice(0, 15), clients, tenantId, acct.employee_email)
+        await importIds(supabase, token, newIds.slice(0, 15), clients, leads, tenantId, acct.employee_email)
       }
       await supabase.from('employee_gmail_accounts').update({ gmail_last_sync_at: new Date().toISOString(), gmail_last_error: null }).eq('employee_email', acct.employee_email)
 
@@ -257,12 +275,13 @@ serve(async (req) => {
     }
 
     const { data: clients } = await supabase.from('clients').select('id,name,email')
+    const { data: leads } = await supabase.from('leads').select('id,name,email')
 
     // Sequential, not parallel — these all share the same Gmail API rate
     // limits, and running N employees' syncs at once would just make all
     // of them more likely to hit rate-limit errors together.
     for (const acct of accounts) {
-      await syncOneAccount(supabase, acct, settings, settings.tenant_id, clients || [])
+      await syncOneAccount(supabase, acct, settings, settings.tenant_id, clients || [], leads || [])
     }
 
     return new Response(JSON.stringify({ ok: true, synced: accounts.length }), { status: 200, headers: corsHeaders })
