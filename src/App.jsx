@@ -139,7 +139,7 @@ function Shell() {
             <Route path="/cases/:id"   element={<Guard section="cases"><Cases /></Guard>} />
             <Route path="/tasks"       element={<Guard section="tasks"><Tasks /></Guard>} />
             <Route path="/calendar"    element={<Guard section="calendar"><Calendar /></Guard>} />
-            <Route path="/transcripts" element={<Guard section="transcripts"><Transcripts /></Guard>} />
+            <Route path="/transcripts" element={<Navigate to="/irsportal" replace />} />
             <Route path="/irsportal" element={<Guard section="transcripts"><IRSPortal /></Guard>} />
             <Route path="/irsforms"    element={<Guard section="irsforms"><IrsForms /></Guard>} />
             <Route path="/stateforms"  element={<Guard section="stateforms"><StateForms /></Guard>} />

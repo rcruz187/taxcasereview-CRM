@@ -22,6 +22,8 @@ export default function TranscriptPull({ clientNames = [], poas = [], onGoToPoa,
   const { employeeName } = useApp()
 
   const [requests, setRequests] = useState([])
+  const [legacyCount, setLegacyCount] = useState(0)
+  const [migrating, setMigrating] = useState(false)
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState(BLANK)
@@ -46,6 +48,53 @@ export default function TranscriptPull({ clientNames = [], poas = [], onGoToPoa,
     setLoading(false)
   }
   useEffect(() => { loadRequests() }, [])
+
+  // ── One-time migration from the retired Transcripts request tracker ──
+  // Old `transcripts` rows that haven't been imported yet (marker not set).
+  useEffect(() => {
+    (async () => {
+      const { count } = await supabase.from('transcripts').select('id', { count: 'exact', head: true }).not('migrated_to_pull', 'is', true)
+      setLegacyCount(count || 0)
+    })().catch(() => setLegacyCount(0))
+  }, [])
+
+  async function migrateLegacy() {
+    setMigrating(true)
+    try {
+      const { data: old, error } = await supabase.from('transcripts').select('*').or('migrated_to_pull.is.null,migrated_to_pull.eq.false')
+      if (error) throw new Error(error.message)
+      const rows = old || []
+      let done = 0
+      for (const t of rows) {
+        const received = (t.status || '').includes('Received')
+        const years = Array.isArray(t.taxYears) ? t.taxYears.join(', ') : (t.taxYears || t.taxYearsCustom || null)
+        const payload = {
+          client_name: t.clientName || 'Unknown',
+          transcript_types: t.transcriptType ? [t.transcriptType] : [],
+          tax_years: years,
+          provider: 'manual',
+          status: received ? 'Completed' : ((t.status || '').includes('Error') || t.status === 'On Hold') ? 'Canceled' : 'In Progress',
+          poa_record_id: null,
+          requested_by: t.assignedTo || null,
+          notes: `[Migrated from Transcripts tab] ${t.notes || ''}`.trim(),
+          requested_at: t.requestDate || t.created_at || new Date().toISOString(),
+          completed_at: received ? (t.receivedDate || null) : null,
+        }
+        const { error: insErr } = await supabase.from('transcript_pull_requests').insert([payload])
+        if (!insErr) {
+          await supabase.from('transcripts').update({ migrated_to_pull: true }).eq('id', t.id)
+          done++
+        }
+      }
+      setLegacyCount(0)
+      loadRequests()
+      flash(`✅ Migrated ${done} request${done === 1 ? '' : 's'} from the old Transcripts tab. Originals kept, marked migrated.`)
+    } catch (e) {
+      flash('❌ Migration failed: ' + e.message)
+    }
+    setMigrating(false)
+  }
+
 
   function flash(t) { setMsg(t); setTimeout(() => setMsg(''), 6000) }
   function ff(k, v) { setForm(f => ({ ...f, [k]: v })) }
@@ -207,6 +256,16 @@ export default function TranscriptPull({ clientNames = [], poas = [], onGoToPoa,
 
   return (
     <div>
+      {legacyCount > 0 && (
+        <div style={{ background: 'rgba(37,99,235,0.1)', border: '1px solid #2563eb', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>📥 {legacyCount} request{legacyCount === 1 ? '' : 's'} from the old Transcripts tab</div>
+            <div style={{ color: 'var(--t3)', fontSize: 11.5, marginTop: 3 }}>Bring your existing transcript request history into Pull Transcripts. Originals are kept and marked migrated — nothing is deleted.</div>
+          </div>
+          <button className="btn" disabled={migrating} onClick={migrateLegacy}>{migrating ? 'Migrating…' : `Migrate ${legacyCount}`}</button>
+        </div>
+      )}
+
       {/* ── Provider strip ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 10, marginBottom: 16 }}>
         {PULL_PROVIDERS.map(p => (
