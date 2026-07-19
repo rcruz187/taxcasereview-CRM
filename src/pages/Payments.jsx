@@ -3,6 +3,7 @@ import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
+import { applyPaymentToInvoice, reversePaymentFromInvoice } from '../lib/invoiceSync'
 
 const BLANK = { clientName:'', invNum:'', amount:'', method:'Credit Card', checkNum:'', date:'', status:'Cleared', notes:'' }
 const METHODS = ['Credit Card','ACH / Bank Transfer','Check','Cash','Zelle','Venmo','PayPal','Money Order','Wire Transfer','Other']
@@ -119,15 +120,10 @@ export default function Payments() {
     setSaving(false)
     if (error) { showToast('Error: '+error.message); return }
 
-    // Auto-update invoice balance if invNum matched
-    if (form.invNum) {
-      const inv = invoices.find(i=>i.invNum===form.invNum)
-      if (inv) {
-        const newPaid = parseFloat(inv.paid||0) + parseFloat(form.amount||0)
-        const newTotal = parseFloat(inv.total||0)
-        const newStatus = newPaid >= newTotal ? 'Paid' : newPaid > 0 ? 'Partial' : 'Unpaid'
-        await supabase.from('invoices').update({paid:String(newPaid), status:newStatus}).eq('id',inv.id)
-      }
+    // Auto-update invoice balance if invNum matched (shared helper — same
+    // path Accounts Receivable uses, so the two screens stay in lockstep).
+    if (form.invNum && !editId) {
+      await applyPaymentToInvoice(form.invNum, form.amount)
     }
 
     showToast('✅ Payment recorded!')
@@ -146,8 +142,14 @@ export default function Payments() {
   }
   async function confirmDeleteItem() {
     if (!confirmDel) return
+    const row = items.find(i => i.id === confirmDel)
     const { error } = await supabase.from('payments').delete().eq('id', confirmDel)
     if (error) { showToast('Error: ' + error.message); setConfirmDel(null); return }
+    // Deleting a recorded payment must give the money back to the invoice,
+    // or the invoice keeps showing collected funds that no longer exist.
+    if (row?.invNum && (row.status === 'Cleared' || row.payment_status === 'Paid')) {
+      await reversePaymentFromInvoice(row.invNum, row.amount)
+    }
     setItems(prev => prev.filter(i => i.id !== confirmDel)); setConfirmDel(null); showToast('Deleted')
   }
 

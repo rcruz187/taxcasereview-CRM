@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { applyPaymentToInvoice, reversePaymentFromInvoice } from '../lib/invoiceSync'
 
 export default function AccountsReceivable() {
   const [payments, setPayments] = useState([])
@@ -25,6 +26,20 @@ export default function AccountsReceivable() {
       status: 'Cleared',
       date: new Date().toISOString().slice(0, 10),
     }).eq('id', p.id)
+    // Keep the linked invoice in sync (invoice-linked rows only).
+    if (p.invNum) await applyPaymentToInvoice(p.invNum, p.amount)
+    load()
+  }
+
+  async function unmarkPaid(p) {
+    await supabase.from('payments').update({
+      payment_status: 'Scheduled',
+      status: 'Scheduled',
+      date: null,
+    }).eq('id', p.id)
+    // Reverse the invoice write-back so a mistaken/bounced payment doesn't
+    // leave the invoice showing collected money it never got.
+    if (p.invNum) await reversePaymentFromInvoice(p.invNum, p.amount)
     load()
   }
 
@@ -185,10 +200,16 @@ export default function AccountsReceivable() {
                         </td>
                         <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--t3)' }}>{p.notes || '—'}</td>
                         <td style={{ padding: '12px 16px' }}>
-                          {p._status !== 'Paid' && (
+                          {p._status !== 'Paid' ? (
                             <button className="btn sec" style={{ fontSize: 11, padding: '4px 10px' }}
                               onClick={() => markPaid(p)}>
                               Mark Paid
+                            </button>
+                          ) : (
+                            <button className="btn sec" style={{ fontSize: 11, padding: '4px 10px', opacity: 0.8 }}
+                              title="Reverses this payment and its invoice write-back"
+                              onClick={() => unmarkPaid(p)}>
+                              ↩ Undo
                             </button>
                           )}
                         </td>
