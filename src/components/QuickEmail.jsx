@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import { sendGmailEmail } from '../lib/gmailUtils'
+import { EMAIL_TEMPLATES, applyTemplate } from '../lib/emailTemplatesList'
 
 // ── Quick Email (click-to-email from a lead/client record) ──
 // Sends from the logged-in rep's connected Gmail (their signature); falls
@@ -14,6 +15,25 @@ export default function QuickEmail({ contact, kind, leadId, onSent, onClose }) {
   const [form, setForm] = useState({ to: contact?.email || '', subject: '', body: '' })
   const [state, setState] = useState('idle') // idle | sending | sent | error
   const [errMsg, setErrMsg] = useState('')
+  const [signature, setSignature] = useState({ text: '', logoUrl: '' })
+
+  // Same resolution as the Email page: personal signature first, firm fallback.
+  useEffect(() => {
+    (async () => {
+      let sigText = '', sigLogo = ''
+      try {
+        const { data: st } = await supabase.from('settings').select('email_signature,email_signature_logo_url').limit(1).maybeSingle()
+        sigText = st?.email_signature || ''; sigLogo = st?.email_signature_logo_url || ''
+        if (user?.email) {
+          const { data: emp } = await supabase.from('employees')
+            .select('email_signature,email_signature_logo_url').eq('email', user.email).maybeSingle()
+          if (emp?.email_signature) sigText = emp.email_signature
+          if (emp?.email_signature_logo_url) sigLogo = emp.email_signature_logo_url
+        }
+      } catch { /* preview only — send still appends server-side */ }
+      setSignature({ text: sigText, logoUrl: sigLogo })
+    })()
+  }, [user])
 
   async function send() {
     if (!form.to.trim() || !form.subject.trim() || !form.body.trim()) { setErrMsg('To, subject, and message are all required.'); setState('error'); return }
@@ -82,6 +102,17 @@ export default function QuickEmail({ contact, kind, leadId, onSent, onClose }) {
             </div>
           ) : (
             <>
+              <div style={{ marginBottom: 12 }}>
+                <label style={label}>Templates</label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {EMAIL_TEMPLATES.map(t => (
+                    <button key={t.label} onClick={() => setForm(f => ({ ...f, ...applyTemplate(t, contact?.name) }))}
+                      style={{ background: 'rgba(15,23,42,0.55)', border: '1px solid var(--line)', borderRadius: 7, color: 'inherit', padding: '4px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div style={{ display: 'grid', gap: 12 }}>
                 <div>
                   <label style={label}>To</label>
@@ -93,7 +124,20 @@ export default function QuickEmail({ contact, kind, leadId, onSent, onClose }) {
                 </div>
                 <div>
                   <label style={label}>Message</label>
-                  <textarea style={{ ...input, resize: 'vertical', minHeight: 140 }} rows={7} value={form.body} onChange={e => setForm(f => ({ ...f, body: e.target.value }))} placeholder="Your signature is added automatically." />
+                  <textarea style={{ ...input, resize: 'vertical', minHeight: 140 }} rows={7} value={form.body} onChange={e => setForm(f => ({ ...f, body: e.target.value }))} placeholder="Write your message — the signature below is appended when sent." />
+                </div>
+                <div>
+                  <label style={label}>Signature <span style={{ textTransform: 'none', fontWeight: 400 }}>(added automatically on send)</span></label>
+                  {(signature.text || signature.logoUrl) ? (
+                    <div style={{ background: 'rgba(15,23,42,0.4)', border: '1px dashed var(--line)', borderRadius: 8, padding: '10px 12px' }}>
+                      {signature.logoUrl && <img src={signature.logoUrl} alt="" style={{ maxHeight: 44, maxWidth: 200, display: 'block', marginBottom: 6 }} />}
+                      {signature.text && <div style={{ fontSize: 12.5, color: 'var(--t2)', whiteSpace: 'pre-wrap', fontFamily: 'Arial, sans-serif', lineHeight: 1.5 }}>{signature.text}</div>}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 11.5, color: 'var(--t3)', padding: '8px 12px', background: 'rgba(15,23,42,0.4)', borderRadius: 8 }}>
+                      No signature set — add yours in Settings → My Signature and it'll appear on every email.
+                    </div>
+                  )}
                 </div>
               </div>
               {state === 'error' && (
