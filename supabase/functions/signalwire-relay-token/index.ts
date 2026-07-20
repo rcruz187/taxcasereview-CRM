@@ -38,6 +38,7 @@ serve(async (req) => {
     // who specifically it belongs to.
     let resource = FALLBACK_RESOURCE
     let agentExtension = null
+    let agentTenantId = null
     const authHeader = req.headers.get('Authorization')
     if (authHeader) {
       const userClient = createClient(
@@ -49,8 +50,9 @@ serve(async (req) => {
       if (userErr) console.error('signalwire-relay-token: could not resolve calling user:', userErr.message)
       if (user?.email) {
         const { data: emp, error: empErr } = await supabase
-          .from('employees').select('extension').eq('email', user.email).maybeSingle()
+          .from('employees').select('extension,tenant_id').eq('email', user.email).maybeSingle()
         if (empErr) console.error('signalwire-relay-token: employee lookup error:', empErr.message)
+        if (emp?.tenant_id) agentTenantId = emp.tenant_id
         if (emp?.extension) {
           agentExtension = emp.extension
           resource = `agent-${emp.extension}`
@@ -62,9 +64,22 @@ serve(async (req) => {
       console.error('signalwire-relay-token: no Authorization header on request - using fallback shared resource')
     }
 
-    const { data: settings, error: sErr } = await supabase.from('settings')
-      .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did')
-      .limit(1).maybeSingle()
+    // Load THIS agent's tenant's SignalWire creds. Falls back to the single
+    // settings row when the agent has no tenant yet or only one exists —
+    // single-tenant behaves identically.
+    let settings = null, sErr = null
+    if (agentTenantId) {
+      const r = await supabase.from('settings')
+        .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did,tenant_id')
+        .eq('tenant_id', agentTenantId).limit(1).maybeSingle()
+      settings = r.data || null; sErr = r.error
+    }
+    if (!settings) {
+      const r = await supabase.from('settings')
+        .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did,tenant_id')
+        .limit(1).maybeSingle()
+      settings = r.data || null; if (!sErr) sErr = r.error
+    }
 
     if (sErr || !settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token) {
       return new Response(JSON.stringify({ error: 'SignalWire credentials are not fully set up in Settings yet.' }),

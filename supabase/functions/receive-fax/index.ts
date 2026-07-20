@@ -37,8 +37,23 @@ serve(async (req) => {
       )
 
       const status = params.get('FaxStatus') || 'unknown'
+
+      // Stamp the tenant that owns the fax number that was dialed (fallback to
+      // the single settings row — single-tenant behaves identically).
+      const DEFAULT_TENANT = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
+      let tenantId = DEFAULT_TENANT
+      const toDigits = (params.get('To') || '').replace(/\D/g, '').slice(-10)
+      try {
+        const { data: rows } = await supabase.from('settings').select('tenant_id,sw_inbound_did')
+        const match = (rows || []).find(
+          r => (r.sw_inbound_did || '').replace(/\D/g, '').slice(-10) === toDigits
+        )
+        if (match?.tenant_id) tenantId = match.tenant_id
+        else if ((rows || []).length === 1 && rows[0].tenant_id) tenantId = rows[0].tenant_id
+      } catch (_) { /* keep default */ }
+
       const insertPayload = {
-        tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a',
+        tenant_id: tenantId,
         from_number:        params.get('From') || '',
         to_number:          params.get('To') || '',
         file_url:           params.get('MediaUrl') || null,

@@ -62,11 +62,29 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    const { data: settings, error: sErr } = await supabase
-      .from('settings')
-      .select('call_forward_number,sw_inbound_did')
-      .limit(1)
-      .maybeSingle()
+    // ── Multi-tenant resolve: match the settings row by the number that was
+    // called (To). Falls back to the single settings row when no DID match —
+    // so a single-tenant setup (one row, one DID) behaves exactly as before.
+    const toDigitsForLookup = to.replace(/\D/g, '').slice(-10)
+    let settings = null, sErr = null
+    if (toDigitsForLookup) {
+      const r = await supabase
+        .from('settings')
+        .select('call_forward_number,sw_inbound_did,tenant_id')
+      sErr = r.error
+      settings = (r.data || []).find(
+        row => (row.sw_inbound_did || '').replace(/\D/g, '').slice(-10) === toDigitsForLookup
+      ) || null
+    }
+    if (!settings) {
+      const r = await supabase
+        .from('settings')
+        .select('call_forward_number,sw_inbound_did,tenant_id')
+        .limit(1)
+        .maybeSingle()
+      if (!sErr) sErr = r.error
+      settings = r.data || null
+    }
 
     if (sErr) console.error('settings fetch error:', sErr)
 

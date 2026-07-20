@@ -652,6 +652,7 @@ function InlineOrganizerForm({ client, onClose, showToast }) {
 
 // ── Canopy-style Document Manager for a specific client ──────────────────────
 export const DOC_FOLDERS = ['IRS Docs','Tax Returns','Agreements','POA & Forms','Transcripts','Correspondence','Financial Statements','E-Signatures','Call Recording','Other']
+const QUICK_TASK_TITLES = ['Request transcripts from IRS','Follow up with client','Prepare & send POA (2848/8821)','Call IRS for account status','Draft engagement letter','Collect financial documents','File tax return','Submit installment agreement','Prepare Offer in Compromise','Follow up on offer','Request wage & income transcripts','Schedule consultation','Send resolution options','Collect payment / trade']
 const FILE_EXT_ICON = n => { const e=(n||'').split('.').pop().toLowerCase(); return {pdf:'📄',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',jpg:'🖼️',jpeg:'🖼️',png:'🖼️',tiff:'🖼️'}[e]||'📎' }
 const fmt = b => b<1024?b+'B':b<1048576?(b/1024).toFixed(1)+'KB':(b/1048576).toFixed(1)+'MB'
 
@@ -2523,6 +2524,16 @@ export default function Clients() {
                   placeholder="e.g. Request transcripts, Follow up on offer..."
                   onKeyDown={e=>e.key==='Enter'&&addTaskFromModal()}
                   autoFocus/>
+                <select value="" onChange={e=>{if(e.target.value)setTaskTitle(e.target.value)}}
+                  style={{marginTop:6,fontSize:12,color:'var(--t2)'}}>
+                  <option value="">⚡ Quick-pick a common task…</option>
+                  {QUICK_TASK_TITLES.map(t=><option key={t} value={t}>{t}</option>)}
+                </select>
+                <div style={{marginTop:8,fontSize:11.5,color:'var(--t3)'}}>
+                  Need a full set of tasks?{' '}
+                  <span style={{color:'var(--blue)',cursor:'pointer',textDecoration:'underline'}}
+                    onClick={()=>{setTaskModal(false);setTemplateModal(true)}}>Apply a workflow template →</span>
+                </div>
               </div>
               <div className="field"><label>Section</label>
                 <input value={taskSectionTitle} onChange={e=>setTaskSectionTitle(e.target.value)}

@@ -41,6 +41,7 @@ serve(async (req) => {
   const digits = params.get('Digits') || ''
   const callSid = params.get('CallSid')
   const from = params.get('From') || ''
+  const to = params.get('To') || ''
 
   try {
     // Press 1 -> dial by extension submenu
@@ -60,13 +61,28 @@ serve(async (req) => {
       )
 
       if (callSid) {
+        // Resolve which tenant owns the number that was called, so the
+        // incoming-call row is stamped to the right firm. Falls back to the
+        // single settings row (single-tenant behaves identically).
+        const DEFAULT_TENANT = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
+        let tenantId = DEFAULT_TENANT
+        const toDigits = to.replace(/\D/g, '').slice(-10)
+        try {
+          const { data: rows } = await supabase.from('settings').select('tenant_id,sw_inbound_did')
+          const match = (rows || []).find(
+            r => (r.sw_inbound_did || '').replace(/\D/g, '').slice(-10) === toDigits
+          )
+          if (match?.tenant_id) tenantId = match.tenant_id
+          else if ((rows || []).length === 1 && rows[0].tenant_id) tenantId = rows[0].tenant_id
+        } catch (_) { /* keep default */ }
+
         const { error: insErr } = await supabase.from('incoming_calls').insert({
           callsid: callSid,
           conference_name: conferenceName,
           from_number: from,
           department,
           status: 'ringing',
-          tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a',
+          tenant_id: tenantId,
         })
         if (insErr) console.error('incoming_calls insert error:', insErr)
       }
