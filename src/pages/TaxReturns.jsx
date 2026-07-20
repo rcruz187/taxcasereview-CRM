@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
 import TaxDocParser from '../components/TaxDocParser'
 import { generateTaxReturnPdf, downloadTaxReturnPdf } from '../lib/taxReturnPdf'
+import ClientLink from '../components/ClientLink'
 
 const SQL_SETUP = `create table if not exists tax_returns (
   id uuid default gen_random_uuid() primary key,
@@ -515,7 +516,7 @@ export default function TaxReturns() {
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--s2)'}
                   onMouseLeave={e => e.currentTarget.style.background = ''}>
                   <td style={{ padding: '9px 12px', fontWeight: 700, color: 'var(--blue)' }}>{ret.returnNum || '—'}</td>
-                  <td style={{ padding: '9px 12px', fontWeight: 600 }}>{ret.clientName}</td>
+                  <td style={{ padding: '9px 12px', fontWeight: 600 }}><ClientLink name={ret.clientName} /></td>
                   <td style={{ padding: '9px 12px', color: 'var(--t2)' }}>{ret.taxYear}</td>
                   <td style={{ padding: '9px 12px', color: 'var(--t2)' }}>{ret.returnType}</td>
                   <td style={{ padding: '9px 12px', color: 'var(--t2)' }}>{ret.filingStatus}</td>

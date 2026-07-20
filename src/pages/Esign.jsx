@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { useLocation } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
+import ClientLink from '../components/ClientLink'
 
 const DOC_TYPES = [
   'Tax Service Agreement',
@@ -272,7 +273,7 @@ export default function Esign() {
 
                         {/* Client */}
                         <td style={{ padding: '13px 14px' }}>
-                          <div style={{ fontWeight: 700, fontSize: 14 }}>{item.client_name}</div>
+                          <div style={{ fontWeight: 700, fontSize: 14 }}><ClientLink name={item.client_name} /></div>
                           {item.client_email && <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>{item.client_email}</div>}
                           {item.investigation_fee && <div style={{ fontSize: 11, color: 'var(--ok)', fontWeight: 700, marginTop: 2 }}>Fee: ${item.investigation_fee}</div>}
                         </td>

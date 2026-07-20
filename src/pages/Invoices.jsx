@@ -7,6 +7,7 @@ import { sendGmailEmail } from '../lib/gmailUtils'
 import { useApp } from '../context/AppContext'
 import { useFirm } from '../lib/useFirm'
 import { generateInvoicePdfBase64 } from '../lib/invoicePdf'
+import ClientLink from '../components/ClientLink'
 
 const BLANK = { clientName:'', caseNum:'', lineItems:'', total:'', paid:'0', dueDate:'', taxRate:'0', status:'Unpaid', notes:'' }
 const SERVICE_TEMPLATES = [
@@ -375,7 +376,7 @@ Please contact our office with any questions.`
                     onMouseEnter={e=>e.currentTarget.style.background='var(--s2)'}
                     onMouseLeave={e=>e.currentTarget.style.background=''}>
                     <td style={{padding:'9px 12px',fontWeight:700,color:'var(--blue)',fontSize:11}}>{inv.invNum}</td>
-                    <td style={{padding:'9px 12px',fontWeight:600}}>{inv.clientName}</td>
+                    <td style={{padding:'9px 12px',fontWeight:600}}><ClientLink name={inv.clientName} /></td>
                     <td style={{padding:'9px 12px',fontWeight:600}}>${t.toLocaleString()}</td>
                     <td style={{padding:'9px 12px',color:'var(--ok)'}}>${p.toLocaleString()}</td>
                     <td style={{padding:'9px 12px',fontWeight:bal>0?700:400,color:bal>0?'var(--warn)':'var(--t2)'}}>${bal.toLocaleString()}</td>

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { applyPaymentToInvoice, reversePaymentFromInvoice } from '../lib/invoiceSync'
+import ClientLink from '../components/ClientLink'
 
 const BLANK = { clientName:'', invNum:'', amount:'', method:'Credit Card', checkNum:'', date:'', status:'Cleared', notes:'' }
 const METHODS = ['Credit Card','ACH / Bank Transfer','Check','Cash','Zelle','Venmo','PayPal','Money Order','Wire Transfer','Other']
@@ -331,7 +332,7 @@ export default function Payments() {
                 <tr key={p.id} style={{borderBottom:'1px solid var(--br)'}}
                   onMouseEnter={e=>e.currentTarget.style.background='var(--s2)'}
                   onMouseLeave={e=>e.currentTarget.style.background=''}>
-                  <td style={{padding:'9px 12px',fontWeight:600}}>{p.clientName}</td>
+                  <td style={{padding:'9px 12px',fontWeight:600}}><ClientLink name={p.clientName} /></td>
                   <td style={{padding:'9px 12px',color:'var(--blue)',fontSize:11,fontWeight:600}}>{p.invNum||'—'}</td>
                   <td style={{padding:'9px 12px',fontWeight:700,color:'var(--ok)',fontSize:13}}>${parseFloat(p.amount||0).toLocaleString()}</td>
                   <td style={{padding:'9px 12px'}}><span className="bdg bn" style={{fontSize:10}}>{p.method}</span></td>

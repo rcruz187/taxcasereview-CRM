@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
+import ClientLink from '../components/ClientLink'
 
 const ENTITY_TYPES = ['LLC','S-Corp','C-Corp','Sole Proprietorship','Partnership','Non-Profit 501(c)(3)','Professional LLC (PLLC)']
 const ENTITY_ICONS = {
@@ -331,7 +332,7 @@ export default function FormaCorp() {
               <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:8}}>
                 <div>
                   <div style={{fontSize:14,fontWeight:800,marginBottom:2}}>{c.entity_name}</div>
-                  <div style={{fontSize:12,color:'var(--t3)'}}>{c.client_name}</div>
+                  <div style={{fontSize:12,color:'var(--t3)'}}><ClientLink name={c.client_name} /></div>
                 </div>
                 <span style={{fontSize:10,padding:'2px 8px',borderRadius:20,background:stageColor[c.stage]+'22',color:stageColor[c.stage],border:`1px solid ${stageColor[c.stage]}44`,fontWeight:600,whiteSpace:'nowrap'}}>{c.stage}</span>
               </div>

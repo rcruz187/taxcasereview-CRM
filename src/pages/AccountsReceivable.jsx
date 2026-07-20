@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { applyPaymentToInvoice, reversePaymentFromInvoice } from '../lib/invoiceSync'
+import ClientLink from '../components/ClientLink'
 
 export default function AccountsReceivable() {
   const [payments, setPayments] = useState([])
@@ -180,7 +181,7 @@ export default function AccountsReceivable() {
                     const st = statusStyle[p._status] || statusStyle.Scheduled
                     return (
                       <tr key={p.id} style={{ borderBottom: '1px solid var(--br)' }}>
-                        <td style={{ padding: '12px 16px', fontWeight: 600, fontSize: 13 }}>{p.clientName || '—'}</td>
+                        <td style={{ padding: '12px 16px', fontWeight: 600, fontSize: 13 }}>{p.clientName ? <ClientLink name={p.clientName} /> : '—'}</td>
                         <td style={{ padding: '12px 16px' }}>
                           <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
                             background: p.trade_type === '1st Trade' ? 'rgba(37,99,235,.12)' : 'rgba(124,58,237,.12)',
