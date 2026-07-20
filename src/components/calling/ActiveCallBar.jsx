@@ -3,6 +3,17 @@ import { useNavigate } from 'react-router-dom'
 import { useCall } from '../../context/CallContext'
 import { supabase } from '../../lib/supabase'
 
+// Quick note starters for logging a call — click to insert, then edit.
+const CALL_LOG_TEMPLATES = [
+  { label: 'Left voicemail', body: 'Left a voicemail. Will follow up if no callback.' },
+  { label: 'Discussed options', body: 'Discussed resolution options and next steps. Client considering.' },
+  { label: 'Requested docs', body: 'Requested documents needed to proceed. Client to send.' },
+  { label: 'Scheduled follow-up', body: 'Scheduled a follow-up call. ' },
+  { label: 'Sent agreement', body: 'Reviewed and sent engagement/service agreement for signature.' },
+  { label: 'Payment discussed', body: 'Discussed fees and payment arrangement.' },
+  { label: 'No answer', body: 'No answer — will attempt again.' },
+]
+
 export default function ActiveCallBar() {
   const navigate = useNavigate()
   const [polishing, setPolishing] = useState(false)
@@ -30,6 +41,8 @@ export default function ActiveCallBar() {
   const [addBusy, setAddBusy] = useState(false)
   const [addMsg, setAddMsg] = useState('')
 
+  const [participants, setParticipants] = useState([]) // {id, number, status: 'ringing'|'connected'}
+
   async function handleAddCaller() {
     const digits = addNumber.replace(/\D/g, '')
     if (digits.length < 10) { setAddMsg('Enter a full 10-digit number.'); return }
@@ -37,9 +50,23 @@ export default function ActiveCallBar() {
     const res = await addParticipant(addNumber.trim())
     setAddBusy(false)
     if (res?.error) { setAddMsg('❌ ' + res.error); return }
-    setAddMsg('✅ Ringing them now — they\'ll join when they pick up.')
+    const num = addNumber.trim()
+    const pid = Date.now()
+    // Show them as a persistent participant — ringing first, then connected.
+    // SignalWire is placing the call; this keeps the CRM in sync with what's
+    // actually happening on the line instead of the panel just vanishing.
+    setParticipants(p => [...p, { id: pid, number: num, status: 'ringing' }])
+    setTimeout(() => {
+      setParticipants(p => p.map(x => x.id === pid && x.status === 'ringing' ? { ...x, status: 'connected' } : x))
+    }, 8000)
+    setAddMsg('')
     setAddNumber('')
-    setTimeout(() => { setShowAddCaller(false); setAddMsg('') }, 3500)
+    setShowAddCaller(false)
+  }
+
+  function markParticipant(id, status) {
+    if (status === 'remove') { setParticipants(p => p.filter(x => x.id !== id)); return }
+    setParticipants(p => p.map(x => x.id === id ? { ...x, status } : x))
   }
 
   // Transfer panel state — employee directory loads when the panel opens
@@ -264,6 +291,30 @@ export default function ActiveCallBar() {
                 🔴 End Call
               </button>
             </div>
+
+            {/* Conference participants — persistent, so you always see who's on */}
+            {participants.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: 700 }}>On this call:</span>
+                {participants.map(p => (
+                  <span key={p.id} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    background: p.status === 'connected' ? 'rgba(21,128,61,0.35)' : 'rgba(180,83,9,0.35)',
+                    border: `1px solid ${p.status === 'connected' ? 'rgba(34,197,94,0.6)' : 'rgba(245,158,11,0.6)'}`,
+                    borderRadius: 20, padding: '3px 10px', fontSize: 11.5, color: '#fff', fontWeight: 600,
+                  }}>
+                    {p.status === 'connected' ? '✅' : '📞'} {p.number}
+                    <span style={{ opacity: 0.85 }}>{p.status === 'connected' ? 'On call' : 'Ringing…'}</span>
+                    {p.status === 'ringing' && (
+                      <span onClick={() => markParticipant(p.id, 'connected')} title="Mark connected"
+                        style={{ cursor: 'pointer', opacity: 0.8, marginLeft: 2 }}>✓</span>
+                    )}
+                    <span onClick={() => markParticipant(p.id, 'remove')} title="Remove from view"
+                      style={{ cursor: 'pointer', opacity: 0.7, marginLeft: 2 }}>✕</span>
+                  </span>
+                ))}
+              </div>
+            )}
 
             {/* Row 2 — call controls, uniform sizing, never wrap labels */}
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -535,6 +586,14 @@ export default function ActiveCallBar() {
 
             <div className="field">
               <label>Notes {transcript && <span style={{ fontSize: 10, color: 'var(--blue)', fontWeight: 600 }}>✓ Transcript included</span>}</label>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                {CALL_LOG_TEMPLATES.map(t => (
+                  <button key={t.label} className="btn sec" style={{ fontSize: 11, padding: '4px 9px' }}
+                    onClick={() => setLogForm(f => ({ ...f, notes: f.notes?.trim() ? f.notes + '\n' + t.body : t.body }))}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
               <textarea
                 value={logForm.notes}
                 onChange={e => setLogForm(f => ({ ...f, notes: e.target.value }))}
