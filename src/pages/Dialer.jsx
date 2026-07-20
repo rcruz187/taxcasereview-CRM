@@ -525,7 +525,7 @@ export default function Dialer() {
 
           {/* Call Queue */}
           {tab === 'queue' && (
-            <div className="card">
+            <div className="card" style={{ maxWidth: 860 }}>
               <div className="ovx">
                 {leads.length === 0 ? (
                   <div style={{ textAlign: 'center', color: 'var(--t3)', padding: 32 }}>No leads in queue</div>
@@ -533,19 +533,19 @@ export default function Dialer() {
                   const name = lead.name || `${lead.first || ''} ${lead.last || ''}`.trim() || 'Unknown'
                   return (
                     <div key={lead.id} style={{
-                      display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
+                      display: 'flex', alignItems: 'center', gap: 12, padding: '7px 14px',
                       borderBottom: '1px solid var(--br)',
                       background: active?.id === lead.id ? 'rgba(37,162,90,0.08)' : 'transparent',
                       transition: 'background .12s ease',
                     }}
                       onMouseEnter={e => { if (active?.id !== lead.id) e.currentTarget.style.background = 'var(--s2)' }}
                       onMouseLeave={e => { if (active?.id !== lead.id) e.currentTarget.style.background = 'transparent' }}>
-                      <div className={`av ${avColor(name)}`} style={{ width: 30, height: 30, fontSize: 11, flexShrink: 0 }}>{initialsFor(name)}</div>
+                      <div className={`av ${avColor(name)}`} style={{ width: 28, height: 28, fontSize: 10.5, flexShrink: 0 }}>{initialsFor(name)}</div>
                       <div style={{ width: 220, minWidth: 0, flexShrink: 0 }}>
                         <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          <ClientLink name={name} style={{ color: 'inherit' }} />
+                          <ClientLink name={name} subtle />
                         </div>
-                        <div style={{ fontSize: 11, color: 'var(--t3)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 2 }}>
+                        <div style={{ fontSize: 10.5, color: 'var(--t3)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
                           {lead.phone
                             ? <span style={{ fontFamily: 'monospace' }}>{lead.phone}</span>
                             : <span style={{ fontStyle: 'italic', opacity: 0.7 }}>No phone</span>}

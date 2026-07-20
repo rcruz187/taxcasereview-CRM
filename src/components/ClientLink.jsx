@@ -36,8 +36,9 @@ async function loadDirectories() {
   return clientsPromise
 }
 
-export default function ClientLink({ name, clientId, style, className, plainIfMissing = true }) {
+export default function ClientLink({ name, clientId, style, className, subtle = false, plainIfMissing = true }) {
   const navigate = useNavigate()
+  const [hover, setHover] = useState(false)
   const [target, setTarget] = useState(
     clientId ? { kind: 'client', id: clientId } : null
   )
@@ -81,8 +82,12 @@ export default function ClientLink({ name, clientId, style, className, plainIfMi
   return (
     <span
       onClick={go}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
       title="Open file"
-      style={{ color: 'var(--blue, #2563eb)', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2, ...style }}
+      style={subtle
+        ? { color: 'inherit', cursor: 'pointer', textDecoration: hover ? 'underline' : 'none', textUnderlineOffset: 2, ...style }
+        : { color: 'var(--blue, #2563eb)', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2, ...style }}
       className={className}
     >
       {name}
