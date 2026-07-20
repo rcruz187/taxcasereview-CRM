@@ -9,6 +9,7 @@ const SERVICES: Record<string, string> = {
   supabase:  'https://status.supabase.com/api/v2/status.json',
   stripe:    'https://status.stripe.com/api/v2/status.json',
   anthropic: 'https://status.anthropic.com/api/v2/status.json',
+  github:    'https://www.githubstatus.com/api/v2/status.json',
 }
 
 serve(async (req) => {

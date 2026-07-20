@@ -1146,6 +1146,15 @@ const SERVICES = [
     descriptionPath: ['status', 'description'],
     logo: '⚡',
   },
+  {
+    name: 'GitHub Pages',
+    description: 'Hosts the CRM app (deploys)',
+    statusUrl: 'https://www.githubstatus.com/',
+    apiUrl: 'https://www.githubstatus.com/api/v2/status.json',
+    indicatorPath: ['status', 'indicator'],
+    descriptionPath: ['status', 'description'],
+    logo: '🐙',
+  },
 ]
 
 function indicatorToStatus(indicator) {
@@ -1170,7 +1179,7 @@ function UptimeTab() {
     // do not, so a direct browser fetch to those two silently fails every
     // time. Routing all three through the edge function (server-side, no CORS)
     // fixes that for good.
-    const NAME_MAP = { supabase: 'Supabase', stripe: 'Stripe', anthropic: 'Anthropic' }
+    const NAME_MAP = { supabase: 'Supabase', stripe: 'Stripe', anthropic: 'Anthropic', github: 'GitHub Pages' }
     try {
       const { data, error } = await supabase.functions.invoke('check-service-status')
       if (error) throw error
