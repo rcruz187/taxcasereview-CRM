@@ -8,6 +8,7 @@ import ErrorBoundary from '../components/ErrorBoundary'
 import InPlaceCaller from '../components/InPlaceCaller'
 import BookingWidget from '../components/BookingWidget'
 import QuickEmail from '../components/QuickEmail'
+import { ESIGN_DOC_TYPES } from './Leads'
 import StripePaymentMethodModal from '../components/StripePaymentMethodModal'
 import SendPaymentLinkModal from '../components/SendPaymentLinkModal'
 import SavedCardsPanel from '../components/SavedCardsPanel'
@@ -287,8 +288,7 @@ function InlineFaxForm({ client, onClose, showToast, onLogged }) {
 }
 
 // ── Inline E-Sign Form ───────────────────────────────────────────────────────
-const DOC_TYPES_INLINE = ['Tax Service Agreement','Form 2848 — Power of Attorney','Form 8821 — Tax Info Auth',
-  'Fee Agreement Addendum','9465 Installment Agreement','OIC Application (656)','Custom Document']
+const DOC_TYPES_INLINE = ESIGN_DOC_TYPES
 
 function InlineEsignForm({ client, onClose, showToast }) {
   const [docType,  setDocType]  = useState('Tax Service Agreement')
@@ -296,12 +296,27 @@ function InlineEsignForm({ client, onClose, showToast }) {
   const [priority, setPriority] = useState('Normal')
   const [saving,   setSaving]   = useState(false)
   const [link,     setLink]     = useState('')
+  const [customFile, setCustomFile] = useState(null)
 
   async function create() {
+    if(docType==='Custom Document' && !message.trim() && !customFile){
+      showToast('For a custom document, type the text to sign or attach a PDF.','err');return
+    }
     setSaving(true)
+    let pdfAttachments=null
+    if(docType==='Custom Document' && customFile){
+      try{
+        const path=`esign-custom/${(client?.name||'client').replace(/[^A-Za-z0-9 _-]/g,'')}/${Date.now()}-${customFile.name}`
+        const{error:upErr}=await supabase.storage.from('documents').upload(path,customFile,{upsert:true})
+        if(!upErr){
+          const{data:u}=supabase.storage.from('documents').getPublicUrl(path)
+          pdfAttachments=[{formType:'custom',label:customFile.name,url:u?.publicUrl}]
+        }
+      }catch(e){console.error('custom upload:',e)}
+    }
     const { data, error } = await supabase.from('esigns').insert([{
       doc_type: docType, client_name: client?.name, client_email: client?.email||'', client_phone: client?.phone||'',
-      message, priority, status:'Awaiting', sent_at: new Date().toISOString(), created_at: new Date().toISOString()
+      message, pdf_attachments:pdfAttachments, priority, status:'Awaiting', sent_at: new Date().toISOString(), created_at: new Date().toISOString()
     }]).select().single()
     setSaving(false)
     if (error) { showToast('Error: '+error.message,'err'); return }
@@ -329,10 +344,17 @@ function InlineEsignForm({ client, onClose, showToast }) {
           {DOC_TYPES_INLINE.map(t=><option key={t}>{t}</option>)}
         </select>
       </div>
-      <div className="field"><label>Message to Client</label>
+      <div className="field"><label>{docType==='Custom Document'?'Document Text':'Message to Client'}</label>
         <textarea value={message} onChange={e=>setMessage(e.target.value)} rows={3}
+          placeholder={docType==='Custom Document'?"Type the document text they'll review and sign… (or attach a PDF below)":''}
           style={{width:'100%',resize:'vertical',padding:'8px 12px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:13,fontFamily:'inherit'}}/>
       </div>
+      {docType==='Custom Document'&&(
+        <div className="field"><label>Or attach a PDF</label>
+          <input type="file" accept="application/pdf" onChange={e=>setCustomFile(e.target.files?.[0]||null)}/>
+          {customFile&&<div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>📎 {customFile.name}</div>}
+        </div>
+      )}
       <div className="field"><label>Priority</label>
         <select value={priority} onChange={e=>setPriority(e.target.value)}>
           <option>Normal</option><option>High</option><option>Urgent</option>

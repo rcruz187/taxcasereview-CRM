@@ -217,18 +217,45 @@ function LeadInlineFax({ lead, onClose, onLogged }) {
   </div>
 }
 
+// Every signable document type — kept identical on Leads and Clients so any
+// standard doc can be sent for signature from either. Custom Document reveals
+// a text box + PDF upload.
+export const ESIGN_DOC_TYPES = ['Tax Service Agreement','Form 2848 — Power of Attorney','Form 8821 — Tax Info Auth','Fee Agreement Addendum','9465 Installment Agreement','OIC Application (656)','Custom Document']
+
 function LeadInlineEsign({ lead, onClose }) {
   const [docType,set0]=useState('Tax Service Agreement')
   const [sendVia,setSendVia]=useState(lead?.email ? 'email' : 'sms')
   const [saving,set2]=useState(false)
   const [done,setDone]=useState(null)
+  const [customMsg,setCustomMsg]=useState('')
+  const [customFile,setCustomFile]=useState(null)
+  const [uploading,setUploading]=useState(false)
   async function create() {
+    if(docType==='Custom Document' && !customMsg.trim() && !customFile){
+      alert('For a custom document, type the text to sign or attach a PDF.');return
+    }
     set2(true)
+    // Custom PDF → upload to storage and attach to the sign page
+    let pdfAttachments=null
+    if(docType==='Custom Document' && customFile){
+      setUploading(true)
+      try{
+        const path=`esign-custom/${(lead?.name||'lead').replace(/[^A-Za-z0-9 _-]/g,'')}/${Date.now()}-${customFile.name}`
+        const{error:upErr}=await supabase.storage.from('documents').upload(path,customFile,{upsert:true})
+        if(!upErr){
+          const{data:u}=supabase.storage.from('documents').getPublicUrl(path)
+          pdfAttachments=[{formType:'custom',label:customFile.name,url:u?.publicUrl}]
+        }
+      }catch(e){console.error('custom upload:',e)}
+      setUploading(false)
+    }
     const{data,error}=await supabase.from('esigns').insert([{
       doc_type:docType,
       client_name:lead?.name,
       client_email:lead?.email||'',
       client_phone:lead?.phone||'',
+      message:docType==='Custom Document'?(customMsg.trim()||'Please review and sign the attached document.'):null,
+      pdf_attachments:pdfAttachments,
       investigation_fee:lead?.taxFee||null,
       tax_years:lead?.taxYearsCustom||lead?.taxYears||null,
       rep_name:lead?.assignedTo||null,
@@ -298,9 +325,21 @@ function LeadInlineEsign({ lead, onClose }) {
   return <div style={{padding:'0 4px 4px'}}>
     <div className="field"><label>Document Type</label>
       <select value={docType} onChange={e=>set0(e.target.value)}>
-        {['Tax Service Agreement','Form 2848 — Power of Attorney','Form 8821 — Tax Info Auth','Fee Agreement Addendum','Custom Document'].map(t=><option key={t}>{t}</option>)}
+        {ESIGN_DOC_TYPES.map(t=><option key={t}>{t}</option>)}
       </select>
     </div>
+    {docType==='Custom Document'&&(
+      <div style={{marginBottom:12}}>
+        <div className="field"><label>Document Text</label>
+          <textarea value={customMsg} onChange={e=>setCustomMsg(e.target.value)} rows={4}
+            placeholder="Type the document text they'll review and sign… (or attach a PDF below)"/>
+        </div>
+        <div className="field"><label>Or attach a PDF</label>
+          <input type="file" accept="application/pdf" onChange={e=>setCustomFile(e.target.files?.[0]||null)}/>
+          {customFile&&<div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>📎 {customFile.name}</div>}
+        </div>
+      </div>
+    )}
     <div style={{background:'var(--s2)',borderRadius:6,padding:'9px 12px',marginBottom:12,fontSize:12,color:'var(--t3)',lineHeight:1.7}}>
       <div>Email: {lead?.email||<span style={{color:'var(--warn)'}}>No email on file</span>}</div>
       <div>Phone: {lead?.phone||<span style={{color:'var(--warn)'}}>No phone on file</span>}</div>
@@ -319,7 +358,7 @@ function LeadInlineEsign({ lead, onClose }) {
     </div>
     <div style={{display:'flex',gap:8,marginTop:4}}>
       <button className="btn sec" style={{flex:1,justifyContent:'center'}} onClick={onClose}>Cancel</button>
-      <button className="btn sm" style={{flex:1,justifyContent:'center',background:'#7c3aed',color:'#fff',borderColor:'#7c3aed'}} onClick={create} disabled={saving}>{saving?'Sending...':'Send Request'}</button>
+      <button className="btn sm" style={{flex:1,justifyContent:'center',background:'#7c3aed',color:'#fff',borderColor:'#7c3aed'}} onClick={create} disabled={saving}>{uploading?'Uploading…':saving?'Sending...':'Send Request'}</button>
     </div>
   </div>
 }
