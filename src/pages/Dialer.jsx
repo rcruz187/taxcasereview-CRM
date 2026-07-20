@@ -533,29 +533,39 @@ export default function Dialer() {
                   const name = lead.name || `${lead.first || ''} ${lead.last || ''}`.trim() || 'Unknown'
                   return (
                     <div key={lead.id} style={{
-                      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
+                      display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
                       borderBottom: '1px solid var(--br)',
                       background: active?.id === lead.id ? 'rgba(37,162,90,0.08)' : 'transparent',
-                    }}>
-                      <div className={`av ${avColor(name)}`} style={{ width: 24, height: 24, fontSize: 9.5 }}>{initialsFor(name)}</div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, fontSize: 12.5, color: 'var(--tx)' }}>{name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--t3)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
-                          <span style={{ fontFamily: 'monospace' }}>{lead.phone}</span>
-                          {lead.source && <><span>·</span><span>{lead.source}</span></>}
+                      transition: 'background .12s ease',
+                    }}
+                      onMouseEnter={e => { if (active?.id !== lead.id) e.currentTarget.style.background = 'var(--s2)' }}
+                      onMouseLeave={e => { if (active?.id !== lead.id) e.currentTarget.style.background = 'transparent' }}>
+                      <div className={`av ${avColor(name)}`} style={{ width: 30, height: 30, fontSize: 11, flexShrink: 0 }}>{initialsFor(name)}</div>
+                      <div style={{ width: 220, minWidth: 0, flexShrink: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <ClientLink name={name} style={{ color: 'inherit' }} />
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--t3)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 2 }}>
+                          {lead.phone
+                            ? <span style={{ fontFamily: 'monospace' }}>{lead.phone}</span>
+                            : <span style={{ fontStyle: 'italic', opacity: 0.7 }}>No phone</span>}
+                          {lead.source && <><span>·</span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.source}</span></>}
                         </div>
                       </div>
-                      <span className="bdg bb" style={{ fontSize: 10, flexShrink: 0 }}>{lead.status}</span>
-                      {lead.phone ? (
-                        <button className="btn pri"
-                          style={{ padding: '5px 11px', fontSize: 11, gap: 4, flexShrink: 0 }}
-                          onClick={() => startCall({ ...lead, entityType: 'lead' })}
-                          disabled={calling}>
-                          📞 Call
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: 10.5, color: 'var(--t3)', flexShrink: 0, width: 64, textAlign: 'center' }}>No phone</span>
-                      )}
+                      <div style={{ flex: 1 }} />
+                      <span className="bdg bb" style={{ fontSize: 10.5, flexShrink: 0, whiteSpace: 'nowrap' }}>{lead.status}</span>
+                      <div style={{ width: 84, flexShrink: 0, display: 'flex', justifyContent: 'flex-end' }}>
+                        {lead.phone ? (
+                          <button className="btn pri"
+                            style={{ padding: '6px 14px', fontSize: 11.5, gap: 4 }}
+                            onClick={() => startCall({ ...lead, entityType: 'lead' })}
+                            disabled={calling}>
+                            📞 Call
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: 10.5, color: 'var(--t3)' }}>—</span>
+                        )}
+                      </div>
                     </div>
                   )
                 })}
