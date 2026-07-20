@@ -525,7 +525,7 @@ export default function Dialer() {
 
           {/* Call Queue */}
           {tab === 'queue' && (
-            <div className="card" style={{ maxWidth: 860 }}>
+            <div className="card" style={{ maxWidth: 1040 }}>
               <div className="ovx">
                 {leads.length === 0 ? (
                   <div style={{ textAlign: 'center', color: 'var(--t3)', padding: 32 }}>No leads in queue</div>
@@ -575,26 +575,29 @@ export default function Dialer() {
 
           {/* Call History */}
           {tab === 'log' && (
-            <div className="card">
+            <div className="card" style={{ maxWidth: 1040 }}>
               <div className="ovx">
                 {callLog.length === 0 ? (
                   <div style={{ textAlign: 'center', color: 'var(--t3)', padding: 32 }}>No calls logged yet</div>
                 ) : callLog.map(c => (
-                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderBottom: '1px solid var(--br)' }}>
-                    <div className={`av ${avColor(c.clientName || c.phone || '?')}`} style={{ width: 24, height: 24, fontSize: 9.5 }}>{initialsFor(c.clientName) !== '?' ? initialsFor(c.clientName) : (c.direction === 'Inbound' ? '↘' : '↗')}</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 700, fontSize: 12.5, color: 'var(--tx)' }}>{c.clientName ? <ClientLink name={c.clientName} style={{color:'inherit'}} /> : 'Unknown caller'}</span>
-                        <span className={`bdg ${c.direction === 'Inbound' ? 'bb' : 'bn'}`} style={{ fontSize: 9.5 }}>{c.direction === 'Inbound' ? '↘ In' : '↗ Out'}</span>
-                        <span className={`bdg ${OUTCOME_C[c.outcome] || 'bn'}`} style={{ fontSize: 9.5 }}>{c.outcome}</span>
+                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '7px 14px', borderBottom: '1px solid var(--br)', transition: 'background .12s ease' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--s2)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <div className={`av ${avColor(c.clientName || c.phone || '?')}`} style={{ width: 28, height: 28, fontSize: 10.5, flexShrink: 0 }}>{initialsFor(c.clientName) !== '?' ? initialsFor(c.clientName) : (c.direction === 'Inbound' ? '↘' : '↗')}</div>
+                    <div style={{ width: 200, minWidth: 0, flexShrink: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {c.clientName ? <ClientLink name={c.clientName} subtle /> : 'Unknown caller'}
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                      <div style={{ fontSize: 10.5, color: 'var(--t3)', marginTop: 1, display: 'flex', alignItems: 'center', gap: 5 }}>
                         <span style={{ fontFamily: 'monospace' }}>{c.phone || '—'}</span>
                         {c.duration && <><span>·</span><span style={{ fontFamily: 'monospace' }}>{c.duration}</span></>}
-                        {c.notes && <><span>·</span><span style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.notes}</span></>}
                       </div>
                     </div>
-                    <div style={{ fontSize: 10.5, color: 'var(--t3)', flexShrink: 0, textAlign: 'right' }}>
+                    <span className={`bdg ${c.direction === 'Inbound' ? 'bb' : 'bn'}`} style={{ fontSize: 9.5, flexShrink: 0 }}>{c.direction === 'Inbound' ? '↘ In' : '↗ Out'}</span>
+                    <span className={`bdg ${OUTCOME_C[c.outcome] || 'bn'}`} style={{ fontSize: 9.5, flexShrink: 0 }}>{c.outcome}</span>
+                    {c.notes && <span style={{ fontSize: 11, color: 'var(--t3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>{c.notes}</span>}
+                    <div style={{ flex: c.notes ? 'unset' : 1 }} />
+                    <div style={{ fontSize: 10.5, color: 'var(--t3)', flexShrink: 0, textAlign: 'right', whiteSpace: 'nowrap' }}>
                       {c.created_at ? new Date(c.created_at).toLocaleString() : '—'}
                     </div>
                   </div>
