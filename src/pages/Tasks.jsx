@@ -1,6 +1,7 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 
@@ -15,6 +16,16 @@ function resolveActorName(user, employees) {
 
 export default function Tasks() {
   const { user } = useApp()
+  const navigate = useNavigate()
+
+  // Jump from a task to the client/lead file it belongs to.
+  function openLinkedFile(name) {
+    if (!name) return
+    const c = clients.find(x => x.name === name)
+    if (c) { navigate(`/clients/${c.id}`); return }
+    const l = leads.find(x => x.name === name)
+    if (l) { navigate(`/leads/${l.id}`); return }
+  }
   const [tasks,     setTasks]     = useState([])
   const [deleted,   setDeleted]   = useState([])   // soft-deleted tasks
   const [clients,   setClients]   = useState([])
@@ -283,7 +294,7 @@ export default function Tasks() {
             overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'
           }}>{t.title}</div>
           <div style={{fontSize:11,color:'var(--t3)',marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
-            {t.clientName&&<span>🏢 {t.clientName}</span>}
+            {t.clientName&&(()=>{const known=clients.some(c=>c.name===t.clientName)||leads.some(l=>l.name===t.clientName);return known?<span onClick={e=>{e.stopPropagation();openLinkedFile(t.clientName)}} style={{cursor:'pointer',color:'var(--blue)',textDecoration:'underline'}} title="Open file">🏢 {t.clientName} ↗</span>:<span>🏢 {t.clientName}</span>})()}
             {t.priority&&<span className={`bdg ${pc(t.priority)}`} style={{fontSize:9}}>{t.priority}</span>}
             {showRestore&&t.deleted_at&&<span style={{color:'var(--bad)'}}>Deleted {t.deleted_at?.slice(0,10)}</span>}
           </div>
@@ -438,7 +449,7 @@ export default function Tasks() {
                           onClick={()=>setCollapsedSections(prev=>({...prev,[g.key]:!prev[g.key]}))}>
                           <span style={{fontSize:11,color:'var(--t3)',transform:collapsedSections[g.key]?'none':'rotate(90deg)',transition:'transform .15s',display:'inline-block'}}>▶</span>
                           <div style={{fontSize:13,fontWeight:700,color:'var(--tx)'}}>
-                            📋 {g.section_title}{g.clientName?<span style={{fontWeight:400,color:'var(--t3)'}}> · {g.clientName}</span>:''}
+                            📋 {g.section_title}{g.clientName?<span onClick={e=>{e.stopPropagation();openLinkedFile(g.clientName)}} style={{fontWeight:400,color:'var(--blue)',cursor:'pointer',textDecoration:'underline'}} title="Open file"> · {g.clientName} ↗</span>:''}
                           </div>
                         </div>
                         <button className="btn sec" style={{fontSize:10.5,padding:'4px 10px',fontWeight:600,opacity:.85}} onClick={()=>addSubtask({clientName:g.clientName, section_title:g.section_title})}>+ Task</button>
