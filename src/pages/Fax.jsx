@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import { useLocation } from 'react-router-dom'
 import { DOC_FOLDERS } from './Clients'
+import ClientLink from '../components/ClientLink'
 
 const BLANK = { to_number:'', from_number:'', client_name:'', subject:'', notes:'' }
 
@@ -278,7 +279,7 @@ export default function Fax() {
                       <div style={{fontSize:12,color:'var(--t3)',marginTop:2}}>{(l.sent_at||l.created_at) ? new Date(l.sent_at||l.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : ''}</div>
                     </td>
                     <td style={{padding:'12px 14px',fontWeight:600,fontSize:14}}>
-                      {l.client_name || (match ? <span title="Suggested match by phone number">{match.name} ?</span> : '—')}
+                      {l.client_name ? <ClientLink name={l.client_name} /> : (match ? <span title="Suggested match by phone number">{match.name} ?</span> : '—')}
                     </td>
                     <td style={{padding:'12px 14px',fontFamily:'monospace',fontSize:13,color:'var(--t2)'}}>{l.to_number ? fmtPhone(l.to_number) : '—'}</td>
                     <td style={{padding:'12px 14px',color:'var(--t2)',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:13}}>{l.subject||'—'}</td>

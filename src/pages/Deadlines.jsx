@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { sendGmailEmail } from '../lib/gmailUtils'
+import ClientLink from '../components/ClientLink'
 
 const TYPES    = ['ACS','Appeals','CDP','CSED','General','Installment Agreement','IRS Notice','Levy Release','OIC','Penalty Abatement','Return Filing']
 const STATUSES = ['Tracking','Action Required','Scheduled','Completed']
@@ -148,7 +149,7 @@ export default function Deadlines() {
     return (
       <tr>
         <td style={{fontWeight:600,color:urgencyColor(dy)}}>{getName(d)}</td>
-        <td style={{fontSize:12,color:'var(--t2)'}}>{getClient(d)}</td>
+        <td style={{fontSize:12,color:'var(--t2)'}}>{getClient(d)!=='—' ? <ClientLink name={getClient(d)} /> : '—'}</td>
         <td><span className="bdg bb" style={{fontSize:10}}>{d.type}</span></td>
         <td style={{color:urgencyColor(dy),fontSize:12}}>{d.dueDate||d.due_date||'—'}</td>
         <td><span className={`bdg ${urgencyBdg(dy)}`}>{daysText(dy)}</span></td>

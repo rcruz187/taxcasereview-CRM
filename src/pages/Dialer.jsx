@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useCall } from '../context/CallContext'
 import { useApp } from '../context/AppContext'
+import ClientLink from '../components/ClientLink'
 
 const OUTCOME_C = {
   'Connected': 'bg', 'No Answer': 'bn', 'Voicemail': 'ba',
@@ -573,7 +574,7 @@ export default function Dialer() {
                     <div className={`av ${avColor(c.clientName || c.phone || '?')}`} style={{ width: 24, height: 24, fontSize: 9.5 }}>{initialsFor(c.clientName) !== '?' ? initialsFor(c.clientName) : (c.direction === 'Inbound' ? '↘' : '↗')}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 700, fontSize: 12.5, color: 'var(--tx)' }}>{c.clientName || 'Unknown caller'}</span>
+                        <span style={{ fontWeight: 700, fontSize: 12.5, color: 'var(--tx)' }}>{c.clientName ? <ClientLink name={c.clientName} style={{color:'inherit'}} /> : 'Unknown caller'}</span>
                         <span className={`bdg ${c.direction === 'Inbound' ? 'bb' : 'bn'}`} style={{ fontSize: 9.5 }}>{c.direction === 'Inbound' ? '↘ In' : '↗ Out'}</span>
                         <span className={`bdg ${OUTCOME_C[c.outcome] || 'bn'}`} style={{ fontSize: 9.5 }}>{c.outcome}</span>
                       </div>
