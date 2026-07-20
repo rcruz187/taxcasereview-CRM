@@ -61,7 +61,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const { to, subject, html, text } = await req.json()
+    const { to, subject, html, text, attachments } = await req.json()
 
     if (!to || !subject || (!html && !text)) {
       return new Response(JSON.stringify({ error: 'Missing required fields: to, subject, html/text' }), {
@@ -90,15 +90,56 @@ serve(async (req) => {
     const sig = settings.email_signature ? `\n\n${settings.email_signature}` : ''
     const finalBody = isHtml ? html : `${text}${sig}`
 
-    const headers = [
-      `To: ${to}`,
-      `From: ${from}`,
-      `Subject: ${encodedSubject}`,
-      `Date: ${new Date().toUTCString()}`,
-      `Content-Type: ${isHtml ? 'text/html' : 'text/plain'}; charset="UTF-8"`,
-      'MIME-Version: 1.0',
-    ].join('\r\n')
-    const message = `${headers}\r\n\r\n${finalBody}`
+    // Fetch any attachments (array of {url, filename}) and base64-encode them
+    // so the actual file rides in the email instead of only a link.
+    const atts: { filename: string; b64: string }[] = []
+    if (Array.isArray(attachments)) {
+      for (const a of attachments) {
+        if (!a?.url) continue
+        try {
+          const r = await fetch(a.url)
+          if (!r.ok) continue
+          const buf = new Uint8Array(await r.arrayBuffer())
+          let bin = ''
+          for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i])
+          atts.push({ filename: a.filename || 'document.pdf', b64: btoa(bin) })
+        } catch (_) { /* skip a failed attachment, still send the email */ }
+      }
+    }
+
+    let message: string
+    if (atts.length > 0) {
+      const boundary = `tcr_${Date.now()}_${Math.random().toString(36).slice(2)}`
+      const headers = [
+        `To: ${to}`,
+        `From: ${from}`,
+        `Subject: ${encodedSubject}`,
+        `Date: ${new Date().toUTCString()}`,
+        'MIME-Version: 1.0',
+        `Content-Type: multipart/mixed; boundary="${boundary}"`,
+      ].join('\r\n')
+      let body = `${headers}\r\n\r\n--${boundary}\r\n`
+      body += `Content-Type: ${isHtml ? 'text/html' : 'text/plain'}; charset="UTF-8"\r\n\r\n${finalBody}\r\n`
+      for (const a of atts) {
+        body += `--${boundary}\r\n`
+        body += `Content-Type: application/pdf; name="${a.filename}"\r\n`
+        body += `Content-Disposition: attachment; filename="${a.filename}"\r\n`
+        body += 'Content-Transfer-Encoding: base64\r\n\r\n'
+        body += `${a.b64.replace(/(.{76})/g, '$1\r\n')}\r\n`
+      }
+      body += `--${boundary}--`
+      message = body
+    } else {
+      const headers = [
+        `To: ${to}`,
+        `From: ${from}`,
+        `Subject: ${encodedSubject}`,
+        `Date: ${new Date().toUTCString()}`,
+        `Content-Type: ${isHtml ? 'text/html' : 'text/plain'}; charset="UTF-8"`,
+        'MIME-Version: 1.0',
+      ].join('\r\n')
+      message = `${headers}\r\n\r\n${finalBody}`
+    }
     const raw = base64UrlEncode(message)
 
     const sendRes = await fetch(SEND_URL, {

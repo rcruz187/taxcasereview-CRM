@@ -40,6 +40,7 @@ export default function Payroll() {
   const [notes,       setNotes]       = useState('')
   const [lineItems,   setLineItems]   = useState([])
   const [activeTab,   setActiveTab]   = useState('payroll')
+  const [firm,        setFirm]        = useState(null)   // settings row → pay stub letterhead
 
   // Edit punch modal state (so you can fix time entries right from Payroll)
   const [editPunch,       setEditPunch]       = useState(null)
@@ -66,14 +67,16 @@ export default function Payroll() {
   }, [])
 
   async function load() {
-    const [{ data:r },{ data:e },{ data:t }] = await Promise.all([
+    const [{ data:r },{ data:e },{ data:t },{ data:s }] = await Promise.all([
       supabase.from('payrollruns').select('*').order('created_at',{ascending:false}),
       supabase.from('employees').select('*').order('name'),
       supabase.from('timeentries').select('*'),
+      supabase.from('settings').select('name,phone,email,address,city,state,zip').limit(1).maybeSingle(),
     ])
     if (r) setRuns(r)
     if (e) setEmployees(e)
     if (t) setTimeEntries(t)
+    if (s) setFirm(s)
   }
 
   function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''),3000) }
@@ -213,13 +216,40 @@ export default function Payroll() {
   const { start: curStart, end: curEnd, label: curLabel } = currentPeriod(today)
   const stubLines = buildLineItems(employees, timeEntries, curStart, curEnd)
 
+  // Firm letterhead shared by both pay-stub print paths — logo from the
+  // firm-assets bucket + name/address/phone from Settings. Falls back to the
+  // firm name alone if settings hasn't loaded yet.
+  const LH_CSS = `
+    .lh{display:flex;align-items:center;gap:16px;border-bottom:3px solid #1e3a8a;padding-bottom:14px;margin-bottom:18px}
+    .lh img{max-height:52px;max-width:170px;object-fit:contain}
+    .lh-name{font-size:17px;font-weight:800;color:#1e3a8a;letter-spacing:.02em}
+    .lh-line{font-size:11px;color:#64748b;margin-top:2px}`
+  function firmLetterhead() {
+    const { data: logo } = supabase.storage.from('firm-assets').getPublicUrl('logo')
+    const name  = firm?.name || 'Tax Case Review'
+    const addr1 = firm?.address || ''
+    const cityLine = [firm?.city, firm?.state].filter(Boolean).join(', ')
+    const addr2 = `${cityLine}${firm?.zip ? ' ' + firm.zip : ''}`.trim()
+    const contact = [firm?.phone, firm?.email].filter(Boolean).join(' · ')
+    return `<div class="lh">
+      <img src="${logo?.publicUrl || ''}" alt="" onerror="this.style.display='none'"/>
+      <div>
+        <div class="lh-name">${name}</div>
+        ${addr1 ? `<div class="lh-line">${addr1}</div>` : ''}
+        ${addr2 ? `<div class="lh-line">${addr2}</div>` : ''}
+        ${contact ? `<div class="lh-line">${contact}</div>` : ''}
+      </div>
+    </div>`
+  }
+
   function printStub(l) {
     const w = window.open('', '_blank')
     w.document.write(`
       <html><head><title>Pay Stub — ${l.name}</title>
       <style>
         body{font-family:Arial,sans-serif;padding:30px;color:#1a1a1a}
-        h1{font-size:18px;margin:0 0 4px}
+        ${LH_CSS}
+        h1{font-size:16px;margin:0 0 4px;color:#1e3a8a;letter-spacing:.06em;text-transform:uppercase}
         .sub{color:#666;font-size:12px;margin-bottom:20px}
         table{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px}
         td,th{padding:8px 10px;border-bottom:1px solid #ddd;text-align:left}
@@ -227,7 +257,8 @@ export default function Payroll() {
         .net{font-weight:800;font-size:16px;color:#16a34a}
         .bad{color:#dc2626}
       </style></head><body>
-        <h1>Tax Case Review — Pay Stub</h1>
+        ${firmLetterhead()}
+        <h1>Pay Stub</h1>
         <div class="sub">${l.name} · ${l.payType} · Period: ${curLabel}</div>
         <table>
           <tr><th>Item</th><th>Hours</th><th>Amount</th></tr>
@@ -370,8 +401,10 @@ export default function Payroll() {
     const lines = buildLineItems(employees, timeEntries.filter(e=>e.date>=navPeriod.start&&e.date<=navPeriod.end), navPeriod.start, navPeriod.end)
     if (!lines.length) { showToast('No data for this period'); return }
     const w = window.open('','_blank')
+    const lh = firmLetterhead()
     w.document.write(`<!DOCTYPE html><html><head><title>Pay Stubs — ${navPeriod.label}</title>
       <style>body{font-family:Arial,sans-serif;margin:0;padding:0}
+      ${LH_CSS}
       .stub{border:1px solid #ccc;padding:24px 32px;margin:20px auto;max-width:680px;page-break-after:always}
       h2{color:#1e3a8a;margin:0 0 4px}h3{margin:0 0 16px;color:#64748b;font-weight:400}
       table{width:100%;border-collapse:collapse;margin-top:12px}
@@ -379,7 +412,7 @@ export default function Payroll() {
       .total{font-weight:700;font-size:15px;color:#16a34a}.net{font-size:18px;font-weight:800;color:#16a34a}
       @media print{.stub{page-break-after:always;margin:0;border:none}}</style></head><body>
       ${lines.map(l=>`<div class="stub">
-        <h2>Tax Case Review</h2><h3>Pay Stub — ${navPeriod.label}</h3>
+        ${lh}<h3>Pay Stub — ${navPeriod.label}</h3>
         <table><tr><th>Employee</th><th>Pay Type</th><th>Hours</th><th>Rate</th><th>Gross</th></tr>
         <tr><td>${l.name}</td><td>${l.payType}</td><td>${l.hours}</td><td>$${l.rate||'—'}/hr</td><td>$${parseFloat(l.gross||0).toFixed(2)}</td></tr></table>
         <table style="margin-top:12px"><tr><th>Federal Tax</th><th>State Tax</th><th>SS</th><th>Medicare</th><th>Total Deductions</th></tr>
