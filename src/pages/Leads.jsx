@@ -24,6 +24,7 @@ import FinancialProfile from './FinancialProfile'
 import SendPaymentLinkModal from '../components/SendPaymentLinkModal'
 import SavedCardsPanel from '../components/SavedCardsPanel'
 import SplitPaymentModal from '../components/SplitPaymentModal'
+import { SMS_TEMPLATES, applySmsTemplate } from '../lib/smsTemplates'
 
 const STATUSES = ['New Lead','Contacted','Consultation Scheduled','Consultation Completed',
   'Tax Inv Agreement Sent','Tax Inv Agreement Signed','Tax Inv Fee Paid',
@@ -1947,6 +1948,14 @@ export default function Leads() {
 
           {leadDetailTab==='sms' && (
             <div style={{padding:16}}>
+              {l.phone && (
+                <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:10}}>
+                  {SMS_TEMPLATES.map(t=>(
+                    <button key={t.label} className="btn sec" style={{fontSize:11,padding:'4px 10px'}}
+                      onClick={()=>setLeadSmsBody(applySmsTemplate(t,l.name))}>{t.label}</button>
+                  ))}
+                </div>
+              )}
               <div style={{display:'flex',gap:8,marginBottom:14}}>
                 <textarea
                   value={leadSmsBody} onChange={e=>setLeadSmsBody(e.target.value)}

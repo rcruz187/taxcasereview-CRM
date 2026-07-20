@@ -411,14 +411,13 @@ export default function ActiveCallBar() {
           {/* ── DTMF Dialpad — appears below call bar ── */}
           {showDialpad && (
             <div style={{
-              position: 'fixed', top: 82, left: '50%', transform: 'translateX(-50%)', zIndex: 3498,
-              width: 220,
-              background: 'rgba(5,15,30,0.97)',
-              border: '1px solid rgba(255,255,255,.15)',
-              borderTop: 'none',
-              borderRadius: '0 0 12px 12px',
-              padding: '12px',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+              position: 'fixed', top: 160, left: '50%', transform: 'translateX(-50%)', zIndex: 3502,
+              width: 240,
+              background: 'rgba(5,15,30,0.98)',
+              border: '1px solid rgba(255,255,255,.2)',
+              borderRadius: '12px',
+              padding: '14px',
+              boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
             }}>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.08em' }}>
                 Keypad — {dtmfPressed || 'Press to send tones'}
@@ -448,7 +447,7 @@ export default function ActiveCallBar() {
           {/* Live transcript panel — attached below the call bar */}
           {showTranscript && (
             <div style={{
-              position: 'fixed', top: 82, left: '50%', transform: 'translateX(-50%)', zIndex: 3499,
+              position: 'fixed', top: 160, left: '50%', transform: 'translateX(-50%)', zIndex: 3502,
               width: 'min(620px, 92vw)',
               background: 'rgba(5,15,30,0.97)',
               border: '1px solid rgba(255,255,255,.15)',

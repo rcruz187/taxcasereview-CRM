@@ -23,6 +23,7 @@ import { generateAddendum, sendAddendumForSignature } from '../lib/docUtils'
 import ChargeResolutionFeeModal from '../components/ChargeResolutionFeeModal'
 import { RESOLUTION_SERVICES } from '../lib/irsFormUtils'
 import { generatePOACoverLetterPdf } from '../lib/irsFormUtils'
+import { SMS_TEMPLATES, applySmsTemplate } from '../lib/smsTemplates'
 
 const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -1919,6 +1920,14 @@ export default function Clients() {
           {/* SMS Tab */}
           {detailTab==='sms'&&(
             <div style={{padding:16}}>
+              {c.phone && (
+                <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:10}}>
+                  {SMS_TEMPLATES.map(t=>(
+                    <button key={t.label} className="btn sec" style={{fontSize:11,padding:'4px 10px'}}
+                      onClick={()=>setSmsBody(applySmsTemplate(t,c.name))}>{t.label}</button>
+                  ))}
+                </div>
+              )}
               <div style={{display:'flex',gap:8,marginBottom:14}}>
                 <textarea
                   value={smsBody} onChange={e=>setSmsBody(e.target.value)}
