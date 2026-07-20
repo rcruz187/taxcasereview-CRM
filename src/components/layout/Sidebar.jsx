@@ -100,9 +100,10 @@ export default function Sidebar() {
 
   // Determine which section contains the active route
   function activeSection() {
+    const p = location.pathname
     for (const s of SECTIONS) {
       if (s.always) continue
-      if (s.items.some(i => i.path !== '/' && location.pathname.startsWith(i.path))) return s.key
+      if (s.items.some(i => i.path !== '/' && (p === i.path || p.startsWith(i.path + '/')))) return s.key
     }
     return null
   }

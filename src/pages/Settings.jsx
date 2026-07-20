@@ -1115,6 +1115,15 @@ const SERVICES = [
     logo: '🤖',
   },
   {
+    name: 'GitHub Pages',
+    description: 'Hosts the CRM app (deploys)',
+    statusUrl: 'https://www.githubstatus.com/',
+    apiUrl: 'https://www.githubstatus.com/api/v2/status.json',
+    indicatorPath: ['status', 'indicator'],
+    descriptionPath: ['status', 'description'],
+    logo: '🐙',
+  },
+  {
     name: 'Gmail / Google',
     description: 'Email sending and sync',
     statusUrl: 'https://www.google.com/appsstatus/dashboard/',
@@ -1145,15 +1154,6 @@ const SERVICES = [
     indicatorPath: ['status', 'indicator'],
     descriptionPath: ['status', 'description'],
     logo: '⚡',
-  },
-  {
-    name: 'GitHub Pages',
-    description: 'Hosts the CRM app (deploys)',
-    statusUrl: 'https://www.githubstatus.com/',
-    apiUrl: 'https://www.githubstatus.com/api/v2/status.json',
-    indicatorPath: ['status', 'indicator'],
-    descriptionPath: ['status', 'description'],
-    logo: '🐙',
   },
 ]
 

@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 
-const ROLES = ['Super Admin', 'Admin', 'Tax Associate', 'View Only', 'Tax Advisor', 'Manager']
+const ROLES = ['Super Admin', 'Admin', 'Manager', 'Tax Associate', 'Tax Advisor', 'View Only']
 const ROLE_COLORS = { 'Super Admin': '#ef4444', 'Admin': '#f59e0b', 'Tax Associate': '#3b82f6', 'View Only': '#64748b', 'Tax Advisor': '#10b981', 'Manager': '#06b6d4' }
 
 // perm levels: 0=No Access, 1=View Only, 2=Edit, 3=Full Admin
