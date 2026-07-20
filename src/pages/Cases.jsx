@@ -5,7 +5,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { useApp } from '../context/AppContext'
-import ClientLink from '../components/ClientLink'
 
 const STATUSES = ['Open','Pending IRS','Active Plan','Docs Needed','POA Sent','Under Review','Resolved','Completed','Closed']
 const STATUS_C = {'Open':'bb','Pending IRS':'ba','Active Plan':'bg','Docs Needed':'ba','POA Sent':'bb','Under Review':'bn','Resolved':'bg','Completed':'bg','Closed':'bn'}
@@ -198,7 +197,7 @@ export default function Cases() {
         <div className="card" style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
             <div>
-              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}><ClientLink name={c.clientName} style={{ color: "inherit", textDecoration: "none", cursor: "pointer" }} /></div>
+              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>{c.clientName}</div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <span className={`bdg ${STATUS_C[c.status] || 'bn'}`}>{c.status}</span>
                 <span className="bdg bb">{c.caseType}</span>
@@ -451,7 +450,7 @@ export default function Cases() {
                   return (
                     <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => openDetail(c)}>
                       <td style={{ color: 'var(--t3)', fontSize: 11 }}>{c.caseNum}</td>
-                      <td style={{ fontWeight: 700, fontSize: 13 }} onClick={e=>e.stopPropagation()}><ClientLink name={c.clientName} /></td>
+                      <td style={{ fontWeight: 700, color: 'var(--tx)', fontSize: 13 }}>{c.clientName}</td>
                       <td><span className="bdg bb">{c.caseType}</span></td>
                       <td style={{ color: c.irsBalance ? 'var(--bad)' : 'var(--t3)', fontWeight: 600 }}>{fmt$(c.irsBalance)}</td>
                       <td>

@@ -16,6 +16,7 @@ import IRSFormFiller from '../components/IRSFormFiller'
 import ErrorBoundary from '../components/ErrorBoundary'
 import ComplianceGrids from './ComplianceGrids'
 import { ClientDocs } from './Clients'
+import { ESIGN_DOC_TYPES } from '../lib/esignDocTypes'
 import InPlaceCaller from '../components/InPlaceCaller'
 import ChargeResolutionFeeModal from '../components/ChargeResolutionFeeModal'
 import FinancialIntakeView from '../components/FinancialIntakeView'
@@ -217,10 +218,6 @@ function LeadInlineFax({ lead, onClose, onLogged }) {
   </div>
 }
 
-// Every signable document type — kept identical on Leads and Clients so any
-// standard doc can be sent for signature from either. Custom Document reveals
-// a text box + PDF upload.
-export const ESIGN_DOC_TYPES = ['Tax Service Agreement','Form 2848 — Power of Attorney','Form 8821 — Tax Info Auth','Fee Agreement Addendum','9465 Installment Agreement','OIC Application (656)','Custom Document']
 
 function LeadInlineEsign({ lead, onClose }) {
   const [docType,set0]=useState('Tax Service Agreement')
