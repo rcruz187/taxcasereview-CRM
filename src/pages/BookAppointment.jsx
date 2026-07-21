@@ -43,9 +43,16 @@ export default function BookAppointment() {
       setCfg(data)
       if ((data.types || []).length) setType(data.types[0])
     })()
+    // Demo overlay: a ?demo=<id> link shows the page as that prospect's firm.
+    const demoId = params.get('demo')
+    if (demoId) {
+      supabase.from('demo_profiles').select('name,logo_url').eq('id', demoId).maybeSingle().then(({ data }) => {
+        if (data) setMeta(m => ({ ...m, firm_name: data.name || m.firm_name, logo_url: data.logo_url || m.logo_url }))
+      }).catch(() => {})
+    }
     // Branding + payment config — additive RPC; safe fallback if not present yet
     supabase.rpc('booking_get_public_meta').then(({ data }) => {
-      if (data) setMeta(m => ({ ...m, ...data, payment: { ...m.payment, ...(data.payment || {}) } }))
+      if (data) setMeta(m => ({ ...m, firm_name: demoId ? m.firm_name : (data.firm_name || m.firm_name), logo_url: demoId ? m.logo_url : (data.logo_url || m.logo_url), payment: { ...m.payment, ...(data.payment || {}) } }))
     }).catch(() => {})
   }, [])
 

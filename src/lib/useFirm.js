@@ -5,10 +5,28 @@
  */
 import { useState, useEffect } from 'react'
 import { supabase } from './supabase'
+import { getActiveDemoProfile, profileToFirm } from './demoBranding'
 
 const BUCKET = 'firm-assets'
 
 let _cache = null   // module-level cache so we only hit DB once per session
+
+async function loadFirmData() {
+  const [{ data: s }, { data: logoData }, demo] = await Promise.all([
+    supabase.from('settings').select('*').limit(1).maybeSingle(),
+    supabase.storage.from(BUCKET).getPublicUrl('logo'),
+    getActiveDemoProfile(),
+  ])
+  let firmData = s || {}
+  let logo = logoData?.publicUrl || '/taxcasereview-CRM/logo.png'
+  // Demo overlay — present as the active prospect without touching real data.
+  const dp = profileToFirm(demo)
+  if (dp) {
+    firmData = { ...firmData, ...dp }
+    if (dp._logoUrl) logo = dp._logoUrl
+  }
+  return { firm: firmData, logoUrl: logo }
+}
 
 export function useFirm() {
   const [firm, setFirm]     = useState(_cache?.firm || null)
@@ -16,39 +34,26 @@ export function useFirm() {
   const [loading, setLoading] = useState(!_cache)
 
   useEffect(() => {
-    if (_cache) return
-    async function load() {
-      const [{ data: s }, { data: logoData }] = await Promise.all([
-        supabase.from('settings').select('*').limit(1).maybeSingle(),
-        supabase.storage.from(BUCKET).getPublicUrl('logo'),
-      ])
-      const firmData = s || {}
-      const logo = logoData?.publicUrl || '/taxcasereview-CRM/logo.png'
-      _cache = { firm: firmData, logoUrl: logo }
-      setFirm(firmData)
-      setLogo(logo)
-      setLoading(false)
+    let alive = true
+    async function go() {
+      if (_cache) { setFirm(_cache.firm); setLogo(_cache.logoUrl); setLoading(false); return }
+      const data = await loadFirmData()
+      _cache = data
+      if (!alive) return
+      setFirm(data.firm); setLogo(data.logoUrl); setLoading(false)
     }
-    load()
+    go()
+    // When Demo Mode switches prospect, rebuild branding app-wide.
+    function onDemoChange() { _cache = null; go() }
+    window.addEventListener('demo-branding-changed', onDemoChange)
+    return () => { alive = false; window.removeEventListener('demo-branding-changed', onDemoChange) }
   }, [])
 
   // Force refresh (called after logo upload or settings save)
   function refresh() {
     _cache = null
     setLoading(true)
-    async function load() {
-      const [{ data: s }, { data: logoData }] = await Promise.all([
-        supabase.from('settings').select('*').limit(1).maybeSingle(),
-        supabase.storage.from(BUCKET).getPublicUrl('logo'),
-      ])
-      const firmData = s || {}
-      const logo = logoData?.publicUrl || '/taxcasereview-CRM/logo.png'
-      _cache = { firm: firmData, logoUrl: logo }
-      setFirm(firmData)
-      setLogo(logo)
-      setLoading(false)
-    }
-    load()
+    loadFirmData().then(data => { _cache = data; setFirm(data.firm); setLogo(data.logoUrl); setLoading(false) })
   }
 
   // Derived helpers used in doc headers

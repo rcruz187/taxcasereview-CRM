@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { useFirm } from '../../lib/useFirm'
+import DemoModeSwitcher from '../DemoModeSwitcher'
 import { isSoundEnabled, setSoundEnabled, playSound } from '../../lib/notifySound'
 
 const PAGE_TITLES = {
@@ -43,7 +44,7 @@ const NEW_ITEMS = [
 export default function TopBar({ onNew }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const { searchQ, setSearchQ, mobileNavOpen, setMobileNavOpen } = useApp()
+  const { searchQ, setSearchQ, mobileNavOpen, setMobileNavOpen, role } = useApp()
   const [clock, setClock] = useState('')
   const [dateStr, setDateStr] = useState('')
   const [open, setOpen] = useState(false)
@@ -118,6 +119,7 @@ export default function TopBar({ onNew }) {
 
       {/* Right side: firm numbers, clock, controls */}
       <div style={{display:'flex',alignItems:'center',gap:14,flexShrink:0}}>
+        {role === 'Super Admin' && <DemoModeSwitcher />}
         <div style={{display:'flex',alignItems:'center',gap:5,fontSize:12,color:'var(--t2)',whiteSpace:'nowrap'}}>
           <span style={{fontSize:13}}>📞</span>
           <span style={{fontWeight:700,letterSpacing:'.02em'}}>{firm?.phone || '(888) 334-5052'}</span>
