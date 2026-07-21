@@ -152,12 +152,17 @@ export async function fillForm(formType, client, useEin = false) {
     setText(map.ssn, taxId);
     setText(map.phone, client.phone || '');
     setText(map.date, today);
-    // Draw print name directly on page 2 (no AcroForm field exists for this line)
+    // Draw taxpayer print name on the Part I "Print name" line (no AcroForm
+    // field exists for it). On this template the taxpayer signature block and
+    // Part II both live on page index 1; the print-name line sits just below
+    // the signature at y≈518. (Previously drawn at y=95 — the bottom of Part II,
+    // which put the taxpayer's name under the Declaration of Representative and
+    // would get the form rejected.)
     try {
       const pages = pdfDoc.getPages();
       const pg2 = pages[1];
       const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      pg2.drawText(client.name || '', { x: 40, y: 95, size: 10, font: helvetica, color: rgb(0,0,0) });
+      pg2.drawText(client.name || '', { x: 42, y: 518, size: 11, font: helvetica, color: rgb(0,0,0) });
     } catch(_) {}
   }
 
