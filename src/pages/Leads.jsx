@@ -1251,6 +1251,7 @@ export default function Leads() {
     setIntakeSending(false)
     if (emailErr) { showToast('Error sending email: '+emailErr.message); return }
     showToast('✅ Financial Intake link sent to '+l.email)
+    await logAction(l.id, l.name, `📊 Financial Intake link sent to ${l.email}`)
   }
 
   async function handleSendFullPackage(l) {
@@ -1381,6 +1382,8 @@ export default function Leads() {
     setPkgSending(false)
     const sent=[emailSent&&`email to ${l.email}`,smsSent&&`SMS to ${l.phone}`].filter(Boolean)
     showToast(sent.length?`Package sent via ${sent.join(' & ')}!`:'Package created — link copied (configure email/SMS in Settings to auto-send).')
+    await logAction(l.id, l.name, `📦 Full Package sent for e-signature — Form 2848/8821 + Service Agreement + $${Number(taxFeeAmt).toLocaleString()} investigation fee${sent.length?` (${sent.join(' & ')})`:' (link copied)'}`)
+    const _fa=getActor(user); await logActivity(supabase,{employeeName:_fa.name,employeeEmail:_fa.email,action:'package_sent',category:'esign',description:`Sent Full Package to: ${l.name}`,entityName:l.name,entityId:l.id}).catch(()=>{})
     await advanceLeadStatus(supabase, l.name, 'Tax Inv Agreement Sent')
     load()
   }
