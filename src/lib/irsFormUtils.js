@@ -88,7 +88,7 @@ export const SIGNATURE_POSITIONS = {
   '2848_business': { page: 1, sigX: 40,  sigY: 555, dateX: 305, dateY: 555, size: 12 },
   '8821_personal': { page: 0, sigX: 60,  sigY: 138, dateX: 438, dateY: 138, size: 12 },
   '8821_business': { page: 0, sigX: 60,  sigY: 138, dateX: 438, dateY: 138, size: 12 },
-  'cc_auth':       { page: 0, sigX: 56,  sigY: 192, dateX: 100, dateY: 142, size: 12 },
+  'cc_auth':       { page: 0, sigX: 60,  sigY: 256, dateX: 366, dateY: 256, size: 12 },
   'addendum':      { page: 'last', sigX: 56, sigY: 698, dateX: 90, dateY: 654, size: 12 },
 };
 
@@ -253,8 +253,6 @@ export function getPackageFormTypes(clientType) {
 }
 
 // ─── Credit Card Authorization — built from scratch for the e-sign package ───
-const CC_AUTH_SIG_Y = 82;
-
 export async function generateCcAuthPdf(client) {
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([612, 792]);
@@ -362,20 +360,24 @@ export async function generateCcAuthPdf(client) {
   y -= 22;
   drawLine('Routing Number', margin, lineW * 0.48, y);
   drawLine('Account Number', margin + lineW * 0.52, lineW * 0.48, y);
-  y -= 26;
+  y -= 44;
 
-  // Notice
-  const noticeY = y;
-  page.drawRectangle({ x: margin, y: noticeY - 42, width: lineW, height: 50, color: rgb(0.96,0.96,0.96), borderWidth: 0.5, borderColor: rgb(0.8,0.8,0.8) });
-  page.drawText('IMPORTANT:', { x: margin + 8, y: noticeY - 4, size: 9, font: bold });
-  drawWrapped('Tax Case Review does not store your card or bank account number. Payment information is processed and stored securely by Stripe, our PCI-compliant payment processor. This signed form authorizes charges per your Tax Service Agreement.', 9, font, 13);
-  y -= 10;
+  // Notice — sized to fit its text with padding, clear of the ACH labels above
+  const noticeTop = y;
+  const noticeH = 60;
+  page.drawRectangle({ x: margin, y: noticeTop - noticeH + 10, width: lineW, height: noticeH, color: rgb(0.96,0.96,0.96), borderWidth: 0.5, borderColor: rgb(0.8,0.8,0.8) });
+  page.drawText('IMPORTANT:', { x: margin + 10, y: noticeTop - 6, size: 9, font: bold });
+  const noticeLines = wrap('Tax Case Review does not store your card or bank account number. Payment information is processed and stored securely by Stripe, our PCI-compliant payment processor. This signed form authorizes charges per your Tax Service Agreement.', 9, lineW - 20, font);
+  let ny = noticeTop - 20;
+  for (const line of noticeLines) { page.drawText(line, { x: margin + 10, y: ny, size: 9, font }); ny -= 12; }
 
-  // Signature line
-  page.drawLine({ start: { x: margin, y: CC_AUTH_SIG_Y + 18 }, end: { x: 340, y: CC_AUTH_SIG_Y + 18 }, thickness: 0.5 });
-  page.drawText('Client Signature', { x: margin, y: CC_AUTH_SIG_Y + 4, size: 9, font });
-  page.drawLine({ start: { x: 360, y: CC_AUTH_SIG_Y + 18 }, end: { x: 612 - margin, y: CC_AUTH_SIG_Y + 18 }, thickness: 0.5 });
-  page.drawText('Date', { x: 360, y: CC_AUTH_SIG_Y + 4, size: 9, font });
+  // Signature block — fixed line at y=250 so the stamped signature and date
+  // (SIGNATURE_POSITIONS.cc_auth, sigY/dateY=256) land exactly on the lines.
+  const sigLineY = 250;
+  page.drawLine({ start: { x: margin, y: sigLineY }, end: { x: 340, y: sigLineY }, thickness: 0.5 });
+  page.drawText('Client Signature', { x: margin, y: sigLineY - 14, size: 9, font });
+  page.drawLine({ start: { x: 360, y: sigLineY }, end: { x: 612 - margin, y: sigLineY }, thickness: 0.5 });
+  page.drawText('Date', { x: 360, y: sigLineY - 14, size: 9, font });
 
   // Footer
   page.drawText('Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408', { x: margin, y: 40, size: 8, font, color: rgb(0.5,0.5,0.5) });
