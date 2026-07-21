@@ -122,6 +122,7 @@ export default function Settings() {
     if (data) {
       setFirm(f => ({ ...f, ...data }))
       if (data.primary_color) applyBrandColor(data.primary_color)
+      if (data.logourl) setLogoUrl(data.logourl)
     }
     const { count } = await supabase.from('employee_gmail_accounts')
       .select('employee_email', { count: 'exact', head: true }).not('gmail_refresh_token', 'is', null)
@@ -222,9 +223,18 @@ export default function Settings() {
     if (!file) return
     setUploading(true)
     try {
-      const { error } = await supabase.storage.from(BUCKET).upload('logo', file, { upsert: true, contentType: file.type })
+      // Per-tenant path + saved to settings.logourl so each firm's logo is
+      // its own — and every document/pay stub reads it via settings, not a
+      // single shared file.
+      const ext = (file.name.split('.').pop() || 'png').toLowerCase()
+      const path = `logo-${firm.tenant_id || firm.id || 'default'}.${ext}`
+      const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true, contentType: file.type })
       if (error) throw error
-      await loadLogo()
+      const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path)
+      const bustedUrl = `${pub.publicUrl}?t=${Date.now()}`
+      await supabase.from('settings').update({ logourl: bustedUrl }).eq('id', firm.id)
+      setFirm(f => ({ ...f, logourl: bustedUrl }))
+      setLogoUrl(bustedUrl)
       showToast('Logo uploaded!')
     } catch (err) { showToast(err.message, 'err') } finally { setUploading(false) }
   }

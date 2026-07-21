@@ -71,7 +71,7 @@ export default function Payroll() {
       supabase.from('payrollruns').select('*').order('created_at',{ascending:false}),
       supabase.from('employees').select('*').order('name'),
       supabase.from('timeentries').select('*'),
-      supabase.from('settings').select('name,phone,email,address,city,state,zip').limit(1).maybeSingle(),
+      supabase.from('settings').select('name,phone,email,address,city,state,zip,logourl').limit(1).maybeSingle(),
     ])
     if (r) setRuns(r)
     if (e) setEmployees(e)
@@ -226,13 +226,14 @@ export default function Payroll() {
     .lh-line{font-size:11px;color:#64748b;margin-top:2px}`
   function firmLetterhead() {
     const { data: logo } = supabase.storage.from('firm-assets').getPublicUrl('logo')
+    const logoSrc = firm?.logourl || logo?.publicUrl || ''
     const name  = firm?.name || 'Tax Case Review'
     const addr1 = firm?.address || ''
     const cityLine = [firm?.city, firm?.state].filter(Boolean).join(', ')
     const addr2 = `${cityLine}${firm?.zip ? ' ' + firm.zip : ''}`.trim()
     const contact = [firm?.phone, firm?.email].filter(Boolean).join(' · ')
     return `<div class="lh">
-      <img src="${logo?.publicUrl || ''}" alt="" onerror="this.style.display='none'"/>
+      <img src="${logoSrc}" alt="" onerror="this.style.display='none'"/>
       <div>
         <div class="lh-name">${name}</div>
         ${addr1 ? `<div class="lh-line">${addr1}</div>` : ''}

@@ -18,7 +18,10 @@ async function loadFirmData() {
     supabase.from('settings').select('*').limit(1).maybeSingle(),
     supabase.storage.from(BUCKET).getPublicUrl('logo'),
   ])
-  return { firm: s || {}, logoUrl: logoData?.publicUrl || '/taxcasereview-CRM/logo.png' }
+  // Prefer THIS tenant's own uploaded logo (settings.logourl, per-tenant via
+  // RLS). Fall back to the shared bucket file, then the bundled default.
+  const logo = (s && s.logourl) ? s.logourl : (logoData?.publicUrl || '/taxcasereview-CRM/logo.png')
+  return { firm: s || {}, logoUrl: logo }
 }
 
 export function useFirm() {
