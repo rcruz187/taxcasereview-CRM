@@ -1,6 +1,9 @@
 // Shared branded email wrapper for ALL outgoing TCR emails.
 // Usage: emailHtml({ body: '...inner html...' })
 // The logo is pulled from Supabase storage with an onerror fallback to text.
+// Pass { firmName, logoUrl, address, phone, email } to override for a
+// tenant's own branding — defaults below only apply when omitted, so every
+// existing caller keeps working exactly as before.
 
 const LOGO_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo'
 const FIRM_NAME = 'Tax Case Review'
@@ -8,22 +11,27 @@ const FIRM_ADDRESS = '631 US Highway One Ste 304, North Palm Beach, FL 33408'
 const FIRM_PHONE = '(888) 334-5052'
 const FIRM_EMAIL = 'info@taxcasereview.org'
 
-export function emailHtml({ body, headerBg = 'linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 100%)' }) {
+export function emailHtml({ body, headerBg = 'linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 100%)', firmName, logoUrl, address, phone, email }) {
+  const fName = firmName || FIRM_NAME
+  const fLogo = logoUrl || LOGO_URL
+  const fAddr = address || FIRM_ADDRESS
+  const fPhone = phone || FIRM_PHONE
+  const fEmail = email || FIRM_EMAIL
   return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px">
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
   <tr><td style="background:${headerBg};padding:28px 40px;text-align:center">
-    <img src="${LOGO_URL}" alt="${FIRM_NAME}" style="max-height:60px;max-width:200px;object-fit:contain;display:block;margin:0 auto 10px" onerror="this.style.display='none'"/>
-    <div style="font-size:13px;font-weight:800;color:#93c5fd;letter-spacing:.12em;text-transform:uppercase">${FIRM_NAME}</div>
+    <img src="${fLogo}" alt="${fName}" style="max-height:60px;max-width:200px;object-fit:contain;display:block;margin:0 auto 10px" onerror="this.style.display='none'"/>
+    <div style="font-size:13px;font-weight:800;color:#93c5fd;letter-spacing:.12em;text-transform:uppercase">${fName}</div>
   </td></tr>
   <tr><td style="padding:36px 40px">
     ${body}
   </td></tr>
   <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:18px 40px;text-align:center">
     <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.8">
-      ${FIRM_NAME} &nbsp;·&nbsp; ${FIRM_ADDRESS}<br>
-      📞 ${FIRM_PHONE} &nbsp;·&nbsp; ✉️ ${FIRM_EMAIL}
+      ${fName} &nbsp;·&nbsp; ${fAddr}<br>
+      📞 ${fPhone} &nbsp;·&nbsp; ✉️ ${fEmail}
     </p>
   </td></tr>
 </table>

@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, PDFName, PDFString, rgb } from 'pdf-lib';
 import { FINANCIAL_INTAKE_STEPS, shouldShow as intakeShouldShow } from './financialIntakeSchema';
+import { supabase } from './supabase';
 
 // ─── Field maps per form type ────────────────────────────────────────────────
 // Only the taxpayer section fields are filled — rep info, tax matters, etc.
@@ -254,6 +255,22 @@ export function getPackageFormTypes(clientType) {
 
 // ─── Credit Card Authorization — built from scratch for the e-sign package ───
 export async function generateCcAuthPdf(client) {
+  // Firm branding for the authorization line + footer — falls back to the
+  // TCR defaults on any error so a settings hiccup never blocks the doc.
+  let firmName = 'Tax Case Review';
+  let firmFooterLine1 = 'Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408';
+  let firmFooterLine2 = 'info@taxcasereview.org · (888) 334-5052 · Fax (561) 420-6999';
+  try {
+    const { data: s } = await supabase.from('settings').select('name,address,city,state,zip,phone,email,firm_fax_number').limit(1).maybeSingle();
+    if (s?.name) {
+      firmName = s.name;
+      const addr = [s.address, [s.city, s.state].filter(Boolean).join(', '), s.zip].filter(Boolean).join(', ');
+      firmFooterLine1 = addr ? `${firmName} · ${addr}` : firmName;
+      const parts = [s.email, s.phone, s.firm_fax_number ? `Fax ${s.firm_fax_number}` : null].filter(Boolean);
+      if (parts.length) firmFooterLine2 = parts.join(' · ');
+    }
+  } catch (_) { /* keep defaults */ }
+
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([612, 792]);
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -294,7 +311,7 @@ export async function generateCcAuthPdf(client) {
 
   // Authorization text
   drawWrapped(
-    `I/We authorize Tax Case Review to charge the payment method below for amounts owed under the Tax Service Agreement and any Addendums, including the investigation fee, resolution fee, and any agreed installment or autopay charges.`,
+    `I/We authorize ${firmName} to charge the payment method below for amounts owed under the Tax Service Agreement and any Addendums, including the investigation fee, resolution fee, and any agreed installment or autopay charges.`,
     10, font, 14
   );
   y -= 6;
@@ -367,7 +384,7 @@ export async function generateCcAuthPdf(client) {
   const noticeH = 60;
   page.drawRectangle({ x: margin, y: noticeTop - noticeH + 10, width: lineW, height: noticeH, color: rgb(0.96,0.96,0.96), borderWidth: 0.5, borderColor: rgb(0.8,0.8,0.8) });
   page.drawText('IMPORTANT:', { x: margin + 10, y: noticeTop - 6, size: 9, font: bold });
-  const noticeLines = wrap('Tax Case Review does not store your card or bank account number. Payment information is processed and stored securely by Stripe, our PCI-compliant payment processor. This signed form authorizes charges per your Tax Service Agreement.', 9, lineW - 20, font);
+  const noticeLines = wrap(`${firmName} does not store your card or bank account number. Payment information is processed and stored securely by Stripe, our PCI-compliant payment processor. This signed form authorizes charges per your Tax Service Agreement.`, 9, lineW - 20, font);
   let ny = noticeTop - 20;
   for (const line of noticeLines) { page.drawText(line, { x: margin + 10, y: ny, size: 9, font }); ny -= 12; }
 
@@ -380,8 +397,8 @@ export async function generateCcAuthPdf(client) {
   page.drawText('Date', { x: 360, y: sigLineY - 14, size: 9, font });
 
   // Footer
-  page.drawText('Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408', { x: margin, y: 40, size: 8, font, color: rgb(0.5,0.5,0.5) });
-  page.drawText('info@taxcasereview.org · (888) 334-5052 · Fax (561) 420-6999', { x: margin, y: 28, size: 8, font, color: rgb(0.5,0.5,0.5) });
+  page.drawText(firmFooterLine1, { x: margin, y: 40, size: 8, font, color: rgb(0.5,0.5,0.5) });
+  page.drawText(firmFooterLine2, { x: margin, y: 28, size: 8, font, color: rgb(0.5,0.5,0.5) });
 
   return pdfDoc.save();
 }
