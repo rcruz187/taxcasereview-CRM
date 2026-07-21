@@ -81,8 +81,8 @@ export default function SignPage() {
     canvas.width  = canvas.offsetWidth  * ratio
     canvas.height = canvas.offsetHeight * ratio
     ctx.scale(ratio, ratio)
-    ctx.strokeStyle = '#ffffff'
-    ctx.lineWidth   = 2.5
+    ctx.strokeStyle = '#0f2c5c'
+    ctx.lineWidth   = 2.8
     ctx.lineCap     = 'round'
     ctx.lineJoin    = 'round'
 
@@ -551,7 +551,7 @@ const styles = {
   input:      { width:'100%', padding:'11px 14px', border:'1px solid #1e3a5f', borderRadius:8, fontSize:14, outline:'none', boxSizing:'border-box', background:'#0a1628', color:'#f1f5f9' },
   sigPad:     { border:'2px dashed #1e3a5f', borderRadius:9, padding:'8px 0', background:'#0a1628' },
   sigInput:   { width:'100%', border:'none', background:'none', outline:'none', padding:'8px 14px', boxSizing:'border-box', fontSize:28, fontFamily:'"Brush Script MT",cursive,Georgia,serif', color:'#60a5fa' },
-  canvas:     { width:'100%', height:130, border:'2px dashed #1e3a5f', borderRadius:9, background:'#0a1628', cursor:'crosshair', display:'block', touchAction:'none' },
+  canvas:     { width:'100%', height:130, border:'2px dashed #94a3b8', borderRadius:9, background:'#ffffff', cursor:'crosshair', display:'block', touchAction:'none' },
   clearBtn:   { background:'none', border:'none', color:'#475569', fontSize:11, cursor:'pointer', textDecoration:'underline', marginTop:4 },
   legal:      { fontSize:11, color:'#475569', marginTop:8 },
   meta:       { fontSize:11, color:'#475569', marginBottom:14, background:'#0a1628', border:'1px solid #1e3a5f', borderRadius:6, padding:'7px 12px', lineHeight:1.6 },
