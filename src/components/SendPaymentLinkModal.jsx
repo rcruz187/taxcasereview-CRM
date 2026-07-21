@@ -31,6 +31,17 @@ export default function SendPaymentLinkModal({ record, recordType, onClose, show
     setCopied(true); setTimeout(() => setCopied(false), 1500)
   }
 
+  async function logSent(channel) {
+    const text = `💵 Payment link ${channel} — ${defaultDescription || 'Payment'}${defaultAmount ? ` ($${defaultAmount})` : ''}`
+    try {
+      if (recordType === 'lead') {
+        await supabase.from('lead_notes').insert({ lead_id: record.id, lead_name: record.name, text, type: 'System', author: 'System', created_at: new Date().toISOString() })
+      } else {
+        await supabase.from('client_notes').insert({ clientname: record.name, text, author: 'System', created_at: new Date().toISOString() })
+      }
+    } catch (_) { /* logging never blocks */ }
+  }
+
   async function emailLink() {
     if (!record.email) { setErr('No email address on file'); return }
     setEmailing(true); setErr('')
@@ -45,6 +56,7 @@ export default function SendPaymentLinkModal({ record, recordType, onClose, show
     setEmailing(false)
     if (error) { setErr(error.message); return }
     showToast?.('✅ Payment link emailed')
+    await logSent('emailed')
     onClose()
   }
 
@@ -59,6 +71,7 @@ export default function SendPaymentLinkModal({ record, recordType, onClose, show
     setSending(false)
     if (error || data?.error) { setErr(data?.error || error.message); return }
     showToast?.('✅ Payment link texted')
+    await logSent('texted')
     onClose()
   }
 

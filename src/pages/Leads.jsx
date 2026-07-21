@@ -310,6 +310,13 @@ function LeadInlineEsign({ lead, onClose }) {
     }
     set2(false)
     const sent=[emailSent&&'email',smsSent&&'SMS'].filter(Boolean)
+    try {
+      await supabase.from('lead_notes').insert({
+        lead_id: lead.id, lead_name: lead?.name,
+        text: `✍️ ${docType} sent for e-signature${sent.length?` via ${sent.join(' & ')}`:' (link copied)'}`,
+        type:'System', author: lead?.assignedTo || 'System', created_at: new Date().toISOString()
+      })
+    } catch(_) {}
     setDone({url,sent})
   }
   if(done) return <div style={{padding:'0 4px 12px'}}>
@@ -1905,7 +1912,7 @@ export default function Leads() {
           <div className="quick-actions-row" style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             <ActionBtn color="#0891b2" icon="📅" label="Schedule" sub="Book Appointment" onClick={()=>setBookingLead(l)}/>
             <ActionBtn color="#16a34a" icon="📦" label={pkgSending?'Building…':'Full Package'} sub="2848/8821 + Agreement" onClick={()=>!pkgSending&&handleSendFullPackage(l)}/>
-            <ActionBtn color="#22863a" icon="📄" label="Tax Engagement" sub="Service Agreement" onClick={()=>generateClientPackage(l)}/>
+            <ActionBtn color="#22863a" icon="📄" label="Tax Engagement" sub="Service Agreement" onClick={async ()=>{ await generateClientPackage(l); await logAction(l.id, l.name, '📄 Service Agreement (Tax Engagement) generated'); }}/>
             <ActionBtn color="#0369a1" icon="🖋️" label="Pre-Fill 8821/2848" sub="IRS PDF Forms" onClick={()=>{
               try {
                 if (!l) { showToast('Error: no lead data found'); return }
@@ -2408,7 +2415,7 @@ export default function Leads() {
           <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setShowEsignModal(false)}>
             <div className="modal" style={{width:520}}>
               <div className="mh"><span className="mt">✍️ E-Signature — {inlineEsignLead.name}</span><button className="xbtn" onClick={()=>setShowEsignModal(false)}>&times;</button></div>
-              <LeadInlineEsign lead={inlineEsignLead} onClose={()=>setShowEsignModal(false)}/>
+              <LeadInlineEsign lead={inlineEsignLead} onClose={()=>{setShowEsignModal(false);loadLeadNotes(inlineEsignLead.id)}}/>
             </div>
           </div>
         )}
