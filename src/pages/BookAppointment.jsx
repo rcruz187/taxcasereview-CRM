@@ -23,6 +23,7 @@ const fmt12 = (t) => {
 export default function BookAppointment() {
   const [params] = useSearchParams()
   const [cfg, setCfg] = useState(null)
+  const [meta, setMeta] = useState({ firm_name: 'Tax Case Review', logo_url: '', payment: { required: false } })
   const [loadErr, setLoadErr] = useState('')
   const [type, setType] = useState('')
   const [date, setDate] = useState('')
@@ -32,6 +33,7 @@ export default function BookAppointment() {
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const [done, setDone] = useState(null)
+  const [payReturn, setPayReturn] = useState(params.get('booking') || '')
   const zone = visitorZone()
 
   useEffect(() => {
@@ -41,6 +43,10 @@ export default function BookAppointment() {
       setCfg(data)
       if ((data.types || []).length) setType(data.types[0])
     })()
+    // Branding + payment config — additive RPC; safe fallback if not present yet
+    supabase.rpc('booking_get_public_meta').then(({ data }) => {
+      if (data) setMeta(m => ({ ...m, ...data, payment: { ...m.payment, ...(data.payment || {}) } }))
+    }).catch(() => {})
   }, [])
 
   // Next N days from config
@@ -69,6 +75,22 @@ export default function BookAppointment() {
     if (!form.name.trim() || !form.email.trim()) {
       setErr('Please enter your name and email so we can send your confirmation.'); return
     }
+
+    // Pay-to-book: hand off to Stripe Checkout. The appointment is created by
+    // the webhook only after payment clears (never an unpaid hold).
+    if (meta.payment?.required) {
+      setSaving(true); setErr('')
+      const base = window.location.origin + window.location.pathname
+      const { data, error } = await supabase.functions.invoke('booking-checkout', { body: {
+        name: form.name.trim(), email: form.email.trim(), phone: form.phone.trim(),
+        event_type: type, date, time, notes: form.notes.trim(),
+        success_url: `${base}?booking=paid`, cancel_url: `${base}?booking=canceled`,
+      }})
+      if (error || !data?.url) { setSaving(false); setErr((data && data.error) || 'Could not start payment. Please call us instead.'); return }
+      window.location.href = data.url
+      return
+    }
+
     setSaving(true); setErr('')
     const { data, error } = await supabase.rpc('booking_create', {
       p_name: form.name.trim(), p_email: form.email.trim(), p_phone: form.phone.trim(),
@@ -104,11 +126,26 @@ export default function BookAppointment() {
     <div style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif', padding: '32px 16px' }}>
       <div style={{ maxWidth: 640, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <div style={{ fontSize: 24, fontWeight: 800 }}>Tax Case Review</div>
+          {meta.logo_url && <img src={meta.logo_url} alt="" style={{ maxHeight: 56, maxWidth: 200, objectFit: 'contain', marginBottom: 10 }} onError={e => { e.target.style.display = 'none' }} />}
+          <div style={{ fontSize: 24, fontWeight: 800 }}>{meta.firm_name || 'Tax Case Review'}</div>
           <div style={{ color: C.dim, fontSize: 14, marginTop: 4 }}>Schedule an appointment</div>
         </div>
 
-        {loadErr ? (
+        {payReturn === 'paid' ? (
+          <div style={{ ...box, textAlign: 'center' }}>
+            <div style={{ fontSize: 40 }}>✅</div>
+            <div style={{ fontWeight: 800, fontSize: 18, marginTop: 8 }}>Payment received — you're booked!</div>
+            <div style={{ color: C.dim, marginTop: 8, fontSize: 14 }}>A confirmation email is on its way. If anything looks off, just give us a call.</div>
+          </div>
+        ) : payReturn === 'canceled' ? (
+          <div style={{ ...box, textAlign: 'center' }}>
+            <div style={{ fontSize: 40 }}>↩️</div>
+            <div style={{ fontWeight: 800, fontSize: 18, marginTop: 8 }}>Payment canceled</div>
+            <div style={{ color: C.dim, marginTop: 8, fontSize: 14 }}>No charge was made and your time wasn't reserved.</div>
+            <button style={{ marginTop: 16, background: C.accent, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+              onClick={() => setPayReturn('')}>Try again</button>
+          </div>
+        ) : loadErr ? (
           <div style={{ ...box, textAlign: 'center', color: C.dim }}>{loadErr}</div>
         ) : !cfg ? (
           <div style={{ ...box, textAlign: 'center', color: C.dim }}>Loading…</div>
@@ -166,15 +203,23 @@ export default function BookAppointment() {
                 <button disabled={saving}
                   style={{ width: '100%', background: C.accent, color: '#fff', border: 'none', borderRadius: 8, padding: '12px 0', fontSize: 15, fontWeight: 700, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}
                   onClick={book}>
-                  {saving ? 'Booking…' : `Confirm — ${etLabelInZone(date, time, zone)} on ${new Date(date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                  {saving ? (meta.payment?.required ? 'Redirecting to secure payment…' : 'Booking…')
+                    : meta.payment?.required
+                      ? `Continue to secure payment — $${Number(meta.payment.amount || 0).toFixed(2)}`
+                      : `Confirm — ${etLabelInZone(date, time, zone)} on ${new Date(date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
                 </button>
+                {meta.payment?.required && (
+                  <div style={{ color: C.dim, fontSize: 11.5, marginTop: 8, textAlign: 'center' }}>
+                    Secure payment via Stripe{meta.payment.label ? ` · ${meta.payment.label}` : ''} · your card is never stored by us
+                  </div>
+                )}
               </>
             )}
           </div>
         )}
 
         <div style={{ textAlign: 'center', color: C.dim, fontSize: 11.5, marginTop: 16 }}>
-          Tax Case Review · North Palm Beach, FL
+          {meta.firm_name || 'Tax Case Review'}
         </div>
       </div>
     </div>

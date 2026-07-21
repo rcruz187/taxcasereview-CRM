@@ -14,6 +14,10 @@ export const DEFAULT_BOOKING_CONFIG = {
   maxDaysOut: 30,
   types: ['Free Consultation'],
   blockedDates: [],
+  // Optional pay-to-book: when required, the client pays via Stripe Checkout
+  // before the appointment is created. Amount is in dollars; label shows on
+  // the Stripe page and the booking screen.
+  payment: { required: false, amount: '', label: '' },
   hours: {
     mon: ['09:00', '17:00'], tue: ['09:00', '17:00'], wed: ['09:00', '17:00'],
     thu: ['09:00', '17:00'], fri: ['09:00', '17:00'], sat: null, sun: null,
@@ -37,7 +41,7 @@ export default function BookingSettings() {
       const { data } = await supabase.from('settings').select('id, booking_config').limit(1).maybeSingle()
       if (data) {
         setRowId(data.id)
-        if (data.booking_config) setCfg({ ...DEFAULT_BOOKING_CONFIG, ...data.booking_config, blockedDates: data.booking_config.blockedDates || [], hours: { ...DEFAULT_BOOKING_CONFIG.hours, ...(data.booking_config.hours || {}) } })
+        if (data.booking_config) setCfg({ ...DEFAULT_BOOKING_CONFIG, ...data.booking_config, blockedDates: data.booking_config.blockedDates || [], payment: { ...DEFAULT_BOOKING_CONFIG.payment, ...(data.booking_config.payment || {}) }, hours: { ...DEFAULT_BOOKING_CONFIG.hours, ...(data.booking_config.hours || {}) } })
       }
       setLoading(false)
     })()
@@ -175,6 +179,31 @@ export default function BookingSettings() {
               {t}
             </label>
           ))}
+        </div>
+
+        <div style={{ fontWeight: 700, fontSize: 12.5, marginBottom: 6 }}>Require payment to book <span style={{ color: 'var(--t3)', fontWeight: 400 }}>(optional — collects a deposit/fee via Stripe before the slot is confirmed)</span></div>
+        <div style={{ border: '1px solid var(--line)', borderRadius: 8, padding: 12, marginBottom: 18 }}>
+          <label style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+            <input type="checkbox" checked={!!cfg.payment?.required}
+              onChange={e => set('payment', { ...cfg.payment, required: e.target.checked })} />
+            Charge a fee before confirming the appointment
+          </label>
+          {cfg.payment?.required && (
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 10 }}>
+              <label style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                Amount (USD)
+                <input type="number" min="1" step="1" style={{ padding: '6px 8px', width: 120 }}
+                  placeholder="399" value={cfg.payment.amount}
+                  onChange={e => set('payment', { ...cfg.payment, amount: e.target.value })} />
+              </label>
+              <label style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minWidth: 200 }}>
+                What they're paying for (shown on the checkout page)
+                <input style={{ padding: '6px 8px' }}
+                  placeholder="Tax Investigation Review" value={cfg.payment.label}
+                  onChange={e => set('payment', { ...cfg.payment, label: e.target.value })} />
+              </label>
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
