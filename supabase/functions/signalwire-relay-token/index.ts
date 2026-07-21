@@ -74,11 +74,20 @@ serve(async (req) => {
         .eq('tenant_id', agentTenantId).limit(1).maybeSingle()
       settings = r.data || null; sErr = r.error
     }
-    if (!settings) {
+    // Fall back to the primary settings row when the agent's tenant has no
+    // usable SignalWire creds of its own (e.g. the sales-demo tenant, or a
+    // firm still mid-onboarding). This makes the dialer connect using the
+    // primary account — exactly like outbound calls / SMS / fax already do,
+    // since those read the primary row too. A tenant that HAS its own creds
+    // passes the check below and keeps using them; only keyless tenants borrow
+    // the primary account. Nothing here affects INBOUND routing (that matches
+    // only on sw_inbound_did in the receive-* functions).
+    if (!settings || !settings.sw_space_url || !settings.sw_project_id || !settings.sw_api_token) {
       const r = await supabase.from('settings')
         .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did,tenant_id')
-        .limit(1).maybeSingle()
-      settings = r.data || null; if (!sErr) sErr = r.error
+        .not('sw_api_token', 'is', null).limit(1).maybeSingle()
+      if (r.data) settings = r.data
+      if (!sErr) sErr = r.error
     }
 
     if (sErr || !settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token) {
