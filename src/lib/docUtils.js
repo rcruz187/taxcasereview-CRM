@@ -4,24 +4,23 @@ import { FIRM } from './firmBranding'
 
 const LOGO_URL = ''  // replaced by FIRM.logoUrl
 
-const FIRM_PHONE = '${FIRM.phone}'
 const FIRM_FAX = '(561) 420-6999'
 
-function printHeader(title, phone = FIRM_PHONE) {
+function printHeader(title, phone = FIRM.phone) {
   return `
     <div style="text-align:center;margin-bottom:28px;padding-bottom:18px;border-bottom:3px solid #1A7FD4">
       <img src="${FIRM.logoUrl}" style="height:52px;margin-bottom:10px;display:block;margin-left:auto;margin-right:auto" onerror="this.style.display='none'"/>
-      <div style="font-size:22px;font-weight:800;color:#1A7FD4;letter-spacing:-.3px">Tax Case Review</div>
-      <div style="font-size:11px;color:#666;margin-top:3px">${FIRM.address} &nbsp;·&nbsp; info@taxcasereview.com &nbsp;·&nbsp; ${phone} &nbsp;·&nbsp; Fax ${FIRM_FAX}</div>
+      <div style="font-size:22px;font-weight:800;color:#1A7FD4;letter-spacing:-.3px">${FIRM.name}</div>
+      <div style="font-size:11px;color:#666;margin-top:3px">${FIRM.address} &nbsp;·&nbsp; ${FIRM.email} &nbsp;·&nbsp; ${phone} &nbsp;·&nbsp; Fax ${FIRM_FAX}</div>
       <div style="font-size:15px;font-weight:700;margin-top:14px;color:#111;text-transform:uppercase;letter-spacing:.5px">${title}</div>
     </div>`
 }
 
-function footer(phone = FIRM_PHONE) {
+function footer(phone = FIRM.phone) {
   return `
     <div style="margin-top:48px;padding-top:16px;border-top:1px solid #ddd;text-align:center;font-size:10px;color:#999;line-height:1.8">
-      Tax Case Review &nbsp;·&nbsp; ${FIRM.address} &nbsp;·&nbsp; info@taxcasereview.com &nbsp;·&nbsp; ${phone} &nbsp;·&nbsp; Fax ${FIRM_FAX}<br/>
-      <em>Tax Case Review is a tax resolution consulting firm and is not a law firm. No attorney-client relationship is created by this agreement.</em>
+      ${FIRM.name} &nbsp;·&nbsp; ${FIRM.address} &nbsp;·&nbsp; ${FIRM.email} &nbsp;·&nbsp; ${phone} &nbsp;·&nbsp; Fax ${FIRM_FAX}<br/>
+      <em>${FIRM.name} is a tax resolution consulting firm and is not a law firm. No attorney-client relationship is created by this agreement.</em>
     </div>`
 }
 
@@ -38,7 +37,7 @@ function sigBlock(label1 = 'Client Signature', label2 = 'Authorized Representati
         </div>
         <div style="flex:1">
           <div style="border-top:1.5px solid #333;padding-top:8px;margin-top:0">
-            <div style="font-size:12px;font-weight:700;color:#222;margin-bottom:4px">${label2} — Tax Case Review</div>
+            <div style="font-size:12px;font-weight:700;color:#222;margin-bottom:4px">${label2} — ${FIRM.name}</div>
             <div style="font-size:11px;color:#555">Name: ___________________________________</div>
             <div style="font-size:11px;color:#555;margin-top:6px">Date: _______________________</div>
           </div>
@@ -48,10 +47,10 @@ function sigBlock(label1 = 'Client Signature', label2 = 'Authorized Representati
 }
 
 export function printBase(title, body, opts = {}) {
-  const { phone = FIRM_PHONE } = opts
+  const { phone = FIRM.phone } = opts
   const w = window.open('', '_blank', 'width=880,height=1100')
   w.document.write(`<!DOCTYPE html><html><head>
-    <title>${title} — Tax Case Review</title>
+    <title>${title} — ${FIRM.name}</title>
     <style>
       *{box-sizing:border-box}
       body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:12.5px;color:#111;padding:48px 56px;max-width:820px;margin:0 auto;line-height:1.6}
@@ -253,7 +252,7 @@ export function generateCreditCardAuthForm(c = null) {
       <b>Electronic Payment Authorization:</b> Client authorizes Tax Case Review to charge amounts owed under the Tax Service Agreement, and any Addendums, to the credit or debit card identified above. Fees charged by Tax Case Review are non-refundable except as set forth in the Tax Service Agreement.
     </div>
 
-    ${sigBlock('Client Signature', 'Authorized Representative — Tax Case Review')}
+    ${sigBlock('Client Signature', 'Authorized Representative')}
   `)
 }
 
@@ -408,9 +407,9 @@ export function generatePOACoverLetter(c = null) {
 
     <div style="margin-top:32px;padding-top:8px;border-top:1.5px solid #333;display:inline-block;min-width:260px">
       <div style="font-size:12px;font-weight:700">Authorized Representative</div>
-      <div style="font-size:11.5px;margin-top:4px">Tax Case Review</div>
+      <div style="font-size:11.5px;margin-top:4px">${FIRM.name}</div>
       <div style="font-size:11px;color:#555;margin-top:2px">${FIRM.address}</div>
-      <div style="font-size:11px;color:#555">info@taxcasereview.com &nbsp;·&nbsp; ${FIRM.phone} &nbsp;·&nbsp; Fax (561) 420-6999</div>
+      <div style="font-size:11px;color:#555">${FIRM.email} &nbsp;·&nbsp; ${FIRM.phone} &nbsp;·&nbsp; Fax (561) 420-6999</div>
       <div style="font-size:11px;color:#888;margin-top:6px">Date: _______________________</div>
     </div>
   `)
@@ -968,7 +967,7 @@ export function generateClientPackage(c = null) {
     <div class="notice">
       <b>Privacy Policy:</b> Tax Case Review uses and shares your information only to perform our obligations under this Agreement and related purposes, or as permitted or required by law. Calls may be recorded or monitored for quality purposes. Contact info@taxcasereview.com with any privacy concerns.
     </div>
-    ${sigBlock('Client Signature', 'Authorized Representative — Tax Case Review')}
+    ${sigBlock('Client Signature', 'Authorized Representative')}
   `)
 }
 
