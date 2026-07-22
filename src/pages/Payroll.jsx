@@ -225,8 +225,7 @@ export default function Payroll() {
     .lh-name{font-size:17px;font-weight:800;color:#1e3a8a;letter-spacing:.02em}
     .lh-line{font-size:11px;color:#64748b;margin-top:2px}`
   function firmLetterhead() {
-    const { data: logo } = supabase.storage.from('firm-assets').getPublicUrl('logo')
-    const logoSrc = firm?.logourl || logo?.publicUrl || ''
+    const logoSrc = firm?.logourl || ''
     const name  = firm?.name || 'Tax Case Review'
     const addr1 = firm?.address || ''
     const cityLine = [firm?.city, firm?.state].filter(Boolean).join(', ')

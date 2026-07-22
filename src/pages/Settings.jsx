@@ -130,8 +130,10 @@ export default function Settings() {
   }
 
   async function loadLogo() {
-    const { data } = await supabase.storage.from(BUCKET).getPublicUrl('logo')
-    if (data?.publicUrl) setLogoUrl(data.publicUrl + '?t=' + Date.now())
+    // Show this tenant's own saved logo; never the shared bucket file (which
+    // gets overwritten across tenants). loadFirm sets it from settings.logourl.
+    const { data } = await supabase.from('settings').select('logourl').limit(1).maybeSingle()
+    if (data?.logourl) setLogoUrl(data.logourl)
   }
 
   async function saveFirm() {

@@ -14,13 +14,12 @@ const BUCKET = 'firm-assets'
 let _cache = null   // module-level cache so we only hit DB once per session
 
 async function loadFirmData() {
-  const [{ data: s }, { data: logoData }] = await Promise.all([
-    supabase.from('settings').select('*').limit(1).maybeSingle(),
-    supabase.storage.from(BUCKET).getPublicUrl('logo'),
-  ])
-  // Prefer THIS tenant's own uploaded logo (settings.logourl, per-tenant via
-  // RLS). Fall back to the shared bucket file, then the bundled default.
-  const logo = (s && s.logourl) ? s.logourl : (logoData?.publicUrl || '/taxcasereview-CRM/logo.png')
+  const { data: s } = await supabase.from('settings').select('*').limit(1).maybeSingle()
+  // Each tenant shows ONLY its own uploaded logo (settings.logourl). We do NOT
+  // fall back to the shared firm-assets/logo bucket file — that single file is
+  // global and gets overwritten by whichever tenant last uploaded, which would
+  // bleed one firm's logo onto another. No logourl → neutral bundled default.
+  const logo = (s && s.logourl) ? s.logourl : '/taxcasereview-CRM/logo.png'
   return { firm: s || {}, logoUrl: logo }
 }
 
