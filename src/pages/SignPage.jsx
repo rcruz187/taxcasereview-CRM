@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { stampSignature, buildCertificatePage, addTearDropStamp, appendPdfPages } from '../lib/irsFormUtils'
 import { useFirm } from '../lib/useFirm'
-import { FIRM } from '../lib/firmBranding'
+import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 
 // IRS forms never get an IP/timestamp stamp — only firm documents (the
 // Tax Service Agreement, addenda, etc.) do.
@@ -62,6 +62,7 @@ export default function SignPage() {
   const drawingRef = useRef(false)
 
   useEffect(() => {
+    loadFirmBrandingPublic()
     async function load() {
       const { data: rows, error } = await supabase.rpc('esign_load', { p_id: id })
       const data = rows?.[0]
@@ -248,7 +249,7 @@ export default function SignPage() {
       if (doc.client_email) {
         await supabase.functions.invoke('send-email', { body: {
           to: doc.client_email,
-          subject: `Signed Copy: ${doc.doc_type} — Tax Case Review`,
+          subject: `Signed Copy: ${doc.doc_type} — ${FIRM.name}`,
           // Attach the actual signed client-copy PDFs (send-email fetches each
           // url and embeds it as a multipart/mixed attachment); the links in
           // the body stay as a fallback if an attachment fetch fails.
@@ -256,13 +257,13 @@ export default function SignPage() {
             url: a.clientUrl || a.url,
             filename: `${String(a.label || a.formType || 'Document').replace(/[\\/:*?"<>|]+/g, '')} - Signed.pdf`,
           })),
-          html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${doc.client_name}</strong>,</p><p>This confirms your signature was received on <strong>${doc.doc_type}</strong> on ${signedDate}. A copy has been saved to your file.</p>${attachmentLinks ? `<p>Signed documents:</p><ul>${attachmentLinks}</ul>` : ''}<p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · ${FIRM.address}</p></div>`
+          html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${doc.client_name}</strong>,</p><p>This confirms your signature was received on <strong>${doc.doc_type}</strong> on ${signedDate}. A copy has been saved to your file.</p>${attachmentLinks ? `<p>Signed documents:</p><ul>${attachmentLinks}</ul>` : ''}<p style="font-size:11px;color:#94a3b8;margin-top:24px">${FIRM.name} · ${FIRM.address}</p></div>`
         }}).catch(() => {})
       }
       if (doc.client_phone && cfg?.signalwire_backend) {
         await fetch(cfg.signalwire_backend + '/sms/send', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: doc.client_phone, body: `Tax Case Review: your signature on ${doc.doc_type} was received and a copy has been saved to your file.` })
+          body: JSON.stringify({ to: doc.client_phone, body: `${FIRM.name}: your signature on ${doc.doc_type} was received and a copy has been saved to your file.` })
         }).catch(() => {})
       }
     } catch (e) {
@@ -301,7 +302,7 @@ export default function SignPage() {
           <div style={{ color:'#94a3b8', fontSize:14, lineHeight:1.7, marginBottom:20 }}>
             Thank you, <strong style={{color:'#f1f5f9'}}>{doc?.signer_full_name || doc?.client_name}</strong>.<br/>
             Your signature has been recorded and saved.<br/>
-            Tax Case Review has been notified.
+            ${FIRM.name} has been notified.
           </div>
           <div style={{ background:'#0a2540', border:'1px solid #166534', borderRadius:10, padding:'14px 16px', fontSize:12, color:'#86efac', textAlign:'left', lineHeight:2, fontFamily:'monospace' }}>
             <strong>CERTIFICATE OF COMPLETION</strong><br/>
@@ -326,7 +327,7 @@ export default function SignPage() {
     <div style={styles.page}>
       {/* Header */}
       <div style={{ textAlign:'center', marginBottom:24, paddingBottom:18, borderBottom:'1px solid #1e3a5f', width:'100%', maxWidth:660 }}>
-        {logoUrl && <img src={logoUrl} alt="Tax Case Review" style={{ height:48, marginBottom:10, objectFit:'contain' }}/>}
+        {logoUrl && <img src={logoUrl} alt="" style={{ height:48, marginBottom:10, objectFit:'contain' }}/>}
         <div style={{ fontSize:12, fontWeight:800, color:'#60a5fa', letterSpacing:'.12em', textTransform:'uppercase', marginBottom:4 }}>${FIRM.name}</div>
         <div style={{ fontSize:11, color:'#475569' }}>Secure Document Signing Portal</div>
       </div>

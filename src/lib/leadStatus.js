@@ -21,7 +21,12 @@ export async function advanceLeadStatus(supabase, leadName, targetStatus) {
   const targetIdx = STATUS_ORDER.indexOf(targetStatus)
   if (targetIdx === -1) return { skipped: true, reason: 'unknown target status' }
 
-  const { data: lead } = await supabase.from('leads').select('id,status').eq('name', leadName).maybeSingle()
+  // .limit(1) rather than .maybeSingle(): maybeSingle() returns NO row when
+  // two leads share a name (common with test/duplicate records), which made
+  // the pipeline silently fail to advance. Take the most recent match.
+  const { data: leads } = await supabase.from('leads').select('id,status')
+    .eq('name', leadName).order('created_at', { ascending: false }).limit(1)
+  const lead = leads && leads[0]
   if (!lead) return { skipped: true, reason: 'no matching lead (may already be a client)' }
 
   const curIdx = STATUS_ORDER.indexOf(lead.status)

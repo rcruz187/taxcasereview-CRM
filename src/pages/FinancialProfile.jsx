@@ -394,6 +394,10 @@ function IntakeTab({ profile, set, setArr, addArrRow, removeArrRow, totalHouseho
 }
 
 function EmploymentBlock({ label, data, onChange }) {
+  // Intake can store a section as explicit null (not just missing), and a
+  // default param only covers undefined — so null must be handled here or
+  // every field read below throws.
+  data = data || {}
   return (
     <div style={{border:'1px solid var(--br)',borderRadius:8,padding:'12px 14px',marginBottom:12,background:'var(--s2)'}}>
       <div style={{fontWeight:700,fontSize:13,marginBottom:8,color:'var(--t2)'}}>{label}</div>
@@ -416,6 +420,7 @@ function EmploymentBlock({ label, data, onChange }) {
 }
 
 function BusinessBlock({ data, onChange }) {
+  data = data || {}
   return (
     <div style={{border:'1px solid var(--br)',borderRadius:8,padding:'12px 14px',marginBottom:12,background:'var(--s2)'}}>
       <div className="fg2">

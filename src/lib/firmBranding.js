@@ -50,6 +50,22 @@ export async function loadFirmBranding() {
 }
 
 // Footer line used at the bottom of most transactional emails.
+// For PUBLIC/anon pages (SignPage, intake + organizer wizards, client portal).
+// Anonymous visitors can't read `settings` under RLS, so branding comes from
+// the anon-safe booking_get_public_meta RPC instead. Call this on mount of any
+// page a logged-out client can reach, or it will render the default firm.
+export async function loadFirmBrandingPublic() {
+  try {
+    const { data } = await supabase.rpc('booking_get_public_meta')
+    if (data) {
+      if (data.firm_name) FIRM.name = data.firm_name
+      if (data.logo_url) FIRM.logoUrl = data.logo_url
+      FIRM.loaded = true
+    }
+  } catch (_) { /* keep defaults */ }
+  return FIRM
+}
+
 export function firmFooterLine() {
   return [FIRM.name, FIRM.address, FIRM.phone].filter(Boolean).join(' · ')
 }

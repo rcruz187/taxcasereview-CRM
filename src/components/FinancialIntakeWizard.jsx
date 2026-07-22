@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { FINANCIAL_INTAKE_STEPS, shouldShow } from '../lib/financialIntakeSchema'
 import { getStateTaxRate } from '../lib/stateTaxRates'
-import { FIRM } from '../lib/firmBranding'
+import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 
 const LOGO_URL = ''  // replaced by FIRM.logoUrl
 
@@ -55,8 +55,8 @@ async function sendIntakeCopyEmail(record, answers) {
   await supabase.functions.invoke('send-email', {
     body: {
       to: record.client_email,
-      subject: `Your Financial Intake Submission — Tax Case Review`,
-      html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${record.client_name||'Client'}</strong>,</p><p>Thank you for completing your financial intake form. Here's a copy of everything you submitted for your records:</p>${answersHtml}<p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · ${FIRM.address}</p></div>`
+      subject: `Your Financial Intake Submission — ${FIRM.name}`,
+      html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${record.client_name||'Client'}</strong>,</p><p>Thank you for completing your financial intake form. Here's a copy of everything you submitted for your records:</p>${answersHtml}<p style="font-size:11px;color:#94a3b8;margin-top:24px">${FIRM.name} · ${FIRM.address}</p></div>`
     }
   })
 }
@@ -77,6 +77,7 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
   const saveTimer = useRef(null)
 
   useEffect(() => {
+    loadFirmBrandingPublic()
     async function load() {
       const { data, error } = await supabase.rpc('financial_intake_load', { p_id: intakeId })
       if (error || !data) {
@@ -374,7 +375,7 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
         <div style={{fontSize:48, marginBottom:12}}>✅</div>
         <div style={{fontSize:19, fontWeight:800, color:'#4ade80', marginBottom:8}}>Submitted — Thank You!</div>
         <div style={{color:'#94a3b8', fontSize:13.5, lineHeight:1.7}}>
-          Thank you{record?.client_name ? `, ${record.client_name}` : ''}. Your financial information has been sent to Tax Case Review, and your advisor will be reaching out soon.
+          Thank you{record?.client_name ? `, ${record.client_name}` : ''}. Your financial information has been sent to {FIRM.name || 'your advisor'}, and your advisor will be reaching out soon.
           {!embedded && ' You may close this window.'}
         </div>
       </div>
