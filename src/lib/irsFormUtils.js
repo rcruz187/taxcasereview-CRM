@@ -93,6 +93,14 @@ export const FORM_USES_EIN = {
 // Title box on line 7 is a constant rather than a per-lead field.
 export const BUSINESS_SIGNER_TITLE = 'Managing Member';
 
+// Romy's rule: every POA carries the date it was SIGNED, not the date the
+// blank was prepared. The 2848 templates ship with a hardcoded declaration date
+// baked into the rep's Part II row, so it gets overwritten at signing time.
+export const REP_DATE_FIELDS = {
+  '2848_personal': 'Text23',
+  '2848_business': 'topmostSubform[0].Page2[0].Table_PartII[0].BodyRow1[0].Date1[0]',
+};
+
 export const SIGNATURE_POSITIONS = {
   '2848_personal': { page: 1, sigX: 40,  sigY: 555, dateX: 305, dateY: 555, size: 12 },
   '2848_business': { page: 1, sigX: 40,  sigY: 555, dateX: 305, dateY: 555, size: 12 },
@@ -102,9 +110,9 @@ export const SIGNATURE_POSITIONS = {
   'addendum':      { page: 'last', sigX: 56, sigY: 698, dateX: 90, dateY: 654, size: 12 },
   // DR-835 page 2, taxpayer block. Rule measured at y 434.3-440.3, signature
   // column x 36-310, date column x 315-450.
-  'state_poa':          { page: 1, sigX: 45, sigY: 438, dateX: 330, dateY: 438, size: 12 },
-  'state_poa_personal': { page: 1, sigX: 45, sigY: 438, dateX: 330, dateY: 438, size: 12 },
-  'state_poa_business': { page: 1, sigX: 45, sigY: 438, dateX: 330, dateY: 438, size: 12 },
+  'state_poa':          { page: 1, sigX: 45, sigY: 438, dateX: 330, dateY: 438, repDateX: 490, repDateY: 117, size: 12 },
+  'state_poa_personal': { page: 1, sigX: 45, sigY: 438, dateX: 330, dateY: 438, repDateX: 490, repDateY: 117, size: 12 },
+  'state_poa_business': { page: 1, sigX: 45, sigY: 438, dateX: 330, dateY: 438, repDateX: 490, repDateY: 117, size: 12 },
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -303,6 +311,23 @@ export async function stampSignature(pdfBytes, formType, signatureText, dateText
     }
   } else if (dateText) {
     page.drawText(dateText, { x: pos.dateX, y: pos.dateY, size: (pos.size || 12) - 2, font: dateFont });
+  }
+
+  // Representative's declaration date — same signing date as the taxpayer's.
+  // On the 2848s this is an AcroForm field carrying a stale baked-in value; on
+  // the state POA there is no field, so it gets drawn into the Part II cell.
+  if (dateText) {
+    const repField = REP_DATE_FIELDS[formType];
+    if (repField) {
+      try {
+        const form = pdfDoc.getForm();
+        const f = form.getTextField(repField);
+        f.setText(dateText);
+        f.setFontSize((pos.size || 12) - 2);
+      } catch (_) { /* field absent in this template variant */ }
+    } else if (pos.repDateX != null) {
+      page.drawText(dateText, { x: pos.repDateX, y: pos.repDateY, size: (pos.size || 12) - 3, font: dateFont });
+    }
   }
 
   return pdfDoc.save();
@@ -1561,7 +1586,6 @@ export async function generateStatePOAWithCover(client, poaPdfBytes, party = 'pe
     ? (client?.ein || '')
     : (client?.ssn ? fmtSsn(client.ssn) : (client?.ein || ''))
   const cityStateZip = [city, state ? `${state} ${zip}` : zip].filter(Boolean).join(', ')
-  const today        = new Date().toLocaleDateString('en-US', { month:'2-digit', day:'2-digit', year:'numeric' })
   const black        = rgb(0, 0, 0)
   const sz           = 9
   // Contact person on a business POA is the human signing for the entity.
@@ -1594,7 +1618,8 @@ export async function generateStatePOAWithCover(client, poaPdfBytes, party = 'pe
   // "Date" / "Print name" captions instead of resting on the line.
   // Taxpayer date is intentionally NOT drawn here — stampSignature writes it at
   // signing time, so an unsigned copy is never pre-dated.
-  p2.drawText(today, { x: 490, y: 117, size: sz, font, color: black }) // Declaration of Representative — date
+  // Declaration of Representative date is written at SIGNING time by
+  // stampSignature, so an unsigned copy carries no date at all.
   p2.drawText(name,  { x: 40,  y: 411, size: sz, font, color: black }) // Print name (first signature block)
 
   return await doc.save()

@@ -1218,8 +1218,25 @@ export default function Leads() {
         name: c.card_name||'', balance: n(c.balance),
         limit: n(c.credit_limit), min_payment: n(c.min_payment)
       }))
+      // Per-loan entries roll up into the profile's single Other Secured Debt
+      // block, but the type breakdown is kept so the associate can see what the
+      // debt actually is. Falls back to the old flat fields for intakes that
+      // were filled in before the per-loan split.
+      const debtRows = (a.other_debt_list || []).filter(r => r && (r.monthly_payment || r.remaining_balance || r.loan_type))
       const otherSecuredDebt = a.has_other_debt === 'Yes'
-        ? { monthly_payment: n(a.other_debt_payment), remaining_balance: n(a.other_debt_balance) } : {}
+        ? (debtRows.length
+            ? {
+                monthly_payment: debtRows.reduce((t, r) => t + n(r.monthly_payment), 0),
+                remaining_balance: debtRows.reduce((t, r) => t + n(r.remaining_balance), 0),
+                breakdown: debtRows.map(r => ({
+                  loan_type: r.loan_type || 'Other',
+                  lender: r.lender || '',
+                  monthly_payment: n(r.monthly_payment),
+                  remaining_balance: n(r.remaining_balance),
+                })),
+              }
+            : { monthly_payment: n(a.other_debt_payment), remaining_balance: n(a.other_debt_balance) })
+        : {}
       const expenses = {
         food_clothing: n(a.food_clothing), housing: n(a.housing_payment),
         homeowners_insurance: n(a.homeowners_renters_insurance), property_taxes: n(a.property_taxes),
@@ -2303,12 +2320,10 @@ export default function Leads() {
           )}
           {leadDetailTab==='finintake' && (
             <ErrorBoundary>
-              <div style={{padding:'10px 16px 0',display:'flex',justifyContent:'flex-end'}}>
-                <button className="btn sec" style={{fontSize:12,padding:'6px 14px'}}
-                  onClick={()=>backfillFromIntake(l)} disabled={backfillingIntake}>
-                  {backfillingIntake ? '⏳ Importing…' : '⬇️ Import into Financial Profile'}
-                </button>
-              </div>
+              {/* No manual import button: the wizard's submit() already runs the
+                  full mapping into client_financial_profiles server-side, so a
+                  second button here only invited a redundant double-import.
+                  backfillFromIntake is kept for repairing older intakes. */}
               <FinancialIntakeView clientName={l.name}/>
             </ErrorBoundary>
           )}

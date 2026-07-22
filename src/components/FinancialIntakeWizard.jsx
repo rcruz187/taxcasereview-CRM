@@ -124,10 +124,15 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
     const current = [...(answers[questionId] || [])]
     current[idx] = { ...current[idx], [fieldId]: value }
 
-    // Auto-calculate state tax when gross pay changes on an employment entry
-    if (questionId === 'jobs_list' && fieldId === 'gross_monthly' && leadState) {
+    // Auto-calculate state tax when gross pay changes on an employment entry.
+    // Gated on the county answer: no county means we don't know the taxing
+    // jurisdiction, so the field is left blank rather than guessed. A 0% state
+    // (FL, TX, etc.) fills a real 0 — previously `rate > 0` skipped those
+    // entirely and the field just sat empty next to a "0%" hint.
+    if (questionId === 'jobs_list' && fieldId === 'gross_monthly' && leadState && (answers.county || '').trim()) {
       const rate = getStateTaxRate(leadState)
-      if (rate !== null && rate > 0 && !current[idx].state_withheld) {
+      const existing = current[idx].state_withheld
+      if (rate !== null && (existing === '' || existing === undefined || existing === null)) {
         current[idx].state_withheld = Math.round(parseFloat(value || 0) * rate)
       }
     }
@@ -284,10 +289,25 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
 
 
       // Other secured debt summary
-      const otherSecuredDebt = a.has_other_debt === 'Yes' ? {
-        monthly_payment: n(a.other_debt_payment),
-        remaining_balance: n(a.other_debt_balance),
-      } : {}
+      // Per-loan entries roll up into the profile's single Other Secured Debt
+      // block, but the type breakdown is kept so the associate can see what the
+      // debt actually is. Falls back to the old flat fields for intakes that
+      // were filled in before the per-loan split.
+      const debtRows = (a.other_debt_list || []).filter(r => r && (r.monthly_payment || r.remaining_balance || r.loan_type))
+      const otherSecuredDebt = a.has_other_debt === 'Yes'
+        ? (debtRows.length
+            ? {
+                monthly_payment: debtRows.reduce((t, r) => t + n(r.monthly_payment), 0),
+                remaining_balance: debtRows.reduce((t, r) => t + n(r.remaining_balance), 0),
+                breakdown: debtRows.map(r => ({
+                  loan_type: r.loan_type || 'Other',
+                  lender: r.lender || '',
+                  monthly_payment: n(r.monthly_payment),
+                  remaining_balance: n(r.remaining_balance),
+                })),
+              }
+            : { monthly_payment: n(a.other_debt_payment), remaining_balance: n(a.other_debt_balance) })
+        : {}
 
       const profileData = {
         client_name: record.client_name,
@@ -504,7 +524,7 @@ function Question({ q, answers, setAnswer, addEntry, updateEntry, removeEntry, l
                         value={entry[f.id]||''} onChange={e=>updateEntry(q.id, idx, f.id, e.target.value)} style={S.inputSm}/>
                       {f.id === 'state_withheld' && leadState && getStateTaxRate(leadState) !== null && (
                         <div style={{fontSize:10, color:'#60a5fa', marginTop:3}}>
-                          Auto-estimated from {leadState} state tax rate ({Math.round((getStateTaxRate(leadState)||0)*100)}%). You can override this.
+                          Auto-estimated from {leadState} state tax rate ({Math.round((getStateTaxRate(leadState)||0)*100)}%) based on the county you entered. You can override this.
                         </div>
                       )}
                     </>

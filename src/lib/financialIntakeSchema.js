@@ -134,9 +134,16 @@ Don't worry about having exact numbers for everything — your best estimate is 
         { id: 'credit_limit', label: 'Credit limit', type: 'number', optional: true },
         { id: 'min_payment', label: 'Minimum monthly payment', type: 'number' },
       ]},
-      { id: 'has_other_debt', label: 'Any other loans secured by collateral — student loans, personal loans, etc.?', type: 'yesno' },
-      { id: 'other_debt_payment', label: 'Total monthly payment for these', type: 'number', showIf: { has_other_debt: 'Yes' } },
-      { id: 'other_debt_balance', label: 'Total remaining balance', type: 'number', showIf: { has_other_debt: 'Yes' } },
+      { id: 'has_other_debt', label: 'Any other loans — student loans, personal loans, medical debt, etc.?', type: 'yesno' },
+      // Captured per-loan rather than as one lump sum: the resolution path
+      // differs by loan type (student loans in particular), so "which one is it"
+      // has to survive into the profile.
+      { id: 'other_debt_list', label: 'Tell us about each loan', type: 'entries', showIf: { has_other_debt: 'Yes' }, entryFields: [
+        { id: 'loan_type', label: 'What kind of loan is this?', type: 'select', options: ['Student Loan','Personal Loan','Medical Debt','Secured Installment Loan','Other'] },
+        { id: 'lender', label: 'Lender / description', type: 'text', optional: true },
+        { id: 'monthly_payment', label: 'Monthly payment', type: 'number' },
+        { id: 'remaining_balance', label: 'Remaining balance', type: 'number' },
+      ]},
     ]
   },
   {
