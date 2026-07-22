@@ -1,22 +1,24 @@
 // Shared branded email wrapper for ALL outgoing TCR emails.
+import { FIRM } from './firmBranding'
 // Usage: emailHtml({ body: '...inner html...' })
 // The logo is pulled from Supabase storage with an onerror fallback to text.
 // Pass { firmName, logoUrl, address, phone, email } to override for a
 // tenant's own branding — defaults below only apply when omitted, so every
 // existing caller keeps working exactly as before.
 
-const LOGO_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo'
+const LOGO_URL = ''  // replaced by FIRM.logoUrl
 const FIRM_NAME = 'Tax Case Review'
-const FIRM_ADDRESS = '631 US Highway One Ste 304, North Palm Beach, FL 33408'
-const FIRM_PHONE = '(888) 334-5052'
+const FIRM_ADDRESS = '${FIRM.address}'
+const FIRM_PHONE = '${FIRM.phone}'
 const FIRM_EMAIL = 'info@taxcasereview.org'
 
 export function emailHtml({ body, headerBg = 'linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 100%)', firmName, logoUrl, address, phone, email }) {
-  const fName = firmName || FIRM_NAME
-  const fLogo = logoUrl || LOGO_URL
-  const fAddr = address || FIRM_ADDRESS
-  const fPhone = phone || FIRM_PHONE
-  const fEmail = email || FIRM_EMAIL
+  // Explicit override → this tenant's live settings (FIRM) → legacy default.
+  const fName = firmName || FIRM.name || FIRM_NAME
+  const fLogo = logoUrl || FIRM.logoUrl || LOGO_URL
+  const fAddr = address || FIRM.address || FIRM_ADDRESS
+  const fPhone = phone || FIRM.phone || FIRM_PHONE
+  const fEmail = email || FIRM.email || FIRM_EMAIL
   return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px">
 <tr><td align="center">

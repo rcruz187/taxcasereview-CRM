@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import BookingSettings from '../components/BookingSettings'
 import { useApp } from '../context/AppContext'
+import { loadFirmBranding } from '../lib/firmBranding'
 
 const BUCKET = 'firm-assets'
 
@@ -237,6 +238,7 @@ export default function Settings() {
       await supabase.from('settings').update({ logourl: bustedUrl }).eq('id', firm.id)
       setFirm(f => ({ ...f, logourl: bustedUrl }))
       setLogoUrl(bustedUrl)
+      await loadFirmBranding()
       showToast('Logo uploaded!')
     } catch (err) { showToast(err.message, 'err') } finally { setUploading(false) }
   }

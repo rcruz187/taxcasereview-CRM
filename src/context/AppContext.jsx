@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { playSound } from '../lib/notifySound'
+import { loadFirmBranding } from '../lib/firmBranding'
 
 const AppContext = createContext(null)
 
@@ -127,6 +128,7 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     loadBrandColor()
+    loadFirmBranding()   // fills FIRM for email/document templates
     supabase.auth.getSession().then(({ data }) => {
       if (data.session?.user) {
         setUser(data.session.user)
@@ -137,7 +139,7 @@ export function AppProvider({ children }) {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
       if (session?.user) {
-        loadRole(session.user.email); loadBrandColor()
+        loadRole(session.user.email); loadBrandColor(); loadFirmBranding()
         // Log login event
         if (_event === 'SIGNED_IN') {
           const name = session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Staff'

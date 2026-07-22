@@ -3,6 +3,7 @@ import { useFirm } from '../lib/useFirm'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
+import { FIRM } from '../lib/firmBranding'
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '')
 
@@ -29,10 +30,10 @@ const STATE_FORMS = [
 ]
 
 const firmName = 'Tax Case Review & Resolution Services'
-const address  = '631 US Highway One Ste 304, North Palm Beach, FL 33408'
+const address  = '${FIRM.address}'
 const email    = 'info@taxcasereview.com'
-const LOGO_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo'
-function printHeader(title) { return `<div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #1A7FD4;padding-bottom:16px"><img src="${LOGO_URL}" style="height:48px;margin-bottom:8px" onerror="this.style.display='none'"/><div style="font-size:20px;font-weight:700;color:#1A7FD4">${firmName}</div><div style="font-size:11px;color:#666">${address} · ${email}</div><div style="font-size:16px;font-weight:700;margin-top:10px;color:#111">${title}</div></div>` }
+const LOGO_URL = ''  // replaced by FIRM.logoUrl
+function printHeader(title) { return `<div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #1A7FD4;padding-bottom:16px"><img src="${FIRM.logoUrl}" style="height:48px;margin-bottom:8px" onerror="this.style.display='none'"/><div style="font-size:20px;font-weight:700;color:#1A7FD4">${firmName}</div><div style="font-size:11px;color:#666">${address} · ${email}</div><div style="font-size:16px;font-weight:700;margin-top:10px;color:#111">${title}</div></div>` }
 function sigBlock(l1='Client Signature',l2='Authorized Representative'){return `<div style="display:flex;gap:40px;margin-top:32px"><div style="flex:1;border-top:1px solid #333;padding-top:6px;font-size:11px;color:#555">${l1}<br/>Date: ___________________</div><div style="flex:1;border-top:1px solid #333;padding-top:6px;font-size:11px;color:#555">${l2} — ${firmName}<br/>Date: ___________________</div></div>`}
 function printBase(title,body){const w=window.open('','_blank','width=860,height=1000');w.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:40px 48px;max-width:800px;margin:0 auto}h3{color:#1A7FD4;margin:18px 0 6px}p{margin:6px 0;line-height:1.6}.fee-box{border:2px solid #1A7FD4;border-radius:6px;padding:12px 16px;margin:16px 0;background:#f0f7ff}</style></head><body>${printHeader(title)}${body}</body></html>`);w.document.close();setTimeout(()=>w.print(),400)}
 function generateServiceAgreement(){printBase('Tax Investigation Service Agreement',`<p>This Tax Investigation Service Agreement is entered into between <b>${firmName}</b> and the undersigned client.</p><h3>1. Scope of Services</h3><p>Initial tax investigation including transcript review, liability identification, evaluation of resolution programs, and written summary of findings.</p><h3>2. Investigation Fee</h3><div class="fee-box"><b>Investigation Fee: $___________</b></div><h3>3. Not a Law Firm</h3><p>${firmName} is a tax resolution consulting firm, not a law firm.</p>${sigBlock()}`)}
@@ -179,7 +180,7 @@ export default function StateForms() {
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
   <tr><td style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);padding:32px 40px;text-align:center">
-    <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style="max-height:60px;max-width:240px;object-fit:contain" onerror="this.style.display='none'"/>
+    <img src="${FIRM.logoUrl}" alt="${FIRM.name}" style="max-height:60px;max-width:240px;object-fit:contain" onerror="this.style.display='none'"/>
     <div style="font-size:22px;font-weight:800;color:#ffffff;margin-top:12px">Tax Case Review</div>
   </td></tr>
   <tr><td style="padding:40px 40px 32px">
@@ -189,11 +190,11 @@ export default function StateForms() {
       <a href="${sigUrl}" style="display:inline-block;background:linear-gradient(135deg,#1d4ed8,#2563eb);color:#ffffff;padding:16px 40px;border-radius:10px;text-decoration:none;font-weight:700;font-size:17px">Review &amp; Sign →</a>
     </td></tr></table>
     <div style="background:#f8fafc;border-radius:8px;padding:16px 20px;border-left:4px solid #3b82f6">
-      <p style="margin:0;font-size:13px;color:#475569">📞 <strong>(888) 334-5052</strong> &nbsp;·&nbsp; ✉️ <strong>info@taxcasereview.org</strong></p>
+      <p style="margin:0;font-size:13px;color:#475569">📞 <strong>${FIRM.phone}</strong> &nbsp;·&nbsp; ✉️ <strong>info@taxcasereview.org</strong></p>
     </div>
   </td></tr>
   <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center">
-    <p style="margin:0;font-size:11px;color:#94a3b8">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p>
+    <p style="margin:0;font-size:11px;color:#94a3b8">Tax Case Review · ${FIRM.address}</p>
   </td></tr>
 </table></td></tr></table></body></html>`
           }

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { stampSignature, buildCertificatePage, addTearDropStamp, appendPdfPages } from '../lib/irsFormUtils'
 import { useFirm } from '../lib/useFirm'
+import { FIRM } from '../lib/firmBranding'
 
 // IRS forms never get an IP/timestamp stamp — only firm documents (the
 // Tax Service Agreement, addenda, etc.) do.
@@ -31,7 +32,7 @@ function printCancellationNotice(doc) {
     <p>You may cancel the Tax Service Agreement signed on ${signedDate || '_______________'}, without any penalty or obligation, within three (3) business days after the date you signed it.</p>
     <p>If you cancel, any payments made by you will be returned within three (3) days following receipt of your cancellation notice. In the event of a cancellation, payments made will be prorated at a $250 hourly rate for all work product services already performed by Tax Case Review.</p>
     <p>You may also terminate the Tax Service Agreement at any later time as provided therein, but Tax Case Review is not required to refund fees you have paid except as set forth in the Agreement.</p>
-    <p>To cancel, mail or deliver a signed and dated copy of this notice to <b>Tax Case Review, 631 US Highway One Ste 304, North Palm Beach, FL 33408</b>, not later than midnight of the third business day after you signed the Tax Service Agreement.</p>
+    <p>To cancel, mail or deliver a signed and dated copy of this notice to <b>Tax Case Review, ${FIRM.address}</b>, not later than midnight of the third business day after you signed the Tax Service Agreement.</p>
     <h3 style="margin-top:28px">I Hereby Cancel the Tax Service Agreement</h3>
     <div class="blank" style="margin-top:24px"></div><div class="lbl">Full Client Name</div>
     <div style="display:flex;gap:48px">
@@ -255,7 +256,7 @@ export default function SignPage() {
             url: a.clientUrl || a.url,
             filename: `${String(a.label || a.formType || 'Document').replace(/[\\/:*?"<>|]+/g, '')} - Signed.pdf`,
           })),
-          html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo\" alt=\"Tax Case Review\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">Tax Case Review</div></div><p>Dear <strong>${doc.client_name}</strong>,</p><p>This confirms your signature was received on <strong>${doc.doc_type}</strong> on ${signedDate}. A copy has been saved to your file.</p>${attachmentLinks ? `<p>Signed documents:</p><ul>${attachmentLinks}</ul>` : ''}<p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
+          html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${doc.client_name}</strong>,</p><p>This confirms your signature was received on <strong>${doc.doc_type}</strong> on ${signedDate}. A copy has been saved to your file.</p>${attachmentLinks ? `<p>Signed documents:</p><ul>${attachmentLinks}</ul>` : ''}<p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · ${FIRM.address}</p></div>`
         }}).catch(() => {})
       }
       if (doc.client_phone && cfg?.signalwire_backend) {
@@ -326,7 +327,7 @@ export default function SignPage() {
       {/* Header */}
       <div style={{ textAlign:'center', marginBottom:24, paddingBottom:18, borderBottom:'1px solid #1e3a5f', width:'100%', maxWidth:660 }}>
         {logoUrl && <img src={logoUrl} alt="Tax Case Review" style={{ height:48, marginBottom:10, objectFit:'contain' }}/>}
-        <div style={{ fontSize:12, fontWeight:800, color:'#60a5fa', letterSpacing:'.12em', textTransform:'uppercase', marginBottom:4 }}>Tax Case Review</div>
+        <div style={{ fontSize:12, fontWeight:800, color:'#60a5fa', letterSpacing:'.12em', textTransform:'uppercase', marginBottom:4 }}>${FIRM.name}</div>
         <div style={{ fontSize:11, color:'#475569' }}>Secure Document Signing Portal</div>
       </div>
 
@@ -339,7 +340,7 @@ export default function SignPage() {
           <div>
             <div style={styles.section}>
               <div style={styles.secTitle}>Tax Service Agreement</div>
-              <div style={styles.docBody}>{`This Tax Service Agreement (as the same may be amended from time to time by any Addendum, the "Agreement"), dated as of ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}, by and between Tax Case Review, with its principal offices located at 631 US Highway One Ste 304, North Palm Beach, FL 33408 (together with any successors or assigns, "Company") and ${doc.client_name} ("Client").`}</div>
+              <div style={styles.docBody}>{`This Tax Service Agreement (as the same may be amended from time to time by any Addendum, the "Agreement"), dated as of ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}, by and between Tax Case Review, with its principal offices located at ${FIRM.address} (together with any successors or assigns, "Company") and ${doc.client_name} ("Client").`}</div>
             </div>
 
             <div style={styles.section}>
@@ -420,12 +421,12 @@ export default function SignPage() {
 
             <div style={styles.section}>
               <div style={styles.secTitle}>12. Electronic Communication Disclosures</div>
-              <div style={styles.docBody}>{`Client agrees, unless specifically requested otherwise, that by entering into transactions with Company, Client affirms consent to receive, in electronic format, all information, copies of agreements, and correspondence from Company, and to send information in electronic format. Client agrees that Company may provide all disclosures, periodic statements, notices, receipts, modifications, amendments, and all other evidence of transactions electronically, and that electronic communications will be given the same legal effect as written and signed paper communications. Client's consent may be withdrawn at any time upon Company's receipt of such withdrawal, which may impair the timing of delivery of services. Client may withdraw consent by emailing info@taxcasereview.com or writing to Tax Case Review, 631 US Highway One Ste 304, North Palm Beach, FL 33408. Client acknowledges that the internet is inherently unsecure and that Client maintains the sole obligation to ensure it can receive and regularly access Company's electronic communications.`}</div>
+              <div style={styles.docBody}>{`Client agrees, unless specifically requested otherwise, that by entering into transactions with Company, Client affirms consent to receive, in electronic format, all information, copies of agreements, and correspondence from Company, and to send information in electronic format. Client agrees that Company may provide all disclosures, periodic statements, notices, receipts, modifications, amendments, and all other evidence of transactions electronically, and that electronic communications will be given the same legal effect as written and signed paper communications. Client's consent may be withdrawn at any time upon Company's receipt of such withdrawal, which may impair the timing of delivery of services. Client may withdraw consent by emailing info@taxcasereview.com or writing to Tax Case Review, ${FIRM.address}. Client acknowledges that the internet is inherently unsecure and that Client maintains the sole obligation to ensure it can receive and regularly access Company's electronic communications.`}</div>
             </div>
 
             <div style={styles.section}>
               <div style={styles.secTitle}>13. Right of Cancellation</div>
-              <div style={{...styles.docBody, marginBottom:0}}>{`Client may cancel this transaction at any time prior to midnight of the third (3rd) business day after the date of execution of this Agreement, without any penalty or obligation. If Client cancels, any payments made and any negotiable instrument executed by Client will be returned within three (3) days following receipt of Client's cancellation notice. In the event of a cancellation, payments made will be prorated at a $250 hourly rate for all work product services performed by Company. Client may also terminate this Agreement at any later time as provided herein, but Company is not required to refund fees already paid except as set forth in this Agreement. To cancel, Client must mail or deliver a signed and dated copy of the cancellation notice (provided to Client separately as part of this signing package) to Tax Case Review, 631 US Highway One Ste 304, North Palm Beach, FL 33408, not later than midnight of the third business day after execution of this Agreement.`}</div>
+              <div style={{...styles.docBody, marginBottom:0}}>{`Client may cancel this transaction at any time prior to midnight of the third (3rd) business day after the date of execution of this Agreement, without any penalty or obligation. If Client cancels, any payments made and any negotiable instrument executed by Client will be returned within three (3) days following receipt of Client's cancellation notice. In the event of a cancellation, payments made will be prorated at a $250 hourly rate for all work product services performed by Company. Client may also terminate this Agreement at any later time as provided herein, but Company is not required to refund fees already paid except as set forth in this Agreement. To cancel, Client must mail or deliver a signed and dated copy of the cancellation notice (provided to Client separately as part of this signing package) to Tax Case Review, ${FIRM.address}, not later than midnight of the third business day after execution of this Agreement.`}</div>
             </div>
 
             <div style={{...styles.section, background:'#1e2a3a', border:'1px solid #334155', borderRadius:10, padding:'14px 16px'}}>
@@ -438,7 +439,7 @@ export default function SignPage() {
               <div style={styles.secTitle}>Notice of Right of Cancellation (Keep for Your Records)</div>
               <div style={{...styles.docBody, marginBottom:10, fontSize:12.5}}>{`You may cancel this Tax Service Agreement, without any penalty or obligation, within three (3) business days after the date you sign it below. If you cancel, any payments made by you will be returned within three (3) days following receipt of your cancellation notice. In the event of a cancellation, payments made will be prorated at a $250 hourly rate for work product services already performed by Tax Case Review.
 
-To cancel, complete and sign this notice, then mail or deliver it to: Tax Case Review, 631 US Highway One Ste 304, North Palm Beach, FL 33408 — not later than midnight of the third business day after you sign this Agreement.`}</div>
+To cancel, complete and sign this notice, then mail or deliver it to: Tax Case Review, ${FIRM.address} — not later than midnight of the third business day after you sign this Agreement.`}</div>
               <div style={{background:'#fff',color:'#111',borderRadius:6,padding:'16px 18px',fontSize:12.5,lineHeight:1.9}}>
                 <div style={{fontWeight:700,marginBottom:10}}>I HEREBY CANCEL THE TAX SERVICE AGREEMENT</div>
                 <div style={{borderBottom:'1px solid #333',height:22,marginBottom:4}}></div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useFirm } from '../lib/useFirm'
 import IRSFormFiller from '../components/IRSFormFiller'
+import { FIRM } from '../lib/firmBranding'
 
 const BLANK = { formNumber: '2848', status: 'Not Filed', client: '', caseNum: '', filedDate: '', notes: '' }
 
@@ -29,13 +30,13 @@ const IRS_FORMS = [
   { num: 'SS-4',   label: 'Apply for EIN',               url: 'https://www.irs.gov/pub/irs-pdf/fss4.pdf' },
 ]
 
-const LOGO_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo'
+const LOGO_URL = ''  // replaced by FIRM.logoUrl
 
 // ─── Shared print header ──────────────────────────────────────────────────────
 function printHeader(title) {
   return `
     <div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #1A7FD4;padding-bottom:16px">
-      <img src="${LOGO_URL}" style="height:48px;margin-bottom:8px" onerror="this.style.display='none'"/>
+      <img src="${FIRM.logoUrl}" style="height:48px;margin-bottom:8px" onerror="this.style.display='none'"/>
       <div style="font-size:20px;font-weight:700;color:#1A7FD4">${firmName}</div>
       <div style="font-size:11px;color:#666">${address} · ${email}</div>
       <div style="font-size:16px;font-weight:700;margin-top:10px;color:#111">${title}</div>

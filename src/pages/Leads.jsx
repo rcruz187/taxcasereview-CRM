@@ -25,6 +25,7 @@ import SendPaymentLinkModal from '../components/SendPaymentLinkModal'
 import SavedCardsPanel from '../components/SavedCardsPanel'
 import SplitPaymentModal from '../components/SplitPaymentModal'
 import { SMS_TEMPLATES, applySmsTemplate } from '../lib/smsTemplates'
+import { FIRM } from '../lib/firmBranding'
 
 const STATUSES = ['New Lead','Contacted','Consultation Scheduled','Consultation Completed',
   'Tax Inv Agreement Sent','Tax Inv Agreement Signed','Tax Inv Fee Paid',
@@ -276,8 +277,8 @@ function LeadInlineEsign({ lead, onClose }) {
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
   <tr><td style="background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 100%);padding:32px 40px;text-align:center">
-    <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style="max-height:60px;max-width:240px;object-fit:contain" onerror="this.style.display='none'"/>
-    <div style="font-size:22px;font-weight:800;color:#ffffff;margin-top:12px">Tax Case Review</div>
+    <img src="${FIRM.logoUrl}" alt="${FIRM.name}" style="max-height:60px;max-width:240px;object-fit:contain" onerror="this.style.display='none'"/>
+    <div style="font-size:22px;font-weight:800;color:#ffffff;margin-top:12px">${FIRM.name}</div>
     <div style="font-size:12px;color:#93c5fd;margin-top:4px;letter-spacing:.08em;text-transform:uppercase">IRS Resolution Services</div>
   </td></tr>
   <tr><td style="padding:40px 40px 32px">
@@ -289,11 +290,11 @@ function LeadInlineEsign({ lead, onClose }) {
     <p style="margin:0 0 8px;font-size:12px;color:#94a3b8;text-align:center">Or copy this link:</p>
     <p style="margin:0 0 32px;font-size:12px;color:#3b82f6;text-align:center;word-break:break-all"><a href="${url}" style="color:#3b82f6">${url}</a></p>
     <div style="background:#f8fafc;border-radius:8px;padding:16px 20px;border-left:4px solid #3b82f6">
-      <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> We're here to help.<br>📞 <strong>(888) 334-5052</strong> &nbsp;·&nbsp; ✉️ <strong>info@taxcasereview.org</strong></p>
+      <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> We're here to help.<br>📞 <strong>${FIRM.phone}</strong> &nbsp;·&nbsp; ✉️ <strong>info@taxcasereview.org</strong></p>
     </div>
   </td></tr>
   <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center">
-    <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.8">Tax Case Review &nbsp;·&nbsp; 631 US Highway One Ste 304, North Palm Beach, FL 33408</p>
+    <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.8">Tax Case Review &nbsp;·&nbsp; ${FIRM.address}</p>
   </td></tr>
 </table>
 </td></tr></table>
@@ -704,7 +705,7 @@ export default function Leads() {
       await navigator.clipboard.writeText(sigUrl).catch(()=>{})
       let emailSent=false, smsSent=false
       if ((via==='email'||via==='both') && lead.email) {
-        const { error:eErr } = await supabase.functions.invoke('send-email', { body: { to:lead.email, subject:`Action Required: Sign Your ${formDef.state} Power of Attorney — Tax Case Review`, html:`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo\" alt=\"Tax Case Review\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">Tax Case Review</div></div><p>Dear <strong>${lead.name}</strong>,</p><p>Your <strong>${formDef.state} Power of Attorney (${formDef.num})</strong> is ready for your review and signature.</p><p style="text-align:center;margin:24px 0"><a href="${sigUrl}" style="background:#1d4ed8;color:#fff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Review &amp; Sign →</a></p><p style="font-size:12px;color:#64748b">${sigUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>` }})
+        const { error:eErr } = await supabase.functions.invoke('send-email', { body: { to:lead.email, subject:`Action Required: Sign Your ${formDef.state} Power of Attorney — ${FIRM.name}`, html:`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${lead.name}</strong>,</p><p>Your <strong>${formDef.state} Power of Attorney (${formDef.num})</strong> is ready for your review and signature.</p><p style="text-align:center;margin:24px 0"><a href="${sigUrl}" style="background:#1d4ed8;color:#fff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Review &amp; Sign →</a></p><p style="font-size:12px;color:#64748b">${sigUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · ${FIRM.address}</p></div>` }})
         emailSent = !eErr
       }
       if ((via==='sms'||via==='both') && lead.phone) {
@@ -768,8 +769,8 @@ export default function Leads() {
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
   <tr><td style="background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 100%);padding:32px 40px;text-align:center">
-    <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style="max-height:60px;max-width:240px;object-fit:contain" onerror="this.style.display='none'"/>
-    <div style="font-size:22px;font-weight:800;color:#ffffff;margin-top:12px">Tax Case Review</div>
+    <img src="${FIRM.logoUrl}" alt="${FIRM.name}" style="max-height:60px;max-width:240px;object-fit:contain" onerror="this.style.display='none'"/>
+    <div style="font-size:22px;font-weight:800;color:#ffffff;margin-top:12px">${FIRM.name}</div>
     <div style="font-size:12px;color:#93c5fd;margin-top:4px;letter-spacing:.08em;text-transform:uppercase">IRS Resolution Services</div>
   </td></tr>
   <tr><td style="padding:40px 40px 32px">
@@ -782,11 +783,11 @@ export default function Leads() {
     <p style="margin:0 0 24px;font-size:12px;color:#94a3b8;text-align:center;word-break:break-all"><a href="${url}" style="color:#3b82f6">${url}</a></p>
     ${paymentSection}
     <div style="background:#f8fafc;border-radius:8px;padding:16px 20px;border-left:4px solid #3b82f6">
-      <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> We're here to help.<br>📞 <strong>(888) 334-5052</strong> &nbsp;·&nbsp; ✉️ <strong>info@taxcasereview.org</strong></p>
+      <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> We're here to help.<br>📞 <strong>${FIRM.phone}</strong> &nbsp;·&nbsp; ✉️ <strong>info@taxcasereview.org</strong></p>
     </div>
   </td></tr>
   <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center">
-    <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.8">Tax Case Review &nbsp;·&nbsp; 631 US Highway One Ste 304, North Palm Beach, FL 33408</p>
+    <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.8">Tax Case Review &nbsp;·&nbsp; ${FIRM.address}</p>
   </td></tr>
 </table>
 </td></tr></table>
@@ -1252,7 +1253,7 @@ export default function Leads() {
       body: {
         to: l.email,
         subject: `Your Financial Intake Form — Tax Case Review`,
-        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo\" alt=\"Tax Case Review\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">Tax Case Review</div></div><p>Dear <strong>${l.name}</strong>,</p><p>Here's your link to fill out (or finish) your financial intake form — it takes about 10-15 minutes and your progress saves automatically.</p><p style="text-align:center;margin:24px 0"><a href="${intakeUrl}" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Financial Intake</a></p><p style="font-size:12px;color:#64748b">Link: ${intakeUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
+        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${l.name}</strong>,</p><p>Here's your link to fill out (or finish) your financial intake form — it takes about 10-15 minutes and your progress saves automatically.</p><p style="text-align:center;margin:24px 0"><a href="${intakeUrl}" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Financial Intake</a></p><p style="font-size:12px;color:#64748b">Link: ${intakeUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · ${FIRM.address}</p></div>`
       }
     })
     setIntakeSending(false)
@@ -1332,8 +1333,8 @@ export default function Leads() {
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
   <tr><td style="background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 100%);padding:32px 40px;text-align:center">
-    <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style="max-height:60px;max-width:240px;object-fit:contain" onerror="this.style.display='none'"/>
-    <div style="font-size:22px;font-weight:800;color:#ffffff;margin-top:12px;letter-spacing:-.02em">Tax Case Review</div>
+    <img src="${FIRM.logoUrl}" alt="${FIRM.name}" style="max-height:60px;max-width:240px;object-fit:contain" onerror="this.style.display='none'"/>
+    <div style="font-size:22px;font-weight:800;color:#ffffff;margin-top:12px;letter-spacing:-.02em">${FIRM.name}</div>
     <div style="font-size:12px;color:#93c5fd;margin-top:4px;letter-spacing:.08em;text-transform:uppercase">IRS Resolution Services</div>
   </td></tr>
   <tr><td style="padding:40px 40px 32px">
@@ -1363,11 +1364,11 @@ export default function Leads() {
       <p style="margin:12px 0 0;font-size:11px;color:#94a3b8;text-align:center">Financial Intake link: <a href="${intakeUrl}" style="color:#7c3aed">${intakeUrl}</a></p>
     </div>
     <div style="background:#f8fafc;border-radius:8px;padding:16px 20px;border-left:4px solid #3b82f6;margin-bottom:8px">
-      <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> Don't hesitate to reach out. We're here every step of the way.<br>📞 <strong>(888) 334-5052</strong> &nbsp;·&nbsp; ✉️ <strong>info@taxcasereview.org</strong></p>
+      <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> Don't hesitate to reach out. We're here every step of the way.<br>📞 <strong>${FIRM.phone}</strong> &nbsp;·&nbsp; ✉️ <strong>info@taxcasereview.org</strong></p>
     </div>
   </td></tr>
   <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center">
-    <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.8">Tax Case Review &nbsp;·&nbsp; 631 US Highway One Ste 304, North Palm Beach, FL 33408<br>This email was sent regarding your active tax resolution case.</p>
+    <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.8">Tax Case Review &nbsp;·&nbsp; ${FIRM.address}<br>This email was sent regarding your active tax resolution case.</p>
   </td></tr>
 </table>
 </td></tr></table>
@@ -1494,7 +1495,7 @@ export default function Leads() {
             body: {
               to: l.email,
               subject: `Your Financial Intake Form — Tax Case Review`,
-              html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo\" alt=\"Tax Case Review\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">Tax Case Review</div></div><p>Dear <strong>${l.name}</strong>,</p><p>Welcome aboard! To get your case moving, please finish your financial intake form — it gives your advisor the full picture needed to put together your resolution plan. Your progress is saved.</p><p style="text-align:center;margin:24px 0"><a href="${intakeUrl}" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Finish My Financial Intake</a></p><p style="font-size:12px;color:#64748b">Link: ${intakeUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
+              html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${l.name}</strong>,</p><p>Welcome aboard! To get your case moving, please finish your financial intake form — it gives your advisor the full picture needed to put together your resolution plan. Your progress is saved.</p><p style="text-align:center;margin:24px 0"><a href="${intakeUrl}" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Finish My Financial Intake</a></p><p style="font-size:12px;color:#64748b">Link: ${intakeUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · ${FIRM.address}</p></div>`
             }
           })
           if (!emailErr) intakeSent = true
@@ -1511,7 +1512,7 @@ export default function Leads() {
               body: {
                 to: l.email,
                 subject: `Your Financial Intake Form — Tax Case Review`,
-                html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo\" alt=\"Tax Case Review\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">Tax Case Review</div></div><p>Dear <strong>${l.name}</strong>,</p><p>Welcome aboard! To get your case moving, please fill out this short financial intake form — it gives your advisor the full picture needed to put together your resolution plan. It takes about 10-15 minutes and your progress saves automatically.</p><p style="text-align:center;margin:24px 0"><a href="${intakeUrl}" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Financial Intake</a></p><p style="font-size:12px;color:#64748b">Link: ${intakeUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
+                html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${l.name}</strong>,</p><p>Welcome aboard! To get your case moving, please fill out this short financial intake form — it gives your advisor the full picture needed to put together your resolution plan. It takes about 10-15 minutes and your progress saves automatically.</p><p style="text-align:center;margin:24px 0"><a href="${intakeUrl}" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Financial Intake</a></p><p style="font-size:12px;color:#64748b">Link: ${intakeUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · ${FIRM.address}</p></div>`
               }
             })
             if (!emailErr) intakeSent = true

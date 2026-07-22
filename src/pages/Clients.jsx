@@ -24,6 +24,7 @@ import ChargeResolutionFeeModal from '../components/ChargeResolutionFeeModal'
 import { RESOLUTION_SERVICES } from '../lib/irsFormUtils'
 import { generatePOACoverLetterPdf } from '../lib/irsFormUtils'
 import { SMS_TEMPLATES, applySmsTemplate } from '../lib/smsTemplates'
+import { FIRM } from '../lib/firmBranding'
 
 const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -402,8 +403,8 @@ function InlinePortalForm({ client, onClose, showToast }) {
 
   <!-- Header banner -->
   <tr><td style="background:linear-gradient(135deg,#0f2d5c 0%,#1a4080 50%,#0e3060 100%);border-radius:16px 16px 0 0;padding:36px 40px;text-align:center">
-    <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style="max-height:64px;max-width:220px;object-fit:contain;margin-bottom:14px;display:block;margin-left:auto;margin-right:auto" onerror="this.style.display='none'"/>
-    <div style="font-size:11px;font-weight:800;color:#93c5fd;letter-spacing:.15em;text-transform:uppercase;margin-bottom:12px">Tax Case Review</div>
+    <img src="${FIRM.logoUrl}" alt="${FIRM.name}" style="max-height:64px;max-width:220px;object-fit:contain;margin-bottom:14px;display:block;margin-left:auto;margin-right:auto" onerror="this.style.display='none'"/>
+    <div style="font-size:11px;font-weight:800;color:#93c5fd;letter-spacing:.15em;text-transform:uppercase;margin-bottom:12px">${FIRM.name}</div>
     <div style="font-size:28px;font-weight:800;color:#ffffff;margin-bottom:6px">Welcome, ${client.name}!</div>
     <div style="font-size:15px;color:#bfdbfe;margin-bottom:0">Your Client Portal is ready and waiting for you.</div>
   </td></tr>
@@ -477,7 +478,7 @@ function InlinePortalForm({ client, onClose, showToast }) {
     <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px 24px;margin-bottom:24px;text-align:center">
       <div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:6px">Have questions? We're here for you.</div>
       <div style="font-size:13px;color:#475569;line-height:1.7">
-        Call us toll-free: <strong style="color:#1d4ed8">(888) 334-5052</strong><br/>
+        Call us toll-free: <strong style="color:#1d4ed8">${FIRM.phone}</strong><br/>
         Or reply to this email and your representative will get back to you promptly.
       </div>
     </div>
@@ -493,8 +494,8 @@ function InlinePortalForm({ client, onClose, showToast }) {
   <tr><td style="background:#0f172a;border-radius:0 0 16px 16px;padding:24px 40px;text-align:center">
     <div style="font-size:12px;color:#60a5fa;font-weight:700;margin-bottom:6px">Tax Case Review & Resolution Services</div>
     <div style="font-size:11px;color:#475569;line-height:1.7">
-      631 US Highway One Ste 304, North Palm Beach, FL 33408<br/>
-      Toll-Free: (888) 334-5052<br/>
+      ${FIRM.address}<br/>
+      Toll-Free: ${FIRM.phone}<br/>
       <a href="${url}" style="color:#3b82f6;text-decoration:none">Access Your Portal</a>
     </div>
   </td></tr>
@@ -605,7 +606,7 @@ function InlineOrganizerForm({ client, onClose, showToast }) {
           body: {
             to: client.email,
             subject: `Your ${year.trim()} Tax Organizer — Tax Case Review`,
-            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo\" alt=\"Tax Case Review\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">Tax Case Review</div></div><p>Dear <strong>${client.name}</strong>,</p><p>Please complete your ${year.trim()} tax organizer so we can begin preparing your return. It only takes a few minutes, and you can save your progress and come back anytime.</p><p style="text-align:center;margin:24px 0"><a href="${url}" style="background:#9333ea;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Tax Organizer</a></p><p style="font-size:12px;color:#64748b">Link: ${url}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
+            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${client.name}</strong>,</p><p>Please complete your ${year.trim()} tax organizer so we can begin preparing your return. It only takes a few minutes, and you can save your progress and come back anytime.</p><p style="text-align:center;margin:24px 0"><a href="${url}" style="background:#9333ea;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Tax Organizer</a></p><p style="font-size:12px;color:#64748b">Link: ${url}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · ${FIRM.address}</p></div>`
           }
         })
         if (!error) emailSent = true
@@ -1489,7 +1490,7 @@ export default function Clients() {
       await navigator.clipboard.writeText(sigUrl).catch(()=>{})
       let emailSent=false, smsSent=false
       if ((via==='email'||via==='both') && client.email) {
-        const { error:eErr } = await supabase.functions.invoke('send-email', { body: { to:client.email, subject:`Action Required: Sign Your ${formDef.state} Power of Attorney — Tax Case Review`, html:`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo\" alt=\"Tax Case Review\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">Tax Case Review</div></div><p>Dear <strong>${client.name}</strong>,</p><p>Your <strong>${formDef.state} Power of Attorney (${formDef.num})</strong> is ready for your review and signature.</p><p style="text-align:center;margin:24px 0"><a href="${sigUrl}" style="background:#1d4ed8;color:#fff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Review &amp; Sign →</a></p><p style="font-size:12px;color:#64748b">${sigUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408<br/>📞 (888) 334-5052</p></div>` }})
+        const { error:eErr } = await supabase.functions.invoke('send-email', { body: { to:client.email, subject:`Action Required: Sign Your ${formDef.state} Power of Attorney — ${FIRM.name}`, html:`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${client.name}</strong>,</p><p>Your <strong>${formDef.state} Power of Attorney (${formDef.num})</strong> is ready for your review and signature.</p><p style="text-align:center;margin:24px 0"><a href="${sigUrl}" style="background:#1d4ed8;color:#fff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Review &amp; Sign →</a></p><p style="font-size:12px;color:#64748b">${sigUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · ${FIRM.address}<br/>📞 ${FIRM.phone}</p></div>` }})
         emailSent = !eErr
       }
       if ((via==='sms'||via==='both') && client.phone) {
@@ -1556,8 +1557,8 @@ export default function Clients() {
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
   <tr><td style="background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 100%);padding:32px 40px;text-align:center">
-    <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style="max-height:60px;max-width:240px;object-fit:contain" onerror="this.style.display='none'"/>
-    <div style="font-size:22px;font-weight:800;color:#ffffff;margin-top:12px">Tax Case Review</div>
+    <img src="${FIRM.logoUrl}" alt="${FIRM.name}" style="max-height:60px;max-width:240px;object-fit:contain" onerror="this.style.display='none'"/>
+    <div style="font-size:22px;font-weight:800;color:#ffffff;margin-top:12px">${FIRM.name}</div>
     <div style="font-size:12px;color:#93c5fd;margin-top:4px;letter-spacing:.08em;text-transform:uppercase">IRS Resolution Services</div>
   </td></tr>
   <tr><td style="padding:40px 40px 32px">
@@ -1570,11 +1571,11 @@ export default function Clients() {
     <p style="margin:0 0 24px;font-size:12px;color:#94a3b8;text-align:center;word-break:break-all"><a href="${url}" style="color:#3b82f6">${url}</a></p>
     ${paymentSection}
     <div style="background:#f8fafc;border-radius:8px;padding:16px 20px;border-left:4px solid #3b82f6">
-      <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> We're here to help.<br>📞 <strong>(888) 334-5052</strong> &nbsp;·&nbsp; ✉️ <strong>info@taxcasereview.org</strong></p>
+      <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> We're here to help.<br>📞 <strong>${FIRM.phone}</strong> &nbsp;·&nbsp; ✉️ <strong>info@taxcasereview.org</strong></p>
     </div>
   </td></tr>
   <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center">
-    <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.8">Tax Case Review &nbsp;·&nbsp; 631 US Highway One Ste 304, North Palm Beach, FL 33408</p>
+    <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.8">Tax Case Review &nbsp;·&nbsp; ${FIRM.address}</p>
   </td></tr>
 </table>
 </td></tr></table>

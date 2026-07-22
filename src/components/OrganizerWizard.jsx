@@ -2,8 +2,9 @@ import { validateFile } from '../lib/uploadUtils'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { ORGANIZER_STEPS, shouldShow } from '../lib/organizerSchema'
+import { FIRM } from '../lib/firmBranding'
 
-const LOGO_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo'
+const LOGO_URL = ''  // replaced by FIRM.logoUrl
 
 // Shared wizard engine. Used standalone (OrganizerPage.jsx, public link) and
 // embedded inside ClientPortal.jsx. Persists answers to `tax_organizer_responses`
@@ -123,7 +124,7 @@ export default function OrganizerWizard({ organizerId, embedded = false, onCompl
     <div style={S.card}>
       {!embedded && (
         <div style={{textAlign:'center', marginBottom:18}}>
-          <img src={LOGO_URL} style={{height:42, marginBottom:8}} onError={e=>e.target.style.display='none'}/>
+          <img src={FIRM.logoUrl} style={{height:42, marginBottom:8}} onError={e=>e.target.style.display='none'}/>
           <div style={{fontSize:11, fontWeight:800, color:'#60a5fa', letterSpacing:'.1em', textTransform:'uppercase'}}>Tax Case Review</div>
           <div style={{fontSize:11, color:'#64748b'}}>Tax Year {record?.tax_year} Organizer</div>
         </div>

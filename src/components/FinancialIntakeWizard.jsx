@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { FINANCIAL_INTAKE_STEPS, shouldShow } from '../lib/financialIntakeSchema'
 import { getStateTaxRate } from '../lib/stateTaxRates'
+import { FIRM } from '../lib/firmBranding'
 
-const LOGO_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo'
+const LOGO_URL = ''  // replaced by FIRM.logoUrl
 
 // Renders the submitted answers into an email-safe HTML block, mirroring
 // the same step/question iteration FinancialIntakeView.jsx uses in the CRM
@@ -55,7 +56,7 @@ async function sendIntakeCopyEmail(record, answers) {
     body: {
       to: record.client_email,
       subject: `Your Financial Intake Submission — Tax Case Review`,
-      html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo\" alt=\"Tax Case Review\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">Tax Case Review</div></div><p>Dear <strong>${record.client_name||'Client'}</strong>,</p><p>Thank you for completing your financial intake form. Here's a copy of everything you submitted for your records:</p>${answersHtml}<p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408</p></div>`
+      html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${record.client_name||'Client'}</strong>,</p><p>Thank you for completing your financial intake form. Here's a copy of everything you submitted for your records:</p>${answersHtml}<p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · ${FIRM.address}</p></div>`
     }
   })
 }
@@ -391,8 +392,8 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
     <div style={S.card}>
       {!embedded && (
         <div style={{textAlign:'center', marginBottom:18}}>
-          <img src={LOGO_URL} style={{height:42, marginBottom:8}} onError={e=>e.target.style.display='none'}/>
-          <div style={{fontSize:11, fontWeight:800, color:'#60a5fa', letterSpacing:'.1em', textTransform:'uppercase'}}>Tax Case Review</div>
+          <img src={FIRM.logoUrl} style={{height:42, marginBottom:8}} onError={e=>e.target.style.display='none'}/>
+          <div style={{fontSize:11, fontWeight:800, color:'#60a5fa', letterSpacing:'.1em', textTransform:'uppercase'}}>${FIRM.name}</div>
           <div style={{fontSize:11, color:'#64748b'}}>Financial Intake</div>
         </div>
       )}

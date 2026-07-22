@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { applyPaymentToInvoice, reversePaymentFromInvoice } from '../lib/invoiceSync'
 import ClientLink from '../components/ClientLink'
+import { FIRM } from '../lib/firmBranding'
 
 const BLANK = { clientName:'', invNum:'', amount:'', method:'Credit Card', checkNum:'', date:'', status:'Cleared', notes:'' }
 const METHODS = ['Credit Card','ACH / Bank Transfer','Check','Cash','Zelle','Venmo','PayPal','Money Order','Wire Transfer','Other']
@@ -208,7 +209,7 @@ export default function Payments() {
     <div class="row"><span class="label">Status</span><span class="value">${pay.status||'Cleared'}</span></div>
     ${pay.notes?`<div class="row"><span class="label">Notes</span><span class="value">${pay.notes}</span></div>`:''}
   </div>
-  <div class="footer">Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408 · Not a Law Firm</div>
+  <div class="footer">${[FIRM.name, FIRM.address].filter(Boolean).join(' · ')} · Not a Law Firm</div>
 </body></html>`)
     w.document.close()
   }
