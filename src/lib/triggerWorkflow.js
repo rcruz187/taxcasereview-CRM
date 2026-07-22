@@ -49,21 +49,51 @@ export async function triggerWorkflow(event, entityType, entityName, actorName, 
 
     if (stepsErr || !steps?.length) return
 
+    // Honour assigned_role exactly as applyWorkTemplate does. This used to dump
+    // every task on actorName — which, when the trigger is a CLIENT signing an
+    // e-sign package, is not an employee at all, so the whole investigation
+    // landed on nobody's queue.
+    // ADVISOR  → whoever the lead/client is permanently assigned to.
+    // ASSOCIATE→ one round-robin associate for this whole firing, not a fresh
+    //            pick per step, so the package stays with one person.
+    let advisorName = null
+    if (entityType === 'client' || entityType === 'case') {
+      const { data: cRows } = await supabase.from('clients').select('assignedTo').eq('name', entityName).limit(1)
+      advisorName = cRows?.[0]?.assignedTo || null
+    }
+    if (!advisorName) {
+      const { data: lRows } = await supabase.from('leads').select('assignedTo').eq('name', entityName).limit(1)
+      advisorName = lRows?.[0]?.assignedTo || null
+    }
+    advisorName = advisorName || actorName
+
+    let associateName = null
+    if (steps.some(s => s.assigned_role === 'ASSOCIATE')) {
+      const { data: rr } = await supabase.rpc('get_next_tax_associate')
+      associateName = rr || advisorName
+    }
+
     // Build task inserts
     const now = new Date()
-    const tasks = steps.map(s => {
+    const tasks = steps.map((s, idx) => {
       const due = new Date(now)
       due.setDate(due.getDate() + (s.due_in_days || 1))
+      // Task lists sort by created_at descending, so space the steps a second
+      // apart to keep step_order from collapsing into an undefined order.
+      const createdAt = new Date(now.getTime() - idx * 1000)
+      const assignee = s.assigned_role === 'ADVISOR' ? advisorName
+                      : s.assigned_role === 'ASSOCIATE' ? associateName
+                      : advisorName
       return {
         title: s.title,
         clientName: entityName,
-        assignedTo: actorName, // assign to actor by default; role-based assignment future enhancement
+        assignedTo: assignee,
         priority: 'Normal',
         dueDate: due.toISOString().slice(0, 10),
         done: false,
         notes: s.notes || '',
         section_title: s.section_title || null,
-        created_at: now.toISOString(),
+        created_at: createdAt.toISOString(),
       }
     })
 

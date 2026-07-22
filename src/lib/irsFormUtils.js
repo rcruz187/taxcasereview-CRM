@@ -23,7 +23,12 @@ export const FIELD_MAPS = {
     ssn:         'topmostSubform[0].Page1[0].TaxpayerIDSSN[0]',
     ein:         'topmostSubform[0].Page1[0].TaxpayerIDEIN[0]',
     phone:       'topmostSubform[0].Page1[0].TaxpayerTelephone[0]',
-    // no date field in blank (already signed on template)
+    // Page 2, line 7. A business POA is signed by an individual with authority,
+    // so PrintName is the PERSON and Title is their capacity; the entity goes in
+    // "Print name of taxpayer from line 1 if other than individual".
+    title:       'topmostSubform[0].Page2[0].Title[0]',
+    printName:   'topmostSubform[0].Page2[0].PrintName[0]',
+    printNameTaxpayer: 'topmostSubform[0].Page2[0].PrintNameTaxpayer[0]',
     idType:      'split',   // name + address separate
   },
   // 8821 Personal (f1_6/f1_7/f1_8 + f1_32 print name + f1_33 date)
@@ -84,6 +89,10 @@ export const FORM_USES_EIN = {
 // place the taxpayer's typed/drawn signature + date directly on that line.
 // page = 0-indexed page number. Coordinates are in PDF points, origin at
 // bottom-left of the page (standard PDF coordinate space).
+// Every business POA this firm sends is signed by a managing member, so the
+// Title box on line 7 is a constant rather than a per-lead field.
+export const BUSINESS_SIGNER_TITLE = 'Managing Member';
+
 export const SIGNATURE_POSITIONS = {
   '2848_personal': { page: 1, sigX: 40,  sigY: 555, dateX: 305, dateY: 555, size: 12 },
   '2848_business': { page: 1, sigX: 40,  sigY: 555, dateX: 305, dateY: 555, size: 12 },
@@ -91,6 +100,11 @@ export const SIGNATURE_POSITIONS = {
   '8821_business': { page: 0, sigX: 60,  sigY: 138, dateX: 438, dateY: 138, size: 12 },
   'cc_auth':       { page: 0, sigX: 60,  sigY: 256, dateX: 366, dateY: 256, size: 12 },
   'addendum':      { page: 'last', sigX: 56, sigY: 698, dateX: 90, dateY: 654, size: 12 },
+  // DR-835 page 2, taxpayer block. Rule measured at y 434.3-440.3, signature
+  // column x 36-310, date column x 315-450.
+  'state_poa':          { page: 1, sigX: 45, sigY: 438, dateX: 330, dateY: 438, size: 12 },
+  'state_poa_personal': { page: 1, sigX: 45, sigY: 438, dateX: 330, dateY: 438, size: 12 },
+  'state_poa_business': { page: 1, sigX: 45, sigY: 438, dateX: 330, dateY: 438, size: 12 },
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -207,6 +221,45 @@ export async function fillForm(formType, client, useEin = false) {
     setText(map.printName, bizName);
     setText(map.date, today);
   }
+
+  // 2848 business line 7: person signs, entity is named separately.
+  if (formType === '2848_business') {
+    setText(map.printName, client.name || '');
+    setText(map.title, BUSINESS_SIGNER_TITLE);
+    setText(map.printNameTaxpayer, bizName);
+
+    // The business template shipped with no representative signature in Part II
+    // (the personal 2848 has it baked into the page). Draw it in — an unsigned
+    // Declaration of Representative gets the POA returned.
+    // Part II row 1 Signature cell: x 296.2-517.7, y 144-156.
+    try {
+      const sigBytes = await fetchTemplate('rep_signature.png');
+      const sigPng   = await pdfDoc.embedPng(sigBytes);
+      const page2    = pdfDoc.getPages()[1];
+      if (page2) page2.drawImage(sigPng, { x: 308, y: 142, width: 34, height: 21 });
+    } catch (e) {
+      console.warn('Rep signature not applied to 2848 business:', e.message);
+    }
+  }
+
+  // The IRS templates ship with a "Check Form for Common Errors & Reminders"
+  // push-button. It is an interactive artifact, not part of the filing, and it
+  // prints as a grey box at the top of the page — drop it from our output.
+  try {
+    const btn = form.getField('topmostSubform[0].Page1[0].CheckForm[0]');
+    if (btn) {
+      btn.acroField.getWidgets().forEach(w => {
+        pdfDoc.getPages().forEach(pg => {
+          const annots = pg.node.Annots();
+          if (!annots) return;
+          for (let i = annots.size() - 1; i >= 0; i--) {
+            if (annots.get(i) === w.ref) annots.remove(i);
+          }
+        });
+      });
+      form.removeField(btn);
+    }
+  } catch (_) { /* button absent in this template — fine */ }
 
   const filledBytes = await pdfDoc.save();
   return filledBytes;
@@ -1497,10 +1550,16 @@ export async function generateStatePOAWithCover(client, poaPdfBytes, party = 'pe
   const state        = client?.state   || ''
   const zip          = client?.zip     || ''
   const phone        = client?.phone   || ''
-  // Business POA is keyed to the FEIN; personal to the SSN (last 4 only).
+  // Business POA is keyed to the FEIN, personal to the SSN — and states reject
+  // the filing if the identifier is masked, so this prints in full (unlike the
+  // federal forms, where only the last four are shown).
+  const fmtSsn = v => {
+    const d = String(v || '').replace(/\D/g,'')
+    return d.length === 9 ? `${d.slice(0,3)}-${d.slice(3,5)}-${d.slice(5)}` : String(v || '')
+  }
   const ssn          = isBiz
     ? (client?.ein || '')
-    : (client?.ssn ? `***-**-${String(client.ssn).replace(/-/g,'').slice(-4)}` : (client?.ein || ''))
+    : (client?.ssn ? fmtSsn(client.ssn) : (client?.ein || ''))
   const cityStateZip = [city, state ? `${state} ${zip}` : zip].filter(Boolean).join(', ')
   const today        = new Date().toLocaleDateString('en-US', { month:'2-digit', day:'2-digit', year:'numeric' })
   const black        = rgb(0, 0, 0)
@@ -1515,7 +1574,12 @@ export async function generateStatePOAWithCover(client, poaPdfBytes, party = 'pe
   p1.drawText(street,       { x: 40,  y: 631, size: sz, font, color: black })
   p1.drawText(cityStateZip, { x: 40,  y: 620, size: sz, font, color: black })
   p1.drawText(ssn,          { x: 291, y: 642, size: sz, font, color: black })
-  p1.drawText(contact,      { x: 340, y: 611, size: sz, font, color: black }) // Contact person
+  // Contact person cell runs x 288-420. Long names used to start at x=340 and
+  // spill under the Telephone box, so start at the cell edge and step the size
+  // down until it fits.
+  let contactSz = sz
+  while (contactSz > 6 && font.widthOfTextAtSize(contact, contactSz) > 126) contactSz -= 0.5
+  p1.drawText(contact,      { x: 292, y: 611, size: contactSz, font, color: black }) // Contact person
   p1.drawText(phone,        { x: 478, y: 604, size: sz, font, color: black }) // Telephone (Section 1 right col)
 
   // Section 2 is pre-printed on this FL DR-835 PDF template with firm info — skip
@@ -1528,7 +1592,9 @@ export async function generateStatePOAWithCover(client, poaPdfBytes, party = 'pe
   // and the Print name rule at y=407.9-413.9 (pdf-lib origin = bottom-left).
   // Both values used to sit BELOW their rule, so the text collided with the
   // "Date" / "Print name" captions instead of resting on the line.
-  p2.drawText(today, { x: 330, y: 438, size: sz, font, color: black }) // Date (first signature block)
+  // Taxpayer date is intentionally NOT drawn here — stampSignature writes it at
+  // signing time, so an unsigned copy is never pre-dated.
+  p2.drawText(today, { x: 490, y: 117, size: sz, font, color: black }) // Declaration of Representative — date
   p2.drawText(name,  { x: 40,  y: 411, size: sz, font, color: black }) // Print name (first signature block)
 
   return await doc.save()
