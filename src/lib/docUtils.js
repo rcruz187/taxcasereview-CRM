@@ -6,6 +6,13 @@ const LOGO_URL = ''  // replaced by FIRM.logoUrl
 
 const FIRM_FAX = '(561) 420-6999'
 
+// Legal/body text renders the SIGNED-IN tenant's own firm, so a demo or
+// prospect tenant never sees Tax Case Review inside an agreement. The email is
+// derived from the firm name rather than settings.email so that TCR resolves
+// back to exactly info@taxcasereview.com and live agreements are unchanged.
+const firmName  = () => FIRM.name || 'Tax Case Review'
+const firmEmail = () => 'info@' + firmName().toLowerCase().replace(/[^a-z0-9]+/g, '') + '.com'
+
 function printHeader(title, phone = FIRM.phone) {
   return `
     <div style="text-align:center;margin-bottom:28px;padding-bottom:18px;border-bottom:3px solid #1A7FD4">
@@ -113,7 +120,7 @@ export function generateServiceAgreement(c = null) {
     <p style="text-align:right;font-size:11px;color:#666;margin-bottom:4px">Date: ${date}</p>
     ${clientBlock(c)}
 
-    <p>This Tax Service Agreement (as the same may be amended from time to time by any Addendum, the <b>"Agreement"</b>), dated as of ${date}, by and between <b>Tax Case Review</b>, with its principal offices located at ${FIRM.address} (together with any successors or assigns, <b>"Company"</b>) and the undersigned Client.</p>
+    <p>This Tax Service Agreement (as the same may be amended from time to time by any Addendum, the <b>"Agreement"</b>), dated as of ${date}, by and between <b>${firmName()}</b>, with its principal offices located at ${FIRM.address} (together with any successors or assigns, <b>"Company"</b>) and the undersigned Client.</p>
 
     <h3>1. Company Obligations</h3>
     <ul>
@@ -178,14 +185,14 @@ export function generateServiceAgreement(c = null) {
     <p>This Agreement is made and services are performed in the State of Florida and is governed by Florida law. This Agreement and any Addendums constitute the full and complete agreement and supersede any prior agreements, whether written or oral. No amendment, change, or modification other than an Addendum shall be valid unless in writing and signed by all parties.</p>
 
     <h3>12. Electronic Communication Disclosures</h3>
-    <p>Client consents to receive, in electronic format, all information, copies of agreements, and correspondence from Company, with the same legal effect as written and signed paper communications. Consent may be withdrawn at any time by emailing info@taxcasereview.com or writing to Tax Case Review, ${FIRM.address}.</p>
+    <p>Client consents to receive, in electronic format, all information, copies of agreements, and correspondence from Company, with the same legal effect as written and signed paper communications. Consent may be withdrawn at any time by emailing ${firmEmail()} or writing to ${firmName()}, ${FIRM.address}.</p>
 
     <div class="page-break"></div>
     <h3>13. Right of Cancellation</h3>
-    <p>Client may cancel this Agreement at any time prior to midnight of the third (3rd) business day after the date of execution, without penalty or obligation. If Client cancels, any payments made will be returned within three (3) days following receipt of Client's cancellation notice, prorated at a $250 hourly rate for any work product services already performed. To cancel, Client must mail or deliver a signed and dated cancellation notice to Tax Case Review, ${FIRM.address}, not later than midnight of the third business day after execution of this Agreement. See the attached Notice of Right of Cancellation for further detail.</p>
+    <p>Client may cancel this Agreement at any time prior to midnight of the third (3rd) business day after the date of execution, without penalty or obligation. If Client cancels, any payments made will be returned within three (3) days following receipt of Client's cancellation notice, prorated at a $250 hourly rate for any work product services already performed. To cancel, Client must mail or deliver a signed and dated cancellation notice to ${firmName()}, ${FIRM.address}, not later than midnight of the third business day after execution of this Agreement. See the attached Notice of Right of Cancellation for further detail.</p>
 
     <div class="notice">
-      <b>Privacy Policy:</b> Tax Case Review uses and shares your information only to perform our obligations under this Agreement and related purposes, or as permitted or required by law. Calls may be recorded or monitored for quality purposes. Contact info@taxcasereview.com with any privacy concerns.
+      <b>Privacy Policy:</b> ${firmName()} uses and shares your information only to perform our obligations under this Agreement and related purposes, or as permitted or required by law. Calls may be recorded or monitored for quality purposes. Contact ${firmEmail()} with any privacy concerns.
     </div>
 
     ${sigBlock('Client Signature', 'Authorized Representative')}
@@ -197,9 +204,9 @@ export function generateCancellationNotice(c = null) {
   printBase('Notice of Right of Cancellation', `
     ${clientBlock(c)}
     <p>You may cancel the Tax Service Agreement, without any penalty or obligation, within three (3) business days after the date you sign it.</p>
-    <p>If you cancel, any payments made by you will be returned within three (3) days following receipt of your cancellation notice. In the event of a cancellation, payments made will be prorated at a $250 hourly rate for all work product services already performed by Tax Case Review.</p>
+    <p>If you cancel, any payments made by you will be returned within three (3) days following receipt of your cancellation notice. In the event of a cancellation, payments made will be prorated at a $250 hourly rate for all work product services already performed by ${firmName()}.</p>
     <p>You may also terminate the Tax Service Agreement at any later time as provided therein, but we are not required to refund fees you have paid us except as set forth in the Agreement.</p>
-    <p>To cancel, mail or deliver a signed and dated copy of this notice to <b>Tax Case Review, ${FIRM.address}</b>, not later than midnight of the third business day after the execution of the Tax Service Agreement.</p>
+    <p>To cancel, mail or deliver a signed and dated copy of this notice to <b>${firmName()}, ${FIRM.address}</b>, not later than midnight of the third business day after the execution of the Tax Service Agreement.</p>
 
     <h3 style="margin-top:32px">I Hereby Cancel the Tax Service Agreement</h3>
     <div style="margin-top:24px">
@@ -230,7 +237,7 @@ export function generateCreditCardAuthForm(c = null) {
   const fee = c?.taxFee ? `$${Number(c.taxFee).toLocaleString()}` : (c?.investigationFee ? `$${c.investigationFee}` : '$___________')
   printBase('Credit Card Authorization Form', `
     ${clientBlock(c)}
-    <p>Complete the following form to authorize <b>Tax Case Review</b> to charge fees to the credit or debit card listed below. If you need assistance completing this form, please contact a Tax Case Review representative at ${FIRM.phone}.</p>
+    <p>Complete the following form to authorize <b>${firmName()}</b> to charge fees to the credit or debit card listed below. If you need assistance completing this form, please contact a ${firmName()} representative at ${FIRM.phone}.</p>
 
     <h3>Cardholder Information</h3>
     <p>Client Name(s): <span style="display:inline-block;min-width:340px;border-bottom:1px solid #333">&nbsp;${c?.name ? `<b>${c.name}</b>` : ''}</span></p>
@@ -249,7 +256,7 @@ export function generateCreditCardAuthForm(c = null) {
     <p>Expiration Date: <span style="display:inline-block;min-width:90px;border-bottom:1px solid #333">&nbsp;</span> &nbsp;&nbsp; Security Code: <span style="display:inline-block;min-width:90px;border-bottom:1px solid #333">&nbsp;</span></p>
 
     <div class="notice">
-      <b>Electronic Payment Authorization:</b> Client authorizes Tax Case Review to charge amounts owed under the Tax Service Agreement, and any Addendums, to the credit or debit card identified above. Fees charged by Tax Case Review are non-refundable except as set forth in the Tax Service Agreement.
+      <b>Electronic Payment Authorization:</b> Client authorizes ${firmName()} to charge amounts owed under the Tax Service Agreement, and any Addendums, to the credit or debit card identified above. Fees charged by ${firmName()} are non-refundable except as set forth in the Tax Service Agreement.
     </div>
 
     ${sigBlock('Client Signature', 'Authorized Representative')}
@@ -276,7 +283,7 @@ export function generateAddendum(c = null, opts = {}) {
     <p style="text-align:right;font-size:11px;color:#666;margin-bottom:4px">Date: ${date}</p>
     ${clientBlock(c)}
 
-    <p>This Addendum (<b>"Addendum"</b>) supplements the Tax Investigation Service Agreement previously executed between <b>Tax Case Review</b> ("Company") and the undersigned client ("Client") and is incorporated therein by reference. The Additional Services below are described in the paragraphs that have been selected with an "X."</p>
+    <p>This Addendum (<b>"Addendum"</b>) supplements the Tax Investigation Service Agreement previously executed between <b>${firmName()}</b> ("Company") and the undersigned client ("Client") and is incorporated therein by reference. The Additional Services below are described in the paragraphs that have been selected with an "X."</p>
 
     <h3>1. Additional Services Authorized</h3>
     <div style="margin:10px 0">
@@ -309,10 +316,10 @@ export function generateAddendum(c = null, opts = {}) {
     <p>All terms of the original Tax Investigation Service Agreement remain in full force and effect and are incorporated herein. In the event of conflict between this Addendum and the original Agreement, this Addendum controls.</p>
 
     <h3>5. Right to Cancel</h3>
-    <p>Client may cancel the transactions set forth in this Addendum at any time prior to midnight of the third (3rd) business day after the date of execution of this Addendum. Any payments made will be returned within three (3) days of Company's receipt of a cancellation notice, prorated at $250/hour for work already performed. To cancel, mail a signed cancellation notice to Tax Case Review, ${FIRM.address}, before midnight of the third business day after signing.</p>
+    <p>Client may cancel the transactions set forth in this Addendum at any time prior to midnight of the third (3rd) business day after the date of execution of this Addendum. Any payments made will be returned within three (3) days of Company's receipt of a cancellation notice, prorated at $250/hour for work already performed. To cancel, mail a signed cancellation notice to ${firmName()}, ${FIRM.address}, before midnight of the third business day after signing.</p>
 
     <h3>6. Client Acknowledgment</h3>
-    <p>By signing below, Client confirms they have read, understand, and agree to the terms of this Addendum and authorize Tax Case Review to proceed with the resolution services checked above. Except as modified by this Addendum, the existing Tax Service Agreement remains unmodified and in full force and effect and is reaffirmed by Client.</p>
+    <p>By signing below, Client confirms they have read, understand, and agree to the terms of this Addendum and authorize ${firmName()} to proceed with the resolution services checked above. Except as modified by this Addendum, the existing Tax Service Agreement remains unmodified and in full force and effect and is reaffirmed by Client.</p>
 
     ${sigBlock('Client Signature', 'Authorized Representative')}
     <div style="margin-top:24px;padding-top:0">
@@ -339,7 +346,7 @@ export function generateEngagementLetter(c = null) {
     ${clientBlock(c)}
 
     <p>Dear <b>${name}</b>,</p>
-    <p>Thank you for choosing <b>Tax Case Review</b>. We are pleased to confirm our engagement to assist you with your ${issue} matter${years !== '___________________' ? ` for tax year(s) ${years}` : ''}. Your dedicated case representative is <b>${rep}</b>.</p>
+    <p>Thank you for choosing <b>${firmName()}</b>. We are pleased to confirm our engagement to assist you with your ${issue} matter${years !== '___________________' ? ` for tax year(s) ${years}` : ''}. Your dedicated case representative is <b>${rep}</b>.</p>
 
     <h3>Services to Be Performed</h3>
     <ul>
@@ -370,7 +377,7 @@ export function generateEngagementLetter(c = null) {
     <p>We are committed to providing professional, ethical, and effective representation. Your assigned representative will keep you informed of all significant developments in your case. We are available Monday through Friday to answer your questions.</p>
 
     <div class="notice">
-      <b>Important:</b> Tax Case Review is a tax resolution consulting firm and is not a law firm. No attorney-client relationship is created by this engagement. All representation is performed by Enrolled Agents and/or licensed tax professionals.
+      <b>Important:</b> ${firmName()} is a tax resolution consulting firm and is not a law firm. No attorney-client relationship is created by this engagement. All representation is performed by Enrolled Agents and/or licensed tax professionals.
     </div>
 
     ${sigBlock('Client Acknowledgment', 'Authorized Representative')}
@@ -397,7 +404,7 @@ export function generatePOACoverLetter(c = null) {
 
     <p style="margin-top:20px">To Whom It May Concern,</p>
 
-    <p>Enclosed please find a completed Form 2848 (Power of Attorney and Declaration of Representative) authorizing <b>Tax Case Review</b> to represent the above-named taxpayer in connection with the tax matters and periods specified therein.</p>
+    <p>Enclosed please find a completed Form 2848 (Power of Attorney and Declaration of Representative) authorizing <b>${firmName()}</b> to represent the above-named taxpayer in connection with the tax matters and periods specified therein.</p>
 
     <p>Please update your records to reflect this authorization and direct all future correspondence regarding the above-referenced matter to our office at the address below. We respectfully request that all notices, letters, and communications be sent to our office rather than directly to the taxpayer.</p>
 
@@ -922,7 +929,7 @@ export function generateClientPackage(c = null) {
     ${clientBlock(c)}
     <p style="text-align:right;font-size:11px;color:#666">Date: ${date}</p>
     <p>Dear <b>${name}</b>,</p>
-    <p>Thank you for choosing <b>Tax Case Review</b>. This document serves as your <b>Tax Investigation Service Agreement</b> and <b>Engagement Letter</b> confirming our engagement to assist you with your ${issue} matter${years !== '___________________' ? ` for tax year(s) ${years}` : ''}.</p>
+    <p>Thank you for choosing <b>${firmName()}</b>. This document serves as your <b>Tax Investigation Service Agreement</b> and <b>Engagement Letter</b> confirming our engagement to assist you with your ${issue} matter${years !== '___________________' ? ` for tax year(s) ${years}` : ''}.</p>
     <h3>1. Scope of Services</h3>
     <ul>
       <li>Review of IRS and/or state tax transcripts</li>
@@ -932,7 +939,7 @@ export function generateClientPackage(c = null) {
       <li>Full IRS/state representation — Case Rep: <b>${rep}</b></li>
     </ul>
     <h3>2. Authorization</h3>
-    <p>Client authorizes Tax Case Review to obtain IRS transcripts via Form 2848/8821 and represent the Client before the IRS and/or applicable state tax authority.</p>
+    <p>Client authorizes ${firmName()} to obtain IRS transcripts via Form 2848/8821 and represent the Client before the IRS and/or applicable state tax authority.</p>
     <h3>3. Investigation Fee</h3>
     <div class="fee-box">
       <div class="fee-main">Investigation Fee: ${fee}</div>
@@ -946,9 +953,9 @@ export function generateClientPackage(c = null) {
       <li>Notify us immediately of any IRS notices, levies, or contacts</li>
     </ul>
     <h3>5. No Guarantee of Outcome</h3>
-    <p>Tax Case Review makes no guarantee as to any specific outcome. Acceptance into any IRS program is solely at the discretion of the IRS.</p>
+    <p>${firmName()} makes no guarantee as to any specific outcome. Acceptance into any IRS program is solely at the discretion of the IRS.</p>
     <h3>6. Not a Law Firm</h3>
-    <p>Tax Case Review is a tax resolution consulting firm and is <b>not a law firm</b>. All representation is performed by Enrolled Agents and/or licensed tax professionals.</p>
+    <p>${firmName()} is a tax resolution consulting firm and is <b>not a law firm</b>. All representation is performed by Enrolled Agents and/or licensed tax professionals.</p>
     <h3>7. Termination</h3>
     <p>Either party may terminate this Agreement at any time by written notice, effective upon actual receipt or five days after transmittal. Upon termination, all service fees shall be apportioned or prorated on a reasonable basis determined by Company.</p>
     <h3>8. Arbitration of Disputes — No Class Actions</h3>
@@ -960,12 +967,12 @@ export function generateClientPackage(c = null) {
     <h3>11. Governing Law &amp; Entire Agreement</h3>
     <p>This Agreement is made and services are performed in the State of Florida and is governed by Florida law. This Agreement and any Addendums constitute the full and complete agreement and supersede any prior agreements, whether written or oral. No amendment, change, or modification other than an Addendum shall be valid unless in writing and signed by all parties.</p>
     <h3>12. Electronic Communication Disclosures</h3>
-    <p>Client consents to receive, in electronic format, all information, copies of agreements, and correspondence from Company, with the same legal effect as written and signed paper communications. Consent may be withdrawn at any time by emailing info@taxcasereview.com or writing to Tax Case Review, ${FIRM.address}.</p>
+    <p>Client consents to receive, in electronic format, all information, copies of agreements, and correspondence from Company, with the same legal effect as written and signed paper communications. Consent may be withdrawn at any time by emailing ${firmEmail()} or writing to ${firmName()}, ${FIRM.address}.</p>
     <div class="page-break"></div>
     <h3>13. Right of Cancellation</h3>
-    <p>Client may cancel this Agreement at any time prior to midnight of the third (3rd) business day after the date of execution, without penalty or obligation. If Client cancels, any payments made will be returned within three (3) days following receipt of Client's cancellation notice, prorated at a $250 hourly rate for any work product services already performed. To cancel, Client must mail or deliver a signed and dated cancellation notice to Tax Case Review, ${FIRM.address}, not later than midnight of the third business day after execution of this Agreement. See the attached Notice of Right of Cancellation for further detail.</p>
+    <p>Client may cancel this Agreement at any time prior to midnight of the third (3rd) business day after the date of execution, without penalty or obligation. If Client cancels, any payments made will be returned within three (3) days following receipt of Client's cancellation notice, prorated at a $250 hourly rate for any work product services already performed. To cancel, Client must mail or deliver a signed and dated cancellation notice to ${firmName()}, ${FIRM.address}, not later than midnight of the third business day after execution of this Agreement. See the attached Notice of Right of Cancellation for further detail.</p>
     <div class="notice">
-      <b>Privacy Policy:</b> Tax Case Review uses and shares your information only to perform our obligations under this Agreement and related purposes, or as permitted or required by law. Calls may be recorded or monitored for quality purposes. Contact info@taxcasereview.com with any privacy concerns.
+      <b>Privacy Policy:</b> ${firmName()} uses and shares your information only to perform our obligations under this Agreement and related purposes, or as permitted or required by law. Calls may be recorded or monitored for quality purposes. Contact ${firmEmail()} with any privacy concerns.
     </div>
     ${sigBlock('Client Signature', 'Authorized Representative')}
   `)
@@ -984,7 +991,7 @@ export function getAgreementMessageText(c = null) {
 
   return `TAX SERVICE AGREEMENT
 
-This Tax Service Agreement (as the same may be amended from time to time by any Addendum, the "Agreement"), dated as of ${date}, by and between Tax Case Review, with its principal offices located at ${FIRM.address} ("Company") and ${name} ("Client").
+This Tax Service Agreement (as the same may be amended from time to time by any Addendum, the "Agreement"), dated as of ${date}, by and between ${firmName()}, with its principal offices located at ${FIRM.address} ("Company") and ${name} ("Client").
 
 1. COMPANY OBLIGATIONS
 - Company will contact the IRS on behalf of Client to determine the total amount of Client's current tax liability accrued, if any
@@ -1026,10 +1033,10 @@ Company's liability for any breach shall not exceed 200% of fees actually collec
 This Agreement is governed by Florida law and constitutes the entire agreement between the parties, superseding prior agreements.
 
 11. ELECTRONIC COMMUNICATION DISCLOSURES
-Client consents to receive all agreements, notices, and disclosures electronically, with the same legal effect as paper communications. Consent may be withdrawn by emailing info@taxcasereview.com.
+Client consents to receive all agreements, notices, and disclosures electronically, with the same legal effect as paper communications. Consent may be withdrawn by emailing ${firmEmail()}.
 
 12. RIGHT OF CANCELLATION
-Client may cancel this Agreement without penalty within three (3) business days after signing. Payments will be returned within three (3) days of Company's receipt of a cancellation notice, prorated at $250/hour for work already performed. To cancel, mail a signed cancellation notice to Tax Case Review, ${FIRM.address}, before midnight of the third business day after signing.
+Client may cancel this Agreement without penalty within three (3) business days after signing. Payments will be returned within three (3) days of Company's receipt of a cancellation notice, prorated at $250/hour for work already performed. To cancel, mail a signed cancellation notice to ${firmName()}, ${FIRM.address}, before midnight of the third business day after signing.
 
 By typing/drawing your signature below, you electronically sign this Tax Service Agreement AND each IRS authorization form included in this package.`
 }
@@ -1147,7 +1154,7 @@ export async function sendAddendumForSignature(record, opts, supabase, sentBy) {
     client_name: record?.name || '',
     client_email: record?.email || '',
     client_phone: record?.phone || '',
-    message: 'Please review the attached Service Addendum, which authorizes Tax Case Review to proceed with the resolution services listed and the associated fee. Sign below to confirm.',
+    message: `Please review the attached Service Addendum, which authorizes ${firmName()} to proceed with the resolution services listed and the associated fee. Sign below to confirm.`,
     pdf_attachments: pdfAttachments,
     priority: 'Normal',
     status: 'Awaiting',
