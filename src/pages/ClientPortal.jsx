@@ -89,6 +89,14 @@ export default function ClientPortal() {
   // to be compared — the browser only ever gets back an opaque session
   // token on success, stored for this tab only.
   const [portalToken, setPortalToken] = useState(() => sessionStorage.getItem('tcr_portal_token_' + id) || '')
+  // Firm logo for this portal — pulled via the anon-safe public-meta RPC so a
+  // logged-out client still sees THEIR firm's branding (not a shared file).
+  const [firmLogo, setFirmLogo] = useState('')
+  useEffect(() => {
+    supabase.rpc('booking_get_public_meta').then(({ data }) => {
+      if (data?.logo_url) setFirmLogo(data.logo_url)
+    }).catch(() => {})
+  }, [])
 
   const [section, setSection] = useState(() => new URLSearchParams(window.location.search).get('section') || 'compliance')
 
@@ -295,7 +303,7 @@ export default function ClientPortal() {
       <div style={{...styles.card, position:'relative', zIndex:1}}>
         {/* Logo + branding */}
         <div style={{textAlign:'center',marginBottom:28}}>
-          <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review" style={{height:60,marginBottom:16,objectFit:'contain'}} onError={e=>{e.currentTarget.style.display="none"}}/>
+          {firmLogo && <img src={firmLogo} alt="" style={{height:60,marginBottom:16,objectFit:'contain'}} onError={e=>{e.currentTarget.style.display="none"}}/>}
           <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,marginBottom:8}}>
             <div style={{flex:1,height:'1px',background:'linear-gradient(90deg,transparent,rgba(59,130,246,.4))'}}/>
             <div style={{fontSize:10,fontWeight:800,color:'#3b82f6',letterSpacing:'.15em',textTransform:'uppercase',whiteSpace:'nowrap'}}>Client Portal</div>
@@ -360,9 +368,9 @@ export default function ClientPortal() {
         {/* ── Premium Header ── */}
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24,paddingBottom:20,borderBottom:'1px solid rgba(255,255,255,.08)',flexWrap:'wrap',gap:12}}>
           <div style={{display:'flex',alignItems:'center',gap:16}}>
-            <img src="https://mpxgxfqdbquzkrvvejkh.supabase.co/storage/v1/object/public/firm-assets/logo" alt="Tax Case Review"
+            {firmLogo && <img src={firmLogo} alt=""
               style={{height:52,objectFit:'contain',filter:'drop-shadow(0 2px 8px rgba(59,130,246,.3))'}}
-              onError={e=>{e.currentTarget.style.display="none"}}/>
+              onError={e=>{e.currentTarget.style.display="none"}}/>}
             <div>
               <div style={{fontSize:24,fontWeight:800,color:'#fff',letterSpacing:'-.03em',lineHeight:1.1}}>{client?.name}</div>
               <div style={{fontSize:11,color:'#60a5fa',marginTop:4,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',display:'flex',alignItems:'center',gap:6}}>

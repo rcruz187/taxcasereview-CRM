@@ -364,14 +364,19 @@ export default function Sidebar() {
 
   useEffect(() => {
     async function loadBranding() {
-      const { data: s } = await supabase.from('settings').select('name,tagline').limit(1).maybeSingle()
+      const { data: s } = await supabase.from('settings').select('name,tagline,logourl').limit(1).maybeSingle()
       if (s?.name)    setFirmName(s.name)
       if (s?.tagline) setTagline(s.tagline)
-      const { data } = supabase.storage.from('firm-assets').getPublicUrl('logo')
-      if (data?.publicUrl) {
+      // Per-tenant logo ONLY (settings.logourl). Never the shared
+      // firm-assets/logo file — that's one global object that whichever
+      // tenant uploaded last overwrites, which bled one firm's logo onto
+      // another's CRM.
+      if (s?.logourl) {
         const img = new Image()
-        img.onload = () => setLogoUrl(data.publicUrl + '?t=' + Date.now())
-        img.src = data.publicUrl
+        img.onload = () => setLogoUrl(s.logourl)
+        img.src = s.logourl
+      } else {
+        setLogoUrl('')
       }
     }
     loadBranding()

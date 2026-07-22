@@ -10,14 +10,16 @@ export default function Kiosk() {
   const [logoUrl, setLogoUrl] = useState(LOGO)
   const [lockdown, setLockdown] = useState(true)
 
-  // Load firm logo from Supabase storage
+  // Load this tenant's own logo (settings.logourl), never the shared file
   useEffect(() => {
-    const { data } = supabase.storage.from('firm-assets').getPublicUrl('logo')
-    if (data?.publicUrl) {
-      const img = new Image()
-      img.onload = () => setLogoUrl(data.publicUrl + '?t=' + Date.now())
-      img.src = data.publicUrl
-    }
+    (async () => {
+      const { data: s } = await supabase.from('settings').select('logourl').limit(1).maybeSingle()
+      if (s?.logourl) {
+        const img = new Image()
+        img.onload = () => setLogoUrl(s.logourl)
+        img.src = s.logourl
+      }
+    })()
   }, [])
 
 
