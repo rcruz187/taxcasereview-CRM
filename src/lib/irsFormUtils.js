@@ -100,8 +100,14 @@ export function formatDate(d) {
   return new Date(d).toLocaleDateString('en-US');
 }
 
-export function buildNameAddress(client) {
-  const name = client.name || client.business_name || '';
+// `party` selects WHICH name heads the block. Business forms (2848_business,
+// 8821_business) must show the entity, not the human — on an Individual & Biz
+// lead those are two different names and putting the person on the business
+// form gets the authorization rejected.
+export function buildNameAddress(client, party = 'personal') {
+  const name = party === 'business'
+    ? (client.business_name || client.name || '')
+    : (client.name || client.business_name || '');
   const parts = [
     client.address || client.street,
     client.city && client.state
@@ -135,7 +141,9 @@ export async function fillForm(formType, client, useEin = false) {
   const form = pdfDoc.getForm();
 
   const today = formatDate(new Date());
-  const nameAddr = buildNameAddress(client);
+  const isBizForm = formType === '2848_business' || formType === '8821_business';
+  const nameAddr = buildNameAddress(client, isBizForm ? 'business' : 'personal');
+  const bizName  = client.business_name || client.name || '';
   const taxId = useEin ? (client.ein || '') : (client.ssn || client.tin || '');
 
   // Helper: safely set a text field (skip if field doesn't exist in this template)
@@ -168,7 +176,7 @@ export async function fillForm(formType, client, useEin = false) {
   }
 
   else if (formType === '2848_business') {
-    setText(map.name, client.business_name || client.name || '');
+    setText(map.name, bizName);
     const addrParts = [
       client.address || client.street,
       client.city && client.state
@@ -196,7 +204,7 @@ export async function fillForm(formType, client, useEin = false) {
     setText(map.nameAddress, nameAddr);
     setText(map.ein, client.ein || '');
     setText(map.phone, client.phone || '');
-    setText(map.printName, client.name || client.business_name || '');
+    setText(map.printName, bizName);
     setText(map.date, today);
   }
 
@@ -1472,24 +1480,33 @@ export async function generateStatePOACover(client) {
   return await (await PDFDocument.create()).save()
 }
 
-export async function generateStatePOAWithCover(client, poaPdfBytes) {
+// `party` — 'personal' fills the human taxpayer, 'business' fills the entity.
+// An Individual & Biz lead needs BOTH, filed as two separate state POAs; the
+// state authorizes one taxpayer per form and the SSN/FEIN line differs.
+export async function generateStatePOAWithCover(client, poaPdfBytes, party = 'personal') {
   const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib')
 
   const doc  = await PDFDocument.load(poaPdfBytes)
   const font = await doc.embedFont(StandardFonts.Helvetica)
 
   // ── Client data ──
-  const name         = client?.name    || ''
+  const isBiz        = party === 'business'
+  const name         = isBiz ? (client?.business_name || client?.name || '') : (client?.name || '')
   const street       = client?.street  || client?.address || ''
   const city         = client?.city    || ''
   const state        = client?.state   || ''
   const zip          = client?.zip     || ''
   const phone        = client?.phone   || ''
-  const ssn          = client?.ssn     ? `***-**-${String(client.ssn).replace(/-/g,'').slice(-4)}` : (client?.ein || '')
+  // Business POA is keyed to the FEIN; personal to the SSN (last 4 only).
+  const ssn          = isBiz
+    ? (client?.ein || '')
+    : (client?.ssn ? `***-**-${String(client.ssn).replace(/-/g,'').slice(-4)}` : (client?.ein || ''))
   const cityStateZip = [city, state ? `${state} ${zip}` : zip].filter(Boolean).join(', ')
   const today        = new Date().toLocaleDateString('en-US', { month:'2-digit', day:'2-digit', year:'numeric' })
   const black        = rgb(0, 0, 0)
   const sz           = 9
+  // Contact person on a business POA is the human signing for the entity.
+  const contact      = isBiz ? (client?.name || name) : name
 
   // ── PAGE 1 — Section 1: Taxpayer Information ──
   // Coordinates derived from exact fitz text search on FL DR-835 (612×792 US Letter)
@@ -1498,7 +1515,7 @@ export async function generateStatePOAWithCover(client, poaPdfBytes) {
   p1.drawText(street,       { x: 40,  y: 631, size: sz, font, color: black })
   p1.drawText(cityStateZip, { x: 40,  y: 620, size: sz, font, color: black })
   p1.drawText(ssn,          { x: 291, y: 642, size: sz, font, color: black })
-  p1.drawText(name,         { x: 340, y: 611, size: sz, font, color: black }) // Contact person
+  p1.drawText(contact,      { x: 340, y: 611, size: sz, font, color: black }) // Contact person
   p1.drawText(phone,        { x: 478, y: 604, size: sz, font, color: black }) // Telephone (Section 1 right col)
 
   // Section 2 is pre-printed on this FL DR-835 PDF template with firm info — skip
@@ -1507,8 +1524,12 @@ export async function generateStatePOAWithCover(client, poaPdfBytes) {
   const p2 = doc.getPage(1)
   p2.drawText(name,  { x: 103, y: 699, size: sz, font, color: black }) // Taxpayer Name(s):
   p2.drawText(ssn,   { x: 382, y: 699, size: sz, font, color: black }) // Federal Identification Number:
-  p2.drawText(today, { x: 382, y: 429, size: sz, font, color: black }) // Date (first signature block)
-  p2.drawText(name,  { x: 185, y: 403, size: sz, font, color: black }) // Print name (first signature block)
+  // Measured off the DR-835 itself: the signature/date rule sits at y=434.3-440.3
+  // and the Print name rule at y=407.9-413.9 (pdf-lib origin = bottom-left).
+  // Both values used to sit BELOW their rule, so the text collided with the
+  // "Date" / "Print name" captions instead of resting on the line.
+  p2.drawText(today, { x: 330, y: 438, size: sz, font, color: black }) // Date (first signature block)
+  p2.drawText(name,  { x: 40,  y: 411, size: sz, font, color: black }) // Print name (first signature block)
 
   return await doc.save()
 }

@@ -1088,23 +1088,40 @@ export async function sendFullPackage(client, supabase) {
   // State POA — auto-include when irsOrState is State or Both IRS + State
   // Generates a pre-filled cover page with client info merged with the blank state form
   if (includeState && clientState && STATE_POA_FILES[clientState]) {
-    try {
-      const poaFile = STATE_POA_FILES[clientState]
-      const poaUrl  = `${base}/state-forms/${poaFile}`
-      const poaRes  = await fetch(poaUrl)
-      if (!poaRes.ok) throw new Error(`Could not load ${clientState} POA PDF`)
-      const rawBytes  = new Uint8Array(await poaRes.arrayBuffer())
-      // Merge cover page (with client info) + raw state form
-      const mergedBytes = await generateStatePOAWithCover(client, rawBytes)
-      const path = `docs/${safeName}/package/state_poa_${clientState}.pdf`
-      const { error: upErr } = await supabase.storage.from('documents')
-        .upload(path, new Blob([mergedBytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
-      if (upErr) throw upErr
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
-      pdfAttachments.push({ formType: 'state_poa', label: `${clientState} State Power of Attorney`, url: urlData.publicUrl })
-    } catch (e) {
-      console.warn('State POA auto-include failed:', e.message)
-      // Non-fatal — package continues without state POA
+    // One state POA per taxpayer, mirroring the 2848/8821 split: a state
+    // authorizes a single taxpayer per form, so an Individual & Biz lead needs
+    // two — the person (SSN) and the entity (FEIN).
+    const stateParties =
+      clientType === 'Individual & Biz' ? ['personal', 'business']
+      : clientType === 'Business'       ? ['business']
+      : ['personal']
+
+    for (const party of stateParties) {
+      try {
+        const poaFile = STATE_POA_FILES[clientState]
+        const poaUrl  = `${base}/state-forms/${poaFile}`
+        const poaRes  = await fetch(poaUrl)
+        if (!poaRes.ok) throw new Error(`Could not load ${clientState} POA PDF`)
+        const rawBytes  = new Uint8Array(await poaRes.arrayBuffer())
+        const mergedBytes = await generateStatePOAWithCover(client, rawBytes, party)
+        const suffix = stateParties.length > 1 ? `_${party}` : ''
+        const path = `docs/${safeName}/package/state_poa_${clientState}${suffix}.pdf`
+        const { error: upErr } = await supabase.storage.from('documents')
+          .upload(path, new Blob([mergedBytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
+        if (upErr) throw upErr
+        const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+        const partyLabel = stateParties.length > 1
+          ? ` (${party === 'business' ? 'Business' : 'Personal'})`
+          : ''
+        pdfAttachments.push({
+          formType: `state_poa${suffix}`,
+          label: `${clientState} State Power of Attorney${partyLabel}`,
+          url: urlData.publicUrl,
+        })
+      } catch (e) {
+        console.warn(`State POA auto-include failed (${party}):`, e.message)
+        // Non-fatal — package continues without this state POA
+      }
     }
   }
 

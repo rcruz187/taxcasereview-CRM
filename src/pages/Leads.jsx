@@ -65,7 +65,7 @@ const YEARS  = Array.from({length:21},(_,i)=>2027-i)
 const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']
 
 const BLANK = {
-  clientType:'Individual', name:'', first:'', mi:'', last:'', phone:'', phone2:'', email:'',
+  clientType:'Individual', name:'', business_name:'', first:'', mi:'', last:'', phone:'', phone2:'', email:'',
   smsConsent:false, smsConsentDate:null,
   ssn:'', ein:'', dob:'',
   spouseName:'', spouseSsn:'', spouseDob:'', filingStatus:'Single',
@@ -684,20 +684,33 @@ export default function Leads() {
       const pdfRes = await fetch(`${base}/state-forms/${formDef.file}`)
       if (!pdfRes.ok) throw new Error('Could not load ' + formDef.state + ' POA PDF')
       const rawBytes = new Uint8Array(await pdfRes.arrayBuffer())
-      // Merge cover page with client info + blank state form
       const { generateStatePOAWithCover } = await import('../lib/irsFormUtils')
-      const mergedBytes = await generateStatePOAWithCover(lead, rawBytes)
-      const pdfBlob = new Blob([mergedBytes], { type: 'application/pdf' })
+      const poaLead = { ...lead, business_name: lead.business_name || lead.name }
+      // A state authorizes one taxpayer per form — an Individual & Biz lead
+      // needs the person (SSN) and the entity (FEIN) on separate POAs.
+      const parties =
+        lead.clientType === 'Individual & Biz' ? ['personal','business']
+        : lead.clientType === 'Business'       ? ['business']
+        : ['personal']
       const safeName = (lead.name||'lead').replace(/[^a-zA-Z0-9]+/g,'-')
-      const path = `docs/${safeName}/state-poa/${formDef.state}_POA_${Date.now()}.pdf`
-      const { error: upErr } = await supabase.storage.from('documents').upload(path, pdfBlob, { upsert:true, contentType:'application/pdf' })
-      if (upErr) throw new Error(upErr.message)
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+      const stamp = Date.now()
+      const poaAttachments = []
+      for (const party of parties) {
+        const mergedBytes = await generateStatePOAWithCover(poaLead, rawBytes, party)
+        const pdfBlob = new Blob([mergedBytes], { type: 'application/pdf' })
+        const suffix = parties.length > 1 ? `_${party}` : ''
+        const path = `docs/${safeName}/state-poa/${formDef.state}_POA${suffix}_${stamp}.pdf`
+        const { error: upErr } = await supabase.storage.from('documents').upload(path, pdfBlob, { upsert:true, contentType:'application/pdf' })
+        if (upErr) throw new Error(upErr.message)
+        const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+        const partyLabel = parties.length > 1 ? ` (${party==='business'?'Business':'Personal'})` : ''
+        poaAttachments.push({ formType:`state_poa${suffix}`, label:`${formDef.state} POA — ${formDef.label}${partyLabel}`, url:urlData.publicUrl })
+      }
       const { data: esign, error: esignErr } = await supabase.from('esigns').insert([{
         doc_type: `State POA — ${formDef.state} (${formDef.num})`,
         client_name: lead.name, client_email: lead.email||'', client_phone: lead.phone||'',
         message: `Please review and sign your ${formDef.state} Power of Attorney. This authorizes Tax Case Review to represent you before the ${formDef.state} tax authority.`,
-        pdf_attachments: [{ formType:'state_poa', label:`${formDef.state} POA — ${formDef.label}`, url:urlData.publicUrl }],
+        pdf_attachments: poaAttachments,
         priority:'Normal', status:'Awaiting', sent_at:new Date().toISOString(), created_at:new Date().toISOString(), sent_by:actor,
       }]).select().single()
       if (esignErr) throw new Error(esignErr.message)
@@ -943,13 +956,21 @@ export default function Leads() {
     setTimeout(() => { active = false; observer.disconnect() }, 1000)
   }
   function composeName(first,mi,last) { return [first, mi?mi+'.':'', last].filter(Boolean).join(' ').replace(/\s+/g,' ').trim() }
-  // For Individual leads the Full Name is derived automatically from First/MI/Last
-  // as the rep types, so there's no separate name to re-type. Business leads keep
-  // a dedicated Business Name field instead.
-  function fldClientType(v) { setForm(f=>({...f, clientType:v, name: v==='Individual' ? composeName(f.first,f.mi,f.last) : f.name })) }
-  function fldFirst(v) { setForm(f=>({...f, first:v, name: f.clientType==='Individual' ? composeName(v,f.mi,f.last) : f.name })) }
-  function fldMi(v)    { setForm(f=>({...f, mi:v,    name: f.clientType==='Individual' ? composeName(f.first,v,f.last) : f.name })) }
-  function fldLast(v)  { setForm(f=>({...f, last:v,  name: f.clientType==='Individual' ? composeName(f.first,f.mi,v) : f.name })) }
+  // `name` is the record's identity key — notes, documents, e-signs and
+  // compliance records are all matched on it as text. So whenever the lead has
+  // a human behind it, `name` is that PERSON and the entity lives in its own
+  // business_name column. Only a pure Business lead mirrors the entity into
+  // `name`, because there is no person to name.
+  function resolveLeadName(f) {
+    const personal = composeName(f.first, f.mi, f.last)
+    if (f.clientType === 'Business') return f.business_name || personal
+    return personal || f.business_name || ''
+  }
+  function fldClientType(v) { setForm(f=>{ const n={...f, clientType:v}; return {...n, name: resolveLeadName(n)} }) }
+  function fldFirst(v) { setForm(f=>{ const n={...f, first:v}; return {...n, name: resolveLeadName(n)} }) }
+  function fldMi(v)    { setForm(f=>{ const n={...f, mi:v};    return {...n, name: resolveLeadName(n)} }) }
+  function fldLast(v)  { setForm(f=>{ const n={...f, last:v};  return {...n, name: resolveLeadName(n)} }) }
+  function fldBizName(v){ setForm(f=>{ const n={...f, business_name:v}; return {...n, name: resolveLeadName(n)} }) }
   function toggleYear(y) { setForm(f=>({...f, taxYears: f.taxYears.includes(y)?f.taxYears.filter(x=>x!==y):[...f.taxYears,y]})) }
 
   const filtered = leads
@@ -958,6 +979,12 @@ export default function Leads() {
     .filter(l => repFilter === 'All' || (repFilter === 'Unassigned' ? !l.assignedTo : l.assignedTo === repFilter))
 
   async function save() {
+    if (form.clientType !== 'Business' && !composeName(form.first,form.mi,form.last)) {
+      showToast('First and last name are required'); return
+    }
+    if (form.clientType !== 'Individual' && !(form.business_name||'').trim()) {
+      showToast('Business name is required'); return
+    }
     if (!form.name.trim()) { showToast('Name is required'); return }
     setSaving(true)
     const actor = resolveActorName(user, employees)
@@ -1018,7 +1045,12 @@ export default function Leads() {
       const { data: allLeads } = await supabase.from('leads').select('*').order('created_at', { ascending: false })
       if (allLeads) setLeads(allLeads)
       const newest = allLeads?.find(l => l.name === form.name)
-      if (newest) { setDetail(newest); loadLeadNotes(newest.id); navigate('/leads/' + newest.id, { replace: true }) }
+      if (newest) {
+        const bizSuffix = newest.business_name && newest.business_name !== newest.name
+          ? ` — ${newest.business_name}` : ''
+        await logAction(newest.id, newest.name, `🆕 Lead created${bizSuffix} (${newest.clientType||'Individual'})`)
+        setDetail(newest); loadLeadNotes(newest.id); navigate('/leads/' + newest.id, { replace: true })
+      }
     }
   }
 
@@ -1270,7 +1302,7 @@ export default function Leads() {
       return
     }
     setPkgSending(true)
-    const res = await sendFullPackage({...l, address:l.street, business_name:l.name}, supabase)
+    const res = await sendFullPackage({...l, address:l.street, business_name:l.business_name||l.name}, supabase)
     if (res.error) { setPkgSending(false)
       const _pa=getActor(user); await logActivity(supabase,{employeeName:_pa.name,employeeEmail:_pa.email,action:'package_sent',category:'esign',description:`Sent Tax Inv Package to: ${l.name}`,entityName:l.name}).catch(()=>{}); showToast('Error: '+res.error); return }
 
@@ -1578,14 +1610,14 @@ export default function Leads() {
               </div>
               {form.clientType !== 'Individual' && (
                 <div className="field"><label>Business Name *</label>
-                  <input value={form.name} onChange={e=>fld('name',e.target.value)} placeholder="Business Name"/>
+                  <input value={form.business_name||''} onChange={e=>fldBizName(e.target.value)} placeholder="Business Name"/>
                 </div>
               )}
             </div>
             <div className="fg3">
-              <div className="field"><label>First Name{form.clientType==='Individual'?' *':''}</label><input value={form.first} onChange={e=>fldFirst(e.target.value)}/></div>
+              <div className="field"><label>First Name{form.clientType!=='Business'?' *':''}</label><input value={form.first} onChange={e=>fldFirst(e.target.value)}/></div>
               <div className="field"><label>MI</label><input value={form.mi} onChange={e=>fldMi(e.target.value)} maxLength={1}/></div>
-              <div className="field"><label>Last Name{form.clientType==='Individual'?' *':''}</label><input value={form.last} onChange={e=>fldLast(e.target.value)}/></div>
+              <div className="field"><label>Last Name{form.clientType!=='Business'?' *':''}</label><input value={form.last} onChange={e=>fldLast(e.target.value)}/></div>
             </div>
             <div className="fg2">
               <div className="field"><label>Phone</label><input value={form.phone} onChange={e=>fld('phone',fmtPhone(e.target.value))} placeholder="(305) 555-0000" maxLength={14}/></div>
@@ -1843,7 +1875,7 @@ export default function Leads() {
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,flexWrap:'wrap'}}>
           <button className="btn" style={{padding:'8px 16px',fontSize:13,fontWeight:600}} onClick={()=>{ setDetail(null); navigate('/leads',{replace:true}); document.querySelector('.page-content')?.scrollTo(0,0) }}>← Back</button>
           {(l.status !== 'Converted to Client' || user?.role === 'Admin' || user?.role === 'Manager') ? (
-            <button className="btn pri" style={{marginLeft:'auto',padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>{setForm({...BLANK,...l,taxYears:(() => {try{return JSON.parse(l.taxYears||'[]')}catch{return []}})(),filingRequirements:(() => {try{return JSON.parse(l.filingRequirements||'[]')}catch{return []}})()});setModal('edit')}}>✏️ Edit</button>
+            <button className="btn pri" style={{marginLeft:'auto',padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>{setForm({...BLANK,...l,business_name: l.business_name || (l.clientType && l.clientType!=='Individual' ? l.name : ''),taxYears:(() => {try{return JSON.parse(l.taxYears||'[]')}catch{return []}})(),filingRequirements:(() => {try{return JSON.parse(l.filingRequirements||'[]')}catch{return []}})()});setModal('edit')}}>✏️ Edit</button>
           ) : (
             <span style={{marginLeft:'auto',fontSize:11,color:'var(--t3)',padding:'8px 12px',background:'var(--s2)',borderRadius:6}}>🔒 Admin Only</span>
           )}
@@ -1863,6 +1895,9 @@ export default function Leads() {
             </div>
             <div style={{flex:1}}>
               <div style={{fontSize:22,fontWeight:800}}>{l.name}</div>
+              {l.business_name && l.business_name !== l.name && (
+                <div style={{fontSize:14,fontWeight:600,color:'var(--t2)',marginTop:2}}>🏢 {l.business_name}</div>
+              )}
               <div style={{display:'flex',gap:6,marginTop:5,flexWrap:'wrap'}}>
                 <span className="bdg bb" style={{fontSize:13,padding:'4px 10px'}}>{l.clientType||'Individual'}</span>
                 <Bdg s={l.status||'New Lead'} style={{fontSize:13,padding:'4px 10px'}}/>
@@ -1917,7 +1952,7 @@ export default function Leads() {
             <ActionBtn color="#0369a1" icon="🖋️" label="Pre-Fill 8821/2848" sub="IRS PDF Forms" onClick={()=>{
               try {
                 if (!l) { showToast('Error: no lead data found'); return }
-                setFillerLead({...l, address:l.street, business_name:l.name})
+                setFillerLead({...l, address:l.street, business_name:l.business_name||l.name})
               } catch (err) { showToast('Error opening form: ' + err.message) }
             }}/>
             <ActionBtn color="#0f766e" icon="🏛️" label="Pre-Fill State POA" sub={l.state ? l.state+' Form' : 'State Form'} onClick={()=>{ setPoaLead(l); setPoaModal(true) }}/>
@@ -2706,7 +2741,12 @@ export default function Leads() {
                 </td></tr>
               ) : filtered.map(l => (
                 <tr key={l.id} onClick={()=>{ setDetail(l); loadLeadNotes(l.id); navigate('/leads/'+l.id, {replace:true}) }} style={{cursor:'pointer'}}>
-                  <td style={{fontWeight:700,color:'var(--tx)',fontSize:13}}>{l.name}</td>
+                  <td style={{fontWeight:700,color:'var(--tx)',fontSize:13}}>
+                    {l.name}
+                    {l.business_name && l.business_name !== l.name && (
+                      <div style={{fontWeight:500,color:'var(--t3)',fontSize:11,marginTop:1}}>🏢 {l.business_name}</div>
+                    )}
+                  </td>
                   <td><span className="bdg bb">{l.clientType||'Individual'}</span></td>
                   <td onClick={e=>e.stopPropagation()}><PhoneLink val={l.phone} name={l.name}/></td>
                   <td><TypeBdg t={l.issueType||'—'}/></td>
