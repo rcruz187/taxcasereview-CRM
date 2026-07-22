@@ -74,6 +74,7 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [leadState, setLeadState] = useState(null) // for state tax auto-calc
+  const [leadInfo, setLeadInfo] = useState(null)   // lead address, for prefills
   const saveTimer = useRef(null)
 
   useEffect(() => {
@@ -90,6 +91,12 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
       setAnswers(rec.answers || {})
       if (rec.status === 'Submitted') setSubmitted(true)
       if (data.leadState) setLeadState(data.leadState)
+      if (data.lead) {
+        setLeadInfo(data.lead)
+        if (data.lead.county && !(rec.answers || {}).county) {
+          setAnswers(prev => ({ ...prev, county: data.lead.county }))
+        }
+      }
       setLoading(false)
     }
     if (intakeId) load()
@@ -118,6 +125,13 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
     const current = answers[questionId] || []
     const blank = {}
     fields.forEach(f => blank[f.id] = '')
+    // First property defaults to the address already on the lead — the client
+    // is confirming what kind of property it is, not retyping where they live.
+    if (questionId === 'real_estate_list' && current.length === 0 && leadInfo) {
+      const line = [leadInfo.street, leadInfo.city, leadInfo.state, leadInfo.zip]
+        .filter(Boolean).join(' ').trim()
+      if (line) blank.address = line
+    }
     setAnswer(questionId, [...current, blank])
   }
   function updateEntry(questionId, idx, fieldId, value) {

@@ -1068,6 +1068,31 @@ export async function sendFullPackage(client, supabase) {
 
   const pdfAttachments = []
 
+  // Tax Service Agreement — first in the package, so the client signs the
+  // engagement itself rather than only the IRS authorizations. Previously the
+  // agreement existed solely as printable HTML, so no copy of it ever reached
+  // the client or their document folder.
+  try {
+    const { buildAgreementPdf } = await import('./agreementPdf')
+    let repSig = null
+    try { repSig = await fetch(`${base}/templates/rep_signature.png`).then(r => r.ok ? r.arrayBuffer() : null) } catch (_) {}
+    const agreementBytes = await buildAgreementPdf({
+      bodyText: getAgreementMessageText(client),
+      firmName: firmName(),
+      firmAddress: FIRM.address,
+      clientName: client?.name || '',
+      repSignature: repSig,
+    })
+    const agreementPath = `docs/${safeName}/package/agreement.pdf`
+    const { error: agErr } = await supabase.storage.from('documents')
+      .upload(agreementPath, new Blob([agreementBytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
+    if (agErr) throw agErr
+    const { data: agUrl } = supabase.storage.from('documents').getPublicUrl(agreementPath)
+    pdfAttachments.push({ formType: 'agreement', label: 'Tax Service Agreement', url: agUrl.publicUrl })
+  } catch (e) {
+    console.warn('Agreement PDF could not be generated:', e.message)
+  }
+
   // IRS forms (2848, 8821, cc_auth)
   for (const formType of formTypes) {
     try {

@@ -7,6 +7,22 @@ import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 
 // IRS forms never get an IP/timestamp stamp — only firm documents (the
 // Tax Service Agreement, addenda, etc.) do.
+// Which Documents folder each signed artifact files into. esign_finalize
+// inserts every attachment under one saved_doc_type, which dropped POAs,
+// agreements and authorizations into the same bucket.
+const SIGNED_DOC_FOLDER = {
+  '2848_personal': 'POA & Forms',
+  '2848_business': 'POA & Forms',
+  '8821_personal': 'POA & Forms',
+  '8821_business': 'POA & Forms',
+  'state_poa': 'POA & Forms',
+  'state_poa_personal': 'POA & Forms',
+  'state_poa_business': 'POA & Forms',
+  'agreement': 'Agreements',
+  'addendum': 'Agreements',
+  'cc_auth': 'Agreements',
+}
+
 const IRS_DOC_TYPES = [
   'Form 2848 — Power of Attorney',
   'Form 8821 — Tax Info Auth',
@@ -205,6 +221,7 @@ export default function SignPage() {
           formType: att.formType, label: att.label,
           url: urlData.publicUrl, clientUrl: clientUrlData?.publicUrl,
           fileSize: signedBytes.byteLength,
+          folder: SIGNED_DOC_FOLDER[att.formType] || null,
         })
       } catch (e) {
         console.error('Failed to stamp', att.formType, e)
@@ -235,6 +252,21 @@ export default function SignPage() {
       p_cert_url:        certUrl,
       p_attachments:     signedAttachments,
     })
+
+    // esign_finalize files every attachment under a single doc type. Re-sort
+    // them so a signed 2848 lands in POA & Forms and the agreement lands in
+    // Agreements, matching where a human would have filed them.
+    try {
+      for (const att of signedAttachments) {
+        if (!att.folder) continue
+        await supabase.from('documents')
+          .update({ docType: att.folder })
+          .eq('client', doc.client_name)
+          .eq('file_url', att.url)
+      }
+    } catch (e) {
+      console.warn('Document folder routing failed (files are still saved):', e.message)
+    }
 
     // Notify the client a signed copy is on file
       let cfg = null
