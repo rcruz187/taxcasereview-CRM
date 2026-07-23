@@ -1,6 +1,18 @@
 import { PDFDocument, StandardFonts, PDFName, PDFString, rgb } from 'pdf-lib';
 import { FINANCIAL_INTAKE_STEPS, shouldShow as intakeShouldShow } from './financialIntakeSchema';
 import { supabase } from './supabase';
+import { FIRM } from './firmBranding';
+
+// Firm identity for generated documents. FIRM is populated per signed-in tenant
+// at load; the fallbacks only apply if branding hasn't resolved yet, so a
+// settings hiccup never leaves a document with a blank letterhead.
+const fName = () => FIRM.name || 'Tax Case Review';
+const fAddr = () => FIRM.address || '631 US Highway One Ste 304, North Palm Beach, FL 33408';
+const fMail = () => FIRM.email || 'info@taxcasereview.com';
+const fPhone = () => FIRM.phone || '(888) 334-5052';
+const fFax = () => FIRM.fax || '(561) 420-6999';
+const fContactLine = () => [fMail(), fPhone(), fFax() ? `Fax ${fFax()}` : null].filter(Boolean).join('  ·  ');
+const fFooterLine = () => [fAddr(), fMail(), fPhone(), fFax() ? `Fax ${fFax()}` : null].filter(Boolean).join(' · ');
 
 // ─── Field maps per form type ────────────────────────────────────────────────
 // Only the taxpayer section fields are filled — rep info, tax matters, etc.
@@ -550,7 +562,7 @@ export async function generatePOACoverLetterPdf(c = null) {
   y -= 24;
 
   drawWrapped(
-    `Enclosed please find a completed Form 2848 (Power of Attorney and Declaration of Representative) authorizing Tax Case Review to represent the above-named taxpayer in connection with the tax matters and periods specified therein.`,
+    `Enclosed please find a completed Form 2848 (Power of Attorney and Declaration of Representative) authorizing ${fName()} to represent the above-named taxpayer in connection with the tax matters and periods specified therein.`,
     11
   );
   y -= 8;
@@ -571,11 +583,11 @@ export async function generatePOACoverLetterPdf(c = null) {
   page.drawLine({ start: { x: margin, y: y + 14 }, end: { x: margin + 260, y: y + 14 }, thickness: 0.5 });
   page.drawText('Authorized Representative', { x: margin, y, size: 11, font: bold });
   y -= 14;
-  page.drawText('Tax Case Review', { x: margin, y, size: 10.5, font });
+  page.drawText(fName(), { x: margin, y, size: 10.5, font });
   y -= 13;
-  page.drawText('631 US Highway One Ste 304, North Palm Beach, FL 33408', { x: margin, y, size: 10, font });
+  page.drawText(fAddr(), { x: margin, y, size: 10, font });
   y -= 13;
-  page.drawText('info@taxcasereview.com  ·  (888) 334-5052  ·  Fax (561) 420-6999', { x: margin, y, size: 10, font });
+  page.drawText(fContactLine(), { x: margin, y, size: 10, font });
   y -= 16;
   page.drawText('Date: _______________________', { x: margin, y, size: 10, font });
 
@@ -1339,9 +1351,9 @@ export async function generateAddendumPdf(c = null, opts = {}) {
   }
 
   // ── Header ──
-  page.drawText('Tax Case Review', { x: margin, y, size: 16, font: bold });
+  page.drawText(fName(), { x: margin, y, size: 16, font: bold });
   y -= 16;
-  page.drawText('631 US Highway One Ste 304, North Palm Beach, FL 33408 · info@taxcasereview.com · (888) 334-5052 · Fax (561) 420-6999', { x: margin, y, size: 8.5, font, color: rgb(0.4, 0.4, 0.4) });
+  page.drawText(fFooterLine(), { x: margin, y, size: 8.5, font, color: rgb(0.4, 0.4, 0.4) });
   y -= 22;
   page.drawText('SERVICE ADDENDUM — ADDITIONAL SERVICES AGREEMENT', { x: margin, y, size: 12.5, font: bold });
   y -= 20;
@@ -1362,7 +1374,7 @@ export async function generateAddendumPdf(c = null, opts = {}) {
   page.drawText(address, { x: margin, y, size: 9.5, font });
   y -= 20;
 
-  drawWrapped(`This Addendum ("Addendum") supplements the Tax Investigation Service Agreement previously executed between Tax Case Review ("Company") and the undersigned client ("Client") and is incorporated therein by reference. The Additional Services below are described in the paragraphs that have been selected with an "X."`, 10.5);
+  drawWrapped(`This Addendum ("Addendum") supplements the Tax Investigation Service Agreement previously executed between ${fName()} ("Company") and the undersigned client ("Client") and is incorporated therein by reference. The Additional Services below are described in the paragraphs that have been selected with an "X."`, 10.5);
   y -= 6;
 
   // ── Checklist ──
@@ -1405,11 +1417,11 @@ export async function generateAddendumPdf(c = null, opts = {}) {
   y -= 4;
 
   heading('5. Right to Cancel');
-  drawWrapped(`Client may cancel the transactions set forth in this Addendum at any time prior to midnight of the third (3rd) business day after the date of execution of this Addendum. Any payments made will be returned within three (3) days of Company's receipt of a cancellation notice, prorated at $250/hour for work already performed. To cancel, mail a signed cancellation notice to Tax Case Review, 631 US Highway One Ste 304, North Palm Beach, FL 33408, before midnight of the third business day after signing.`, 10.5);
+  drawWrapped(`Client may cancel the transactions set forth in this Addendum at any time prior to midnight of the third (3rd) business day after the date of execution of this Addendum. Any payments made will be returned within three (3) days of Company's receipt of a cancellation notice, prorated at $250/hour for work already performed. To cancel, mail a signed cancellation notice to ${fName()}, ${fAddr()}, before midnight of the third business day after signing.`, 10.5);
   y -= 4;
 
   heading('6. Client Acknowledgment');
-  drawWrapped(`By signing below, Client confirms they have read, understand, and agree to the terms of this Addendum and authorize Tax Case Review to proceed with the resolution services checked above. Except as modified by this Addendum, the existing Tax Service Agreement remains unmodified and in full force and effect and is reaffirmed by Client.`, 10.5);
+  drawWrapped(`By signing below, Client confirms they have read, understand, and agree to the terms of this Addendum and authorize ${fName()} to proceed with the resolution services checked above. Except as modified by this Addendum, the existing Tax Service Agreement remains unmodified and in full force and effect and is reaffirmed by Client.`, 10.5);
 
   // ── Signatures — always on their own page so the e-sign stamp position is
   // predictable, with real blank space ABOVE each line (not just a caption)
@@ -1430,7 +1442,7 @@ export async function generateAddendumPdf(c = null, opts = {}) {
 
   const repLineY = coClientLineY - 70;
   page.drawLine({ start: { x: margin, y: repLineY }, end: { x: margin + 260, y: repLineY }, thickness: 0.8 });
-  page.drawText('Authorized Representative — Tax Case Review', { x: margin, y: repLineY - 12, size: 10, font: bold });
+  page.drawText(`Authorized Representative — ${fName()}`, { x: margin, y: repLineY - 12, size: 10, font: bold });
   page.drawText('Name: ___________________________________', { x: margin, y: repLineY - 26, size: 9.5, font });
   page.drawText('Date: _______________________', { x: margin, y: repLineY - 40, size: 9.5, font });
 
@@ -1498,9 +1510,9 @@ export async function generateFinancialIntakePdf(clientName, answers = {}, submi
     y -= 14;
   }
 
-  page.drawText('Tax Case Review', { x: margin, y, size: 16, font: bold });
+  page.drawText(fName(), { x: margin, y, size: 16, font: bold });
   y -= 16;
-  page.drawText('631 US Highway One Ste 304, North Palm Beach, FL 33408 · info@taxcasereview.com · (888) 334-5052 · Fax (561) 420-6999', { x: margin, y, size: 8.5, font, color: rgb(0.4, 0.4, 0.4) });
+  page.drawText(fFooterLine(), { x: margin, y, size: 8.5, font, color: rgb(0.4, 0.4, 0.4) });
   y -= 22;
   page.drawText('FINANCIAL INTAKE — SUBMITTED SUMMARY', { x: margin, y, size: 12.5, font: bold });
   y -= 18;
@@ -1687,7 +1699,7 @@ export async function buildCertificatePage({ docType, clientName, signedBy, ip, 
 
   // Legal text
   const legalText = 'This certificate confirms that the above-named individual electronically signed the referenced document. ' +
-    'The electronic signature was captured via Tax Case Review\'s secure signing portal and has the same legal effect ' +
+    `The electronic signature was captured via ${fName()}'s secure signing portal and has the same legal effect ` +
     'as a handwritten signature under the Electronic Signatures in Global and National Commerce Act (ESIGN) and ' +
     'the Uniform Electronic Transactions Act (UETA).'
 
@@ -1705,7 +1717,7 @@ export async function buildCertificatePage({ docType, clientName, signedBy, ip, 
 
   // Footer
   page.drawRectangle({ x:0, y:0, width, height:40, color: rgb(0.07, 0.17, 0.35) })
-  page.drawText('Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408 · (888) 334-5052 · taxcasereview.org', {
+  page.drawText(`${fName()} · ${fFooterLine()}`, {
     x:40, y:14, size:7.5, font, color:gray,
   })
 
@@ -1802,12 +1814,15 @@ export async function fillForm656L(client) {
   setText(`${p6}.Phone[0].Phone1[0]`, p1);
   setText(`${p6}.Phone[0].Phone2[0]`, p2);
 
-  // Section 7 — Preparer (Tax Case Review)
+  // Section 7 — Preparer. Resolves per signed-in tenant.
   const p8 = 'topmostSubform[0].page_8[0]';
-  setText(`${p8}.Address[0]`, 'Tax Case Review Org · 631 US Highway 1 Ste 304 · North Palm Beach, FL 33408');
-  setText(`${p8}.Phone[1].Area_Code[0]`, '888');
-  setText(`${p8}.Phone[1].Phone1[0]`, '334');
-  setText(`${p8}.Phone[1].Phone2[0]`, '5052');
+  setText(`${p8}.Address[0]`, `${fName()} · ${fAddr()}`);
+  const firmDigits = String(fPhone()).replace(/\D/g, '');
+  if (firmDigits.length >= 10) {
+    setText(`${p8}.Phone[1].Area_Code[0]`, firmDigits.slice(0, 3));
+    setText(`${p8}.Phone[1].Phone1[0]`, firmDigits.slice(3, 6));
+    setText(`${p8}.Phone[1].Phone2[0]`, firmDigits.slice(6, 10));
+  }
 
   return await pdfDoc.save();
 }
