@@ -975,6 +975,9 @@ export default function Leads() {
 
   const filtered = leads
     .filter(l => showArchived ? !!l.archived : !l.archived)
+    // A converted lead now lives in Clients — it stays out of the working pool
+    // unless you deliberately filter for that status.
+    .filter(l => filter === 'Converted to Client' || l.status !== 'Converted to Client')
     .filter(l => filter === 'All' || l.status === filter)
     .filter(l => repFilter === 'All' || (repFilter === 'Unassigned' ? !l.assignedTo : l.assignedTo === repFilter))
 
@@ -1446,11 +1449,24 @@ export default function Leads() {
   }
 
   async function convertToClient(l, skipConfirm) {
+    if (converting) return
     if (!skipConfirm && !confirm(`Convert "${l.name}" to a full client?`)) return
     setConverting(true)
+    // A second conversion of the same lead (double-click, or the resolution-fee
+    // path firing alongside the button) used to insert a duplicate client.
+    // Clients are keyed by name everywhere, so a duplicate splits the file.
+    const { data: dupe } = await supabase.from('clients').select('id').eq('name', l.name).limit(1)
+    if (dupe?.length) {
+      setConverting(false)
+      showToast(`${l.name} is already a client — opening their file`)
+      await supabase.from('leads').update({ status: 'Converted to Client' }).eq('id', l.id)
+      navigate('/clients/' + dupe[0].id)
+      return
+    }
     const taxYearsStr = l.taxYearsCustom || (()=>{try{return JSON.parse(l.taxYears||'[]').join(', ')}catch{return l.taxYears||''}})()
     const { data: newClient, error } = await supabase.from('clients').insert([{
       name: l.name, clientType: l.clientType || 'Individual',
+      business_name: l.business_name || null,
       first: l.first, mi: l.mi, last: l.last,
       phone: l.phone, phone2: l.phone2, email: l.email,
       smsConsent: l.smsConsent || false, smsConsentDate: l.smsConsentDate || null,
@@ -1473,6 +1489,10 @@ export default function Leads() {
       created_at: new Date().toISOString()
     }]).select().single()
     if (error) { showToast('Error: '+error.message); setConverting(false); return }
+    // Everything from here is follow-up work on an already-committed client
+    // row. It runs inside a try so a failure in any one step can't strand the
+    // UI on the lead page with the client invisible until a manual refresh.
+    try {
     // Re-point every saved card on the lead to the new client record — the
     // multi-card list (and split payment) would otherwise show empty for a
     // client that arrived with cards already on file as a lead.
@@ -1587,17 +1607,28 @@ export default function Leads() {
       }
     } catch (e) { console.error('Document transfer error:', e) }
 
+    } catch (e) {
+      console.error('Post-conversion step failed (client was created):', e)
+    }
+
     setConverting(false)
-    const { count } = await supabase.from('client_compliance_records').select('*', { count: 'exact', head: true }).eq('client_name', l.name)
+    const { count } = await supabase.from('client_compliance_records').select('*', { count: 'exact', head: true }).eq('client_name', l.name).catch(() => ({ count: null }))
     const intakeMsg = intakeAlreadySubmitted ? ', financial intake already on file'
       : intakeSent ? ', financial intake form emailed'
       : (l.email ? '' : ', financial intake created but no email on file to send it to')
     showToast(count ? `✅ ${l.name} converted to Client! 3 onboarding tasks created${intakeMsg}, compliance data (${count} records) carried over.` : `✅ ${l.name} converted to Client! 3 onboarding tasks created${intakeMsg}.`)
     // ── Workflow engine — lead converted trigger ──
-    const convActor = resolveActorName(user, employees)
-    await triggerWorkflow('lead_converted', 'lead', l.name, convActor)
-    const _ca=getActor(user); await logActivity(supabase,{employeeName:_ca.name,employeeEmail:_ca.email,action:'lead_converted',category:'lead',description:`Converted to client: ${l.name}`,entityName:l.name})
-    setDetail(null); load()
+    try {
+      const convActor = resolveActorName(user, employees)
+      await triggerWorkflow('lead_converted', 'lead', l.name, convActor)
+      const _ca=getActor(user); await logActivity(supabase,{employeeName:_ca.name,employeeEmail:_ca.email,action:'lead_converted',category:'lead',description:`Converted to client: ${l.name}`,entityName:l.name})
+    } catch (e) { console.error('Conversion workflow/activity log failed:', e) }
+    setDetail(null)
+    load()
+    // Go straight into the new client file. This used to just clear the lead
+    // detail and reload the lead list, so the client existed but nothing on
+    // screen showed it until a manual refresh.
+    navigate('/clients/' + newClient.id)
   }
 
   // ── Detail View ──

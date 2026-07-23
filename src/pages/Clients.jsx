@@ -45,7 +45,7 @@ const IRS_STATUS_OPTIONS = ['ACS','Notice Status','Queue for ACS','Currently Not
 
 const BLANK_DEP = { name:'', ssn:'', dob:'', relationship:'Child' }
 const BLANK = {
-  clientType:'Individual', name:'', phone:'', phone2:'', email:'',
+  clientType:'Individual', name:'', business_name:'', phone:'', phone2:'', email:'',
   street:'', city:'', state:'', zip:'', county:'',
   ssn:'', ein:'', dobM:'', dobD:'', dobY:'',
   spouseName:'', spouseSsn:'', spouseDob:'', filingStatus:'Single',
@@ -1738,6 +1738,9 @@ export default function Clients() {
             </div>
             <div style={{flex:1}}>
               <div style={{fontSize:22,fontWeight:800}}>{c.name}</div>
+              {c.business_name && c.business_name !== c.name && (
+                <div style={{fontSize:14,fontWeight:600,color:'var(--t2)',marginTop:2}}>🏢 {c.business_name}</div>
+              )}
               <div style={{display:'flex',gap:6,marginTop:5,flexWrap:'wrap'}}>
                 <Bdg s={c.clientType||'Individual'} c="bb" style={{fontSize:13,padding:'4px 10px'}}/>
                 <Bdg s={c.status||'Active'} c={c.status==='Active'?'bg':'bn'} style={{fontSize:13,padding:'4px 10px'}}/>
@@ -1842,7 +1845,7 @@ export default function Clients() {
             <ActionBtn color="#0369a1" icon="📋" label="Pre-Fill 8821/2848" sub="IRS PDF Forms" onClick={()=>{
               try {
                 if (!c) { showToast('Error: no client data found'); return }
-                setFillerClient({...c, address:c.street, business_name:c.name})
+                setFillerClient({...c, address:c.street, business_name:c.business_name||c.name})
               } catch (err) { showToast('Error opening form: ' + err.message) }
             }}/>
             <ActionBtn color="#0f766e" icon="🏛️" label="Pre-Fill State POA" sub={c.state ? c.state+' Form' : 'State Form'} onClick={()=>{ setPoaClient(c); setPoaModal(true) }}/>
@@ -3076,6 +3079,13 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
             <input value={form.name} onChange={e=>fld('name',e.target.value)} placeholder="First Last"/>
           </div>
         </div>
+        {form.clientType !== 'Individual' && (
+          <div className="fg2">
+            <div className="field"><label>Business Name *</label>
+              <input value={form.business_name||''} onChange={e=>fld('business_name',e.target.value)} placeholder="Business Name"/>
+            </div>
+          </div>
+        )}
         <div className="fg3">
           <div className="field"><label>Phone 1</label><input value={form.phone||''} onChange={e=>fld('phone',fmtPhone(e.target.value))} placeholder="(305) 555-0000" maxLength={14}/></div>
           <div className="field"><label>Phone 2</label><input value={form.phone2||''} onChange={e=>fld('phone2',fmtPhone(e.target.value))} placeholder="(305) 555-0000" maxLength={14}/></div>
