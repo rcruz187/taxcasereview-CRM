@@ -114,8 +114,8 @@ serve(async (req) => {
       stripe_payment_intent_id: intent.id,
       source: source || 'manual',
       created_at: new Date().toISOString(),
-    ,
-      tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a'}])
+      tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a',
+    }])
 
     if (table === 'clients') {
       await supabase.from('clients').update({

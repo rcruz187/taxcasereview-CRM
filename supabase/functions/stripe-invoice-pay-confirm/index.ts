@@ -92,16 +92,16 @@ serve(async (req) => {
       stripe_payment_intent_id: intent.id,
       source: 'client_portal',
       created_at: new Date().toISOString(),
-    ,
-      tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a'}])
+      tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a',
+    }])
 
     await supabase.from('client_notes').insert([{
       client_name: inv.clientName,
       content: `💳 Payment of $${amountPaid.toLocaleString('en-US',{minimumFractionDigits:2})} received online for Invoice #${inv.invNum || ''}. New balance: $${Math.max(newBalance,0).toLocaleString('en-US',{minimumFractionDigits:2})}.`,
       visible_to_client: true,
       created_at: new Date().toISOString(),
-    ,
-      tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a'}])
+      tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a',
+    }])
 
     return new Response(JSON.stringify({ success: true, status: intent.status, amountPaid, newBalance, newStatus }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
