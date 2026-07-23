@@ -1749,6 +1749,9 @@ export default function Clients() {
                 <Bdg s={c.status||'Active'} c={c.status==='Active'?'bg':'bn'} style={{fontSize:13,padding:'4px 10px'}}/>
                 {c.irsOrState&&<Bdg s={c.irsOrState} c="ba" style={{fontSize:13,padding:'4px 10px'}}/>}
                 {c.issueType&&<Bdg s={c.issueType} c="bb" style={{fontSize:13,padding:'4px 10px'}}/>}
+                {/* Renders from pipelineStage itself, so it can never disagree
+                    with the pipeline row below — one source of truth. */}
+                <Bdg s={'📊 '+(PIPELINE_STAGES.find(p=>p.key===(c.pipelineStage||'investigation'))?.label||'Investigation')} c="ba" style={{fontSize:13,padding:'4px 10px'}}/>
                 {c.assignedTo&&<Bdg s={'👤 '+c.assignedTo} c="bn" style={{fontSize:13,padding:'4px 10px'}}/>}
               </div>
             </div>

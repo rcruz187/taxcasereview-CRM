@@ -1461,6 +1461,10 @@ export default function Leads() {
       payment_method_brand: l.payment_method_brand,
       payment_method_last4: l.payment_method_last4,
       street: l.street, city: l.city, state: l.state, zip: l.zip, county: l.county,
+      // Conversion follows a completed investigation and transcript pull —
+      // that's what the whole signed-package flow was — so the case pipeline
+      // opens at Analysis rather than restarting at Investigation.
+      pipelineStage: 'analysis',
       biz_street: l.biz_street || null, biz_city: l.biz_city || null,
       biz_state: l.biz_state || null, biz_zip: l.biz_zip || null,
       source: l.source, assignedTo: l.assignedTo, taxAssociate: l.taxAssociate || null,
