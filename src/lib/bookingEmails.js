@@ -74,7 +74,7 @@ export function sendCancelEmails({ name, email, type, date, time, notifyEmail })
         <p>Hi <strong>${name}</strong>,</p>
         <p>Your <strong>${type}</strong> on ${whenLong(date, time)} has been canceled.</p>
         <p>Changed your mind? You can grab a new time any time:</p>
-        <p style="text-align:center;margin:20px 0"><a href="${BOOK_URL}" style="background:#1d4ed8;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;font-size:14px;display:inline-block">📅 Book Again</a></p>
+        <p style="text-align:center;margin:20px 0"><a href="${bookUrl()}" style="background:#1d4ed8;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;font-size:14px;display:inline-block">📅 Book Again</a></p>
         <p style="margin-top:20px"><strong>${firm.firmName || 'Tax Case Review'}</strong></p>` }),
     } })
     await supabase.functions.invoke('send-email', { body: {
@@ -117,9 +117,18 @@ export function sendFirmNotification({ name, email, phone, notes, type, date, ti
 // Calendar's Send Booking Link modal and the lead/client scheduling strip.
 export const BOOK_URL = `${window.location.origin}${import.meta.env.BASE_URL}book`
 
+// Tenant-carrying booking URL. The booking RPCs are tenant-scoped via a ?t=
+// hint (falling back to TCR when absent), so every link generated INSIDE the
+// app must carry the signed-in tenant's id or a prospect's bookings land on
+// the wrong calendar. Call at click/send time — FIRM loads async at app start.
+export function bookUrl() {
+  return FIRM.tenantId ? `${BOOK_URL}?t=${FIRM.tenantId}` : BOOK_URL
+}
+
 export async function sendBookingInvite({ name, email, phone }) {
   const first = (name || '').trim().split(' ')[0] || 'there'
   const q = new URLSearchParams()
+  if (FIRM.tenantId) q.set('t', FIRM.tenantId)
   if ((name || '').trim()) q.set('name', name.trim())
   if ((email || '').trim()) q.set('email', email.trim())
   if ((phone || '').trim()) q.set('phone', phone.trim())

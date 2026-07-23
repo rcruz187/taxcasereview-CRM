@@ -36,9 +36,16 @@ export default function BookAppointment() {
   const [payReturn, setPayReturn] = useState(params.get('booking') || '')
   const zone = visitorZone()
 
+  // Tenant hint from the link (?t=<tenant uuid>). Links come in two shapes —
+  // hash-side query (#/book?t=x, read by useSearchParams) and search-side
+  // (/book?t=x from emailed links) — so check both. Absent → the RPCs fall
+  // back to the primary (TCR) tenant, exactly the pre-tenant behavior.
+  const tid = (params.get('t') || new URLSearchParams(window.location.search).get('t') || '').trim()
+  const tenantArgs = tid ? { p_tenant: tid } : {}
+
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabase.rpc('booking_get_config')
+      const { data, error } = await supabase.rpc('booking_get_config', tenantArgs)
       if (error || !data) { setLoadErr('Online booking is unavailable right now. Please call us instead.'); return }
       setCfg(data)
       if ((data.types || []).length) setType(data.types[0])
@@ -67,7 +74,7 @@ export default function BookAppointment() {
 
   async function pickDate(iso) {
     setDate(iso); setTime(''); setSlots(null)
-    const { data, error } = await supabase.rpc('booking_get_slots', { p_date: iso })
+    const { data, error } = await supabase.rpc('booking_get_slots', { p_date: iso, ...tenantArgs })
     setSlots(error ? [] : (data || []))
   }
 
@@ -83,7 +90,7 @@ export default function BookAppointment() {
       const base = window.location.origin + window.location.pathname
       const { data, error } = await supabase.functions.invoke('booking-checkout', { body: {
         name: form.name.trim(), email: form.email.trim(), phone: form.phone.trim(),
-        event_type: type, date, time, notes: form.notes.trim(),
+        event_type: type, date, time, notes: form.notes.trim(), tenant: tid || '',
         success_url: `${base}?booking=paid`, cancel_url: `${base}?booking=canceled`,
       }})
       if (error || !data?.url) { setSaving(false); setErr((data && data.error) || 'Could not start payment. Please call us instead.'); return }
@@ -95,6 +102,7 @@ export default function BookAppointment() {
     const { data, error } = await supabase.rpc('booking_create', {
       p_name: form.name.trim(), p_email: form.email.trim(), p_phone: form.phone.trim(),
       p_event_type: type, p_date: date, p_time: time, p_notes: form.notes.trim(),
+      ...tenantArgs,
     })
     setSaving(false)
     if (error) { setErr(error.message); return }

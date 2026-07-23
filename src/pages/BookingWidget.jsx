@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { advanceLeadStatus } from '../lib/leadStatus'
 import { emailHtml } from '../lib/emailTemplate'
+import { FIRM } from '../lib/firmBranding'
 
 const CLIENT_EVENT_TYPES = [
   { type: 'Case Discussion',          icon: '💬' },
@@ -33,7 +34,8 @@ export default function BookingWidget({ contact, onClose, mode = 'lead' }) {
   const [linkSent, setLinkSent] = useState(false)
 
   // Calendly-style: email them the public booking link and let THEM pick
-  const BOOK_URL = `${window.location.origin}${window.location.pathname}#/book`
+  // Hash-route link; ?t= rides inside the hash and BookAppointment reads both sides.
+  const BOOK_URL = `${window.location.origin}${window.location.pathname}#/book${FIRM.tenantId ? `?t=${FIRM.tenantId}` : ''}`
   async function sendBookingLink() {
     if (!contact?.email) return
     setLinkSent('sending')

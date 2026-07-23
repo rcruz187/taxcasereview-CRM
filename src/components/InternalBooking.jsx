@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { sendBookingInvite, BOOK_URL } from '../lib/bookingEmails'
+import { sendBookingInvite, bookUrl } from '../lib/bookingEmails'
 
 // ── Send Booking Link (Calendar header) ──
 // Calendly-exact: staff never pick times for anyone. This sends the person
@@ -20,7 +20,7 @@ export default function InternalBooking({ onClose }) {
   }
 
   function copyLink() {
-    navigator.clipboard.writeText(BOOK_URL).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800) })
+    navigator.clipboard.writeText(bookUrl()).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800) })
   }
 
   const label = { display: 'block', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--t3)', marginBottom: 5 }

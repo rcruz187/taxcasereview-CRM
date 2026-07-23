@@ -23,6 +23,7 @@ export function firmSlug(name) {
 export const FIRM = {
   name: '',
   slug: '',
+  tenantId: '',  // settings.tenant_id (uuid) — carried on public /book links as ?t=
   logoUrl: '',
   address: '',   // full one-line address
   phone: '',
@@ -36,7 +37,7 @@ export async function loadFirmBranding() {
   try {
     const { data: s } = await supabase
       .from('settings')
-      .select('name,firmname,logourl,address,firmaddress,city,state,zip,phone,firmphone,email,firmemail,website,firm_fax_number')
+      .select('tenant_id,name,firmname,logourl,address,firmaddress,city,state,zip,phone,firmphone,email,firmemail,website,firm_fax_number')
       .limit(1).maybeSingle()
     if (!s) return FIRM
 
@@ -48,6 +49,7 @@ export async function loadFirmBranding() {
 
     FIRM.name = name
     FIRM.slug = firmSlug(name)
+    FIRM.tenantId = s.tenant_id || ''
     // The browser tab is part of the product's face — a prospect signed into
     // their demo should not see another firm's name above their own CRM. The
     // static index.html title remains the pre-login fallback.

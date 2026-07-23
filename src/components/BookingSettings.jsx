@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { formatMoneyInput, parseMoney } from '../lib/money'
 import { supabase } from '../lib/supabase'
+import { bookUrl } from '../lib/bookingEmails'
 
 // ── Online Booking settings (Calendly-style) ──
 // Config lives in settings.booking_config (jsonb). The public /book page
@@ -27,7 +28,6 @@ export const DEFAULT_BOOKING_CONFIG = {
 
 const DAYS = [['mon', 'Monday'], ['tue', 'Tuesday'], ['wed', 'Wednesday'], ['thu', 'Thursday'], ['fri', 'Friday'], ['sat', 'Saturday'], ['sun', 'Sunday']]
 const TYPE_OPTIONS = ['Free Consultation', 'Case Discussion', 'Tax Investigation Review', 'Document Signing', 'Follow-Up Call', 'In-Person Meeting']
-const BOOK_URL = `${window.location.origin}${import.meta.env.BASE_URL}book`
 
 export default function BookingSettings() {
   const [cfg, setCfg] = useState(DEFAULT_BOOKING_CONFIG)
@@ -76,7 +76,7 @@ export default function BookingSettings() {
   }
 
   function copyLink() {
-    navigator.clipboard.writeText(BOOK_URL).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800) })
+    navigator.clipboard.writeText(bookUrl()).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800) })
   }
 
   if (loading) return <div className="card"><div style={{ padding: 16, color: 'var(--t3)' }}>Loading…</div></div>
@@ -99,9 +99,9 @@ export default function BookingSettings() {
         </label>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
-          <input readOnly value={BOOK_URL} style={{ flex: 1, minWidth: 260, fontSize: 12 }} onFocus={e => e.target.select()} />
+          <input readOnly value={bookUrl()} style={{ flex: 1, minWidth: 260, fontSize: 12 }} onFocus={e => e.target.select()} />
           <button className="btn sec" onClick={copyLink}>{copied ? '✅ Copied' : '📋 Copy Link'}</button>
-          <a className="btn sec" href={BOOK_URL} target="_blank" rel="noreferrer">↗ Preview</a>
+          <a className="btn sec" href={bookUrl()} target="_blank" rel="noreferrer">↗ Preview</a>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 16 }}>
