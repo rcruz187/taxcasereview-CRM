@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatMoneyInput, parseMoney } from '../lib/money'
 import { supabase } from '../lib/supabase'
 import { emailHtml, ctaButton, fallbackLink } from '../lib/emailTemplate'
 import { FIRM } from '../lib/firmBranding'
@@ -92,7 +93,7 @@ export default function SendPaymentLinkModal({ record, recordType, onClose, show
             </div>
             <div className="field" style={{ marginBottom: 10 }}>
               <label>Amount ($)</label>
-              <input type="number" step="0.01" autoFocus value={amount} onChange={e => setAmount(e.target.value)} placeholder="e.g. 500" />
+              <input type="text" inputMode="decimal" autoFocus value={formatMoneyInput(amount)} onChange={e => setAmount(parseMoney(e.target.value))} placeholder="e.g. 500" />
             </div>
             <div className="field">
               <label>Description (optional)</label>

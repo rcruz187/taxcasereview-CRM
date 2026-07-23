@@ -52,11 +52,12 @@ function Field({ label, value, onChange, type='text', placeholder='', wide }) {
   // input silently refuses any value containing a comma. parseMoney strips them
   // back out before the value is stored, so nothing formatted reaches the row.
   const isMoney = type === 'number'
+  const isCount = type === 'count'
   return (
     <div className="field" style={wide ? { gridColumn: '1 / -1' } : {}}>
       <label>{label}</label>
       <input
-        type={isMoney ? 'text' : type}
+        type={isMoney ? 'text' : isCount ? 'number' : type}
         inputMode={isMoney ? 'decimal' : undefined}
         value={isMoney ? formatMoneyInput(value) : (value ?? '')}
         onChange={e=>onChange(isMoney ? parseMoney(e.target.value) : e.target.value)}
@@ -320,8 +321,8 @@ function IntakeTab({ profile, set, setArr, addArrRow, removeArrRow, totalHouseho
         <Field label="County" value={profile.county} onChange={v=>set('county',v)}/>
       </div>
       <div className="fg2">
-        <Field label="Household Under 65" value={profile.household_under_65} onChange={v=>set('household_under_65',v)} type="number"/>
-        <Field label="Household Over 65" value={profile.household_over_65} onChange={v=>set('household_over_65',v)} type="number"/>
+        <Field label="Household Under 65" value={profile.household_under_65} onChange={v=>set('household_under_65',v)} type="count"/>
+        <Field label="Household Over 65" value={profile.household_over_65} onChange={v=>set('household_over_65',v)} type="count"/>
       </div>
       <div className="fg2">
         <Field label="Filing Status" value={profile.filing_status} onChange={v=>set('filing_status',v)} placeholder="e.g. Married Filing Jointly"/>
@@ -448,7 +449,7 @@ function BusinessBlock({ data, onChange }) {
       </div>
       <div className="fg2">
         <Field label="Other Partners" value={data.other_partners} onChange={v=>onChange('other_partners',v)}/>
-        <Field label="Number of Employees" value={data.num_employees} onChange={v=>onChange('num_employees',v)} type="number"/>
+        <Field label="Number of Employees" value={data.num_employees} onChange={v=>onChange('num_employees',v)} type="count"/>
       </div>
       <div className="fg2">
         <Field label="Payroll Processor" value={data.payroll_processor} onChange={v=>onChange('payroll_processor',v)}/>
@@ -516,7 +517,7 @@ function VehicleBlock({ idx, row, onChange }) {
       </div>
       <div className="fg3">
         <Field label="Final Payment Date" value={row.final_payment_date} onChange={v=>onChange('final_payment_date',v)} type="date"/>
-        <Field label="Mileage" value={row.mileage} onChange={v=>onChange('mileage',v)} type="number"/>
+        <Field label="Mileage" value={row.mileage} onChange={v=>onChange('mileage',v)} type="count"/>
         <Field label="Current Value (KBB)" value={row.kbb_value} onChange={v=>onChange('kbb_value',v)} type="number"/>
       </div>
       <Field label="Remaining Balance" value={row.remaining_balance} onChange={v=>onChange('remaining_balance',v)} type="number"/>
@@ -727,7 +728,7 @@ function ExpField({ label, k, expenses, set, std }) {
   return (
     <div className="fp-expfield" style={{display:'grid',gridTemplateColumns: std!==undefined ? '1fr 140px 120px' : '1fr 140px', gap:10, alignItems:'center', padding:'7px 0'}}>
       <div style={{fontSize:14,fontWeight:500,color:'var(--tx)'}}>{label}</div>
-      <input type="number" value={expenses[k] ?? ''} onChange={e=>set('expenses.'+k, e.target.value)} placeholder="0.00"
+      <input type="text" inputMode="decimal" value={formatMoneyInput(expenses[k])} onChange={e=>set('expenses.'+k, parseMoney(e.target.value))} placeholder="0.00"
         style={{padding:'8px 10px',fontSize:14,background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)'}}/>
       {std!==undefined && <div style={{fontSize:13,color:'var(--t3)',textAlign:'right'}}>Std: {fmt(std)}</div>}
     </div>

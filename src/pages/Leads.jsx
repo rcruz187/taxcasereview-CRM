@@ -1,4 +1,5 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import { formatMoneyInput, parseMoney } from '../lib/money'
 import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -1837,7 +1838,7 @@ export default function Leads() {
               <div style={{fontSize:10,fontWeight:700,color:'var(--ok)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>💰 Tax Investigation Fee</div>
               <div className="fg2">
                 <div className="field"><label>Fee Amount ($399–$599)</label>
-                  <input type="number" value={form.taxFee} onChange={e=>fld('taxFee',e.target.value)} min={399} max={599} placeholder="399"/>
+                  <input type="text" inputMode="decimal" value={formatMoneyInput(form.taxFee)} onChange={e=>fld('taxFee',parseMoney(e.target.value))} min={399} max={599} placeholder="399"/>
                 </div>
                 <div className="field"><label>Manager Override?</label>
                   <select value={form.taxFeeOverride} onChange={e=>fld('taxFeeOverride',e.target.value)}>
@@ -2594,10 +2595,10 @@ export default function Leads() {
               </div>
               <div className="fg2">
                 <div className="field"><label>Resolution Service Fee ($) *</label>
-                  <input type="number" value={addForm.resolutionFee} onChange={e=>setAddForm(f=>({...f,resolutionFee:e.target.value}))} placeholder="e.g. 3500"/>
+                  <input type="text" inputMode="decimal" value={formatMoneyInput(addForm.resolutionFee)} onChange={e=>setAddForm(f=>({...f,resolutionFee:parseMoney(e.target.value)}))} placeholder="e.g. 3500"/>
                 </div>
                 <div className="field"><label>Monthly Payment Plan ($)</label>
-                  <input type="number" value={addForm.paymentPlan} onChange={e=>setAddForm(f=>({...f,paymentPlan:e.target.value}))} placeholder="e.g. 350"/>
+                  <input type="text" inputMode="decimal" value={formatMoneyInput(addForm.paymentPlan)} onChange={e=>setAddForm(f=>({...f,paymentPlan:parseMoney(e.target.value)}))} placeholder="e.g. 350"/>
                 </div>
               </div>
               <div className="field"><label>Payments Start Date</label>

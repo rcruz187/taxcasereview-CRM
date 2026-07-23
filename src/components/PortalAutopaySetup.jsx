@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatMoneyInput, parseMoney } from '../lib/money'
 import { supabase } from '../lib/supabase'
 import StripePaymentMethodModal from './StripePaymentMethodModal'
 
@@ -53,7 +54,7 @@ export default function PortalAutopaySetup({ client, suggestedAmount, onClose, o
         </div>
         <div style={{ marginBottom: 14 }}>
           <label style={{ fontSize: 11.5, color: '#94a3b8', display: 'block', marginBottom: 6 }}>Monthly Amount ($)</label>
-          <input type="number" step="0.01" min="1" value={amount} onChange={e => setAmount(e.target.value)}
+          <input type="text" inputMode="decimal" value={formatMoneyInput(amount)} onChange={e => setAmount(parseMoney(e.target.value))}
             style={{ width: '100%', padding: '10px 12px', borderRadius: 7, background: '#0a1628', border: '1px solid #1e3a5f', color: '#f1f5f9', fontSize: 14, boxSizing: 'border-box' }} />
         </div>
         {err && <div style={{ color: '#f87171', fontSize: 12, marginBottom: 10 }}>{err}</div>}

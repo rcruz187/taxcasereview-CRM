@@ -1,4 +1,5 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import { formatMoneyInput, parseMoney } from '../lib/money'
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -348,7 +349,7 @@ export default function Books() {
               </div>
               <div className="field">
                 <label>Amount *</label>
-                <input type="number" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} placeholder="0.00"/>
+                <input type="text" inputMode="decimal" value={formatMoneyInput(form.amount)} onChange={e=>setForm(f=>({...f,amount:parseMoney(e.target.value)}))} placeholder="0.00"/>
               </div>
               <div className="field">
                 <label>Category</label>

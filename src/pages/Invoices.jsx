@@ -1,4 +1,5 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import { formatMoneyInput, parseMoney } from '../lib/money'
 import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
@@ -454,14 +455,14 @@ Please contact our office with any questions.`
                 <label>Total Amount *</label>
                 <div style={{position:'relative'}}>
                   <span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--t3)'}}>$</span>
-                  <input type="number" value={form.total} onChange={e=>fld('total',e.target.value)} style={{paddingLeft:22}} placeholder="0.00"/>
+                  <input type="text" inputMode="decimal" value={formatMoneyInput(form.total)} onChange={e=>fld('total',parseMoney(e.target.value))} style={{paddingLeft:22}} placeholder="0.00"/>
                 </div>
               </div>
               <div className="field">
                 <label>Amount Paid</label>
                 <div style={{position:'relative'}}>
                   <span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--t3)'}}>$</span>
-                  <input type="number" value={form.paid} onChange={e=>fld('paid',e.target.value)} style={{paddingLeft:22}} placeholder="0.00"/>
+                  <input type="text" inputMode="decimal" value={formatMoneyInput(form.paid)} onChange={e=>fld('paid',parseMoney(e.target.value))} style={{paddingLeft:22}} placeholder="0.00"/>
                 </div>
               </div>
             </div>

@@ -1,4 +1,5 @@
 import { validateFile } from '../lib/uploadUtils'
+import { formatMoneyInput, parseMoney } from '../lib/money'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { ORGANIZER_STEPS, shouldShow } from '../lib/organizerSchema'
@@ -221,7 +222,8 @@ function Question({ q, answers, setAnswer, onUpload, uploadingKey, addEntry, upd
       )}
 
       {q.type === 'number' && (
-        <input type="number" value={val||''} onChange={e=>setAnswer(q.id, e.target.value)} style={S.input}/>
+        <input type="text" inputMode="decimal" value={formatMoneyInput(val)}
+          onChange={e=>setAnswer(q.id, parseMoney(e.target.value))} style={S.input}/>
       )}
 
       {q.type === 'date' && (

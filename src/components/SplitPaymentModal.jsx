@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { formatMoneyInput, parseMoney } from '../lib/money'
 import { supabase } from '../lib/supabase'
 
 // Charges a total amount across one or more saved cards in one go — e.g.
@@ -103,7 +104,7 @@ export default function SplitPaymentModal({ record, recordType, onClose, showToa
             </div>
             <div className="field" style={{ marginBottom: 10 }}>
               <label>Total Amount ($)</label>
-              <input type="number" step="0.01" value={total} onChange={e => setTotal(e.target.value)} placeholder="e.g. 1500" />
+              <input type="text" inputMode="decimal" value={formatMoneyInput(total)} onChange={e => setTotal(parseMoney(e.target.value))} placeholder="e.g. 1500" />
             </div>
             <div className="field" style={{ marginBottom: 14 }}>
               <label>Description (optional)</label>
@@ -117,7 +118,7 @@ export default function SplitPaymentModal({ record, recordType, onClose, showToa
                     <option value="">Select card…</option>
                     {cards.map(c => <option key={c.id} value={c.id}>{c.brand} ••••{c.last4} {c.is_default ? '(default)' : ''}</option>)}
                   </select>
-                  <input type="number" step="0.01" value={row.amount} onChange={e => updateRow(i, 'amount', e.target.value)}
+                  <input type="text" inputMode="decimal" value={formatMoneyInput(row.amount)} onChange={e => updateRow(i, 'amount', parseMoney(e.target.value))}
                     placeholder="$" style={{ width: 100 }} />
                   {rows.length > 1 && <button className="btn del" style={{ padding: '6px 9px', fontSize: 12 }} onClick={() => removeRow(i)}>×</button>}
                 </div>

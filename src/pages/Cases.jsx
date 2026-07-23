@@ -1,4 +1,5 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import { formatMoneyInput, parseMoney } from '../lib/money'
 import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
@@ -535,11 +536,11 @@ function CaseModal({ form, fld, reps, saving, onSave, onClose, title, sug, searc
         <div className="fg2">
           <div className="field">
             <label>IRS Balance ($)</label>
-            <input type="number" value={form.irsBalance} onChange={e => fld('irsBalance', e.target.value)} placeholder="Auto-filled from client" />
+            <input type="text" inputMode="decimal" value={formatMoneyInput(form.irsBalance)} onChange={e => fld('irsBalance', parseMoney(e.target.value))} placeholder="Auto-filled from client" />
           </div>
           <div className="field">
             <label>Resolution Amount ($)</label>
-            <input type="number" value={form.resolutionAmount} onChange={e => fld('resolutionAmount', e.target.value)} placeholder="Proposed settlement" />
+            <input type="text" inputMode="decimal" value={formatMoneyInput(form.resolutionAmount)} onChange={e => fld('resolutionAmount', parseMoney(e.target.value))} placeholder="Proposed settlement" />
           </div>
         </div>
 

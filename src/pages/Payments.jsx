@@ -1,4 +1,5 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import { formatMoneyInput, parseMoney } from '../lib/money'
 import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
@@ -407,7 +408,7 @@ export default function Payments() {
                 <label>Amount *</label>
                 <div style={{position:'relative'}}>
                   <span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--t3)'}}>$</span>
-                  <input type="number" value={form.amount} onChange={e=>fld('amount',e.target.value)} style={{paddingLeft:22}} placeholder="0.00"/>
+                  <input type="text" inputMode="decimal" value={formatMoneyInput(form.amount)} onChange={e=>fld('amount',parseMoney(e.target.value))} style={{paddingLeft:22}} placeholder="0.00"/>
                 </div>
               </div>
               <div className="field"><label>Date</label><input type="date" value={form.date} onChange={e=>fld('date',e.target.value)}/></div>

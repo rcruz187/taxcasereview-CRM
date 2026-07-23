@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { formatMoneyInput, parseMoney } from '../lib/money'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import ClientLink from '../components/ClientLink'
@@ -444,7 +445,7 @@ export default function FormaCorp() {
 
             <div className="fg2">
               <div className="field"><label>Formation Fee</label>
-                <input type="number" value={form.fee} onChange={e=>fld('fee',e.target.value)} placeholder="0.00"/>
+                <input type="text" inputMode="decimal" value={formatMoneyInput(form.fee)} onChange={e=>fld('fee',parseMoney(e.target.value))} placeholder="0.00"/>
               </div>
               <div className="field"><label>Stage</label>
                 <select value={form.stage} onChange={e=>fld('stage',e.target.value)}>

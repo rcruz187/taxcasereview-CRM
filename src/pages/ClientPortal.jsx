@@ -1,4 +1,5 @@
 import { validateFile } from '../lib/uploadUtils'
+import { formatMoneyInput, parseMoney } from '../lib/money'
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -774,9 +775,9 @@ export default function ClientPortal() {
                       <div style={{ position: 'relative' }}>
                         <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748b', fontSize: 13 }}>$</span>
                         <input
-                          type="number" min="0" step="0.01"
-                          value={ieEdits[f.k] ?? ''}
-                          onChange={e => setIeEdits(prev => ({ ...prev, [f.k]: e.target.value }))}
+                          type="text" inputMode="decimal"
+                          value={formatMoneyInput(ieEdits[f.k])}
+                          onChange={e => setIeEdits(prev => ({ ...prev, [f.k]: parseMoney(e.target.value) }))}
                           placeholder="0.00"
                           style={{ width: '100%', padding: '9px 10px 9px 22px', background: '#0a1628', border: '1px solid #1e3a5f', borderRadius: 8, color: '#f1f5f9', fontSize: 13, boxSizing: 'border-box' }}
                         />

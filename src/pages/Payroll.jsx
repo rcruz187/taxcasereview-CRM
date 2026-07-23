@@ -1,4 +1,5 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import { formatMoneyInput, parseMoney } from '../lib/money'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import PayrollStatCards from '../components/PayrollStatCards'
@@ -943,23 +944,23 @@ export default function Payroll() {
                           style={{ width:65, padding:'3px 6px', fontSize:11, background:'var(--s2)', border:'1px solid var(--br)', borderRadius:4, color:'var(--tx)' }}/>
                       </td>
                       <td style={{ padding:'4px 8px' }}>
-                        <input type="number" step="0.01" value={l.gross} onChange={e=>updateLine(i,'gross',e.target.value)}
+                        <input type="text" inputMode="decimal" value={formatMoneyInput(l.gross)} onChange={e=>updateLine(i,'gross',parseMoney(e.target.value))}
                           style={{ width:80, padding:'3px 6px', fontSize:11, background:'var(--s2)', border:'1px solid var(--br)', borderRadius:4, color:'var(--tx)' }}/>
                       </td>
                       <td style={{ padding:'4px 8px' }}>
-                        <input type="number" step="0.01" value={l.fedTax} onChange={e=>updateLine(i,'fedTax',e.target.value)}
+                        <input type="text" inputMode="decimal" value={formatMoneyInput(l.fedTax)} onChange={e=>updateLine(i,'fedTax',parseMoney(e.target.value))}
                           style={{ width:65, padding:'3px 6px', fontSize:11, background:'var(--s2)', border:'1px solid var(--br)', borderRadius:4, color:'var(--tx)' }}/>
                       </td>
                       <td style={{ padding:'4px 8px' }}>
-                        <input type="number" step="0.01" value={l.stateTax} onChange={e=>updateLine(i,'stateTax',e.target.value)}
+                        <input type="text" inputMode="decimal" value={formatMoneyInput(l.stateTax)} onChange={e=>updateLine(i,'stateTax',parseMoney(e.target.value))}
                           style={{ width:62, padding:'3px 6px', fontSize:11, background:'var(--s2)', border:'1px solid var(--br)', borderRadius:4, color:'var(--tx)' }}/>
                       </td>
                       <td style={{ padding:'4px 8px' }}>
-                        <input type="number" step="0.01" value={l.ss} onChange={e=>updateLine(i,'ss',e.target.value)}
+                        <input type="text" inputMode="decimal" value={formatMoneyInput(l.ss)} onChange={e=>updateLine(i,'ss',parseMoney(e.target.value))}
                           style={{ width:62, padding:'3px 6px', fontSize:11, background:'var(--s2)', border:'1px solid var(--br)', borderRadius:4, color:'var(--tx)' }}/>
                       </td>
                       <td style={{ padding:'4px 8px' }}>
-                        <input type="number" step="0.01" value={l.medicare} onChange={e=>updateLine(i,'medicare',e.target.value)}
+                        <input type="text" inputMode="decimal" value={formatMoneyInput(l.medicare)} onChange={e=>updateLine(i,'medicare',parseMoney(e.target.value))}
                           style={{ width:62, padding:'3px 6px', fontSize:11, background:'var(--s2)', border:'1px solid var(--br)', borderRadius:4, color:'var(--tx)' }}/>
                       </td>
                       <td style={{ padding:'6px 8px', fontWeight:700, color:'var(--ok)', fontSize:13 }}>${parseFloat(l.net||0).toLocaleString()}</td>

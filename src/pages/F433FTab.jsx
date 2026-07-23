@@ -1,14 +1,24 @@
 import { useState } from 'react'
+import { formatMoneyInput, parseMoney } from '../lib/money'
 import { fillForm433F, fillForm433A, fillForm433D, fillForm433H, fillForm433B, fillForm433AOIC, fillForm656L } from '../lib/irsFormUtils'
 
 function n(v) { const x = parseFloat(v); return isNaN(x) ? 0 : x }
 function fmt(v) { return '$' + n(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
 function Field({ label, value, onChange, type='text', wide }) {
+  // type='number' means money here and renders as text so the separators show;
+  // type='count' stays a real number input for months, headcounts and the like.
+  const isMoney = type === 'number'
+  const isCount = type === 'count'
   return (
     <div className="field" style={wide ? { gridColumn: '1 / -1' } : {}}>
       <label>{label}</label>
-      <input type={type} value={value ?? ''} onChange={e=>onChange(e.target.value)} placeholder=""/>
+      <input
+        type={isMoney ? 'text' : isCount ? 'number' : type}
+        inputMode={isMoney || isCount ? 'decimal' : undefined}
+        value={isMoney ? formatMoneyInput(value) : (value ?? '')}
+        onChange={e=>onChange(isMoney ? parseMoney(e.target.value) : e.target.value)}
+        placeholder=""/>
     </div>
   )
 }
@@ -131,7 +141,7 @@ export default function F433FTab({ profile, set, client, totalHousehold, income,
       ))}
       <div className="fg2" style={{marginTop:10}}>
         <Field label="Everyone Claimed Had Health Insurance All 12 Months?" value={extra.health_insurance_12mo} onChange={v=>setExtra('health_insurance_12mo',v)} placeholder="Yes/No"/>
-        <Field label="If No, How Many Months?" value={extra.health_insurance_months} onChange={v=>setExtra('health_insurance_months',v)} type="number"/>
+        <Field label="If No, How Many Months?" value={extra.health_insurance_months} onChange={v=>setExtra('health_insurance_months',v)} type="count"/>
       </div>
       <div style={{fontSize:12,color:'var(--t3)',marginTop:4}}>Total Household Size: <strong style={{color:'var(--tx)'}}>{totalHousehold}</strong></div>
 
@@ -140,7 +150,7 @@ export default function F433FTab({ profile, set, client, totalHousehold, income,
       <div className="fg3" style={{marginTop:10}}>
         <Field label="Business EIN" value={extra.business_ein} onChange={v=>setExtra('business_ein',v)} placeholder={profile.business_1?.ein || ''}/>
         <Field label="Type of Business" value={extra.business_type} onChange={v=>setExtra('business_type',v)}/>
-        <Field label="Number of Employees (Not Counting Owner)" value={extra.num_employees} onChange={v=>setExtra('num_employees',v)} type="number" placeholder={profile.business_1?.num_employees || ''}/>
+        <Field label="Number of Employees (Not Counting Owner)" value={extra.num_employees} onChange={v=>setExtra('num_employees',v)} type="count" placeholder={profile.business_1?.num_employees || ''}/>
       </div>
 
       <SectionHeader>Bank Accounts &amp; Assets (from Assets &amp; Equity)</SectionHeader>

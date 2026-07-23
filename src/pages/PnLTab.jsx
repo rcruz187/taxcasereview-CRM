@@ -1,3 +1,5 @@
+import { formatMoneyInput, parseMoney } from '../lib/money'
+
 function n(v) { const x = parseFloat(v); return isNaN(x) ? 0 : x }
 function fmt(v) { return '$' + n(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
@@ -39,7 +41,12 @@ function Field({ label, value, onChange, type='text', wide, monthly }) {
   return (
     <div className="field" style={wide ? { gridColumn: '1 / -1' } : {}}>
       <label>{label}{monthly!==undefined && <span style={{color:'var(--t3)',fontWeight:400}}> · Monthly: {fmt(monthly)}</span>}</label>
-      <input type={type} value={value ?? ''} onChange={e=>onChange(e.target.value)} placeholder="0.00"/>
+      <input
+        type={type === 'number' ? 'text' : type}
+        inputMode={type === 'number' ? 'decimal' : undefined}
+        value={type === 'number' ? formatMoneyInput(value) : (value ?? '')}
+        onChange={e=>onChange(type === 'number' ? parseMoney(e.target.value) : e.target.value)}
+        placeholder="0.00"/>
     </div>
   )
 }

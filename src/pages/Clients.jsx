@@ -1,4 +1,5 @@
 import { validateFile } from '../lib/uploadUtils'
+import { formatMoneyInput, parseMoney } from '../lib/money'
 import { NOTE_TEMPLATES } from '../lib/noteTemplates'
 import { logActivity, getActor } from '../lib/activityLog'
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
@@ -2662,7 +2663,7 @@ export default function Clients() {
                 <label>Amount *</label>
                 <div style={{position:'relative'}}>
                   <span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--t3)'}}>$</span>
-                  <input type="number" value={payForm.amount} onChange={e=>setPayForm(f=>({...f,amount:e.target.value}))} style={{paddingLeft:22}} placeholder="0.00" autoFocus/>
+                  <input type="text" inputMode="decimal" value={formatMoneyInput(payForm.amount)} onChange={e=>setPayForm(f=>({...f,amount:parseMoney(e.target.value)}))} style={{paddingLeft:22}} placeholder="0.00" autoFocus/>
                 </div>
               </div>
               <div className="fg2">
@@ -2700,10 +2701,10 @@ export default function Clients() {
               </div>
               <div className="fg2">
                 <div className="field"><label>Resolution Service Fee ($) *</label>
-                  <input type="number" value={addForm.resolutionFee} onChange={e=>setAddForm(f=>({...f,resolutionFee:e.target.value}))} placeholder="e.g. 3500"/>
+                  <input type="text" inputMode="decimal" value={formatMoneyInput(addForm.resolutionFee)} onChange={e=>setAddForm(f=>({...f,resolutionFee:parseMoney(e.target.value)}))} placeholder="e.g. 3500"/>
                 </div>
                 <div className="field"><label>Monthly Payment Plan ($)</label>
-                  <input type="number" value={addForm.paymentPlan} onChange={e=>setAddForm(f=>({...f,paymentPlan:e.target.value}))} placeholder="e.g. 350"/>
+                  <input type="text" inputMode="decimal" value={formatMoneyInput(addForm.paymentPlan)} onChange={e=>setAddForm(f=>({...f,paymentPlan:parseMoney(e.target.value)}))} placeholder="e.g. 350"/>
                 </div>
               </div>
               <div className="field"><label>Payments Start Date</label>
@@ -2892,14 +2893,14 @@ export default function Clients() {
                 <div className="fg2">
                   <div className="field">
                     <label>IRS Liability ($)</label>
-                    <input type="number" value={installmentForm.irsLiability}
-                      onChange={e=>setInstallmentForm(f=>({...f,irsLiability:e.target.value}))}
+                    <input type="text" inputMode="decimal" value={formatMoneyInput(installmentForm.irsLiability)}
+                      onChange={e=>setInstallmentForm(f=>({...f,irsLiability:parseMoney(e.target.value)}))}
                       placeholder="e.g. 45000"/>
                   </div>
                   <div className="field">
                     <label>Tax Resolution Fee ($) *</label>
-                    <input type="number" value={installmentForm.totalFee}
-                      onChange={e=>setInstallmentForm(f=>({...f,totalFee:e.target.value}))}
+                    <input type="text" inputMode="decimal" value={formatMoneyInput(installmentForm.totalFee)}
+                      onChange={e=>setInstallmentForm(f=>({...f,totalFee:parseMoney(e.target.value)}))}
                       placeholder="e.g. 3000"/>
                   </div>
                 </div>
@@ -3184,7 +3185,7 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
           </div>
           {!form.default_payment_method_id && <div style={{fontSize:11,color:'var(--warn)',marginBottom:8}}>No payment method on file yet — add one from the client's Overview tab before enabling autopay.</div>}
           <div className="fg3">
-            <div className="field"><label>Amount ($)</label><input type="number" step="0.01" value={form.autopay_amount||''} onChange={e=>fld('autopay_amount',e.target.value)}/></div>
+            <div className="field"><label>Amount ($)</label><input type="text" inputMode="decimal" value={formatMoneyInput(form.autopay_amount||'')} onChange={e=>fld('autopay_amount',parseMoney(e.target.value))}/></div>
             <div className="field"><label>Frequency</label>
               <select value={form.autopay_frequency||'monthly'} onChange={e=>fld('autopay_frequency',e.target.value)}>
                 {['weekly','biweekly','monthly','one-time'].map(o=><option key={o} value={o}>{o[0].toUpperCase()+o.slice(1)}</option>)}

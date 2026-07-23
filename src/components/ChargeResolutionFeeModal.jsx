@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatMoneyInput, parseMoney } from '../lib/money'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { supabase } from '../lib/supabase'
@@ -87,7 +88,7 @@ export default function ChargeResolutionFeeModal({ lead, onClose, onPaid, showTo
               This is the one-time fee for doing the resolution work, based on what came back from the IRS — separate from the investigation fee already paid. Once it clears, this lead converts to a client automatically.
             </div>
             <div className="field"><label>Resolution Fee Amount ($)</label>
-              <input type="number" step="0.01" autoFocus value={amount} onChange={e=>setAmount(e.target.value)}
+              <input type="text" inputMode="decimal" autoFocus value={formatMoneyInput(amount)} onChange={e=>setAmount(parseMoney(e.target.value))}
                 onKeyDown={e=>e.key==='Enter'&&startCharge()} placeholder="e.g. 3500" />
             </div>
             {err && <div style={{ color: 'var(--bad)', fontSize: 13, marginTop: 6 }}>{err}</div>}

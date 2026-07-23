@@ -1,4 +1,5 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import { formatMoneyInput, parseMoney } from '../lib/money'
 import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
@@ -433,7 +434,7 @@ export default function Esign() {
 
             <div className="fg2">
               <div className="field"><label>Investigation Fee ($)</label>
-                <input type="number" value={form.investigationFee} onChange={e => fld('investigationFee', e.target.value)} placeholder="399" min="399" max="599" />
+                <input type="text" inputMode="decimal" value={formatMoneyInput(form.investigationFee)} onChange={e => fld('investigationFee', parseMoney(e.target.value))} placeholder="399" min="399" max="599" />
               </div>
               <div className="field"><label>Tax Years</label>
                 <input value={form.taxYears} onChange={e => fld('taxYears', e.target.value)} placeholder="2022, 2023, 2024" />

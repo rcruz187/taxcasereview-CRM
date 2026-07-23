@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { formatMoneyInput, parseMoney } from '../lib/money'
 import { supabase } from '../lib/supabase'
 
 // ── Online Booking settings (Calendly-style) ──
@@ -192,9 +193,9 @@ export default function BookingSettings() {
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 10 }}>
               <label style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 3 }}>
                 Amount (USD)
-                <input type="number" min="1" step="1" style={{ padding: '6px 8px', width: 120 }}
-                  placeholder="399" value={cfg.payment.amount}
-                  onChange={e => set('payment', { ...cfg.payment, amount: e.target.value })} />
+                <input type="text" inputMode="decimal" style={{ padding: '6px 8px', width: 120 }}
+                  placeholder="399" value={formatMoneyInput(cfg.payment.amount)}
+                  onChange={e => set('payment', { ...cfg.payment, amount: parseMoney(e.target.value) })} />
               </label>
               <label style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minWidth: 200 }}>
                 What they're paying for (shown on the checkout page)

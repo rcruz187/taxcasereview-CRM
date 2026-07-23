@@ -1,4 +1,5 @@
 import { validateFile, maybeCompressImage } from '../lib/uploadUtils'
+import { formatMoneyInput, parseMoney } from '../lib/money'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
@@ -435,7 +436,7 @@ export default function Employees() {
                     </div>
                     <div className="field">
                       <label>{form.payType === 'Salary' ? 'Annual Salary ($)' : 'Hourly Rate ($/hr)'}</label>
-                      <input type="number" step="0.01" value={form.hourlyRate||''} onChange={e => setForm(f => ({ ...f, hourlyRate: e.target.value }))} placeholder={form.payType==='Salary'?'52000':'25.00'}/>
+                      <input type="text" inputMode="decimal" value={formatMoneyInput(form.hourlyRate||'')} onChange={e => setForm(f => ({ ...f, hourlyRate: parseMoney(e.target.value) }))} placeholder={form.payType==='Salary'?'52000':'25.00'}/>
                     </div>
                   </div>
                   <div className="form-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
