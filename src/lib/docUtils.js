@@ -7,11 +7,16 @@ const LOGO_URL = ''  // replaced by FIRM.logoUrl
 const FIRM_FAX = '(561) 420-6999'
 
 // Legal/body text renders the SIGNED-IN tenant's own firm, so a demo or
-// prospect tenant never sees Tax Case Review inside an agreement. The email is
-// derived from the firm name rather than settings.email so that TCR resolves
-// back to exactly info@taxcasereview.com and live agreements are unchanged.
+// prospect tenant never sees Tax Case Review inside an agreement.
+// The contact email comes from the tenant's own settings row, which is the
+// address that actually receives mail — contracts use it for cancellation
+// notices and withdrawal of e-communication consent, so a derived-but-wrong
+// address would send legally operative notices into a void. Falls back to a
+// name-derived .com only when a tenant hasn't set one.
 const firmName  = () => FIRM.name || 'Tax Case Review'
-const firmEmail = () => 'info@' + firmName().toLowerCase().replace(/[^a-z0-9]+/g, '') + '.com'
+const firmEmail = () =>
+  (FIRM.email || '').trim() ||
+  'info@' + firmName().toLowerCase().replace(/[^a-z0-9]+/g, '') + '.com'
 
 function printHeader(title, phone = FIRM.phone) {
   return `
