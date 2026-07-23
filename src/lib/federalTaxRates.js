@@ -16,6 +16,11 @@
 
 export const TAX_YEAR = 2025
 
+// Withholding is reported to the cent — rounding to whole dollars threw the
+// disposable-income figure off by a few dollars a month across several entries,
+// which matters on a 433 analysis.
+const round2 = n => Math.round(n * 100) / 100
+
 // FICA — exact, and the part clients most often leave blank.
 export const SOCIAL_SECURITY_RATE = 0.062
 export const SOCIAL_SECURITY_WAGE_BASE = 176100  // 2025
@@ -60,7 +65,7 @@ function bracketsFor(filingStatus) {
  * Estimated federal income tax withheld per month.
  * @param {number} grossMonthly
  * @param {string} filingStatus  one of the intake's filing status options
- * @returns {number} whole dollars per month, 0 if income is below the standard deduction
+ * @returns {number} dollars and cents per month, 0 if income is below the standard deduction
  */
 export function estimateFederalWithholding(grossMonthly, filingStatus) {
   const gross = parseFloat(grossMonthly) || 0
@@ -78,7 +83,7 @@ export function estimateFederalWithholding(grossMonthly, filingStatus) {
     tax += (Math.min(taxable, ceiling) - floor) * rate
     floor = ceiling
   }
-  return Math.round(tax / 12)
+  return round2(tax / 12)
 }
 
 /**
@@ -86,7 +91,7 @@ export function estimateFederalWithholding(grossMonthly, filingStatus) {
  * Exact for wage earners: 6.2% up to the wage base, plus 1.45% on everything,
  * plus the 0.9% additional Medicare an employer withholds above the threshold.
  * @param {number} grossMonthly
- * @returns {number} whole dollars per month
+ * @returns {number} dollars and cents per month
  */
 export function estimateFicaWithholding(grossMonthly) {
   const gross = parseFloat(grossMonthly) || 0
@@ -98,5 +103,5 @@ export function estimateFicaWithholding(grossMonthly) {
   if (annual > ADDITIONAL_MEDICARE_THRESHOLD) {
     medicare += (annual - ADDITIONAL_MEDICARE_THRESHOLD) * ADDITIONAL_MEDICARE_RATE
   }
-  return Math.round((socialSecurity + medicare) / 12)
+  return round2((socialSecurity + medicare) / 12)
 }

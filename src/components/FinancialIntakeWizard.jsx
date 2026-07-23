@@ -151,7 +151,7 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
     }
     if (!next.state_withheld_manual && leadState && (answers.county || '').trim()) {
       const rate = getStateTaxRate(leadState)
-      if (rate !== null) next.state_withheld = Math.round(gross * rate)
+      if (rate !== null) next.state_withheld = Math.round(gross * rate * 100) / 100
     }
     return next
   }
