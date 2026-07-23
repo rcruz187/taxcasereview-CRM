@@ -168,14 +168,25 @@ export function buildNameAddress(client, party = 'personal') {
 // Same per-tenant lookup for the state POA blanks, which also carry the
 // representative block. Returns the first URL that responds, or the shared
 // original when the tenant has no folder of its own.
+// Per-session memo of which tenant-scoped paths exist. Without it every
+// template fetch pays a guaranteed 404 round-trip first for any tenant that
+// has no override folder (TCR has none; the demo folder holds five files) —
+// which is most fetches, and made package generation visibly slow.
+const tenantPathMemo = new Map()
+
 export async function resolveStateFormUrl(base, filename) {
   const slug = FIRM.slug || '';
   if (slug) {
     const tenantUrl = `${base}/state-forms/${slug}/${filename}`;
-    try {
-      const head = await fetch(tenantUrl, { method: 'HEAD' });
-      if (head.ok) return tenantUrl;
-    } catch (_) { /* fall through to the shared template */ }
+    const memo = tenantPathMemo.get(tenantUrl);
+    if (memo === true) return tenantUrl;
+    if (memo !== false) {
+      try {
+        const head = await fetch(tenantUrl, { method: 'HEAD' });
+        tenantPathMemo.set(tenantUrl, head.ok);
+        if (head.ok) return tenantUrl;
+      } catch (_) { tenantPathMemo.set(tenantUrl, false); }
+    }
   }
   return `${base}/state-forms/${filename}`;
 }
@@ -191,10 +202,14 @@ export async function fetchTemplate(filename) {
     `https://raw.githubusercontent.com/taxresolutioncrm/taxcasereview-CRM/gh-pages/templates/${filename}`,
   ];
   for (const url of paths) {
+    if (tenantPathMemo.get(url) === false) continue;
     try {
       const res = await fetch(url);
+      // Only misses are memoized: a template that WAS found must stay
+      // re-fetchable, since its bytes are consumed by the caller each time.
       if (res.ok) return res.arrayBuffer();
-    } catch (_) {}
+      tenantPathMemo.set(url, false);
+    } catch (_) { tenantPathMemo.set(url, false); }
   }
   throw new Error(`Template not found: ${filename}`);
 }

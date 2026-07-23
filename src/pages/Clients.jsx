@@ -2561,7 +2561,7 @@ export default function Clients() {
         )}
 
         {bookingClient && (
-          <BookingWidget contact={{name:bookingClient.name, email:bookingClient.email, phone:bookingClient.phone}} onClose={()=>setBookingClient(null)} mode="client"/>
+          <BookingWidget mode="client" contact={{id:bookingClient.id, name:bookingClient.name, email:bookingClient.email, phone:bookingClient.phone}} onClose={()=>setBookingClient(null)} mode="client"/>
         )}
         {quickEmail && <QuickEmail contact={{ name: quickEmail.name, email: quickEmail.email }} kind="client" onSent={() => loadRelated(quickEmail.name)} onClose={() => setQuickEmail(null)} />}
 

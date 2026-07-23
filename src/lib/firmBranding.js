@@ -48,6 +48,10 @@ export async function loadFirmBranding() {
 
     FIRM.name = name
     FIRM.slug = firmSlug(name)
+    // The browser tab is part of the product's face — a prospect signed into
+    // their demo should not see another firm's name above their own CRM. The
+    // static index.html title remains the pre-login fallback.
+    try { document.title = `${name} — IRS Resolution CRM` } catch (_) {}
     FIRM.logoUrl = s.logourl || ''
     FIRM.address = address
     FIRM.phone = s.phone || s.firmphone || ''

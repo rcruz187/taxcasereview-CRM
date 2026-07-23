@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { FIRM } from './firmBranding'
 import { emailHtml } from './emailTemplate'
 
 // Firm branding for booking emails — cached lookup via the anon-safe
@@ -11,6 +12,10 @@ let _firmMetaCache = null
 async function getFirmMeta() {
   if (_firmMetaCache) return _firmMetaCache
   try {
+    // Inside the app FIRM is already the signed-in tenant's branding; the
+    // public meta RPC returns the FIRST settings row for every caller and is
+    // only a fallback for anon contexts where FIRM never loaded.
+    if (FIRM.loaded && FIRM.name) return { firmName: FIRM.name, logoUrl: FIRM.logoUrl || '' }
     const { data } = await supabase.rpc('booking_get_public_meta')
     _firmMetaCache = data && data.firm_name ? { firmName: data.firm_name, logoUrl: data.logo_url } : {}
   } catch (_) {

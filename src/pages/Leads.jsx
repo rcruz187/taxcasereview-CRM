@@ -1756,11 +1756,13 @@ export default function Leads() {
               </div>
             </div>
             {(form.irsOrState||'IRS Federal')!=='IRS Federal' && (
+              <div className="fg2">
               <div className="field"><label>Est. State Balance</label>
                 <select value={form.stateBalance||''} onChange={e=>fld('stateBalance',e.target.value)}>
                   <option value="">Unknown</option>
                   {['Under $10,000','$10,000 - $20,000','$20,000 - $30,000','$30,000 - $50,000','$50,000 - $100,000','$100,000 - $250,000','Over $250,000'].map(o=><option key={o}>{o}</option>)}
                 </select>
+              </div>
               </div>
             )}
             <div className="fg2">
@@ -1876,7 +1878,7 @@ export default function Leads() {
                 </div>
                 {[
                   {step:'1',color:'#3b82f6',title:'Greeting',lines:[
-                    '"Thank you for calling Tax Case Review, this is [Name] — how can I help you today?"',
+                    `"Thank you for calling ${FIRM.name || 'our firm'}, this is [Name] — how can I help you today?"`,
                     'Be warm and confident. Let them speak first. Do not rush.',
                   ]},
                   {step:'2',color:'#8b5cf6',title:'Get the Story',lines:[
@@ -2672,7 +2674,7 @@ export default function Leads() {
         )}
 
         {bookingLead && (
-          <BookingWidget contact={{name:bookingLead.name, email:bookingLead.email, phone:bookingLead.phone}} onClose={()=>setBookingLead(null)} mode="lead"/>
+          <BookingWidget mode="lead" contact={{id:bookingLead.id, name:bookingLead.name, email:bookingLead.email, phone:bookingLead.phone}} onClose={()=>setBookingLead(null)} mode="lead"/>
         )}
         {quickEmail && <QuickEmail contact={{ name: quickEmail.name, email: quickEmail.email }} kind="lead" leadId={quickEmail.id} onSent={() => loadLeadNotes(quickEmail.id)} onClose={() => setQuickEmail(null)} />}
         {resolutionFeeLead && (
