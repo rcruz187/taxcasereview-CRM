@@ -2477,7 +2477,7 @@ export default function Leads() {
         <div className="detail-2col" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
           <div className="card">
             <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>Contact Info</div>
-            {[['Phone',l.phone],['Phone 2',l.phone2],['Email',l.email],['SSN',l.ssn?'***-**-'+l.ssn.replace(/-/g,'').slice(-4):null],['EIN',l.ein],['Date of Birth',l.dob],['Filing Status',l.filingStatus],['Spouse Name',l.spouseName],['Spouse DOB',l.spouseDob],['Spouse SSN',l.spouseSsn?'***-**-'+l.spouseSsn.replace(/-/g,'').slice(-4):null],[l.business_name ? 'Personal Address' : 'Address',[l.street,l.city,l.state,l.zip].filter(Boolean).join(', ')],['Business Address',[l.biz_street,l.biz_city,l.biz_state,l.biz_zip].filter(Boolean).join(', ')],['County',l.county],['Source',l.source],['Tax Advisor',l.assignedTo||'—'],['Tax Associate',l.taxAssociate||'—']].map(([label,val])=>(
+            {[['Phone',l.phone],['Phone 2',l.phone2],['Email',l.email],['SSN',l.ssn?'***-**-'+l.ssn.replace(/-/g,'').slice(-4):null],['EIN',l.ein],['Date of Birth',l.dob],['Filing Status',l.filingStatus],['Spouse Name',l.spouseName],['Spouse DOB',l.spouseDob],['Spouse SSN',l.spouseSsn?'***-**-'+l.spouseSsn.replace(/-/g,'').slice(-4):null],[l.business_name ? 'Personal Address' : 'Address',[l.street,l.city,l.state,l.zip].filter(Boolean).join(', ')],['Business Address',[l.biz_street,l.biz_city,l.biz_state,l.biz_zip].filter(Boolean).join(', ')],['County',l.county],['Source',l.source]].map(([label,val])=>(
               <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">
                 {(label==='Phone'||label==='Phone 2') && val
                   ? <InPlaceCaller phone={val} name={l.name} entityType="lead" entityId={l.id} supabase={supabase} showToast={showToast} onLogged={()=>loadLeadNotes(l.id)}/>
@@ -2508,6 +2508,8 @@ export default function Leads() {
                 ['State Status',   l.stateStatus==='Other'?l.stateStatusOther:l.stateStatus],
                 ['State Deadline', l.stateDeadline],
               ] : []),
+              ['Tax Advisor',  l.assignedTo||<span style={{color:'var(--warn)'}}>Unassigned</span>],
+              ['Tax Associate', l.taxAssociate||'—'],
               ['Tax Inv Fee',  l.taxFee?<span style={{fontWeight:700,color:'var(--ok)'}}>${l.taxFee}</span>:'Not set'],
             ].map(([label,val])=>(
               <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">{val||'—'}</span></div>
