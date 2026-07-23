@@ -72,6 +72,7 @@ const BLANK = {
   ssn:'', ein:'', dob:'',
   spouseName:'', spouseSsn:'', spouseDob:'', filingStatus:'Single',
   street:'', city:'', state:'', zip:'', county:'', source:'Referral', taxAssociate:'',
+  biz_street:'', biz_city:'', biz_state:'', biz_zip:'', biz_same_as_personal:false,
   irsBalance:'', stateBalance:'', issueType:'OIC', irsOrState:'IRS Federal', taxYears:[],
   filingRequirements:[],
   irsStatus:'', irsStatusOther:'', irsDeadline:'',
@@ -1485,6 +1486,8 @@ export default function Leads() {
       payment_method_brand: l.payment_method_brand,
       payment_method_last4: l.payment_method_last4,
       street: l.street, city: l.city, state: l.state, zip: l.zip, county: l.county,
+      biz_street: l.biz_street || null, biz_city: l.biz_city || null,
+      biz_state: l.biz_state || null, biz_zip: l.biz_zip || null,
       source: l.source, assignedTo: l.assignedTo, taxAssociate: l.taxAssociate || null,
       irsBalance: l.irsBalance, stateBalance: l.stateBalance, issueType: l.issueType, irsOrState: l.irsOrState,
       irsStatus: l.irsStatus, irsStatusOther: l.irsStatusOther, irsDeadline: l.irsDeadline,
@@ -1718,6 +1721,9 @@ export default function Leads() {
               </div>
             </div>
 
+            <div style={{fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',margin:'6px 0 4px'}}>
+              {form.clientType === 'Business' ? 'Address' : 'Personal Address'}
+            </div>
             <div className="field"><label>Street Address</label><input value={form.street} onChange={e=>fld('street',e.target.value)}/></div>
             <div className="fg3">
               <div className="field"><label>City</label><input value={form.city} onChange={e=>fld('city',e.target.value)}/></div>
@@ -1728,6 +1734,39 @@ export default function Leads() {
               </div>
               <div className="field"><label>ZIP</label><input value={form.zip} onChange={e=>handleZip(e.target.value)} maxLength={5} placeholder="33408"/></div>
             </div>
+            {form.clientType !== 'Individual' && (
+              <>
+                <div style={{display:'flex',alignItems:'center',gap:10,margin:'14px 0 4px'}}>
+                  <div style={{fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Business Address</div>
+                  <label style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'var(--t3)',cursor:'pointer'}}>
+                    <input type="checkbox" checked={!!form.biz_same_as_personal}
+                      onChange={e=>setForm(f=>({...f, biz_same_as_personal:e.target.checked,
+                        ...(e.target.checked ? { biz_street:f.street, biz_city:f.city, biz_state:f.state, biz_zip:f.zip } : {})}))}/>
+                    Same as personal
+                  </label>
+                </div>
+                <div className="field"><label>Business Street Address</label>
+                  <input value={form.biz_street||''} disabled={!!form.biz_same_as_personal}
+                    onChange={e=>fld('biz_street',e.target.value)}/>
+                </div>
+                <div className="fg3">
+                  <div className="field"><label>City</label>
+                    <input value={form.biz_city||''} disabled={!!form.biz_same_as_personal}
+                      onChange={e=>fld('biz_city',e.target.value)}/>
+                  </div>
+                  <div className="field"><label>State</label>
+                    <select value={form.biz_state||''} disabled={!!form.biz_same_as_personal}
+                      onChange={e=>fld('biz_state',e.target.value)}>
+                      <option value="">Select...</option>{STATES.map(s=><option key={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div className="field"><label>ZIP</label>
+                    <input value={form.biz_zip||''} disabled={!!form.biz_same_as_personal}
+                      onChange={e=>fld('biz_zip',e.target.value)} maxLength={5}/>
+                  </div>
+                </div>
+              </>
+            )}
             <div className="fg2">
               <div className="field"><label>Source</label>
                 <select value={form.source} onChange={e=>fld('source',e.target.value)}>
@@ -2438,7 +2477,7 @@ export default function Leads() {
         <div className="detail-2col" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
           <div className="card">
             <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>Contact Info</div>
-            {[['Phone',l.phone],['Phone 2',l.phone2],['Email',l.email],['SSN',l.ssn?'***-**-'+l.ssn.replace(/-/g,'').slice(-4):null],['EIN',l.ein],['Date of Birth',l.dob],['Filing Status',l.filingStatus],['Spouse Name',l.spouseName],['Spouse DOB',l.spouseDob],['Spouse SSN',l.spouseSsn?'***-**-'+l.spouseSsn.replace(/-/g,'').slice(-4):null],['Address',[l.street,l.city,l.state,l.zip].filter(Boolean).join(', ')],['County',l.county],['Source',l.source],['Tax Advisor',l.assignedTo],['Tax Associate',l.taxAssociate]].map(([label,val])=>(
+            {[['Phone',l.phone],['Phone 2',l.phone2],['Email',l.email],['SSN',l.ssn?'***-**-'+l.ssn.replace(/-/g,'').slice(-4):null],['EIN',l.ein],['Date of Birth',l.dob],['Filing Status',l.filingStatus],['Spouse Name',l.spouseName],['Spouse DOB',l.spouseDob],['Spouse SSN',l.spouseSsn?'***-**-'+l.spouseSsn.replace(/-/g,'').slice(-4):null],[l.business_name ? 'Personal Address' : 'Address',[l.street,l.city,l.state,l.zip].filter(Boolean).join(', ')],['Business Address',[l.biz_street,l.biz_city,l.biz_state,l.biz_zip].filter(Boolean).join(', ')],['County',l.county],['Source',l.source],['Tax Advisor',l.assignedTo||'—'],['Tax Associate',l.taxAssociate||'—']].map(([label,val])=>(
               <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">
                 {(label==='Phone'||label==='Phone 2') && val
                   ? <InPlaceCaller phone={val} name={l.name} entityType="lead" entityId={l.id} supabase={supabase} showToast={showToast} onLogged={()=>loadLeadNotes(l.id)}/>
@@ -2469,7 +2508,6 @@ export default function Leads() {
                 ['State Status',   l.stateStatus==='Other'?l.stateStatusOther:l.stateStatus],
                 ['State Deadline', l.stateDeadline],
               ] : []),
-              ['Assigned Rep', l.assignedTo||<span style={{color:'var(--warn)'}}>Unassigned</span>],
               ['Tax Inv Fee',  l.taxFee?<span style={{fontWeight:700,color:'var(--ok)'}}>${l.taxFee}</span>:'Not set'],
             ].map(([label,val])=>(
               <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">{val||'—'}</span></div>

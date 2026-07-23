@@ -1,4 +1,4 @@
-import { formatMoneyInput, parseMoney } from '../lib/money'
+import { formatMoneyInput, parseMoney, normalizeMoney } from '../lib/money'
 
 function n(v) { const x = parseFloat(v); return isNaN(x) ? 0 : x }
 function fmt(v) { return '$' + n(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
@@ -46,6 +46,7 @@ function Field({ label, value, onChange, type='text', wide, monthly }) {
         inputMode={type === 'number' ? 'decimal' : undefined}
         value={type === 'number' ? formatMoneyInput(value) : (value ?? '')}
         onChange={e=>onChange(type === 'number' ? parseMoney(e.target.value) : e.target.value)}
+        onBlur={type === 'number' ? (e=>onChange(normalizeMoney(e.target.value))) : undefined}
         placeholder="0.00"/>
     </div>
   )

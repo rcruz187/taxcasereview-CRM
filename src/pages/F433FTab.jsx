@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { formatMoneyInput, parseMoney } from '../lib/money'
+import { formatMoneyInput, parseMoney, normalizeMoney } from '../lib/money'
 import { fillForm433F, fillForm433A, fillForm433D, fillForm433H, fillForm433B, fillForm433AOIC, fillForm656L } from '../lib/irsFormUtils'
 
 function n(v) { const x = parseFloat(v); return isNaN(x) ? 0 : x }
@@ -18,6 +18,7 @@ function Field({ label, value, onChange, type='text', wide }) {
         inputMode={isMoney || isCount ? 'decimal' : undefined}
         value={isMoney ? formatMoneyInput(value) : (value ?? '')}
         onChange={e=>onChange(isMoney ? parseMoney(e.target.value) : e.target.value)}
+        onBlur={isMoney ? (e=>onChange(normalizeMoney(e.target.value))) : undefined}
         placeholder=""/>
     </div>
   )

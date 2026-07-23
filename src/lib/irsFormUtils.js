@@ -145,11 +145,17 @@ export function buildNameAddress(client, party = 'personal') {
   const name = party === 'business'
     ? (client.business_name || client.name || '')
     : (client.name || client.business_name || '');
+  // A business authorization is filed at the entity's own address when one is
+  // on record. Falling back to the personal address is correct for a business
+  // run from home, which is most of them.
+  const useBiz = party === 'business' && client.biz_street;
+  const street = useBiz ? client.biz_street : (client.address || client.street);
+  const city   = useBiz ? client.biz_city   : client.city;
+  const st     = useBiz ? client.biz_state  : client.state;
+  const zip    = useBiz ? client.biz_zip    : client.zip;
   const parts = [
-    client.address || client.street,
-    client.city && client.state
-      ? `${client.city} ${client.state}${client.zip ? ' ' + client.zip : ''}`
-      : client.city || client.state || '',
+    street,
+    city && st ? `${city} ${st}${zip ? ' ' + zip : ''}` : city || st || '',
   ].filter(Boolean);
   return name + (parts.length ? '\r' + parts.join('\r') : '');
 }

@@ -59,3 +59,16 @@ export function formatDollars(value, opts = {}) {
   const s = formatMoney(value, opts)
   return s === '' ? (opts.blank ?? '') : '$' + s
 }
+
+/**
+ * Normalize a money value for storage once the person has finished typing.
+ * Pads to two decimals so 4200.5 is stored and shown as 4200.50 — mid-typing
+ * padding would fight the caret, so this belongs on blur, never on change.
+ * Leaves a genuinely empty field empty rather than inventing a 0.00.
+ */
+export function normalizeMoney(value) {
+  if (value === null || value === undefined || String(value).trim() === '') return ''
+  const n = parseFloat(String(value).replace(/[^0-9.\-]/g, ''))
+  if (!isFinite(n)) return ''
+  return n.toFixed(2)
+}

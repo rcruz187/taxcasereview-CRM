@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { formatMoneyInput, parseMoney } from '../lib/money'
+import { formatMoneyInput, parseMoney, normalizeMoney } from '../lib/money'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
@@ -61,6 +61,7 @@ function Field({ label, value, onChange, type='text', placeholder='', wide }) {
         inputMode={isMoney ? 'decimal' : undefined}
         value={isMoney ? formatMoneyInput(value) : (value ?? '')}
         onChange={e=>onChange(isMoney ? parseMoney(e.target.value) : e.target.value)}
+        onBlur={isMoney ? (e=>onChange(normalizeMoney(e.target.value))) : undefined}
         placeholder={placeholder}/>
     </div>
   )
@@ -123,6 +124,20 @@ export default function FinancialProfile({ clientName, client, isLead = false })
     if (!next.dob) next.dob = toIsoDate(client.dob)
     if (!next.county) next.county = client.county || ''
     if (!next.filing_status) next.filing_status = client.filingStatus || ''
+
+    // Business identity carries over from the lead/client record. Without this
+    // the associate re-typed the entity name and EIN that were captured at
+    // intake, and a mistyped EIN follows the case onto every form after it.
+    if (client.business_name || client.ein) {
+      const b = { ...(next.business_1 || {}) }
+      if (!b.name) b.name = client.business_name || ''
+      if (!b.ein)  b.ein  = client.ein || ''
+      if (!b.address) {
+        b.address = [client.biz_street, client.biz_city, client.biz_state, client.biz_zip]
+          .filter(Boolean).join(', ')
+      }
+      next.business_1 = b
+    }
 
     // Household size: taxpayer (+spouse if MFJ) + dependents, split by age 65
     if (!next.household_under_65 && !next.household_over_65) {
@@ -728,7 +743,7 @@ function ExpField({ label, k, expenses, set, std }) {
   return (
     <div className="fp-expfield" style={{display:'grid',gridTemplateColumns: std!==undefined ? '1fr 140px 120px' : '1fr 140px', gap:10, alignItems:'center', padding:'7px 0'}}>
       <div style={{fontSize:14,fontWeight:500,color:'var(--tx)'}}>{label}</div>
-      <input type="text" inputMode="decimal" value={formatMoneyInput(expenses[k])} onChange={e=>set('expenses.'+k, parseMoney(e.target.value))} placeholder="0.00"
+      <input type="text" inputMode="decimal" value={formatMoneyInput(expenses[k])} onChange={e=>set('expenses.'+k, parseMoney(e.target.value))} onBlur={e=>set('expenses.'+k, normalizeMoney(e.target.value))} placeholder="0.00"
         style={{padding:'8px 10px',fontSize:14,background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)'}}/>
       {std!==undefined && <div style={{fontSize:13,color:'var(--t3)',textAlign:'right'}}>Std: {fmt(std)}</div>}
     </div>

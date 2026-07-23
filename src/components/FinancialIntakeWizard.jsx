@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { FINANCIAL_INTAKE_STEPS, shouldShow } from '../lib/financialIntakeSchema'
 import { getStateTaxRate } from '../lib/stateTaxRates'
 import { estimateFederalWithholding, estimateFicaWithholding } from '../lib/federalTaxRates'
-import { formatMoneyInput, parseMoney } from '../lib/money'
+import { formatMoneyInput, parseMoney, normalizeMoney } from '../lib/money'
 import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 
 const LOGO_URL = ''  // replaced by FIRM.logoUrl
@@ -58,7 +58,7 @@ async function sendIntakeCopyEmail(record, answers) {
     body: {
       to: record.client_email,
       subject: `Your Financial Intake Submission — ${FIRM.name}`,
-      html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${record.client_name||'Client'}</strong>,</p><p>Thank you for completing your financial intake form. Here's a copy of everything you submitted for your records:</p>${answersHtml}<p style="font-size:11px;color:#94a3b8;margin-top:24px">${FIRM.name} · ${FIRM.address}</p></div>`
+      html: `<!DOCTYPE html><html><body style=\"margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f1f5f9;padding:32px 16px\"><tr><td align=\"center\"><table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)\"><tr><td style=\"background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 100%);padding:32px 40px;text-align:center\"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:60px;max-width:240px;object-fit:contain\" onerror=\"this.style.display='none'\"/><div style=\"font-size:22px;font-weight:800;color:#ffffff;margin-top:12px;letter-spacing:-.02em\">${FIRM.name}</div><div style=\"font-size:12px;color:#93c5fd;margin-top:4px;letter-spacing:.08em;text-transform:uppercase\">IRS Resolution Services</div></td></tr><tr><td style=\"padding:40px 40px 32px;color:#334155;font-size:15px;line-height:1.7\"><p style=\"margin:0 0 16px;font-size:16px;color:#0f172a\">Dear <strong>${record.client_name||'Client'}</strong>,</p><p style=\"margin:0 0 16px\">Thank you for completing your financial intake. Your advisor now has what they need to review your situation and build a resolution plan. Here is a copy of everything you submitted, for your records.</p>${answersHtml}<p style=\"margin:16px 0 0\">If anything looks wrong, just reply to this email and we will correct it.</p><p style=\"margin:20px 0 0\">Sincerely,<br/><strong>${FIRM.name}</strong></p></td></tr><tr><td style=\"background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;font-size:11px;color:#94a3b8;line-height:1.6\">${FIRM.name} · ${FIRM.address}<br/>This message and any attachments are confidential and intended only for the addressee.</td></tr></table></td></tr></table></body></html>`
     }
   })
 }
@@ -546,7 +546,8 @@ function Question({ q, answers, setAnswer, addEntry, updateEntry, removeEntry, l
         // and these figures get read back to clients. parseMoney strips the
         // separators again before anything is stored.
         <input type="text" inputMode="decimal" value={formatMoneyInput(val)}
-          onChange={e=>setAnswer(q.id, parseMoney(e.target.value))} style={S.input}/>
+          onChange={e=>setAnswer(q.id, parseMoney(e.target.value))}
+          onBlur={e=>setAnswer(q.id, normalizeMoney(e.target.value))} style={S.input}/>
       )}
 
       {q.type === 'date' && (
@@ -584,6 +585,7 @@ function Question({ q, answers, setAnswer, addEntry, updateEntry, removeEntry, l
                         placeholder={f.placeholder||''}
                         value={f.type === 'number' ? formatMoneyInput(entry[f.id]) : (entry[f.id]||'')}
                         onChange={e=>updateEntry(q.id, idx, f.id, f.type === 'number' ? parseMoney(e.target.value) : e.target.value)}
+                        onBlur={f.type === 'number' ? (e=>updateEntry(q.id, idx, f.id, normalizeMoney(e.target.value))) : undefined}
                         style={S.inputSm}/>
                       {(f.id === 'fed_withheld' || f.id === 'ss_med_withheld') && (
                         <div style={{fontSize:10, color:'#60a5fa', marginTop:3}}>
