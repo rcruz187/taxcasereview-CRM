@@ -1,4 +1,5 @@
 import { validateFile } from '../lib/uploadUtils'
+import { NOTE_TEMPLATES } from '../lib/noteTemplates'
 import { logActivity, getActor } from '../lib/activityLog'
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect, useRef } from 'react'
@@ -45,7 +46,7 @@ const IRS_STATUS_OPTIONS = ['ACS','Notice Status','Queue for ACS','Currently Not
 
 const BLANK_DEP = { name:'', ssn:'', dob:'', relationship:'Child' }
 const BLANK = {
-  clientType:'Individual', name:'', business_name:'', phone:'', phone2:'', email:'',
+  clientType:'Individual', name:'', business_name:'', taxAssociate:'', phone:'', phone2:'', email:'',
   street:'', city:'', state:'', zip:'', county:'',
   ssn:'', ein:'', dobM:'', dobD:'', dobY:'',
   spouseName:'', spouseSsn:'', spouseDob:'', filingStatus:'Single',
@@ -1107,7 +1108,7 @@ export default function Clients() {
     setLoadingRel(true)
     const [casesRes,tasksRes,invoicesRes,docsRes,clientNotesRes,paymentsRes,smsRes,deadlinesRes] = await Promise.all([
       supabase.from('cases').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
-      supabase.from('tasks').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
+      supabase.from('tasks').select('*').eq('clientName', clientName).order('dueDate',{ascending:true}).order('created_at',{ascending:true}),
       supabase.from('invoices').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('documents').select('*').eq('client', clientName).order('created_at',{ascending:false}),
       supabase.from('client_notes').select('*').eq('clientname', clientName).order('created_at',{ascending:false}),
@@ -2001,6 +2002,20 @@ export default function Clients() {
                   style={{flex:1,padding:'8px 10px',borderRadius:8,border:'1px solid var(--br)',resize:'vertical',minHeight:60,fontSize:13,fontFamily:'inherit',background:'var(--s2)',color:'var(--tx)'}}
                 />
                 <div style={{display:'flex',flexDirection:'column',gap:6,alignItems:'flex-start'}}>
+                  {/* Fills the box for the rep to finish; never posts on its own. */}
+                  <select value="" style={{fontSize:11,padding:'5px 8px',borderRadius:6,width:'100%'}}
+                    onChange={e=>{
+                      const t = NOTE_TEMPLATES.flatMap(g=>g.items).find(i=>i.label===e.target.value)
+                      if (!t) return
+                      setNewNote(prev => prev.trim() ? prev.trim()+'\n\n'+t.text : t.text)
+                    }}>
+                    <option value="">📝 Template…</option>
+                    {NOTE_TEMPLATES.map(g=>(
+                      <optgroup key={g.group} label={g.group}>
+                        {g.items.map(i=><option key={i.label} value={i.label}>{i.label}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
                   <label style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'var(--t3)',cursor:'pointer',whiteSpace:'nowrap'}}>
                     <input type="checkbox" checked={noteVisibleToClient} onChange={e=>setNoteVisibleToClient(e.target.checked)}/>
                     Visible to client
@@ -2467,7 +2482,8 @@ export default function Clients() {
                   <DR label="State Deadline" val={c.stateDeadline}/>
                 </>
               )}
-              <DR label="Assigned Rep" val={c.assignedTo}/>
+              <DR label="Tax Advisor" val={c.assignedTo}/>
+              <DR label="Tax Associate" val={c.taxAssociate}/>
               <DR label="Client Since" val={c.clientSince}/>
             </div>
 
@@ -3282,9 +3298,15 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
               <option>Active</option><option>Inactive</option><option>Prospect</option>
             </select>
           </div>
-          <div className="field"><label>Assigned Rep</label>
+          <div className="field"><label>Tax Advisor</label>
             <select value={form.assignedTo||''} onChange={e=>fld('assignedTo',e.target.value)}>
               <option value="">Unassigned</option>{reps.map(r=><option key={r}>{r}</option>)}
+            </select>
+          </div>
+          {/* Named associate overrides the round-robin pick on workflow steps. */}
+          <div className="field"><label>Tax Associate</label>
+            <select value={form.taxAssociate||''} onChange={e=>fld('taxAssociate',e.target.value)}>
+              <option value="">Auto (round-robin)</option>{reps.map(r=><option key={r}>{r}</option>)}
             </select>
           </div>
         </div>

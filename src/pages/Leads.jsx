@@ -3,6 +3,7 @@ import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { NOTE_TEMPLATES } from '../lib/noteTemplates'
 import { triggerWorkflow, applyWorkflowTemplate } from '../lib/triggerWorkflow'
 import { useApp } from '../context/AppContext'
 import { useCall } from '../context/CallContext'
@@ -69,7 +70,7 @@ const BLANK = {
   smsConsent:false, smsConsentDate:null,
   ssn:'', ein:'', dob:'',
   spouseName:'', spouseSsn:'', spouseDob:'', filingStatus:'Single',
-  street:'', city:'', state:'', zip:'', county:'', source:'Referral',
+  street:'', city:'', state:'', zip:'', county:'', source:'Referral', taxAssociate:'',
   irsBalance:'', stateBalance:'', issueType:'OIC', irsOrState:'IRS Federal', taxYears:[],
   filingRequirements:[],
   irsStatus:'', irsStatusOther:'', irsDeadline:'',
@@ -519,7 +520,7 @@ export default function Leads() {
   async function load() {
     const [{ data }, { data: emp }, { data: cats }, { data: sts }] = await Promise.all([
       supabase.from('leads').select('*').order('created_at', { ascending: false }),
-      supabase.from('employees').select('id,name,avatar_url,email').order('name'),
+      supabase.from('employees').select('id,name,avatar_url,email,role').order('name'),
       supabase.from('workflow_status_categories').select('*').order('sort_order'),
       supabase.from('workflow_statuses').select('*').order('sort_order'),
     ])
@@ -567,7 +568,12 @@ export default function Leads() {
   // added here while still a lead doesn't need any copy/transfer step at
   // conversion time — it's the same row, same key, still there afterward.
   async function loadLeadTasks(leadName) {
-    const { data } = await supabase.from('tasks').select('*').eq('clientName', leadName).order('created_at', { ascending: false })
+    // Due date ascending is the order a rep actually works the file, and it
+    // survives however the rows were inserted. Sorting on created_at desc put
+    // the last workflow step at the top whenever the insert timestamps landed
+    // in the same second. created_at breaks ties within a single due date.
+    const { data } = await supabase.from('tasks').select('*').eq('clientName', leadName)
+      .order('dueDate', { ascending: true }).order('created_at', { ascending: true })
     setLeadTasks(data || [])
   }
   // Covers every way the detail view can open — list click, direct URL/
@@ -1478,7 +1484,7 @@ export default function Leads() {
       payment_method_brand: l.payment_method_brand,
       payment_method_last4: l.payment_method_last4,
       street: l.street, city: l.city, state: l.state, zip: l.zip, county: l.county,
-      source: l.source, assignedTo: l.assignedTo,
+      source: l.source, assignedTo: l.assignedTo, taxAssociate: l.taxAssociate || null,
       irsBalance: l.irsBalance, stateBalance: l.stateBalance, issueType: l.issueType, irsOrState: l.irsOrState,
       irsStatus: l.irsStatus, irsStatusOther: l.irsStatusOther, irsDeadline: l.irsDeadline,
       stateStatus: l.stateStatus, stateStatusOther: l.stateStatusOther, stateDeadline: l.stateDeadline,
@@ -1806,9 +1812,18 @@ export default function Leads() {
             </div>
             <div className="field"><label>Notes</label><textarea value={form.notes} onChange={e=>fld('notes',e.target.value)}/></div>
             <div className="fg2">
-              <div className="field"><label>Assigned Rep</label>
+              <div className="field"><label>Tax Advisor</label>
                 <select value={form.assignedTo} onChange={e=>fld('assignedTo',e.target.value)}>
                   <option value="">Unassigned</option>
+                  {(employees.length>0?employees.map(e=>e.name):['Romy Cruz','Dana Richard','Yesenia Gonzalez']).map(n=><option key={n}>{n}</option>)}
+                </select>
+              </div>
+              {/* The associate who works the case day to day. Workflow steps
+                  marked ASSOCIATE go here when set; otherwise they fall back to
+                  the round-robin pick, which is why this can stay blank. */}
+              <div className="field"><label>Tax Associate</label>
+                <select value={form.taxAssociate||''} onChange={e=>fld('taxAssociate',e.target.value)}>
+                  <option value="">Auto (round-robin)</option>
                   {(employees.length>0?employees.map(e=>e.name):['Romy Cruz','Dana Richard','Yesenia Gonzalez']).map(n=><option key={n}>{n}</option>)}
                 </select>
               </div>
@@ -2126,6 +2141,23 @@ export default function Leads() {
                   style={{flex:1,padding:'8px 10px',borderRadius:8,border:'1px solid var(--br)',resize:'vertical',minHeight:60,fontSize:13,fontFamily:'inherit',background:'var(--s2)',color:'var(--tx)'}}
                 />
                 <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                  {/* Templates fill the box for the rep to finish — they never
+                      post on their own. Blanks are ____ so an unedited note is
+                      obvious to whoever reads the file next. */}
+                  <select value="" style={{fontSize:11,padding:'5px 8px',borderRadius:6}}
+                    onChange={e=>{
+                      const t = NOTE_TEMPLATES.flatMap(g=>g.items).find(i=>i.label===e.target.value)
+                      if (!t) return
+                      setNewLeadNote(prev => prev.trim() ? prev.trim()+'\n\n'+t.text : t.text)
+                      if (t.type) setNoteType(t.type)
+                    }}>
+                    <option value="">📝 Template…</option>
+                    {NOTE_TEMPLATES.map(g=>(
+                      <optgroup key={g.group} label={g.group}>
+                        {g.items.map(i=><option key={i.label} value={i.label}>{i.label}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
                   <select value={noteType} onChange={e=>setNoteType(e.target.value)} style={{fontSize:11,padding:'5px 8px',borderRadius:6}}>
                     {['Call','Email','Text','Voicemail','Meeting','Note'].map(t=><option key={t} value={t}>{t}</option>)}
                   </select>
@@ -2405,7 +2437,7 @@ export default function Leads() {
         <div className="detail-2col" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
           <div className="card">
             <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>Contact Info</div>
-            {[['Phone',l.phone],['Phone 2',l.phone2],['Email',l.email],['SSN',l.ssn?'***-**-'+l.ssn.replace(/-/g,'').slice(-4):null],['EIN',l.ein],['Date of Birth',l.dob],['Filing Status',l.filingStatus],['Spouse Name',l.spouseName],['Spouse DOB',l.spouseDob],['Spouse SSN',l.spouseSsn?'***-**-'+l.spouseSsn.replace(/-/g,'').slice(-4):null],['Address',[l.street,l.city,l.state,l.zip].filter(Boolean).join(', ')],['County',l.county],['Source',l.source]].map(([label,val])=>(
+            {[['Phone',l.phone],['Phone 2',l.phone2],['Email',l.email],['SSN',l.ssn?'***-**-'+l.ssn.replace(/-/g,'').slice(-4):null],['EIN',l.ein],['Date of Birth',l.dob],['Filing Status',l.filingStatus],['Spouse Name',l.spouseName],['Spouse DOB',l.spouseDob],['Spouse SSN',l.spouseSsn?'***-**-'+l.spouseSsn.replace(/-/g,'').slice(-4):null],['Address',[l.street,l.city,l.state,l.zip].filter(Boolean).join(', ')],['County',l.county],['Source',l.source],['Tax Advisor',l.assignedTo],['Tax Associate',l.taxAssociate]].map(([label,val])=>(
               <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">
                 {(label==='Phone'||label==='Phone 2') && val
                   ? <InPlaceCaller phone={val} name={l.name} entityType="lead" entityId={l.id} supabase={supabase} showToast={showToast} onLogged={()=>loadLeadNotes(l.id)}/>

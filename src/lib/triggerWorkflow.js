@@ -67,10 +67,25 @@ export async function triggerWorkflow(event, entityType, entityName, actorName, 
     }
     advisorName = advisorName || actorName
 
+    // An associate named on the record wins; round-robin is only the fallback
+    // for records that haven't been assigned one.
     let associateName = null
     if (steps.some(s => s.assigned_role === 'ASSOCIATE')) {
-      const { data: rr } = await supabase.rpc('get_next_tax_associate')
-      associateName = rr || advisorName
+      let named = null
+      if (entityType === 'client' || entityType === 'case') {
+        const { data: cRows } = await supabase.from('clients').select('taxAssociate').eq('name', entityName).limit(1)
+        named = cRows?.[0]?.taxAssociate || null
+      }
+      if (!named) {
+        const { data: lRows } = await supabase.from('leads').select('taxAssociate').eq('name', entityName).limit(1)
+        named = lRows?.[0]?.taxAssociate || null
+      }
+      if (named) {
+        associateName = named
+      } else {
+        const { data: rr } = await supabase.rpc('get_next_tax_associate')
+        associateName = rr || advisorName
+      }
     }
 
     // Build task inserts
@@ -165,8 +180,21 @@ export async function applyWorkflowTemplate(templateIds, entityName, actorName, 
 
   let associateName = null
   if (steps.some(s => s.assigned_role === 'ASSOCIATE')) {
-    const { data: rr } = await supabase.rpc('get_next_tax_associate')
-    associateName = rr || actorName
+    // Named associate on the record wins over the round-robin pick.
+    let named = null
+    if (entityKind === 'client') {
+      const { data: cRows } = await supabase.from('clients').select('taxAssociate').eq('name', entityName).limit(1)
+      named = cRows?.[0]?.taxAssociate || null
+    }
+    if (!named) {
+      const { data: lRows } = await supabase.from('leads').select('taxAssociate').eq('name', entityName).limit(1)
+      named = lRows?.[0]?.taxAssociate || null
+    }
+    if (named) associateName = named
+    else {
+      const { data: rr } = await supabase.rpc('get_next_tax_associate')
+      associateName = rr || actorName
+    }
   }
 
   const now = new Date()
