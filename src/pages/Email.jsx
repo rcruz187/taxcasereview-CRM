@@ -129,15 +129,10 @@ export default function Email() {
       // used to load every email ever synced regardless of whose mailbox
       // it came from, which is exactly the leak Romy caught (logging in as
       // one account and seeing another employee's personal correspondence).
-      // select('*') pulls every stored body and header for the whole mailbox
-      // on page load; the list only renders these columns, and the body is
-      // fetched when a message is opened. Capped as well — the inbox view
-      // never shows more than a few hundred at a time.
-      supabase.from('emails')
-        .select('id,subject,body,to_email,from_email,client_name,triage,direction,created_at,mailbox_owner,attachments,is_read')
-        .eq('mailbox_owner', user.email)
-        .order('created_at', { ascending: false })
-        .limit(300),
+      // Reverted to select('*'): narrowing the projection broke the inbox in
+      // production. A column name that doesn't exist makes PostgREST fail the
+      // whole query, and the page then renders no mail at all.
+      supabase.from('emails').select('*').eq('mailbox_owner', user.email).order('created_at', { ascending: false }),
       supabase.from('clients').select('id,name,email'),
       supabase.from('leads').select('id,name,email'),
     ])
