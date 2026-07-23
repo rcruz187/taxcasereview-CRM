@@ -48,6 +48,7 @@ const IRS_STATUS_OPTIONS = ['ACS','Notice Status','Queue for ACS','Currently Not
 const BLANK_DEP = { name:'', ssn:'', dob:'', relationship:'Child' }
 const BLANK = {
   clientType:'Individual', name:'', business_name:'', taxAssociate:'', phone:'', phone2:'', email:'',
+  biz_street:'', biz_city:'', biz_state:'', biz_zip:'', biz_same_as_personal:false,
   street:'', city:'', state:'', zip:'', county:'',
   ssn:'', ein:'', dobM:'', dobD:'', dobY:'',
   spouseName:'', spouseSsn:'', spouseDob:'', filingStatus:'Single',
@@ -2419,7 +2420,8 @@ export default function Clients() {
               <DR label="Phone"   val={c.phone} name={c.name} entityId={c.id} showToast={showToast} onLogged={()=>{ loadRelated(c.name) }}/>
               <DR label="Phone 2" val={c.phone2} name={c.name} entityId={c.id} showToast={showToast} onLogged={()=>{ loadRelated(c.name) }}/>
               <DR label="Email"   val={c.email ? <span style={{color:'var(--blue)',cursor:'pointer',textDecoration:'underline'}} title="Send email" onClick={()=>setQuickEmail({ name:c.name, email:c.email })}>{c.email} ✉️</span> : null}/>
-              <DR label="Address" val={[c.street,c.city,c.state,c.zip].filter(Boolean).join(', ')}/>
+              <DR label={c.business_name ? "Personal Address" : "Address"} val={[c.street,c.city,c.state,c.zip].filter(Boolean).join(', ')}/>
+              <DR label="Business Address" val={[c.biz_street,c.biz_city,c.biz_state,c.biz_zip].filter(Boolean).join(', ')}/>
               <DR label="County"  val={c.county}/>
             </div>
 
@@ -3124,6 +3126,9 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
             Client has verbally or in writing consented to receive text message updates about their case (required before sending SMS — TCR compliance)
           </label>
         </div>
+        <div style={{fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',margin:'6px 0 4px'}}>
+          {form.clientType === 'Business' ? 'Address' : 'Personal Address'}
+        </div>
         <div className="field"><label>Street Address</label><input value={form.street||''} onChange={e=>fld('street',e.target.value)}/></div>
         <div className="fg3">
           <div className="field"><label>City</label><input value={form.city||''} onChange={e=>fld('city',e.target.value)}/></div>
@@ -3135,6 +3140,35 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
           <div className="field"><label>ZIP</label><input value={form.zip||''} onChange={e=>handleZip(e.target.value)} maxLength={5} placeholder="33408"/></div>
         </div>
         <div className="field"><label>County</label><input value={form.county||''} onChange={e=>fld('county',e.target.value)} placeholder="e.g. Palm Beach"/></div>
+        {form.clientType !== 'Individual' && (
+          <>
+            <div style={{display:'flex',alignItems:'center',gap:10,margin:'14px 0 4px'}}>
+              <div style={{fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Business Address</div>
+              <label style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'var(--t3)',cursor:'pointer'}}>
+                <input type="checkbox" checked={!!form.biz_same_as_personal}
+                  onChange={e=>setForm(f=>({...f, biz_same_as_personal:e.target.checked,
+                    ...(e.target.checked ? { biz_street:f.street, biz_city:f.city, biz_state:f.state, biz_zip:f.zip } : {})}))}/>
+                Same as personal
+              </label>
+            </div>
+            <div className="field"><label>Business Street Address</label>
+              <input value={form.biz_street||''} disabled={!!form.biz_same_as_personal} onChange={e=>fld('biz_street',e.target.value)}/>
+            </div>
+            <div className="fg3">
+              <div className="field"><label>City</label>
+                <input value={form.biz_city||''} disabled={!!form.biz_same_as_personal} onChange={e=>fld('biz_city',e.target.value)}/>
+              </div>
+              <div className="field"><label>State</label>
+                <select value={form.biz_state||''} disabled={!!form.biz_same_as_personal} onChange={e=>fld('biz_state',e.target.value)}>
+                  <option value="">Select…</option>{STATES.map(s=><option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="field"><label>ZIP</label>
+                <input value={form.biz_zip||''} disabled={!!form.biz_same_as_personal} onChange={e=>fld('biz_zip',e.target.value)} maxLength={5}/>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Taxpayer */}
         <div style={{background:'var(--s3)',borderRadius:8,padding:12,marginBottom:10}}>
