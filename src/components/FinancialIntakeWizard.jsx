@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { FINANCIAL_INTAKE_STEPS, shouldShow } from '../lib/financialIntakeSchema'
 import { getStateTaxRate } from '../lib/stateTaxRates'
 import { estimateFederalWithholding, estimateFicaWithholding } from '../lib/federalTaxRates'
+import { formatMoneyInput, parseMoney } from '../lib/money'
 import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 
 const LOGO_URL = ''  // replaced by FIRM.logoUrl
@@ -541,7 +542,11 @@ function Question({ q, answers, setAnswer, addEntry, updateEntry, removeEntry, l
       )}
 
       {q.type === 'number' && (
-        <input type="number" value={val||''} onChange={e=>setAnswer(q.id, e.target.value)} style={S.input}/>
+        // Text rather than number: a number input refuses to display commas,
+        // and these figures get read back to clients. parseMoney strips the
+        // separators again before anything is stored.
+        <input type="text" inputMode="decimal" value={formatMoneyInput(val)}
+          onChange={e=>setAnswer(q.id, parseMoney(e.target.value))} style={S.input}/>
       )}
 
       {q.type === 'date' && (
@@ -573,8 +578,13 @@ function Question({ q, answers, setAnswer, addEntry, updateEntry, removeEntry, l
                     </div>
                   ) : (
                     <>
-                      <input type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'} placeholder={f.placeholder||''}
-                        value={entry[f.id]||''} onChange={e=>updateEntry(q.id, idx, f.id, e.target.value)} style={S.inputSm}/>
+                      <input
+                        type={f.type === 'date' ? 'date' : 'text'}
+                        inputMode={f.type === 'number' ? 'decimal' : undefined}
+                        placeholder={f.placeholder||''}
+                        value={f.type === 'number' ? formatMoneyInput(entry[f.id]) : (entry[f.id]||'')}
+                        onChange={e=>updateEntry(q.id, idx, f.id, f.type === 'number' ? parseMoney(e.target.value) : e.target.value)}
+                        style={S.inputSm}/>
                       {(f.id === 'fed_withheld' || f.id === 'ss_med_withheld') && (
                         <div style={{fontSize:10, color:'#60a5fa', marginTop:3}}>
                           Calculated from your gross pay{f.id === 'fed_withheld' ? ' and filing status' : ''}. You can override this.

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { formatMoneyInput, parseMoney } from '../lib/money'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
@@ -47,10 +48,19 @@ function n(v) { const x = parseFloat(v); return isNaN(x) ? 0 : x }
 function fmt(v) { return '$' + n(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
 function Field({ label, value, onChange, type='text', placeholder='', wide }) {
+  // Money fields render as text so the thousands separators survive — a number
+  // input silently refuses any value containing a comma. parseMoney strips them
+  // back out before the value is stored, so nothing formatted reaches the row.
+  const isMoney = type === 'number'
   return (
     <div className="field" style={wide ? { gridColumn: '1 / -1' } : {}}>
       <label>{label}</label>
-      <input type={type} value={value ?? ''} onChange={e=>onChange(e.target.value)} placeholder={placeholder}/>
+      <input
+        type={isMoney ? 'text' : type}
+        inputMode={isMoney ? 'decimal' : undefined}
+        value={isMoney ? formatMoneyInput(value) : (value ?? '')}
+        onChange={e=>onChange(isMoney ? parseMoney(e.target.value) : e.target.value)}
+        placeholder={placeholder}/>
     </div>
   )
 }
