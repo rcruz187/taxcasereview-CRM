@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { FINANCIAL_INTAKE_STEPS, shouldShow } from '../lib/financialIntakeSchema'
 import { getStateTaxRate } from '../lib/stateTaxRates'
+import { estimateFederalWithholding, estimateFicaWithholding } from '../lib/federalTaxRates'
 import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 
 const LOGO_URL = ''  // replaced by FIRM.logoUrl
@@ -138,16 +139,32 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
     const current = [...(answers[questionId] || [])]
     current[idx] = { ...current[idx], [fieldId]: value }
 
-    // Auto-calculate state tax when gross pay changes on an employment entry.
-    // Gated on the county answer: no county means we don't know the taxing
-    // jurisdiction, so the field is left blank rather than guessed. A 0% state
-    // (FL, TX, etc.) fills a real 0 — previously `rate > 0` skipped those
-    // entirely and the field just sat empty next to a "0%" hint.
-    if (questionId === 'jobs_list' && fieldId === 'gross_monthly' && leadState && (answers.county || '').trim()) {
-      const rate = getStateTaxRate(leadState)
-      const existing = current[idx].state_withheld
-      if (rate !== null && (existing === '' || existing === undefined || existing === null)) {
-        current[idx].state_withheld = Math.round(parseFloat(value || 0) * rate)
+    // Entering gross pay fills the withholding lines the client would
+    // otherwise have to dig a pay stub out for. Only ever fills a BLANK field,
+    // so anything typed by hand — or read off an actual stub — is never
+    // overwritten.
+    if (questionId === 'jobs_list' && fieldId === 'gross_monthly') {
+      const blank = v => v === '' || v === undefined || v === null
+      const gross = parseFloat(value || 0)
+
+      // Federal and FICA are the same in every state, so neither waits on the
+      // county — only the state line does.
+      if (blank(current[idx].fed_withheld)) {
+        current[idx].fed_withheld = estimateFederalWithholding(gross, answers.filing_status)
+      }
+      if (blank(current[idx].ss_med_withheld)) {
+        current[idx].ss_med_withheld = estimateFicaWithholding(gross)
+      }
+
+      // State needs a jurisdiction. No county means we don't know it, so the
+      // field is left alone rather than guessed. A 0% state (FL, TX) fills a
+      // real 0 — an earlier `rate > 0` guard skipped those entirely and left
+      // the field empty next to a hint announcing "0%".
+      if (leadState && (answers.county || '').trim()) {
+        const rate = getStateTaxRate(leadState)
+        if (rate !== null && blank(current[idx].state_withheld)) {
+          current[idx].state_withheld = Math.round(gross * rate)
+        }
       }
     }
 
@@ -536,6 +553,11 @@ function Question({ q, answers, setAnswer, addEntry, updateEntry, removeEntry, l
                     <>
                       <input type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'} placeholder={f.placeholder||''}
                         value={entry[f.id]||''} onChange={e=>updateEntry(q.id, idx, f.id, e.target.value)} style={S.inputSm}/>
+                      {(f.id === 'fed_withheld' || f.id === 'ss_med_withheld') && (
+                        <div style={{fontSize:10, color:'#60a5fa', marginTop:3}}>
+                          Estimated from your gross pay{f.id === 'fed_withheld' ? ' and filing status' : ''}. If you have a pay stub handy, use the exact figure.
+                        </div>
+                      )}
                       {f.id === 'state_withheld' && leadState && getStateTaxRate(leadState) !== null && (
                         <div style={{fontSize:10, color:'#60a5fa', marginTop:3}}>
                           Auto-estimated from {leadState} state tax rate ({Math.round((getStateTaxRate(leadState)||0)*100)}%) based on the county you entered. You can override this.
