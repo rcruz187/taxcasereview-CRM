@@ -2496,7 +2496,7 @@ export default function Leads() {
               ...((l.irsOrState||'IRS Federal')!=='IRS Federal' ? [
                 ['Est. State Balance', l.stateBalance ? <span style={{fontWeight:700,color:'var(--bad)'}}>~{l.stateBalance}</span> : '—'],
               ] : []),
-              ['Issue Type',   <TypeBdg t={l.issueType||'—'}/>],
+              ['Issue Type',   <TypeBdg t={l.issueType||'—'} style={{fontSize:13,padding:'3px 10px'}}/>],
               ['IRS or State', l.irsOrState],
               ['Tax Years',    taxYearsList],
               ['Filing Reqs',  (()=>{try{return JSON.parse(l.filingRequirements||'[]').join(', ')}catch{return ''}})()],
