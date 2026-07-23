@@ -31,7 +31,7 @@ export default function Dashboard() {
       supabase.from('leads').select('*').order('created_at', { ascending: false }),
       supabase.from('clients').select('*').order('created_at', { ascending: false }),
       supabase.from('cases').select('*').order('created_at', { ascending: false }),
-      supabase.from('tasks').select('*').order('created_at', { ascending: false }),
+      supabase.from('tasks').select('*').not('deleted','is',true).order('created_at', { ascending: false }),
       supabase.from('invoices').select('id,total,status,clientName'),
       supabase.from('payments').select('id,amount,status,created_at,source,enrolled_by'),
       supabase.from('deadlines').select('*').order('dueDate', { ascending: true }),

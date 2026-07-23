@@ -574,7 +574,7 @@ export default function Leads() {
     // survives however the rows were inserted. Sorting on created_at desc put
     // the last workflow step at the top whenever the insert timestamps landed
     // in the same second. created_at breaks ties within a single due date.
-    const { data } = await supabase.from('tasks').select('*').eq('clientName', leadName)
+    const { data } = await supabase.from('tasks').select('*').eq('clientName', leadName).not('deleted','is',true)
       .order('dueDate', { ascending: true }).order('created_at', { ascending: true })
     setLeadTasks(data || [])
   }

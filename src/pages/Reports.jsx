@@ -38,7 +38,7 @@ export default function Reports() {
       supabase.from('clients').select('*').order('created_at',{ascending:true}),
       supabase.from('leads').select('*').order('created_at',{ascending:true}),
       supabase.from('cases').select('*').order('created_at',{ascending:true}),
-      supabase.from('tasks').select('*').order('created_at',{ascending:true}),
+      supabase.from('tasks').select('*').not('deleted','is',true).order('created_at',{ascending:true}),
       supabase.from('invoices').select('*').order('created_at',{ascending:true}),
       supabase.from('payments').select('*').order('created_at',{ascending:true}),
       supabase.from('deadlines').select('*'),

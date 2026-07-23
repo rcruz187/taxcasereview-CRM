@@ -1110,7 +1110,7 @@ export default function Clients() {
     setLoadingRel(true)
     const [casesRes,tasksRes,invoicesRes,docsRes,clientNotesRes,paymentsRes,smsRes,deadlinesRes] = await Promise.all([
       supabase.from('cases').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
-      supabase.from('tasks').select('*').eq('clientName', clientName).order('dueDate',{ascending:true}).order('created_at',{ascending:true}),
+      supabase.from('tasks').select('*').eq('clientName', clientName).not('deleted','is',true).order('dueDate',{ascending:true}).order('created_at',{ascending:true}),
       supabase.from('invoices').select('*').eq('clientName', clientName).order('created_at',{ascending:false}),
       supabase.from('documents').select('*').eq('client', clientName).order('created_at',{ascending:false}),
       supabase.from('client_notes').select('*').eq('clientname', clientName).order('created_at',{ascending:false}),

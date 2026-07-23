@@ -89,7 +89,11 @@ export default function Tasks() {
 
   async function load() {
     const [{ data:t },{ data:dt },{ data:c },{ data:lds },{ data:e },{ data:cats },{ data:sts }] = await Promise.all([
-      supabase.from('tasks').select('*').eq('deleted', false).order('created_at',{ascending:false}),
+      // `not is true` rather than `eq false`: a task inserted without the column
+      // set is NULL, and eq('deleted', false) hid those from this page entirely
+      // — so they could never be deleted from here while still showing on the
+      // lead and client tabs.
+      supabase.from('tasks').select('*').not('deleted','is',true).order('created_at',{ascending:false}),
       supabase.from('tasks').select('*').eq('deleted', true).order('deleted_at',{ascending:false}),
       supabase.from('clients').select('id,name'),
       supabase.from('leads').select('id,name'),

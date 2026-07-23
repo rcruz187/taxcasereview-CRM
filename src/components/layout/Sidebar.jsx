@@ -294,7 +294,7 @@ export default function Sidebar() {
       // Email.jsx — otherwise every user sees everyone's unread count.
       const [emailsRes, tasksRes] = await Promise.all([
         supabase.from('emails').select('id,is_read,triage').eq('mailbox_owner', user.email),
-        supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('done', false),
+        supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('done', false).not('deleted','is',true),
       ])
       const emails = emailsRes.data || []
       const inboxTriages = ['Inbox', 'Action Needed', 'Waiting']
