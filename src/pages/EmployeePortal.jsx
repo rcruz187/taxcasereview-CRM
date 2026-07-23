@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { hoursFromEntry, currentPeriod, buildLineItems } from '../lib/payrollUtils'
-import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
+// NOTE: do NOT use loadFirmBrandingPublic() here. booking_get_public_meta is
+// `select ... from settings order by id limit 1` — it returns the FIRST tenant's
+// row no matter who is asking, so on any tenant but the first it hands back the
+// wrong firm. Branding comes from emp_login instead, which knows the employee's
+// own tenant, and is cached so the login screen can show it next time.
+const BRAND_CACHE_KEY = 'tcr_portal_brand'
 
-// Fallback only — the real logo and name come from the signed-in tenant's
-// settings via loadFirmBrandingPublic(), which works before login because the
-// booking meta RPC is public.
-const LOGO_FALLBACK = '/taxcasereview-CRM/logo.png'
+function readCachedBrand() {
+  try { return JSON.parse(localStorage.getItem(BRAND_CACHE_KEY) || 'null') } catch (_) { return null }
+}
 
 // Same time math the kiosk (ClockIn.jsx) and admin TimeClock.jsx use, kept in sync.
 function parseTimeToMins(t) {
@@ -69,16 +73,11 @@ const PRIORITY_COLOR = { High: '#f87171', Normal: '#60a5fa', Low: '#64748b' }
 
 export default function EmployeePortal() {
   const [screen, setScreen] = useState('login')
-  // Branding is fetched before login so the portal shows the tenant's own firm
-  // rather than Tax Case Review on every deployment.
-  const [brand, setBrand] = useState({ name: FIRM.name, logoUrl: FIRM.logoUrl })
-  useEffect(() => {
-    let alive = true
-    loadFirmBrandingPublic().then(f => {
-      if (alive) setBrand({ name: f.name || 'Employee Portal', logoUrl: f.logoUrl || LOGO_FALLBACK })
-    })
-    return () => { alive = false }
-  }, [])
+  // Before anyone signs in there is genuinely no way to know which tenant this
+  // browser belongs to — same URL for every firm. So: show whatever firm last
+  // signed in on this device, and nothing at all on a fresh browser, rather
+  // than defaulting to a specific firm's logo and being wrong for everyone else.
+  const [brand, setBrand] = useState(() => readCachedBrand() || { name: '', logoUrl: '' })
   const [loginEmail, setLoginEmail] = useState('')
   const [pin, setPin] = useState('')
   const [changingPin, setChangingPin] = useState(false)
@@ -177,6 +176,12 @@ export default function EmployeePortal() {
     }
     setEmpToken(data.token)
     setEmp(data.employee)
+    // emp_login resolves the firm from the employee's own tenant.
+    if (data.firm) {
+      const b = { name: data.firm.name || '', logoUrl: data.firm.logo_url || '' }
+      setBrand(b)
+      try { localStorage.setItem(BRAND_CACHE_KEY, JSON.stringify(b)) } catch (_) {}
+    }
     await Promise.all([
       loadWeek(data.token, 0), loadPeriod(data.token, 0),
       loadTasks(data.token), loadEvents(data.token), loadTimeOff(data.token),
@@ -311,8 +316,8 @@ export default function EmployeePortal() {
 
   if (screen === 'login') return (
     <div style={{ minHeight: '100vh', background: '#060d18', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
-      <img src={brand.logoUrl || LOGO_FALLBACK} alt={brand.name} style={{ width: '100%', maxWidth: 280, height: 'auto', objectFit: 'contain', marginBottom: 20 }} onError={e => { e.currentTarget.style.display = 'none' }} />
-      <h1 style={{ fontSize: 22, fontWeight: 800, color: '#f1f5f9', margin: '0 0 6px' }}>{brand.name}</h1>
+      {brand.logoUrl && <img src={brand.logoUrl} alt={brand.name} style={{ width: '100%', maxWidth: 280, height: 'auto', objectFit: 'contain', marginBottom: 20 }} onError={e => { e.currentTarget.style.display = 'none' }} />}
+      <h1 style={{ fontSize: 22, fontWeight: 800, color: '#f1f5f9', margin: '0 0 6px' }}>{brand.name || 'Employee Portal'}</h1>
       <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 32px' }}>Employee Portal</p>
       <div style={{ width: '100%', maxWidth: 360 }}>
         <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 6 }}>WORK EMAIL</label>
