@@ -1122,6 +1122,11 @@ export default function Leads() {
     if (status === 'Tax Investigation Active') {
       const dueDate = new Date(); dueDate.setDate(dueDate.getDate() + 1)
       const dueDateStr = dueDate.toISOString().slice(0, 10)
+      // These are investigation work, so they belong to the associate named on
+      // the lead. The code used to assign them to whoever clicked the status,
+      // which contradicted the comment above and put them on an advisor's queue
+      // whenever the advisor was the one moving the pipeline.
+      const investigator = l.taxAssociate || l.assignedTo || actor
       await supabase.from('tasks').insert([
         {
           title: `📞 Call IRS — gather tax investigation info for ${l.name}`,
@@ -1129,7 +1134,7 @@ export default function Leads() {
           priority: 'High',
           dueDate: dueDateStr,
           done: false,
-          assignedTo: actor, // assigned to whoever triggered this (tax associate on file)
+          assignedTo: investigator,
           notes: 'Call IRS with POA to pull transcripts, balances, lien info, assessment dates, and filing history. Enter results into the Compliance tab on this lead.',
           created_at: new Date().toISOString(),
         },
@@ -1139,7 +1144,7 @@ export default function Leads() {
           priority: 'High',
           dueDate: dueDateStr,
           done: false,
-          assignedTo: actor,
+          assignedTo: investigator,
           notes: 'Review the Financial Profile (I&E, Assets & Equity tabs) populated from the client\'s intake submission. Cross-reference with IRS results to determine the best resolution path (OIC, IA, CNC, etc.).',
           created_at: new Date().toISOString(),
         },
