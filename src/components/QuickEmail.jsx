@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { FIRM } from '../lib/firmBranding'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import { sendGmailEmail } from '../lib/gmailUtils'
@@ -31,7 +32,10 @@ export default function QuickEmail({ contact, kind, leadId, onSent, onClose }) {
           if (emp?.email_signature_logo_url) sigLogo = emp.email_signature_logo_url
         }
       } catch { /* preview only — send still appends server-side */ }
-      setSignature({ text: sigText, logoUrl: sigLogo })
+      // The signature image is its own settings field. When a tenant hasn't set
+      // one, fall back to their firm logo rather than leaving the shared default,
+      // which showed Tax Case Review's logo on every other firm's signature.
+      setSignature({ text: sigText, logoUrl: sigLogo || FIRM.logoUrl || '' })
     })()
   }, [user])
 

@@ -160,7 +160,11 @@ export default function Books() {
           )}
           <select value={year} onChange={e=>setYear(Number(e.target.value))}
             style={{ padding:'7px 12px', borderRadius:8, border:'1px solid var(--br)', background:'var(--s2)', color:'var(--tx)', fontSize:13 }}>
-            {[2026,2025,2024,2023,2022].map(y=><option key={y}>{y}</option>)}
+            {/* Generated from the current year rather than hardcoded, so the
+                list never goes stale and prior years stay available for a P&L
+                that is being prepared after the fact. */}
+            {Array.from({ length: 9 }, (_, i) => new Date().getFullYear() + 1 - i)
+              .map(y=><option key={y}>{y}</option>)}
           </select>
           <button className="btn" onClick={exportQuickBooksCSV} style={{ display:'flex', alignItems:'center', gap:6 }}>
             ⬇️ Export to QuickBooks

@@ -453,18 +453,18 @@ export default function Cases() {
                     <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => openDetail(c)}>
                       <td style={{ color: 'var(--t3)', fontSize: 11 }}>{c.caseNum}</td>
                       <td style={{ fontWeight: 700, fontSize: 13 }} onClick={e=>e.stopPropagation()}><ClientLink name={c.clientName} /></td>
-                      <td><span className="bdg bb">{c.caseType}</span></td>
+                      <td><span className="bdg bb" style={{fontSize:12,padding:'3px 9px'}}>{c.caseType}</span></td>
                       <td style={{ color: c.irsBalance ? 'var(--bad)' : 'var(--t3)', fontWeight: 600 }}>{fmt$(c.irsBalance)}</td>
                       <td>
                         {c.resolutionAmount
-                          ? <span style={{ color: 'var(--green)', fontWeight: 600 }}>
+                          ? <span style={{ color: 'var(--green)', fontWeight: 600, fontSize: 13 }}>
                             {fmt$(c.resolutionAmount)}
                             {pct && <span style={{ fontSize: 10, color: 'var(--t3)', marginLeft: 4 }}>({pct}% off)</span>}
                           </span>
-                          : <span style={{ color: 'var(--t3)' }}>—</span>
+                          : <span style={{ color: 'var(--t3)', fontSize: 13 }}>—</span>
                         }
                       </td>
-                      <td><span className={`bdg ${STATUS_C[c.status] || 'bn'}`}>{c.status}</span></td>
+                      <td><span className={`bdg ${STATUS_C[c.status] || 'bn'}`} style={{fontSize:12,padding:'3px 9px'}}>{c.status}</span></td>
                       <td style={{ color: 'var(--t2)', fontSize: 12 }}>{c.assignedTo || '—'}</td>
                       <td style={{ color: overdue ? 'var(--bad)' : 'var(--t2)', fontSize: 12, fontWeight: overdue ? 700 : 400 }}>
                         {overdue && '⚠️ '}{c.deadline ? fmtDate(c.deadline) : '—'}

@@ -93,9 +93,10 @@ export async function triggerWorkflow(event, entityType, entityName, actorName, 
     const tasks = steps.map((s, idx) => {
       const due = new Date(now)
       due.setDate(due.getDate() + (s.due_in_days || 1))
-      // Task lists sort by created_at descending, so space the steps a second
-      // apart to keep step_order from collapsing into an undefined order.
-      const createdAt = new Date(now.getTime() - idx * 1000)
+      // Task lists sort by due date then created_at ASCENDING, so space the
+      // steps forward a second each. Templates where every step shares the same
+      // due_in_days (the Business IRS one) rely on this entirely for order.
+      const createdAt = new Date(now.getTime() + idx * 1000)
       const assignee = s.assigned_role === 'ADVISOR' ? advisorName
                       : s.assigned_role === 'ASSOCIATE' ? associateName
                       : advisorName
@@ -205,7 +206,7 @@ export async function applyWorkflowTemplate(templateIds, entityName, actorName, 
     // step the exact same timestamp made their relative order undefined —
     // spacing them 1 second apart (first step = latest timestamp) makes the
     // intended step_order survive that sort correctly.
-    const createdAt = new Date(now.getTime() - idx * 1000)
+    const createdAt = new Date(now.getTime() + idx * 1000)
     const assignee = s.assigned_role === 'ADVISOR' ? advisorName
                     : s.assigned_role === 'ASSOCIATE' ? associateName
                     : actorName

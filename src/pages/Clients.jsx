@@ -126,7 +126,7 @@ function DR({label,val,name,entityId,onLogged,showToast}) {
     if (isPhone) return (
       <InPlaceCaller phone={val} name={name} entityType="client" entityId={entityId} supabase={supabase} showToast={showToast} onLogged={onLogged}/>
     )
-    if (label==='Address') return (
+    if (String(label).endsWith('Address')) return (
       <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(val)}`} target="_blank" rel="noopener noreferrer" style={{color:'var(--blue)'}}>{val} ↗</a>
     )
     return val
@@ -3042,13 +3042,13 @@ export default function Clients() {
               ):filtered.map(c=>(
                 <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>openDetail(c)}>
                   <td style={{fontWeight:700,color:'var(--tx)',fontSize:13}}>{c.name}</td>
-                  <td><span className="bdg bb">{c.clientType||'Individual'}</span></td>
+                  <td><span className="bdg bb" style={{fontSize:12,padding:'3px 9px'}}>{c.clientType||'Individual'}</span></td>
                   <td onClick={e=>e.stopPropagation()}><PhoneLink val={c.phone} name={c.name}/></td>
                   <td style={{color:'var(--t2)',fontSize:12}}>{c.email||'—'}</td>
                   <td style={{color:c.irsBalance?'var(--bad)':'var(--t3)',fontWeight:c.irsBalance?600:400}}>{formatBalance(c.irsBalance)}</td>
-                  <td><span className="bdg bn" style={{fontSize:11}}>{c.issueType||'—'}</span></td>
+                  <td><span className="bdg bn" style={{fontSize:12,padding:'3px 9px'}}>{c.issueType||'—'}</span></td>
                   <td style={{color:'var(--t2)',fontSize:12}}>{c.assignedTo||'—'}</td>
-                  <td><span className={`bdg ${c.status==='Active'?'bg':'bn'}`}>{c.status||'Active'}</span></td>
+                  <td><span className={`bdg ${c.status==='Active'?'bg':'bn'}`} style={{fontSize:12,padding:'3px 9px'}}>{c.status||'Active'}</span></td>
                   <td onClick={e=>e.stopPropagation()}>
                     {c.archived
                       ? <button className="btn" style={{padding:'3px 8px',fontSize:12}} onClick={()=>restoreClient(c.id)}>↩ Restore</button>

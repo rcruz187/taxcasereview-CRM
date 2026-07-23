@@ -2458,7 +2458,7 @@ export default function Leads() {
                   ? <InPlaceCaller phone={val} name={l.name} entityType="lead" entityId={l.id} supabase={supabase} showToast={showToast} onLogged={()=>loadLeadNotes(l.id)}/>
                   : label==='Email' && val
                   ? <span style={{color:'var(--blue)',cursor:'pointer',textDecoration:'underline'}} title="Send email" onClick={()=>setQuickEmail({ name:l.name, email:val, kind:'lead', id:l.id })}>{val} ✉️</span>
-                  : label==='Address' && val
+                  : label.endsWith('Address') && val
                   ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(val)}`} target="_blank" rel="noopener noreferrer" style={{color:'var(--blue)'}}>{val} ↗</a>
                   : (val||'—')}
               </span></div>
@@ -2843,10 +2843,10 @@ export default function Leads() {
                   </td>
                   <td><span className="bdg bb">{l.clientType||'Individual'}</span></td>
                   <td onClick={e=>e.stopPropagation()}><PhoneLink val={l.phone} name={l.name}/></td>
-                  <td><TypeBdg t={l.issueType||'—'}/></td>
+                  <td><TypeBdg t={l.issueType||'—'} style={{fontSize:12,padding:'3px 9px'}}/></td>
                   <td style={{color:l.irsBalance&&l.irsBalance!=='—'?'var(--bad)':'var(--t3)',fontWeight:l.irsBalance&&l.irsBalance!=='—'?600:400}}>{l.irsBalance||'—'}</td>
                   <td style={{color:'var(--t2)',fontSize:12.5}}>{l.source||'—'}</td>
-                  <td><Bdg s={l.status||'New Lead'}/></td>
+                  <td><Bdg s={l.status||'New Lead'} style={{fontSize:12,padding:'3px 9px'}}/></td>
                   <td style={{color:'var(--t2)',fontSize:12.5}}>{l.assignedTo||<span style={{color:'var(--warn)'}}>Unassigned</span>}</td>
                   <td onClick={e=>e.stopPropagation()}>
                     {l.archived

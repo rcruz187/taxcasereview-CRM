@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { hoursFromEntry, currentPeriod, buildLineItems } from '../lib/payrollUtils'
+import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 
-const LOGO = '/taxcasereview-CRM/logo.png'
+// Fallback only — the real logo and name come from the signed-in tenant's
+// settings via loadFirmBrandingPublic(), which works before login because the
+// booking meta RPC is public.
+const LOGO_FALLBACK = '/taxcasereview-CRM/logo.png'
 
 // Same time math the kiosk (ClockIn.jsx) and admin TimeClock.jsx use, kept in sync.
 function parseTimeToMins(t) {
@@ -65,6 +69,16 @@ const PRIORITY_COLOR = { High: '#f87171', Normal: '#60a5fa', Low: '#64748b' }
 
 export default function EmployeePortal() {
   const [screen, setScreen] = useState('login')
+  // Branding is fetched before login so the portal shows the tenant's own firm
+  // rather than Tax Case Review on every deployment.
+  const [brand, setBrand] = useState({ name: FIRM.name, logoUrl: FIRM.logoUrl })
+  useEffect(() => {
+    let alive = true
+    loadFirmBrandingPublic().then(f => {
+      if (alive) setBrand({ name: f.name || 'Employee Portal', logoUrl: f.logoUrl || LOGO_FALLBACK })
+    })
+    return () => { alive = false }
+  }, [])
   const [loginEmail, setLoginEmail] = useState('')
   const [pin, setPin] = useState('')
   const [changingPin, setChangingPin] = useState(false)
@@ -248,7 +262,7 @@ export default function EmployeePortal() {
       if (toList.length === 0) return
       const subject = `Time off request — ${e.name}`
       const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">` +
-        `<div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div>` +
+        `<div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">${brand.name}</div>` +
         `<p><strong>${e.name}</strong> (${e.employee_id}) requested ${type.toUpperCase()} time off.</p>` +
         `<p>${start} to ${end} (${days} day${days === 1 ? '' : 's'})</p>` +
         `<p style="font-size:12px;color:#64748b">Review and approve/deny in the CRM under Time Off.</p></div>`
@@ -297,8 +311,8 @@ export default function EmployeePortal() {
 
   if (screen === 'login') return (
     <div style={{ minHeight: '100vh', background: '#060d18', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
-      <img src={LOGO} alt="Tax Case Review" style={{ width: '100%', maxWidth: 280, height: 'auto', objectFit: 'contain', marginBottom: 20 }} onError={e => { e.currentTarget.style.display = 'none' }} />
-      <h1 style={{ fontSize: 22, fontWeight: 800, color: '#f1f5f9', margin: '0 0 6px' }}>Tax Case Review</h1>
+      <img src={brand.logoUrl || LOGO_FALLBACK} alt={brand.name} style={{ width: '100%', maxWidth: 280, height: 'auto', objectFit: 'contain', marginBottom: 20 }} onError={e => { e.currentTarget.style.display = 'none' }} />
+      <h1 style={{ fontSize: 22, fontWeight: 800, color: '#f1f5f9', margin: '0 0 6px' }}>{brand.name}</h1>
       <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 32px' }}>Employee Portal</p>
       <div style={{ width: '100%', maxWidth: 360 }}>
         <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 6 }}>WORK EMAIL</label>
@@ -705,7 +719,7 @@ export default function EmployeePortal() {
               <div class="name">${emp.name}</div>
               <div class="id">${emp.employee_id}</div>
               ${emp.title ? `<div class="div">${emp.title}</div>` : ''}
-              <p style="font-size:11px;color:#94a3b8;margin-top:12px">Tax Case Review — Employee Badge</p>
+              <p style="font-size:11px;color:#94a3b8;margin-top:12px">${brand.name} — Employee Badge</p>
               <button onclick="window.print()" style="margin-top:12px;padding:8px 20px;background:#16a34a;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;">🖨️ Print Badge</button>
             </div></body></html>`)
             w.document.close()

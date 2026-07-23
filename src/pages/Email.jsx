@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { FIRM } from '../lib/firmBranding'
 import { supabase } from '../lib/supabase'
 import { sendGmailEmail, downloadGmailAttachment, fetchGmailAttachmentBlob } from '../lib/gmailUtils'
 import { EMAIL_TEMPLATES as TEMPLATES } from '../lib/emailTemplatesList'
@@ -115,7 +116,10 @@ export default function Email() {
       if (emp?.email_signature) sigText = emp.email_signature
       if (emp?.email_signature_logo_url) sigLogo = emp.email_signature_logo_url
     }
-    setSignature({ text: sigText, logoUrl: sigLogo })
+    // The signature image is its own settings field. When a tenant hasn't set
+    // one, fall back to their firm logo rather than leaving the shared default,
+    // which showed Tax Case Review's logo on every other firm's signature.
+    setSignature({ text: sigText, logoUrl: sigLogo || FIRM.logoUrl || '' })
   }
 
   async function load() {
@@ -125,7 +129,15 @@ export default function Email() {
       // used to load every email ever synced regardless of whose mailbox
       // it came from, which is exactly the leak Romy caught (logging in as
       // one account and seeing another employee's personal correspondence).
-      supabase.from('emails').select('*').eq('mailbox_owner', user.email).order('created_at', { ascending: false }),
+      // select('*') pulls every stored body and header for the whole mailbox
+      // on page load; the list only renders these columns, and the body is
+      // fetched when a message is opened. Capped as well — the inbox view
+      // never shows more than a few hundred at a time.
+      supabase.from('emails')
+        .select('id,subject,body,to_email,from_email,client_name,triage,direction,created_at,mailbox_owner,attachments,is_read')
+        .eq('mailbox_owner', user.email)
+        .order('created_at', { ascending: false })
+        .limit(300),
       supabase.from('clients').select('id,name,email'),
       supabase.from('leads').select('id,name,email'),
     ])
