@@ -135,37 +135,59 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
     }
     setAnswer(questionId, [...current, blank])
   }
+  // Federal and FICA are identical in every state, so neither waits on the
+  // county — only the state line needs a jurisdiction, and without a county we
+  // leave it alone rather than guess. A 0% state (FL, TX) still fills a real 0.
+  function applyWithholding(entry, grossValue) {
+    const gross = parseFloat(grossValue || 0)
+    const next = { ...entry }
+    if (!gross) return next
+
+    if (!next.fed_withheld_manual) {
+      next.fed_withheld = estimateFederalWithholding(gross, answers.filing_status)
+    }
+    if (!next.ss_med_withheld_manual) {
+      next.ss_med_withheld = estimateFicaWithholding(gross)
+    }
+    if (!next.state_withheld_manual && leadState && (answers.county || '').trim()) {
+      const rate = getStateTaxRate(leadState)
+      if (rate !== null) next.state_withheld = Math.round(gross * rate)
+    }
+    return next
+  }
+
+  // Gross pay entered before these estimates existed — or on a form the client
+  // is resuming — would otherwise sit next to empty withholding boxes until
+  // someone happened to retype the gross figure.
+  useEffect(() => {
+    const jobs = answers.jobs_list
+    if (!Array.isArray(jobs) || !jobs.length) return
+    let changed = false
+    const filled = jobs.map(j => {
+      if (!j?.gross_monthly) return j
+      const missing = [j.fed_withheld, j.ss_med_withheld].some(v => v === '' || v === undefined || v === null)
+      if (!missing) return j
+      changed = true
+      return applyWithholding(j, j.gross_monthly)
+    })
+    if (changed) setAnswer('jobs_list', filled)
+  }, [answers.jobs_list, answers.filing_status, leadState, answers.county])
+
   function updateEntry(questionId, idx, fieldId, value) {
     const current = [...(answers[questionId] || [])]
     current[idx] = { ...current[idx], [fieldId]: value }
 
-    // Entering gross pay fills the withholding lines the client would
-    // otherwise have to dig a pay stub out for. Only ever fills a BLANK field,
-    // so anything typed by hand — or read off an actual stub — is never
-    // overwritten.
+    // Typing in a withholding box marks it as the client's own figure, so a
+    // later change to gross pay never overwrites what they read off a stub.
+    if (questionId === 'jobs_list' && ['fed_withheld','ss_med_withheld','state_withheld'].includes(fieldId)) {
+      current[idx] = { ...current[idx], [fieldId + '_manual']: true }
+    }
+
+    // Changing gross pay recalculates every withholding line the client hasn't
+    // overridden. This recalculates rather than only filling blanks: an
+    // estimate left over from a previous gross figure is wrong, not stale.
     if (questionId === 'jobs_list' && fieldId === 'gross_monthly') {
-      const blank = v => v === '' || v === undefined || v === null
-      const gross = parseFloat(value || 0)
-
-      // Federal and FICA are the same in every state, so neither waits on the
-      // county — only the state line does.
-      if (blank(current[idx].fed_withheld)) {
-        current[idx].fed_withheld = estimateFederalWithholding(gross, answers.filing_status)
-      }
-      if (blank(current[idx].ss_med_withheld)) {
-        current[idx].ss_med_withheld = estimateFicaWithholding(gross)
-      }
-
-      // State needs a jurisdiction. No county means we don't know it, so the
-      // field is left alone rather than guessed. A 0% state (FL, TX) fills a
-      // real 0 — an earlier `rate > 0` guard skipped those entirely and left
-      // the field empty next to a hint announcing "0%".
-      if (leadState && (answers.county || '').trim()) {
-        const rate = getStateTaxRate(leadState)
-        if (rate !== null && blank(current[idx].state_withheld)) {
-          current[idx].state_withheld = Math.round(gross * rate)
-        }
-      }
+      current[idx] = applyWithholding(current[idx], value)
     }
 
     setAnswer(questionId, current)
@@ -555,7 +577,7 @@ function Question({ q, answers, setAnswer, addEntry, updateEntry, removeEntry, l
                         value={entry[f.id]||''} onChange={e=>updateEntry(q.id, idx, f.id, e.target.value)} style={S.inputSm}/>
                       {(f.id === 'fed_withheld' || f.id === 'ss_med_withheld') && (
                         <div style={{fontSize:10, color:'#60a5fa', marginTop:3}}>
-                          Estimated from your gross pay{f.id === 'fed_withheld' ? ' and filing status' : ''}. If you have a pay stub handy, use the exact figure.
+                          Calculated from your gross pay{f.id === 'fed_withheld' ? ' and filing status' : ''}. You can override this.
                         </div>
                       )}
                       {f.id === 'state_withheld' && leadState && getStateTaxRate(leadState) !== null && (
