@@ -23,7 +23,7 @@ import { useApp } from '../context/AppContext'
 import { useCall } from '../context/CallContext'
 import { generateAddendum, sendAddendumForSignature } from '../lib/docUtils'
 import ChargeResolutionFeeModal from '../components/ChargeResolutionFeeModal'
-import { RESOLUTION_SERVICES } from '../lib/irsFormUtils'
+import { RESOLUTION_SERVICES, resolveStateFormUrl } from '../lib/irsFormUtils'
 import { generatePOACoverLetterPdf } from '../lib/irsFormUtils'
 import { SMS_TEMPLATES, applySmsTemplate } from '../lib/smsTemplates'
 import { FIRM } from '../lib/firmBranding'
@@ -1469,7 +1469,7 @@ export default function Clients() {
     try {
       const actor = resolveActorName(user, employees)
       const base = import.meta.env.BASE_URL.replace(/\/$/, '')
-      const pdfRes = await fetch(`${base}/state-forms/${formDef.file}`)
+      const pdfRes = await fetch(await resolveStateFormUrl(base, formDef.file))
       if (!pdfRes.ok) throw new Error('Could not load ' + formDef.state + ' POA PDF')
       const rawBytes = new Uint8Array(await pdfRes.arrayBuffer())
       const { generateStatePOAWithCover } = await import('../lib/irsFormUtils')

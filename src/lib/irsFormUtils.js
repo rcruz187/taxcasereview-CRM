@@ -154,9 +154,33 @@ export function buildNameAddress(client, party = 'personal') {
   return name + (parts.length ? '\r' + parts.join('\r') : '');
 }
 
+// Blank form templates carry the representative's own details (name, address,
+// CAF, PTIN) — data that belongs to the firm, not to the code. A tenant with its
+// own set drops it in /templates/<slug>/; everyone else falls through to the
+// shared originals, so an absent folder simply means "use the defaults" and no
+// existing firm is affected by another firm's templates appearing.
+// Same per-tenant lookup for the state POA blanks, which also carry the
+// representative block. Returns the first URL that responds, or the shared
+// original when the tenant has no folder of its own.
+export async function resolveStateFormUrl(base, filename) {
+  const slug = FIRM.slug || '';
+  if (slug) {
+    const tenantUrl = `${base}/state-forms/${slug}/${filename}`;
+    try {
+      const head = await fetch(tenantUrl, { method: 'HEAD' });
+      if (head.ok) return tenantUrl;
+    } catch (_) { /* fall through to the shared template */ }
+  }
+  return `${base}/state-forms/${filename}`;
+}
+
 export async function fetchTemplate(filename) {
-  // Try relative path first (works when deployed), then raw GitHub fallback
+  const slug = FIRM.slug || '';
   const paths = [
+    ...(slug ? [
+      `/taxcasereview-CRM/templates/${slug}/${filename}`,
+      `https://raw.githubusercontent.com/taxresolutioncrm/taxcasereview-CRM/gh-pages/templates/${slug}/${filename}`,
+    ] : []),
     `/taxcasereview-CRM/templates/${filename}`,
     `https://raw.githubusercontent.com/taxresolutioncrm/taxcasereview-CRM/gh-pages/templates/${filename}`,
   ];

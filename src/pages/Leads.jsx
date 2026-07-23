@@ -10,7 +10,7 @@ import { useApp } from '../context/AppContext'
 import { useCall } from '../context/CallContext'
 import { useFirm } from '../lib/useFirm'
 import { generateClientPackage, generateAddendum, generatePOACoverLetter, sendFullPackage, generateCreditCardAuthForm, sendAddendumForSignature } from '../lib/docUtils'
-import { generatePOACoverLetterPdf, RESOLUTION_SERVICES, generateFinancialIntakePdf } from '../lib/irsFormUtils'
+import { generatePOACoverLetterPdf, RESOLUTION_SERVICES, generateFinancialIntakePdf, resolveStateFormUrl } from '../lib/irsFormUtils'
 import { advanceLeadStatus } from '../lib/leadStatus'
 import BookingWidget from '../components/BookingWidget'
 import QuickEmail from '../components/QuickEmail'
@@ -688,7 +688,7 @@ export default function Leads() {
     try {
       const actor = resolveActorName(user, employees)
       const base = import.meta.env.BASE_URL.replace(/\/$/, '')
-      const pdfRes = await fetch(`${base}/state-forms/${formDef.file}`)
+      const pdfRes = await fetch(await resolveStateFormUrl(base, formDef.file))
       if (!pdfRes.ok) throw new Error('Could not load ' + formDef.state + ' POA PDF')
       const rawBytes = new Uint8Array(await pdfRes.arrayBuffer())
       const { generateStatePOAWithCover } = await import('../lib/irsFormUtils')

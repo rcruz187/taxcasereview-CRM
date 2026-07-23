@@ -12,8 +12,17 @@
 
 import { supabase } from './supabase'
 
+// Slug for per-tenant asset folders (blank IRS/state form templates carrying
+// that firm's representative details). Derived from the firm name rather than a
+// tenant id so it needs no schema change and stays readable on disk.
+export function firmSlug(name) {
+  return String(name || '').toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
 export const FIRM = {
   name: '',
+  slug: '',
   logoUrl: '',
   address: '',   // full one-line address
   phone: '',
@@ -38,6 +47,7 @@ export async function loadFirmBranding() {
     const address = built || s.firmaddress || ''
 
     FIRM.name = name
+    FIRM.slug = firmSlug(name)
     FIRM.logoUrl = s.logourl || ''
     FIRM.address = address
     FIRM.phone = s.phone || s.firmphone || ''

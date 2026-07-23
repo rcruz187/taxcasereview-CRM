@@ -1,5 +1,5 @@
 // ─── Shared document utilities — Tax Case Review CRM ─────────────────────────
-import { getPackageFormTypes, FORM_LABELS, FORM_USES_EIN, fillForm, generateCcAuthPdf, RESOLUTION_SERVICES, generateAddendumPdf, generateStatePOAWithCover } from './irsFormUtils'
+import { getPackageFormTypes, FORM_LABELS, FORM_USES_EIN, fillForm, generateCcAuthPdf, RESOLUTION_SERVICES, generateAddendumPdf, generateStatePOAWithCover, resolveStateFormUrl } from './irsFormUtils'
 import { FIRM } from './firmBranding'
 
 const LOGO_URL = ''  // replaced by FIRM.logoUrl
@@ -1129,7 +1129,7 @@ export async function sendFullPackage(client, supabase) {
     for (const party of stateParties) {
       try {
         const poaFile = STATE_POA_FILES[clientState]
-        const poaUrl  = `${base}/state-forms/${poaFile}`
+        const poaUrl  = await resolveStateFormUrl(base, poaFile)
         const poaRes  = await fetch(poaUrl)
         if (!poaRes.ok) throw new Error(`Could not load ${clientState} POA PDF`)
         const rawBytes  = new Uint8Array(await poaRes.arrayBuffer())
