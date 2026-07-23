@@ -1113,44 +1113,14 @@ export default function Leads() {
     }])
     if (noteErr) showToast('Status updated, but failed to log note: ' + noteErr.message)
 
-    // ── Pipeline trigger tasks ──────────────────────────────────────────
-    // When a lead moves to "Tax Investigation Active", assign tasks to the
-    // tax associate (or any staff if none assigned) to call the IRS and
-    // review the financial intake info so they can build the resolution.
-    // When it moves to "IRS Facts Received", notify the original tax advisor
-    // so they can go over the IRS results with the client.
-    if (status === 'Tax Investigation Active') {
-      const dueDate = new Date(); dueDate.setDate(dueDate.getDate() + 1)
-      const dueDateStr = dueDate.toISOString().slice(0, 10)
-      // These are investigation work, so they belong to the associate named on
-      // the lead. The code used to assign them to whoever clicked the status,
-      // which contradicted the comment above and put them on an advisor's queue
-      // whenever the advisor was the one moving the pipeline.
-      const investigator = l.taxAssociate || l.assignedTo || actor
-      await supabase.from('tasks').insert([
-        {
-          title: `📞 Call IRS — gather tax investigation info for ${l.name}`,
-          clientName: l.name,
-          priority: 'High',
-          dueDate: dueDateStr,
-          done: false,
-          assignedTo: investigator,
-          notes: 'Call IRS with POA to pull transcripts, balances, lien info, assessment dates, and filing history. Enter results into the Compliance tab on this lead.',
-          created_at: new Date().toISOString(),
-        },
-        {
-          title: `🧾 Review financial intake — build resolution plan for ${l.name}`,
-          clientName: l.name,
-          priority: 'High',
-          dueDate: dueDateStr,
-          done: false,
-          assignedTo: investigator,
-          notes: 'Review the Financial Profile (I&E, Assets & Equity tabs) populated from the client\'s intake submission. Cross-reference with IRS results to determine the best resolution path (OIC, IA, CNC, etc.).',
-          created_at: new Date().toISOString(),
-        },
-      ])
-      showToast('Status updated — 2 tasks created for tax investigation')
-    } else if (status === 'IRS Facts Received') {
+    // Pipeline trigger tasks
+    // Moving to "Tax Investigation Active" creates nothing here: the whole
+    // investigation task set lives in the Tax Investigation workflow templates,
+    // editable from the Workflows page. This used to insert its own "Call IRS"
+    // and "Review financial intake" pair, which duplicated template steps and
+    // meant the same checklist was maintained in two places.
+    // "IRS Facts Received" still notifies the original tax advisor.
+    if (status === 'IRS Facts Received') {
       // Notify the original tax advisor who sold this lead
       const advisor = l.assignedTo || actor
       const dueDate = new Date(); dueDate.setDate(dueDate.getDate() + 1)
