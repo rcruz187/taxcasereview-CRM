@@ -93,12 +93,18 @@ export default function ClientPortal() {
   // Firm logo for this portal — pulled via the anon-safe public-meta RPC so a
   // logged-out client still sees THEIR firm's branding (not a shared file).
   const [firmLogo, setFirmLogo] = useState('')
+  const [firmMeta, setFirmMeta] = useState({ name: 'Tax Case Review', phone: '(888) 334-5052' })
   useEffect(() => {
     // Pass the client id from the portal URL so the RPC resolves THIS client's
     // tenant branding; without it the RPC's legacy fallback is the first
     // settings row, which showed TCR's logo on every tenant's portal.
+    // Defaults above are the legacy TCR values, so a blank field never blanks the UI.
     supabase.rpc('booking_get_public_meta', { p_client_id: id }).then(({ data }) => {
       if (data?.logo_url) setFirmLogo(data.logo_url)
+      setFirmMeta(m => ({
+        name: (data?.firm_name || '').trim() || m.name,
+        phone: (data?.phone || '').trim() || m.phone,
+      }))
     }).catch(() => {})
   }, [id])
 
@@ -212,7 +218,7 @@ export default function ClientPortal() {
   async function lockInPlan() {
     if (!totalBalance || totalBalance <= 0) { showToast('No outstanding balance to set a plan for.'); return }
     const changes = client.payment_plan_changes || 0
-    if (changes >= MAX_PLAN_CHANGES) { showToast('You have reached the maximum of 3 plan changes. Please call us at (888) 334-5052.'); return }
+    if (changes >= MAX_PLAN_CHANGES) { showToast(`You have reached the maximum of 3 plan changes. Please call us at ${firmMeta.phone}.`); return }
     setPlanLocking(true)
     const monthlyAmount = Math.ceil((totalBalance / planMonths) * 100) / 100
     const nextCharge = new Date(); nextCharge.setDate(nextCharge.getDate() + 1)
@@ -385,13 +391,13 @@ export default function ClientPortal() {
           </div>
           <div style={{textAlign:'right'}}>
             <div style={{fontSize:11,color:'#64748b',marginBottom:4}}>Need help? Call us anytime</div>
-            <a href="tel:8883345052" style={{
+            <a href={`tel:${firmMeta.phone.replace(/\D/g, '') || '8883345052'}`} style={{
               display:'inline-block', padding:'10px 18px',
               background:'linear-gradient(135deg,rgba(59,130,246,.3),rgba(37,99,235,.2))',
               border:'1px solid rgba(59,130,246,.45)', borderRadius:10,
               fontSize:22, fontWeight:900, color:'#fff', textDecoration:'none', letterSpacing:'-.01em',
               boxShadow:'0 0 18px rgba(59,130,246,.2)'
-            }}>(888) 334-5052</a>
+            }}>{firmMeta.phone}</a>
             <div style={{fontSize:11,color:'#4ade80',marginTop:6,fontWeight:600}}>✓ Encrypted · Secure</div>
           </div>
         </div>
@@ -608,7 +614,7 @@ export default function ClientPortal() {
                     </div>
                     {!canEditPlan && (
                       <div style={{ fontSize: 11, color: '#f59e0b', background: 'rgba(245,158,11,.1)', borderRadius: 6, padding: '7px 10px' }}>
-                        🔒 You've made the maximum of {MAX_PLAN_CHANGES} plan changes. Please call us at <strong>(888) 334-5052</strong> to make further changes.
+                        🔒 You've made the maximum of {MAX_PLAN_CHANGES} plan changes. Please call us at <strong>{firmMeta.phone}</strong> to make further changes.
                       </div>
                     )}
                   </div>
@@ -801,11 +807,11 @@ export default function ClientPortal() {
         {/* ── EMAILS ── */}
         {section === 'emails' && (
           <div>
-            <div style={{fontSize:12,color:'#64748b',marginBottom:16}}>All email correspondence between you and your Tax Case Review team.</div>
+            <div style={{fontSize:12,color:'#64748b',marginBottom:16}}>All email correspondence between you and your {firmMeta.name} team.</div>
             {clientEmails.length === 0 ? <Empty msg="No emails on file yet." /> : (
               <div style={{display:'flex',flexDirection:'column',gap:10}}>
                 {clientEmails.map(email => {
-                  try { return <EmailCard key={email.id} email={email} /> }
+                  try { return <EmailCard key={email.id} email={email} firmName={firmMeta.name} /> }
                   catch(e) { return null }
                 })}
               </div>
@@ -816,7 +822,7 @@ export default function ClientPortal() {
         {/* ── MESSAGES ── */}
         {section === 'messages' && (
           <div>
-            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>All text messages between you and your Tax Case Review team.</div>
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>All text messages between you and your {firmMeta.name} team.</div>
             {smsMessages.length === 0 ? <Empty msg="No text messages on file yet." /> : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {smsMessages.map(msg => {
@@ -856,7 +862,7 @@ export default function ClientPortal() {
         )}
 
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', textAlign: 'center', marginTop: 28 }}>
-          Questions? Call us at (888) 334-5052 or contact your Tax Case Review representative.
+          Questions? Call us at {firmMeta.phone} or contact your {firmMeta.name} representative.
         </div>
       </div>
       </div>
@@ -864,7 +870,7 @@ export default function ClientPortal() {
   )
 }
 
-function EmailCard({ email }) {
+function EmailCard({ email, firmName = 'Tax Case Review' }) {
   const [expanded, setExpanded] = useState(false)
   if (!email) return null
   const isInbound = email.triage === 'Inbox'
@@ -881,7 +887,7 @@ function EmailCard({ email }) {
             <div style={{fontWeight:700,fontSize:13.5,color:'#f1f5f9',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{email.subject || '(No subject)'}</div>
             <div style={{fontSize:11,color:'#64748b',flexShrink:0}}>{dateStr}</div>
           </div>
-          <div style={{fontSize:12,color:'#64748b',marginTop:3}}>{isInbound ? 'From you' : `From Tax Case Review`} · {email.status || 'Sent'}</div>
+          <div style={{fontSize:12,color:'#64748b',marginTop:3}}>{isInbound ? 'From you' : `From ${firmName}`} · {email.status || 'Sent'}</div>
           {!expanded && <div style={{fontSize:12,color:'#94a3b8',marginTop:4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{bodyText}</div>}
         </div>
         <div style={{color:'#64748b',fontSize:12,flexShrink:0}}>{expanded ? '▲' : '▼'}</div>
