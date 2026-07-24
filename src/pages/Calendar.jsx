@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { advanceLeadStatus } from '../lib/leadStatus'
+import { FIRM } from '../lib/firmBranding'
 import { sendGmailEmail } from '../lib/gmailUtils'
 import InternalBooking from '../components/InternalBooking'
 
@@ -133,7 +134,11 @@ export default function Calendar() {
     // path (this app deploys under /taxcasereview-CRM/, not the bare
     // domain root) -- import.meta.env.BASE_URL is Vite's own resolved
     // base path, so this stays correct even if that ever changes.
-    return `${window.location.origin}${import.meta.env.BASE_URL}meet/${ev.id}`
+    // Carry the sender tenant's uuid so the join page shows the firm's
+    // logo/name instead of the primary tenant's (TCR). Absent → legacy
+    // first-row branding, same as before this change.
+    const base = `${window.location.origin}${import.meta.env.BASE_URL}meet/${ev.id}`
+    return FIRM.tenantId ? `${base}?t=${FIRM.tenantId}` : base
   }
 
   async function copyMeetingLink(ev) {

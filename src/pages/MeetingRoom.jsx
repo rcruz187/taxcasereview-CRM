@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
+import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 import { useWebRTCRoom } from '../lib/webrtcRoom'
 import { useVideoBackground } from '../lib/videoBackground'
 // MediaPipe Selfie Segmentation loaded dynamically in videoBackground.js
@@ -8,6 +9,8 @@ import VideoTile from '../components/VideoTile'
 
 export default function MeetingRoom() {
   const { id } = useParams()
+  const [params]                    = useSearchParams()
+  const [brandingReady, setBrandingReady] = useState(false)
   const [name, setName]             = useState('')
   const [entered, setEntered]       = useState(false)
   const [joining, setJoining]       = useState(false)
@@ -18,6 +21,14 @@ export default function MeetingRoom() {
   const peerConnsRef = webrtc.peerConnsRef
   const vbg = useVideoBackground()
   const rawRef  = useRef(null)  // original camera stream
+
+  useEffect(() => {
+    // Meeting links generated inside the app carry ?t=<tenant uuid> so the
+    // public join screen renders the sender firm's logo + name. Absent → the
+    // RPC falls back to the legacy first-row (TCR), same as before.
+    const t = (params.get('t') || '').trim()
+    loadFirmBrandingPublic(t || undefined).finally(() => setBrandingReady(true))
+  }, [params])
 
   useEffect(() => {
     return () => { webrtc.leave(); vbg.stopLoop() }
@@ -81,9 +92,9 @@ export default function MeetingRoom() {
       <div style={S.page}>
         <div style={S.card}>
           <div style={{ textAlign: 'center', marginBottom: 20 }}>
-            <img src="/taxcasereview-CRM/logo.png" alt="Tax Case Review" style={{ height: 48, objectFit: 'contain', marginBottom: 14 }} onError={e => e.target.style.display='none'} />
+            <img src={FIRM.logoUrl || '/taxcasereview-CRM/logo.png'} alt={FIRM.name || 'Tax Case Review'} style={{ height: 48, objectFit: 'contain', marginBottom: 14 }} onError={e => e.target.style.display='none'} />
             <div style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: 4 }}>Join your meeting</div>
-            <div style={{ fontSize: 13, color: '#94a3b8' }}>Tax Case Review — secure video meeting</div>
+            <div style={{ fontSize: 13, color: '#94a3b8' }}>{FIRM.name || 'Tax Case Review'} — secure video meeting</div>
           </div>
           <label style={S.label}>Your name</label>
           <input
