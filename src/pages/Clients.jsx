@@ -3031,11 +3031,11 @@ export default function Clients() {
         <div className="ovx">
           <table>
             <thead>
-              <tr><th>Name</th><th>Type</th><th>Phone</th><th>Email</th><th>IRS Balance</th><th>Issue</th><th>Assigned</th><th>Status</th><th></th></tr>
+              <tr><th>Name</th><th>Type</th><th>Phone</th><th>Email</th><th>IRS Balance</th><th>Issue</th><th>Assigned</th><th>Pipeline</th><th>Status</th><th></th></tr>
             </thead>
             <tbody>
               {filtered.length===0?(
-                <tr><td colSpan={9}>
+                <tr><td colSpan={10}>
                   <div style={{textAlign:'center',padding:'48px 20px',color:'var(--t3)'}}>
                     <div style={{fontSize:36,marginBottom:10}}>👤</div>
                     <div style={{fontWeight:700,fontSize:15,color:'var(--tx)',marginBottom:4}}>No clients yet</div>
@@ -3051,6 +3051,7 @@ export default function Clients() {
                   <td style={{color:c.irsBalance?'var(--bad)':'var(--t3)',fontWeight:c.irsBalance?600:400}}>{formatBalance(c.irsBalance)}</td>
                   <td><span className="bdg bn" style={{fontSize:12,padding:'3px 9px'}}>{c.issueType||'—'}</span></td>
                   <td style={{color:'var(--t2)',fontSize:12}}>{c.assignedTo||'—'}</td>
+                  <td><span className="bdg ba" style={{fontSize:12,padding:'3px 9px'}}>📊 {PIPELINE_STAGES.find(p=>p.key===(c.pipelineStage||'investigation'))?.label||'Investigation'}</span></td>
                   <td><span className={`bdg ${c.status==='Active'?'bg':'bn'}`} style={{fontSize:12,padding:'3px 9px'}}>{c.status||'Active'}</span></td>
                   <td onClick={e=>e.stopPropagation()}>
                     {c.archived
