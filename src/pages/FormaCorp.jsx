@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { formatMoneyInput, parseMoney } from '../lib/money'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import ClientLink from '../components/ClientLink'
+import { buildFlArticlesPdf } from '../lib/flArticlesPdf'
 
 const ENTITY_TYPES = ['LLC','S-Corp','C-Corp','Sole Proprietorship','Partnership','Non-Profit 501(c)(3)','Professional LLC (PLLC)']
 const ENTITY_ICONS = {
@@ -43,6 +44,77 @@ export default function FormaCorp() {
   const [wForm,    setWForm]    = useState(WIZ_BLANK)
   const [wSugg,    setWSugg]    = useState([])
   const [wShowSug, setWShowSug] = useState(false)
+
+  // Sunbiz name check — FL only, runs off the entity_name field on wizard step 3
+  // and the same field on the +New Formation modal. Debounced so we don't hit
+  // Sunbiz on every keystroke. `state:'unavailable'` means Sunbiz itself was
+  // unreachable/parse-failed, not "name is taken" — the UI distinguishes.
+  const [nameCheck, setNameCheck] = useState({ state:'idle', input:'', result:null })
+  const nameCheckTimer = useRef(null)
+  // Sunbiz existing-entity lookup — opens a small modal from Quick Links.
+  const [lookup, setLookup] = useState({ open:false, query:'', running:false, result:null })
+  // Articles PDF generation state (per-case; prevents double-clicks)
+  const [pdfBusy, setPdfBusy] = useState(false)
+
+  function checkNameSoon(name, state) {
+    // Only auto-check FL. Other states get the same button on the case detail
+    // page, but not the inline "as you type" on the wizard.
+    if (state !== 'FL' || !name || name.trim().length < 3) {
+      setNameCheck({ state:'idle', input:name || '', result:null })
+      return
+    }
+    setNameCheck(nc => ({ ...nc, state:'pending', input:name }))
+    if (nameCheckTimer.current) clearTimeout(nameCheckTimer.current)
+    nameCheckTimer.current = setTimeout(async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('sunbiz-search', {
+          body: { mode:'name-check', name }
+        })
+        if (error || !data?.ok) {
+          setNameCheck({ state:'unavailable', input:name, result:null })
+          return
+        }
+        setNameCheck({ state:'done', input:name, result:data })
+      } catch (_e) {
+        setNameCheck({ state:'unavailable', input:name, result:null })
+      }
+    }, 450)
+  }
+
+  async function runLookup() {
+    if (!lookup.query || lookup.query.trim().length < 3) return
+    setLookup(l => ({ ...l, running:true, result:null }))
+    try {
+      const { data, error } = await supabase.functions.invoke('sunbiz-search', {
+        body: { mode:'lookup', query: lookup.query.trim() }
+      })
+      if (error || !data?.ok) {
+        setLookup(l => ({ ...l, running:false, result:{ ok:false, reason: data?.reason || 'sunbiz_unavailable' } }))
+        return
+      }
+      setLookup(l => ({ ...l, running:false, result:data }))
+    } catch (_e) {
+      setLookup(l => ({ ...l, running:false, result:{ ok:false, reason:'network_error' } }))
+    }
+  }
+
+  async function downloadArticlesPdf(c) {
+    if (pdfBusy) return
+    setPdfBusy(true)
+    try {
+      const blob = await buildFlArticlesPdf(c)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Articles-of-Organization-${(c.entity_name || 'LLC').replace(/[^a-z0-9]+/gi,'-')}.pdf`
+      document.body.appendChild(a); a.click(); a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 4000)
+    } catch (e) {
+      showToast('Could not generate Articles PDF: ' + (e?.message || e), 'err')
+    } finally {
+      setPdfBusy(false)
+    }
+  }
 
   useEffect(() => { load() }, [])
 
@@ -248,6 +320,18 @@ export default function FormaCorp() {
               style={{display:'inline-flex',alignItems:'center',gap:6,padding:'7px 14px',borderRadius:7,background:'var(--s2)',border:'1px solid var(--br)',fontSize:12,fontWeight:600,color:'var(--blue)',textDecoration:'none'}}>
               🏛️ File with {c.state} Secretary of State
             </a>
+            {c.state === 'FL' && (
+              <button onClick={()=>downloadArticlesPdf(c)} disabled={pdfBusy}
+                style={{display:'inline-flex',alignItems:'center',gap:6,padding:'7px 14px',borderRadius:7,background:'var(--s2)',border:'1px solid var(--br)',fontSize:12,fontWeight:600,color:'var(--blue)',cursor:pdfBusy?'wait':'pointer'}}>
+                {pdfBusy ? '⏳ Building…' : '📄 Generate FL Articles PDF'}
+              </button>
+            )}
+            {c.state === 'FL' && (
+              <button onClick={()=>setLookup({ open:true, query:c.entity_name || '', running:false, result:null })}
+                style={{display:'inline-flex',alignItems:'center',gap:6,padding:'7px 14px',borderRadius:7,background:'var(--s2)',border:'1px solid var(--br)',fontSize:12,fontWeight:600,color:'var(--blue)',cursor:'pointer'}}>
+                🔍 Sunbiz Lookup
+              </button>
+            )}
             <a href="https://www.irs.gov/businesses/small-businesses-self-employed/s-corporations" target="_blank" rel="noreferrer"
               style={{display:'inline-flex',alignItems:'center',gap:6,padding:'7px 14px',borderRadius:7,background:'var(--s2)',border:'1px solid var(--br)',fontSize:12,fontWeight:600,color:'var(--blue)',textDecoration:'none'}}>
               📋 IRS S-Corp / LLC Info
@@ -259,6 +343,50 @@ export default function FormaCorp() {
           <div className="card" style={{padding:'10px 16px',marginBottom:10}}>
             <div className="stitle" style={{marginBottom:4}}>Notes</div>
             <div style={{fontSize:13,color:'var(--t2)',lineHeight:1.7,whiteSpace:'pre-wrap'}}>{c.notes}</div>
+          </div>
+        )}
+
+        {lookup.open && (
+          <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setLookup({ open:false, query:'', running:false, result:null })}>
+            <div className="modal" style={{maxWidth:520}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                <div style={{fontWeight:800,fontSize:15}}>🔍 Sunbiz Entity Lookup</div>
+                <button className="btn sm" onClick={()=>setLookup({ open:false, query:'', running:false, result:null })}>✕</button>
+              </div>
+              <div style={{fontSize:12,color:'var(--t3)',marginBottom:10}}>Search the FL Division of Corporations for an existing entity by name or document number.</div>
+              <div style={{display:'flex',gap:6,marginBottom:10}}>
+                <input value={lookup.query} onChange={e=>setLookup(l=>({ ...l, query:e.target.value }))}
+                  onKeyDown={e=>e.key==='Enter'&&runLookup()}
+                  placeholder="e.g. Smith Holdings LLC or L23000012345"
+                  style={{flex:1,padding:'8px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:13}}/>
+                <button className="btn pri" onClick={runLookup} disabled={lookup.running || !lookup.query || lookup.query.length < 3}>
+                  {lookup.running ? '…' : 'Search'}
+                </button>
+              </div>
+              {lookup.result && !lookup.result.ok && (
+                <div style={{fontSize:12,color:'var(--warn)',padding:'8px 10px',background:'var(--s2)',borderRadius:6}}>
+                  Sunbiz couldn't be reached — try again in a moment, or check manually at search.sunbiz.org
+                </div>
+              )}
+              {lookup.result?.ok && lookup.result.entities?.length === 0 && (
+                <div style={{fontSize:12,color:'var(--t3)',padding:'8px 10px',background:'var(--s2)',borderRadius:6}}>
+                  No entities matched "{lookup.query}".
+                </div>
+              )}
+              {lookup.result?.ok && lookup.result.entities?.length > 0 && (
+                <div style={{maxHeight:340,overflowY:'auto'}}>
+                  {lookup.result.entities.map(m => (
+                    <div key={m.documentNumber} style={{padding:'8px 10px',borderTop:'1px solid var(--br)',fontSize:12}}>
+                      <div style={{fontWeight:700}}>{m.name}</div>
+                      <div style={{color:'var(--t3)',marginTop:2}}>
+                        #{m.documentNumber} · {m.status}
+                        {m.detailUrl && <> · <a href={m.detailUrl} target="_blank" rel="noreferrer" style={{color:'var(--blue)'}}>View on Sunbiz</a></>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -565,7 +693,40 @@ export default function FormaCorp() {
                   )}
                 </div>
                 <div className="field"><label>Entity Name *</label>
-                  <input value={wForm.entity_name} onChange={e=>wFld('entity_name',e.target.value)} placeholder="e.g. Smith Holdings LLC"/>
+                  <input value={wForm.entity_name} onChange={e=>{ wFld('entity_name',e.target.value); checkNameSoon(e.target.value, wForm.state) }} placeholder="e.g. Smith Holdings LLC"/>
+                  {wForm.state === 'FL' && wForm.entity_name && wForm.entity_name.length >= 3 && (
+                    <div style={{marginTop:6,fontSize:12}}>
+                      {nameCheck.state === 'pending' && (
+                        <span style={{color:'var(--t3)'}}>⏳ Checking with Sunbiz…</span>
+                      )}
+                      {nameCheck.state === 'unavailable' && (
+                        <span style={{color:'var(--t3)'}}>ℹ️ Sunbiz unreachable — check manually at <a href="https://search.sunbiz.org" target="_blank" rel="noreferrer" style={{color:'var(--blue)'}}>search.sunbiz.org</a></span>
+                      )}
+                      {nameCheck.state === 'done' && nameCheck.result?.available && (
+                        <span style={{color:'var(--ok)'}}>✅ No exact match in FL — likely available (Sunbiz confirms at filing time)</span>
+                      )}
+                      {nameCheck.state === 'done' && nameCheck.result && !nameCheck.result.available && (
+                        <div>
+                          <div style={{color:'var(--warn)'}}>⚠️ Exact match already exists in FL:</div>
+                          {nameCheck.result.exactMatches.slice(0,3).map(m => (
+                            <div key={m.documentNumber} style={{color:'var(--t2)',marginTop:2,fontSize:11}}>
+                              • {m.name} — {m.status} — <a href={m.detailUrl} target="_blank" rel="noreferrer" style={{color:'var(--blue)'}}>#{m.documentNumber}</a>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {nameCheck.state === 'done' && nameCheck.result?.available && (nameCheck.result.nearMatches?.length > 0) && (
+                        <details style={{marginTop:4}}>
+                          <summary style={{cursor:'pointer',color:'var(--t3)',fontSize:11}}>Similar names on file ({nameCheck.result.nearMatches.length})</summary>
+                          {nameCheck.result.nearMatches.map(m => (
+                            <div key={m.documentNumber} style={{color:'var(--t3)',marginTop:2,fontSize:11}}>
+                              • {m.name} — {m.status}
+                            </div>
+                          ))}
+                        </details>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="field"><label>Owners / Members (names & %)</label>
                   <input value={wForm.owners} onChange={e=>wFld('owners',e.target.value)} placeholder="e.g. John Smith 60%, Jane Smith 40%"/>
