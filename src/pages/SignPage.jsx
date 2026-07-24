@@ -5,6 +5,15 @@ import { stampSignature, buildCertificatePage, addTearDropStamp, appendPdfPages 
 import { useFirm } from '../lib/useFirm'
 import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 
+// Mirrors docUtils.js — tenant-resolved firm name and contact email so the
+// signing page's agreement body reads for whichever firm the signer is
+// signing with, not just the primary tenant. Prefers the tenant's own
+// settings.email; falls back to a name-derived .com only when unset.
+const firmName  = () => FIRM.name || 'Tax Case Review'
+const firmEmail = () =>
+  (FIRM.email || '').trim() ||
+  'info@' + firmName().toLowerCase().replace(/[^a-z0-9]+/g, '') + '.com'
+
 // IRS forms never get an IP/timestamp stamp — only firm documents (the
 // Tax Service Agreement, addenda, etc.) do.
 // Which Documents folder each signed artifact files into. esign_finalize
@@ -46,9 +55,9 @@ function printCancellationNotice(doc) {
     </style></head><body>
     <h1>Notice of Right of Cancellation</h1>
     <p>You may cancel the Tax Service Agreement signed on ${signedDate || '_______________'}, without any penalty or obligation, within three (3) business days after the date you signed it.</p>
-    <p>If you cancel, any payments made by you will be returned within three (3) days following receipt of your cancellation notice. In the event of a cancellation, payments made will be prorated at a $250 hourly rate for all work product services already performed by Tax Case Review.</p>
-    <p>You may also terminate the Tax Service Agreement at any later time as provided therein, but Tax Case Review is not required to refund fees you have paid except as set forth in the Agreement.</p>
-    <p>To cancel, mail or deliver a signed and dated copy of this notice to <b>Tax Case Review, ${FIRM.address}</b>, not later than midnight of the third business day after you signed the Tax Service Agreement.</p>
+    <p>If you cancel, any payments made by you will be returned within three (3) days following receipt of your cancellation notice. In the event of a cancellation, payments made will be prorated at a $250 hourly rate for all work product services already performed by ${firmName()}.</p>
+    <p>You may also terminate the Tax Service Agreement at any later time as provided therein, but ${firmName()} is not required to refund fees you have paid except as set forth in the Agreement.</p>
+    <p>To cancel, mail or deliver a signed and dated copy of this notice to <b>${firmName()}, ${FIRM.address}</b>, not later than midnight of the third business day after you signed the Tax Service Agreement.</p>
     <h3 style="margin-top:28px">I Hereby Cancel the Tax Service Agreement</h3>
     <div class="blank" style="margin-top:24px"></div><div class="lbl">Full Client Name</div>
     <div style="display:flex;gap:48px">
@@ -381,7 +390,7 @@ export default function SignPage() {
           <div>
             <div style={styles.section}>
               <div style={styles.secTitle}>Tax Service Agreement</div>
-              <div style={styles.docBody}>{`This Tax Service Agreement (as the same may be amended from time to time by any Addendum, the "Agreement"), dated as of ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}, by and between Tax Case Review, with its principal offices located at ${FIRM.address} (together with any successors or assigns, "Company") and ${doc.client_name} ("Client").`}</div>
+              <div style={styles.docBody}>{`This Tax Service Agreement (as the same may be amended from time to time by any Addendum, the "Agreement"), dated as of ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}, by and between ${firmName()}, with its principal offices located at ${FIRM.address} (together with any successors or assigns, "Company") and ${doc.client_name} ("Client").`}</div>
             </div>
 
             <div style={styles.section}>
@@ -462,25 +471,25 @@ export default function SignPage() {
 
             <div style={styles.section}>
               <div style={styles.secTitle}>12. Electronic Communication Disclosures</div>
-              <div style={styles.docBody}>{`Client agrees, unless specifically requested otherwise, that by entering into transactions with Company, Client affirms consent to receive, in electronic format, all information, copies of agreements, and correspondence from Company, and to send information in electronic format. Client agrees that Company may provide all disclosures, periodic statements, notices, receipts, modifications, amendments, and all other evidence of transactions electronically, and that electronic communications will be given the same legal effect as written and signed paper communications. Client's consent may be withdrawn at any time upon Company's receipt of such withdrawal, which may impair the timing of delivery of services. Client may withdraw consent by emailing info@taxcasereview.com or writing to Tax Case Review, ${FIRM.address}. Client acknowledges that the internet is inherently unsecure and that Client maintains the sole obligation to ensure it can receive and regularly access Company's electronic communications.`}</div>
+              <div style={styles.docBody}>{`Client agrees, unless specifically requested otherwise, that by entering into transactions with Company, Client affirms consent to receive, in electronic format, all information, copies of agreements, and correspondence from Company, and to send information in electronic format. Client agrees that Company may provide all disclosures, periodic statements, notices, receipts, modifications, amendments, and all other evidence of transactions electronically, and that electronic communications will be given the same legal effect as written and signed paper communications. Client's consent may be withdrawn at any time upon Company's receipt of such withdrawal, which may impair the timing of delivery of services. Client may withdraw consent by emailing ${firmEmail()} or writing to ${firmName()}, ${FIRM.address}. Client acknowledges that the internet is inherently unsecure and that Client maintains the sole obligation to ensure it can receive and regularly access Company's electronic communications.`}</div>
             </div>
 
             <div style={styles.section}>
               <div style={styles.secTitle}>13. Right of Cancellation</div>
-              <div style={{...styles.docBody, marginBottom:0}}>{`Client may cancel this transaction at any time prior to midnight of the third (3rd) business day after the date of execution of this Agreement, without any penalty or obligation. If Client cancels, any payments made and any negotiable instrument executed by Client will be returned within three (3) days following receipt of Client's cancellation notice. In the event of a cancellation, payments made will be prorated at a $250 hourly rate for all work product services performed by Company. Client may also terminate this Agreement at any later time as provided herein, but Company is not required to refund fees already paid except as set forth in this Agreement. To cancel, Client must mail or deliver a signed and dated copy of the cancellation notice (provided to Client separately as part of this signing package) to Tax Case Review, ${FIRM.address}, not later than midnight of the third business day after execution of this Agreement.`}</div>
+              <div style={{...styles.docBody, marginBottom:0}}>{`Client may cancel this transaction at any time prior to midnight of the third (3rd) business day after the date of execution of this Agreement, without any penalty or obligation. If Client cancels, any payments made and any negotiable instrument executed by Client will be returned within three (3) days following receipt of Client's cancellation notice. In the event of a cancellation, payments made will be prorated at a $250 hourly rate for all work product services performed by Company. Client may also terminate this Agreement at any later time as provided herein, but Company is not required to refund fees already paid except as set forth in this Agreement. To cancel, Client must mail or deliver a signed and dated copy of the cancellation notice (provided to Client separately as part of this signing package) to ${firmName()}, ${FIRM.address}, not later than midnight of the third business day after execution of this Agreement.`}</div>
             </div>
 
             <div style={{...styles.section, background:'#1e2a3a', border:'1px solid #334155', borderRadius:10, padding:'14px 16px'}}>
               <div style={styles.secTitle}>Privacy Policy</div>
-              <div style={{...styles.docBody, marginBottom:0, fontSize:11.5, color:'#94a3b8'}}>{`Tax Case Review recognizes that your financial information is personal. We use and share information about you to perform our obligations under this Agreement, and for related purposes, or as permitted or required by law. We may also share information with a successor in interest in connection with a merger, acquisition, or sale of assets. Calls between Company and Client may be recorded or monitored to ensure quality of service. We are careful to use only accurate, current, and complete information and will correct erroneous information promptly upon request. This policy is subject to change. Contact info@taxcasereview.com with any privacy concerns or to opt out.`}</div>
+              <div style={{...styles.docBody, marginBottom:0, fontSize:11.5, color:'#94a3b8'}}>{`${firmName()} recognizes that your financial information is personal. We use and share information about you to perform our obligations under this Agreement, and for related purposes, or as permitted or required by law. We may also share information with a successor in interest in connection with a merger, acquisition, or sale of assets. Calls between Company and Client may be recorded or monitored to ensure quality of service. We are careful to use only accurate, current, and complete information and will correct erroneous information promptly upon request. This policy is subject to change. Contact ${firmEmail()} with any privacy concerns or to opt out.`}</div>
             </div>
 
             {/* Right of Cancellation — blank notice for client to print, fill out, and mail back if they choose to cancel. Intentionally left unfilled. */}
             <div style={{...styles.section, background:'#0a1628', border:'1px dashed #475569', borderRadius:10, padding:'16px 18px'}}>
               <div style={styles.secTitle}>Notice of Right of Cancellation (Keep for Your Records)</div>
-              <div style={{...styles.docBody, marginBottom:10, fontSize:12.5}}>{`You may cancel this Tax Service Agreement, without any penalty or obligation, within three (3) business days after the date you sign it below. If you cancel, any payments made by you will be returned within three (3) days following receipt of your cancellation notice. In the event of a cancellation, payments made will be prorated at a $250 hourly rate for work product services already performed by Tax Case Review.
+              <div style={{...styles.docBody, marginBottom:10, fontSize:12.5}}>{`You may cancel this Tax Service Agreement, without any penalty or obligation, within three (3) business days after the date you sign it below. If you cancel, any payments made by you will be returned within three (3) days following receipt of your cancellation notice. In the event of a cancellation, payments made will be prorated at a $250 hourly rate for work product services already performed by ${firmName()}.
 
-To cancel, complete and sign this notice, then mail or deliver it to: Tax Case Review, ${FIRM.address} — not later than midnight of the third business day after you sign this Agreement.`}</div>
+To cancel, complete and sign this notice, then mail or deliver it to: ${firmName()}, ${FIRM.address} — not later than midnight of the third business day after you sign this Agreement.`}</div>
               <div style={{background:'#fff',color:'#111',borderRadius:6,padding:'16px 18px',fontSize:12.5,lineHeight:1.9}}>
                 <div style={{fontWeight:700,marginBottom:10}}>I HEREBY CANCEL THE TAX SERVICE AGREEMENT</div>
                 <div style={{borderBottom:'1px solid #333',height:22,marginBottom:4}}></div>
