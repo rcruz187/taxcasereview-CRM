@@ -2337,6 +2337,13 @@ export default function Clients() {
                 </div>
               )}
               <div style={{display:'flex',gap:6,marginTop:pendingSection?4:12}}>
+                <select value="" onChange={e=>{if(e.target.value)setQuickTask(e.target.value)}}
+                  style={{flex:1,padding:'8px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--t2)',fontSize:12}}>
+                  <option value="">⚡ Quick-pick a common task…</option>
+                  {QUICK_TASK_TITLES.map(t=><option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div style={{display:'flex',gap:6,marginTop:6}}>
                 <input
                   value={quickTask}
                   onChange={e=>setQuickTask(e.target.value)}
