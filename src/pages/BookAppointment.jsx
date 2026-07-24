@@ -50,8 +50,10 @@ export default function BookAppointment() {
       setCfg(data)
       if ((data.types || []).length) setType(data.types[0])
     })()
-    // Branding + payment config — additive RPC; safe fallback if not present yet
-    supabase.rpc('booking_get_public_meta').then(({ data }) => {
+    // Branding + payment config — additive RPC; safe fallback if not present yet.
+    // Pass the tenant hint (?t=) so a demo /book link shows the demo's firm name and
+    // logo; absent → the RPC's legacy first-row fallback (TCR) is preserved.
+    supabase.rpc('booking_get_public_meta', tid ? { p_tenant: tid } : {}).then(({ data }) => {
       if (data) setMeta(m => ({ ...m, ...data, payment: { ...m.payment, ...(data.payment || {}) } }))
     }).catch(() => {})
   }, [])
