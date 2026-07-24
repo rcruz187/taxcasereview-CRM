@@ -1,0 +1,69 @@
+name: Deploy Edge Functions
+
+# Deploys every function under supabase/functions/ whose folder changed in
+# the push. Runs on GitHub Actions runners, which have full internet access
+# to api.supabase.com (Claude's sandbox does not — this workflow is the only
+# reliable path for edge fn deploys).
+#
+# Requires repo secret SUPABASE_ACCESS_TOKEN (personal access token, sbp_*)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+  workflow_dispatch:
+    inputs:
+      function:
+        description: 'Function slug to deploy (leave blank to deploy all changed since previous commit)'
+        required: false
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: mpxgxfqdbquzkrvvejkh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Install Supabase CLI
+        run: |
+          curl -fsSL https://github.com/supabase/cli/releases/download/v1.200.3/supabase_1.200.3_linux_amd64.tar.gz \
+            | tar -xz -C /usr/local/bin supabase
+
+      - name: Determine which functions to deploy
+        id: fns
+        run: |
+          if [ -n "${{ github.event.inputs.function }}" ]; then
+            echo "list=${{ github.event.inputs.function }}" >> $GITHUB_OUTPUT
+          else
+            # Every supabase/functions/<slug>/ that had any file changed in this push
+            changed=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} \
+              | grep '^supabase/functions/' \
+              | awk -F/ '{print $3}' \
+              | sort -u \
+              | tr '\n' ' ')
+            echo "list=$changed" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy each function
+        run: |
+          for fn in ${{ steps.fns.outputs.list }}; do
+            if [ -z "$fn" ] || [ ! -d "supabase/functions/$fn" ]; then continue; fi
+            echo "▶ Deploying $fn"
+            # Match the JWT-verify convention used elsewhere in this repo:
+            # anon/public endpoints deploy with --no-verify-jwt. If a fn needs
+            # JWT ON, add it to the JWT_ON list below.
+            case "$fn" in
+              signalwire-relay-token|call-recap|start-outbound-call|call-hold|call-transfer|call-add-participant|end-conference|join-conference)
+                supabase functions deploy "$fn" --project-ref "$PROJECT_REF"
+                ;;
+              *)
+                supabase functions deploy "$fn" --project-ref "$PROJECT_REF" --no-verify-jwt
+                ;;
+            esac
+          done
