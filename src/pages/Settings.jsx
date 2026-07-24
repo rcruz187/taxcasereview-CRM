@@ -251,8 +251,11 @@ export default function Settings() {
     if (!file) return
     setSigLogoUploading(true)
     try {
-      const ext = file.name.split('.').pop() || 'png'
-      const path = `signature-logo.${ext}`
+      const ext = (file.name.split('.').pop() || 'png').toLowerCase()
+      // Per-tenant path — matching the main logo handler above. A flat
+      // 'signature-logo.ext' let every tenant's upload overwrite the same
+      // shared file, bleeding one firm's signature logo onto all others.
+      const path = `signature-logo-${firm.tenant_id || firm.id || 'default'}.${ext}`
       const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true, contentType: file.type })
       if (error) throw error
       const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path)
