@@ -3,6 +3,73 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 
+const CARD_COLORS = {
+    'Active Cases':        '#f59e0b',
+    'Open Leads':          '#a855f7',
+    'Clients':             '#3b82f6',
+    'MTD 1st Trades':      '#22c55e',
+    'MTD 2nd Trades':      '#22c55e',
+    'AR Outstanding':      '#ef4444',
+    'Unpaid Invoices':     '#a855f7',
+    'Open Tasks':          '#1A7FD4',
+    'Upcoming DL':         '#f59e0b',
+    'Overdue DL':          '#ef4444',
+    'Closed Leads':        '#a855f7',
+    'Team MTD 1st Trades': '#3b82f6',
+  }
+
+// Hoisted to module scope: defining this inside Dashboard created a new
+// component type on every render (the clock re-renders every second), so React
+// remounted every card each tick. A remount mid-drag swallowed dragend, left
+// dragIdx stuck non-null, and the stuck guard silently killed tile clicks.
+function StatCard({ card, idx, onDragStart, onDragOver, onDrop, onDragEnd, onCardClick }) {
+    const { label, val, sub, color, to, icon } = card
+    const borderColor = CARD_COLORS[label] || 'var(--blue)'
+    return (
+      <div
+        draggable
+        data-card-idx={idx}
+        onDragStart={e => { e.currentTarget.style.opacity = '0.4'; onDragStart(e, idx) }}
+        onDragOver={e => onDragOver(e, idx)}
+        onDrop={e => { e.currentTarget.style.opacity = '1'; onDrop(e, idx) }}
+        onDragEnd={e => { e.currentTarget.style.opacity = '1'; onDragEnd() }}
+        onClick={() => onCardClick(to)}
+        title="Drag to rearrange"
+        style={{
+          background: 'var(--sf)',
+          border: '1px solid var(--br)',
+          borderTop: 'none',
+          borderRadius: '0 0 12px 12px',
+          padding: '18px 20px',
+          cursor: 'grab',
+          transition: 'transform .15s, box-shadow .15s',
+          position: 'relative',
+          overflow: 'hidden',
+          minHeight: 100,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          userSelect: 'none',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 6px 24px ${borderColor}40` }}
+        onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}
+      >
+        {/* Thick colored top bar */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: borderColor }}/>
+        {/* Drag handle hint */}
+        <div style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, color: 'var(--t3)', opacity: 0.5, lineHeight: 1, letterSpacing: 1 }}>⠿</div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', paddingTop: 6 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 10, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>{label}</div>
+            <div style={{ fontSize: 28, fontWeight: 900, color: color || 'var(--tx)', lineHeight: 1 }}>{val ?? '—'}</div>
+            {sub && <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 6 }}>{sub}</div>}
+          </div>
+          {icon && <div style={{ fontSize: 28, opacity: .15, flexShrink: 0 }}>{icon}</div>}
+        </div>
+      </div>
+    )
+  }
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const { user, role, employeeName, can } = useApp()
@@ -243,20 +310,7 @@ export default function Dashboard() {
 
   // ── Drag-and-drop dashboard layout ──────────────────────────────────────────
 
-  const CARD_COLORS = {
-    'Active Cases':        '#f59e0b',
-    'Open Leads':          '#a855f7',
-    'Clients':             '#3b82f6',
-    'MTD 1st Trades':      '#22c55e',
-    'MTD 2nd Trades':      '#22c55e',
-    'AR Outstanding':      '#ef4444',
-    'Unpaid Invoices':     '#a855f7',
-    'Open Tasks':          '#1A7FD4',
-    'Upcoming DL':         '#f59e0b',
-    'Overdue DL':          '#ef4444',
-    'Closed Leads':        '#a855f7',
-    'Team MTD 1st Trades': '#3b82f6',
-  }
+
 
   // All cards available per role — label is the unique key
   const ALL_ROLE_CARDS = isTaxAdvisor ? [
@@ -345,53 +399,6 @@ export default function Dashboard() {
     dragOver.current = null
   }
 
-  const StatCard = ({ card, idx }) => {
-    const { label, val, sub, color, to, icon } = card
-    const borderColor = CARD_COLORS[label] || 'var(--blue)'
-    return (
-      <div
-        draggable
-        data-card-idx={idx}
-        onDragStart={e => { e.currentTarget.style.opacity = '0.4'; onDragStart(e, idx) }}
-        onDragOver={e => onDragOver(e, idx)}
-        onDrop={e => { e.currentTarget.style.opacity = '1'; onDrop(e, idx) }}
-        onDragEnd={e => { e.currentTarget.style.opacity = '1'; onDragEnd() }}
-        onClick={() => to && dragIdx.current === null && navigate(to)}
-        title="Drag to rearrange"
-        style={{
-          background: 'var(--sf)',
-          border: '1px solid var(--br)',
-          borderTop: 'none',
-          borderRadius: '0 0 12px 12px',
-          padding: '18px 20px',
-          cursor: 'grab',
-          transition: 'transform .15s, box-shadow .15s',
-          position: 'relative',
-          overflow: 'hidden',
-          minHeight: 100,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          userSelect: 'none',
-        }}
-        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 6px 24px ${borderColor}40` }}
-        onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}
-      >
-        {/* Thick colored top bar */}
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: borderColor }}/>
-        {/* Drag handle hint */}
-        <div style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, color: 'var(--t3)', opacity: 0.5, lineHeight: 1, letterSpacing: 1 }}>⠿</div>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', paddingTop: 6 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 10, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>{label}</div>
-            <div style={{ fontSize: 28, fontWeight: 900, color: color || 'var(--tx)', lineHeight: 1 }}>{val ?? '—'}</div>
-            {sub && <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 6 }}>{sub}</div>}
-          </div>
-          {icon && <div style={{ fontSize: 28, opacity: .15, flexShrink: 0 }}>{icon}</div>}
-        </div>
-      </div>
-    )
-  }
 
 
   // TAS widget (extracted so it renders in sidebar)
@@ -468,7 +475,9 @@ export default function Dashboard() {
       <div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14 }}>
           {orderedCards.map((card, idx) => (
-            <StatCard key={card.label} card={card} idx={idx} />
+            <StatCard key={card.label} card={card} idx={idx}
+              onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop} onDragEnd={onDragEnd}
+              onCardClick={to => { if (to && dragIdx.current === null) navigate(to) }} />
           ))}
         </div>
         {saveIndicator && (
