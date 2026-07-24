@@ -1,6 +1,7 @@
 import { useState, useEffect, Fragment } from 'react'
 import PhoneNumber from '../components/PhoneNumber'
 import { supabase } from '../lib/supabase'
+import { FIRM } from '../lib/firmBranding'
 import { useApp } from '../context/AppContext'
 import { DOC_FOLDERS } from './Clients'
 
@@ -8,42 +9,42 @@ const TEMPLATES = [
   {
     label: 'Appointment Reminder',
     icon: '📅',
-    body: `Hi {name}, this is the Tax Case Review team reaching out to remind you of your upcoming appointment with us. We're looking forward to speaking with you! If you need to reschedule or have any questions beforehand, please don't hesitate to call or text us back at (888) 334-5052. We're here to help. See you soon! — Tax Case Review`
+    body: `Hi {name}, this is the {firm} team reaching out to remind you of your upcoming appointment with us. We're looking forward to speaking with you! If you need to reschedule or have any questions beforehand, please don't hesitate to call or text us back at {phone}. We're here to help. See you soon! — {firm}`
   },
   {
     label: 'Document Request',
     icon: '📋',
-    body: `Hi {name}, hope you're doing well! This is Tax Case Review following up on your case. In order to move forward, we need a few documents from you. Please give us a call at (888) 334-5052 or reply to this message and we'll send you a list of what we need. We appreciate your cooperation and are working hard to get the best resolution for you!`
+    body: `Hi {name}, hope you're doing well! This is {firm} following up on your case. In order to move forward, we need a few documents from you. Please give us a call at {phone} or reply to this message and we'll send you a list of what we need. We appreciate your cooperation and are working hard to get the best resolution for you!`
   },
   {
     label: 'Payment Due',
     icon: '💳',
-    body: `Hi {name}, this is a friendly reminder from Tax Case Review that a balance is currently due on your account. We have flexible payment options available and want to make this as easy as possible for you. Please give us a call at (888) 334-5052 at your convenience so we can assist you. Thank you for trusting us with your case!`
+    body: `Hi {name}, this is a friendly reminder from {firm} that a balance is currently due on your account. We have flexible payment options available and want to make this as easy as possible for you. Please give us a call at {phone} at your convenience so we can assist you. Thank you for trusting us with your case!`
   },
   {
     label: 'Resolution Update',
     icon: '📊',
-    body: `Hi {name}, great news — we have an update on your IRS case and we'd love to go over the details with you! Please call us at your earliest convenience at (888) 334-5052 or reply to this message to schedule a time to chat. We're committed to keeping you informed every step of the way. — Tax Case Review`
+    body: `Hi {name}, great news — we have an update on your IRS case and we'd love to go over the details with you! Please call us at your earliest convenience at {phone} or reply to this message to schedule a time to chat. We're committed to keeping you informed every step of the way. — {firm}`
   },
   {
     label: 'Welcome Text',
     icon: '👋',
-    body: `Hi {name}, welcome to Tax Case Review! We're so glad to have you as a client and we're already hard at work on your case. Your dedicated case rep will be reaching out to you shortly to introduce themselves and walk you through next steps. In the meantime, feel free to call or text us anytime at (888) 334-5052. We're in your corner!`
+    body: `Hi {name}, welcome to {firm}! We're so glad to have you as a client and we're already hard at work on your case. Your dedicated case rep will be reaching out to you shortly to introduce themselves and walk you through next steps. In the meantime, feel free to call or text us anytime at {phone}. We're in your corner!`
   },
   {
     label: 'Missing Information',
     icon: '⚠️',
-    body: `Hi {name}, this is Tax Case Review checking in. We noticed we may be missing some information needed to continue working on your case. Could you please give us a call at (888) 334-5052 when you get a chance? We want to make sure we have everything we need to get you the best possible outcome. Thank you!`
+    body: `Hi {name}, this is {firm} checking in. We noticed we may be missing some information needed to continue working on your case. Could you please give us a call at {phone} when you get a chance? We want to make sure we have everything we need to get you the best possible outcome. Thank you!`
   },
   {
     label: 'IRS Notice Received',
     icon: '📬',
-    body: `Hi {name}, we received a notice from the IRS regarding your case and we want to make sure we address it right away. Please call us as soon as possible at (888) 334-5052 so we can review the notice together and discuss next steps. Don't worry — we're on it! — Tax Case Review`
+    body: `Hi {name}, we received a notice from the IRS regarding your case and we want to make sure we address it right away. Please call us as soon as possible at {phone} so we can review the notice together and discuss next steps. Don't worry — we're on it! — {firm}`
   },
   {
     label: 'Case Resolved',
     icon: '✅',
-    body: `Hi {name}, we have some wonderful news — your IRS case has been successfully resolved! It's been our pleasure working with you, and we're thrilled with the outcome. Please call us at (888) 334-5052 so we can go over the final details together. Thank you for choosing Tax Case Review!`
+    body: `Hi {name}, we have some wonderful news — your IRS case has been successfully resolved! It's been our pleasure working with you, and we're thrilled with the outcome. Please call us at {phone} so we can go over the final details together. Thank you for choosing {firm}!`
   },
 ]
 
@@ -133,8 +134,18 @@ export default function Sms() {
   }
 
   function useTemplate(t){
-    const name=form.clientName||'{name}'
-    fld('body',t.body.replace(/{name}/g,name))
+    // Tenant-substitute at apply time so templates read for whichever firm is
+    // signed in (TCR, demo, or a future tenant). {name}=recipient, {firm}=firm
+    // display name, {phone}=firm phone (unformatted → keep the placeholder
+    // exactly as typed in the template constant).
+    const name  = form.clientName || '{name}'
+    const firm  = FIRM.name  || 'Tax Case Review'
+    const phone = FIRM.phone || '(888) 334-5052'
+    const body = t.body
+      .replace(/\{name\}/g,  name)
+      .replace(/\{firm\}/g,  firm)
+      .replace(/\{phone\}/g, phone)
+    fld('body', body)
     setView('compose')
   }
 
@@ -233,7 +244,7 @@ export default function Sms() {
               {sug.length>0&&(
                 <div style={{position:'absolute',top:'100%',left:0,right:0,background:'var(--sf)',border:'1px solid var(--br)',borderRadius:8,zIndex:500,boxShadow:'0 4px 20px rgba(0,0,0,.3)'}}>
                   {sug.map(c=>(
-                    <div key={c.id} onClick={()=>{ fld('clientName',c.name); fld('phone',c.phone||''); setSug([]); setForm(f => ({ ...f, clientName: c.name, phone: c.phone||'', body: f.body.replace(/{name}/g, c.name) })) }}
+                    <div key={c.id} onClick={()=>{ fld('clientName',c.name); fld('phone',c.phone||''); setSug([]); setForm(f => ({ ...f, clientName: c.name, phone: c.phone||'', body: f.body.replace(/\{name\}/g, c.name).replace(/\{firm\}/g, FIRM.name || 'Tax Case Review').replace(/\{phone\}/g, FIRM.phone || '(888) 334-5052') })) }}
                       style={{padding:'10px 14px',cursor:'pointer',fontSize:14}}
                       onMouseEnter={e=>e.currentTarget.style.background='var(--s2)'}
                       onMouseLeave={e=>e.currentTarget.style.background='transparent'}>

@@ -28,6 +28,10 @@ import { generatePOACoverLetterPdf } from '../lib/irsFormUtils'
 import { SMS_TEMPLATES, applySmsTemplate } from '../lib/smsTemplates'
 import { FIRM } from '../lib/firmBranding'
 
+// Tenant-resolved firm name so onboarding email + POA/addendum SMS bodies
+// read for whichever firm is signed in. Mirrors Leads.jsx and docUtils.
+const firmName = () => FIRM.name || 'Tax Case Review'
+
 const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const DAYS   = Array.from({length:31},(_,i)=>String(i+1).padStart(2,'0'))
@@ -398,7 +402,7 @@ function InlinePortalForm({ client, onClose, showToast }) {
     if ((sendVia === 'email' || sendVia === 'both') && client?.email) {
       try {
         const { error } = await supabase.functions.invoke('send-email', {
-          body: {
+          body: { tenant_id: FIRM.tenantId || undefined,
             to: client.email,
             subject: `Your Tax Case Review Client Portal Is Ready — Welcome, ${client.name}!`,
             html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif">
@@ -418,7 +422,7 @@ function InlinePortalForm({ client, onClose, showToast }) {
   <tr><td style="background:#ffffff;padding:36px 40px">
 
     <p style="font-size:15px;color:#1e293b;line-height:1.7;margin:0 0 20px">
-      We're thrilled to have you as a client at <strong>Tax Case Review</strong>. Your dedicated team is already working hard on your case, and your personal Client Portal gives you a front-row seat to everything that's happening — 24 hours a day, 7 days a week.
+      We're thrilled to have you as a client at <strong>${firmName()}</strong>. Your dedicated team is already working hard on your case, and your personal Client Portal gives you a front-row seat to everything that's happening — 24 hours a day, 7 days a week.
     </p>
 
     <p style="font-size:15px;color:#1e293b;line-height:1.7;margin:0 0 24px">
@@ -489,9 +493,9 @@ function InlinePortalForm({ client, onClose, showToast }) {
     </div>
 
     <p style="font-size:13px;color:#64748b;line-height:1.7;margin:0">
-      Thank you for choosing Tax Case Review. We are committed to delivering the best possible outcome for your case and will be with you every step of the way.
+      Thank you for choosing ${firmName()}. We are committed to delivering the best possible outcome for your case and will be with you every step of the way.
     </p>
-    <p style="font-size:14px;color:#1e293b;margin:16px 0 0"><strong>The Tax Case Review Team</strong></p>
+    <p style="font-size:14px;color:#1e293b;margin:16px 0 0"><strong>The ${firmName()} Team</strong></p>
 
   </td></tr>
 
@@ -608,7 +612,7 @@ function InlineOrganizerForm({ client, onClose, showToast }) {
     if ((sendVia === 'email' || sendVia === 'both') && client?.email) {
       try {
         const { error } = await supabase.functions.invoke('send-email', {
-          body: {
+          body: { tenant_id: FIRM.tenantId || undefined,
             to: client.email,
             subject: `Your ${year.trim()} Tax Organizer — Tax Case Review`,
             html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${client.name}</strong>,</p><p>Please complete your ${year.trim()} tax organizer so we can begin preparing your return. It only takes a few minutes, and you can save your progress and come back anytime.</p><p style="text-align:center;margin:24px 0"><a href="${url}" style="background:#9333ea;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Tax Organizer</a></p><p style="font-size:12px;color:#64748b">Link: ${url}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · ${FIRM.address}</p></div>`
@@ -1495,12 +1499,12 @@ export default function Clients() {
       await navigator.clipboard.writeText(sigUrl).catch(()=>{})
       let emailSent=false, smsSent=false
       if ((via==='email'||via==='both') && client.email) {
-        const { error:eErr } = await supabase.functions.invoke('send-email', { body: { to:client.email, subject:`Action Required: Sign Your ${formDef.state} Power of Attorney — ${FIRM.name}`, html:`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${client.name}</strong>,</p><p>Your <strong>${formDef.state} Power of Attorney (${formDef.num})</strong> is ready for your review and signature.</p><p style="text-align:center;margin:24px 0"><a href="${sigUrl}" style="background:#1d4ed8;color:#fff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Review &amp; Sign →</a></p><p style="font-size:12px;color:#64748b">${sigUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · ${FIRM.address}<br/>📞 ${FIRM.phone}</p></div>` }})
+        const { error:eErr } = await supabase.functions.invoke('send-email', { body: { tenant_id: FIRM.tenantId || undefined, to:client.email, subject:`Action Required: Sign Your ${formDef.state} Power of Attorney — ${FIRM.name}`, html:`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${client.name}</strong>,</p><p>Your <strong>${formDef.state} Power of Attorney (${formDef.num})</strong> is ready for your review and signature.</p><p style="text-align:center;margin:24px 0"><a href="${sigUrl}" style="background:#1d4ed8;color:#fff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Review &amp; Sign →</a></p><p style="font-size:12px;color:#64748b">${sigUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · ${FIRM.address}<br/>📞 ${FIRM.phone}</p></div>` }})
         emailSent = !eErr
       }
       if ((via==='sms'||via==='both') && client.phone) {
         const { data:cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
-        if (cfg?.signalwire_backend) { try { await fetch(cfg.signalwire_backend+'/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:client.phone,body:`Tax Case Review: sign your ${formDef.state} POA here: ${sigUrl}`})}); smsSent=true } catch(_){} }
+        if (cfg?.signalwire_backend) { try { await fetch(cfg.signalwire_backend+'/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:client.phone,body:`${firmName()}: sign your ${formDef.state} POA here: ${sigUrl}`})}); smsSent=true } catch(_){} }
       }
       await insertClientNote({ clientname:client.name, content:`🏛️ ${formDef.state} State POA sent for e-signature (${formDef.num})${emailSent?' via email':''}${smsSent?' via SMS':''}`, created_by:actor, visible_to_client:false, created_at:new Date().toISOString() })
       setPoaModal(false)
@@ -1554,7 +1558,7 @@ export default function Clients() {
     let emailSent=false, smsSent=false
 
     if ((via==='email'||via==='both') && c.email) {
-      const { error: eErr } = await supabase.functions.invoke('send-email', { body: {
+      const { error: eErr } = await supabase.functions.invoke('send-email', { body: { tenant_id: FIRM.tenantId || undefined,
         to: c.email,
         subject: `Action Required: Sign Your Service Addendum — Tax Case Review`,
         html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif">
@@ -1580,7 +1584,7 @@ export default function Clients() {
     </div>
   </td></tr>
   <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center">
-    <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.8">Tax Case Review &nbsp;·&nbsp; ${FIRM.address}</p>
+    <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.8">${firmName()} &nbsp;·&nbsp; ${FIRM.address}</p>
   </td></tr>
 </table>
 </td></tr></table>
@@ -1594,7 +1598,7 @@ export default function Clients() {
         try {
           await fetch(cfg.signalwire_backend + '/sms/send', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ to: c.phone, body: `Tax Case Review: please review and sign your Service Addendum here: ${url}` })
+            body: JSON.stringify({ to: c.phone, body: `${firmName()}: please review and sign your Service Addendum here: ${url}` })
           })
           smsSent = true
         } catch (_) {}

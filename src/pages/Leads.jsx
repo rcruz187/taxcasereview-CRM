@@ -29,6 +29,14 @@ import SplitPaymentModal from '../components/SplitPaymentModal'
 import { SMS_TEMPLATES, applySmsTemplate } from '../lib/smsTemplates'
 import { FIRM } from '../lib/firmBranding'
 
+// Tenant-resolved firm name + contact email so the transactional email HTML,
+// SMS bodies, and subject lines below read as whichever firm is signed in,
+// not just the primary tenant. Mirrors docUtils.js:16-19 and SignPage.
+const firmName  = () => FIRM.name || 'Tax Case Review'
+const firmEmail = () =>
+  (FIRM.email || '').trim() ||
+  'info@' + firmName().toLowerCase().replace(/[^a-z0-9]+/g, '') + '.com'
+
 const STATUSES = ['New Lead','Contacted','Consultation Scheduled','Consultation Completed',
   'Tax Inv Agreement Sent','Tax Inv Agreement Signed','Tax Inv Fee Paid',
   'Tax Investigation Active','IRS Facts Received','Addendum Sent','Addendum Signed',
@@ -274,9 +282,9 @@ function LeadInlineEsign({ lead, onClose }) {
     const{data:cfg}=await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
     if((sendVia==='email'||sendVia==='both')&&lead?.email){
       try{
-        const{error:eErr}=await supabase.functions.invoke('send-email',{body:{
+        const{error:eErr}=await supabase.functions.invoke('send-email',{body:{ tenant_id: FIRM.tenantId || undefined,
           to:lead.email,
-          subject:`Please Sign: ${docType} — Tax Case Review`,
+          subject:`Please Sign: ${docType} — ${firmName()}`,
           html:`<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px">
 <tr><td align="center">
@@ -295,11 +303,11 @@ function LeadInlineEsign({ lead, onClose }) {
     <p style="margin:0 0 8px;font-size:12px;color:#94a3b8;text-align:center">Or copy this link:</p>
     <p style="margin:0 0 32px;font-size:12px;color:#3b82f6;text-align:center;word-break:break-all"><a href="${url}" style="color:#3b82f6">${url}</a></p>
     <div style="background:#f8fafc;border-radius:8px;padding:16px 20px;border-left:4px solid #3b82f6">
-      <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> We're here to help.<br>📞 <strong>${FIRM.phone}</strong> &nbsp;·&nbsp; ✉️ <strong>info@taxcasereview.org</strong></p>
+      <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> We're here to help.<br>📞 <strong>${FIRM.phone}</strong> &nbsp;·&nbsp; ✉️ <strong>${firmEmail()}</strong></p>
     </div>
   </td></tr>
   <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center">
-    <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.8">Tax Case Review &nbsp;·&nbsp; ${FIRM.address}</p>
+    <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.8">${firmName()} &nbsp;·&nbsp; ${FIRM.address}</p>
   </td></tr>
 </table>
 </td></tr></table>
@@ -310,7 +318,7 @@ function LeadInlineEsign({ lead, onClose }) {
     }
     if((sendVia==='sms'||sendVia==='both')&&lead?.phone&&cfg?.signalwire_backend){
       try{
-        const r=await fetch(cfg.signalwire_backend+'/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:lead.phone,body:`Hi ${lead?.name}, Tax Case Review sent you a document to sign: ${url}`})})
+        const r=await fetch(cfg.signalwire_backend+'/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:lead.phone,body:`Hi ${lead?.name}, ${firmName()} sent you a document to sign: ${url}`})})
         const d=await r.json();if(d.success)smsSent=true
       }catch(e){console.error('SMS error:',e)}
     }
@@ -719,7 +727,7 @@ export default function Leads() {
       const { data: esign, error: esignErr } = await supabase.from('esigns').insert([{
         doc_type: `State POA — ${formDef.state} (${formDef.num})`,
         client_name: lead.name, client_email: lead.email||'', client_phone: lead.phone||'',
-        message: `Please review and sign your ${formDef.state} Power of Attorney. This authorizes Tax Case Review to represent you before the ${formDef.state} tax authority.`,
+        message: `Please review and sign your ${formDef.state} Power of Attorney. This authorizes ${firmName()} to represent you before the ${formDef.state} tax authority.`,
         pdf_attachments: poaAttachments,
         priority:'Normal', status:'Awaiting', sent_at:new Date().toISOString(), created_at:new Date().toISOString(), sent_by:actor,
       }]).select().single()
@@ -728,12 +736,12 @@ export default function Leads() {
       await navigator.clipboard.writeText(sigUrl).catch(()=>{})
       let emailSent=false, smsSent=false
       if ((via==='email'||via==='both') && lead.email) {
-        const { error:eErr } = await supabase.functions.invoke('send-email', { body: { to:lead.email, subject:`Action Required: Sign Your ${formDef.state} Power of Attorney — ${FIRM.name}`, html:`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${lead.name}</strong>,</p><p>Your <strong>${formDef.state} Power of Attorney (${formDef.num})</strong> is ready for your review and signature.</p><p style="text-align:center;margin:24px 0"><a href="${sigUrl}" style="background:#1d4ed8;color:#fff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Review &amp; Sign →</a></p><p style="font-size:12px;color:#64748b">${sigUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · ${FIRM.address}</p></div>` }})
+        const { error:eErr } = await supabase.functions.invoke('send-email', { body: { tenant_id: FIRM.tenantId || undefined, to:lead.email, subject:`Action Required: Sign Your ${formDef.state} Power of Attorney — ${FIRM.name}`, html:`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${lead.name}</strong>,</p><p>Your <strong>${formDef.state} Power of Attorney (${formDef.num})</strong> is ready for your review and signature.</p><p style="text-align:center;margin:24px 0"><a href="${sigUrl}" style="background:#1d4ed8;color:#fff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Review &amp; Sign →</a></p><p style="font-size:12px;color:#64748b">${sigUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">${firmName()} · ${FIRM.address}</p></div>` }})
         emailSent = !eErr
       }
       if ((via==='sms'||via==='both') && lead.phone) {
         const { data:cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
-        if (cfg?.signalwire_backend) { try { await fetch(cfg.signalwire_backend+'/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:lead.phone,body:`Tax Case Review: sign your ${formDef.state} POA here: ${sigUrl}`})}); smsSent=true } catch(_){} }
+        if (cfg?.signalwire_backend) { try { await fetch(cfg.signalwire_backend+'/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:lead.phone,body:`${firmName()}: sign your ${formDef.state} POA here: ${sigUrl}`})}); smsSent=true } catch(_){} }
       }
       await supabase.from('lead_notes').insert({ lead_id:lead.id, text:`🏛️ ${formDef.state} State POA sent for e-signature (${formDef.num})${emailSent?' via email':''}${smsSent?' via SMS':''}`, author:actor, created_at: new Date().toISOString() })
       setPoaModal(false)
@@ -784,9 +792,9 @@ export default function Leads() {
     let emailSent=false, smsSent=false
 
     if ((via==='email'||via==='both') && l.email) {
-      const { error: eErr } = await supabase.functions.invoke('send-email', { body: {
+      const { error: eErr } = await supabase.functions.invoke('send-email', { body: { tenant_id: FIRM.tenantId || undefined,
         to: l.email,
-        subject: `Action Required: Sign Your Service Addendum — Tax Case Review`,
+        subject: `Action Required: Sign Your Service Addendum — ${firmName()}`,
         html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px">
 <tr><td align="center">
@@ -798,7 +806,7 @@ export default function Leads() {
   </td></tr>
   <tr><td style="padding:40px 40px 32px">
     <p style="margin:0 0 16px;font-size:16px;color:#0f172a">Dear <strong>${l.name}</strong>,</p>
-    <p style="margin:0 0 20px;font-size:15px;color:#334155;line-height:1.7">Your <strong>Service Addendum</strong> is ready for your review and signature. This document authorizes Tax Case Review to proceed with the resolution services we've outlined for your case and confirms the associated service fee.</p>
+    <p style="margin:0 0 20px;font-size:15px;color:#334155;line-height:1.7">Your <strong>Service Addendum</strong> is ready for your review and signature. This document authorizes ${firmName()} to proceed with the resolution services we've outlined for your case and confirms the associated service fee.</p>
     <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#0f172a;text-transform:uppercase;letter-spacing:.06em">✍️ Step 1 — Review &amp; Sign</p>
     <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 20px">
       <a href="${url}" style="display:inline-block;background:linear-gradient(135deg,#16a34a,#15803d);color:#ffffff;padding:16px 40px;border-radius:10px;text-decoration:none;font-weight:700;font-size:17px;box-shadow:0 4px 14px rgba(22,163,74,.35)">Review &amp; Sign Addendum →</a>
@@ -806,11 +814,11 @@ export default function Leads() {
     <p style="margin:0 0 24px;font-size:12px;color:#94a3b8;text-align:center;word-break:break-all"><a href="${url}" style="color:#3b82f6">${url}</a></p>
     ${paymentSection}
     <div style="background:#f8fafc;border-radius:8px;padding:16px 20px;border-left:4px solid #3b82f6">
-      <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> We're here to help.<br>📞 <strong>${FIRM.phone}</strong> &nbsp;·&nbsp; ✉️ <strong>info@taxcasereview.org</strong></p>
+      <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> We're here to help.<br>📞 <strong>${FIRM.phone}</strong> &nbsp;·&nbsp; ✉️ <strong>${firmEmail()}</strong></p>
     </div>
   </td></tr>
   <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center">
-    <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.8">Tax Case Review &nbsp;·&nbsp; ${FIRM.address}</p>
+    <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.8">${firmName()} &nbsp;·&nbsp; ${FIRM.address}</p>
   </td></tr>
 </table>
 </td></tr></table>
@@ -823,8 +831,8 @@ export default function Leads() {
       if (cfg?.signalwire_backend) {
         try {
           const smsBody = stripePayUrl
-            ? `Tax Case Review: Step 1 – Sign Addendum: ${url}  |  Step 2 – Pay ${feeDisplay}: ${stripePayUrl}`
-            : `Tax Case Review: please review and sign your Service Addendum here: ${url}`
+            ? `${firmName()}: Step 1 – Sign Addendum: ${url}  |  Step 2 – Pay ${feeDisplay}: ${stripePayUrl}`
+            : `${firmName()}: please review and sign your Service Addendum here: ${url}`
           await fetch(cfg.signalwire_backend + '/sms/send', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ to: l.phone, body: smsBody })
@@ -1287,10 +1295,10 @@ export default function Leads() {
     }
     const intakeUrl = window.location.origin + '/taxcasereview-CRM/financial-intake/' + intakeId
     const { error: emailErr } = await supabase.functions.invoke('send-email', {
-      body: {
+      body: { tenant_id: FIRM.tenantId || undefined,
         to: l.email,
-        subject: `Your Financial Intake Form — Tax Case Review`,
-        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${l.name}</strong>,</p><p>Here's your link to fill out (or finish) your financial intake form — it takes about 10-15 minutes and your progress saves automatically.</p><p style="text-align:center;margin:24px 0"><a href="${intakeUrl}" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Financial Intake</a></p><p style="font-size:12px;color:#64748b">Link: ${intakeUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · ${FIRM.address}</p></div>`
+        subject: `Your Financial Intake Form — ${firmName()}`,
+        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${l.name}</strong>,</p><p>Here's your link to fill out (or finish) your financial intake form — it takes about 10-15 minutes and your progress saves automatically.</p><p style="text-align:center;margin:24px 0"><a href="${intakeUrl}" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Financial Intake</a></p><p style="font-size:12px;color:#64748b">Link: ${intakeUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">${firmName()} · ${FIRM.address}</p></div>`
       }
     })
     setIntakeSending(false)
@@ -1362,9 +1370,9 @@ export default function Leads() {
         <a href="${stripePayUrl}" style="display:inline-block;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#ffffff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;letter-spacing:-.01em;box-shadow:0 4px 14px rgba(14,165,233,.35)">Pay $${Number(taxFeeAmt).toLocaleString()} Now →</a>
       </td></tr></table>
     </div>` : ''
-        const{error:eErr}=await supabase.functions.invoke('send-email',{body:{
+        const{error:eErr}=await supabase.functions.invoke('send-email',{body:{ tenant_id: FIRM.tenantId || undefined,
           to:l.email,
-          subject:`Action Required: Sign & Pay — Tax Case Review Investigation Package`,
+          subject:`Action Required: Sign & Pay — ${firmName()} Investigation Package`,
           html:`<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px">
 <tr><td align="center">
@@ -1401,11 +1409,11 @@ export default function Leads() {
       <p style="margin:12px 0 0;font-size:11px;color:#94a3b8;text-align:center">Financial Intake link: <a href="${intakeUrl}" style="color:#7c3aed">${intakeUrl}</a></p>
     </div>
     <div style="background:#f8fafc;border-radius:8px;padding:16px 20px;border-left:4px solid #3b82f6;margin-bottom:8px">
-      <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> Don't hesitate to reach out. We're here every step of the way.<br>📞 <strong>${FIRM.phone}</strong> &nbsp;·&nbsp; ✉️ <strong>info@taxcasereview.org</strong></p>
+      <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> Don't hesitate to reach out. We're here every step of the way.<br>📞 <strong>${FIRM.phone}</strong> &nbsp;·&nbsp; ✉️ <strong>${firmEmail()}</strong></p>
     </div>
   </td></tr>
   <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center">
-    <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.8">Tax Case Review &nbsp;·&nbsp; ${FIRM.address}<br>This email was sent regarding your active tax resolution case.</p>
+    <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.8">${firmName()} &nbsp;·&nbsp; ${FIRM.address}<br>This email was sent regarding your active tax resolution case.</p>
   </td></tr>
 </table>
 </td></tr></table>
@@ -1417,8 +1425,8 @@ export default function Leads() {
     if(l.phone&&cfg?.signalwire_backend){
       try{
         const smsBody = stripePayUrl
-          ? `Hi ${l.name}, Tax Case Review sent your Investigation Package. Step 1 – Sign: ${url}  |  Step 2 – Pay $${Number(taxFeeAmt).toLocaleString()}: ${stripePayUrl}  |  Step 3 – Financial Intake: ${intakeUrl}`
-          : `Hi ${l.name}, Tax Case Review sent you a Tax Investigation Package to review and sign: ${url}  |  Financial Intake: ${intakeUrl}`
+          ? `Hi ${l.name}, ${firmName()} sent your Investigation Package. Step 1 – Sign: ${url}  |  Step 2 – Pay $${Number(taxFeeAmt).toLocaleString()}: ${stripePayUrl}  |  Step 3 – Financial Intake: ${intakeUrl}`
+          : `Hi ${l.name}, ${firmName()} sent you a Tax Investigation Package to review and sign: ${url}  |  Financial Intake: ${intakeUrl}`
         const r=await fetch(cfg.signalwire_backend+'/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:l.phone,body:smsBody})})
         const d=await r.json();if(d.success)smsSent=true
       }catch(e){console.error('SMS error:',e)}
@@ -1552,10 +1560,10 @@ export default function Leads() {
         } else if (l.email) {
           const intakeUrl = window.location.origin + '/taxcasereview-CRM/financial-intake/' + existingIntake.id
           const { error: emailErr } = await supabase.functions.invoke('send-email', {
-            body: {
+            body: { tenant_id: FIRM.tenantId || undefined,
               to: l.email,
-              subject: `Your Financial Intake Form — Tax Case Review`,
-              html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${l.name}</strong>,</p><p>Welcome aboard! To get your case moving, please finish your financial intake form — it gives your advisor the full picture needed to put together your resolution plan. Your progress is saved.</p><p style="text-align:center;margin:24px 0"><a href="${intakeUrl}" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Finish My Financial Intake</a></p><p style="font-size:12px;color:#64748b">Link: ${intakeUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · ${FIRM.address}</p></div>`
+              subject: `Your Financial Intake Form — ${firmName()}`,
+              html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${l.name}</strong>,</p><p>Welcome aboard! To get your case moving, please finish your financial intake form — it gives your advisor the full picture needed to put together your resolution plan. Your progress is saved.</p><p style="text-align:center;margin:24px 0"><a href="${intakeUrl}" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Finish My Financial Intake</a></p><p style="font-size:12px;color:#64748b">Link: ${intakeUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">${firmName()} · ${FIRM.address}</p></div>`
             }
           })
           if (!emailErr) intakeSent = true
@@ -1569,10 +1577,10 @@ export default function Leads() {
           const intakeUrl = window.location.origin + '/taxcasereview-CRM/financial-intake/' + intakeRec.id
           if (l.email) {
             const { error: emailErr } = await supabase.functions.invoke('send-email', {
-              body: {
+              body: { tenant_id: FIRM.tenantId || undefined,
                 to: l.email,
-                subject: `Your Financial Intake Form — Tax Case Review`,
-                html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${l.name}</strong>,</p><p>Welcome aboard! To get your case moving, please fill out this short financial intake form — it gives your advisor the full picture needed to put together your resolution plan. It takes about 10-15 minutes and your progress saves automatically.</p><p style="text-align:center;margin:24px 0"><a href="${intakeUrl}" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Financial Intake</a></p><p style="font-size:12px;color:#64748b">Link: ${intakeUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · ${FIRM.address}</p></div>`
+                subject: `Your Financial Intake Form — ${firmName()}`,
+                html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${l.name}</strong>,</p><p>Welcome aboard! To get your case moving, please fill out this short financial intake form — it gives your advisor the full picture needed to put together your resolution plan. It takes about 10-15 minutes and your progress saves automatically.</p><p style="text-align:center;margin:24px 0"><a href="${intakeUrl}" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Financial Intake</a></p><p style="font-size:12px;color:#64748b">Link: ${intakeUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">${firmName()} · ${FIRM.address}</p></div>`
               }
             })
             if (!emailErr) intakeSent = true

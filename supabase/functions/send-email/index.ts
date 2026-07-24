@@ -61,7 +61,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const { to, subject, html, text, attachments } = await req.json()
+    const { to, subject, html, text, attachments, tenant_id } = await req.json()
 
     if (!to || !subject || (!html && !text)) {
       return new Response(JSON.stringify({ error: 'Missing required fields: to, subject, html/text' }), {
@@ -73,7 +73,13 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
-    const { data: settings } = await supabase.from('settings').select('*').limit(1).maybeSingle()
+    // Optional tenant_id lets the caller send From the tenant's own display
+    // name + address instead of the primary (TCR) settings row. Absent → first
+    // row, which matches the pre-tenant behavior exactly.
+    let settingsQuery = supabase.from('settings').select('*')
+    if (tenant_id) settingsQuery = settingsQuery.eq('tenant_id', tenant_id)
+    else settingsQuery = settingsQuery.limit(1)
+    const { data: settings } = await settingsQuery.maybeSingle()
 
     if (!settings?.gmail_refresh_token || !settings?.gmail_client_id || !settings?.gmail_client_secret) {
       return new Response(JSON.stringify({ error: 'Gmail is not connected in Settings yet' }), {

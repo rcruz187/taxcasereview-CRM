@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
+import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 import { supabase } from '../lib/supabase'
 import { fmt12, whenLong, sendClientConfirmation, sendCancelEmails, sendRescheduleNotice } from '../lib/bookingEmails'
 import { etLabelInZone, visitorZone, zoneShort } from '../lib/timezones'
@@ -29,14 +30,24 @@ export default function ManageBooking() {
   useEffect(() => {
     (async () => {
       const { data, error } = await supabase.rpc('booking_get', { p_token: token })
-      setBk(error || !data ? null : data)
+      const rec = error || !data ? null : data
+      // Load the booking's tenant branding BEFORE we render — otherwise the
+      // header would show whichever FIRM was loaded last (TCR by default on a
+      // fresh browser). If booking_get doesn't return tenant_id, tenantHint is
+      // undefined and loadFirmBrandingPublic falls back to legacy first-row.
+      await loadFirmBrandingPublic(rec?.tenant_id)
+      setBk(rec)
     })()
   }, [token])
 
   async function pickDate(iso) {
     setDate(iso); setTime(''); setSlots(null)
     if (!iso) return
-    const { data, error } = await supabase.rpc('booking_get_slots', { p_date: iso })
+    // Thread the booking's tenant into slot lookup so demo reschedule sees demo
+    // availability instead of TCR's. Absent → RPC falls back to TCR-001, which
+    // matches pre-existing behavior for legacy bookings.
+    const args = bk?.tenant_id ? { p_date: iso, p_tenant: bk.tenant_id } : { p_date: iso }
+    const { data, error } = await supabase.rpc('booking_get_slots', args)
     setSlots(error ? [] : (data || []))
   }
 
@@ -71,7 +82,7 @@ export default function ManageBooking() {
     <div style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif', padding: '32px 16px' }}>
       <div style={{ maxWidth: 560, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <div style={{ fontSize: 24, fontWeight: 800 }}>Tax Case Review</div>
+          <div style={{ fontSize: 24, fontWeight: 800 }}>{FIRM.name || 'Tax Case Review'}</div>
           <div style={{ color: C.dim, fontSize: 14, marginTop: 4 }}>Manage your appointment</div>
         </div>
 

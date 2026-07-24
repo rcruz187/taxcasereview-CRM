@@ -43,7 +43,7 @@ export function sendClientConfirmation({ name, email, type, date, time, token })
   const manage = token ? `${window.location.origin}${import.meta.env.BASE_URL}book/manage/${token}` : null
   ;(async () => {
     const firm = await getFirmMeta()
-    await supabase.functions.invoke('send-email', { body: {
+    await supabase.functions.invoke('send-email', { body: { tenant_id: FIRM.tenantId || undefined,
       to: email,
       subject: `Appointment Confirmed — ${type}, ${whenShort(date, time)}`,
       html: emailHtml({ firmName: firm.firmName, logoUrl: firm.logoUrl, body: `
@@ -67,7 +67,7 @@ export function sendClientConfirmation({ name, email, type, date, time, token })
 export function sendCancelEmails({ name, email, type, date, time, notifyEmail }) {
   (async () => {
     const firm = await getFirmMeta()
-    if (email) await supabase.functions.invoke('send-email', { body: {
+    if (email) await supabase.functions.invoke('send-email', { body: { tenant_id: FIRM.tenantId || undefined,
       to: email,
       subject: `Appointment Canceled — ${type}, ${whenShort(date, time)}`,
       html: emailHtml({ firmName: firm.firmName, logoUrl: firm.logoUrl, body: `
@@ -77,7 +77,7 @@ export function sendCancelEmails({ name, email, type, date, time, notifyEmail })
         <p style="text-align:center;margin:20px 0"><a href="${bookUrl()}" style="background:#1d4ed8;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;font-size:14px;display:inline-block">📅 Book Again</a></p>
         <p style="margin-top:20px"><strong>${firm.firmName || 'Tax Case Review'}</strong></p>` }),
     } })
-    await supabase.functions.invoke('send-email', { body: {
+    await supabase.functions.invoke('send-email', { body: { tenant_id: FIRM.tenantId || undefined,
       to: notifyEmail || 'info@taxcasereview.org',
       subject: `❌ Booking canceled: ${name} — ${whenShort(date, time)}`,
       html: emailHtml({ firmName: firm.firmName, logoUrl: firm.logoUrl, body: `<p><strong>${name}</strong> canceled their <strong>${type}</strong> on ${whenLong(date, time)}. The slot is open again.</p>` }),
@@ -89,7 +89,7 @@ export function sendCancelEmails({ name, email, type, date, time, notifyEmail })
 export function sendRescheduleNotice({ name, type, oldDate, oldTime, date, time, notifyEmail }) {
   (async () => {
     const firm = await getFirmMeta()
-    await supabase.functions.invoke('send-email', { body: {
+    await supabase.functions.invoke('send-email', { body: { tenant_id: FIRM.tenantId || undefined,
       to: notifyEmail || 'info@taxcasereview.org',
       subject: `🔁 Rescheduled: ${name} — now ${whenShort(date, time)}`,
       html: emailHtml({ firmName: firm.firmName, logoUrl: firm.logoUrl, body: `<p><strong>${name}</strong> moved their <strong>${type}</strong>:</p><p style="line-height:1.9">Was: ${whenLong(oldDate, oldTime)}<br>Now: <strong>${whenLong(date, time)}</strong></p><p>The calendar is already updated.</p>` }),
@@ -101,7 +101,7 @@ export function sendRescheduleNotice({ name, type, oldDate, oldTime, date, time,
 export function sendFirmNotification({ name, email, phone, notes, type, date, time, notifyEmail, bookedBy }) {
   (async () => {
     const firm = await getFirmMeta()
-    await supabase.functions.invoke('send-email', { body: {
+    await supabase.functions.invoke('send-email', { body: { tenant_id: FIRM.tenantId || undefined,
       to: notifyEmail || 'info@taxcasereview.org',
       subject: `📅 New booking: ${name} — ${whenShort(date, time)}`,
       html: emailHtml({ firmName: firm.firmName, logoUrl: firm.logoUrl, body: `
@@ -135,7 +135,7 @@ export async function sendBookingInvite({ name, email, phone }) {
   const link = q.toString() ? `${BOOK_URL}?${q.toString()}` : BOOK_URL
   const firm = await getFirmMeta()
   const fName = firm.firmName || 'Tax Case Review'
-  const { error } = await supabase.functions.invoke('send-email', { body: {
+  const { error } = await supabase.functions.invoke('send-email', { body: { tenant_id: FIRM.tenantId || undefined,
     to: email,
     subject: `Schedule Your Appointment — ${fName}`,
     html: emailHtml({ firmName: firm.firmName, logoUrl: firm.logoUrl, body: `<p>Hi <strong>${first}</strong>,</p><p>Pick whichever time works best for you — it takes less than a minute:</p><p style="text-align:center;margin:24px 0"><a href="${link}" style="background:#1d4ed8;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:700;font-size:15px;display:inline-block">📅 Choose a Time</a></p><p>You'll see our live availability and get an instant confirmation. If nothing there works, just reply to this email or give us a call.</p><p style="margin-top:20px">Talk soon,<br><strong>${fName}</strong></p>` }),
