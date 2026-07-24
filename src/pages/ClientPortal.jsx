@@ -94,10 +94,13 @@ export default function ClientPortal() {
   // logged-out client still sees THEIR firm's branding (not a shared file).
   const [firmLogo, setFirmLogo] = useState('')
   useEffect(() => {
-    supabase.rpc('booking_get_public_meta').then(({ data }) => {
+    // Pass the client id from the portal URL so the RPC resolves THIS client's
+    // tenant branding; without it the RPC's legacy fallback is the first
+    // settings row, which showed TCR's logo on every tenant's portal.
+    supabase.rpc('booking_get_public_meta', { p_client_id: id }).then(({ data }) => {
       if (data?.logo_url) setFirmLogo(data.logo_url)
     }).catch(() => {})
-  }, [])
+  }, [id])
 
   const [section, setSection] = useState(() => new URLSearchParams(window.location.search).get('section') || 'compliance')
 
