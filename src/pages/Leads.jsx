@@ -163,7 +163,9 @@ function ActionBtn({color, icon, label, sub, onClick}) {
 }
 
 function LeadInlineFax({ lead, onClose, onLogged }) {
-  const [toNum,set0]=useState((lead?.phone||'').replace(/\D/g,''))
+  // TO stays blank on open — the lead's phone number is not the fax number,
+  // and prefilling led users to send to the wrong destination.
+  const [toNum,set0]=useState('')
   const [subject,set1]=useState('')
   const [file,set2]=useState(null)
   const [sending,set3]=useState(false)

@@ -196,7 +196,9 @@ function ActionBtn({color, icon, label, sub, onClick}) {
 
 // ── Inline Fax Form ─────────────────────────────────────────────────────────
 function InlineFaxForm({ client, onClose, showToast, onLogged }) {
-  const [toNum,   setToNum]   = useState((client?.phone||'').replace(/\D/g,''))
+  // TO stays blank on open — the client's phone number is not the fax number,
+  // and prefilling led users to send to the wrong destination.
+  const [toNum,   setToNum]   = useState('')
   const [subject, setSubject] = useState('')
   const [notes,   setNotes]   = useState('')
   const [file,    setFile]    = useState(null)
