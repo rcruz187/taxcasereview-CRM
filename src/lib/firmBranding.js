@@ -70,9 +70,12 @@ export async function loadFirmBranding() {
 // Anonymous visitors can't read `settings` under RLS, so branding comes from
 // the anon-safe booking_get_public_meta RPC instead. Call this on mount of any
 // page a logged-out client can reach, or it will render the default firm.
-export async function loadFirmBrandingPublic() {
+export async function loadFirmBrandingPublic(tenantHint) {
   try {
-    const { data } = await supabase.rpc('booking_get_public_meta')
+    // Optional tenant hint (uuid as text) → RPC resolves this tenant's row.
+    // Without it the RPC falls back to the legacy first-row (TCR) branding.
+    const args = tenantHint ? { p_tenant: String(tenantHint) } : {}
+    const { data } = await supabase.rpc('booking_get_public_meta', args)
     if (data) {
       if (data.firm_name) FIRM.name = data.firm_name
       if (data.logo_url) FIRM.logoUrl = data.logo_url

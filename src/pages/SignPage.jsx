@@ -78,11 +78,19 @@ export default function SignPage() {
   const drawingRef = useRef(false)
 
   useEffect(() => {
-    loadFirmBrandingPublic()
     async function load() {
       const { data: rows, error } = await supabase.rpc('esign_load', { p_id: id })
       const data = rows?.[0]
-      if (error || !data) { setError('Signing request not found or expired.'); setLoading(false); return }
+      if (error || !data) {
+        // No record to source a tenant from → legacy first-row fallback keeps the
+        // error page from being unbranded.
+        await loadFirmBrandingPublic()
+        setError('Signing request not found or expired.'); setLoading(false); return
+      }
+      // Load the signing tenant's branding BEFORE we render (FIRM is a mutable
+      // module-level object; without the await the first paint uses whatever
+      // was last set, i.e. TCR on the demo).
+      await loadFirmBrandingPublic(data.tenant_id)
       if (data.status === 'Signed') { setDone(true); setDoc(data); setLoading(false); return }
       setDoc(data); setLoading(false)
     }
