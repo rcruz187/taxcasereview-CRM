@@ -2338,22 +2338,22 @@ export default function Clients() {
                   <button onClick={()=>setPendingSection('')} style={{background:'none',border:'none',color:'var(--bad)',cursor:'pointer',fontSize:11}}>Cancel</button>
                 </div>
               )}
-              <div style={{display:'flex',gap:6,marginTop:pendingSection?4:12}}>
+              <div style={{display:'flex',gap:6,marginTop:pendingSection?4:10}}>
                 <select value="" onChange={e=>{if(e.target.value)setQuickTask(e.target.value)}}
-                  style={{flex:1,padding:'8px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--t2)',fontSize:12}}>
+                  style={{flex:1,padding:'5px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--t2)',fontSize:12}}>
                   <option value="">⚡ Quick-pick a common task…</option>
                   {QUICK_TASK_TITLES.map(t=><option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
-              <div style={{display:'flex',gap:6,marginTop:6}}>
+              <div style={{display:'flex',gap:6,marginTop:4}}>
                 <input
                   value={quickTask}
                   onChange={e=>setQuickTask(e.target.value)}
                   onKeyDown={e=>e.key==='Enter'&&addQuickTask()}
                   placeholder={pendingSection ? 'Add a sub-task…' : 'Add a task…'}
-                  style={{flex:1,padding:'8px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12}}
+                  style={{flex:1,padding:'5px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12}}
                 />
-                <button className="btn pri" style={{fontSize:11,padding:'7px 14px'}} onClick={addQuickTask} disabled={addingTask}>
+                <button className="btn pri" style={{fontSize:11,padding:'5px 12px'}} onClick={addQuickTask} disabled={addingTask}>
                   {addingTask?'…':'+ Add'}
                 </button>
               </div>
