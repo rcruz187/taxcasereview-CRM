@@ -34,3 +34,41 @@ verify_jwt = false
 # public-facing endpoints above).
 [functions.sunbiz-search]
 verify_jwt = false
+
+# ── Public endpoints called WITHOUT a Supabase JWT ──────────────────────────
+# These are hit directly by external services (SignalWire call webhooks, the
+# Stripe payment webhook) or before a session exists (client portal login), so
+# they MUST have verify_jwt = false or the caller is rejected. Recorded here in
+# the repo so a deploy can never silently reset them again.
+[functions.caller-hangup]
+verify_jwt = false
+
+[functions.conference-ended]
+verify_jwt = false
+
+[functions.hold-music]
+verify_jwt = false
+
+[functions.ivr-extension]
+verify_jwt = false
+
+[functions.join-conference]
+verify_jwt = false
+
+[functions.log-call]
+verify_jwt = false
+
+[functions.outbound-call-status]
+verify_jwt = false
+
+[functions.outbound-leg]
+verify_jwt = false
+
+[functions.voicemail-recorded]
+verify_jwt = false
+
+[functions.stripe-checkout-webhook]
+verify_jwt = false
+
+[functions.portal-login]
+verify_jwt = false
