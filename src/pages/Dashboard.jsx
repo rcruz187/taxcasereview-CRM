@@ -316,7 +316,7 @@ export default function Dashboard() {
   const ALL_ROLE_CARDS = isTaxAdvisor ? [
     { label: 'Open Leads',           val: metrics.myOpenLeads,   color: 'var(--warn)', to: '/leads',     icon: '👤', sub: 'Assigned to you' },
     { label: 'Closed Leads',         val: metrics.myClosedLeads, color: 'var(--ok)',   to: '/leads',     icon: '🏁', sub: 'Assigned to you' },
-    { label: 'MTD 1st Trades',       val: '$' + Math.round(metrics.my1stTradeMtd || 0).toLocaleString(), color: 'var(--ok)', to: '/payments', icon: '💰', sub: 'Your enrollments' },
+    { label: 'MTD 1st Trades',       val: '$' + Math.round(metrics.my1stTradeMtd || 0).toLocaleString(), color: 'var(--ok)', to: '/leads', icon: '💰', sub: 'Inv. fees sold · your leads' },
     { label: 'Team MTD 1st Trades',  val: '$' + Math.round(metrics.mtd1stTrades  || 0).toLocaleString(), color: 'var(--blue)', icon: '👥', sub: 'Whole sales team' },
   ] : isTaxAssociate ? [
     { label: 'Active Cases',   val: metrics.activeCases,   color: 'var(--blue)', to: '/cases',     icon: '📁' },
@@ -333,7 +333,7 @@ export default function Dashboard() {
     { label: 'Open Leads',     val: metrics.openLeads,     color: 'var(--warn)', to: '/leads',     icon: '👤' },
     { label: 'Closed Leads',   val: metrics.closedLeads,   color: 'var(--ok)',   to: '/leads',     icon: '🏁' },
     { label: 'Clients',        val: metrics.totalClients,  color: 'var(--ok)',   to: '/clients',   icon: '🏢' },
-    { label: 'MTD 1st Trades', val: '$' + Math.round(metrics.my1stTradeMtd || 0).toLocaleString(), color: 'var(--ok)', to: '/payments', icon: '💰', sub: 'Team: $' + Math.round(metrics.mtd1stTrades || 0).toLocaleString() },
+    { label: 'MTD 1st Trades', val: '$' + Math.round(metrics.my1stTradeMtd || 0).toLocaleString(), color: 'var(--ok)', to: '/leads', icon: '💰', sub: 'Inv. fees sold · Team: $' + Math.round(metrics.mtd1stTrades || 0).toLocaleString() },
     { label: 'MTD 2nd Trades', val: '$' + Math.round(metrics.my2ndTradeMtd || 0).toLocaleString(), color: 'var(--ok)', to: '/payments', icon: '💵', sub: 'Team: $' + Math.round(metrics.mtd2ndTrades || 0).toLocaleString() },
     { label: 'AR Outstanding', val: '$' + Math.round(metrics.arOutstanding  || 0).toLocaleString(), color: '#ef4444', to: '/ar', icon: '💳', sub: 'Scheduled installments' },
     { label: 'Unpaid Invoices',val: metrics.unpaidInvoices, color: '#a855f7', to: '/invoices', icon: '🧾', sub: metrics.unpaidAmt > 0 ? '$' + Math.round(metrics.unpaidAmt).toLocaleString() + ' outstanding' : 'All paid' },
@@ -344,7 +344,7 @@ export default function Dashboard() {
     { label: 'Open Leads',     val: metrics.openLeads,     color: 'var(--warn)', to: '/leads',     icon: '👤' },
     { label: 'Clients',        val: metrics.totalClients,  color: 'var(--ok)',   to: '/clients',   icon: '🏢' },
     { label: 'Active Cases',   val: metrics.activeCases,   color: 'var(--blue)', to: '/cases',     icon: '📁' },
-    { label: 'MTD 1st Trades', val: '$' + Math.round(metrics.mtd1stTrades  || 0).toLocaleString(), color: 'var(--ok)', to: '/payments', icon: '💰', sub: 'Total: $' + Math.round(metrics.total1stTrades || 0).toLocaleString() },
+    { label: 'MTD 1st Trades', val: '$' + Math.round(metrics.mtd1stTrades  || 0).toLocaleString(), color: 'var(--ok)', to: '/leads', icon: '💰', sub: 'Inv. fees sold · Total: $' + Math.round(metrics.total1stTrades || 0).toLocaleString() },
     { label: 'MTD 2nd Trades', val: '$' + Math.round(metrics.mtd2ndTrades  || 0).toLocaleString(), color: 'var(--ok)', to: '/payments', icon: '💵', sub: 'Total: $' + Math.round(metrics.total2ndTrades || 0).toLocaleString() },
     { label: 'Unpaid Invoices',val: metrics.unpaidInvoices, color: '#a855f7', to: '/invoices', icon: '🧾', sub: metrics.unpaidAmt > 0 ? '$' + Math.round(metrics.unpaidAmt).toLocaleString() + ' outstanding' : 'All paid' },
     { label: 'Open Tasks',     val: metrics.openTasks,     color: '#1A7FD4',  to: '/tasks',     icon: '✅', sub: metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue` : 'On track' },
