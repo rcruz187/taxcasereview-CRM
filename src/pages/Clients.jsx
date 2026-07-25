@@ -2102,6 +2102,7 @@ export default function Clients() {
                         const authorLower = (n.author||'').toLowerCase().trim()
                         const emp = employees.find(e => e.name && e.name.toLowerCase()===authorLower)
                           || employees.find(e => e.name && e.name.toLowerCase().split(' ')[0]===authorLower)
+                          || employees.find(e => e.email && e.email.toLowerCase()===authorLower)
                         return (
                           <div key={n.id||i} style={{display:'flex',gap:10,padding:'12px 14px',borderRadius:10,border:'1px solid var(--br)',background:'var(--s2)'}}>
                             <div style={{width:34,height:34,borderRadius:'50%',flexShrink:0,overflow:'hidden',background:avatarColor(n.author),display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:800,color:'#fff'}}>
