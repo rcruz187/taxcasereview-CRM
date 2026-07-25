@@ -28,3 +28,9 @@ verify_jwt = false
 
 [functions.redirect-to-voicemail]
 verify_jwt = false
+
+# Public FormaCorp name-check — called from the entity-formation wizard before
+# any auth context exists, so JWT verification must be off (like the other
+# public-facing endpoints above).
+[functions.sunbiz-search]
+verify_jwt = false
