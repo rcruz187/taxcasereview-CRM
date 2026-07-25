@@ -67,9 +67,16 @@ export default function StripeAddCardModal({ clientId, clientName, email, onClos
 
   useEffect(() => {
     async function init() {
+      // Staff (authenticated) can read settings directly. Client Portal visitors are
+      // anonymous, so RLS blocks that read — fall back to the tenant-scoped RPC.
       const { data: s } = await supabase.from('settings').select('stripe_publishable_key').limit(1).maybeSingle()
-      if (!s?.stripe_publishable_key) { setErr('Online payments are not configured — contact our office.'); setLoading(false); return }
-      setPublishableKey(s.stripe_publishable_key)
+      let pk = s?.stripe_publishable_key || null
+      if (!pk && clientId) {
+        const { data: rpcPk } = await supabase.rpc('portal_get_stripe_pk', { p_client_id: String(clientId) })
+        pk = rpcPk || null
+      }
+      if (!pk) { setErr('Online payments are not configured — contact our office.'); setLoading(false); return }
+      setPublishableKey(pk)
 
       const { data, error } = await supabase.functions.invoke('stripe-setup-intent', {
         body: { clientId, clientName, email, recordType: 'client' }

@@ -44,7 +44,7 @@ function InnerForm({ invoiceId, paymentIntentId, balance, onPaid, onClose }) {
   )
 }
 
-export default function StripeInvoicePayModal({ invoice, onClose, onPaid }) {
+export default function StripeInvoicePayModal({ invoice, clientId, onClose, onPaid }) {
   const [clientSecret, setClientSecret] = useState(null)
   const [paymentIntentId, setPaymentIntentId] = useState(null)
   const [balance, setBalance] = useState(0)
@@ -53,9 +53,16 @@ export default function StripeInvoicePayModal({ invoice, onClose, onPaid }) {
 
   useEffect(() => {
     async function init() {
+      // Staff read settings directly; anonymous Client Portal visitors are blocked by
+      // RLS, so fall back to the tenant-scoped RPC.
       const { data: s } = await supabase.from('settings').select('stripe_publishable_key').limit(1).maybeSingle()
-      if (!s?.stripe_publishable_key) { setErr('Online payments are not set up yet — please contact our office.'); return }
-      setPublishableKey(s.stripe_publishable_key)
+      let pk = s?.stripe_publishable_key || null
+      if (!pk && clientId) {
+        const { data: rpcPk } = await supabase.rpc('portal_get_stripe_pk', { p_client_id: String(clientId) })
+        pk = rpcPk || null
+      }
+      if (!pk) { setErr('Online payments are not set up yet — please contact our office.'); return }
+      setPublishableKey(pk)
 
       const { data, error } = await supabase.functions.invoke('stripe-invoice-pay-intent', {
         body: { invoiceId: invoice.id }

@@ -710,7 +710,7 @@ export default function ClientPortal() {
               </>
             )}
             {payModalInv && (
-              <StripeInvoicePayModal invoice={payModalInv} onClose={() => setPayModalInv(null)} onPaid={() => refreshPaymentsAndInvoices()} />
+              <StripeInvoicePayModal invoice={payModalInv} clientId={client?.id} onClose={() => setPayModalInv(null)} onPaid={() => refreshPaymentsAndInvoices()} />
             )}
             {addCardModal && (
               <StripeAddCardModal
@@ -763,7 +763,7 @@ export default function ClientPortal() {
               })
             )}
             {payModalInv && (
-              <StripeInvoicePayModal invoice={payModalInv} onClose={() => setPayModalInv(null)} onPaid={() => refreshPaymentsAndInvoices()} />
+              <StripeInvoicePayModal invoice={payModalInv} clientId={client?.id} onClose={() => setPayModalInv(null)} onPaid={() => refreshPaymentsAndInvoices()} />
             )}
           </div>
         )}
