@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
+import { OPEN_STATUSES } from '../lib/caseStatuses'
 
 const CARD_COLORS = {
     'Active Cases':        '#f59e0b',
@@ -146,7 +147,7 @@ export default function Dashboard() {
     const arOutstanding = (arScheduled || []).reduce((s, p) => s + parseFloat(p.amount || 0), 0)
 
     setMetrics({
-      activeCases: (cases || []).filter(c => ['Open', 'Pending IRS', 'Active Plan', 'Under Review'].includes(c.status)).length,
+      activeCases: (cases || []).filter(c => OPEN_STATUSES.includes(c.status)).length,
       openLeads: (leads || []).filter(l => !['Converted to Client', 'Dead', 'Do Not Contact'].includes(l.status)).length,
       totalClients: (clients || []).length,
       mtd1stTrades, total1stTrades, mtd2ndTrades, total2ndTrades,

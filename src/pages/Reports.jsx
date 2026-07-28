@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { exportPDF, exportExcel } from '../lib/exportUtils'
+import { OPEN_STATUSES } from '../lib/caseStatuses'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 const PIPELINE_STAGES = ['investigation','transcripts','analysis','proposal','negotiation','resolution','closed']
@@ -93,7 +94,7 @@ export default function Reports() {
 
   const totalRevenue    = fPayments.filter(p=>p.status==='Cleared').reduce((s,p)=>s+parseFloat(p.amount||0),0)
   const pendingRevenue  = fInvoices.filter(i=>i.status!=='Paid').reduce((s,i)=>s+parseFloat(i.total||0),0)
-  const openCases       = cases.filter(c=>c.status==='Open'||c.status==='Pending IRS').length
+  const openCases       = cases.filter(c=>OPEN_STATUSES.includes(c.status)).length
   const overdueDl       = deadlines.filter(d=>d.dueDate&&new Date(d.dueDate)<new Date()&&d.status!=='Completed').length
   const conversionRate  = leads.length ? Math.round((clients.length/leads.length)*100) : 0
 

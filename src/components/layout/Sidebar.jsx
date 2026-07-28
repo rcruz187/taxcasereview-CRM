@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { supabase } from '../../lib/supabase'
+import { OPEN_STATUSES } from '../../lib/caseStatuses'
 
 const LOGO = '/taxcasereview-CRM/logo.png'
 
@@ -166,7 +167,7 @@ export default function Sidebar() {
       const [leadsRes, clientsRes, casesRes, deadlinesRes] = await Promise.all([
         supabase.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'New Lead'),
         supabase.from('clients').select('id', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString()),
-        supabase.from('cases').select('id', { count: 'exact', head: true }).in('status', ['Open', 'Pending IRS']),
+        supabase.from('cases').select('id', { count: 'exact', head: true }).in('status', OPEN_STATUSES),
         supabase.from('deadlines').select('dueDate,status'),
       ])
       setNewLeads(leadsRes.count || 0)

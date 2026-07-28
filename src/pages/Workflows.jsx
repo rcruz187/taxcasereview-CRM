@@ -2,6 +2,7 @@ import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
+import { CASE_STATUSES } from '../lib/caseStatuses'
 
 const TRIGGER_EVENTS = {
   lead: [
@@ -173,8 +174,6 @@ const LEAD_STATUSES = [
   'Documents Submitted','Pending IRS Review','IRS Approved','Enrolled',
   'Converted to Client','Closed - Lost',
 ]
-
-const CASE_STATUSES = ['Open','Pending IRS','Active Plan','Docs Needed','POA Sent','Under Review','Resolved','Completed','Closed']
 
 const ROLES = ['Admin','Super Admin','Tax Advisor','Tax Associate','Manager']
 

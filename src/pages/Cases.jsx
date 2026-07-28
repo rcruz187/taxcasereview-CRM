@@ -7,9 +7,7 @@ import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { useApp } from '../context/AppContext'
 import ClientLink from '../components/ClientLink'
-
-const STATUSES = ['Open','Pending IRS','Active Plan','Docs Needed','POA Sent','Under Review','Resolved','Completed','Closed']
-const STATUS_C = {'Open':'bb','Pending IRS':'ba','Active Plan':'bg','Docs Needed':'ba','POA Sent':'bb','Under Review':'bn','Resolved':'bg','Completed':'bg','Closed':'bn'}
+import { CASE_STATUSES as STATUSES, CASE_STATUS_COLORS as STATUS_C, ACTIVE_STATUSES, PENDING_STATUSES, RESOLVED_STATUSES } from '../lib/caseStatuses'
 const CASE_TYPES = ['OIC','Installment Agreement','CNC','Penalty Abatement','Lien Withdrawal','TFRP','Appeals','Payroll Tax','Audit','Liens/Levies','Unfiled Returns','Tax Investigation','Other']
 
 const BLANK = { clientName:'', caseType:'OIC', irsBalance:'', status:'Open', assignedTo:'', deadline:'', taxYears:'', resolutionAmount:'', notes:'' }
@@ -173,9 +171,10 @@ export default function Cases() {
     acc[s] = cases.filter(c => c.status === s).length
     return acc
   }, {})
-  const activeCount  = (statCounts['Open'] || 0) + (statCounts['Active Plan'] || 0) + (statCounts['Pending IRS'] || 0)
-  const pendingCount = (statCounts['Docs Needed'] || 0) + (statCounts['POA Sent'] || 0) + (statCounts['Under Review'] || 0)
-  const resolvedCount = (statCounts['Resolved'] || 0) + (statCounts['Completed'] || 0)
+  const sumStatuses = list => list.reduce((n, s) => n + (statCounts[s] || 0), 0)
+  const activeCount   = sumStatuses(ACTIVE_STATUSES)
+  const pendingCount  = sumStatuses(PENDING_STATUSES)
+  const resolvedCount = sumStatuses(RESOLVED_STATUSES)
 
   // ── Detail view ──────────────────────────────────────────────────────────────
   if (detail) {
