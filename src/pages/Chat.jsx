@@ -65,7 +65,19 @@ function Avatar({ name, size = 36, color, avatarUrl }) {
 export default function Chat() {
   const { user, role } = useApp()
   const canManageChannels = ['Super Admin','Admin'].includes(role)
-  const [active, setActive]       = useState(CHANNELS[0])
+  // Deep link from a chat notification: /chat?c=<channel id>. Falls back to
+  // the default channel when the param is absent or doesn't match anything.
+  const [active, setActive]       = useState(() => {
+    try {
+      const want = new URLSearchParams(window.location.search).get('c')
+      if (want) {
+        const hit = CHANNELS.find(c => c.id === want)
+        if (hit) return hit
+        if (want.startsWith('dm_')) return { id: want, name: 'Direct Message' }
+      }
+    } catch (_) {}
+    return CHANNELS[0]
+  })
   const [messages, setMessages]   = useState([])
   const [input, setInput]         = useState('')
   const [sending, setSending]     = useState(false)
@@ -136,6 +148,15 @@ export default function Chat() {
     el.style.padding = '0'; el.style.overflow = 'hidden'; el.style.height = '100%'; el.style.position = 'relative'
     return () => { el.style.padding = op; el.style.overflow = oo; el.style.height = oh; el.style.position = opos }
   }, [])
+
+  // A deep-linked DM starts as a placeholder (we only have the channel id
+  // before the roster loads); swap in the real entry once TEAM arrives so the
+  // header shows the person's name and avatar rather than "Direct Message".
+  useEffect(() => {
+    if (!active?.id?.startsWith('dm_') || active.empId) return
+    const hit = TEAM.find(t => t.id === active.id)
+    if (hit) setActive(hit)
+  }, [TEAM, active])
 
   // ── fetch all employees for DM list ──
   useEffect(() => {

@@ -71,7 +71,11 @@ export function Modal() {
 export function Toast() {
   const { toast } = useApp()
   return (
-    <div className={`toast ${toast.type} ${toast.show ? 'show' : ''}`}>
+    <div
+      className={`toast ${toast.type} ${toast.show ? 'show' : ''}`}
+      onClick={toast.onClick || undefined}
+      style={toast.onClick ? { cursor: 'pointer' } : undefined}
+    >
       {toast.msg}
     </div>
   )

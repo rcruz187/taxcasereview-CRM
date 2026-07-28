@@ -158,6 +158,68 @@ export function AppProvider({ children }) {
     return () => listener.subscription.unsubscribe()
   }, [])
 
+  // ── Team Chat visual notifications ────────────────────────────────────
+  // A DM's channel is 'dm_<recipient employee id>', so a direct message is
+  // only ours when the channel carries our own employee id. Channel messages
+  // notify everyone. Muted conversations are skipped, matching the mute
+  // toggle already stored in chat_conv_prefs.
+  const myEmpIdRef  = useRef(null)
+  const mutedRef    = useRef(new Set())
+
+  useEffect(() => {
+    if (!user?.email) return
+    let cancelled = false
+    const myName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'You'
+    supabase.from('employees').select('id').eq('email', user.email).maybeSingle()
+      .then(({ data }) => { if (!cancelled && data) myEmpIdRef.current = data.id })
+    supabase.from('chat_conv_prefs').select('conv_id, muted').eq('viewer_name', myName)
+      .then(({ data }) => {
+        if (cancelled || !data) return
+        mutedRef.current = new Set(data.filter(r => r.muted).map(r => r.conv_id))
+      })
+    return () => { cancelled = true }
+  }, [user?.email])
+
+  function openChatConversation(channel) {
+    // BrowserRouter picks up a pushState + popstate without a full reload.
+    const base = '/taxcasereview-CRM'
+    window.history.pushState({}, '', `${base}/chat?c=${encodeURIComponent(channel || '')}`)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }
+
+  // Declared as a function so it hoists above the realtime effect, and it
+  // drives the toast state directly — showToast is defined further down this
+  // file, so calling it from here would hit the temporal dead zone.
+  function notifyChatMessage(msg, myName) {
+    if (!msg || msg.sender === myName) return
+    const channel = msg.channel || ''
+    if (channel.startsWith('dm_')) {
+      const mine = myEmpIdRef.current && channel === 'dm_' + myEmpIdRef.current
+      if (!mine) return
+    }
+    if (mutedRef.current.has(channel)) return
+    // Already looking at chat? The page itself shows the message.
+    if (window.location.pathname.includes('/chat') && document.visibilityState === 'visible') return
+
+    const who  = msg.sender || 'Team Chat'
+    const body = (msg.text || msg.attachment_name || 'Sent an attachment').slice(0, 140)
+
+    if (document.visibilityState !== 'visible') {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const n = new Notification(`💬 ${who}`, {
+          body,
+          icon: '/taxcasereview-CRM/icon-192.png',
+          tag: `chat-${channel}`, // collapses a burst from one conversation
+        })
+        n.onclick = () => { window.focus(); openChatConversation(channel); n.close() }
+      }
+    } else {
+      if (toastTimer.current) clearTimeout(toastTimer.current)
+      setToast({ msg: `💬 ${who}: ${body}`, type: 'ok', show: true, onClick: () => openChatConversation(channel) })
+      toastTimer.current = setTimeout(() => setToast(t => ({ ...t, show: false })), 6000)
+    }
+  }
+
   // Global notification sounds — chat messages, leads/appointments via API,
   // new emails, huddle invites, inbound SMS, and inbound faxes. Active
   // whenever logged in. (Inbound-call ringing is handled in CallContext,
@@ -221,6 +283,9 @@ export function AppProvider({ children }) {
       } else if (msg.sender !== myName) {
         playSound('message')
       }
+      // Visual notification. Chat.jsx only mounts on /chat, so without this a rep
+      // sitting on any other page never sees an incoming message.
+      notifyChatMessage(msg, myName)
     })
 
     withReconnect('global-email-notify', 'emails', ({ new: row }) => {
@@ -359,10 +424,12 @@ export function AppProvider({ children }) {
     return false
   }, [role, perms])
 
-  const showToast = useCallback((msg, type = 'ok') => {
+  const showToast = useCallback((msg, type = 'ok', onClick = null) => {
     if (toastTimer.current) clearTimeout(toastTimer.current)
-    setToast({ msg, type, show: true })
-    toastTimer.current = setTimeout(() => setToast(t => ({ ...t, show: false })), 3000)
+    setToast({ msg, type, show: true, onClick })
+    // Chat toasts hang around a little longer — they're meant to be clicked.
+    const ms = onClick ? 6000 : 3000
+    toastTimer.current = setTimeout(() => setToast(t => ({ ...t, show: false })), ms)
   }, [])
 
   const openModal  = useCallback((title, body) => setModal({ open: true, title, body }), [])
