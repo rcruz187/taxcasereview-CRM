@@ -884,6 +884,7 @@ export default function Clients() {
   const [saving,    setSaving]    = useState(false)
   const [toast,     setToast]     = useState('')
   const [detail,    setDetail]    = useState(null)
+  const [showFlow,  setShowFlow]  = useState(false)
   // Addendum + 2nd Trade combined modal
   const [addModal,    setAddModal]    = useState(false)
   const [addModalTab, setAddModalTab] = useState('addendum') // 'addendum' | 'charge'
@@ -1714,6 +1715,26 @@ export default function Clients() {
     const c=detail
     const deps=parseDependents(c.dependents)
     const si=stageIdx(c)
+    // Palette for the flow chips (PIPELINE_STAGES have no colors of their own).
+    const STAGE_PALETTE=['#6366f1','#8b5cf6','#3b82f6','#0ea5e9','#06b6d4','#14b8a6','#10b981','#84cc16','#f59e0b','#f97316','#ef4444','#ec4899','#64748b']
+    // Shared stage-change logic — used by both the dropdown and the View Flow modal.
+    const applyPipelineStage=async(newKey)=>{
+      if(newKey===c.pipelineStage) return
+      const prevStage=PIPELINE_STAGES.find(p=>p.key===(c.pipelineStage||DEFAULT_PIPELINE_STAGE))
+      const newStage=PIPELINE_STAGES.find(p=>p.key===newKey)
+      const {error}=await supabase.from('clients').update({pipelineStage:newKey}).eq('id',c.id)
+      if(error){showToast('Error updating pipeline stage: '+error.message);return}
+      const {data}=await supabase.from('clients').select('*').eq('id',c.id).single()
+      if(data)setDetail(data)
+      const actor=resolveActorName(user,employees)
+      const noteContent=`📊 Pipeline stage changed: ${prevStage?.label||'—'} → ${newStage?.label||newKey}`
+      const {error:noteErr}=await insertClientNote({clientname:c.name,content:noteContent,created_by:actor,created_at:new Date().toISOString()})
+      if(noteErr){showToast('Stage updated, but failed to log note: '+noteErr.message)}
+      else if(detail?.id===c.id){
+        const{data:notesData}=await supabase.from('client_notes').select('*').eq('clientname',c.name).order('created_at',{ascending:false})
+        if(notesData)setRelNotes(notesData)
+      }
+    }
 
     return (
       <div style={{maxWidth:960,margin:'0 auto'}}>
@@ -1762,7 +1783,10 @@ export default function Clients() {
 
           {/* Pipeline — compact current-stage display (no horizontal overflow) */}
           <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid var(--br)'}}>
-            <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>Case Pipeline</div>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+              <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Case Pipeline</div>
+              <button className="btn sec" style={{padding:'2px 8px',fontSize:10}} onClick={()=>setShowFlow(true)}>📊 View Flow</button>
+            </div>
             <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
               <span className="bdg ba" style={{fontSize:14,fontWeight:700,padding:'6px 14px',borderRadius:24}}>
                 📊 {pipelineStageLabel(c.pipelineStage||DEFAULT_PIPELINE_STAGE)}
@@ -1770,24 +1794,7 @@ export default function Clients() {
               <span style={{fontSize:12,color:'var(--t3)',fontWeight:600}}>Stage {si+1} of {PIPELINE_STAGES.length}</span>
               <select
                 value={c.pipelineStage||DEFAULT_PIPELINE_STAGE}
-                onChange={async(e)=>{
-                  const newKey=e.target.value
-                  if(newKey===c.pipelineStage) return
-                  const prevStage=PIPELINE_STAGES.find(p=>p.key===(c.pipelineStage||DEFAULT_PIPELINE_STAGE))
-                  const newStage=PIPELINE_STAGES.find(p=>p.key===newKey)
-                  const {error}=await supabase.from('clients').update({pipelineStage:newKey}).eq('id',c.id)
-                  if(error){showToast('Error updating pipeline stage: '+error.message);return}
-                  const {data}=await supabase.from('clients').select('*').eq('id',c.id).single()
-                  if(data)setDetail(data)
-                  const actor=resolveActorName(user,employees)
-                  const noteContent=`📊 Pipeline stage changed: ${prevStage?.label||'—'} → ${newStage?.label||newKey}`
-                  const {error:noteErr}=await insertClientNote({clientname:c.name,content:noteContent,created_by:actor,created_at:new Date().toISOString()})
-                  if(noteErr){showToast('Stage updated, but failed to log note: '+noteErr.message)}
-                  else if(detail?.id===c.id){
-                    const{data:notesData}=await supabase.from('client_notes').select('*').eq('clientname',c.name).order('created_at',{ascending:false})
-                    if(notesData)setRelNotes(notesData)
-                  }
-                }}
+                onChange={e=>applyPipelineStage(e.target.value)}
                 style={{fontSize:13,padding:'6px 10px',borderRadius:8,background:'var(--s2)',color:'var(--tx)',border:'1px solid var(--br)',cursor:'pointer'}}
               >
                 {PIPELINE_STAGES.map(s=><option key={s.key} value={s.key}>{s.label}</option>)}
@@ -1797,6 +1804,29 @@ export default function Clients() {
               <div style={{height:'100%',width:`${Math.round(((si+1)/PIPELINE_STAGES.length)*100)}%`,background:'var(--blue)',borderRadius:4,transition:'width .3s'}}/>
             </div>
           </div>
+
+          {/* Case Pipeline Flow Modal */}
+          {showFlow && (
+            <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setShowFlow(false)}>
+              <div className="modal" style={{maxWidth:900,width:'95vw'}}>
+                <div className="mh">
+                  <span className="mt">📊 Case Pipeline Flow</span>
+                  <button className="xbtn" onClick={()=>setShowFlow(false)}>&times;</button>
+                </div>
+                <div style={{overflowX:'auto',padding:'8px 0'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:0,flexWrap:'wrap',rowGap:12}}>
+                    {PIPELINE_STAGES.map((s,i,arr)=>(
+                      <div key={s.key} style={{display:'flex',alignItems:'center',gap:0}}>
+                        <div onClick={()=>{applyPipelineStage(s.key);setShowFlow(false)}} style={{background:STAGE_PALETTE[i%STAGE_PALETTE.length],color:'#fff',borderRadius:6,padding:'7px 9px',fontSize:11,fontWeight:700,textAlign:'center',width:120,lineHeight:1.2,cursor:'pointer',opacity:c.pipelineStage===s.key?1:0.55,outline:c.pipelineStage===s.key?'2px solid #fff':'none',outlineOffset:-2,transition:'opacity .15s'}}>{s.label}</div>
+                        {i<arr.length-1 && <div style={{color:'var(--t3)',fontSize:13,margin:'0 3px'}}>→</div>}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{marginTop:14,fontSize:11,color:'var(--t3)'}}>Click a stage to move this client to it.</div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Balance summary */}
           {(() => {
