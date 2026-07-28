@@ -93,7 +93,7 @@ const SECTIONS = [
 ]
 
 export default function Sidebar() {
-  const { user, logout, can, role, mobileNavOpen, setMobileNavOpen } = useApp()
+  const { user, logout, can, role, mobileNavOpen, setMobileNavOpen, employeeName } = useApp()
   const location = useLocation()
   const navigate = useNavigate()
   const [logoUrl, setLogoUrl] = useState(LOGO)
@@ -332,7 +332,7 @@ export default function Sidebar() {
         .from('chat_messages')
         .select('id', { count: 'exact', head: true })
         .gt('created_at', lastSeen)
-        .neq('sender', user?.email || '')
+        .neq('sender', employeeName || user?.email || '')
       setUnreadChat(count || 0)
     }
     countUnreadChat()
@@ -347,7 +347,7 @@ export default function Sidebar() {
     // Realtime — new chat message arrives
     const ch = supabase.channel('sidebar-chat-badge')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
-        if (payload.new?.sender !== (user?.email || '')) {
+        if (payload.new?.sender !== (employeeName || user?.email || '')) {
           const isOnChat = window.location.pathname.includes('/chat')
           if (isOnChat) {
             localStorage.setItem(storageKey, new Date().toISOString())
@@ -358,7 +358,7 @@ export default function Sidebar() {
       })
       .subscribe()
     return () => { supabase.removeChannel(ch); clearInterval(poll); document.removeEventListener('visibilitychange', onVisible) }
-  }, [user?.email, location.pathname])
+  }, [user?.email, employeeName, location.pathname])
 
   const [tagline,  setTagline]  = useState('IRS Resolution Services')
 

@@ -75,3 +75,9 @@ verify_jwt = false
 
 [functions.retention-purge]
 verify_jwt = false
+
+[functions.run-autopay-batch]
+verify_jwt = false
+
+[functions.gmail-sync-cron]
+verify_jwt = false
