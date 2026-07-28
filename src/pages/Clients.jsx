@@ -1264,7 +1264,7 @@ export default function Clients() {
   async function archiveClient(id,name) { setConfirmArchive({id,name}) }
   async function confirmArchiveClient() {
     const {id,name} = confirmArchive; setConfirmArchive(null)
-    const { error } = await supabase.from('clients').update({ archived: true }).eq('id',id)
+    const { error } = await supabase.from('clients').update({ archived: true, deleted_at: new Date().toISOString() }).eq('id',id)
     if (error) { showToast('Error: '+error.message); return }
     const actorA = resolveActorName(user, employees)
     await triggerWorkflow('client_archived', 'client', name || '', actorA).catch(()=>{})
@@ -1279,7 +1279,7 @@ export default function Clients() {
 
   async function restoreClient(id) {
     const client = clients.find(c=>c.id===id)
-    const { error } = await supabase.from('clients').update({ archived: false }).eq('id',id)
+    const { error } = await supabase.from('clients').update({ archived: false, deleted_at: null }).eq('id',id)
     if (error) { showToast('Error: '+error.message); return }
     showToast('Client restored');load()
     if (client) await logAction(client.name, '📤 Client restored from archive')
@@ -3033,7 +3033,7 @@ export default function Clients() {
 
       <div className="card">
         <div className="ch">
-          <span className="ct">{showArchived?'Archived Clients':'Client Roster'} <span style={{fontSize:12,fontWeight:500,color:'var(--t3)',marginLeft:6}}>({filtered.length})</span></span>
+          <span className="ct">{showArchived?'Archived Clients':'Client Roster'} <span style={{fontSize:12,fontWeight:500,color:'var(--t3)',marginLeft:6}}>({filtered.length})</span>{showArchived && <span style={{fontSize:11,fontWeight:500,color:'var(--t3)',marginLeft:8}}>· permanently deleted 30 days after archiving · Restore to keep</span>}</span>
           <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
             {['All','Individual','Business'].map(f=>(
               <span key={f} className={`chip${filter===f?' on':''}`} onClick={()=>setFilter(f)}>{f}</span>

@@ -1081,7 +1081,7 @@ export default function Leads() {
   async function confirmArchiveLead() {
     const l = confirmArchive; setConfirmArchive(null)
     const actor = resolveActorName(user, employees)
-    const { error } = await supabase.from('leads').update({ archived: true }).eq('id', l.id)
+    const { error } = await supabase.from('leads').update({ archived: true, deleted_at: new Date().toISOString() }).eq('id', l.id)
     if (error) { showToast('Error: ' + error.message); return }
     await logAction(l.id, l.name, '🗄️ Lead archived')
     // Update local state immediately — no refresh needed
@@ -1094,7 +1094,7 @@ export default function Leads() {
   }
 
   async function restoreLead(l) {
-    const { error } = await supabase.from('leads').update({ archived: false }).eq('id', l.id)
+    const { error } = await supabase.from('leads').update({ archived: false, deleted_at: null }).eq('id', l.id)
     if (error) { showToast('Error: ' + error.message); return }
     await logAction(l.id, l.name, '📤 Lead restored from archive')
     showToast('Lead restored'); load()
@@ -2830,7 +2830,7 @@ export default function Leads() {
 
       <div className="card">
         <div className="ch">
-          <span className="ct">{showArchived ? 'Archived Leads' : 'All Leads'} <span style={{fontSize:12,fontWeight:500,color:'var(--t3)',marginLeft:6}}>({filtered.length})</span></span>
+          <span className="ct">{showArchived ? 'Archived Leads' : 'All Leads'} <span style={{fontSize:12,fontWeight:500,color:'var(--t3)',marginLeft:6}}>({filtered.length})</span>{showArchived && <span style={{fontSize:11,fontWeight:500,color:'var(--t3)',marginLeft:8}}>· permanently deleted 30 days after archiving · Restore to keep</span>}</span>
           <button className="btn pri" onClick={()=>{ setForm(isTaxAdvisor && employeeName ? { ...BLANK, assignedTo: employeeName } : BLANK); setModal(true) }}>+ Add Lead</button>
         </div>
         <div className="ovx">
