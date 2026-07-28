@@ -1,5 +1,6 @@
 import { validateFile } from '../lib/uploadUtils'
 import { formatMoneyInput, parseMoney } from '../lib/money'
+import { PIPELINE_STAGES, DEFAULT_PIPELINE_STAGE, pipelineStageLabel } from '../lib/caseStatuses'
 import { NOTE_TEMPLATES } from '../lib/noteTemplates'
 import { logActivity, getActor } from '../lib/activityLog'
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
@@ -37,16 +38,6 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 const DAYS   = Array.from({length:31},(_,i)=>String(i+1).padStart(2,'0'))
 const YDOB   = Array.from({length:80},(_,i)=>2005-i)
 
-const PIPELINE_STAGES = [
-  { label:'Investigation', key:'investigation' },
-  { label:'Transcripts',   key:'transcripts' },
-  { label:'Analysis',      key:'analysis' },
-  { label:'Proposal',      key:'proposal' },
-  { label:'Negotiation',   key:'negotiation' },
-  { label:'Resolution',    key:'resolution' },
-  { label:'Closed',        key:'closed' },
-]
-
 const IRS_STATUS_OPTIONS = ['ACS','Notice Status','Queue for ACS','Currently Not Collectible','Installment Agreement','Garnishment','Levy Issued','Levied','Lien Filed','Appeals','Litigation','Released','Other']
 
 const BLANK_DEP = { name:'', ssn:'', dob:'', relationship:'Child' }
@@ -61,7 +52,7 @@ const BLANK = {
   irsStatus:'', irsStatusOther:'', irsDeadline:'',
   stateStatus:'', stateStatusOther:'', stateDeadline:'',
   clientSince:'', status:'Active', notes:'', assignedTo:'',
-  pipelineStage:'investigation', dependents:[],
+  pipelineStage:DEFAULT_PIPELINE_STAGE, dependents:[],
   autopay_enabled:false, autopay_amount:'', autopay_frequency:'monthly', autopay_next_charge:'',
 }
 
@@ -1716,7 +1707,7 @@ export default function Clients() {
   }
 
   const reps=employees.length>0?employees.map(e=>e.name):['Romy Cruz','Dana Richard','Yesenia Gonzalez']
-  const stageIdx=c=>PIPELINE_STAGES.findIndex(s=>s.key===(c.pipelineStage||'investigation'))
+  const stageIdx=c=>PIPELINE_STAGES.findIndex(s=>s.key===(c.pipelineStage||DEFAULT_PIPELINE_STAGE))
 
   // ── Detail View ──────────────────────────────────────────────────────────────
   if (detail) {
@@ -1757,7 +1748,7 @@ export default function Clients() {
                 {c.issueType&&<Bdg s={c.issueType} c="bb" style={{fontSize:13,padding:'4px 10px'}}/>}
                 {/* Renders from pipelineStage itself, so it can never disagree
                     with the pipeline row below — one source of truth. */}
-                <Bdg s={'📊 '+(PIPELINE_STAGES.find(p=>p.key===(c.pipelineStage||'investigation'))?.label||'Investigation')} c="ba" style={{fontSize:13,padding:'4px 10px'}}/>
+                <Bdg s={'📊 '+pipelineStageLabel(c.pipelineStage||DEFAULT_PIPELINE_STAGE)} c="ba" style={{fontSize:13,padding:'4px 10px'}}/>
                 {c.assignedTo&&<Bdg s={'👤 '+c.assignedTo} c="bn" style={{fontSize:13,padding:'4px 10px'}}/>}
               </div>
             </div>
@@ -1778,7 +1769,7 @@ export default function Clients() {
                   <div
                     onClick={async()=>{
                       if (s.key === c.pipelineStage) return // no-op if clicking current stage
-                      const prevStage = PIPELINE_STAGES.find(p=>p.key===(c.pipelineStage||'investigation'))
+                      const prevStage = PIPELINE_STAGES.find(p=>p.key===(c.pipelineStage||DEFAULT_PIPELINE_STAGE))
                       // Try to update pipelineStage (run SQL: alter table clients add column if not exists "pipelineStage" text default 'investigation')
                       const {error}=await supabase.from('clients').update({pipelineStage:s.key}).eq('id',c.id)
                       if(error){
@@ -3065,7 +3056,7 @@ export default function Clients() {
                   <td style={{color:c.irsBalance?'var(--bad)':'var(--t3)',fontWeight:c.irsBalance?600:400}}>{formatBalance(c.irsBalance)}</td>
                   <td><span className="bdg bn" style={{fontSize:12,padding:'3px 9px'}}>{c.issueType||'—'}</span></td>
                   <td style={{color:'var(--t2)',fontSize:12}}>{c.assignedTo||'—'}</td>
-                  <td><span className="bdg ba" style={{fontSize:12,padding:'3px 9px'}}>📊 {PIPELINE_STAGES.find(p=>p.key===(c.pipelineStage||'investigation'))?.label||'Investigation'}</span></td>
+                  <td><span className="bdg ba" style={{fontSize:12,padding:'3px 9px'}}>📊 {pipelineStageLabel(c.pipelineStage||DEFAULT_PIPELINE_STAGE)}</span></td>
                   <td><span className={`bdg ${c.status==='Active'?'bg':'bn'}`} style={{fontSize:12,padding:'3px 9px'}}>{c.status||'Active'}</span></td>
                   <td onClick={e=>e.stopPropagation()}>
                     {c.archived
@@ -3339,7 +3330,7 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
         )}
         <div className="fg2">
           <div className="field"><label>Pipeline Stage</label>
-            <select value={form.pipelineStage||'investigation'} onChange={e=>fld('pipelineStage',e.target.value)}>
+            <select value={form.pipelineStage||DEFAULT_PIPELINE_STAGE} onChange={e=>fld('pipelineStage',e.target.value)}>
               {PIPELINE_STAGES.map(s=><option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
           </div>

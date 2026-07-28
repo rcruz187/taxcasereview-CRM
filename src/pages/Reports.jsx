@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { exportPDF, exportExcel } from '../lib/exportUtils'
-import { OPEN_STATUSES } from '../lib/caseStatuses'
+import { OPEN_STATUSES, PIPELINE_STAGE_KEYS as PIPELINE_STAGES, PIPELINE_STAGE_LABELS as STAGE_LABELS, DEFAULT_PIPELINE_STAGE } from '../lib/caseStatuses'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-const PIPELINE_STAGES = ['investigation','transcripts','analysis','proposal','negotiation','resolution','closed']
-const STAGE_LABELS = { investigation:'Investigation', transcripts:'Transcripts', analysis:'Analysis', proposal:'Proposal', negotiation:'Negotiation', resolution:'Resolution', closed:'Closed' }
 
 const TABS = [
   { key:'overview',    label:'📊 Overview' },
@@ -101,7 +99,7 @@ export default function Reports() {
   // Pipeline
   const pipelineCount = {}
   PIPELINE_STAGES.forEach(s=>pipelineCount[s]=0)
-  clients.forEach(c=>{ const s=c.pipelineStage||'investigation'; if(pipelineCount[s]!==undefined) pipelineCount[s]++ })
+  clients.forEach(c=>{ const s=c.pipelineStage||DEFAULT_PIPELINE_STAGE; if(pipelineCount[s]!==undefined) pipelineCount[s]++ })
   const maxPipeline = Math.max(...Object.values(pipelineCount),1)
 
   // Revenue by month
@@ -288,7 +286,7 @@ export default function Reports() {
               const count=pipelineCount[stage]||0
               const pct=Math.round((count/Math.max(clients.length,1))*100)
               const width=Math.round((count/maxPipeline)*100)
-              const colors=['#6366f1','#8b5cf6','#3b82f6','#f59e0b','#ef4444','#10b981','#64748b']
+              const colors=['#6366f1','#8b5cf6','#3b82f6','#f59e0b','#ef4444','#10b981','#0ea5e9','#64748b']
               return (
                 <div key={stage} style={{marginBottom:14}}>
                   <div style={{display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:5}}>

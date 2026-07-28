@@ -73,3 +73,25 @@ export const PENDING_STATUSES = [
 export const RESOLVED_STATUSES = ['Resolved', 'Completed']
 
 export const caseStatusColor = s => CASE_STATUS_COLORS[s] || 'bn'
+
+// ── Client resolution pipeline (clients.pipelineStage) ───────────────────────
+// Distinct from cases.status above: this is the ordered lifecycle a CLIENT moves
+// through, stored as lowercase keys with a label map. Drives the client stepper,
+// the 📊 badge, the add/edit-client dropdown, and the Reports pipeline funnel.
+// 7/28: replaced the old Investigation→…→Closed stages with the resolution
+// pipeline. Existing client rows remapped to these keys (see the remap migration).
+export const PIPELINE_STAGES = [
+  { key: 'collection_hold',    label: 'Collection Hold' },
+  { key: 'compliance',         label: 'Compliance (Filing/Payment)' },
+  { key: 'financials',         label: 'Financials' },
+  { key: 'resolution_pending', label: 'Resolution Pending' },
+  { key: 'resolved',           label: 'Resolved' },
+  { key: 'penalty_abatement',  label: 'Penalty Abatement' },
+  { key: 'monitoring',         label: 'Monitoring/Review' },
+  { key: 'close_file',         label: 'Close File' },
+]
+
+export const DEFAULT_PIPELINE_STAGE = PIPELINE_STAGES[0].key // 'collection_hold'
+export const PIPELINE_STAGE_KEYS = PIPELINE_STAGES.map(s => s.key)
+export const PIPELINE_STAGE_LABELS = Object.fromEntries(PIPELINE_STAGES.map(s => [s.key, s.label]))
+export const pipelineStageLabel = k => PIPELINE_STAGE_LABELS[k] || PIPELINE_STAGES[0].label
