@@ -78,12 +78,20 @@ export const caseStatusColor = s => CASE_STATUS_COLORS[s] || 'bn'
 // Distinct from cases.status above: this is the ordered lifecycle a CLIENT moves
 // through, stored as lowercase keys with a label map. Drives the client stepper,
 // the 📊 badge, the add/edit-client dropdown, and the Reports pipeline funnel.
-// 7/28: replaced the old Investigation→…→Closed stages with the resolution
-// pipeline. Existing client rows remapped to these keys (see the remap migration).
+// 7/28: combined pipeline — Dana's intake/progression stages (Investigation→
+// Negotiation) followed by Chris's resolution-execution stages, deduped. One
+// ordered client journey. Rendered as a compact current-stage display (badge +
+// dropdown + progress), NOT an all-stages horizontal stepper, so it never
+// overflows regardless of length.
 export const PIPELINE_STAGES = [
+  { key: 'investigation',      label: 'Investigation' },
+  { key: 'transcripts',        label: 'Transcripts' },
+  { key: 'analysis',           label: 'Analysis' },
   { key: 'collection_hold',    label: 'Collection Hold' },
   { key: 'compliance',         label: 'Compliance (Filing/Payment)' },
   { key: 'financials',         label: 'Financials' },
+  { key: 'proposal',           label: 'Proposal' },
+  { key: 'negotiation',        label: 'Negotiation' },
   { key: 'resolution_pending', label: 'Resolution Pending' },
   { key: 'resolved',           label: 'Resolved' },
   { key: 'penalty_abatement',  label: 'Penalty Abatement' },
@@ -91,7 +99,7 @@ export const PIPELINE_STAGES = [
   { key: 'close_file',         label: 'Close File' },
 ]
 
-export const DEFAULT_PIPELINE_STAGE = PIPELINE_STAGES[0].key // 'collection_hold'
+export const DEFAULT_PIPELINE_STAGE = PIPELINE_STAGES[0].key // 'investigation'
 export const PIPELINE_STAGE_KEYS = PIPELINE_STAGES.map(s => s.key)
 export const PIPELINE_STAGE_LABELS = Object.fromEntries(PIPELINE_STAGES.map(s => [s.key, s.label]))
 export const pipelineStageLabel = k => PIPELINE_STAGE_LABELS[k] || PIPELINE_STAGES[0].label

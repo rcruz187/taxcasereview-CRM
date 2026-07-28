@@ -1760,47 +1760,41 @@ export default function Clients() {
             )}
           </div>
 
-          {/* Pipeline */}
+          {/* Pipeline — compact current-stage display (no horizontal overflow) */}
           <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid var(--br)'}}>
             <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>Case Pipeline</div>
-            <div style={{display:'flex',alignItems:'center',gap:0,overflowX:'auto',paddingBottom:4}}>
-              {PIPELINE_STAGES.map((s,i)=>(
-                <div key={s.key} style={{display:'flex',alignItems:'center'}}>
-                  <div
-                    onClick={async()=>{
-                      if (s.key === c.pipelineStage) return // no-op if clicking current stage
-                      const prevStage = PIPELINE_STAGES.find(p=>p.key===(c.pipelineStage||DEFAULT_PIPELINE_STAGE))
-                      // Try to update pipelineStage (run SQL: alter table clients add column if not exists "pipelineStage" text default 'investigation')
-                      const {error}=await supabase.from('clients').update({pipelineStage:s.key}).eq('id',c.id)
-                      if(error){
-                        showToast('Error updating pipeline stage: '+error.message)
-                        return
-                      }
-                      const {data}=await supabase.from('clients').select('*').eq('id',c.id).single()
-                      if(data)setDetail(data)
-                      // Log the stage change as a note
-                      const actor = resolveActorName(user, employees)
-                      const noteContent = `📊 Pipeline stage changed: ${prevStage?.label||'—'} → ${s.label}`
-                      const {error:noteErr} = await insertClientNote({clientname:c.name,content:noteContent,created_by:actor,created_at:new Date().toISOString()})
-                      if(noteErr){
-                        showToast('Stage updated, but failed to log note: '+noteErr.message)
-                      } else if(detail?.id===c.id){
-                        const{data:notesData}=await supabase.from('client_notes').select('*').eq('clientname',c.name).order('created_at',{ascending:false})
-                        if(notesData)setRelNotes(notesData)
-                      }
-                    }}
-                    style={{
-                      padding:'8px 16px',borderRadius:24,fontSize:14,fontWeight:600,cursor:'pointer',
-                      whiteSpace:'nowrap',
-                      background:i<=si?'var(--blue)':'var(--s3)',
-                      color:i<=si?'#fff':'var(--t3)',
-                      border:i===si?'2px solid var(--blue)':'2px solid transparent',
-                      transform:i===si?'scale(1.05)':'scale(1)',
-                      transition:'all .15s'
-                    }}>{s.label}</div>
-                  {i<PIPELINE_STAGES.length-1&&<div style={{width:20,height:2,background:i<si?'var(--blue)':'var(--br)',flexShrink:0}}/>}
-                </div>
-              ))}
+            <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+              <span className="bdg ba" style={{fontSize:14,fontWeight:700,padding:'6px 14px',borderRadius:24}}>
+                📊 {pipelineStageLabel(c.pipelineStage||DEFAULT_PIPELINE_STAGE)}
+              </span>
+              <span style={{fontSize:12,color:'var(--t3)',fontWeight:600}}>Stage {si+1} of {PIPELINE_STAGES.length}</span>
+              <select
+                value={c.pipelineStage||DEFAULT_PIPELINE_STAGE}
+                onChange={async(e)=>{
+                  const newKey=e.target.value
+                  if(newKey===c.pipelineStage) return
+                  const prevStage=PIPELINE_STAGES.find(p=>p.key===(c.pipelineStage||DEFAULT_PIPELINE_STAGE))
+                  const newStage=PIPELINE_STAGES.find(p=>p.key===newKey)
+                  const {error}=await supabase.from('clients').update({pipelineStage:newKey}).eq('id',c.id)
+                  if(error){showToast('Error updating pipeline stage: '+error.message);return}
+                  const {data}=await supabase.from('clients').select('*').eq('id',c.id).single()
+                  if(data)setDetail(data)
+                  const actor=resolveActorName(user,employees)
+                  const noteContent=`📊 Pipeline stage changed: ${prevStage?.label||'—'} → ${newStage?.label||newKey}`
+                  const {error:noteErr}=await insertClientNote({clientname:c.name,content:noteContent,created_by:actor,created_at:new Date().toISOString()})
+                  if(noteErr){showToast('Stage updated, but failed to log note: '+noteErr.message)}
+                  else if(detail?.id===c.id){
+                    const{data:notesData}=await supabase.from('client_notes').select('*').eq('clientname',c.name).order('created_at',{ascending:false})
+                    if(notesData)setRelNotes(notesData)
+                  }
+                }}
+                style={{fontSize:13,padding:'6px 10px',borderRadius:8,background:'var(--s2)',color:'var(--tx)',border:'1px solid var(--br)',cursor:'pointer'}}
+              >
+                {PIPELINE_STAGES.map(s=><option key={s.key} value={s.key}>{s.label}</option>)}
+              </select>
+            </div>
+            <div style={{marginTop:8,height:6,background:'var(--s3)',borderRadius:4,overflow:'hidden'}}>
+              <div style={{height:'100%',width:`${Math.round(((si+1)/PIPELINE_STAGES.length)*100)}%`,background:'var(--blue)',borderRadius:4,transition:'width .3s'}}/>
             </div>
           </div>
 

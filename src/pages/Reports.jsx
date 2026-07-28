@@ -286,7 +286,8 @@ export default function Reports() {
               const count=pipelineCount[stage]||0
               const pct=Math.round((count/Math.max(clients.length,1))*100)
               const width=Math.round((count/maxPipeline)*100)
-              const colors=['#6366f1','#8b5cf6','#3b82f6','#f59e0b','#ef4444','#10b981','#0ea5e9','#64748b']
+              const palette=['#6366f1','#8b5cf6','#3b82f6','#0ea5e9','#06b6d4','#14b8a6','#10b981','#84cc16','#f59e0b','#f97316','#ef4444','#ec4899','#64748b']
+              const colors=PIPELINE_STAGES.map((_,idx)=>palette[idx%palette.length])
               return (
                 <div key={stage} style={{marginBottom:14}}>
                   <div style={{display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:5}}>
