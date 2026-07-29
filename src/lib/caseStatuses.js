@@ -87,17 +87,21 @@ export const PIPELINE_STAGES = [
   { key: 'investigation',      label: 'Investigation' },
   { key: 'transcripts',        label: 'Transcripts' },
   { key: 'analysis',           label: 'Analysis' },
-  { key: 'collection_hold',    label: 'Collection Hold' },
   { key: 'compliance',         label: 'Compliance (Filing/Payment)' },
   { key: 'financials',         label: 'Financials' },
   { key: 'proposal',           label: 'Proposal' },
   { key: 'negotiation',        label: 'Negotiation' },
   { key: 'resolution_pending', label: 'Resolution Pending' },
   { key: 'resolved',           label: 'Resolved' },
-  { key: 'penalty_abatement',  label: 'Penalty Abatement' },
-  { key: 'monitoring',         label: 'Monitoring/Review' },
   { key: 'close_file',         label: 'Close File' },
 ]
+
+// Parallel actions/services — NOT sequential stages. A client can have several
+// at once (e.g. Collection Hold while in Analysis; Penalty Abatement pursued
+// alongside the resolution). These were wrongly forced into the linear pipeline
+// before, which produced impossible orderings like "Resolved → Penalty Abatement".
+// They live OFF the pipeline, tracked as clients.services (text[]).
+export const CASE_SERVICES = ['Collection Hold', 'Penalty Abatement', 'Monitoring/Review']
 
 export const DEFAULT_PIPELINE_STAGE = PIPELINE_STAGES[0].key // 'investigation'
 export const PIPELINE_STAGE_KEYS = PIPELINE_STAGES.map(s => s.key)

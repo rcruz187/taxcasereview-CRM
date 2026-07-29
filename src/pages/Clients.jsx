@@ -1,6 +1,6 @@
 import { validateFile } from '../lib/uploadUtils'
 import { formatMoneyInput, parseMoney } from '../lib/money'
-import { PIPELINE_STAGES, DEFAULT_PIPELINE_STAGE, pipelineStageLabel } from '../lib/caseStatuses'
+import { PIPELINE_STAGES, DEFAULT_PIPELINE_STAGE, pipelineStageLabel, CASE_SERVICES } from '../lib/caseStatuses'
 import { NOTE_TEMPLATES } from '../lib/noteTemplates'
 import { logActivity, getActor } from '../lib/activityLog'
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
@@ -1717,6 +1717,15 @@ export default function Clients() {
     const si=stageIdx(c)
     // Palette for the flow chips (PIPELINE_STAGES have no colors of their own).
     const STAGE_PALETTE=['#6366f1','#8b5cf6','#3b82f6','#0ea5e9','#06b6d4','#14b8a6','#10b981','#84cc16','#f59e0b','#f97316','#ef4444','#ec4899','#64748b']
+    // Toggle a parallel service/action on/off (clients.services text[]).
+    const toggleService=async(svc)=>{
+      const cur=Array.isArray(c.services)?c.services:[]
+      const next=cur.includes(svc)?cur.filter(x=>x!==svc):[...cur,svc]
+      const {error}=await supabase.from('clients').update({services:next}).eq('id',c.id)
+      if(error){showToast('Error updating services: '+error.message);return}
+      const {data}=await supabase.from('clients').select('*').eq('id',c.id).single()
+      if(data)setDetail(data)
+    }
     // Shared stage-change logic — used by both the dropdown and the View Flow modal.
     const applyPipelineStage=async(newKey)=>{
       if(newKey===c.pipelineStage) return
@@ -1802,6 +1811,22 @@ export default function Clients() {
             </div>
             <div style={{marginTop:8,height:6,background:'var(--s3)',borderRadius:4,overflow:'hidden'}}>
               <div style={{height:'100%',width:`${Math.round(((si+1)/PIPELINE_STAGES.length)*100)}%`,background:'var(--blue)',borderRadius:4,transition:'width .3s'}}/>
+            </div>
+            {/* Active Services — parallel actions, not pipeline stages (a client can have several at once) */}
+            <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid var(--br)'}}>
+              <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>Active Services</div>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                {CASE_SERVICES.map(svc=>{
+                  const on=(Array.isArray(c.services)?c.services:[]).includes(svc)
+                  return (
+                    <div key={svc} onClick={()=>toggleService(svc)} style={{
+                      padding:'6px 14px',borderRadius:24,fontSize:13,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap',
+                      background:on?'#10b981':'var(--s3)',color:on?'#fff':'var(--t3)',
+                      border:on?'2px solid #10b981':'2px solid transparent',transition:'all .15s'
+                    }}>{on?'✓ ':''}{svc}</div>
+                  )
+                })}
+              </div>
             </div>
           </div>
 
