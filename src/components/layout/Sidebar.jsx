@@ -89,6 +89,7 @@ const SECTIONS = [
       { path: '/reports',   icon: BarIcon,     label: 'Reports',       section: 'reports' },
       { path: '/workflows', icon: GearIcon,    label: 'Workflows',     section: 'workflows' },
       { path: '/settings',  icon: GearIcon,    label: 'Settings',      section: 'settings' },
+      { path: '/new-office', icon: GearIcon,   label: 'CRM Companies', section: null, platformOnly: true },
     ]
   },
 ]
@@ -124,6 +125,18 @@ export default function Sidebar() {
   useEffect(() => { setMobileNavOpen(false) }, [location.pathname])
 
   const [firmName, setFirmName] = useState('Tax Case Review')
+  // Gates the CRM Companies link — a TCR *platform* Super Admin only, not just
+  // any tenant's Super Admin. Same check as NewOffice.jsx's own page guard;
+  // duplicated here (rather than shared via context) since it's a one-time
+  // lightweight query and AppContext doesn't carry tenant_id today.
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false)
+  useEffect(() => {
+    if (!user?.email) return
+    supabase.from('employees').select('access,tenant_id').eq('email', user.email).maybeSingle()
+      .then(({ data }) => {
+        setIsPlatformAdmin(!!data && data.access === 'Super Admin' && data.tenant_id === '61a89aef-0e7e-4ea2-b222-44ab2024655a')
+      })
+  }, [user?.email])
   const [pendingTimeOff, setPendingTimeOff] = useState(0)
   const [newLeads, setNewLeads] = useState(0)
   const [newClients, setNewClients] = useState(0)
@@ -445,6 +458,7 @@ export default function Sidebar() {
             {/* Items — only show when open */}
             {isOpen && section.items.map(item => {
               if (item.section && !can('view', item.section)) return null
+              if (item.platformOnly && !isPlatformAdmin) return null
               const Icon = item.icon
               return (
                 <NavLink
