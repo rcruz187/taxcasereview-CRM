@@ -89,7 +89,15 @@ const SECTIONS = [
       { path: '/reports',   icon: BarIcon,     label: 'Reports',       section: 'reports' },
       { path: '/workflows', icon: GearIcon,    label: 'Workflows',     section: 'workflows' },
       { path: '/settings',  icon: GearIcon,    label: 'Settings',      section: 'settings' },
-      { path: '/new-office', icon: GearIcon,   label: 'CRM Companies', section: null, platformOnly: true },
+    ]
+  },
+  {
+    key: 'crmcompanies',
+    label: 'CRM Companies',
+    always: true,
+    platformOnly: true,
+    items: [
+      { path: '/new-office', icon: GearIcon, label: 'CRM Companies', section: null },
     ]
   },
 ]
@@ -420,7 +428,7 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {SECTIONS.map(section => {
+      {SECTIONS.filter(section => !section.platformOnly || isPlatformAdmin).map(section => {
         const isOpen = section.always || openKey === section.key
         const hasActive = !section.always && section.items.some(i => i.path !== '/' && location.pathname.startsWith(i.path))
 
@@ -458,7 +466,6 @@ export default function Sidebar() {
             {/* Items — only show when open */}
             {isOpen && section.items.map(item => {
               if (item.section && !can('view', item.section)) return null
-              if (item.platformOnly && !isPlatformAdmin) return null
               const Icon = item.icon
               return (
                 <NavLink
