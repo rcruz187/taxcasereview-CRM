@@ -78,6 +78,28 @@ export default function EmployeePortal() {
   // signed in on this device, and nothing at all on a fresh browser, rather
   // than defaulting to a specific firm's logo and being wrong for everyone else.
   const [brand, setBrand] = useState(() => readCachedBrand() || { name: '', logoUrl: '' })
+
+  // Before login there's no session yet to resolve a tenant from — but once a
+  // full-looking email is typed, we CAN look up just that firm's branding
+  // (emp_login_branding returns name+logo only, nothing about the employee).
+  // Debounced so it doesn't fire on every keystroke, and only while still on
+  // the login screen so it can't stomp the real brand after signing in.
+  useEffect(() => {
+    if (screen !== 'login') return
+    const email = loginEmail.trim()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return
+    const t = setTimeout(() => {
+      supabase.rpc('emp_login_branding', { p_email: email }).then(({ data }) => {
+        if (!data) return
+        const b = { name: data.name || '', logoUrl: data.logo_url || '' }
+        if (b.logoUrl || b.name) {
+          setBrand(b)
+          try { localStorage.setItem(BRAND_CACHE_KEY, JSON.stringify(b)) } catch (_) {}
+        }
+      })
+    }, 500)
+    return () => clearTimeout(t)
+  }, [loginEmail, screen])
   const [loginEmail, setLoginEmail] = useState('')
   const [pin, setPin] = useState('')
   const [changingPin, setChangingPin] = useState(false)
