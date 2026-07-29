@@ -130,6 +130,7 @@ export default function Chat() {
   const [searchQ, setSearchQ]   = useState('')
   const [showSearch, setShowSearch] = useState(false)
   const [TEAM, setTEAM] = useState([])
+  const [myEmpId, setMyEmpId] = useState(null)
   const bottomRef = useRef(null)
   const inputRef  = useRef(null)
   const fileRef   = useRef(null)
@@ -137,8 +138,14 @@ export default function Chat() {
 
   const myName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'You'
   const allChannels = [...CHANNELS, ...extraChans]
-  const channelId = active.id
+  // A DM lives in ONE symmetric channel keyed by BOTH employee ids (sorted),
+  // so my view and the other person's view are the same conversation and nobody
+  // can read a third party's DM wall by opening their roster entry. Legacy
+  // messages used a one-sided 'dm_<recipient>' wall — those are reconstructed at
+  // read time by sender (see loadMessages) so no history is orphaned.
+  const dmPair = (a, b) => 'dm_' + [String(a), String(b)].sort().join('__')
   const isChannel = !active.id.startsWith('dm_')
+  const channelId = (!isChannel && active.empId && myEmpId) ? dmPair(myEmpId, active.empId) : active.id
 
   // ── escape page-content padding ──
   useEffect(() => {
@@ -162,6 +169,8 @@ export default function Chat() {
   useEffect(() => {
     supabase.from('employees').select('id, name, role, avatar_url, email').order('name').then(({ data }) => {
       if (!data) return
+      const me = data.find(e => e.email && user?.email && e.email.toLowerCase() === user.email.toLowerCase())
+      if (me) setMyEmpId(me.id)
       setTEAM(data.map(e => ({
         id: 'dm_' + e.id,
         empId: e.id,
@@ -172,7 +181,7 @@ export default function Chat() {
         email: e.email || '',
       })))
     })
-  }, [])
+  }, [user?.email])
 
   // ── per-viewer rep prefs (hidden / VIP) ──
   useEffect(() => {
@@ -247,9 +256,29 @@ export default function Chat() {
 
   const loadMessages = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
-    const { data, error } = await supabase
-      .from('chat_messages').select('*').eq('channel', channelId)
-      .order('created_at', { ascending: true }).limit(300)
+    let data, error
+    if (!isChannel && active.empId) {
+      // DM: read the new symmetric pair channel PLUS the two legacy one-sided
+      // walls, then keep only messages that belong to THIS pair — the pair
+      // channel in full, and legacy wall messages filtered by sender so a third
+      // party's messages on either wall are never shown to us.
+      const pair    = myEmpId ? dmPair(myEmpId, active.empId) : null
+      const dmOther = 'dm_' + active.empId
+      const dmMine  = myEmpId ? 'dm_' + myEmpId : null
+      const chans   = [...new Set([dmOther, ...(pair ? [pair] : []), ...(dmMine ? [dmMine] : [])])]
+      const res = await supabase.from('chat_messages').select('*').in('channel', chans)
+        .order('created_at', { ascending: true }).limit(600)
+      error = res.error
+      data = (res.data || []).filter(m =>
+        (pair && m.channel === pair) ||                              // new symmetric channel
+        (m.channel === dmOther && m.sender === myName) ||            // legacy: I → them
+        (dmMine && m.channel === dmMine && m.sender === active.name) // legacy: them → me
+      )
+    } else {
+      const res = await supabase.from('chat_messages').select('*').eq('channel', channelId)
+        .order('created_at', { ascending: true }).limit(300)
+      data = res.data; error = res.error
+    }
     if (!silent) setLoading(false)
     if (error) {
       if (!silent) setMessages([{ id: 'sys', isSystem: true, text:
@@ -260,7 +289,7 @@ export default function Chat() {
       return
     }
     setMessages(data || [])
-  }, [channelId])
+  }, [channelId, isChannel, active.empId, active.name, myEmpId, myName])
 
   useEffect(() => {
     loadMessages(); inputRef.current?.focus()

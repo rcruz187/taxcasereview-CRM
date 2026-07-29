@@ -1718,20 +1718,42 @@ export default function Clients() {
     // Palette for the flow chips (PIPELINE_STAGES have no colors of their own).
     const STAGE_PALETTE=['#6366f1','#8b5cf6','#3b82f6','#0ea5e9','#06b6d4','#14b8a6','#10b981','#84cc16','#f59e0b','#f97316','#ef4444','#ec4899','#64748b']
     // Toggle a parallel service/action on/off (clients.services text[]).
+    // Log a client_note and refresh the notes panel — same pattern as
+    // applyPipelineStage, so Active Services and IRS/State status changes show
+    // up on the client's timeline the way stage changes do.
+    const logAndRefreshNote=async(content)=>{
+      const actor=resolveActorName(user,employees)
+      const {error:noteErr}=await insertClientNote({clientname:c.name,content,created_by:actor,created_at:new Date().toISOString()})
+      if(noteErr){showToast('Saved, but failed to log note: '+noteErr.message);return}
+      if(detail?.id===c.id){
+        const{data:notesData}=await supabase.from('client_notes').select('*').eq('clientname',c.name).order('created_at',{ascending:false})
+        if(notesData)setRelNotes(notesData)
+      }
+    }
     const toggleService=async(svc)=>{
       const cur=Array.isArray(c.services)?c.services:[]
-      const next=cur.includes(svc)?cur.filter(x=>x!==svc):[...cur,svc]
+      const added=!cur.includes(svc)
+      const next=added?[...cur,svc]:cur.filter(x=>x!==svc)
       const {error}=await supabase.from('clients').update({services:next}).eq('id',c.id)
       if(error){showToast('Error updating services: '+error.message);return}
       const {data}=await supabase.from('clients').select('*').eq('id',c.id).single()
       if(data)setDetail(data)
+      await logAndRefreshNote(`🔧 Service ${added?'added':'removed'}: ${svc}`)
     }
-    // Update the client's current IRS or State status inline.
+    // Update the client's current IRS or State status inline (+ log a note).
+    const STATUS_FIELD_LABEL={irsStatus:'IRS status',stateStatus:'State status',irsStatusOther:'IRS status detail',stateStatusOther:'State status detail'}
     const applyStatusField=async(field,value)=>{
+      const prev=c[field]||''
+      if(prev===(value||'')) return
       const {error}=await supabase.from('clients').update({[field]:value}).eq('id',c.id)
       if(error){showToast('Error updating status: '+error.message);return}
       const {data}=await supabase.from('clients').select('*').eq('id',c.id).single()
       if(data)setDetail(data)
+      const lbl=STATUS_FIELD_LABEL[field]||field
+      const note=(field==='irsStatusOther'||field==='stateStatusOther')
+        ? `🏛️ ${lbl} set: ${value||'—'}`
+        : `🏛️ ${lbl} changed: ${prev||'—'} → ${value||'—'}`
+      await logAndRefreshNote(note)
     }
     // Shared stage-change logic — used by both the dropdown and the View Flow modal.
     const applyPipelineStage=async(newKey)=>{
@@ -1847,6 +1869,12 @@ export default function Clients() {
                       <option value="">—</option>
                       {IRS_STATUS_OPTIONS.map(o=><option key={o} value={o}>{o}</option>)}
                     </select>
+                    {c.irsStatus==='Other'&&(
+                      <input key={'irsOther-'+c.id} defaultValue={c.irsStatusOther||''}
+                        onBlur={e=>{const v=e.target.value.trim(); if(v!==(c.irsStatusOther||''))applyStatusField('irsStatusOther',v)}}
+                        placeholder="Specify IRS status"
+                        style={{fontSize:12,padding:'5px 8px',borderRadius:8,background:'var(--s2)',color:'var(--tx)',border:'1px solid var(--br)',width:150}}/>
+                    )}
                   </div>
                 )}
                 {(c.irsOrState||'IRS Federal')!=='IRS Federal' && (
@@ -1857,6 +1885,12 @@ export default function Clients() {
                       <option value="">—</option>
                       {IRS_STATUS_OPTIONS.map(o=><option key={o} value={o}>{o}</option>)}
                     </select>
+                    {c.stateStatus==='Other'&&(
+                      <input key={'stateOther-'+c.id} defaultValue={c.stateStatusOther||''}
+                        onBlur={e=>{const v=e.target.value.trim(); if(v!==(c.stateStatusOther||''))applyStatusField('stateStatusOther',v)}}
+                        placeholder="Specify state status"
+                        style={{fontSize:12,padding:'5px 8px',borderRadius:8,background:'var(--s2)',color:'var(--tx)',border:'1px solid var(--br)',width:150}}/>
+                    )}
                   </div>
                 )}
               </div>

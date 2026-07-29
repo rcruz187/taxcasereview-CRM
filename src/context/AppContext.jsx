@@ -193,11 +193,25 @@ export function AppProvider({ children }) {
   function notifyChatMessage(msg, myName) {
     if (!msg || msg.sender === myName) return
     const channel = msg.channel || ''
+    // DMs now live in a symmetric channel 'dm_<a>__<b>'. A message is ours when
+    // our own employee id is one of the two ids; the deep link opens the OTHER
+    // person's roster entry (still keyed 'dm_<otherId>'). Legacy one-sided
+    // 'dm_<recipient>' walls are still recognised for our own inbox.
+    let deepLinkTarget = channel
     if (channel.startsWith('dm_')) {
-      const mine = myEmpIdRef.current && channel === 'dm_' + myEmpIdRef.current
-      if (!mine) return
+      const me = myEmpIdRef.current ? String(myEmpIdRef.current) : null
+      if (!me) return
+      const parts = channel.slice(3).split('__')
+      if (parts.length === 2) {
+        if (!parts.includes(me)) return
+        const otherId = parts.find(p => p !== me) || parts[0]
+        deepLinkTarget = 'dm_' + otherId
+      } else {
+        if (channel !== 'dm_' + me) return
+        deepLinkTarget = channel
+      }
     }
-    if (mutedRef.current.has(channel)) return
+    if (mutedRef.current.has(deepLinkTarget)) return
     // Already looking at chat? The page itself shows the message.
     if (window.location.pathname.includes('/chat') && document.visibilityState === 'visible') return
 
@@ -209,13 +223,13 @@ export function AppProvider({ children }) {
         const n = new Notification(`💬 ${who}`, {
           body,
           icon: '/taxcasereview-CRM/icon-192.png',
-          tag: `chat-${channel}`, // collapses a burst from one conversation
+          tag: `chat-${deepLinkTarget}`, // collapses a burst from one conversation
         })
-        n.onclick = () => { window.focus(); openChatConversation(channel); n.close() }
+        n.onclick = () => { window.focus(); openChatConversation(deepLinkTarget); n.close() }
       }
     } else {
       if (toastTimer.current) clearTimeout(toastTimer.current)
-      setToast({ msg: `💬 ${who}: ${body}`, type: 'ok', show: true, onClick: () => openChatConversation(channel) })
+      setToast({ msg: `💬 ${who}: ${body}`, type: 'ok', show: true, onClick: () => openChatConversation(deepLinkTarget) })
       toastTimer.current = setTimeout(() => setToast(t => ({ ...t, show: false })), 6000)
     }
   }
