@@ -4,9 +4,13 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
+import { applyWorkflowTemplate } from '../lib/triggerWorkflow'
 
 const BLANK = { title:'', clientName:'', caseNum:'', assignedTo:'', dueDate:'', priority:'Normal', notes:'', done:false, section_title:'' }
 const QT_BLANK = { title:'', dueDate:'', priority:'Normal', clientName:'', assignedTo:'' }
+// Mirrors the quick-pick list in Clients.jsx / Leads.jsx so the Tasks-page
+// Add Task modal and Quick Add row offer the same common tasks. Keep in sync.
+const QUICK_TASK_TITLES = ['Request transcripts from IRS','Follow up with client','Prepare & send POA (2848/8821)','Call IRS for account status','Draft engagement letter','Collect financial documents','File tax return','Submit installment agreement','Prepare Offer in Compromise','Follow up on offer','Request wage & income transcripts','Schedule consultation','Send resolution options','Collect payment / trade']
 
 function resolveActorName(user, employees) {
   const email = user?.email?.toLowerCase()
@@ -42,6 +46,15 @@ export default function Tasks() {
   const [sug,       setSug]       = useState([])
   const [qtSug,     setQtSug]     = useState([])
   const [saving,    setSaving]    = useState(false)
+  // Workflow-template picker (mirrors Clients.jsx / Leads.jsx). templateTarget
+  // holds the resolved client/lead the picker will apply against, since the
+  // global Tasks modal has no implicit entity like the per-record pages do.
+  const [templateModal,       setTemplateModal]       = useState(false)
+  const [availableTemplates,  setAvailableTemplates]  = useState([])
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState([])
+  const [templateSearch,      setTemplateSearch]      = useState('')
+  const [applyingTemplateId,  setApplyingTemplateId]  = useState('')
+  const [templateTarget,      setTemplateTarget]      = useState({ name:'', type:null })
   const [confirmDelId, setConfirmDelId] = useState(null)
   const [toast,     setToast]     = useState('')
   const [view,      setView]      = useState('open') // 'open' | 'completed' | 'deleted'
@@ -122,6 +135,49 @@ export default function Tasks() {
     if (val.length<2){isQt?setQtSug([]):setSug([]);return}
     const res=clients.filter(c=>c.name.toLowerCase().includes(val.toLowerCase())).slice(0,6)
     isQt?setQtSug(res):setSug(res)
+  }
+
+  // The Tasks page is global, so a workflow template needs to know WHICH
+  // client/lead it targets and whether that entity is a client or a lead
+  // (templates are scoped by entity_type). Resolve from the already-loaded
+  // lists rather than re-querying.
+  function resolveEntity(name) {
+    const n = (name||'').trim()
+    if (!n) return { name:'', type:null }
+    if (clients.some(c => c.name === n)) return { name:n, type:'client' }
+    if (leads.some(l => l.name === n))   return { name:n, type:'lead' }
+    return { name:n, type:null }
+  }
+
+  async function openTemplatePicker(name) {
+    const target = resolveEntity(name)
+    if (!target.type) { showToast('Pick an existing client or lead first to apply a workflow template'); return }
+    const types = target.type === 'client' ? ['client','both'] : ['lead','both']
+    const { data } = await supabase.from('workflow_templates')
+      .select('id,name,description').in('entity_type',types).eq('active',true).order('name')
+    setAvailableTemplates(data || [])
+    setTemplateSearch('')
+    setSelectedTemplateIds([])
+    setTemplateTarget(target)
+    setModal(false)   // close the Add Task modal if it was open (mirrors Clients.jsx)
+    setTemplateModal(true)
+  }
+
+  function toggleTemplateSelection(id) {
+    setSelectedTemplateIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  async function applySelectedTemplates() {
+    if (!selectedTemplateIds.length || !templateTarget.type) return
+    setApplyingTemplateId('__batch__')
+    const actorName = resolveActorName(user, employees)
+    const result = await applyWorkflowTemplate(selectedTemplateIds, templateTarget.name, actorName, templateTarget.type)
+    setApplyingTemplateId('')
+    if (result?.error) { showToast('❌ ' + result.error); return }
+    const names = availableTemplates.filter(t => selectedTemplateIds.includes(t.id)).map(t => t.name).join(', ')
+    setTemplateModal(false)
+    showToast(`✅ Applied "${names}" — ${result.count} task(s) created`)
+    load()
   }
 
   async function save(data) {
@@ -515,6 +571,17 @@ export default function Tasks() {
               onKeyDown={e=>e.key==='Enter'&&save(qtForm)}
               placeholder="Task description"/>
           </div>
+          <div style={{margin:'-4px 0 8px'}}>
+            <select value="" onChange={e=>{if(e.target.value)setQt(f=>({...f,title:e.target.value}))}}
+              style={{width:'100%',boxSizing:'border-box',padding:'8px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--t2)',fontSize:12}}>
+              <option value="">⚡ Quick-pick a common task…</option>
+              {QUICK_TASK_TITLES.map(t=><option key={t} value={t}>{t}</option>)}
+            </select>
+            <div style={{marginTop:6,fontSize:11,color:'var(--t3)'}}>
+              <span style={{color:'var(--blue)',cursor:'pointer',textDecoration:'underline'}}
+                onClick={()=>openTemplatePicker(qtForm.clientName)}>Apply a workflow template →</span>
+            </div>
+          </div>
           <div className="fg2">
             <div className="field"><label>Due Date</label>
               <input type="date" value={qtForm.dueDate} onChange={e=>setQt(f=>({...f,dueDate:e.target.value}))}/>
@@ -556,6 +623,18 @@ export default function Tasks() {
           <div className="modal" style={{width:540}}>
             <div className="mh"><span className="mt">Add Task</span><button className="xbtn" onClick={()=>{setModal(false);setSubtasks([])}}>&times;</button></div>
             <div className="field"><label>Title *</label><input value={form.title} onChange={e=>fld('title',e.target.value)} placeholder="Task description"/></div>
+            <div style={{margin:'-4px 0 8px'}}>
+              <select value="" onChange={e=>{if(e.target.value)fld('title',e.target.value)}}
+                style={{width:'100%',boxSizing:'border-box',padding:'8px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--t2)',fontSize:12}}>
+                <option value="">⚡ Quick-pick a common task…</option>
+                {QUICK_TASK_TITLES.map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+              <div style={{marginTop:8,fontSize:11.5,color:'var(--t3)'}}>
+                Need a full set of tasks?{' '}
+                <span style={{color:'var(--blue)',cursor:'pointer',textDecoration:'underline'}}
+                  onClick={()=>openTemplatePicker(form.clientName)}>Apply a workflow template →</span>
+              </div>
+            </div>
             <div className="field" style={{position:'relative'}}>
               <label>Client / Lead</label>
               <input value={form.clientName} onChange={e=>searchClient(e.target.value)} placeholder="Search clients..." autoComplete="off"/>
@@ -600,6 +679,43 @@ export default function Tasks() {
             <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:10}} onClick={()=>save(form)} disabled={saving}>
               {saving?'Saving…':'Add Task'}
             </button>
+          </div>
+        </div>
+      )}
+      {templateModal&&(
+        <div className="modal-bg open" onClick={e=>e.target===e.currentTarget&&setTemplateModal(false)}>
+          <div className="modal" style={{width:480,maxHeight:'80vh',display:'flex',flexDirection:'column'}}>
+            <div className="mh">
+              <span className="mt">📋 Apply Work Template — {templateTarget.name}</span>
+              <button className="xbtn" onClick={()=>setTemplateModal(false)}>&times;</button>
+            </div>
+            <div style={{padding:'0 4px 12px'}}>
+              <input value={templateSearch} onChange={e=>setTemplateSearch(e.target.value)} placeholder="Search templates..."
+                style={{width:'100%',boxSizing:'border-box',padding:'9px 13px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:7,color:'var(--tx)',fontSize:13}}/>
+            </div>
+            <div style={{overflowY:'auto',flex:1}}>
+              {availableTemplates.length===0 && (
+                <div style={{color:'var(--t3)',fontSize:12,textAlign:'center',padding:'20px 0'}}>No active workflow templates for {templateTarget.type||'this'} yet. Build one in Workflows first.</div>
+              )}
+              {availableTemplates
+                .filter(t => !templateSearch.trim() || t.name.toLowerCase().includes(templateSearch.toLowerCase()))
+                .map(t => (
+                  <div key={t.id} onClick={()=>!applyingTemplateId && toggleTemplateSelection(t.id)}
+                    style={{padding:'12px 10px',borderBottom:'1px solid var(--br)',cursor:applyingTemplateId?'default':'pointer',opacity:applyingTemplateId?0.5:1,display:'flex',gap:10,alignItems:'flex-start'}}>
+                    <input type="checkbox" checked={selectedTemplateIds.includes(t.id)} readOnly style={{marginTop:3}}/>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:700,color:'var(--tx)'}}>{t.name}</div>
+                      {t.description&&<div style={{fontSize:11,color:'var(--t3)',marginTop:3,lineHeight:1.5}}>{t.description}</div>}
+                    </div>
+                  </div>
+                ))
+              }
+            </div>
+            <div style={{padding:'12px 4px 4px',borderTop:'1px solid var(--br)'}}>
+              <button className="btn pri" style={{width:'100%'}} disabled={!selectedTemplateIds.length||!!applyingTemplateId} onClick={applySelectedTemplates}>
+                {applyingTemplateId ? 'Applying…' : selectedTemplateIds.length ? `Apply Selected (${selectedTemplateIds.length})` : 'Select a template to apply'}
+              </button>
+            </div>
           </div>
         </div>
       )}
