@@ -1726,6 +1726,13 @@ export default function Clients() {
       const {data}=await supabase.from('clients').select('*').eq('id',c.id).single()
       if(data)setDetail(data)
     }
+    // Update the client's current IRS or State status inline.
+    const applyStatusField=async(field,value)=>{
+      const {error}=await supabase.from('clients').update({[field]:value}).eq('id',c.id)
+      if(error){showToast('Error updating status: '+error.message);return}
+      const {data}=await supabase.from('clients').select('*').eq('id',c.id).single()
+      if(data)setDetail(data)
+    }
     // Shared stage-change logic — used by both the dropdown and the View Flow modal.
     const applyPipelineStage=async(newKey)=>{
       if(newKey===c.pipelineStage) return
@@ -1826,6 +1833,32 @@ export default function Clients() {
                     }}>{on?'✓ ':''}{svc}</div>
                   )
                 })}
+              </div>
+            </div>
+            {/* Current IRS / State status — the client's standing (distinct from pipeline & services) */}
+            <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid var(--br)'}}>
+              <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>Current IRS / State Status</div>
+              <div style={{display:'flex',gap:20,flexWrap:'wrap'}}>
+                {(c.irsOrState||'IRS Federal')!=='State' && (
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{fontSize:11,fontWeight:700,color:'var(--t3)',width:36}}>IRS</span>
+                    <span className="bdg ba" style={{fontSize:13,fontWeight:700,padding:'5px 12px',borderRadius:20}}>{c.irsStatus==='Other'?(c.irsStatusOther||'Other'):(c.irsStatus||'—')}</span>
+                    <select value={c.irsStatus||''} onChange={e=>applyStatusField('irsStatus',e.target.value)} style={{fontSize:12,padding:'5px 8px',borderRadius:8,background:'var(--s2)',color:'var(--tx)',border:'1px solid var(--br)',cursor:'pointer'}}>
+                      <option value="">—</option>
+                      {IRS_STATUS_OPTIONS.map(o=><option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </div>
+                )}
+                {(c.irsOrState||'IRS Federal')!=='IRS Federal' && (
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{fontSize:11,fontWeight:700,color:'var(--t3)',width:36}}>State</span>
+                    <span className="bdg ba" style={{fontSize:13,fontWeight:700,padding:'5px 12px',borderRadius:20}}>{c.stateStatus==='Other'?(c.stateStatusOther||'Other'):(c.stateStatus||'—')}</span>
+                    <select value={c.stateStatus||''} onChange={e=>applyStatusField('stateStatus',e.target.value)} style={{fontSize:12,padding:'5px 8px',borderRadius:8,background:'var(--s2)',color:'var(--tx)',border:'1px solid var(--br)',cursor:'pointer'}}>
+                      <option value="">—</option>
+                      {IRS_STATUS_OPTIONS.map(o=><option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </div>
+                )}
               </div>
             </div>
           </div>
