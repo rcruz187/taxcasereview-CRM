@@ -24,6 +24,7 @@ import ClientPortal  from './pages/ClientPortal'
 import OrganizerPage from './pages/OrganizerPage'
 import FinancialIntakePage from './pages/FinancialIntakePage'
 import AuthCallback from './pages/AuthCallback'
+import NewOffice from './pages/NewOffice'
 
 // Everything behind login is lazy-loaded — each page's code only downloads
 // when you actually navigate to it, instead of all ~30 pages loading upfront
@@ -168,6 +169,7 @@ function Shell() {
             <Route path="/formacorp"   element={<Guard section="books"><FormaCorp /></Guard>} />
             <Route path="/fax"         element={<Guard section="email"><Fax /></Guard>} />
             <Route path="/workflows"   element={<Guard section="workflows"><Workflows /></Guard>} />
+            <Route path="/new-office"  element={<NewOffice />} />
             <Route path="*"            element={<Navigate to="/" />} />
           </Routes>
           </Suspense>
