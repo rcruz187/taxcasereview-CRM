@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const LOGO = '/taxcasereview-CRM/logo.png'
@@ -9,18 +10,25 @@ export default function Kiosk() {
   const [now, setNow] = useState(new Date())
   const [logoUrl, setLogoUrl] = useState(LOGO)
   const [lockdown, setLockdown] = useState(true)
+  const [params] = useSearchParams()
 
-  // Load this tenant's own logo (settings.logourl), never the shared file
+  // Load this office's own logo. A wall kiosk is anon and pre-employee-
+  // selection, so — like the public booking page — it takes an optional
+  // ?t=<tenant uuid> hint and resolves via the same anon-safe RPC
+  // (booking_get_public_meta). Without a hint it falls back to the legacy
+  // first-tenant row, matching pre-multi-tenant behavior.
   useEffect(() => {
     (async () => {
-      const { data: s } = await supabase.from('settings').select('logourl').limit(1).maybeSingle()
-      if (s?.logourl) {
+      const tenantHint = params.get('t')
+      const { data } = await supabase.rpc('booking_get_public_meta', tenantHint ? { p_tenant: tenantHint } : {})
+      const url = data?.logo_url
+      if (url) {
         const img = new Image()
-        img.onload = () => setLogoUrl(s.logourl)
-        img.src = s.logourl
+        img.onload = () => setLogoUrl(url)
+        img.src = url
       }
     })()
-  }, [])
+  }, [params])
 
 
   // Clock tick
