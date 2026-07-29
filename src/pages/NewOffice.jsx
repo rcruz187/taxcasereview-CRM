@@ -4,23 +4,28 @@ import { useApp } from '../context/AppContext'
 
 const TCR_TENANT = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
 const BLANK = { firm_name:'', tenant_code:'', admin_name:'', admin_email:'', firm_phone:'', brand_color:'#2563eb', plan_tier:'starter' }
+const STATUS_COLORS = { active:'#10b981', trial:'#f59e0b', past_due:'#f97316', cancelled:'#ef4444' }
 
-// Platform-only tool: provisions a brand-new office (tenant) — creates the
-// tenant, its settings row, and the office's first Super Admin employee + a
-// working login, all via the provision-tenant edge function. This is a TCR
-// PLATFORM action, not a per-tenant admin one, so it's gated on the caller's
-// own employee row belonging to the TCR tenant specifically (checked here,
-// and re-checked server-side by the edge function regardless).
+function fmtBytes(n) {
+  if (!n) return ''
+  if (n < 1024) return n + ' B'
+  if (n < 1024*1024) return (n/1024).toFixed(0) + ' KB'
+  return (n/1024/1024).toFixed(1) + ' MB'
+}
+
+// Platform-only tool: CRM Companies — every office running on this platform.
+// List view for browsing/creating offices, detail view (click a row) for
+// contract/contact info, phone numbers, staff, agreement files, and
+// activate/deactivate. Gated on the caller being a TCR platform Super Admin —
+// checked here for UI purposes, and re-checked independently by every RPC and
+// edge function this page calls.
 export default function NewOffice() {
   const { user, showToast } = useApp()
   const [checking, setChecking] = useState(true)
   const [allowed, setAllowed]   = useState(false)
-  const [form, setForm]         = useState(BLANK)
-  const [saving, setSaving]     = useState(false)
-  const [result, setResult]     = useState(null) // { tenant_code, admin_email, temp_password, ... }
-  const [copied, setCopied]     = useState(false)
   const [offices, setOffices]   = useState(null) // null = not loaded yet
-  const [showForm, setShowForm] = useState(false)
+  const [view, setView]         = useState('list') // 'list' | 'form' | 'detail'
+  const [selectedId, setSelectedId] = useState(null)
 
   useEffect(() => {
     if (!user?.email) { setChecking(false); return }
@@ -39,11 +44,81 @@ export default function NewOffice() {
     setOffices(data || [])
   }
 
-  function fld(k, v) { setForm(f => ({ ...f, [k]: v })) }
+  function openDetail(id) { setSelectedId(id); setView('detail') }
+  function backToList() { setView('list'); setSelectedId(null); loadOffices() }
 
-  function slugify(name) {
-    return name.toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 12)
-  }
+  if (checking) return <div style={{padding:40,color:'var(--t3)'}}>Checking access…</div>
+  if (!allowed) return (
+    <div style={{padding:40,maxWidth:520}}>
+      <div style={{fontSize:18,fontWeight:700,marginBottom:8,color:'var(--tx)'}}>Not available</div>
+      <div style={{color:'var(--t3)',fontSize:13.5,lineHeight:1.6}}>This page is a platform-level tool and isn't available from this account.</div>
+    </div>
+  )
+
+  if (view === 'form') return <NewOfficeForm onDone={backToList} onCancel={() => setView('list')} showToast={showToast} />
+  if (view === 'detail') return <OfficeDetail tenantId={selectedId} onBack={backToList} showToast={showToast} />
+
+  return (
+    <div style={{padding:'28px 32px',maxWidth:820}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+        <div style={{fontSize:20,fontWeight:800,color:'var(--tx)'}}>🏢 CRM Companies</div>
+        <button className="btn pri" onClick={() => setView('form')}>+ New Office</button>
+      </div>
+      <div style={{color:'var(--t3)',fontSize:13,marginBottom:24}}>
+        Every office running on this platform, each on its own isolated tenant. Click one for contract info, contacts, phone numbers, and agreement files.
+      </div>
+
+      <div style={{border:'1px solid var(--br)',borderRadius:10,overflow:'hidden'}}>
+        {offices === null ? (
+          <div style={{padding:24,color:'var(--t3)',fontSize:13}}>Loading offices…</div>
+        ) : offices.length === 0 ? (
+          <div style={{padding:24,color:'var(--t3)',fontSize:13}}>No offices yet.</div>
+        ) : (
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+            <thead>
+              <tr style={{background:'var(--s2)',textAlign:'left'}}>
+                {['Firm','Code','Admin','Staff','Plan','Status'].map(h=>(
+                  <th key={h} style={{padding:'10px 14px',fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {offices.map(o => (
+                <tr key={o.id} onClick={()=>openDetail(o.id)}
+                  style={{borderTop:'1px solid var(--br)',cursor:'pointer'}}
+                  onMouseEnter={e=>e.currentTarget.style.background='var(--s2)'}
+                  onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                  <td style={{padding:'10px 14px',color:'var(--tx)',fontWeight:600}}>
+                    {o.brand_color && <span style={{display:'inline-block',width:9,height:9,borderRadius:'50%',background:o.brand_color,marginRight:8}}/>}
+                    {o.firm_name}
+                  </td>
+                  <td style={{padding:'10px 14px',color:'var(--t2)',fontFamily:'monospace'}}>{o.tenant_code}</td>
+                  <td style={{padding:'10px 14px',color:'var(--t2)'}}>{o.admin_email || '—'}</td>
+                  <td style={{padding:'10px 14px',color:'var(--t2)'}}>{o.employee_count}</td>
+                  <td style={{padding:'10px 14px',color:'var(--t2)',textTransform:'capitalize'}}>{o.plan_tier}</td>
+                  <td style={{padding:'10px 14px'}}>
+                    <span style={{fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:20,textTransform:'capitalize',
+                      background:(STATUS_COLORS[o.status]||'#94a3b8')+'22',color:STATUS_COLORS[o.status]||'#94a3b8'}}>{o.status}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Create-office form (unchanged behavior, extracted as its own component) ─
+function NewOfficeForm({ onDone, onCancel, showToast }) {
+  const [form, setForm]     = useState(BLANK)
+  const [saving, setSaving] = useState(false)
+  const [result, setResult] = useState(null)
+  const [copied, setCopied] = useState(false)
+
+  function fld(k, v) { setForm(f => ({ ...f, [k]: v })) }
+  function slugify(name) { return name.toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 12) }
 
   async function submit() {
     if (!form.firm_name.trim() || !form.tenant_code.trim() || !form.admin_email.trim()) {
@@ -52,20 +127,15 @@ export default function NewOffice() {
     setSaving(true)
     const { data, error } = await supabase.functions.invoke('provision-tenant', {
       body: {
-        firm_name: form.firm_name.trim(),
-        tenant_code: form.tenant_code.trim(),
-        admin_name: form.admin_name.trim(),
-        admin_email: form.admin_email.trim().toLowerCase(),
-        firm_phone: form.firm_phone.trim() || null,
-        brand_color: form.brand_color || null,
+        firm_name: form.firm_name.trim(), tenant_code: form.tenant_code.trim(),
+        admin_name: form.admin_name.trim(), admin_email: form.admin_email.trim().toLowerCase(),
+        firm_phone: form.firm_phone.trim() || null, brand_color: form.brand_color || null,
         plan_tier: form.plan_tier,
       }
     })
     setSaving(false)
     if (error || data?.error) { showToast('❌ ' + (data?.error || error.message)); return }
     setResult(data)
-    setForm(BLANK)
-    loadOffices()
   }
 
   function copyCreds() {
@@ -74,27 +144,13 @@ export default function NewOffice() {
     setCopied(true); setTimeout(() => setCopied(false), 2500)
   }
 
-  if (checking) return <div style={{padding:40,color:'var(--t3)'}}>Checking access…</div>
-  if (!allowed) return (
-    <div style={{padding:40,maxWidth:520}}>
-      <div style={{fontSize:18,fontWeight:700,marginBottom:8,color:'var(--tx)'}}>Not available</div>
-      <div style={{color:'var(--t3)',fontSize:13.5,lineHeight:1.6}}>Provisioning a new office is a platform-level action and isn't available from this account.</div>
-    </div>
-  )
-
   return (
-    <div style={{padding:'28px 32px',maxWidth:760}}>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
-        <div style={{fontSize:20,fontWeight:800,color:'var(--tx)'}}>🏢 Offices</div>
-        {!result && (
-          <button className="btn pri" onClick={() => setShowForm(s => !s)}>
-            {showForm ? '← Back to list' : '+ New Office'}
-          </button>
-        )}
+    <div style={{padding:'28px 32px',maxWidth:640}}>
+      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:4}}>
+        <button className="btn sec" onClick={onCancel}>← Back</button>
+        <div style={{fontSize:20,fontWeight:800,color:'var(--tx)'}}>New Office</div>
       </div>
-      <div style={{color:'var(--t3)',fontSize:13,marginBottom:24}}>
-        Every office running on this platform, and its own isolated tenant — separate data, staff, and login from every other office.
-      </div>
+      <div style={{color:'var(--t3)',fontSize:13,margin:'8px 0 24px'}}>Stand up a brand-new office on its own isolated tenant.</div>
 
       {result ? (
         <div style={{background:'var(--s2)',border:'1px solid var(--br)',borderRadius:10,padding:20}}>
@@ -105,21 +161,21 @@ export default function NewOffice() {
             <div><b>Temporary password:</b> <code style={{background:'var(--s3)',padding:'2px 8px',borderRadius:5}}>{result.temp_password}</code></div>
           </div>
           <div style={{fontSize:12,color:'var(--t3)',marginTop:10,lineHeight:1.6}}>
-            This password is shown once and isn't stored anywhere retrievable — copy it now and send it to the new admin over a secure channel. They should sign in and change it right away.
+            This password is shown once and isn't stored anywhere retrievable — copy it now and send it to the new admin over a secure channel.
           </div>
           <div style={{display:'flex',gap:10,marginTop:16}}>
             <button className="btn pri" onClick={copyCreds}>{copied ? '✓ Copied' : '📋 Copy login details'}</button>
-            <button className="btn sec" onClick={() => { setResult(null); setShowForm(false) }}>← Back to list</button>
+            <button className="btn sec" onClick={onDone}>Done → Back to list</button>
           </div>
         </div>
-      ) : showForm ? (
+      ) : (
         <div style={{display:'flex',flexDirection:'column',gap:14}}>
           <div className="field"><label>Firm Name *</label>
             <input value={form.firm_name} onChange={e=>{fld('firm_name',e.target.value); if(!form.tenant_code) fld('tenant_code', slugify(e.target.value))}} placeholder="e.g. Bennett Tax Resolution"/>
           </div>
           <div className="field"><label>Office Code *</label>
             <input value={form.tenant_code} onChange={e=>fld('tenant_code', slugify(e.target.value))} placeholder="e.g. BENNETT" style={{fontFamily:'monospace'}}/>
-            <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>Short, unique identifier for this office. Auto-filled from the firm name — edit if you'd like something shorter.</div>
+            <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>Short, unique identifier for this office.</div>
           </div>
           <div style={{display:'flex',gap:14}}>
             <div className="field" style={{flex:1}}><label>Admin Name</label>
@@ -148,49 +204,238 @@ export default function NewOffice() {
             {saving ? 'Creating office…' : 'Create Office'}
           </button>
         </div>
-      ) : (
-        <div style={{border:'1px solid var(--br)',borderRadius:10,overflow:'hidden'}}>
-          {offices === null ? (
-            <div style={{padding:24,color:'var(--t3)',fontSize:13}}>Loading offices…</div>
-          ) : offices.length === 0 ? (
-            <div style={{padding:24,color:'var(--t3)',fontSize:13}}>No offices yet.</div>
-          ) : (
-            <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-              <thead>
-                <tr style={{background:'var(--s2)',textAlign:'left'}}>
-                  <th style={{padding:'10px 14px',fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em'}}>Firm</th>
-                  <th style={{padding:'10px 14px',fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em'}}>Code</th>
-                  <th style={{padding:'10px 14px',fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em'}}>Admin</th>
-                  <th style={{padding:'10px 14px',fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em'}}>Staff</th>
-                  <th style={{padding:'10px 14px',fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em'}}>Plan</th>
-                  <th style={{padding:'10px 14px',fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em'}}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {offices.map(o => (
-                  <tr key={o.id} style={{borderTop:'1px solid var(--br)'}}>
-                    <td style={{padding:'10px 14px',color:'var(--tx)',fontWeight:600}}>
-                      {o.brand_color && <span style={{display:'inline-block',width:9,height:9,borderRadius:'50%',background:o.brand_color,marginRight:8}}/>}
-                      {o.firm_name}
-                    </td>
-                    <td style={{padding:'10px 14px',color:'var(--t2)',fontFamily:'monospace'}}>{o.tenant_code}</td>
-                    <td style={{padding:'10px 14px',color:'var(--t2)'}}>{o.admin_email || '—'}</td>
-                    <td style={{padding:'10px 14px',color:'var(--t2)'}}>{o.employee_count}</td>
-                    <td style={{padding:'10px 14px',color:'var(--t2)',textTransform:'capitalize'}}>{o.plan_tier}</td>
-                    <td style={{padding:'10px 14px'}}>
-                      <span style={{
-                        fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:20,textTransform:'capitalize',
-                        background:o.status==='active'?'#10b98122':o.status==='trial'?'#f59e0b22':'#ef444422',
-                        color:o.status==='active'?'#10b981':o.status==='trial'?'#f59e0b':'#ef4444'
-                      }}>{o.status}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+      )}
+    </div>
+  )
+}
+
+// ── Office detail: contract/contact info, phone numbers, staff, agreements ──
+function OfficeDetail({ tenantId, onBack, showToast }) {
+  const [detail, setDetail] = useState(null)
+  const [edit, setEdit]     = useState(null) // draft patch while editing
+  const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false)
+  const [deactivateReason, setDeactivateReason] = useState('')
+
+  useEffect(() => { load() }, [tenantId])
+
+  async function load() {
+    setDetail(null)
+    const { data, error } = await supabase.rpc('get_office_detail', { p_tenant_id: tenantId })
+    if (error) { showToast('❌ ' + error.message); return }
+    setDetail(data)
+    setEdit(null)
+  }
+
+  function startEdit() {
+    const t = detail.tenant
+    setEdit({
+      firm_name: t.firm_name || '', firm_phone: t.firm_phone || '', firm_address: t.firm_address || '',
+      primary_contact_name: t.primary_contact_name || '', primary_contact_email: t.primary_contact_email || '',
+      contract_start_date: t.contract_start_date || '', contract_end_date: t.contract_end_date || '',
+      monthly_rate: t.monthly_rate ?? '', notes: t.notes || '',
+      signalwire_phone_number: t.signalwire_phone_number || '', signalwire_project_id: t.signalwire_project_id || '',
+      plan_tier: t.plan_tier || 'starter', brand_color: t.brand_color || '#2563eb',
+    })
+  }
+
+  async function saveEdit() {
+    setSaving(true)
+    const { error } = await supabase.rpc('update_office', { p_tenant_id: tenantId, p_patch: edit })
+    setSaving(false)
+    if (error) { showToast('❌ ' + error.message); return }
+    showToast('✅ Saved')
+    load()
+  }
+
+  async function toggleStatus(newStatus) {
+    const { error } = await supabase.rpc('set_office_status', {
+      p_tenant_id: tenantId, p_status: newStatus,
+      p_reason: newStatus === 'cancelled' ? (deactivateReason.trim() || null) : null,
+    })
+    if (error) { showToast('❌ ' + error.message); return }
+    setConfirmDeactivate(false); setDeactivateReason('')
+    showToast(newStatus === 'cancelled' ? '🚫 Office deactivated' : '✅ Office reactivated')
+    load()
+  }
+
+  async function handleUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    const reader = new FileReader()
+    reader.onload = async () => {
+      const base64 = reader.result.split(',')[1]
+      const { data, error } = await supabase.functions.invoke('office-agreement-file', {
+        body: { action: 'upload', tenant_id: tenantId, file_name: file.name, file_base64: base64, content_type: file.type, label: null }
+      })
+      setUploading(false)
+      if (error || data?.error) { showToast('❌ ' + (data?.error || error.message)); return }
+      showToast('✅ Agreement uploaded')
+      load()
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  async function viewAgreement(filePath) {
+    const { data, error } = await supabase.functions.invoke('office-agreement-file', { body: { action: 'geturl', file_path: filePath } })
+    if (error || data?.error) { showToast('❌ ' + (data?.error || error.message)); return }
+    window.open(data.url, '_blank')
+  }
+
+  async function deleteAgreement(id) {
+    const { data, error } = await supabase.functions.invoke('office-agreement-file', { body: { action: 'delete', agreement_id: id } })
+    if (error || data?.error) { showToast('❌ ' + (data?.error || error.message)); return }
+    showToast('Agreement removed')
+    load()
+  }
+
+  if (!detail) return (
+    <div style={{padding:'28px 32px'}}>
+      <button className="btn sec" onClick={onBack}>← Back to offices</button>
+      <div style={{marginTop:20,color:'var(--t3)'}}>Loading office…</div>
+    </div>
+  )
+
+  const t = detail.tenant
+  const isTCR = tenantId === TCR_TENANT
+
+  return (
+    <div style={{padding:'28px 32px',maxWidth:720}}>
+      <button className="btn sec" onClick={onBack}>← Back to offices</button>
+
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',margin:'18px 0 4px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <div style={{fontSize:22,fontWeight:800,color:'var(--tx)'}}>{t.firm_name}</div>
+          <span style={{fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:20,textTransform:'capitalize',
+            background:(STATUS_COLORS[t.status]||'#94a3b8')+'22',color:STATUS_COLORS[t.status]||'#94a3b8'}}>{t.status}</span>
+        </div>
+        {!edit && (
+          <div style={{display:'flex',gap:8}}>
+            <button className="btn sec" onClick={startEdit}>✏️ Edit</button>
+            {!isTCR && (t.status === 'cancelled'
+              ? <button className="btn pri" onClick={()=>toggleStatus('active')}>Reactivate</button>
+              : <button className="btn" style={{background:'#ef444422',color:'#ef4444',border:'1px solid #ef444455'}} onClick={()=>setConfirmDeactivate(true)}>Deactivate</button>)}
+          </div>
+        )}
+      </div>
+      <div style={{color:'var(--t3)',fontSize:12.5,fontFamily:'monospace',marginBottom:20}}>{t.tenant_code}</div>
+
+      {confirmDeactivate && (
+        <div style={{background:'#ef444411',border:'1px solid #ef444455',borderRadius:10,padding:16,marginBottom:20}}>
+          <div style={{fontWeight:700,color:'#ef4444',marginBottom:8}}>Deactivate {t.firm_name}?</div>
+          <div style={{fontSize:12.5,color:'var(--t2)',marginBottom:10}}>Staff at this office won't be able to log in until it's reactivated. Their data is kept, not deleted.</div>
+          <input value={deactivateReason} onChange={e=>setDeactivateReason(e.target.value)} placeholder="Reason (optional)"
+            style={{width:'100%',boxSizing:'border-box',padding:'8px 10px',marginBottom:10,background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)'}}/>
+          <div style={{display:'flex',gap:8}}>
+            <button className="btn" style={{background:'#ef4444',color:'#fff'}} onClick={()=>toggleStatus('cancelled')}>Confirm Deactivate</button>
+            <button className="btn sec" onClick={()=>setConfirmDeactivate(false)}>Cancel</button>
+          </div>
         </div>
       )}
+
+      <Section title="Contract & Contact">
+        {edit ? (
+          <div style={{display:'flex',flexDirection:'column',gap:12}}>
+            <Row label="Firm Name"><input value={edit.firm_name} onChange={e=>setEdit(f=>({...f,firm_name:e.target.value}))}/></Row>
+            <Row label="Firm Address"><input value={edit.firm_address} onChange={e=>setEdit(f=>({...f,firm_address:e.target.value}))}/></Row>
+            <Row label="Primary Contact"><input value={edit.primary_contact_name} onChange={e=>setEdit(f=>({...f,primary_contact_name:e.target.value}))} placeholder="Name"/></Row>
+            <Row label="Contact Email"><input value={edit.primary_contact_email} onChange={e=>setEdit(f=>({...f,primary_contact_email:e.target.value}))} type="email"/></Row>
+            <Row label="Contract Start"><input value={edit.contract_start_date} onChange={e=>setEdit(f=>({...f,contract_start_date:e.target.value}))} type="date"/></Row>
+            <Row label="Contract End"><input value={edit.contract_end_date} onChange={e=>setEdit(f=>({...f,contract_end_date:e.target.value}))} type="date"/></Row>
+            <Row label="Monthly Rate"><input value={edit.monthly_rate} onChange={e=>setEdit(f=>({...f,monthly_rate:e.target.value}))} type="number" step="0.01" placeholder="$"/></Row>
+            <Row label="Plan"><select value={edit.plan_tier} onChange={e=>setEdit(f=>({...f,plan_tier:e.target.value}))}><option value="starter">Starter</option><option value="growth">Growth</option><option value="pro">Pro</option></select></Row>
+            <Row label="Notes"><textarea value={edit.notes} onChange={e=>setEdit(f=>({...f,notes:e.target.value}))} rows={3} style={{width:'100%',boxSizing:'border-box'}}/></Row>
+            <div style={{display:'flex',gap:8,marginTop:4}}>
+              <button className="btn pri" disabled={saving} onClick={saveEdit}>{saving?'Saving…':'Save'}</button>
+              <button className="btn sec" onClick={()=>setEdit(null)}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{display:'flex',flexDirection:'column',gap:8,fontSize:13}}>
+            <InfoRow label="Address" value={t.firm_address}/>
+            <InfoRow label="Primary Contact" value={t.primary_contact_name}/>
+            <InfoRow label="Contact Email" value={t.primary_contact_email}/>
+            <InfoRow label="Contract" value={t.contract_start_date || t.contract_end_date ? `${t.contract_start_date||'—'} → ${t.contract_end_date||'—'}` : null}/>
+            <InfoRow label="Monthly Rate" value={t.monthly_rate ? `$${t.monthly_rate}` : null}/>
+            <InfoRow label="Plan" value={t.plan_tier} capitalize/>
+            <InfoRow label="Notes" value={t.notes}/>
+          </div>
+        )}
+      </Section>
+
+      <Section title="Phone Numbers">
+        {edit ? (
+          <div style={{display:'flex',flexDirection:'column',gap:12}}>
+            <Row label="Office Phone"><input value={edit.firm_phone} onChange={e=>setEdit(f=>({...f,firm_phone:e.target.value}))}/></Row>
+            <Row label="SignalWire Number"><input value={edit.signalwire_phone_number} onChange={e=>setEdit(f=>({...f,signalwire_phone_number:e.target.value}))} placeholder="+1..."/></Row>
+            <Row label="SignalWire Project ID"><input value={edit.signalwire_project_id} onChange={e=>setEdit(f=>({...f,signalwire_project_id:e.target.value}))}/></Row>
+          </div>
+        ) : (
+          <div style={{display:'flex',flexDirection:'column',gap:8,fontSize:13}}>
+            <InfoRow label="Office Phone" value={t.firm_phone}/>
+            <InfoRow label="SignalWire Number" value={t.signalwire_phone_number}/>
+            <InfoRow label="SignalWire Project ID" value={t.signalwire_project_id}/>
+          </div>
+        )}
+      </Section>
+
+      <Section title={`Staff (${detail.employees.length})`}>
+        {detail.employees.length === 0 ? <div style={{color:'var(--t3)',fontSize:13}}>No staff yet.</div> : (
+          <div style={{display:'flex',flexDirection:'column',gap:6}}>
+            {detail.employees.map(e => (
+              <div key={e.id} style={{display:'flex',justifyContent:'space-between',fontSize:13,padding:'6px 0',borderBottom:'1px solid var(--br)'}}>
+                <span style={{color:'var(--tx)',fontWeight:600}}>{e.name}</span>
+                <span style={{color:'var(--t3)'}}>{e.email} · {e.access}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      <Section title="Agreement Files">
+        <div style={{marginBottom:12}}>
+          <label className="btn sec" style={{cursor:'pointer',display:'inline-block'}}>
+            {uploading ? 'Uploading…' : '📎 Upload Agreement'}
+            <input type="file" onChange={handleUpload} disabled={uploading} style={{display:'none'}}/>
+          </label>
+        </div>
+        {detail.agreements.length === 0 ? <div style={{color:'var(--t3)',fontSize:13}}>No agreement files uploaded yet.</div> : (
+          <div style={{display:'flex',flexDirection:'column',gap:6}}>
+            {detail.agreements.map(a => (
+              <div key={a.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:13,padding:'8px 10px',background:'var(--s2)',borderRadius:6}}>
+                <div>
+                  <span style={{color:'var(--tx)',fontWeight:600,cursor:'pointer',textDecoration:'underline'}} onClick={()=>viewAgreement(a.file_path)}>{a.file_name}</span>
+                  <span style={{color:'var(--t3)',marginLeft:8}}>{fmtBytes(a.file_size)} · {new Date(a.created_at).toLocaleDateString()}</span>
+                </div>
+                <button className="btn sec" style={{padding:'4px 10px',fontSize:12}} onClick={()=>deleteAgreement(a.id)}>Remove</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+    </div>
+  )
+}
+
+function Section({ title, children }) {
+  return (
+    <div style={{marginBottom:22}}>
+      <div style={{fontSize:12,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:10}}>{title}</div>
+      <div style={{background:'var(--s1)',border:'1px solid var(--br)',borderRadius:10,padding:16}}>{children}</div>
+    </div>
+  )
+}
+function Row({ label, children }) {
+  return <div><label style={{display:'block',fontSize:11.5,color:'var(--t3)',marginBottom:4}}>{label}</label>{children}</div>
+}
+function InfoRow({ label, value, capitalize }) {
+  return (
+    <div style={{display:'flex',justifyContent:'space-between'}}>
+      <span style={{color:'var(--t3)'}}>{label}</span>
+      <span style={{color:'var(--tx)',textTransform:capitalize?'capitalize':'none'}}>{value || '—'}</span>
     </div>
   )
 }
