@@ -78,6 +78,7 @@ export default function EmployeePortal() {
   // signed in on this device, and nothing at all on a fresh browser, rather
   // than defaulting to a specific firm's logo and being wrong for everyone else.
   const [brand, setBrand] = useState(() => readCachedBrand() || { name: '', logoUrl: '' })
+  const [loginEmail, setLoginEmail] = useState('')
 
   // Before login there's no session yet to resolve a tenant from — but once a
   // full-looking email is typed, we CAN look up just that firm's branding
@@ -100,7 +101,6 @@ export default function EmployeePortal() {
     }, 500)
     return () => clearTimeout(t)
   }, [loginEmail, screen])
-  const [loginEmail, setLoginEmail] = useState('')
   const [pin, setPin] = useState('')
   const [changingPin, setChangingPin] = useState(false)
   const [newPin, setNewPin] = useState('')
