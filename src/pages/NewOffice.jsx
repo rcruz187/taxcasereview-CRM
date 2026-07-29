@@ -19,15 +19,25 @@ export default function NewOffice() {
   const [saving, setSaving]     = useState(false)
   const [result, setResult]     = useState(null) // { tenant_code, admin_email, temp_password, ... }
   const [copied, setCopied]     = useState(false)
+  const [offices, setOffices]   = useState(null) // null = not loaded yet
+  const [showForm, setShowForm] = useState(false)
 
   useEffect(() => {
     if (!user?.email) { setChecking(false); return }
     supabase.from('employees').select('access,tenant_id').eq('email', user.email).maybeSingle()
       .then(({ data }) => {
-        setAllowed(!!data && data.access === 'Super Admin' && data.tenant_id === TCR_TENANT)
+        const ok = !!data && data.access === 'Super Admin' && data.tenant_id === TCR_TENANT
+        setAllowed(ok)
         setChecking(false)
+        if (ok) loadOffices()
       })
   }, [user?.email])
+
+  async function loadOffices() {
+    const { data, error } = await supabase.rpc('list_tenants')
+    if (error) { showToast('❌ ' + error.message); return }
+    setOffices(data || [])
+  }
 
   function fld(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
@@ -55,6 +65,7 @@ export default function NewOffice() {
     if (error || data?.error) { showToast('❌ ' + (data?.error || error.message)); return }
     setResult(data)
     setForm(BLANK)
+    loadOffices()
   }
 
   function copyCreds() {
@@ -72,9 +83,18 @@ export default function NewOffice() {
   )
 
   return (
-    <div style={{padding:'28px 32px',maxWidth:640}}>
-      <div style={{fontSize:20,fontWeight:800,color:'var(--tx)',marginBottom:4}}>🏢 New Office</div>
-      <div style={{color:'var(--t3)',fontSize:13,marginBottom:24}}>Stand up a brand-new office on its own isolated tenant — its own data, staff, and login, separate from TCR and every other office.</div>
+    <div style={{padding:'28px 32px',maxWidth:760}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+        <div style={{fontSize:20,fontWeight:800,color:'var(--tx)'}}>🏢 Offices</div>
+        {!result && (
+          <button className="btn pri" onClick={() => setShowForm(s => !s)}>
+            {showForm ? '← Back to list' : '+ New Office'}
+          </button>
+        )}
+      </div>
+      <div style={{color:'var(--t3)',fontSize:13,marginBottom:24}}>
+        Every office running on this platform, and its own isolated tenant — separate data, staff, and login from every other office.
+      </div>
 
       {result ? (
         <div style={{background:'var(--s2)',border:'1px solid var(--br)',borderRadius:10,padding:20}}>
@@ -89,10 +109,10 @@ export default function NewOffice() {
           </div>
           <div style={{display:'flex',gap:10,marginTop:16}}>
             <button className="btn pri" onClick={copyCreds}>{copied ? '✓ Copied' : '📋 Copy login details'}</button>
-            <button className="btn sec" onClick={() => setResult(null)}>+ Add another office</button>
+            <button className="btn sec" onClick={() => { setResult(null); setShowForm(false) }}>← Back to list</button>
           </div>
         </div>
-      ) : (
+      ) : showForm ? (
         <div style={{display:'flex',flexDirection:'column',gap:14}}>
           <div className="field"><label>Firm Name *</label>
             <input value={form.firm_name} onChange={e=>{fld('firm_name',e.target.value); if(!form.tenant_code) fld('tenant_code', slugify(e.target.value))}} placeholder="e.g. Bennett Tax Resolution"/>
@@ -127,6 +147,48 @@ export default function NewOffice() {
           <button className="btn pri" disabled={saving} onClick={submit} style={{marginTop:8,alignSelf:'flex-start',padding:'10px 24px'}}>
             {saving ? 'Creating office…' : 'Create Office'}
           </button>
+        </div>
+      ) : (
+        <div style={{border:'1px solid var(--br)',borderRadius:10,overflow:'hidden'}}>
+          {offices === null ? (
+            <div style={{padding:24,color:'var(--t3)',fontSize:13}}>Loading offices…</div>
+          ) : offices.length === 0 ? (
+            <div style={{padding:24,color:'var(--t3)',fontSize:13}}>No offices yet.</div>
+          ) : (
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+              <thead>
+                <tr style={{background:'var(--s2)',textAlign:'left'}}>
+                  <th style={{padding:'10px 14px',fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em'}}>Firm</th>
+                  <th style={{padding:'10px 14px',fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em'}}>Code</th>
+                  <th style={{padding:'10px 14px',fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em'}}>Admin</th>
+                  <th style={{padding:'10px 14px',fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em'}}>Staff</th>
+                  <th style={{padding:'10px 14px',fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em'}}>Plan</th>
+                  <th style={{padding:'10px 14px',fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em'}}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {offices.map(o => (
+                  <tr key={o.id} style={{borderTop:'1px solid var(--br)'}}>
+                    <td style={{padding:'10px 14px',color:'var(--tx)',fontWeight:600}}>
+                      {o.brand_color && <span style={{display:'inline-block',width:9,height:9,borderRadius:'50%',background:o.brand_color,marginRight:8}}/>}
+                      {o.firm_name}
+                    </td>
+                    <td style={{padding:'10px 14px',color:'var(--t2)',fontFamily:'monospace'}}>{o.tenant_code}</td>
+                    <td style={{padding:'10px 14px',color:'var(--t2)'}}>{o.admin_email || '—'}</td>
+                    <td style={{padding:'10px 14px',color:'var(--t2)'}}>{o.employee_count}</td>
+                    <td style={{padding:'10px 14px',color:'var(--t2)',textTransform:'capitalize'}}>{o.plan_tier}</td>
+                    <td style={{padding:'10px 14px'}}>
+                      <span style={{
+                        fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:20,textTransform:'capitalize',
+                        background:o.status==='active'?'#10b98122':o.status==='trial'?'#f59e0b22':'#ef444422',
+                        color:o.status==='active'?'#10b981':o.status==='trial'?'#f59e0b':'#ef4444'
+                      }}>{o.status}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
     </div>
