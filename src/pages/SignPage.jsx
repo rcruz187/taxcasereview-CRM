@@ -268,6 +268,7 @@ export default function SignPage() {
       p_saved_doc_type:  savedDocType,
       p_cert_url:        certUrl,
       p_attachments:     signedAttachments,
+      p_cert_size:       certBytes ? certBytes.length : null,
     })
 
     // esign_finalize files every attachment under a single doc type. Re-sort
