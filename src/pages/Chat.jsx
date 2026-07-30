@@ -951,6 +951,12 @@ export default function Chat() {
       {repMenu && (
         <ContextMenu pos={repMenu}>
           <MenuHeader>{repMenu.rep.name}</MenuHeader>
+          <MenuItem onClick={() => {
+            const rep = repMenu.rep; setRepMenu(null)
+            if (huddle) { inviteToHuddle(rep.name) }
+            else { startHuddle().then(() => inviteToHuddle(rep.name)) }
+          }}>🎙️ Start huddle with {repMenu.rep.name.split(' ')[0]}</MenuItem>
+          <MenuDivider/>
           <MenuItem onClick={() => { setDetailsPanel({ conv: repMenu.rep, convType: 'dm' }); setRepMenu(null) }}>Conversation details</MenuItem>
           <MenuItem onClick={() => { navigator.clipboard.writeText(repMenu.rep.name); setRepMenu(null); showToast('Copied') }}>Copy name</MenuItem>
           <MenuItem onClick={() => toggleConvPref(repMenu.rep.id, 'dm', 'starred')}>

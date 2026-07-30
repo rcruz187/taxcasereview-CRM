@@ -4,7 +4,9 @@ import { Suspense, lazy, useEffect } from 'react'
 import { AppProvider, useApp } from './context/AppContext'
 import { CallProvider } from './context/CallContext'
 import { GmailSyncProvider } from './context/GmailSyncContext'
+import { ScreenShareProvider } from './context/ScreenShareContext'
 import ActiveCallBar from './components/calling/ActiveCallBar'
+import ScreenShareOverlay from './components/ScreenShareOverlay'
 import Sidebar  from './components/layout/Sidebar'
 import TopBar   from './components/layout/TopBar'
 import { Modal, Toast } from './components/ui'
@@ -17,7 +19,8 @@ import Kiosk      from './pages/Kiosk'
 import BookAppointment from './pages/BookAppointment'
 import ManageBooking from './pages/ManageBooking'
 import SignPage     from './pages/SignPage'
-import MeetingRoom  from './pages/MeetingRoom'
+import MeetingRoom      from './pages/MeetingRoom'
+import ScreenShareJoin  from './pages/ScreenShareJoin'
 import ClockIn       from './pages/ClockIn'
 import EmployeePortal from './pages/EmployeePortal'
 import ClientPortal  from './pages/ClientPortal'
@@ -117,10 +120,12 @@ function Shell() {
   }
 
   return (
+    <ScreenShareProvider>
     <CallProvider>
     <GmailSyncProvider>
     <div className="app-shell">
       <ActiveCallBar />
+      <ScreenShareOverlay />
       <Sidebar />
       <div className="main-area">
         <TopBar onNew={handleNew} />
@@ -180,6 +185,7 @@ function Shell() {
     </div>
     </GmailSyncProvider>
     </CallProvider>
+    </ScreenShareProvider>
   )
 }
 
@@ -202,7 +208,8 @@ function AuthRouter() {
       <Route path="/clockin" element={<ClockIn />} />
       <Route path="/employee" element={<EmployeePortal />} />
       <Route path="/sign/:id" element={<SignPage />} />
-      <Route path="/meet/:id" element={<MeetingRoom />} />
+      <Route path="/meet/:id"     element={<MeetingRoom />} />
+      <Route path="/screenshare"  element={<ScreenShareJoin />} />
       <Route path="/portal/:id" element={<ClientPortal />} />
       <Route path="/organizer/:id" element={<OrganizerPage />} />
       <Route path="/financial-intake/:id" element={<FinancialIntakePage />} />
