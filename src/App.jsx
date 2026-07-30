@@ -21,6 +21,7 @@ import ManageBooking from './pages/ManageBooking'
 import SignPage     from './pages/SignPage'
 import MeetingRoom      from './pages/MeetingRoom'
 import ScreenShareJoin  from './pages/ScreenShareJoin'
+import ScreenShareHost  from './pages/ScreenShareHost'
 import ClockIn       from './pages/ClockIn'
 import EmployeePortal from './pages/EmployeePortal'
 import ClientPortal  from './pages/ClientPortal'
@@ -208,8 +209,9 @@ function AuthRouter() {
       <Route path="/clockin" element={<ClockIn />} />
       <Route path="/employee" element={<EmployeePortal />} />
       <Route path="/sign/:id" element={<SignPage />} />
-      <Route path="/meet/:id"     element={<MeetingRoom />} />
-      <Route path="/screenshare"  element={<ScreenShareJoin />} />
+      <Route path="/meet/:id"          element={<MeetingRoom />} />
+      <Route path="/screenshare"       element={<ScreenShareJoin />} />
+      <Route path="/screenshare-host"  element={<ScreenShareHost />} />
       <Route path="/portal/:id" element={<ClientPortal />} />
       <Route path="/organizer/:id" element={<OrganizerPage />} />
       <Route path="/financial-intake/:id" element={<FinancialIntakePage />} />
