@@ -8,8 +8,8 @@ import { FIRM } from './firmBranding'
 
 const LOGO_URL = ''  // replaced by FIRM.logoUrl
 const FIRM_NAME = 'Tax Case Review'
-const FIRM_ADDRESS = '${FIRM.address}'
-const FIRM_PHONE = '${FIRM.phone}'
+const FIRM_ADDRESS = FIRM.address || ''
+const FIRM_PHONE   = FIRM.phone   || ''
 const FIRM_EMAIL = 'info@taxcasereview.org'
 
 export function emailHtml({ body, headerBg = 'linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 100%)', firmName, logoUrl, address, phone, email }) {
