@@ -65,8 +65,25 @@ export default function ScreenShareHost() {
   const [screenState, setScreenState] = useState(null)  // { host, sharing }
 
   const webrtc = useWebRTCRoom('screenshare')
+  const bcRef  = useRef(null)
 
   useEffect(() => { loadFirmBrandingPublic().finally(() => setReady(true)) }, [])
+
+  // BroadcastChannel — listens for 'end' from main window, also receives screen-state
+  useEffect(() => {
+    const ch = new BroadcastChannel('tcr-screenshare')
+    bcRef.current = ch
+    ch.addEventListener('message', e => {
+      if (e.data?.type === 'end') {
+        // Main window ended the session — leave and close this pop-out
+        webrtc.leave().finally(() => window.close())
+      }
+      if (e.data?.type === 'screen-state') {
+        setScreenState({ host: e.data.host, sharing: e.data.sharing })
+      }
+    })
+    return () => { ch.close(); bcRef.current = null }
+  }, [])
 
   // Auto-join as soon as the page loads and branding is ready
   useEffect(() => {
@@ -76,7 +93,8 @@ export default function ScreenShareHost() {
       setConnecting(false)
       if (result.ok) {
         setJoined(true)
-        // Subscribe to screen-state broadcasts
+        // Also listen via Supabase Realtime channel for screen-state
+        // (BroadcastChannel handles it from the main CRM window already)
         webrtc.channelRef.current?.on('broadcast', { event: 'screen-state' }, ({ payload }) => {
           setScreenState(payload)
         })
@@ -122,10 +140,14 @@ export default function ScreenShareHost() {
           </span>
         )}
         <span style={{ marginLeft: 'auto', fontSize: 12, color: '#64748b' }}>Host view</span>
-        <button onClick={() => window.close()}
-          style={{ background: '#475569', border: 'none', borderRadius: 7, padding: '7px 16px',
+        <button onClick={() => {
+          // Signal main window to end the session (which also closes this window via BroadcastChannel)
+          bcRef.current?.postMessage({ type: 'end' })
+          webrtc.leave().finally(() => window.close())
+        }}
+          style={{ background: '#dc2626', border: 'none', borderRadius: 7, padding: '7px 16px',
                    color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>
-          Close
+          End session
         </button>
       </div>
 
