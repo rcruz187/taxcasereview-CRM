@@ -13,6 +13,68 @@ export default function Settings() {
   const [saving, setSaving] = useState(false)
   const [logoUrl, setLogoUrl] = useState('')
   const [uploading, setUploading] = useState(false)
+
+  // Accounting integrations (QuickBooks/Xero) — need this tenant's own id to
+  // build the OAuth "state" param and to call get_accounting_status.
+  const [myTenantId, setMyTenantId] = useState(null)
+  const [acctStatus, setAcctStatus] = useState({}) // { quickbooks: {...}, xero: {...} }
+  const [syncing, setSyncing] = useState({ quickbooks: false, xero: false })
+
+  useEffect(() => {
+    if (!user?.email) return
+    supabase.from('employees').select('tenant_id').eq('email', user.email).maybeSingle()
+      .then(({ data }) => { if (data?.tenant_id) setMyTenantId(data.tenant_id) })
+    loadAcctStatus()
+  }, [user?.email])
+
+  async function loadAcctStatus() {
+    const { data } = await supabase.rpc('get_accounting_status')
+    if (data) setAcctStatus(data)
+  }
+
+  function connectQuickBooks() {
+    if (!myTenantId) { showToast('Still loading your account — try again in a moment'); return }
+    if (!firm.qb_client_id) { showToast('Save your QuickBooks Client ID/Secret first'); return }
+    const state = btoa(myTenantId)
+    const redirectUri = window.location.origin + '/taxcasereview-CRM/auth/quickbooks-callback'
+    const authorizeUrl = `https://appcenter.intuit.com/connect/oauth2?client_id=${encodeURIComponent(firm.qb_client_id)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=com.intuit.quickbooks.accounting&state=${encodeURIComponent(state)}`
+    window.location.href = authorizeUrl
+  }
+
+  function connectXero() {
+    if (!myTenantId) { showToast('Still loading your account — try again in a moment'); return }
+    if (!firm.xero_client_id) { showToast('Save your Xero Client ID/Secret first'); return }
+    const state = btoa(myTenantId)
+    const redirectUri = window.location.origin + '/taxcasereview-CRM/auth/xero-callback'
+    const authorizeUrl = `https://login.xero.com/identity/connect/authorize?response_type=code&client_id=${encodeURIComponent(firm.xero_client_id)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent('accounting.transactions accounting.contacts offline_access')}&state=${encodeURIComponent(state)}`
+    window.location.href = authorizeUrl
+  }
+
+  async function disconnectAccounting(provider) {
+    const { error } = await supabase.rpc('disconnect_accounting', { p_provider: provider })
+    if (error) { showToast('❌ ' + error.message); return }
+    showToast(`${provider === 'quickbooks' ? 'QuickBooks' : 'Xero'} disconnected`)
+    loadAcctStatus()
+  }
+
+  async function syncAccounting(provider) {
+    setSyncing(s => ({ ...s, [provider]: true }))
+    const fnName = provider === 'quickbooks' ? 'quickbooks-sync' : 'xero-sync'
+    const { data, error } = await supabase.functions.invoke(fnName, { body: {} })
+    setSyncing(s => ({ ...s, [provider]: false }))
+    if (error || data?.error) { showToast('❌ ' + (data?.error || error.message)); return }
+    showToast(`✅ Synced ${data.synced_invoices} invoice${data.synced_invoices===1?'':'s'}, ${data.synced_payments} payment${data.synced_payments===1?'':'s'}${data.errors?.length ? ` (${data.errors.length} skipped)` : ''}`)
+    loadAcctStatus()
+  }
+
+  // Show a one-time toast if we just landed back from the OAuth redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const qb = params.get('qb_connect'); const xero = params.get('xero_connect'); const msg = params.get('msg')
+    if (qb) { showToast((qb === 'ok' ? '✅ ' : '❌ ') + (msg || 'QuickBooks connection updated')); loadAcctStatus() }
+    if (xero) { showToast((xero === 'ok' ? '✅ ' : '❌ ') + (msg || 'Xero connection updated')); loadAcctStatus() }
+    if (qb || xero) window.history.replaceState({}, '', window.location.pathname)
+  }, [])
   const [sigLogoUploading, setSigLogoUploading] = useState(false)
   const fileRef = useRef()
   const sigLogoFileRef = useRef()
@@ -170,6 +232,8 @@ export default function Settings() {
         signalwire_backend: firm.signalwire_backend,
         qb_client_id: firm.qb_client_id,
         qb_client_secret: firm.qb_client_secret,
+        xero_client_id: firm.xero_client_id,
+        xero_client_secret: firm.xero_client_secret,
         email_signature: firm.email_signature,
         metered_app_name: firm.metered_app_name,
         metered_api_key: firm.metered_api_key,
@@ -646,13 +710,83 @@ export default function Settings() {
               <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 14 }}>Click the Redirect URI field to copy it.</div>
 
               <div style={{ background: 'rgba(212,147,10,.1)', border: '1px solid rgba(212,147,10,.3)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--t2)', marginBottom: 14, lineHeight: 1.7 }}>
-                <strong style={{ color: 'var(--warn)' }}>⚠️ Note:</strong> Saving credentials here stores them for when the sync feature is fully wired up.
-                The "Connect to QuickBooks" button below isn't live yet — it needs a small server-side piece to securely exchange the authorization code, which is in progress.
+                <strong style={{ color: 'var(--warn)' }}>⚠️ Note:</strong> Save your Client ID/Secret above first, then click Connect.
               </div>
+
+              {acctStatus.quickbooks?.status === 'connected' ? (
+                <div style={{ background: 'rgba(44,160,28,.1)', border: '1px solid rgba(44,160,28,.3)', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#2CA01C', marginBottom: 4 }}>✅ Connected{acctStatus.quickbooks.external_company_name ? ` — ${acctStatus.quickbooks.external_company_name}` : ''}</div>
+                  {acctStatus.quickbooks.last_synced_at && <div style={{ fontSize: 11.5, color: 'var(--t3)' }}>Last synced {new Date(acctStatus.quickbooks.last_synced_at).toLocaleString()}{acctStatus.quickbooks.last_sync_result ? ` — ${acctStatus.quickbooks.last_sync_result.synced_invoices||0} invoices, ${acctStatus.quickbooks.last_sync_result.synced_payments||0} payments` : ''}</div>}
+                </div>
+              ) : null}
 
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                 <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save QuickBooks Config'}</button>
-                <button className="btn sec" disabled style={{ opacity: .5, cursor: 'not-allowed' }} title="Coming soon">🔗 Connect to QuickBooks (coming soon)</button>
+                {acctStatus.quickbooks?.status === 'connected' ? (
+                  <>
+                    <button className="btn sec" disabled={syncing.quickbooks} onClick={()=>syncAccounting('quickbooks')}>{syncing.quickbooks ? 'Syncing…' : '🔄 Sync Now'}</button>
+                    <button className="btn sec" onClick={()=>disconnectAccounting('quickbooks')} style={{color:'#ef4444'}}>Disconnect</button>
+                  </>
+                ) : (
+                  <button className="btn sec" onClick={connectQuickBooks}>🔗 Connect to QuickBooks</button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Xero */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">📗 Xero</span></div>
+            <div style={{ padding: '0 20px 20px' }}>
+              <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.7 }}>
+                Connect Xero to sync invoices and payments automatically — same idea as QuickBooks above, for firms that run their books on Xero instead.
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                {[
+                  ['1', 'Go to developer.xero.com/app/manage and sign in with your Xero account'],
+                  ['2', 'Create a new app → choose "Web app"'],
+                  ['3', `Add Redirect URI: ${window.location.origin}/taxcasereview-CRM/auth/xero-callback`],
+                  ['4', 'In the app\'s Configuration, grab your Client ID and generate a Client Secret'],
+                  ['5', 'Copy your Client ID and Client Secret below, then save'],
+                ].map(([step, text]) => (
+                  <div key={step} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#13B5EA', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, flexShrink: 0 }}>{step}</div>
+                    <div style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, paddingTop: 2 }}>{text}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="fg2">
+                <div className="field"><label>Xero Client ID</label>
+                  <input value={firm.xero_client_id || ''} onChange={set('xero_client_id')} placeholder="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" />
+                </div>
+                <div className="field"><label>Xero Client Secret</label>
+                  <input type="password" value={firm.xero_client_secret || ''} onChange={set('xero_client_secret')} placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+                </div>
+              </div>
+              <div className="field"><label>Redirect URI (copy this exactly into the Xero app)</label>
+                <input readOnly value={window.location.origin + '/taxcasereview-CRM/auth/xero-callback'} style={{ color: 'var(--t3)', cursor: 'text' }} onClick={e => { e.target.select(); document.execCommand('copy'); }} />
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 14 }}>Click the Redirect URI field to copy it.</div>
+
+              {acctStatus.xero?.status === 'connected' ? (
+                <div style={{ background: 'rgba(19,181,234,.1)', border: '1px solid rgba(19,181,234,.3)', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#13B5EA', marginBottom: 4 }}>✅ Connected{acctStatus.xero.external_company_name ? ` — ${acctStatus.xero.external_company_name}` : ''}</div>
+                  {acctStatus.xero.last_synced_at && <div style={{ fontSize: 11.5, color: 'var(--t3)' }}>Last synced {new Date(acctStatus.xero.last_synced_at).toLocaleString()}{acctStatus.xero.last_sync_result ? ` — ${acctStatus.xero.last_sync_result.synced_invoices||0} invoices, ${acctStatus.xero.last_sync_result.synced_payments||0} payments` : ''}</div>}
+                </div>
+              ) : null}
+
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Xero Config'}</button>
+                {acctStatus.xero?.status === 'connected' ? (
+                  <>
+                    <button className="btn sec" disabled={syncing.xero} onClick={()=>syncAccounting('xero')}>{syncing.xero ? 'Syncing…' : '🔄 Sync Now'}</button>
+                    <button className="btn sec" onClick={()=>disconnectAccounting('xero')} style={{color:'#ef4444'}}>Disconnect</button>
+                  </>
+                ) : (
+                  <button className="btn sec" onClick={connectXero}>🔗 Connect to Xero</button>
+                )}
               </div>
             </div>
           </div>
