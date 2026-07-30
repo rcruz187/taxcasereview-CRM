@@ -2696,7 +2696,7 @@ export default function Leads() {
         )}
 
         {bookingLead && (
-          <BookingWidget mode="lead" contact={{id:bookingLead.id, name:bookingLead.name, email:bookingLead.email, phone:bookingLead.phone}} onClose={()=>setBookingLead(null)} mode="lead"/>
+          <BookingWidget mode="lead" contact={{id:bookingLead.id, name:bookingLead.name, email:bookingLead.email, phone:bookingLead.phone}} onClose={()=>setBookingLead(null)}/>
         )}
         {quickEmail && <QuickEmail contact={{ name: quickEmail.name, email: quickEmail.email }} kind="lead" leadId={quickEmail.id} onSent={() => loadLeadNotes(quickEmail.id)} onClose={() => setQuickEmail(null)} />}
         {resolutionFeeLead && (
