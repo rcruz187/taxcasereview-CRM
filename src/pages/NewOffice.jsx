@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 
-const TCR_TENANT = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
+const PLATFORM_ADMIN_EMAIL = 'romy@taxcasereview.org'
 const BLANK = { firm_name:'', tenant_code:'', admin_name:'', admin_email:'', firm_phone:'', brand_color:'#2563eb', plan_tier:'starter' }
 const STATUS_COLORS = { active:'#10b981', trial:'#f59e0b', past_due:'#f97316', cancelled:'#ef4444' }
 
@@ -16,27 +16,19 @@ function fmtBytes(n) {
 // Platform-only tool: CRM Companies — every office running on this platform.
 // List view for browsing/creating offices, detail view (click a row) for
 // contract/contact info, phone numbers, staff, agreement files, and
-// activate/deactivate. Gated on the caller being a TCR platform Super Admin —
-// checked here for UI purposes, and re-checked independently by every RPC and
-// edge function this page calls.
+// activate/deactivate. Gated on Romy specifically (not any Super Admin
+// anywhere) — checked here for UI purposes, and re-checked independently by
+// every RPC and edge function this page calls.
 export default function NewOffice() {
   const { user, showToast } = useApp()
-  const [checking, setChecking] = useState(true)
-  const [allowed, setAllowed]   = useState(false)
+  const allowed = (user?.email || '').toLowerCase() === PLATFORM_ADMIN_EMAIL
   const [offices, setOffices]   = useState(null) // null = not loaded yet
   const [view, setView]         = useState('list') // 'list' | 'form' | 'detail'
   const [selectedId, setSelectedId] = useState(null)
 
   useEffect(() => {
-    if (!user?.email) { setChecking(false); return }
-    supabase.from('employees').select('access,tenant_id').eq('email', user.email).maybeSingle()
-      .then(({ data }) => {
-        const ok = !!data && data.access === 'Super Admin' && data.tenant_id === TCR_TENANT
-        setAllowed(ok)
-        setChecking(false)
-        if (ok) loadOffices()
-      })
-  }, [user?.email])
+    if (allowed) loadOffices()
+  }, [allowed])
 
   async function loadOffices() {
     const { data, error } = await supabase.rpc('list_tenants')
@@ -47,7 +39,6 @@ export default function NewOffice() {
   function openDetail(id) { setSelectedId(id); setView('detail') }
   function backToList() { setView('list'); setSelectedId(null); loadOffices() }
 
-  if (checking) return <div style={{padding:40,color:'var(--t3)'}}>Checking access…</div>
   if (!allowed) return (
     <div style={{padding:40,maxWidth:520}}>
       <div style={{fontSize:18,fontWeight:700,marginBottom:8,color:'var(--tx)'}}>Not available</div>

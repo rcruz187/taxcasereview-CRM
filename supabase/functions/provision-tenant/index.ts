@@ -20,7 +20,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-const TCR_TENANT = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
+const PLATFORM_ADMIN_EMAIL = 'romy@taxcasereview.org'
 
 function genPassword(): string {
   const bytes = new Uint8Array(18)
@@ -48,10 +48,9 @@ serve(async (req) => {
     const { data: { user }, error: userErr } = await asCaller.auth.getUser()
     if (userErr || !user?.email) return json({ error: 'Invalid session' }, 401)
 
+    // ── verify caller is THIS platform admin specifically (not any Super Admin) ──
+    if (user.email.toLowerCase() !== PLATFORM_ADMIN_EMAIL) return json({ error: 'Not authorized to provision offices' }, 403)
     const admin = createClient(url, serviceKey)
-    const { data: caller } = await admin.from('employees')
-      .select('id').eq('email', user.email).eq('access', 'Super Admin').eq('tenant_id', TCR_TENANT).maybeSingle()
-    if (!caller) return json({ error: 'Not authorized to provision offices' }, 403)
 
     // ── inputs ──
     const b = await req.json().catch(() => ({}))

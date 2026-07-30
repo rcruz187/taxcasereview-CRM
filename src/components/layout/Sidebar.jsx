@@ -133,18 +133,12 @@ export default function Sidebar() {
   useEffect(() => { setMobileNavOpen(false) }, [location.pathname])
 
   const [firmName, setFirmName] = useState('Tax Case Review')
-  // Gates the CRM Companies link — a TCR *platform* Super Admin only, not just
-  // any tenant's Super Admin. Same check as NewOffice.jsx's own page guard;
-  // duplicated here (rather than shared via context) since it's a one-time
-  // lightweight query and AppContext doesn't carry tenant_id today.
-  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false)
-  useEffect(() => {
-    if (!user?.email) return
-    supabase.from('employees').select('access,tenant_id').eq('email', user.email).maybeSingle()
-      .then(({ data }) => {
-        setIsPlatformAdmin(!!data && data.access === 'Super Admin' && data.tenant_id === '61a89aef-0e7e-4ea2-b222-44ab2024655a')
-      })
-  }, [user?.email])
+  // Gates the CRM Companies link — Romy specifically, not any Super Admin
+  // anywhere (he was explicit: no one else should ever see this, even another
+  // Super Admin on TCR or any other tenant). A plain email match is simpler
+  // and stricter than the previous role+tenant lookup, and needs no query.
+  const PLATFORM_ADMIN_EMAIL = 'romy@taxcasereview.org'
+  const isPlatformAdmin = (user?.email || '').toLowerCase() === PLATFORM_ADMIN_EMAIL
   const [pendingTimeOff, setPendingTimeOff] = useState(0)
   const [newLeads, setNewLeads] = useState(0)
   const [newClients, setNewClients] = useState(0)
