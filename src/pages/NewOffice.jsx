@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import Papa from 'papaparse'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 
@@ -48,8 +49,8 @@ export default function NewOffice() {
   )
 
   if (view === 'form') return <NewOfficeForm onDone={backToList} onCancel={() => setView('list')} showToast={showToast} />
-  if (view === 'detail') return <OfficeDetail tenantId={selectedId} onBack={backToList} showToast={showToast} />
-
+  if (view === 'detail') return <OfficeDetail tenantId={selectedId} onBack={backToList} showToast={showToast} onImport={()=>setView('import')} />
+  if (view === 'import') return <DataImport tenantId={selectedId} onBack={()=>setView('detail')} showToast={showToast} />
   return (
     <div style={{padding:'28px 32px',maxWidth:820}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
@@ -202,7 +203,7 @@ function NewOfficeForm({ onDone, onCancel, showToast }) {
 }
 
 // ── Office detail: contract/contact info, phone numbers, staff, agreements ──
-function OfficeDetail({ tenantId, onBack, showToast }) {
+function OfficeDetail({ tenantId, onBack, showToast, onImport }) {
   const [detail, setDetail] = useState(null)
   const [edit, setEdit]     = useState(null) // draft patch while editing
   const [saving, setSaving] = useState(false)
@@ -308,6 +309,7 @@ function OfficeDetail({ tenantId, onBack, showToast }) {
         {!edit && (
           <div style={{display:'flex',gap:8}}>
             <button className="btn sec" onClick={startEdit}>✏️ Edit</button>
+            <button className="btn sec" onClick={onImport}>📥 Import Data</button>
             {!isTCR && (t.status === 'cancelled'
               ? <button className="btn pri" onClick={()=>toggleStatus('active')}>Reactivate</button>
               : <button className="btn" style={{background:'#ef444422',color:'#ef4444',border:'1px solid #ef444455'}} onClick={()=>setConfirmDeactivate(true)}>Deactivate</button>)}
@@ -460,6 +462,185 @@ function InfoRow({ label, value, capitalize }) {
     <div style={{display:'flex',justifyContent:'space-between'}}>
       <span style={{color:'var(--t3)'}}>{label}</span>
       <span style={{color:'var(--tx)',textTransform:capitalize?'capitalize':'none'}}>{value || '—'}</span>
+    </div>
+  )
+}
+
+// ── Data Import: bring in clients/leads (and their documents) from any other
+// CRM export — Canopy, Soraban, TaxDome, whatever. No universal cross-CRM API
+// exists, so the reusable piece is this generic CSV → mapped-fields → preview
+// → commit pipeline; each source platform is just "however you get a CSV out
+// of it" feeding the same tool. Runs against ONE target office at a time.
+const CLIENT_FIELDS = [
+  { key: 'name', label: 'Full Name *', required: true },
+  { key: 'first', label: 'First Name' },
+  { key: 'last', label: 'Last Name' },
+  { key: 'email', label: 'Email' },
+  { key: 'phone', label: 'Phone' },
+  { key: 'phone2', label: 'Phone 2' },
+  { key: 'street', label: 'Street Address' },
+  { key: 'city', label: 'City' },
+  { key: 'state', label: 'State' },
+  { key: 'zip', label: 'ZIP' },
+  { key: 'ssn', label: 'SSN' },
+  { key: 'ein', label: 'EIN' },
+  { key: 'filingstatus', label: 'Filing Status' },
+  { key: 'notes', label: 'Notes' },
+]
+
+function DataImport({ tenantId, onBack, showToast }) {
+  const [step, setStep] = useState('upload') // upload | map | preview | done
+  const [sourceName, setSourceName] = useState('')
+  const [rawRows, setRawRows] = useState([])   // parsed CSV rows (array of objects, keyed by CSV header)
+  const [csvHeaders, setCsvHeaders] = useState([])
+  const [mapping, setMapping] = useState({})   // { csvHeader: tcrFieldKey }
+  const [importing, setImporting] = useState(false)
+  const [result, setResult] = useState(null)
+
+  function handleFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (res) => {
+        if (!res.data.length) { showToast('That file has no rows'); return }
+        setCsvHeaders(res.meta.fields || [])
+        setRawRows(res.data)
+        // Best-effort auto-map by header name similarity
+        const auto = {}
+        for (const h of res.meta.fields || []) {
+          const norm = h.toLowerCase().replace(/[^a-z]/g, '')
+          const match = CLIENT_FIELDS.find(f => norm === f.key || norm.includes(f.key))
+          if (match) auto[h] = match.key
+        }
+        setMapping(auto)
+        setStep('map')
+      },
+      error: (err) => showToast('❌ Could not read that file: ' + err.message),
+    })
+    e.target.value = ''
+  }
+
+  function buildMappedRecords() {
+    return rawRows.map(row => {
+      const rec = {}
+      for (const [csvHeader, fieldKey] of Object.entries(mapping)) {
+        if (!fieldKey) continue
+        rec[fieldKey] = row[csvHeader]
+      }
+      return rec
+    })
+  }
+
+  async function commitImport() {
+    const nameHeader = Object.entries(mapping).find(([, v]) => v === 'name')
+    if (!nameHeader) { showToast('Map a column to Full Name before importing'); return }
+    setImporting(true)
+    const records = buildMappedRecords()
+    const { data, error } = await supabase.rpc('import_clients_bulk', { p_tenant_id: tenantId, p_records: records })
+    setImporting(false)
+    if (error) { showToast('❌ ' + error.message); return }
+    setResult(data)
+    setStep('done')
+  }
+
+  return (
+    <div style={{padding:'28px 32px',maxWidth:760}}>
+      <button className="btn sec" onClick={onBack}>← Back to office</button>
+      <div style={{fontSize:20,fontWeight:800,color:'var(--tx)',margin:'18px 0 4px'}}>📥 Import Data</div>
+      <div style={{color:'var(--t3)',fontSize:13,marginBottom:24}}>
+        Bring in clients from an export out of any other CRM (Canopy, Soraban, TaxDome, a spreadsheet — anything that can export a CSV). Map its columns to TCR's fields, preview, then commit.
+      </div>
+
+      {step === 'upload' && (
+        <div style={{border:'2px dashed var(--br)',borderRadius:10,padding:40,textAlign:'center'}}>
+          <div style={{fontSize:13,color:'var(--t3)',marginBottom:16}}>
+            Export your client list as a CSV from the other system, then upload it here.
+          </div>
+          <div className="field" style={{maxWidth:320,margin:'0 auto 14px'}}>
+            <label>Source (optional, for your records)</label>
+            <input value={sourceName} onChange={e=>setSourceName(e.target.value)} placeholder="e.g. Canopy"/>
+          </div>
+          <label className="btn pri" style={{cursor:'pointer',display:'inline-block'}}>
+            Choose CSV File
+            <input type="file" accept=".csv" onChange={handleFile} style={{display:'none'}}/>
+          </label>
+        </div>
+      )}
+
+      {step === 'map' && (
+        <div>
+          <div style={{fontSize:13,color:'var(--t2)',marginBottom:14}}>{rawRows.length} row{rawRows.length===1?'':'s'} found. Match each column from your file to a TCR field — leave a column unmapped to skip it.</div>
+          <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:20}}>
+            {csvHeaders.map(h => (
+              <div key={h} style={{display:'flex',alignItems:'center',gap:12}}>
+                <div style={{flex:1,fontSize:13,color:'var(--tx)',fontWeight:600,fontFamily:'monospace'}}>{h}</div>
+                <div style={{color:'var(--t3)'}}>→</div>
+                <select value={mapping[h]||''} onChange={e=>setMapping(m=>({...m,[h]:e.target.value}))} style={{flex:1}}>
+                  <option value="">— Skip this column —</option>
+                  {CLIENT_FIELDS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+                </select>
+              </div>
+            ))}
+          </div>
+          <div style={{display:'flex',gap:10}}>
+            <button className="btn pri" onClick={()=>setStep('preview')}>Preview →</button>
+            <button className="btn sec" onClick={()=>{setStep('upload');setRawRows([]);setCsvHeaders([]);setMapping({})}}>Start Over</button>
+          </div>
+        </div>
+      )}
+
+      {step === 'preview' && (
+        <div>
+          <div style={{fontSize:13,color:'var(--t2)',marginBottom:14}}>Preview of the first 5 rows as they'll be imported. {rawRows.length} total row{rawRows.length===1?'':'s'} will be processed.</div>
+          <div style={{overflowX:'auto',border:'1px solid var(--br)',borderRadius:8,marginBottom:20}}>
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+              <thead><tr style={{background:'var(--s2)'}}>
+                {Object.values(mapping).filter(Boolean).map(k => (
+                  <th key={k} style={{padding:'8px 10px',textAlign:'left',color:'var(--t3)',whiteSpace:'nowrap'}}>{CLIENT_FIELDS.find(f=>f.key===k)?.label || k}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {buildMappedRecords().slice(0,5).map((rec,i) => (
+                  <tr key={i} style={{borderTop:'1px solid var(--br)'}}>
+                    {Object.values(mapping).filter(Boolean).map(k => (
+                      <td key={k} style={{padding:'8px 10px',color:'var(--tx)',whiteSpace:'nowrap'}}>{rec[k] || '—'}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{display:'flex',gap:10}}>
+            <button className="btn pri" disabled={importing} onClick={commitImport}>{importing?'Importing…':`Import ${rawRows.length} Client${rawRows.length===1?'':'s'}`}</button>
+            <button className="btn sec" onClick={()=>setStep('map')}>← Back to Mapping</button>
+          </div>
+        </div>
+      )}
+
+      {step === 'done' && result && (
+        <div style={{background:'var(--s2)',border:'1px solid var(--br)',borderRadius:10,padding:20}}>
+          <div style={{fontSize:15,fontWeight:700,color:'#10b981',marginBottom:12}}>✅ Import complete</div>
+          <div style={{fontSize:13,color:'var(--tx)',marginBottom:10}}>
+            <b>{result.inserted}</b> client{result.inserted===1?'':'s'} imported, <b>{result.skipped}</b> skipped.
+          </div>
+          {result.errors?.length > 0 && (
+            <div style={{fontSize:12,color:'var(--t3)',maxHeight:200,overflowY:'auto',background:'var(--s3)',borderRadius:6,padding:10}}>
+              {result.errors.map((e,i) => (
+                <div key={i} style={{marginBottom:4}}>{e.error} {e.record?.name ? `— "${e.record.name}"` : ''}</div>
+              ))}
+            </div>
+          )}
+          <div style={{fontSize:12,color:'var(--t3)',marginTop:14,lineHeight:1.6}}>
+            To bring over each client's documents too, upload the files under that client's own file (Documents tab) — bulk document import from a source platform's file export is the next piece to wire up once you know how Canopy hands off files.
+          </div>
+          <div style={{display:'flex',gap:10,marginTop:16}}>
+            <button className="btn sec" onClick={onBack}>← Back to office</button>
+            <button className="btn pri" onClick={()=>{setStep('upload');setRawRows([]);setCsvHeaders([]);setMapping({});setResult(null)}}>Import Another File</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
