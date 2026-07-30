@@ -94,7 +94,6 @@ const SECTIONS = [
   {
     key: 'crmcompanies',
     label: 'CRM Companies',
-    always: true,
     platformOnly: true,
     items: [
       { path: '/new-office', icon: GearIcon, label: 'CRM Companies', section: null },
