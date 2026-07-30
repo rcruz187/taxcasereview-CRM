@@ -1302,7 +1302,20 @@ export default function Leads() {
       }
     })
     setIntakeSending(false)
-    if (emailErr) { showToast('Error sending email: '+emailErr.message); return }
+    // The intake record + link are already created regardless of email —
+    // if the office hasn't connected Gmail yet (or the send fails for any
+    // other reason), don't dead-end on an error: copy the link so the rep
+    // can still hand it to the client, and say plainly why the email didn't
+    // go out. This surfaced because a real tenant-isolation fix made the
+    // demo's own (unconnected) Gmail state visible instead of silently
+    // routing through TCR's — correct behavior, just needs to degrade
+    // gracefully instead of erroring.
+    if (emailErr) {
+      try { await navigator.clipboard.writeText(intakeUrl) } catch (_) {}
+      showToast(`Link copied — email not sent (Gmail isn't connected for this office yet). Share it manually: ${intakeUrl}`)
+      await logAction(l.id, l.name, `📊 Financial Intake link created (email not sent — Gmail not connected)`)
+      return
+    }
     showToast('✅ Financial Intake link sent to '+l.email)
     await logAction(l.id, l.name, `📊 Financial Intake link sent to ${l.email}`)
   }
