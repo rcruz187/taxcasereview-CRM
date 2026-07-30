@@ -1,183 +1,300 @@
-// ScreenShareOverlay
-// Persistent floating overlay for the screen-share / training tool.
-// Lives in Shell (App.jsx) alongside ActiveCallBar — mounts once and
-// stays mounted so the session survives navigation between CRM pages.
-//
-// Three UI states:
-//   hidden     — no active session
-//   minimized  — compact pill at bottom-right (click to expand)
-//   expanded   — full overlay panel with participants + controls
-//
-// The host's screen stream is rendered in a large tile; everyone's
-// camera tiles appear in a scrollable row underneath. Session join
-// link is copyable so the host can paste it into Chat.
+// ScreenShareOverlay — Zoom-quality training / screen-share tool.
+// Persists in Shell so it survives CRM navigation.
+// Features: gallery view, active-speaker highlight, screen-share with
+// source label, participant cameras always visible, mic/cam toggles,
+// copyable room link, minimize to pill, end session.
 
-import { useState, useRef, useEffect } from 'react'
-import { useScreenShare }    from '../context/ScreenShareContext'
-import { useApp }            from '../context/AppContext'
-import VideoTile             from './VideoTile'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { useScreenShare } from '../context/ScreenShareContext'
+import { useApp }         from '../context/AppContext'
 
 const BASE = '/taxcasereview-CRM'
+const ACCENT = '#2563eb'
 
+// ── Tiny video element that auto-attaches a MediaStream ──────────────────────
+function StreamVideo({ stream, muted = false, mirror = false, style = {} }) {
+  const ref = useRef(null)
+  useEffect(() => { if (ref.current) ref.current.srcObject = stream || null }, [stream])
+  return (
+    <video ref={ref} autoPlay playsInline muted={muted}
+      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+               transform: mirror ? 'scaleX(-1)' : 'none', background: '#0d1526', ...style }} />
+  )
+}
+
+// ── One participant tile ──────────────────────────────────────────────────────
+function Tile({ stream, name, muted = false, mirror = false, isScreen = false, isSpeaking = false, label }) {
+  const hasVideo = (stream?.getVideoTracks()?.length || 0) > 0
+  const initials = (name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+  return (
+    <div style={{ position: 'relative', background: '#1e293b', borderRadius: 10, overflow: 'hidden',
+                  aspectRatio: isScreen ? '16/9' : '4/3',
+                  boxShadow: isSpeaking ? '0 0 0 2px #22c55e' : 'none', flexShrink: 0 }}>
+      {hasVideo
+        ? <StreamVideo stream={stream} muted={muted} mirror={mirror} />
+        : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', background: '#1e293b' }}>
+            <div style={{ width: 52, height: 52, borderRadius: '50%', background: ACCENT,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 20, fontWeight: 700, color: '#fff' }}>{initials}</div>
+          </div>
+      }
+      <div style={{ position: 'absolute', bottom: 6, left: 8, fontSize: 11, color: '#e2e8f0',
+                    background: 'rgba(0,0,0,.55)', borderRadius: 4, padding: '2px 6px',
+                    fontWeight: 600, backdropFilter: 'blur(4px)' }}>
+        {label || name}{muted ? ' 🔇' : ''}
+      </div>
+      {isScreen && (
+        <div style={{ position: 'absolute', top: 6, left: 8, fontSize: 10, color: '#93c5fd',
+                      background: 'rgba(0,0,0,.6)', borderRadius: 4, padding: '2px 6px', fontWeight: 700 }}>
+          SCREEN
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Main overlay ──────────────────────────────────────────────────────────────
 export default function ScreenShareOverlay() {
   const ss = useScreenShare()
   const { employeeName, showToast } = useApp()
 
-  const [joining, setJoining]     = useState(false)
-  const [joinCode, setJoinCode]   = useState('')
-  const [showJoinInput, setShowJoinInput] = useState(false)
-  const [starting, setStarting]   = useState(false)
+  const [starting,       setStarting]       = useState(false)
+  const [joining,        setJoining]        = useState(false)
+  const [joinCode,       setJoinCode]       = useState('')
+  const [showJoin,       setShowJoin]       = useState(false)
+  const [screenLabel,    setScreenLabel]    = useState('')   // e.g. "Monitor 1" or tab title
+  const [speakers,       setSpeakers]       = useState({})  // { name: bool } — crude VAD
 
-  // ------- not active — show a launcher pill in the bottom-right corner --------
-  // (only shown to staff; public pages never render Shell, so this never
-  //  shows up on sign pages, portals, etc.)
+  const myName = employeeName || 'Me'
 
+  // ── Active-speaker detection via Web Audio analyser ──────────────────────
+  const analyserRef = useRef(null)
+  const vadRef      = useRef(null)
+  useEffect(() => {
+    if (!ss.active || !ss.webrtc.localStreamRef.current) return
+    try {
+      const ctx  = new AudioContext()
+      const src  = ctx.createMediaStreamSource(ss.webrtc.localStreamRef.current)
+      const an   = ctx.createAnalyser()
+      an.fftSize = 512
+      src.connect(an)
+      analyserRef.current = an
+      const buf = new Uint8Array(an.frequencyBinCount)
+      vadRef.current = setInterval(() => {
+        an.getByteFrequencyData(buf)
+        const avg = buf.reduce((a, b) => a + b, 0) / buf.length
+        setSpeakers(prev => ({ ...prev, [myName]: avg > 18 }))
+      }, 200)
+      return () => { clearInterval(vadRef.current); ctx.close() }
+    } catch { /* AudioContext blocked in some browsers — no VAD, no crash */ }
+  }, [ss.active, myName])
+
+  // ── Capture the screen source label from the track settings ──────────────
+  useEffect(() => {
+    if (ss.sharingScreen && ss.screenStream) {
+      const track = ss.screenStream.getVideoTracks()[0]
+      const label = track?.label || ''   // e.g. "screen:0:0", "window:12345", or tab title
+      if (label.startsWith('screen:')) setScreenLabel('Entire screen')
+      else if (label.startsWith('window:') || label.startsWith('application:')) setScreenLabel('Window')
+      else if (label) setScreenLabel(label.slice(0, 40))
+      else setScreenLabel('Screen')
+    } else {
+      setScreenLabel('')
+    }
+  }, [ss.sharingScreen, ss.screenStream])
+
+  const joinUrl = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}`
+  const peers   = ss.webrtc.members.filter(n => n !== myName)
+
+  // ── Not active — launcher ─────────────────────────────────────────────────
   if (!ss.active) {
     return (
-      <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 9990, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-
-        {showJoinInput && (
-          <div style={{ background: 'var(--sf)', border: '1px solid var(--bd)', borderRadius: 10, padding: '12px 14px', boxShadow: '0 4px 20px rgba(0,0,0,.25)', display: 'flex', gap: 8 }}>
-            <input
-              value={joinCode}
-              onChange={e => setJoinCode(e.target.value.toUpperCase())}
-              onKeyDown={async e => { if (e.key === 'Enter') { await doJoin() } }}
-              placeholder="Room code (e.g. AB3XY)"
-              style={{ background: 'var(--bg)', border: '1px solid var(--bd)', borderRadius: 6, padding: '6px 10px', color: 'var(--tx)', fontSize: 13, width: 160, outline: 'none' }}
-              autoFocus
-            />
+      <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 9990,
+                    display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+        {showJoin && (
+          <div style={{ background: 'var(--sf)', border: '1px solid var(--bd)', borderRadius: 12,
+                        padding: '14px 16px', boxShadow: '0 6px 24px rgba(0,0,0,.3)',
+                        display: 'flex', flexDirection: 'column', gap: 8, width: 240 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t2)' }}>Enter room code</div>
+            <input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())}
+              onKeyDown={e => { if (e.key === 'Enter') doJoin() }}
+              placeholder="e.g. AB3XY"
+              style={{ background: 'var(--bg)', border: '1px solid var(--bd)', borderRadius: 8,
+                       padding: '8px 12px', color: 'var(--tx)', fontSize: 14, outline: 'none',
+                       fontFamily: 'monospace', letterSpacing: 2, textTransform: 'uppercase' }}
+              autoFocus />
             <button onClick={doJoin} disabled={joining || !joinCode.trim()}
-              style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-              {joining ? '…' : 'Join'}
+              style={{ padding: '9px 0', background: ACCENT, border: 'none', borderRadius: 8,
+                       color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                       opacity: !joinCode.trim() ? .5 : 1 }}>
+              {joining ? 'Connecting…' : 'Join session'}
             </button>
           </div>
         )}
-
         <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={() => { setShowJoinInput(v => !v); setJoinCode('') }}
-            style={{ background: 'var(--sf)', border: '1px solid var(--bd)', borderRadius: 20, padding: '8px 16px', cursor: 'pointer', fontSize: 13, color: 'var(--tx)', boxShadow: '0 2px 8px rgba(0,0,0,.2)', fontWeight: 500 }}>
-            🔗 Join session
+          <button onClick={() => { setShowJoin(v => !v); setJoinCode('') }}
+            style={{ background: 'var(--sf)', border: '1px solid var(--bd)', borderRadius: 20,
+                     padding: '9px 16px', cursor: 'pointer', fontSize: 13, color: 'var(--tx)',
+                     boxShadow: '0 2px 8px rgba(0,0,0,.15)', fontWeight: 500 }}>
+            🔗 Join
           </button>
-          <button
-            onClick={doStart}
-            disabled={starting}
-            style={{ background: '#2563eb', border: 'none', borderRadius: 20, padding: '8px 16px', cursor: 'pointer', fontSize: 13, color: '#fff', boxShadow: '0 2px 8px rgba(37,99,235,.4)', fontWeight: 600 }}>
-            {starting ? '…' : '📺 Share screen'}
+          <button onClick={doStart} disabled={starting}
+            style={{ background: ACCENT, border: 'none', borderRadius: 20,
+                     padding: '9px 18px', cursor: 'pointer', fontSize: 13, color: '#fff',
+                     boxShadow: '0 2px 10px rgba(37,99,235,.45)', fontWeight: 700 }}>
+            {starting ? '…' : '📺 Start session'}
           </button>
         </div>
       </div>
     )
   }
 
-  // ------- minimized pill --------
+  // ── Minimized pill ────────────────────────────────────────────────────────
   if (ss.minimized) {
     return (
-      <div
-        onClick={() => ss.setMinimized(false)}
-        style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 9990, background: '#1e3a8a', color: '#fff', borderRadius: 20, padding: '10px 18px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, boxShadow: '0 4px 16px rgba(0,0,0,.35)' }}>
-        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }}/>
-        {ss.sharingScreen ? '🖥️' : '📷'} Session · {ss.webrtc.members.length} participant{ss.webrtc.members.length !== 1 ? 's' : ''}
-        <span style={{ opacity: .7, fontSize: 11 }}>click to expand</span>
+      <div onClick={() => ss.setMinimized(false)}
+        style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 9990,
+                 background: '#1e3a8a', color: '#fff', borderRadius: 20,
+                 padding: '10px 20px', cursor: 'pointer',
+                 display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, fontWeight: 600,
+                 boxShadow: '0 4px 20px rgba(0,0,0,.4)' }}>
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e' }}/>
+        {ss.sharingScreen ? '🖥️' : '📷'}
+        {peers.length + 1} in session · {ss.roomId}
+        <span style={{ opacity: .6, fontSize: 11, marginLeft: 4 }}>click to expand</span>
       </div>
     )
   }
 
-  // ------- expanded overlay --------
-  const myName  = employeeName || 'Me'
-  const peers   = ss.webrtc.members.filter(n => n !== myName)
-  const joinUrl = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}`
+  // ── Expanded — full Zoom-style panel ─────────────────────────────────────
+  const totalParticipants = peers.length + 1   // includes self
+  const showGallery = !ss.sharingScreen         // gallery when no screen share
 
   return (
-    <div style={{
-      position: 'fixed', bottom: 0, right: 0, zIndex: 9990,
-      width: 420, maxHeight: '90vh',
-      background: '#0f172a', borderRadius: '12px 12px 0 0',
-      boxShadow: '0 -4px 32px rgba(0,0,0,.5)',
-      display: 'flex', flexDirection: 'column', overflow: 'hidden',
-    }}>
+    <div style={{ position: 'fixed', bottom: 0, right: 0, zIndex: 9990,
+                  width: 480, maxHeight: '92vh', background: '#0f172a',
+                  borderRadius: '14px 14px 0 0',
+                  boxShadow: '0 -6px 40px rgba(0,0,0,.6)',
+                  display: 'flex', flexDirection: 'column', fontFamily: 'Arial, sans-serif' }}>
 
-      {/* Header */}
-      <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid #1e293b' }}>
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      <div style={{ padding: '11px 16px', display: 'flex', alignItems: 'center', gap: 8,
+                    borderBottom: '1px solid #1e293b', flexShrink: 0 }}>
         <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }}/>
         <span style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc', flex: 1 }}>
-          Screen share · Room {ss.roomId}
+          {ss.sharingScreen ? `Sharing: ${screenLabel}` : 'Training session'}
+          <span style={{ fontSize: 11, color: '#64748b', marginLeft: 8, fontWeight: 400 }}>
+            · {totalParticipants} participant{totalParticipants !== 1 ? 's' : ''}
+          </span>
         </span>
-        <button onClick={() => ss.setMinimized(true)}
-          style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16, padding: 4, lineHeight: 1 }} title="Minimize">−</button>
-        <button onClick={() => { if (window.confirm('End session for everyone?')) ss.endSession() }}
-          style={{ background: '#dc2626', border: 'none', color: '#fff', borderRadius: 6, cursor: 'pointer', fontSize: 12, padding: '3px 8px', fontWeight: 600 }}>End</button>
+        <button onClick={() => ss.setMinimized(true)} title="Minimize"
+          style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer',
+                   fontSize: 18, lineHeight: 1, padding: '2px 6px' }}>−</button>
+        <button onClick={() => window.confirm('End session for everyone?') && ss.endSession()}
+          style={{ background: '#dc2626', border: 'none', borderRadius: 6,
+                   padding: '5px 12px', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+          End
+        </button>
       </div>
 
-      {/* Screen / main video area */}
-      <div style={{ flex: 1, overflow: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* ── Video area ──────────────────────────────────────────────────── */}
+      <div style={{ flex: 1, overflow: 'auto', padding: 12,
+                    display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-        {/* Big screen-share tile (host view) */}
-        {ss.sharingScreen && ss.screenStream ? (
-          <div style={{ borderRadius: 8, overflow: 'hidden', background: '#0d1526' }}>
-            <ScreenPreview stream={ss.screenStream} />
-            <div style={{ padding: '5px 10px', fontSize: 11, color: '#94a3b8', background: '#0d1526' }}>🖥️ Your screen</div>
-          </div>
-        ) : (
-          // Remote screen shares — if a peer is sharing their screen,
-          // their video stream will contain the screen track
-          peers.length === 0 ? (
-            <div style={{ padding: 24, textAlign: 'center', color: '#64748b', fontSize: 13 }}>
-              Waiting for others to join…
-              <div style={{ marginTop: 6, fontSize: 12, color: '#475569' }}>Share the room code so they can connect</div>
-            </div>
-          ) : null
+        {/* Screen share — full width when active */}
+        {ss.sharingScreen && ss.screenStream && (
+          <Tile stream={ss.screenStream} name={myName}
+            label={`Your screen · ${screenLabel}`} isScreen muted />
         )}
 
-        {/* Participant camera tiles */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          <div style={{ width: 'calc(50% - 4px)', minWidth: 140 }}>
-            <VideoTile
-              stream={ss.webrtc.localStreamRef.current}
-              name={myName} label={`${myName} (you)`}
-              muted mirror videoEnabled={ss.webrtc.cameraOn} />
-          </div>
-          {peers.map(name => (
-            <div key={name} style={{ width: 'calc(50% - 4px)', minWidth: 140 }}>
-              <VideoTile stream={ss.webrtc.remoteStreams[name]} name={name} label={name} />
-            </div>
-          ))}
+        {/* Remote screen stream — first peer who has a screen track */}
+        {!ss.sharingScreen && peers.map(name => {
+          const rs = ss.webrtc.remoteStreams[name]
+          if (!rs) return null
+          const tracks = rs.getVideoTracks()
+          if (!tracks.length) return null
+          // A screen share sends a track with a high resolution — heuristic:
+          // if width > 1200 treat as screen rather than camera
+          const settings = tracks[0].getSettings?.() || {}
+          if (settings.width > 1200) {
+            return (
+              <Tile key={name + '_screen'} stream={rs} name={name}
+                label={`${name}'s screen`} isScreen />
+            )
+          }
+          return null
+        })}
+
+        {/* Gallery — participant cameras */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: totalParticipants === 1 ? '1fr'
+            : totalParticipants === 2 ? '1fr 1fr'
+            : totalParticipants <= 4 ? '1fr 1fr'
+            : '1fr 1fr 1fr',
+          gap: 8
+        }}>
+          {/* Self */}
+          <Tile stream={ss.webrtc.localStreamRef.current} name={myName}
+            label={`${myName} (you)`} muted mirror
+            isSpeaking={speakers[myName]}
+            videoEnabled={ss.webrtc.cameraOn} />
+
+          {/* Peers */}
+          {peers.map(name => {
+            const rs = ss.webrtc.remoteStreams[name]
+            const settings = rs?.getVideoTracks()[0]?.getSettings?.() || {}
+            const isScreen = settings.width > 1200
+            if (isScreen) return null   // already rendered above
+            return (
+              <Tile key={name} stream={rs} name={name}
+                isSpeaking={speakers[name]} />
+            )
+          })}
         </div>
 
-        {/* Controls */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button onClick={ss.webrtc.toggleMic}
-            style={{ flex: 1, minWidth: 70, padding: '7px 0', borderRadius: 8, border: '1px solid #334155', background: ss.webrtc.micOn ? '#1e293b' : '#dc2626', color: '#f8fafc', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-            {ss.webrtc.micOn ? '🎙️ Mute' : '🔇 Unmute'}
-          </button>
-          <button onClick={ss.webrtc.toggleCamera}
-            style={{ flex: 1, minWidth: 70, padding: '7px 0', borderRadius: 8, border: '1px solid #334155', background: ss.webrtc.cameraOn ? '#1e293b' : '#dc2626', color: '#f8fafc', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-            {ss.webrtc.cameraOn ? '📷 Cam off' : '📷 Cam on'}
-          </button>
-          {!ss.sharingScreen ? (
-            <button onClick={doShareScreen}
-              style={{ flex: 1, minWidth: 100, padding: '7px 0', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-              🖥️ Share screen
-            </button>
-          ) : (
-            <button onClick={ss.stopScreenShare}
-              style={{ flex: 1, minWidth: 100, padding: '7px 0', borderRadius: 8, border: 'none', background: '#7c3aed', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-              ⏹ Stop sharing
-            </button>
-          )}
-        </div>
-
-        {/* Room link — for sharing */}
-        <div style={{ background: '#1e293b', borderRadius: 8, padding: '10px 12px' }}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>Room code &amp; link</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 20, fontWeight: 800, color: '#93c5fd', letterSpacing: 3, fontFamily: 'monospace' }}>{ss.roomId}</span>
-            <button onClick={() => { navigator.clipboard.writeText(joinUrl); showToast('Link copied') }}
-              style={{ marginLeft: 'auto', background: '#334155', border: 'none', borderRadius: 6, padding: '5px 10px', color: '#e2e8f0', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
-              Copy link
-            </button>
+        {/* Empty state */}
+        {peers.length === 0 && (
+          <div style={{ padding: '14px 0 4px', textAlign: 'center', color: '#475569', fontSize: 13 }}>
+            Share the link below — participants will appear here when they join.
           </div>
+        )}
+      </div>
+
+      {/* ── Controls ────────────────────────────────────────────────────── */}
+      <div style={{ padding: '10px 12px', borderTop: '1px solid #1e293b',
+                    display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
+        <CtrlBtn active={ss.webrtc.micOn} offColor="#dc2626"
+          onClick={ss.webrtc.toggleMic}>
+          {ss.webrtc.micOn ? '🎙️ Mute' : '🔇 Unmute'}
+        </CtrlBtn>
+        <CtrlBtn active={ss.webrtc.cameraOn} offColor="#dc2626"
+          onClick={ss.webrtc.toggleCamera}>
+          {ss.webrtc.cameraOn ? '📷 Stop cam' : '📷 Start cam'}
+        </CtrlBtn>
+        {!ss.sharingScreen
+          ? <CtrlBtn active color={ACCENT} onClick={doShareScreen}>🖥️ Share screen</CtrlBtn>
+          : <CtrlBtn active color="#7c3aed" onClick={ss.stopScreenShare}>⏹ Stop sharing</CtrlBtn>
+        }
+      </div>
+
+      {/* ── Room link / copy bar ────────────────────────────────────────── */}
+      <div style={{ padding: '10px 12px 14px', borderTop: '1px solid #1e293b',
+                    display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 10, color: '#64748b', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+            Room code
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#93c5fd',
+                        fontFamily: 'monospace', letterSpacing: 4 }}>{ss.roomId}</div>
         </div>
+        <button onClick={() => { navigator.clipboard.writeText(joinUrl); showToast('Join link copied — paste it in Chat') }}
+          style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8,
+                   padding: '8px 14px', color: '#e2e8f0', cursor: 'pointer',
+                   fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
+          📋 Copy invite link
+        </button>
       </div>
     </div>
   )
@@ -187,9 +304,9 @@ export default function ScreenShareOverlay() {
     const result = await ss.startSession(myName)
     setStarting(false)
     if (!result.ok) { showToast(result.reason || 'Could not start session'); return }
-    // Start screen share immediately after joining
-    const shareResult = await ss.startScreenShare()
-    if (!shareResult.ok) showToast(shareResult.reason || 'Screen share unavailable')
+    // Immediately prompt for screen share
+    const sResult = await ss.startScreenShare()
+    if (!sResult.ok) showToast(sResult.reason || 'Screen share unavailable — you can start it from the controls')
   }
 
   async function doJoin() {
@@ -198,9 +315,8 @@ export default function ScreenShareOverlay() {
     setJoining(true)
     const result = await ss.joinSession(code, myName)
     setJoining(false)
-    if (!result.ok) { showToast(result.reason || 'Could not join session'); return }
-    setShowJoinInput(false)
-    setJoinCode('')
+    if (!result.ok) { showToast(result.reason || 'Could not join — check the room code'); return }
+    setShowJoin(false); setJoinCode('')
   }
 
   async function doShareScreen() {
@@ -209,12 +325,14 @@ export default function ScreenShareOverlay() {
   }
 }
 
-// Raw screen preview — no aspect-ratio constraint, just fills the container.
-function ScreenPreview({ stream }) {
-  const ref = useRef(null)
-  useEffect(() => { if (ref.current) ref.current.srcObject = stream || null }, [stream])
+function CtrlBtn({ children, onClick, active, color = '#1e293b', offColor = '#1e293b' }) {
   return (
-    <video ref={ref} autoPlay playsInline muted
-      style={{ width: '100%', maxHeight: 220, objectFit: 'contain', background: '#0d1526', display: 'block' }} />
+    <button onClick={onClick}
+      style={{ flex: 1, minWidth: 80, padding: '8px 4px', borderRadius: 8,
+               border: '1px solid #334155', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+               background: active ? color : offColor, color: '#f8fafc',
+               transition: 'background .15s' }}>
+      {children}
+    </button>
   )
 }
