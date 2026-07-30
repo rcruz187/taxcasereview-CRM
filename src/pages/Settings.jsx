@@ -1070,10 +1070,11 @@ function StorageTab() {
 
   useEffect(() => {
     async function load() {
-      const [{ data: d }, { data: e }] = await Promise.all([
-        supabase.from('documents').select('file_size, doc_type, client_name, created_at').order('file_size', { ascending: false }),
+      const [{ data: d, error: docsErr }, { data: e }] = await Promise.all([
+        supabase.from('documents').select('file_size, "docType", client, created_at').order('file_size', { ascending: false }),
         supabase.from('esigns').select('created_at').limit(200),
       ])
+      if (docsErr) console.error('Storage Usage: failed to load documents —', docsErr.message)
       setDocs(d || [])
       setEsigns(e || [])
       setLoading(false)
@@ -1120,10 +1121,10 @@ function StorageTab() {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
   }
 
-  // Group by doc_type
+  // Group by docType
   const byType = {}
   docs.forEach(d => {
-    const t = d.doc_type || 'Other'
+    const t = d.docType || 'Other'
     if (!byType[t]) byType[t] = { count: 0, bytes: 0 }
     byType[t].count++
     byType[t].bytes += (d.file_size || 0)
@@ -1234,8 +1235,8 @@ function StorageTab() {
             {largest.map((d, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--br)', fontSize: 13 }}>
                 <span style={{ color: 'var(--t3)', width: 20, flexShrink: 0 }}>#{i+1}</span>
-                <span style={{ flex: 1, fontWeight: 600 }}>{d.doc_type || 'Document'}</span>
-                <span style={{ color: 'var(--t2)', fontSize: 12 }}>{d.client_name || '—'}</span>
+                <span style={{ flex: 1, fontWeight: 600 }}>{d.docType || 'Document'}</span>
+                <span style={{ color: 'var(--t2)', fontSize: 12 }}>{d.client || '—'}</span>
                 <span style={{ color: d.file_size > 5*1024*1024 ? 'var(--warn)' : 'var(--t2)', fontWeight: 600, flexShrink: 0 }}>{fmt(d.file_size)}</span>
               </div>
             ))}
