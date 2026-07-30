@@ -29,17 +29,22 @@ const STATE_FORMS = [
   { num: 'WY-POA',         state: 'WY', label: 'Power of Attorney', url: `${BASE}/state-forms/Wyoming.pdf` },
 ]
 
-const firmName = 'Tax Case Review & Resolution Services'
-const address  = '${FIRM.address}'
-const email    = 'info@taxcasereview.com'
+// Tenant-resolved firm identity, mirroring src/lib/docUtils.js exactly.
+// Previously these were hardcoded constants -- and `address` was written with
+// SINGLE quotes around a template placeholder, so every State Forms letterhead
+// and POA cover letter printed the literal text ${FIRM.address}.
+const firmName  = () => FIRM.name || 'Tax Case Review'
+const firmEmail = () =>
+  (FIRM.email || '').trim() ||
+  'info@' + firmName()().toLowerCase().replace(/[^a-z0-9]+/g, '') + '.com'
 const LOGO_URL = ''  // replaced by FIRM.logoUrl
-function printHeader(title) { return `<div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #1A7FD4;padding-bottom:16px"><img src="${FIRM.logoUrl}" style="height:48px;margin-bottom:8px" onerror="this.style.display='none'"/><div style="font-size:20px;font-weight:700;color:#1A7FD4">${firmName}</div><div style="font-size:11px;color:#666">${address} · ${email}</div><div style="font-size:16px;font-weight:700;margin-top:10px;color:#111">${title}</div></div>` }
-function sigBlock(l1='Client Signature',l2='Authorized Representative'){return `<div style="display:flex;gap:40px;margin-top:32px"><div style="flex:1;border-top:1px solid #333;padding-top:6px;font-size:11px;color:#555">${l1}<br/>Date: ___________________</div><div style="flex:1;border-top:1px solid #333;padding-top:6px;font-size:11px;color:#555">${l2} — ${firmName}<br/>Date: ___________________</div></div>`}
+function printHeader(title) { return `<div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #1A7FD4;padding-bottom:16px"><img src="${FIRM.logoUrl}" style="height:48px;margin-bottom:8px" onerror="this.style.display='none'"/><div style="font-size:20px;font-weight:700;color:#1A7FD4">${firmName()}</div><div style="font-size:11px;color:#666">${FIRM.address} · ${firmEmail()}</div><div style="font-size:16px;font-weight:700;margin-top:10px;color:#111">${title}</div></div>` }
+function sigBlock(l1='Client Signature',l2='Authorized Representative'){return `<div style="display:flex;gap:40px;margin-top:32px"><div style="flex:1;border-top:1px solid #333;padding-top:6px;font-size:11px;color:#555">${l1}<br/>Date: ___________________</div><div style="flex:1;border-top:1px solid #333;padding-top:6px;font-size:11px;color:#555">${l2} — ${firmName()}<br/>Date: ___________________</div></div>`}
 function printBase(title,body){const w=window.open('','_blank','width=860,height=1000');w.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:40px 48px;max-width:800px;margin:0 auto}h3{color:#1A7FD4;margin:18px 0 6px}p{margin:6px 0;line-height:1.6}.fee-box{border:2px solid #1A7FD4;border-radius:6px;padding:12px 16px;margin:16px 0;background:#f0f7ff}</style></head><body>${printHeader(title)}${body}</body></html>`);w.document.close();setTimeout(()=>w.print(),400)}
-function generateServiceAgreement(){printBase('Tax Investigation Service Agreement',`<p>This Tax Investigation Service Agreement is entered into between <b>${firmName}</b> and the undersigned client.</p><h3>1. Scope of Services</h3><p>Initial tax investigation including transcript review, liability identification, evaluation of resolution programs, and written summary of findings.</p><h3>2. Investigation Fee</h3><div class="fee-box"><b>Investigation Fee: $___________</b></div><h3>3. Not a Law Firm</h3><p>${firmName} is a tax resolution consulting firm, not a law firm.</p>${sigBlock()}`)}
-function generateAddendum(){printBase('Service Addendum',`<p>This Addendum supplements the Tax Investigation Service Agreement between <b>${firmName}</b> and the undersigned client.</p><h3>Additional Services</h3><ul><li>Full IRS/State representation</li><li>POA representation</li><li>Filing of delinquent returns</li></ul><div class="fee-box"><b>Additional Service Fee: $___________</b><br/>Payment plan: $___________ /month</div>${sigBlock()}`)}
-function generateEngagementLetter(){printBase('Engagement Letter',`<p>Dear Client,</p><p>Thank you for choosing <b>${firmName}</b>. We are pleased to confirm our engagement to assist you with your tax resolution matter.</p><h3>Services</h3><ul><li>Review tax transcripts</li><li>Identify outstanding liabilities</li><li>Represent you through resolution</li></ul>${sigBlock('Client Acknowledgment','Authorized Representative')}`)}
-function generatePOALetter(){printBase('Power of Attorney Cover Letter',`<p><b>Internal Revenue Service</b></p><p><b>Re: Form 2848 — Taxpayer: _____________________________</b></p><p>Enclosed is a completed Form 2848 authorizing <b>${firmName}</b> to represent the above-named taxpayer.</p><div style="border-left:3px solid #1A7FD4;padding-left:16px;margin:16px 0"><b>${firmName}</b><br/>${address}<br/>Email: ${email}</div>${sigBlock('','Authorized Representative — ' + firmName)}`)}
+function generateServiceAgreement(){printBase('Tax Investigation Service Agreement',`<p>This Tax Investigation Service Agreement is entered into between <b>${firmName()}</b> and the undersigned client.</p><h3>1. Scope of Services</h3><p>Initial tax investigation including transcript review, liability identification, evaluation of resolution programs, and written summary of findings.</p><h3>2. Investigation Fee</h3><div class="fee-box"><b>Investigation Fee: $___________</b></div><h3>3. Not a Law Firm</h3><p>${firmName()} is a tax resolution consulting firm, not a law firm.</p>${sigBlock()}`)}
+function generateAddendum(){printBase('Service Addendum',`<p>This Addendum supplements the Tax Investigation Service Agreement between <b>${firmName()}</b> and the undersigned client.</p><h3>Additional Services</h3><ul><li>Full IRS/State representation</li><li>POA representation</li><li>Filing of delinquent returns</li></ul><div class="fee-box"><b>Additional Service Fee: $___________</b><br/>Payment plan: $___________ /month</div>${sigBlock()}`)}
+function generateEngagementLetter(){printBase('Engagement Letter',`<p>Dear Client,</p><p>Thank you for choosing <b>${firmName()}</b>. We are pleased to confirm our engagement to assist you with your tax resolution matter.</p><h3>Services</h3><ul><li>Review tax transcripts</li><li>Identify outstanding liabilities</li><li>Represent you through resolution</li></ul>${sigBlock('Client Acknowledgment','Authorized Representative')}`)}
+function generatePOALetter(){printBase('Power of Attorney Cover Letter',`<p><b>Internal Revenue Service</b></p><p><b>Re: Form 2848 — Taxpayer: _____________________________</b></p><p>Enclosed is a completed Form 2848 authorizing <b>${firmName()}</b> to represent the above-named taxpayer.</p><div style="border-left:3px solid #1A7FD4;padding-left:16px;margin:16px 0"><b>${firmName()}</b><br/>${FIRM.address}<br/>Email: ${firmEmail()}</div>${sigBlock('','Authorized Representative — ' + firmName())}`)}
 
 export default function StateForms() {
   const [searchParams] = useSearchParams()
@@ -154,7 +159,7 @@ export default function StateForms() {
         client_name: selectedClient.name,
         client_email: selectedClient.email || '',
         client_phone: selectedClient.phone || '',
-        message: `Please review and sign your ${form.state} Power of Attorney form. This authorizes Tax Case Review to represent you before the ${form.state} tax authority.`,
+        message: `Please review and sign your ${form.state} Power of Attorney form. This authorizes ${firmName()} to represent you before the ${form.state} tax authority.`,
         pdf_attachments: [{ formType: 'state_poa', label: `${form.state} POA — ${form.label}`, url: pdfUrl }],
         priority: 'Normal',
         status: 'Awaiting',
@@ -174,27 +179,27 @@ export default function StateForms() {
         const { error: eErr } = await supabase.functions.invoke('send-email', {
           body: {
             to: selectedClient.email,
-            subject: `Action Required: Sign Your ${form.state} Power of Attorney — Tax Case Review`,
+            subject: `Action Required: Sign Your ${form.state} Power of Attorney — ${firmName()}`,
             html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px">
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
   <tr><td style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);padding:32px 40px;text-align:center">
     <img src="${FIRM.logoUrl}" alt="${FIRM.name}" style="max-height:60px;max-width:240px;object-fit:contain" onerror="this.style.display='none'"/>
-    <div style="font-size:22px;font-weight:800;color:#ffffff;margin-top:12px">Tax Case Review</div>
+    <div style="font-size:22px;font-weight:800;color:#ffffff;margin-top:12px">${firmName()}</div>
   </td></tr>
   <tr><td style="padding:40px 40px 32px">
     <p style="margin:0 0 16px;font-size:16px;color:#0f172a">Dear <strong>${selectedClient.name}</strong>,</p>
-    <p style="margin:0 0 20px;font-size:15px;color:#334155;line-height:1.7">Your <strong>${form.state} Power of Attorney (${form.num})</strong> is ready for your review and signature. This form authorizes Tax Case Review to represent you before the ${form.state} tax authority.</p>
+    <p style="margin:0 0 20px;font-size:15px;color:#334155;line-height:1.7">Your <strong>${form.state} Power of Attorney (${form.num})</strong> is ready for your review and signature. This form authorizes ${firmName()} to represent you before the ${form.state} tax authority.</p>
     <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 28px">
       <a href="${sigUrl}" style="display:inline-block;background:linear-gradient(135deg,#1d4ed8,#2563eb);color:#ffffff;padding:16px 40px;border-radius:10px;text-decoration:none;font-weight:700;font-size:17px">Review &amp; Sign →</a>
     </td></tr></table>
     <div style="background:#f8fafc;border-radius:8px;padding:16px 20px;border-left:4px solid #3b82f6">
-      <p style="margin:0;font-size:13px;color:#475569">📞 <strong>${FIRM.phone}</strong> &nbsp;·&nbsp; ✉️ <strong>info@taxcasereview.org</strong></p>
+      <p style="margin:0;font-size:13px;color:#475569">📞 <strong>${FIRM.phone}</strong> &nbsp;·&nbsp; ✉️ <strong>${firmEmail()}</strong></p>
     </div>
   </td></tr>
   <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center">
-    <p style="margin:0;font-size:11px;color:#94a3b8">Tax Case Review · ${FIRM.address}</p>
+    <p style="margin:0;font-size:11px;color:#94a3b8">${firmName()} · ${FIRM.address}</p>
   </td></tr>
 </table></td></tr></table></body></html>`
           }
@@ -209,7 +214,7 @@ export default function StateForms() {
           try {
             await fetch(cfg.signalwire_backend + '/sms/send', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ to: selectedClient.phone, body: `Tax Case Review: please review and sign your ${form.state} POA here: ${sigUrl}` })
+              body: JSON.stringify({ to: selectedClient.phone, body: `${firmName()}: please review and sign your ${form.state} POA here: ${sigUrl}` })
             })
             smsSent = true
           } catch (_) {}
