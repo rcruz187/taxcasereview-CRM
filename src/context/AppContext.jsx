@@ -164,15 +164,32 @@ export function AppProvider({ children }) {
   // notify everyone. Muted conversations are skipped, matching the mute
   // toggle already stored in chat_conv_prefs.
   const myEmpIdRef  = useRef(null)
+  const myRealNameRef = useRef(null)
   const mutedRef    = useRef(new Set())
 
   useEffect(() => {
     if (!user?.email) return
     let cancelled = false
-    const myName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'You'
-    supabase.from('employees').select('id').eq('email', user.email).maybeSingle()
-      .then(({ data }) => { if (!cancelled && data) myEmpIdRef.current = data.id })
-    supabase.from('chat_conv_prefs').select('conv_id, muted').eq('viewer_name', myName)
+    // Real display name from employees, not Auth metadata — user_metadata.name
+    // isn't reliably set, so this was silently falling back to the email's
+    // local-part (e.g. "romy" instead of "Romy Cruz"), which broke both the
+    // chat-mute lookup below (keyed by name) and the sender!==myName check in
+    // the realtime handler (new-message sound never fired reliably).
+    const fallbackName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'You'
+    supabase.from('employees').select('id, name').eq('email', user.email).maybeSingle()
+      .then(({ data }) => {
+        if (cancelled || !data) return
+        myEmpIdRef.current = data.id
+        myRealNameRef.current = data.name?.trim() || null
+        // Re-run the mute-prefs load now that we may have a corrected name —
+        // cheap, and only runs once per mount.
+        supabase.from('chat_conv_prefs').select('conv_id, muted').eq('viewer_name', data.name?.trim() || fallbackName)
+          .then(({ data: prefs }) => {
+            if (cancelled || !prefs) return
+            mutedRef.current = new Set(prefs.filter(r => r.muted).map(r => r.conv_id))
+          })
+      })
+    supabase.from('chat_conv_prefs').select('conv_id, muted').eq('viewer_name', fallbackName)
       .then(({ data }) => {
         if (cancelled || !data) return
         mutedRef.current = new Set(data.filter(r => r.muted).map(r => r.conv_id))
@@ -252,7 +269,6 @@ export function AppProvider({ children }) {
   // manages its own lifecycle independently.
   useEffect(() => {
     if (!user) return
-    const myName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'You'
     const channels = []
     let cancelled = false
     const pendingTimeouts = []
@@ -290,16 +306,21 @@ export function AppProvider({ children }) {
     }
 
     withReconnect('global-chat-notify', 'chat_messages', ({ new: msg }) => {
+      // Read fresh at message-arrival time, not once at effect-mount — the
+      // employees lookup that fills myRealNameRef resolves asynchronously,
+      // so capturing myName once here risked a stale "romy" fallback baked
+      // in for the whole channel's lifetime even after the real name loaded.
+      const liveName = myRealNameRef.current || user?.user_metadata?.name || user?.email?.split('@')[0] || 'You'
       if (msg.huddle_id && msg.sender === '🔔 System') {
         playSound('huddle')
       } else if (msg.sender === '🔔 System') {
         playSound('lead') // new lead / appointment / payment notifications from LeadFlow etc.
-      } else if (msg.sender !== myName) {
+      } else if (msg.sender !== liveName) {
         playSound('message')
       }
       // Visual notification. Chat.jsx only mounts on /chat, so without this a rep
       // sitting on any other page never sees an incoming message.
-      notifyChatMessage(msg, myName)
+      notifyChatMessage(msg, liveName)
     })
 
     withReconnect('global-email-notify', 'emails', ({ new: row }) => {

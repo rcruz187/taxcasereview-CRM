@@ -131,12 +131,19 @@ export default function Chat() {
   const [showSearch, setShowSearch] = useState(false)
   const [TEAM, setTEAM] = useState([])
   const [myEmpId, setMyEmpId] = useState(null)
+  // Real display name from the employees table — messages were being sent
+  // under user.email's local-part (e.g. "romy", "rcruz187") whenever Supabase
+  // Auth's user_metadata.name wasn't set, which also broke avatar matching
+  // downstream (avatars are looked up by exact name match against TEAM).
+  // Resolving from the same employees row myEmpId already comes from fixes
+  // both at once.
+  const [myRealName, setMyRealName] = useState(null)
   const bottomRef = useRef(null)
   const inputRef  = useRef(null)
   const fileRef   = useRef(null)
   const pollerRef = useRef(null)
 
-  const myName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'You'
+  const myName = myRealName || user?.user_metadata?.name || user?.email?.split('@')[0] || 'You'
   const allChannels = [...CHANNELS, ...extraChans]
   // A DM lives in ONE symmetric channel keyed by BOTH employee ids (sorted),
   // so my view and the other person's view are the same conversation and nobody
@@ -170,7 +177,7 @@ export default function Chat() {
     supabase.from('employees').select('id, name, role, avatar_url, email').order('name').then(({ data }) => {
       if (!data) return
       const me = data.find(e => e.email && user?.email && e.email.toLowerCase() === user.email.toLowerCase())
-      if (me) setMyEmpId(me.id)
+      if (me) { setMyEmpId(me.id); setMyRealName(me.name) }
       setTEAM(data.map(e => ({
         id: 'dm_' + e.id,
         empId: e.id,
@@ -839,7 +846,7 @@ export default function Chat() {
                       <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 3, paddingLeft: 8, borderLeft: '2px solid #334155' }}>↩ Reply</div>
                     )}
                     {item.text && (
-                      <div style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--tx)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{item.text}</div>
+                      <div style={{ fontSize: 16, lineHeight: 1.6, color: 'var(--tx)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{item.text}</div>
                     )}
                     {item.attachment_url && (
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 8, padding: '8px 14px', marginTop: 4, maxWidth: 340 }}>
