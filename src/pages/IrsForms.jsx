@@ -38,8 +38,8 @@ function printHeader(title) {
   return `
     <div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #1A7FD4;padding-bottom:16px">
       <img src="${FIRM.logoUrl}" style="height:48px;margin-bottom:8px" onerror="this.style.display='none'"/>
-      <div style="font-size:20px;font-weight:700;color:#1A7FD4">${firmName}</div>
-      <div style="font-size:11px;color:#666">${address} · ${email}</div>
+      <div style="font-size:20px;font-weight:700;color:#1A7FD4">${FIRM.name}</div>
+      <div style="font-size:11px;color:#666">${FIRM.address} · ${FIRM.email}</div>
       <div style="font-size:16px;font-weight:700;margin-top:10px;color:#111">${title}</div>
     </div>`
 }
@@ -51,7 +51,7 @@ function sigBlock(label1 = 'Client Signature', label2 = 'Authorized Representati
         ${label1}<br/>Date: ___________________
       </div>
       <div style="flex:1;border-top:1px solid #333;padding-top:6px;font-size:11px;color:#555">
-        ${label2} — ${firmName}<br/>Date: ___________________
+        ${label2} — ${FIRM.name}<br/>Date: ___________________
       </div>
     </div>`
 }
@@ -80,7 +80,7 @@ function printBase(title, body) {
 // ─── Document generators ──────────────────────────────────────────────────────
 function generateServiceAgreement() {
   printBase('Tax Investigation Service Agreement', `
-    <p>This Tax Investigation Service Agreement ("Agreement") is entered into between <b>${firmName}</b> ("Company") and the undersigned client ("Client") as of the date signed below.</p>
+    <p>This Tax Investigation Service Agreement ("Agreement") is entered into between <b>${FIRM.name}</b> ("Company") and the undersigned client ("Client") as of the date signed below.</p>
 
     <h3>1. Scope of Services</h3>
     <p>The Company agrees to perform an initial tax investigation, which includes review of tax transcripts, identification of IRS or state tax liabilities, evaluation of available resolution programs, and preparation of a written summary of findings and recommended resolution strategy.</p>
@@ -110,7 +110,7 @@ function generateServiceAgreement() {
     </div>
 
     <h3>5. Not a Law Firm</h3>
-    <p>${firmName} is a tax resolution consulting firm and is <b>not a law firm</b>. No attorney-client relationship is created by this agreement. The Company does not provide legal advice. Enrolled Agents and/or licensed tax professionals perform all representation services.</p>
+    <p>${FIRM.name} is a tax resolution consulting firm and is <b>not a law firm</b>. No attorney-client relationship is created by this agreement. The Company does not provide legal advice. Enrolled Agents and/or licensed tax professionals perform all representation services.</p>
 
     <h3>6. No Guarantee of Outcome</h3>
     <p>The Company makes no guarantee as to the specific outcome of any IRS or state tax resolution matter. Acceptance into any IRS program (including Offer in Compromise) is solely at the discretion of the IRS.</p>
@@ -124,16 +124,16 @@ function generateServiceAgreement() {
     <h3>9. Governing Law</h3>
     <p>This Agreement is governed by the laws of the State of Florida.</p>
 
-    ${sigBlock('Client Signature', 'Authorized Representative — ${firmName}')}
+    ${sigBlock('Client Signature', 'Authorized Representative — ${FIRM.name}')}
     <p style="font-size:10px;color:#888;margin-top:20px;text-align:center">
-      ${firmName} · ${address} · ${email} · Not a law firm
+      ${FIRM.name} · ${FIRM.address} · ${FIRM.email} · Not a law firm
     </p>
   `)
 }
 
 function generateAddendum() {
   printBase('Service Addendum — Additional Services Agreement', `
-    <p>This Addendum ("Addendum") supplements the Tax Investigation Service Agreement previously executed between <b>${firmName}</b> ("Company") and the undersigned client ("Client") and is incorporated therein by reference.</p>
+    <p>This Addendum ("Addendum") supplements the Tax Investigation Service Agreement previously executed between <b>${FIRM.name}</b> ("Company") and the undersigned client ("Client") and is incorporated therein by reference.</p>
 
     <h3>1. Additional Services Authorized</h3>
     <p>Client authorizes the Company to proceed with the following additional resolution services beyond the initial tax investigation:</p>
@@ -158,9 +158,9 @@ function generateAddendum() {
     <h3>4. Incorporation</h3>
     <p>All terms of the original Tax Investigation Service Agreement remain in full force and effect and are incorporated herein. In the event of conflict, this Addendum controls.</p>
 
-    ${sigBlock('Client Signature', 'Authorized Representative — ${firmName}')}
+    ${sigBlock('Client Signature', 'Authorized Representative — ${FIRM.name}')}
     <p style="font-size:10px;color:#888;margin-top:20px;text-align:center">
-      ${firmName} · ${address} · ${email} · Not a law firm
+      ${FIRM.name} · ${FIRM.address} · ${FIRM.email} · Not a law firm
     </p>
   `)
 }
@@ -168,7 +168,7 @@ function generateAddendum() {
 function generateEngagementLetter() {
   printBase('Engagement Letter', `
     <p>Dear Client,</p>
-    <p>Thank you for choosing <b>${firmName}</b>. We are pleased to confirm our engagement to assist you with your federal and/or state tax resolution matter. This letter outlines the terms of our engagement.</p>
+    <p>Thank you for choosing <b>${FIRM.name}</b>. We are pleased to confirm our engagement to assist you with your federal and/or state tax resolution matter. This letter outlines the terms of our engagement.</p>
 
     <h3>Services to Be Performed</h3>
     <ul>
@@ -187,16 +187,16 @@ function generateEngagementLetter() {
     </ul>
 
     <h3>Important Disclosures</h3>
-    <p>${firmName} is a tax resolution firm staffed by Enrolled Agents and licensed tax professionals. We are <b>not a law firm</b> and do not provide legal advice. Results in tax resolution matters cannot be guaranteed, as final decisions rest with the IRS or applicable state agency.</p>
+    <p>${FIRM.name} is a tax resolution firm staffed by Enrolled Agents and licensed tax professionals. We are <b>not a law firm</b> and do not provide legal advice. Results in tax resolution matters cannot be guaranteed, as final decisions rest with the IRS or applicable state agency.</p>
 
     <p>We are committed to providing you with diligent, professional representation. Please do not hesitate to contact our office with any questions.</p>
 
     <p style="margin-top:16px">Sincerely,</p>
-    <p><b>${firmName}</b><br/>${address}<br/>${email}</p>
+    <p><b>${FIRM.name}</b><br/>${FIRM.address}<br/>${FIRM.email}</p>
 
-    ${sigBlock('Client Acknowledgment', 'Authorized Representative — ${firmName}')}
+    ${sigBlock('Client Acknowledgment', 'Authorized Representative — ${FIRM.name}')}
     <p style="font-size:10px;color:#888;margin-top:20px;text-align:center">
-      ${firmName} · ${address} · ${email} · Not a law firm
+      ${FIRM.name} · ${FIRM.address} · ${FIRM.email} · Not a law firm
     </p>
   `)
 }
@@ -214,17 +214,17 @@ function generatePOALetter() {
 
     <p>Dear IRS Representative,</p>
 
-    <p>Please find enclosed a completed and executed Form 2848, Power of Attorney and Declaration of Representative, authorizing <b>${firmName}</b> to represent the above-named taxpayer before the Internal Revenue Service.</p>
+    <p>Please find enclosed a completed and executed Form 2848, Power of Attorney and Declaration of Representative, authorizing <b>${FIRM.name}</b> to represent the above-named taxpayer before the Internal Revenue Service.</p>
 
     <p>Effective immediately, please direct all correspondence, notices, and communications regarding the above-referenced taxpayer and tax period(s) to our office:</p>
 
     <div style="border-left:3px solid #1A7FD4;padding-left:16px;margin:16px 0">
-      <b>${firmName}</b><br/>
+      <b>${FIRM.name}</b><br/>
       631 US Highway One Ste 304<br/>
       North Palm Beach, FL 33408<br/>
       Phone: (561) ___-____<br/>
       Fax: (561) ___-____<br/>
-      Email: ${email}
+      Email: ${FIRM.email}
     </div>
 
     <p>Our authorized representative(s) are Enrolled Agents licensed to practice before the IRS. We respectfully request that all future contact regarding this matter be made through our office so that we may best serve our client's interests.</p>
@@ -234,13 +234,13 @@ function generatePOALetter() {
     <p style="margin-top:16px">Respectfully submitted,</p>
 
     <div style="margin-top:40px;border-top:1px solid #333;width:280px;padding-top:6px;font-size:11px;color:#555">
-      Authorized Representative — ${firmName}<br/>
+      Authorized Representative — ${FIRM.name}<br/>
       Enrolled Agent / Licensed Professional<br/>
       Date: ___________________
     </div>
 
     <p style="font-size:10px;color:#888;margin-top:24px;text-align:center">
-      ${firmName} · ${address} · ${email} · Not a law firm
+      ${FIRM.name} · ${FIRM.address} · ${FIRM.email} · Not a law firm
     </p>
   `)
 }
@@ -266,7 +266,7 @@ export default function IrsForms() {
   }
 
   async function loadClients() {
-    const { data, error } = await supabase.from('clients').select('id, name, entityName, street, city, state, zip, phone, ssn, ein').order('name')
+    const { data, error } = await supabase.from('clients').select('id, name, business_name, street, city, state, zip, phone, ssn, ein').order('name')
     if (error) { console.error('loadClients error:', error.message); return }
     if (data) setClients(data)
   }
@@ -364,17 +364,17 @@ export default function IrsForms() {
             />
             {showClientDrop && clientSearch && (() => {
               const q = clientSearch.toLowerCase()
-              const matches = clients.filter(c => (c.name||'').toLowerCase().includes(q) || (c.entityName||'').toLowerCase().includes(q)).slice(0, 10)
+              const matches = clients.filter(c => (c.name||'').toLowerCase().includes(q) || (c.business_name||'').toLowerCase().includes(q)).slice(0, 10)
               return matches.length > 0 ? (
                 <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: 8, zIndex: 50, maxHeight: 220, overflowY: 'auto', boxShadow: '0 4px 16px rgba(0,0,0,.25)' }}>
                   {matches.map(c => (
                     <div key={c.id}
-                      onMouseDown={() => { setSelectedClientId(c.id); setClientSearch(c.entityName || c.name); setShowClientDrop(false) }}
+                      onMouseDown={() => { setSelectedClientId(c.id); setClientSearch(c.business_name || c.name); setShowClientDrop(false) }}
                       style={{ padding: '9px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--tx)', borderBottom: '1px solid var(--br)' }}
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--s2)'}
                       onMouseLeave={e => e.currentTarget.style.background = ''}
                     >
-                      {c.entityName || c.name}
+                      {c.business_name || c.name}
                     </div>
                   ))}
                 </div>
@@ -390,7 +390,7 @@ export default function IrsForms() {
             disabled={!selectedClientId}
             onClick={() => {
               const c = clients.find(x => x.id === selectedClientId)
-              if (c) setFillerClient({...c, address:c.street, business_name:c.entityName})
+              if (c) setFillerClient({...c, address:c.street, business_name:c.business_name})
             }}
             style={{ padding: '8px 18px', opacity: selectedClientId ? 1 : 0.45 }}
           >
