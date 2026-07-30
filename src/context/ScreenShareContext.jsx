@@ -1,8 +1,13 @@
 // ScreenShareContext — app-level training/screen-share session state.
-// TDZ fix: all mutable callbacks stored in a ref so declaration order
-// never matters and the minifier can't create circular initialization.
+//
+// KEY FIX: When the host starts/stops screen sharing, we broadcast a
+// 'screen-state' event over the Supabase Realtime channel so joiners
+// know which peer's video track is the screen — no resolution guessing.
+// The joining page subscribes to the same channel and gets a { host, sharing }
+// payload it can use to route the right stream to the main tile.
 
 import { createContext, useContext, useState, useRef } from 'react'
+import { supabase } from '../lib/supabase'
 import { useWebRTCRoom } from '../lib/webrtcRoom'
 
 const Ctx = createContext(null)
@@ -18,13 +23,27 @@ export function ScreenShareProvider({ children }) {
   const [minimized,     setMinimized]     = useState(false)
   const [sharingScreen, setSharingScreen] = useState(false)
   const [screenStream,  setScreenStream]  = useState(null)
+  // { hostName, sharing } — received from broadcast, used by overlay too
+  const [remoteScreenState, setRemoteScreenState] = useState(null)
 
-  const webrtc        = useWebRTCRoom('screenshare')
+  const webrtc         = useWebRTCRoom('screenshare')
   const screenTrackRef = useRef(null)
+  const roomIdRef      = useRef('')
 
-  // Keep latest values accessible inside callbacks without stale closure issues
+  // stateRef lets plain functions read current state without stale closures
   const stateRef = useRef({})
-  stateRef.current = { webrtc, screenStream }
+  stateRef.current = { webrtc, screenStream, roomId }
+
+  // ── Broadcast that we started/stopped sharing so joiners can route correctly ──
+  function broadcastScreenState(sharing, myName) {
+    const ch = stateRef.current.webrtc.channelRef?.current
+    if (!ch) return
+    ch.send({
+      type: 'broadcast',
+      event: 'screen-state',
+      payload: { host: myName, sharing },
+    }).catch(() => {})
+  }
 
   function replacePeerTracks(newTrack) {
     const pcs = stateRef.current.webrtc.peerConnsRef.current
@@ -40,7 +59,7 @@ export function ScreenShareProvider({ children }) {
     })
   }
 
-  function doStopScreenShare() {
+  function doStopScreenShare(myName) {
     if (screenTrackRef.current) {
       screenTrackRef.current.stop()
       screenTrackRef.current = null
@@ -49,19 +68,29 @@ export function ScreenShareProvider({ children }) {
     if (ss) { ss.getTracks().forEach(t => t.stop()); setScreenStream(null) }
     setSharingScreen(false)
     replacePeerTracks(null)
+    if (myName) broadcastScreenState(false, myName)
   }
 
   async function startSession(myName) {
     const id = makeRoomId()
+    roomIdRef.current = id
     setRoomId(id)
     setActive(true)
     setMinimized(false)
     const result = await webrtc.join(id, myName, true)
     if (!result.ok) { setActive(false); return { ok: false, reason: result.reason } }
+
+    // Also listen for incoming screen-state broadcasts (so the host panel
+    // can react if a remote participant starts sharing)
+    webrtc.channelRef?.current?.on('broadcast', { event: 'screen-state' }, ({ payload }) => {
+      setRemoteScreenState(payload)
+    })
+
     return { ok: true, roomId: id }
   }
 
   async function joinSession(id, myName) {
+    roomIdRef.current = id
     setRoomId(id)
     setActive(true)
     setMinimized(false)
@@ -70,18 +99,24 @@ export function ScreenShareProvider({ children }) {
     return { ok: true }
   }
 
-  async function startScreenShare() {
+  async function startScreenShare(myName) {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: 30, cursor: 'always' },
-        audio: true,   // capture tab/system audio when available
+        video: { frameRate: 30, cursor: 'always', displaySurface: 'monitor' },
+        audio: true,
       })
       const track = stream.getVideoTracks()[0]
+      // Read actual surface type for the label
+      const settings   = track.getSettings?.() || {}
+      const surface    = settings.displaySurface  // 'monitor' | 'window' | 'browser'
+      track._surface   = surface  // stash for the label reader in the overlay
+
       screenTrackRef.current = track
       setScreenStream(stream)
       setSharingScreen(true)
-      track.onended = () => doStopScreenShare()   // user hit "Stop sharing" in browser UI
+      track.onended = () => doStopScreenShare(myName)
       replacePeerTracks(track)
+      broadcastScreenState(true, myName)
       return { ok: true }
     } catch (e) {
       if (e.name === 'NotAllowedError') return { ok: false, reason: 'Permission denied' }
@@ -89,17 +124,18 @@ export function ScreenShareProvider({ children }) {
     }
   }
 
-  async function endSession() {
-    doStopScreenShare()
+  async function endSession(myName) {
+    doStopScreenShare(myName)
     await webrtc.leave()
     setActive(false); setMinimized(false); setRoomId(''); setSharingScreen(false)
+    setRemoteScreenState(null)
   }
 
   const value = {
     active, minimized, setMinimized, roomId, webrtc,
-    screenStream, sharingScreen,
-    startSession, joinSession, startScreenShare,
-    stopScreenShare: doStopScreenShare, endSession,
+    screenStream, sharingScreen, remoteScreenState,
+    startSession, joinSession,
+    startScreenShare, stopScreenShare: doStopScreenShare, endSession,
   }
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

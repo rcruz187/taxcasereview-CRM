@@ -246,6 +246,6 @@ export function useWebRTCRoom(channelPrefix) {
 
   return {
     members, remoteStreams, micOn, cameraOn, joined, error,
-    localStreamRef, peerConnsRef, join, leave, toggleMic, toggleCamera,
+    localStreamRef, peerConnsRef, channelRef, join, leave, toggleMic, toggleCamera,
   }
 }
