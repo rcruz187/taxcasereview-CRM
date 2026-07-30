@@ -68,7 +68,7 @@ export default function NewOffice() {
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
             <thead>
               <tr style={{background:'var(--s2)',textAlign:'left'}}>
-                {['Firm','Code','Admin','Staff','Plan','Status'].map(h=>(
+                {['Firm','Code','Admin','Staff','Billing','Status'].map(h=>(
                   <th key={h} style={{padding:'10px 14px',fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em'}}>{h}</th>
                 ))}
               </tr>
@@ -86,7 +86,7 @@ export default function NewOffice() {
                   <td style={{padding:'10px 14px',color:'var(--t2)',fontFamily:'monospace'}}>{o.tenant_code}</td>
                   <td style={{padding:'10px 14px',color:'var(--t2)'}}>{o.admin_email || '—'}</td>
                   <td style={{padding:'10px 14px',color:'var(--t2)'}}>{o.employee_count}</td>
-                  <td style={{padding:'10px 14px',color:'var(--t2)',textTransform:'capitalize'}}>{o.plan_tier}</td>
+                  <td style={{padding:'10px 14px',color:'var(--t2)'}}>{o.effective_monthly != null ? `$${Number(o.effective_monthly).toFixed(2)}/mo` : '—'}</td>
                   <td style={{padding:'10px 14px'}}>
                     <span style={{fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:20,textTransform:'capitalize',
                       background:(STATUS_COLORS[o.status]||'#94a3b8')+'22',color:STATUS_COLORS[o.status]||'#94a3b8'}}>{o.status}</span>
@@ -228,6 +228,7 @@ function OfficeDetail({ tenantId, onBack, showToast }) {
       monthly_rate: t.monthly_rate ?? '', notes: t.notes || '',
       signalwire_phone_number: t.signalwire_phone_number || '', signalwire_project_id: t.signalwire_project_id || '',
       plan_tier: t.plan_tier || 'starter', brand_color: t.brand_color || '#2563eb',
+      per_seat_rate: t.per_seat_rate ?? '',
     })
   }
 
@@ -336,7 +337,6 @@ function OfficeDetail({ tenantId, onBack, showToast }) {
             <Row label="Contact Email"><input value={edit.primary_contact_email} onChange={e=>setEdit(f=>({...f,primary_contact_email:e.target.value}))} type="email"/></Row>
             <Row label="Contract Start"><input value={edit.contract_start_date} onChange={e=>setEdit(f=>({...f,contract_start_date:e.target.value}))} type="date"/></Row>
             <Row label="Contract End"><input value={edit.contract_end_date} onChange={e=>setEdit(f=>({...f,contract_end_date:e.target.value}))} type="date"/></Row>
-            <Row label="Monthly Rate"><input value={edit.monthly_rate} onChange={e=>setEdit(f=>({...f,monthly_rate:e.target.value}))} type="number" step="0.01" placeholder="$"/></Row>
             <Row label="Plan"><select value={edit.plan_tier} onChange={e=>setEdit(f=>({...f,plan_tier:e.target.value}))}><option value="starter">Starter</option><option value="growth">Growth</option><option value="pro">Pro</option></select></Row>
             <Row label="Notes"><textarea value={edit.notes} onChange={e=>setEdit(f=>({...f,notes:e.target.value}))} rows={3} style={{width:'100%',boxSizing:'border-box'}}/></Row>
             <div style={{display:'flex',gap:8,marginTop:4}}>
@@ -350,9 +350,41 @@ function OfficeDetail({ tenantId, onBack, showToast }) {
             <InfoRow label="Primary Contact" value={t.primary_contact_name}/>
             <InfoRow label="Contact Email" value={t.primary_contact_email}/>
             <InfoRow label="Contract" value={t.contract_start_date || t.contract_end_date ? `${t.contract_start_date||'—'} → ${t.contract_end_date||'—'}` : null}/>
-            <InfoRow label="Monthly Rate" value={t.monthly_rate ? `$${t.monthly_rate}` : null}/>
             <InfoRow label="Plan" value={t.plan_tier} capitalize/>
             <InfoRow label="Notes" value={t.notes}/>
+          </div>
+        )}
+      </Section>
+
+      <Section title="Billing">
+        {edit ? (
+          <div style={{display:'flex',flexDirection:'column',gap:12}}>
+            <Row label="Per-Seat Rate ($/mo)">
+              <input value={edit.per_seat_rate} onChange={e=>setEdit(f=>({...f,per_seat_rate:e.target.value}))} type="number" step="0.01" placeholder="e.g. 55.00"/>
+            </Row>
+            <div style={{fontSize:11.5,color:'var(--t3)'}}>
+              {detail.employees.length} seat{detail.employees.length===1?'':'s'} × {edit.per_seat_rate ? `$${edit.per_seat_rate}` : '—'} = {edit.per_seat_rate ? `$${(detail.employees.length * parseFloat(edit.per_seat_rate||0)).toFixed(2)}/mo` : '—'} (recalculates automatically as staff are added or removed)
+            </div>
+            <Row label="Flat Rate Override ($/mo)">
+              <input value={edit.monthly_rate} onChange={e=>setEdit(f=>({...f,monthly_rate:e.target.value}))} type="number" step="0.01" placeholder="Leave blank to bill per-seat"/>
+            </Row>
+            <div style={{fontSize:11.5,color:'var(--t3)'}}>If set, this flat amount is billed instead of the per-seat total — for a negotiated deal. Leave blank for standard per-seat billing.</div>
+            <div style={{display:'flex',gap:8,marginTop:4}}>
+              <button className="btn pri" disabled={saving} onClick={saveEdit}>{saving?'Saving…':'Save'}</button>
+              <button className="btn sec" onClick={()=>setEdit(null)}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{display:'flex',flexDirection:'column',gap:8,fontSize:13}}>
+            <InfoRow label="Per-Seat Rate" value={detail.billing.per_seat_rate ? `$${detail.billing.per_seat_rate}/seat/mo` : null}/>
+            <InfoRow label="Seats" value={detail.billing.seats}/>
+            {detail.billing.flat_override && (
+              <InfoRow label="Flat Override" value={`$${detail.billing.flat_override}/mo (overrides per-seat)`}/>
+            )}
+            <div style={{display:'flex',justifyContent:'space-between',paddingTop:8,marginTop:4,borderTop:'1px solid var(--br)'}}>
+              <span style={{color:'var(--tx)',fontWeight:700}}>Effective Monthly</span>
+              <span style={{color:'var(--tx)',fontWeight:700}}>{detail.billing.effective_monthly != null ? `$${Number(detail.billing.effective_monthly).toFixed(2)}` : '— not set'}</span>
+            </div>
           </div>
         )}
       </Section>
