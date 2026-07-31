@@ -1,7 +1,7 @@
 // ScreenShareHost — host's pop-out monitor window.
 // Reads the screen stream DIRECTLY from window.opener (same-origin) so
 // there is no WebRTC join, no double-participant, no relay needed.
-// Local camera preview is a separate getUserMedia, never sent to anyone.
+// Camera preview + mic controls mirror the main window's real session stream.
 
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams }              from 'react-router-dom'
@@ -26,6 +26,7 @@ export default function ScreenShareHost() {
   const [ended,        setEnded]        = useState(false)
   const [screenStream, setScreenStream] = useState(null)
   const [sharing,      setSharing]      = useState(false)
+  const [surfaceType,  setSurfaceType]  = useState(null)
   const [participants, setParticipants] = useState(0)
 
   // Local camera preview — NEVER sent to anyone
@@ -44,11 +45,20 @@ export default function ScreenShareHost() {
       if (ctx?.sharingScreen && ctx?.screenStream) {
         setScreenStream(ctx.screenStream)
         setSharing(true)
+        // 'monitor' = entire screen. Showing the live feed here would capture
+        // this very window, producing an infinite hall-of-mirrors.
+        const track = ctx.screenStream.getVideoTracks?.()[0]
+        setSurfaceType(track?.getSettings?.().displaySurface || null)
       } else {
         setScreenStream(null)
         setSharing(false)
+        setSurfaceType(null)
       }
       if (ctx?.memberCount !== undefined) setParticipants(ctx.memberCount)
+      // Mirror the REAL session camera + mic state from the main window.
+      if (ctx?.localStream !== undefined) setSelfStream(ctx.localStream || null)
+      if (ctx?.micOn    !== undefined) setMicOn(ctx.micOn)
+      if (ctx?.cameraOn !== undefined) setCamOn(ctx.cameraOn)
     } catch { /* cross-origin guard, should never happen */ }
   }
 
@@ -82,16 +92,10 @@ export default function ScreenShareHost() {
     return () => { ch.close(); bcRef.current = null; clearInterval(poll) }
   }, [])
 
-  // Start local camera preview
-  useEffect(() => {
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-      .then(stream => { selfStreamRef.current = stream; setSelfStream(stream) })
-      .catch(() => setCamOn(false))
-    return () => stopSelf()
-  }, [])
-
+  // No getUserMedia here — the pop-out shows the SAME stream the session is
+  // already sending. Opening a second camera/mic would give the host two
+  // captures and a mute button that controls the wrong one.
   function stopSelf() {
-    selfStreamRef.current?.getTracks().forEach(t => t.stop())
     selfStreamRef.current = null
     setSelfStream(null)
   }
@@ -107,18 +111,15 @@ export default function ScreenShareHost() {
     setTimeout(() => window.close(), 600)
   }
 
+  // Drive the real session tracks in the opener window, then re-read state.
   function toggleMic() {
-    const track = selfStreamRef.current?.getAudioTracks()[0]
-    if (!track) return
-    track.enabled = !track.enabled
-    setMicOn(track.enabled)
+    try { window.opener?._tcrScreenShare?.toggleMic?.() } catch {}
+    setTimeout(syncScreenStream, 60)
   }
 
   function toggleCam() {
-    const track = selfStreamRef.current?.getVideoTracks()[0]
-    if (!track) return
-    track.enabled = !track.enabled
-    setCamOn(track.enabled)
+    try { window.opener?._tcrScreenShare?.toggleCamera?.() } catch {}
+    setTimeout(syncScreenStream, 60)
   }
 
   if (ended) return (
@@ -163,8 +164,25 @@ export default function ScreenShareHost() {
         {/* Screen share — main tile */}
         <div style={{ flex: 1, minHeight: 300, borderRadius: 12, overflow: 'hidden',
                       background: '#0d1526', border: '1px solid #1e293b' }}>
-          {sharing && screenStream ? (
+          {sharing && screenStream && surfaceType !== 'monitor' ? (
             <StreamVideo stream={screenStream} muted contain />
+          ) : sharing && screenStream ? (
+            <div style={{ width: '100%', height: '100%', minHeight: 300, display: 'flex',
+                          alignItems: 'center', justifyContent: 'center', flexDirection: 'column',
+                          gap: 12, padding: 24, textAlign: 'center' }}>
+              <span style={{ fontSize: 40 }}>🟢</span>
+              <span style={{ color: '#f8fafc', fontSize: 17, fontWeight: 700 }}>
+                You're sharing your entire screen
+              </span>
+              <span style={{ color: '#94a3b8', fontSize: 13, maxWidth: 420, lineHeight: 1.6 }}>
+                Participants can see everything on your monitor. The live preview is hidden
+                here on purpose — showing it would capture this window inside itself.
+              </span>
+              <span style={{ color: '#64748b', fontSize: 12, maxWidth: 420, lineHeight: 1.6 }}>
+                To see exactly what participants see, share a single window or browser tab
+                instead of the entire screen.
+              </span>
+            </div>
           ) : (
             <div style={{ width: '100%', height: '100%', minHeight: 300, display: 'flex',
                           alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 10 }}>

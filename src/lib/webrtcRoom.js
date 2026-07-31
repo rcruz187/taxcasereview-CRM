@@ -62,6 +62,10 @@ export function useWebRTCRoom(channelPrefix) {
   const iceServersRef = useRef(FALLBACK_ICE) // refreshed in join() from turn-credentials
   const fullyJoinedRef = useRef(false) // true only after this client has tracked its own presence
   const viewerOnlyRef  = useRef(false)  // true when joined with viewerOnly — no local tracks sent
+  // When a screen share is running, this holds the screen track. Anyone who
+  // joins AFTER the share started must be given the screen track instead of
+  // the camera track — replaceTrack() only rewires peers that already exist.
+  const screenTrackRef = useRef(null)
 
 
   function createPC(peerName) {
@@ -69,7 +73,13 @@ export function useWebRTCRoom(channelPrefix) {
     const pc = new RTCPeerConnection(iceServersRef.current)
     peerConnsRef.current[peerName] = pc
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(t => pc.addTrack(t, localStreamRef.current))
+      localStreamRef.current.getTracks().forEach(t => {
+        // Skip the camera video track when screen sharing — the screen track
+        // is added in its place below, so late joiners see the screen.
+        if (t.kind === 'video' && screenTrackRef.current) return
+        pc.addTrack(t, localStreamRef.current)
+      })
+      if (screenTrackRef.current) pc.addTrack(screenTrackRef.current, localStreamRef.current)
     } else if (viewerOnlyRef.current) {
       // Viewer-only: explicitly request incoming streams without sending anything
       pc.addTransceiver('video', { direction: 'recvonly' })
@@ -243,6 +253,7 @@ export function useWebRTCRoom(channelPrefix) {
   const leave = useCallback(async () => {
     fullyJoinedRef.current = false
     viewerOnlyRef.current = false
+    screenTrackRef.current = null
     if (channelRef.current) {
       await channelRef.current.untrack().catch(() => {})
       await supabase.removeChannel(channelRef.current)
@@ -267,6 +278,6 @@ export function useWebRTCRoom(channelPrefix) {
 
   return {
     members, remoteStreams, micOn, cameraOn, joined, error,
-    localStreamRef, peerConnsRef, channelRef, join, leave, toggleMic, toggleCamera,
+    localStreamRef, peerConnsRef, channelRef, screenTrackRef, join, leave, toggleMic, toggleCamera,
   }
 }
