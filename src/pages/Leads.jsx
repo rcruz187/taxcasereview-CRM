@@ -2106,7 +2106,7 @@ export default function Leads() {
               {key:'payments', icon:'💳', text:'Payments'},
               {key:'finintake', icon:'💰', text:'Financial Intake'},
               {key:'finprofile', icon:'🧮', text:'Financial Profile'},
-              {key:'docs',  icon:'📁', text:'Documents'},
+              {key:'docs',  icon:'📁', text:'Docs'},
             ].filter(Boolean).map(t=>(
               <button key={t.key} onClick={()=>switchLeadTab(t.key)}
                 style={{display:'inline-flex',alignItems:'center',gap:5,padding:'12px 7px',border:'none',borderBottom:leadDetailTab===t.key?'2px solid var(--blue)':'2px solid transparent',

@@ -372,16 +372,42 @@ export default function StateForms() {
             style={{ width: '100%', maxWidth: 360, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--tx)', fontSize: 13, boxSizing: 'border-box' }}
           />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
           {filtered.length === 0 ? (
             <div style={{ color: 'var(--t3)', fontSize: 13, padding: '12px 0' }}>No forms match your search.</div>
           ) : filtered.map(f => (
-            <a key={f.num} href={f.url} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
-              <button className="btn sec" style={{ width: '100%', justifyContent: 'flex-start', gap: 8, padding: '9px 14px' }}>
-                <span style={{ background: 'var(--blue)', color: '#fff', borderRadius: 4, padding: '1px 7px', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{f.state}</span>
-                <span style={{ fontSize: 12, textAlign: 'left', lineHeight: 1.3 }}>{f.label}</span>
-              </button>
-            </a>
+            <div key={f.num} style={{ background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 10, padding: '10px 14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ background: 'var(--blue)', color: '#fff', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{f.state}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--tx)', lineHeight: 1.3 }}>{f.label}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <a href={f.url} target="_blank" rel="noreferrer" style={{ flex: 1, textDecoration: 'none' }}>
+                  <button className="btn sec" style={{ width: '100%', fontSize: 11, padding: '5px 8px', justifyContent: 'center' }}>
+                    📄 Blank
+                  </button>
+                </a>
+                <button
+                  className="btn sec"
+                  style={{ flex: 1, fontSize: 11, padding: '5px 8px', justifyContent: 'center', opacity: selectedClient ? 1 : 0.45 }}
+                  disabled={!selectedClient || prefilling === f.num}
+                  onClick={() => selectedClient && downloadPrefilledStatePOA(f)}
+                >
+                  {prefilling === f.num ? '⏳' : '✏️'} Pre-fill
+                </button>
+                <button
+                  className="btn pri"
+                  style={{ flex: 1, fontSize: 11, padding: '5px 8px', justifyContent: 'center', opacity: selectedClient ? 1 : 0.45 }}
+                  disabled={!selectedClient || sending}
+                  onClick={() => selectedClient && sendStatePOA(f)}
+                >
+                  ✍️ E-Sign
+                </button>
+              </div>
+              {!selectedClient && (
+                <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 4, textAlign: 'center' }}>Select a client above to pre-fill</div>
+              )}
+            </div>
           ))}
         </div>
       </div>
