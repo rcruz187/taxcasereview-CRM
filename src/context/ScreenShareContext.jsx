@@ -37,6 +37,11 @@ export function ScreenShareProvider({ children }) {
   const stateRef       = useRef({})
   stateRef.current     = { webrtc, screenStream, sharingScreen }
 
+  // Expose screen state on window so the pop-out can read it directly (same-origin)
+  useEffect(() => {
+    window._tcrScreenShare = { sharingScreen, screenStream, memberCount: webrtc.members.filter(n => !n.endsWith('(view)')).length - 1 }
+  }, [sharingScreen, screenStream, webrtc.members])
+
   // Broadcast member list to pop-out whenever it changes
   useEffect(() => {
     if (!active) return
