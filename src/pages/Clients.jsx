@@ -678,6 +678,41 @@ function InlineOrganizerForm({ client, onClose, showToast }) {
 // ── Canopy-style Document Manager for a specific client ──────────────────────
 export const DOC_FOLDERS = ['IRS Docs','Tax Returns','Agreements','POA & Forms','Transcripts','Correspondence','Financial Statements','E-Signatures','Call Recording','Other']
 const QUICK_TASK_TITLES = ['Request transcripts from IRS','Follow up with client','Prepare & send POA (2848/8821)','Call IRS for account status','Draft engagement letter','Collect financial documents','File tax return','Submit installment agreement','Prepare Offer in Compromise','Follow up on offer','Request wage & income transcripts','Schedule consultation','Send resolution options','Collect payment / trade']
+// WIP summary widget shown in the client Overview tab
+// Shows unbilled hours + amount + a quick "Log Time" button
+function ClientWIPWidget({ clientId, clientName, onLogTime }) {
+  const [wip, setWip] = useState(null)
+  useEffect(() => {
+    if (!clientName) return
+    const q = clientId
+      ? supabase.from('billing_time_entries').select('hours,amount,billed').eq('client_id', clientId).eq('billed', false)
+      : supabase.from('billing_time_entries').select('hours,amount,billed').eq('client_name', clientName).eq('billed', false)
+    q.then(({ data }) => {
+      if (!data) return
+      const hours  = data.reduce((s, e) => s + Number(e.hours || 0), 0)
+      const amount = data.reduce((s, e) => s + Number(e.amount || 0), 0)
+      setWip({ hours, amount, count: data.length })
+    })
+  }, [clientId, clientName])
+  if (!wip) return null
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 16, borderLeft: '1px solid var(--br)', paddingLeft: 16, marginLeft: 8 }}>
+      <div>
+        <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>WIP Hours</div>
+        <div style={{fontSize:22,fontWeight:800,color:'#f59e0b'}}>{Number(wip.hours).toFixed(1)}h</div>
+      </div>
+      <div>
+        <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>WIP Amount</div>
+        <div style={{fontSize:22,fontWeight:800,color:'#f59e0b'}}>${Number(wip.amount).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}</div>
+      </div>
+      <button onClick={onLogTime}
+        style={{padding:'6px 12px',background:'var(--blue)',border:'none',borderRadius:7,color:'#fff',fontWeight:700,fontSize:11,cursor:'pointer',whiteSpace:'nowrap',marginTop:8}}>
+        + Log Time
+      </button>
+    </div>
+  )
+}
+
 const FILE_EXT_ICON = n => { const e=(n||'').split('.').pop().toLowerCase(); return {pdf:'📄',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',jpg:'🖼️',jpeg:'🖼️',png:'🖼️',tiff:'🖼️'}[e]||'📎' }
 const fmt = b => b<1024?b+'B':b<1048576?(b/1024).toFixed(1)+'KB':(b/1048576).toFixed(1)+'MB'
 
@@ -2047,6 +2082,7 @@ export default function Clients() {
                   <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Payments</div>
                   <div style={{fontSize:22,fontWeight:800,color:'var(--ok)'}}>{relPayments.length}</div>
                 </div>
+                <ClientWIPWidget clientId={c.id} clientName={c.name} onLogTime={() => setDetailTab('time')} />
               </div>
             </div>
           )}

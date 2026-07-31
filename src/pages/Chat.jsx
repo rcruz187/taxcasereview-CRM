@@ -387,7 +387,33 @@ export default function Chat() {
     setHuddleId(id)
   }
 
-  async function inviteToHuddle(name) {
+  // Ring a specific person directly — posts into their DM pair channel with
+  // invite_to so only they get the incoming call notification, not everyone.
+  async function ringPerson(rep) {
+    const roomId = huddleId || (() => {
+      // shouldn't happen — startHuddle sets huddleId before we get here
+      const id = Math.random().toString(36).slice(2, 8).toUpperCase()
+      return id
+    })()
+
+    // Find the rep's empId to build the DM pair channel
+    const repEmpId = rep.empId
+    const pairChannel = (myEmpId && repEmpId) ? dmPair(myEmpId, repEmpId) : 'general'
+
+    await supabase.from('chat_messages').insert([{
+      channel: pairChannel,
+      sender: '🔔 System',
+      text: `📞 ${myName} is calling you`,
+      huddle_id: roomId,
+      invite_to: rep.name,
+      created_at: new Date().toISOString()
+    }])
+  }
+
+  async function inviteToHuddle(rep) {
+    // Legacy path: used by the "+ Invite" panel inside an active huddle
+    // where we don't have a rep object with empId — just post to general
+    const name = typeof rep === 'string' ? rep : rep.name
     if (!huddleMembers.includes(name)) {
       await supabase.from('chat_messages').insert([{
         channel: 'general', sender: '🔔 System',
@@ -474,12 +500,15 @@ export default function Chat() {
   useEffect(() => {
     const ch = supabase.channel('huddle-notify')
     ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, ({ new: msg }) => {
-      if (msg.huddle_id && msg.sender === '🔔 System' && !huddle) {
-        setIncomingHuddle({ from: msg.text, huddleId: msg.huddle_id })
-      }
+      if (!msg.huddle_id || msg.sender !== '🔔 System' || huddle) return
+      // Direct ring: invite_to must match my name (or be absent for legacy broadcasts)
+      if (msg.invite_to && msg.invite_to !== myName) return
+      // Extract caller name from "📞 X is calling you" or legacy "📞 X invited Y..."
+      const caller = msg.text?.replace(/^📞\s*/, '').replace(/ is calling you.*/, '').replace(/ invited .*/, '') || 'Someone'
+      setIncomingHuddle({ from: caller, huddleId: msg.huddle_id })
     }).subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [huddle])
+  }, [huddle, myName])
 
   // Huddles are scoped to this page (unlike phone calls, which persist
   // via CallContext at the Shell level) -- navigating away from Chat
@@ -525,16 +554,19 @@ export default function Chat() {
 
       {/* ── Incoming Huddle Alert ── */}
       {incomingHuddle && !huddle && (
-        <div style={{ background: 'linear-gradient(90deg,#14532d,#15803d)', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 14, fontSize: 13, color: '#dcfce7', flexShrink: 0, zIndex: 100 }}>
-          <span style={{ fontSize: 20 }}>📞</span>
-          <span style={{ fontWeight: 700, flex: 1 }}>Incoming Huddle — someone started a call. Join to talk!</span>
+        <div style={{ background: 'linear-gradient(90deg,#14532d,#15803d)', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 14, fontSize: 13, color: '#dcfce7', flexShrink: 0, zIndex: 100 }}>
+          <span style={{ fontSize: 24, animation: 'spin 1s linear infinite' }}>📞</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 800, fontSize: 14, color: '#fff' }}>Incoming call from {incomingHuddle.from}</div>
+            <div style={{ fontSize: 12, opacity: .8, marginTop: 2 }}>Tap Accept to join the huddle</div>
+          </div>
           <button onClick={() => joinHuddle(incomingHuddle.huddleId)}
-            style={{ padding: '6px 18px', borderRadius: 8, border: 'none', background: '#16a34a', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
-            Join Call
+            style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#16a34a', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+            ✅ Accept
           </button>
           <button onClick={() => setIncomingHuddle(null)}
-            style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: 'rgba(255,255,255,.15)', color: '#dcfce7', cursor: 'pointer', fontSize: 13 }}>
-            Dismiss
+            style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+            ❌ Decline
           </button>
         </div>
       )}
@@ -1006,8 +1038,8 @@ export default function Chat() {
           <MenuHeader>{repMenu.rep.name}</MenuHeader>
           <MenuItem onClick={() => {
             const rep = repMenu.rep; setRepMenu(null)
-            if (huddle) { inviteToHuddle(rep.name) }
-            else { startHuddle().then(() => inviteToHuddle(rep.name)) }
+            if (huddle) { ringPerson(rep) }
+            else { startHuddle().then(() => ringPerson(rep)) }
           }}>🎙️ Start huddle with {repMenu.rep.name.split(' ')[0]}</MenuItem>
           <MenuDivider/>
           <MenuItem onClick={() => { setDetailsPanel({ conv: repMenu.rep, convType: 'dm' }); setRepMenu(null) }}>Conversation details</MenuItem>
