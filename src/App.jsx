@@ -5,8 +5,6 @@ import { AppProvider, useApp } from './context/AppContext'
 import { CallProvider } from './context/CallContext'
 import { GmailSyncProvider } from './context/GmailSyncContext'
 import { ScreenShareProvider } from './context/ScreenShareContext'
-import ActiveCallBar from './components/calling/ActiveCallBar'
-import ScreenShareOverlay from './components/ScreenShareOverlay'
 import Sidebar  from './components/layout/Sidebar'
 import TopBar   from './components/layout/TopBar'
 import { Modal, Toast } from './components/ui'
@@ -127,7 +125,6 @@ function Shell() {
     <GmailSyncProvider>
     <div className="app-shell">
       <ActiveCallBar />
-      <ScreenShareOverlay />
       <Sidebar />
       <div className="main-area">
         <TopBar onNew={handleNew} />
