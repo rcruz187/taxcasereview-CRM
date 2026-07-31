@@ -347,7 +347,7 @@ export default function Settings() {
   // Tax Advisor / Tax Associate / Manager only ever see their own signature
   // editor + the live status page (read-only) — nothing firm-wide.
   const tabs = isPrivileged
-    ? ['firm', 'integrations', 'booking', 'branding', 'import', 'users', 'security', 'storage', 'statuses', 'uptime']
+    ? ['firm', 'integrations', 'booking', 'branding', 'import', 'users', 'security', 'storage', 'statuses', 'billing', 'uptime']
     : ['mysignature', 'uptime']
 
   return (
@@ -355,7 +355,7 @@ export default function Settings() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
         {tabs.map(t => (
           <button key={t} className={`btn${tab === t ? ' pri' : ''}`} onClick={() => setTab(t)} style={{ whiteSpace: 'nowrap' }}>
-            {t === 'firm' ? '🏢 Firm Info' : t === 'integrations' ? '🔌 Integrations' : t === 'booking' ? '📅 Online Booking' : t === 'branding' ? '🎨 Branding' : t === 'import' ? '📥 Import Data' : t === 'users' ? '👥 Users' : t === 'security' ? '🔒 Security' : t === 'storage' ? '💾 Storage' : t === 'statuses' ? '🏷️ Workflow Statuses' : t === 'mysignature' ? '✍️ My Signature' : '🟢 Uptime'}
+            {t === 'firm' ? '🏢 Firm Info' : t === 'integrations' ? '🔌 Integrations' : t === 'booking' ? '📅 Online Booking' : t === 'branding' ? '🎨 Branding' : t === 'import' ? '📥 Import Data' : t === 'users' ? '👥 Users' : t === 'security' ? '🔒 Security' : t === 'storage' ? '💾 Storage' : t === 'statuses' ? '🏷️ Workflow Statuses' : t === 'billing' ? '⏱️ Billing Rates' : t === 'mysignature' ? '✍️ My Signature' : '🟢 Uptime'}
           </button>
         ))}
       </div>
@@ -1054,6 +1054,7 @@ export default function Settings() {
       {tab === 'import' && isPrivileged && <ImportTab />}
       {tab === 'storage' && isPrivileged && <StorageTab />}
       {tab === 'statuses' && isPrivileged && <StatusesTab />}
+      {tab === 'billing' && isPrivileged && <BillingRatesTab />}
       {tab === 'uptime' && <UptimeTab />}
     </div>
   )
@@ -1774,6 +1775,139 @@ function StatusesTab() {
               style={{ fontSize: 12, padding: '7px 10px', background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 6, color: 'var(--tx)' }}
             />
             <button className="btn pri" style={{ fontSize: 11, padding: '6px 10px' }} onClick={addCategory}>+ Add Category</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Billing Rates Tab ───────────────────────────────────────────────────────
+function BillingRatesTab() {
+  const { showToast } = useApp()
+  const [activities, setActivities] = useState([])
+  const [loading,    setLoading]    = useState(true)
+  const [saving,     setSaving]     = useState(null) // id being saved
+  const [deleting,   setDeleting]   = useState(null)
+  const [newForm,    setNewForm]    = useState({ name: '', default_rate: '', color: '#2563eb' })
+  const [adding,     setAdding]     = useState(false)
+
+  const COLORS = ['#2563eb','#7c3aed','#0891b2','#059669','#dc2626','#d97706','#64748b','#ec4899']
+
+  async function load() {
+    setLoading(true)
+    const { data } = await supabase.from('billing_activity_types').select('*').order('sort_order')
+    setActivities(data || [])
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  async function updateRate(act, rate) {
+    setSaving(act.id)
+    const parsed = parseFloat(rate)
+    if (isNaN(parsed) || parsed < 0) { showToast('Enter a valid rate'); setSaving(null); return }
+    await supabase.from('billing_activity_types').update({ default_rate: parsed }).eq('id', act.id)
+    setSaving(null)
+    load()
+  }
+
+  async function updateColor(id, color) {
+    await supabase.from('billing_activity_types').update({ color }).eq('id', id)
+    load()
+  }
+
+  async function addActivity() {
+    const name = newForm.name.trim()
+    const rate = parseFloat(newForm.default_rate)
+    if (!name) { showToast('Enter an activity name'); return }
+    if (isNaN(rate) || rate < 0) { showToast('Enter a valid rate'); return }
+    setAdding(true)
+    const maxSort = activities.reduce((m, a) => Math.max(m, a.sort_order || 0), 0)
+    const { error } = await supabase.from('billing_activity_types').insert([{
+      name, default_rate: rate, color: newForm.color, sort_order: maxSort + 1
+    }])
+    setAdding(false)
+    if (error) { showToast('❌ ' + (error.code === '23505' ? 'Activity type already exists' : error.message)); return }
+    setNewForm({ name: '', default_rate: '', color: '#2563eb' })
+    showToast('✅ Activity type added')
+    load()
+  }
+
+  async function deleteActivity(id) {
+    if (!confirm('Delete this activity type? Existing time entries keep their activity label.')) return
+    setDeleting(id)
+    await supabase.from('billing_activity_types').delete().eq('id', id)
+    setDeleting(null)
+    load()
+  }
+
+  if (loading) return <div style={{ padding: 20, color: 'var(--t3)' }}>Loading…</div>
+
+  return (
+    <div className="card">
+      <div className="card-header"><span className="card-title">⏱️ Billing Activity Types & Rates</span></div>
+      <div style={{ padding: '0 20px 20px' }}>
+        <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 16 }}>
+          Default hourly rates for each activity type. Staff can override the rate on individual time entries.
+          These rates auto-fill when logging time.
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+          {activities.map(a => (
+            <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+                                     background: 'var(--s1)', border: '1px solid var(--br)', borderRadius: 8 }}>
+              {/* Color picker */}
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <div style={{ width: 16, height: 16, borderRadius: '50%', background: a.color, cursor: 'pointer', border: '2px solid var(--br)' }}
+                  onClick={() => {
+                    const idx = COLORS.indexOf(a.color)
+                    const next = COLORS[(idx + 1) % COLORS.length]
+                    updateColor(a.id, next)
+                  }} title="Click to change color" />
+              </div>
+
+              <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--tx)' }}>{a.name}</span>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 12, color: 'var(--t3)' }}>$/hr</span>
+                <input
+                  type="text" inputMode="decimal"
+                  defaultValue={Number(a.default_rate).toFixed(2)}
+                  onBlur={e => { if (e.target.value !== String(Number(a.default_rate).toFixed(2))) updateRate(a, e.target.value) }}
+                  onKeyDown={e => e.key === 'Enter' && e.target.blur()}
+                  style={{ width: 80, padding: '5px 8px', background: 'var(--s2)', border: '1px solid var(--br)',
+                           borderRadius: 6, color: 'var(--tx)', fontSize: 13, textAlign: 'right' }}
+                />
+                {saving === a.id && <span style={{ fontSize: 11, color: 'var(--t3)' }}>Saving…</span>}
+              </div>
+
+              <button onClick={() => deleteActivity(a.id)} disabled={deleting === a.id}
+                style={{ padding: '4px 8px', background: 'none', border: '1px solid var(--br)',
+                         borderRadius: 5, color: 'var(--bad)', cursor: 'pointer', fontSize: 13 }}>×</button>
+            </div>
+          ))}
+        </div>
+
+        {/* Add new */}
+        <div style={{ background: 'var(--s1)', border: '1px dashed var(--br)', borderRadius: 8, padding: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>Add Activity Type</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input value={newForm.name} onChange={e => setNewForm(f => ({ ...f, name: e.target.value }))}
+              placeholder="Activity name…" onKeyDown={e => e.key === 'Enter' && addActivity()}
+              style={{ flex: 2, minWidth: 140, padding: '7px 10px', background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 7, color: 'var(--tx)', fontSize: 13 }} />
+            <input value={newForm.default_rate} onChange={e => setNewForm(f => ({ ...f, default_rate: e.target.value }))}
+              placeholder="Rate/hr" inputMode="decimal" onKeyDown={e => e.key === 'Enter' && addActivity()}
+              style={{ width: 90, padding: '7px 10px', background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 7, color: 'var(--tx)', fontSize: 13 }} />
+            <div style={{ display: 'flex', gap: 4 }}>
+              {COLORS.map(c => (
+                <div key={c} onClick={() => setNewForm(f => ({ ...f, color: c }))}
+                  style={{ width: 18, height: 18, borderRadius: '50%', background: c, cursor: 'pointer',
+                           border: newForm.color === c ? '3px solid var(--tx)' : '2px solid transparent' }} />
+              ))}
+            </div>
+            <button className="btn pri" onClick={addActivity} disabled={adding} style={{ fontSize: 12, padding: '7px 14px' }}>
+              {adding ? 'Adding…' : '+ Add'}
+            </button>
           </div>
         </div>
       </div>
