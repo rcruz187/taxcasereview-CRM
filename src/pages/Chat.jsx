@@ -304,8 +304,10 @@ export default function Chat() {
 
   useEffect(() => {
     loadMessages(); inputRef.current?.focus()
+    // Realtime subscription handles new messages — no polling needed.
+    // Keep a 60-second heartbeat only as a fallback for missed realtime events.
     clearInterval(pollerRef.current)
-    pollerRef.current = setInterval(() => loadMessages(true), 4000)
+    pollerRef.current = setInterval(() => loadMessages(true), 60000)
     return () => clearInterval(pollerRef.current)
   }, [loadMessages])
 

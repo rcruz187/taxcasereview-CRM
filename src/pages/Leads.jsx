@@ -193,7 +193,7 @@ function LeadInlineFax({ lead, onClose, onLogged }) {
   }
   async function send() {
     set3(true)
-    const {data:s}=await supabase.from('settings').select('signalwire_backend,sw_inbound_did').limit(1).maybeSingle()
+    const s = await getSettings()
     let fileUrl=null
     if(file){const path='fax/'+Date.now()+'_'+file.name;await supabase.storage.from('documents').upload(path,file,{upsert:true});const{data:u}=supabase.storage.from('documents').getPublicUrl(path);fileUrl=u?.publicUrl}
     const toFull='+1'+toNum.slice(-10)
@@ -279,7 +279,7 @@ function LeadInlineEsign({ lead, onClose }) {
     const url=window.location.origin+'/taxcasereview-CRM/sign/'+data.id
     await navigator.clipboard.writeText(url).catch(()=>{})
     let smsSent=false,emailSent=false
-    const{data:cfg}=await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
+    const cfg = await getSettings()
     if((sendVia==='email'||sendVia==='both')&&lead?.email){
       try{
         const{error:eErr}=await supabase.functions.invoke('send-email',{body:{ tenant_id: FIRM.tenantId || undefined,
@@ -387,6 +387,15 @@ export default function Leads() {
   const { id: urlLeadId } = useParams()
   const [searchParams] = useSearchParams()
   const isTaxAdvisor = role === 'Tax Advisor'
+
+  // Cache settings at load time — avoids re-fetching signalwire_backend on every action
+  const settingsRef = useRef(null)
+  async function getSettings() {
+    if (settingsRef.current) return settingsRef.current
+    const { data } = await supabase.from('settings').select('signalwire_backend,sw_inbound_did,sw_space_url').limit(1).maybeSingle()
+    settingsRef.current = data || {}
+    return settingsRef.current
+  }
 
   // Auto-open Add Lead modal when navigated here with ?new=1
   useEffect(() => {
@@ -531,7 +540,7 @@ export default function Leads() {
 
   async function load() {
     const [{ data }, { data: emp }, { data: cats }, { data: sts }] = await Promise.all([
-      supabase.from('leads').select('*').order('created_at', { ascending: false }),
+      supabase.from('leads').select('id,name,status,"taxFee","assignedTo",created_at,"clientType",phone,email,"taxAssociate","pipelineStage",archived,deleted_at,"business_name","filingStatus",city,state,source').order('created_at', { ascending: false }),
       supabase.from('employees').select('id,name,avatar_url,email,role').order('name'),
       supabase.from('workflow_status_categories').select('*').order('sort_order'),
       supabase.from('workflow_statuses').select('*').order('sort_order'),
@@ -740,7 +749,7 @@ export default function Leads() {
         emailSent = !eErr
       }
       if ((via==='sms'||via==='both') && lead.phone) {
-        const { data:cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
+        const cfg = await getSettings()
         if (cfg?.signalwire_backend) { try { await fetch(cfg.signalwire_backend+'/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:lead.phone,body:`${firmName()}: sign your ${formDef.state} POA here: ${sigUrl}`})}); smsSent=true } catch(_){} }
       }
       await supabase.from('lead_notes').insert({ lead_id:lead.id, text:`🏛️ ${formDef.state} State POA sent for e-signature (${formDef.num})${emailSent?' via email':''}${smsSent?' via SMS':''}`, author:actor, created_at: new Date().toISOString() })
@@ -827,7 +836,7 @@ export default function Leads() {
       emailSent = !eErr
     }
     if ((via==='sms'||via==='both') && l.phone) {
-      const { data: cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
+      const cfg = await getSettings()
       if (cfg?.signalwire_backend) {
         try {
           const smsBody = stripePayUrl
@@ -860,7 +869,7 @@ export default function Leads() {
     setLeadSmsSending(true)
 
     const toNum = '+1' + l.phone.replace(/\D/g,'').slice(-10)
-    const { data: settings } = await supabase.from('settings').select('sw_space_url').limit(1).maybeSingle()
+    const settings = await getSettings()
     let status = 'Sent', swId = null, errMsg = null
 
     if (settings?.sw_space_url) {
@@ -1063,7 +1072,7 @@ export default function Leads() {
       }
     } else {
       // New lead — reload then navigate straight into the detail view
-      const { data: allLeads } = await supabase.from('leads').select('*').order('created_at', { ascending: false })
+      const { data: allLeads } = await supabase.from('leads').select('id,name,status,"taxFee","assignedTo",created_at,"clientType",phone,email,"taxAssociate","pipelineStage",archived,deleted_at,"business_name","filingStatus",city,state,source').order('created_at', { ascending: false })
       if (allLeads) setLeads(allLeads)
       const newest = allLeads?.find(l => l.name === form.name)
       if (newest) {
@@ -1371,7 +1380,7 @@ export default function Leads() {
       if (!stripeErr && stripeData?.url) stripePayUrl = stripeData.url
     } catch(e) { console.error('Stripe link error:', e) }
     let smsSent=false,emailSent=false
-    const{data:cfg}=await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
+    const cfg = await getSettings()
 
     if(l.email){
       try{

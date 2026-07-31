@@ -218,7 +218,7 @@ function InlineFaxForm({ client, onClose, showToast, onLogged }) {
   async function send() {
     if (!toNum) { showToast('Fax number required','err'); return }
     setSending(true)
-    const { data:s } = await supabase.from('settings').select('signalwire_backend,sw_inbound_did').limit(1).maybeSingle()
+    const s = await getSettings()
     let fileUrl = null
     if (file) {
       const path = 'fax/'+Date.now()+'_'+file.name
@@ -389,7 +389,7 @@ function InlinePortalForm({ client, onClose, showToast }) {
     setSending(true)
     await navigator.clipboard.writeText(url).catch(() => {})
     let emailSent = false, smsSent = false
-    const { data: cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
+    const cfg = await getSettings()
 
     if ((sendVia === 'email' || sendVia === 'both') && client?.email) {
       try {
@@ -599,7 +599,7 @@ function InlineOrganizerForm({ client, onClose, showToast }) {
     const url = window.location.origin + '/taxcasereview-CRM/organizer/' + orgId
     await navigator.clipboard.writeText(url).catch(() => {})
     let emailSent = false, smsSent = false
-    const { data: cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
+    const cfg = await getSettings()
 
     if ((sendVia === 'email' || sendVia === 'both') && client?.email) {
       try {
@@ -866,6 +866,15 @@ export default function Clients() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useApp()
 
+  // Cache settings at load time — avoids re-fetching signalwire_backend on every action
+  const settingsRef = useRef(null)
+  async function getSettings() {
+    if (settingsRef.current) return settingsRef.current
+    const { data } = await supabase.from('settings').select('signalwire_backend,sw_inbound_did,sw_space_url').limit(1).maybeSingle()
+    settingsRef.current = data || {}
+    return settingsRef.current
+  }
+
   useEffect(() => {
     if (searchParams.get('new') === '1') {
       setForm(BLANK)
@@ -1068,7 +1077,7 @@ export default function Clients() {
 
   async function load() {
     const [{ data:cl },{ data:em },{ data:cats },{ data:sts }] = await Promise.all([
-      supabase.from('clients').select('*').order('created_at',{ascending:false}),
+      supabase.from('clients').select('id,name,status,email,phone,city,state,"clientType","assignedTo","taxAssociate","pipelineStage",archived,deleted_at,"business_name",created_at').order('created_at',{ascending:false}),
       supabase.from('employees').select('id,name,avatar_url,email'),
       supabase.from('workflow_status_categories').select('*').order('sort_order'),
       supabase.from('workflow_statuses').select('*').order('sort_order'),
@@ -1214,7 +1223,7 @@ export default function Clients() {
     await logActivity(supabase,{employeeName:actorC,action:'client_created',category:'client',description:`Added client: ${form.name}`,entityName:form.name}).catch(()=>{})
     setModal(false); setForm(BLANK)
     // Reload then navigate straight into the new client's detail
-    const { data: allClients } = await supabase.from('clients').select('*').order('created_at', { ascending: false })
+    const { data: allClients } = await supabase.from('clients').select('id,name,status,email,phone,city,state,"clientType","assignedTo","taxAssociate","pipelineStage",archived,deleted_at,"business_name",created_at').order('created_at', { ascending: false })
     if (allClients) setClients(allClients)
     const newest = allClients?.find(c => c.name === form.name)
     if (newest) { setDetail(newest); loadRelated(newest.name); navigate('/clients/' + newest.id, { replace: true }) }
@@ -1291,7 +1300,7 @@ export default function Clients() {
     setSmsSending(true)
 
     const toNum = '+1' + c.phone.replace(/\D/g,'').slice(-10)
-    const { data: settings } = await supabase.from('settings').select('sw_space_url').limit(1).maybeSingle()
+    const settings = await getSettings()
     let status = 'Sent', swId = null, errMsg = null
 
     if (settings?.sw_space_url) {
@@ -1496,7 +1505,7 @@ export default function Clients() {
         emailSent = !eErr
       }
       if ((via==='sms'||via==='both') && client.phone) {
-        const { data:cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
+        const cfg = await getSettings()
         if (cfg?.signalwire_backend) { try { await fetch(cfg.signalwire_backend+'/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:client.phone,body:`${firmName()}: sign your ${formDef.state} POA here: ${sigUrl}`})}); smsSent=true } catch(_){} }
       }
       await insertClientNote({ clientname:client.name, content:`🏛️ ${formDef.state} State POA sent for e-signature (${formDef.num})${emailSent?' via email':''}${smsSent?' via SMS':''}`, created_by:actor, visible_to_client:false, created_at:new Date().toISOString() })
@@ -1586,7 +1595,7 @@ export default function Clients() {
       emailSent = !eErr
     }
     if ((via==='sms'||via==='both') && c.phone) {
-      const { data: cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle()
+      const cfg = await getSettings()
       if (cfg?.signalwire_backend) {
         try {
           await fetch(cfg.signalwire_backend + '/sms/send', {

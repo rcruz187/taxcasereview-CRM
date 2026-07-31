@@ -132,7 +132,7 @@ export default function Email() {
       // Reverted to select('*'): narrowing the projection broke the inbox in
       // production. A column name that doesn't exist makes PostgREST fail the
       // whole query, and the page then renders no mail at all.
-      supabase.from('emails').select('*').eq('mailbox_owner', user.email).order('created_at', { ascending: false }),
+      supabase.from('emails').select('id,subject,from_email,from_name,to_email,snippet,body,created_at,is_read,triage,thread_id,mailbox_owner,attachments,client_id,gmail_message_id,in_reply_to,references').eq('mailbox_owner', user.email).order('created_at', { ascending: false }).limit(300),
       supabase.from('clients').select('id,name,email'),
       supabase.from('leads').select('id,name,email'),
     ])
