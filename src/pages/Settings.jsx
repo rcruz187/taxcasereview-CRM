@@ -1811,6 +1811,11 @@ function BillingRatesTab() {
     load()
   }
 
+  async function toggleNonBillable(id, current) {
+    await supabase.from('billing_activity_types').update({ non_billable: !current }).eq('id', id)
+    load()
+  }
+
   async function updateColor(id, color) {
     await supabase.from('billing_activity_types').update({ color }).eq('id', id)
     load()
@@ -1880,6 +1885,12 @@ function BillingRatesTab() {
                 />
                 {saving === a.id && <span style={{ fontSize: 11, color: 'var(--t3)' }}>Saving…</span>}
               </div>
+              <button onClick={() => toggleNonBillable(a.id, a.non_billable)}
+                style={{ padding: '4px 8px', borderRadius: 5, border: '1px solid var(--br)', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                         background: a.non_billable ? '#fef3c7' : 'var(--s2)', color: a.non_billable ? '#92400e' : 'var(--t3)' }}
+                title="Toggle non-billable">
+                {a.non_billable ? 'NON-BILLABLE' : 'Billable'}
+              </button>
 
               <button onClick={() => deleteActivity(a.id)} disabled={deleting === a.id}
                 style={{ padding: '4px 8px', background: 'none', border: '1px solid var(--br)',

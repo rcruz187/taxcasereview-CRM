@@ -71,10 +71,14 @@ export default function TimeEntry({ clientId, clientName, embed = false }) {
   }, [form.client_name])
 
   // When activity type changes, auto-fill rate from the activity's default rate
+  // Non-billable activities get rate 0 automatically
   useEffect(() => {
     if (!form.activity_type || editId) return // don't override on edit
     const act = activities.find(a => a.name === form.activity_type)
-    if (act) fld('rate', act.default_rate)
+    if (act) {
+      fld('rate', act.non_billable ? 0 : act.default_rate)
+      if (act.non_billable) fld('billed', true) // mark non-billable as already "billed" so they don't show as WIP
+    }
   }, [form.activity_type, activities])
 
   function openNew() {
@@ -366,7 +370,7 @@ export default function TimeEntry({ clientId, clientName, embed = false }) {
               <select value={form.activity_type} onChange={e => fld('activity_type', e.target.value)}
                 style={{ width: '100%', padding: '8px 10px', background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 7, color: 'var(--tx)', fontSize: 13, boxSizing: 'border-box' }}>
                 <option value="">Select activity…</option>
-                {activities.map(a => <option key={a.id} value={a.name}>{a.name} (${Number(a.default_rate).toFixed(0)}/hr)</option>)}
+                {activities.map(a => <option key={a.id} value={a.name}>{a.name}{a.non_billable ? ' — NON-BILLABLE' : ` ($${Number(a.default_rate).toFixed(0)}/hr)`}</option>)}
               </select>
             </div>
 

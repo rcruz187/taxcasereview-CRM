@@ -680,9 +680,9 @@ function InlineOrganizerForm({ client, onClose, showToast }) {
 export const DOC_FOLDERS = ['IRS Docs','Tax Returns','Agreements','POA & Forms','Transcripts','Correspondence','Financial Statements','E-Signatures','Call Recording','Other']
 const QUICK_TASK_TITLES = ['Request transcripts from IRS','Follow up with client','Prepare & send POA (2848/8821)','Call IRS for account status','Draft engagement letter','Collect financial documents','File tax return','Submit installment agreement','Prepare Offer in Compromise','Follow up on offer','Request wage & income transcripts','Schedule consultation','Send resolution options','Collect payment / trade']
 // WIP summary widget shown in the client Overview tab
-// Shows unbilled hours + amount + a quick "Log Time" button
-function ClientWIPWidget({ clientId, clientName, onLogTime }) {
-  const [wip, setWip] = useState(null)
+// WIP stats shown on Overview — read-only, no button
+function ClientWIPWidget({ clientId, clientName }) {
+  const [wip, setWip] = useState({ hours: 0, amount: 0 })
   useEffect(() => {
     if (!clientName) return
     const q = clientId
@@ -690,14 +690,14 @@ function ClientWIPWidget({ clientId, clientName, onLogTime }) {
       : supabase.from('billing_time_entries').select('hours,amount,billed').eq('client_name', clientName).eq('billed', false)
     q.then(({ data }) => {
       if (!data) return
-      const hours  = data.reduce((s, e) => s + Number(e.hours || 0), 0)
-      const amount = data.reduce((s, e) => s + Number(e.amount || 0), 0)
-      setWip({ hours, amount, count: data.length })
+      setWip({
+        hours:  data.reduce((s, e) => s + Number(e.hours || 0), 0),
+        amount: data.reduce((s, e) => s + Number(e.amount || 0), 0),
+      })
     })
   }, [clientId, clientName])
-  if (!wip) return null
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 16, borderLeft: '1px solid var(--br)', paddingLeft: 16, marginLeft: 8 }}>
+    <>
       <div>
         <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>WIP Hours</div>
         <div style={{fontSize:22,fontWeight:800,color:'#f59e0b'}}>{Number(wip.hours).toFixed(1)}h</div>
@@ -706,11 +706,7 @@ function ClientWIPWidget({ clientId, clientName, onLogTime }) {
         <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>WIP Amount</div>
         <div style={{fontSize:22,fontWeight:800,color:'#f59e0b'}}>${Number(wip.amount).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}</div>
       </div>
-      <button onClick={onLogTime}
-        style={{padding:'6px 12px',background:'var(--blue)',border:'none',borderRadius:7,color:'#fff',fontWeight:700,fontSize:11,cursor:'pointer',whiteSpace:'nowrap',marginTop:8}}>
-        + Log Time
-      </button>
-    </div>
+    </>
   )
 }
 
@@ -2038,7 +2034,6 @@ export default function Clients() {
               {key:'payments',   icon:'💳', text:'Payments'},
               {key:'cases',      icon:'📁', text:'Cases'},
               {key:'organizer',  icon:'🧾', text:'Tax-Organizer'},
-              {key:'time',       icon:'⏱️', text:'Time & Billing'},
               {key:'activity',   icon:'📋', text:'Activity Report'},
             ].map(t=>(
               <button key={t.key} onClick={()=>setDetailTab(t.key)}
@@ -2084,7 +2079,7 @@ export default function Clients() {
                   <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Payments</div>
                   <div style={{fontSize:22,fontWeight:800,color:'var(--ok)'}}>{relPayments.length}</div>
                 </div>
-                <ClientWIPWidget clientId={c.id} clientName={c.name} onLogTime={() => setDetailTab('time')} />
+                <ClientWIPWidget clientId={c.id} clientName={c.name} />
               </div>
             </div>
           )}
@@ -2148,13 +2143,6 @@ export default function Clients() {
           {detailTab==='organizer'&&(
             <ErrorBoundary>
               <OrganizerView clientName={c.name}/>
-            </ErrorBoundary>
-          )}
-
-          {/* Time & Billing Tab */}
-          {detailTab==='time'&&(
-            <ErrorBoundary>
-              <TimeEntry clientId={c.id} clientName={c.name} embed />
             </ErrorBoundary>
           )}
 
@@ -2531,6 +2519,14 @@ export default function Clients() {
                 <button className="btn pri" style={{fontSize:11,padding:'5px 12px'}} onClick={addQuickTask} disabled={addingTask}>
                   {addingTask?'…':'+ Add'}
                 </button>
+              </div>
+
+              {/* Time & Billing — Canopy-style, lives at the bottom of the Tasks tab */}
+              <div style={{marginTop:24,borderTop:'1px solid var(--br)',paddingTop:16}}>
+                <div style={{fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>⏱️ Time & Billing</div>
+                <ErrorBoundary>
+                  <TimeEntry clientId={c.id} clientName={c.name} embed />
+                </ErrorBoundary>
               </div>
             </div>
           )}
