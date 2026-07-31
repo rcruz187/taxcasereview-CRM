@@ -95,6 +95,10 @@ export default function Chat() {
   const rawHuddleRef = useRef(null)
   const [huddleProcessedStream, setHuddleProcessedStream] = useState(null)
   const [showBgPanel, setShowBgPanel] = useState(false)
+  // Huddle screen share
+  const [huddleScreenStream,  setHuddleScreenStream]  = useState(null)
+  const [huddleSharingScreen, setHuddleSharingScreen] = useState(false)
+  const huddleScreenTrackRef = useRef(null)
   const [chatToast, setChatToast] = useState('')
   function showToast(msg) { setChatToast(msg); setTimeout(() => setChatToast(''), 4000) }
   const [showEmoji, setShowEmoji]   = useState(false)
@@ -392,12 +396,51 @@ export default function Chat() {
   }
 
   async function leaveHuddle() {
+    stopHuddleScreenShare()
     vbg.stopLoop()
     setHuddleProcessedStream(null)
     setShowBgPanel(false)
     await webrtc.leave()
     setHuddleId(null)
     setShowHuddleInvite(false)
+  }
+
+  async function startHuddleScreenShare() {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30, cursor: 'always' }, audio: true })
+      const track  = stream.getVideoTracks()[0]
+      huddleScreenTrackRef.current = track
+      setHuddleScreenStream(stream)
+      setHuddleSharingScreen(true)
+      // Replace video track on every peer connection
+      const pcs = webrtc.peerConnsRef.current
+      Object.values(pcs).forEach(pc => {
+        const sender = pc.getSenders().find(s => s.track?.kind === 'video')
+        if (sender) sender.replaceTrack(track).catch(() => {})
+      })
+      track.onended = () => stopHuddleScreenShare()
+    } catch (e) {
+      if (e.name !== 'NotAllowedError') showToast('Screen share unavailable')
+    }
+  }
+
+  function stopHuddleScreenShare() {
+    if (huddleScreenTrackRef.current) {
+      huddleScreenTrackRef.current.onended = null
+      huddleScreenTrackRef.current.stop()
+      huddleScreenTrackRef.current = null
+    }
+    if (huddleScreenStream) { huddleScreenStream.getTracks().forEach(t => t.stop()); setHuddleScreenStream(null) }
+    setHuddleSharingScreen(false)
+    // Restore camera track to all peers
+    const camTrack = webrtc.localStreamRef.current?.getVideoTracks()[0]
+    if (camTrack) {
+      const pcs = webrtc.peerConnsRef.current
+      Object.values(pcs).forEach(pc => {
+        const sender = pc.getSenders().find(s => s.track?.kind === 'video')
+        if (sender) sender.replaceTrack(camTrack).catch(() => {})
+      })
+    }
   }
 
   async function handleHuddleBgSelect(mode, presetId, customUrl) {
@@ -708,6 +751,14 @@ export default function Chat() {
             <button onClick={webrtc.toggleCamera} style={{ padding: '3px 12px', borderRadius: 5, background: 'rgba(255,255,255,.15)', border: '1px solid rgba(255,255,255,.3)', color: '#dcfce7', cursor: 'pointer', fontWeight: 600, fontSize: 12 }} title={cameraOn ? 'Turn camera off' : 'Turn camera on'}>
               {cameraOn ? '📹 Camera On' : '📷 Off'}
             </button>
+            {!huddleSharingScreen
+              ? <button onClick={startHuddleScreenShare} style={{ padding: '3px 12px', borderRadius: 5, background: 'rgba(255,255,255,.15)', border: '1px solid rgba(255,255,255,.3)', color: '#dcfce7', cursor: 'pointer', fontWeight: 600, fontSize: 12 }} title="Share your screen">
+                  🖥️ Share Screen
+                </button>
+              : <button onClick={stopHuddleScreenShare} style={{ padding: '3px 12px', borderRadius: 5, background: 'rgba(124,58,237,.3)', border: '1px solid #7c3aed', color: '#c4b5fd', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
+                  ⏹ Stop Sharing
+                </button>
+            }
             <button onClick={() => setShowBgPanel(p => !p)} style={{ padding: '3px 12px', borderRadius: 5, background: showBgPanel ? 'rgba(59,130,246,.3)' : 'rgba(255,255,255,.15)', border: showBgPanel ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,.3)', color: showBgPanel ? '#93c5fd' : '#dcfce7', cursor: 'pointer', fontWeight: 600, fontSize: 12 }} title="Virtual Background">
               🖼️ BG
             </button>
