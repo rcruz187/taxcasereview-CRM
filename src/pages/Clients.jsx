@@ -950,6 +950,7 @@ export default function Clients() {
   const [addingNote,  setAddingNote]  = useState(false)
   const [relTasks,    setRelTasks]    = useState([])
   const [clientTaskFilter, setClientTaskFilter] = useState('all') // 'all' | 'active' | 'completed'
+  const [taskSubTab,  setTaskSubTab]  = useState('tasks') // 'tasks' | 'time'
   const [clientSectionOverride, setClientSectionOverride] = useState({})
   const [relInvoices, setRelInvoices] = useState([])
   const [relPayments, setRelPayments] = useState([])
@@ -2027,7 +2028,6 @@ export default function Clients() {
               {key:'overview',   icon:'📋', text:'Overview'},
               {key:'notes',      icon:'📝', text:'Notes'},
               {key:'tasks',      icon:'✅', text:'Tasks'},
-              {key:'time',       icon:'⏱️', text:'Time & Billing'},
               {key:'docs',       icon:'📁', text:'Docs'},
               {key:'finprofile', icon:'🧮', text:'Financial Profile'},
               {key:'sms',        icon:'💬', text:'SMS'},
@@ -2144,13 +2144,6 @@ export default function Clients() {
           {detailTab==='organizer'&&(
             <ErrorBoundary>
               <OrganizerView clientName={c.name}/>
-            </ErrorBoundary>
-          )}
-
-          {/* Time & Billing Tab */}
-          {detailTab==='time'&&(
-            <ErrorBoundary>
-              <TimeEntry clientId={c.id} clientName={c.name} embed />
             </ErrorBoundary>
           )}
 
@@ -2387,7 +2380,26 @@ export default function Clients() {
           {/* Tasks Tab */}
           {detailTab==='tasks'&&(
             <div style={{padding:16}}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+              {/* Inner sub-tabs — same pattern as Financial Profile */}
+              <div style={{display:'flex',gap:4,marginBottom:16,borderBottom:'1px solid var(--br)',flexWrap:'wrap'}}>
+                {[
+                  {key:'tasks', label:'✅ Tasks'},
+                  {key:'time',  label:'⏱️ Time & Billing'},
+                ].map(t=>(
+                  <button key={t.key} onClick={()=>setTaskSubTab(t.key)} style={{
+                    padding:'8px 16px', borderRadius:'8px 8px 0 0',
+                    border:'1px solid var(--br)', borderBottom: taskSubTab===t.key ? '1px solid var(--sf)' : '1px solid var(--br)',
+                    background: taskSubTab===t.key ? 'var(--sf)' : 'var(--s2)',
+                    color: taskSubTab===t.key ? 'var(--tx)' : 'var(--t3)',
+                    fontWeight: taskSubTab===t.key ? 700 : 400,
+                    cursor:'pointer', fontSize:13, marginBottom:-1
+                  }}>{t.label}</button>
+                ))}
+              </div>
+
+              {/* Tasks sub-tab */}
+              {taskSubTab==='tasks'&&(
+              <>
                 <div style={{fontSize:12,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>
                   ✅ Tasks ({relTasks.length})
                 </div>
@@ -2400,7 +2412,6 @@ export default function Clients() {
                   </select>
                   <button className="btn sec" style={{fontSize:11,padding:'5px 12px'}} onClick={openTemplatePicker}>📋 Apply Work Template</button>
                 </div>
-              </div>
               {loadingRel&&<div style={{color:'var(--t3)',fontSize:12}}>Loading…</div>}
               {!loadingRel&&relTasks.length===0&&(
                 <div style={{color:'var(--t3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No tasks yet for this client.</div>
@@ -2530,6 +2541,14 @@ export default function Clients() {
               </div>
 
 
+              </>)}
+
+              {/* Time & Billing sub-tab */}
+              {taskSubTab==='time'&&(
+                <ErrorBoundary>
+                  <TimeEntry clientId={c.id} clientName={c.name} embed />
+                </ErrorBoundary>
+              )}
             </div>
           )}
 
