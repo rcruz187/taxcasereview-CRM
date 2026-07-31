@@ -18,6 +18,7 @@ import SavedCardsPanel from '../components/SavedCardsPanel'
 import SplitPaymentModal from '../components/SplitPaymentModal'
 import FinancialProfile from './FinancialProfile'
 import TimeEntry from './TimeEntry'
+import ClientActivityReport from './ClientActivityReport'
 import OrganizerView from '../components/OrganizerView'
 import { supabase } from '../lib/supabase'
 import { triggerWorkflow, applyWorkflowTemplate } from '../lib/triggerWorkflow'
@@ -2038,6 +2039,7 @@ export default function Clients() {
               {key:'cases',      icon:'📁', text:'Cases'},
               {key:'organizer',  icon:'🧾', text:'Tax-Organizer'},
               {key:'time',       icon:'⏱️', text:'Time & Billing'},
+              {key:'activity',   icon:'📋', text:'Activity Report'},
             ].map(t=>(
               <button key={t.key} onClick={()=>setDetailTab(t.key)}
                 style={{display:'inline-flex',alignItems:'center',gap:5,padding:'12px 9px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
@@ -2153,6 +2155,13 @@ export default function Clients() {
           {detailTab==='time'&&(
             <ErrorBoundary>
               <TimeEntry clientId={c.id} clientName={c.name} embed />
+            </ErrorBoundary>
+          )}
+
+          {/* Activity Report Tab */}
+          {detailTab==='activity'&&(
+            <ErrorBoundary>
+              <ClientActivityReport entityId={c.id} entityName={c.name} entityType="client" />
             </ErrorBoundary>
           )}
 

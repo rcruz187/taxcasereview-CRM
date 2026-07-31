@@ -1,5 +1,6 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { formatMoneyInput, parseMoney } from '../lib/money'
+import ClientActivityReport from './ClientActivityReport'
 import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -2101,6 +2102,7 @@ export default function Leads() {
               {key:'notes', icon:'📝', text:`Notes & Activity (${leadNotes.length})`},
               {key:'tasks', icon:'✅', text:`Tasks (${leadTasks.length})`},
               {key:'sms', icon:'💬', text:'SMS'},
+              {key:'activity', icon:'📋', text:'Activity Report'},
               {key:'payments', icon:'💳', text:'Payments'},
               {key:'finintake', icon:'💰', text:'Financial Intake'},
               {key:'finprofile', icon:'🧮', text:'Financial Profile'},
@@ -2159,6 +2161,10 @@ export default function Leads() {
                 </div>
               ))}
             </div>
+          )}
+
+          {leadDetailTab==='activity' && (
+            <ClientActivityReport entityId={l.id} entityName={l.name} entityType="lead" />
           )}
 
           {leadDetailTab==='overview' && (

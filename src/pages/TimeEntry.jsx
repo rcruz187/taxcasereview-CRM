@@ -34,6 +34,7 @@ export default function TimeEntry({ clientId, clientName, embed = false }) {
   const [tasks,       setTasks]       = useState([])
   const [loading,     setLoading]     = useState(true)
   const [showForm,    setShowForm]    = useState(false)
+  const [showReport,  setShowReport]  = useState(false)
   const [form,        setForm]        = useState({ ...BLANK })
   const [editId,      setEditId]      = useState(null)
   const [saving,      setSaving]      = useState(false)
@@ -208,6 +209,118 @@ export default function TimeEntry({ clientId, clientName, embed = false }) {
           ))}
         </div>
       </div>
+
+      {/* Toolbar */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button className="btn pri" style={{ fontSize: 12, padding: '7px 14px' }} onClick={openNew}>+ Log Time</button>
+        <div style={{ display: 'flex', gap: 4, background: 'var(--s1)', border: '1px solid var(--br)', borderRadius: 7, padding: 3 }}>
+          {['all', 'wip', 'billed'].map(v => (
+            <button key={v} onClick={() => setFilterBilled(v)}
+              style={{ padding: '4px 12px', borderRadius: 5, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                       background: filterBilled === v ? 'var(--blue)' : 'transparent',
+                       color: filterBilled === v ? '#fff' : 'var(--t2)' }}>
+              {v === 'all' ? 'All' : v === 'wip' ? '⏳ WIP' : '✅ Billed'}
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setShowReport(r => !r)}
+          style={{ padding: '7px 14px', background: showReport ? '#1e3a8a' : 'var(--s1)', border: '1px solid var(--br)', borderRadius: 8, color: showReport ? '#fff' : 'var(--t2)', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
+          📊 {showReport ? 'Hide Report' : 'Billing Report'}
+        </button>
+      </div>
+
+      {/* Billing Report Panel */}
+      {showReport && (() => {
+        const byActivity = {}
+        entries.forEach(e => {
+          if (!byActivity[e.activity_type]) byActivity[e.activity_type] = { hours: 0, amount: 0, billed: 0, wip: 0, count: 0 }
+          byActivity[e.activity_type].hours  += Number(e.hours || 0)
+          byActivity[e.activity_type].amount += Number(e.amount || 0)
+          byActivity[e.activity_type].count  += 1
+          if (e.billed) byActivity[e.activity_type].billed += Number(e.amount || 0)
+          else          byActivity[e.activity_type].wip    += Number(e.amount || 0)
+        })
+        const rows = Object.entries(byActivity).sort((a, b) => b[1].amount - a[1].amount)
+        const totH = entries.reduce((s, e) => s + Number(e.hours || 0), 0)
+        const totA = entries.reduce((s, e) => s + Number(e.amount || 0), 0)
+        const totW = entries.filter(e => !e.billed).reduce((s, e) => s + Number(e.amount || 0), 0)
+        const totB = entries.filter(e =>  e.billed).reduce((s, e) => s + Number(e.amount || 0), 0)
+
+        function printBillingReport() {
+          const w = window.open('', '_blank')
+          const now = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+          w.document.write(`<!DOCTYPE html><html><head><title>Billing Report${filterClient ? ' — ' + filterClient : ''}</title>
+          <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;padding:36px;color:#1e293b;font-size:12px}
+          h1{font-size:18px;font-weight:800;color:#1e3a8a;margin-bottom:4px}.meta{font-size:11px;color:#64748b;margin-bottom:20px}
+          table{width:100%;border-collapse:collapse;font-size:12px}th{background:#f1f5f9;padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#64748b;border:1px solid #e2e8f0}
+          td{padding:7px 10px;border:1px solid #e2e8f0}tr:nth-child(even) td{background:#f8fafc}
+          .total{font-weight:800;background:#f1f5f9}.footer{margin-top:24px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:8px}</style>
+          </head><body>
+          <h1>Billing Report${filterClient ? ' — ' + filterClient : ''}</h1>
+          <div class="meta">Generated ${now} · ${entries.length} entries</div>
+          <table><thead><tr><th>Activity Type</th><th>Entries</th><th>Hours</th><th>Total</th><th>WIP</th><th>Billed</th></tr></thead><tbody>
+          ${rows.map(([act, d]) => `<tr><td>${act}</td><td>${d.count}</td><td>${Number(d.hours).toFixed(2)}h</td><td>$${Number(d.amount).toLocaleString('en-US',{minimumFractionDigits:2})}</td><td style="color:#92400e">$${Number(d.wip).toLocaleString('en-US',{minimumFractionDigits:2})}</td><td style="color:#15803d">$${Number(d.billed).toLocaleString('en-US',{minimumFractionDigits:2})}</td></tr>`).join('')}
+          <tr class="total"><td>TOTAL</td><td>${entries.length}</td><td>${totH.toFixed(2)}h</td><td>$${totA.toLocaleString('en-US',{minimumFractionDigits:2})}</td><td style="color:#92400e">$${totW.toLocaleString('en-US',{minimumFractionDigits:2})}</td><td style="color:#15803d">$${totB.toLocaleString('en-US',{minimumFractionDigits:2})}</td></tr>
+          </tbody></table>
+          <div class="footer">Tax Case Review · Confidential</div>
+          </body></html>`)
+          w.document.close(); setTimeout(() => w.print(), 400)
+        }
+
+        return (
+          <div style={{ background: 'var(--s1)', border: '1px solid var(--br)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--tx)' }}>📊 Billing Summary — {entries.length} entries</div>
+              <button onClick={printBillingReport}
+                style={{ padding: '6px 14px', background: '#1e3a8a', border: 'none', borderRadius: 7, color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                🖨️ Print
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+              {[
+                { label: 'Total Hours', val: fmtH(totH), color: '#2563eb' },
+                { label: 'Total Amount', val: fmt(totA), color: '#2563eb' },
+                { label: 'WIP (Unbilled)', val: fmt(totW), color: '#f59e0b' },
+                { label: 'Billed', val: fmt(totB), color: '#22c55e' },
+              ].map(s => (
+                <div key={s.label} style={{ background: 'var(--bg)', border: '1px solid var(--br)', borderRadius: 8, padding: '10px 14px', minWidth: 110 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{s.label}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: s.color }}>{s.val}</div>
+                </div>
+              ))}
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: 'var(--s2)' }}>
+                  {['Activity Type','Entries','Hours','Total','WIP','Billed'].map(h => (
+                    <th key={h} style={{ padding: '6px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.05em', borderBottom: '1px solid var(--br)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(([act, d]) => (
+                  <tr key={act}>
+                    <td style={{ padding: '7px 10px', fontWeight: 600, color: 'var(--tx)', borderBottom: '1px solid var(--br)' }}>{act}</td>
+                    <td style={{ padding: '7px 10px', color: 'var(--t2)', borderBottom: '1px solid var(--br)' }}>{d.count}</td>
+                    <td style={{ padding: '7px 10px', color: 'var(--t2)', borderBottom: '1px solid var(--br)' }}>{fmtH(d.hours)}</td>
+                    <td style={{ padding: '7px 10px', fontWeight: 700, color: 'var(--tx)', borderBottom: '1px solid var(--br)' }}>{fmt(d.amount)}</td>
+                    <td style={{ padding: '7px 10px', color: '#92400e', borderBottom: '1px solid var(--br)' }}>{fmt(d.wip)}</td>
+                    <td style={{ padding: '7px 10px', color: '#15803d', borderBottom: '1px solid var(--br)' }}>{fmt(d.billed)}</td>
+                  </tr>
+                ))}
+                <tr style={{ background: 'var(--s2)', fontWeight: 800 }}>
+                  <td style={{ padding: '8px 10px', color: 'var(--tx)' }}>TOTAL</td>
+                  <td style={{ padding: '8px 10px', color: 'var(--t2)' }}>{entries.length}</td>
+                  <td style={{ padding: '8px 10px', color: 'var(--tx)' }}>{fmtH(totH)}</td>
+                  <td style={{ padding: '8px 10px', color: 'var(--tx)' }}>{fmt(totA)}</td>
+                  <td style={{ padding: '8px 10px', color: '#92400e' }}>{fmt(totW)}</td>
+                  <td style={{ padding: '8px 10px', color: '#15803d' }}>{fmt(totB)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )
+      })()}
 
       {/* Log Time Form */}
       {showForm && (

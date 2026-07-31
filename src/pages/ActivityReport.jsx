@@ -88,6 +88,7 @@ export default function ActivityReport() {
   const [toVal,      setToVal]      = useState(today())
   const [employees,  setEmployees]  = useState([])
   const [selEmp,     setSelEmp]     = useState('All')
+  const [selEntity,  setSelEntity]  = useState('')   // filter by client/lead name
   const [logs,       setLogs]       = useState([])
   const [loading,    setLoading]    = useState(true)
   const [view,       setView]       = useState('summary') // summary | timeline
@@ -148,7 +149,9 @@ export default function ActivityReport() {
     online: e.loginAt && e.lastAt ? fmtDuration(e.loginAt, e.lastAt) : null,
   })).sort((a,b) => b.total - a.total)
 
-  const filteredLogs = selEmp === 'All' ? logs : logs.filter(l => l.employee_name === selEmp)
+  const filteredLogs = logs
+    .filter(l => selEmp === 'All' || l.employee_name === selEmp)
+    .filter(l => !selEntity.trim() || (l.entity_name || '').toLowerCase().includes(selEntity.toLowerCase()))
 
   return (
     <div>
@@ -181,6 +184,11 @@ export default function ActivityReport() {
           <option value="All">All Employees</option>
           {employees.map(e => <option key={e.id} value={e.name}>{e.name}</option>)}
         </select>
+        <input
+          value={selEntity} onChange={e => { setSelEntity(e.target.value); if (e.target.value) setView('timeline') }}
+          placeholder="Filter by client/lead name…"
+          style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--tx)', fontSize: 13, minWidth: 200 }}
+        />
         {selEmp !== 'All' && (
           <div style={{ display: 'flex', gap: 4 }}>
             {['summary','timeline'].map(v => (
