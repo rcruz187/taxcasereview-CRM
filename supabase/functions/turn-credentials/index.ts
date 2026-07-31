@@ -1,22 +1,10 @@
 // turn-credentials
-// Returns a ready-to-use iceServers array for RTCPeerConnection, including
-// a TURN relay (Metered.ca's free Open Relay Project, 20GB/month free)
-// alongside plain STUN. Called by the browser (useWebRTCRoom) once per
-// huddle/meeting join, not per peer connection.
-//
-// Without TURN, peer-to-peer video only connects when both people happen
-// to be on networks that allow a direct connection -- a real chunk of
-// real-world pairings (different ISPs, corporate firewalls, some
-// cellular/CGNAT setups) can't, and silently fail to connect even though
-// the signaling (offer/answer) completes fine.
-//
-// The Metered API key itself never reaches the browser -- only the
-// short-lived credentials it hands back, which is what they're designed
-// to expose. Falls back to STUN-only (no relay) if Metered isn't
-// configured yet in Settings, rather than erroring the whole call out.
-//
-// Deploy via: Supabase Dashboard -> Edge Functions -> Deploy new function
-// (paste this file in as index.ts), name it "turn-credentials".
+// Returns a ready-to-use iceServers array for RTCPeerConnection.
+// Tenant-aware: reads the calling user's tenant's Metered credentials.
+// Falls back to TCR's credentials if the tenant has none,
+// then to free public TURN (Open Relay Project) if nothing is configured.
+// The Metered API key never reaches the browser — only the short-lived
+// credentials it returns, which is what they're designed to expose.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -26,10 +14,27 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Free public TURN — Open Relay Project (no account needed, reasonable limits)
+const FREE_TURN = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'turn:openrelay.metered.ca:80',      username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443',     username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+]
+
 const FALLBACK_STUN = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
 ]
+
+async function getMeteredCredentials(appName: string, apiKey: string) {
+  const res = await fetch(
+    `https://${appName}.metered.live/api/v1/turn/credentials?apiKey=${encodeURIComponent(apiKey)}`
+  )
+  if (!res.ok) return null
+  return await res.json()
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -40,39 +45,68 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    const { data: settings } = await supabase
+    // Resolve calling user's tenant from the JWT
+    const authHeader = req.headers.get('Authorization') || ''
+    let tenantId: string | null = null
+    if (authHeader.startsWith('Bearer ')) {
+      const { data: { user } } = await createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_ANON_KEY')!,
+        { global: { headers: { Authorization: authHeader } } }
+      ).auth.getUser()
+
+      if (user?.email) {
+        const { data: emp } = await supabase
+          .from('employees')
+          .select('tenant_id')
+          .eq('email', user.email)
+          .single()
+        tenantId = emp?.tenant_id || null
+      }
+    }
+
+    // Try this tenant's Metered credentials first
+    if (tenantId) {
+      const { data: tenantSettings } = await supabase
+        .from('settings')
+        .select('metered_app_name, metered_api_key')
+        .eq('tenant_id', tenantId)
+        .maybeSingle()
+
+      if (tenantSettings?.metered_app_name && tenantSettings?.metered_api_key) {
+        const creds = await getMeteredCredentials(tenantSettings.metered_app_name, tenantSettings.metered_api_key)
+        if (creds) {
+          return new Response(JSON.stringify(creds), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+      }
+    }
+
+    // Fall back to TCR's Metered credentials (platform-level key)
+    const { data: tcrSettings } = await supabase
       .from('settings')
       .select('metered_app_name, metered_api_key')
-      .limit(1)
+      .eq('tenant_id', '61a89aef-0e7e-4ea2-b222-44ab2024655a')
       .maybeSingle()
 
-    if (!settings?.metered_app_name || !settings?.metered_api_key) {
-      // Not configured yet -- still return something usable rather than
-      // failing the call outright. Direct connections will keep working;
-      // only connections that actually need a relay will fail.
-      return new Response(JSON.stringify(FALLBACK_STUN), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+    if (tcrSettings?.metered_app_name && tcrSettings?.metered_api_key) {
+      const creds = await getMeteredCredentials(tcrSettings.metered_app_name, tcrSettings.metered_api_key)
+      if (creds) {
+        return new Response(JSON.stringify(creds), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
     }
 
-    const res = await fetch(
-      `https://${settings.metered_app_name}.metered.live/api/v1/turn/credentials?apiKey=${encodeURIComponent(settings.metered_api_key)}`
-    )
-    if (!res.ok) {
-      console.error('turn-credentials: Metered API error', res.status, await res.text())
-      return new Response(JSON.stringify(FALLBACK_STUN), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    const iceServers = await res.json()
-    return new Response(JSON.stringify(iceServers), {
+    // Final fallback: free public TURN — works for demo tenant with no Metered key
+    return new Response(JSON.stringify(FREE_TURN), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
   } catch (err) {
     console.error('turn-credentials error:', err)
-    return new Response(JSON.stringify(FALLBACK_STUN), {
+    return new Response(JSON.stringify(FREE_TURN), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
