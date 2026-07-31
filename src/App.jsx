@@ -124,7 +124,6 @@ function Shell() {
     <CallProvider>
     <GmailSyncProvider>
     <div className="app-shell">
-      <ActiveCallBar />
       <Sidebar />
       <div className="main-area">
         <TopBar onNew={handleNew} />
