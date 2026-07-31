@@ -61,6 +61,7 @@ export function useWebRTCRoom(channelPrefix) {
   const myNameRef = useRef('')
   const iceServersRef = useRef(FALLBACK_ICE) // refreshed in join() from turn-credentials
   const fullyJoinedRef = useRef(false) // true only after this client has tracked its own presence
+  const viewerOnlyRef  = useRef(false)  // true when joined with viewerOnly — no local tracks sent
 
 
   function createPC(peerName) {
@@ -69,7 +70,10 @@ export function useWebRTCRoom(channelPrefix) {
     peerConnsRef.current[peerName] = pc
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(t => pc.addTrack(t, localStreamRef.current))
-    } else {
+    } else if (viewerOnlyRef.current) {
+      // Viewer-only: explicitly request incoming streams without sending anything
+      pc.addTransceiver('video', { direction: 'recvonly' })
+      pc.addTransceiver('audio', { direction: 'recvonly' })
     }
     pc.ontrack = (e) => {
       setRemoteStreams(prev => ({ ...prev, [peerName]: e.streams[0] }))
@@ -192,6 +196,7 @@ export function useWebRTCRoom(channelPrefix) {
     }
     if (withVideo === 'viewerOnly') {
       // Skip getUserMedia — join presence channel to receive remote streams only
+      viewerOnlyRef.current = true
       localStreamRef.current = null
       await iceServersPromise
       await ch.track({ name: myName })
@@ -237,6 +242,7 @@ export function useWebRTCRoom(channelPrefix) {
 
   const leave = useCallback(async () => {
     fullyJoinedRef.current = false
+    viewerOnlyRef.current = false
     if (channelRef.current) {
       await channelRef.current.untrack().catch(() => {})
       await supabase.removeChannel(channelRef.current)
