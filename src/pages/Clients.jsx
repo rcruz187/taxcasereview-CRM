@@ -2027,6 +2027,7 @@ export default function Clients() {
               {key:'overview',   icon:'📋', text:'Overview'},
               {key:'notes',      icon:'📝', text:'Notes'},
               {key:'tasks',      icon:'✅', text:'Tasks'},
+              {key:'time',       icon:'⏱️', text:'Time & Billing'},
               {key:'docs',       icon:'📁', text:'Docs'},
               {key:'finprofile', icon:'🧮', text:'Financial Profile'},
               {key:'sms',        icon:'💬', text:'SMS'},
@@ -2143,6 +2144,13 @@ export default function Clients() {
           {detailTab==='organizer'&&(
             <ErrorBoundary>
               <OrganizerView clientName={c.name}/>
+            </ErrorBoundary>
+          )}
+
+          {/* Time & Billing Tab */}
+          {detailTab==='time'&&(
+            <ErrorBoundary>
+              <TimeEntry clientId={c.id} clientName={c.name} embed />
             </ErrorBoundary>
           )}
 
@@ -2521,13 +2529,7 @@ export default function Clients() {
                 </button>
               </div>
 
-              {/* Time & Billing — Canopy-style, lives at the bottom of the Tasks tab */}
-              <div style={{marginTop:24,borderTop:'1px solid var(--br)',paddingTop:16}}>
-                <div style={{fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>⏱️ Time & Billing</div>
-                <ErrorBoundary>
-                  <TimeEntry clientId={c.id} clientName={c.name} embed />
-                </ErrorBoundary>
-              </div>
+
             </div>
           )}
 
