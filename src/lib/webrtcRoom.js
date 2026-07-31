@@ -185,6 +185,21 @@ export function useWebRTCRoom(channelPrefix) {
     }
 
     let stream = null
+    // viewerOnly: skip getUserMedia entirely — no local tracks sent to peers.
+    // Used by the pop-out host window to receive streams without joining as a participant.
+    if (!withVideo && withVideo !== false) {
+      // normal audio-only fallback path
+    }
+    if (withVideo === 'viewerOnly') {
+      // Skip getUserMedia — join presence channel to receive remote streams only
+      localStreamRef.current = null
+      await iceServersPromise
+      await ch.track({ name: myName })
+      setMembers(m => m.includes(myName) ? m : [...m, myName])
+      fullyJoinedRef.current = true
+      setJoined(true)
+      return { ok: true }
+    }
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: withVideo })
     } catch (e) {
