@@ -61,6 +61,74 @@ export const FIELD_MAPS = {
     date:        'Text3',   // date
     idType:      'ein',
   },
+
+  // ─── Collection Information Statements ─────────────────────────────────────
+
+  // 433-A (Individual) — Taxpayer section (Lines 1a-1e, Taxpayer block 4a-4h)
+  // Line 1a = full name, Line 1b = SSN (split into p1-t4/p1-t5)
+  // Line 1c = street address (p1-t6c = street, p1-t7c = apt)
+  // Line 1d = city/state/zip (p1-t8d = city, p1-t9d = state/zip combined)
+  // Line 1e = home phone (p1-t10e), cell phone (p1-t11e)
+  // Taxpayer employment: 4a=last name (p1_t15_4a), 4b=first name (p1_t16_4b)
+  '433a': {
+    name:        'topmostSubform[0].Page1[0].c1[0].Lines1a-b[0].p1-t4[0]',
+    ssn:         'topmostSubform[0].Page1[0].c1[0].Lines1a-b[0].p1-t5[0]',
+    street:      'topmostSubform[0].Page1[0].c1[0].Line1c[0].p1-t6c[0]',
+    apt:         'topmostSubform[0].Page1[0].c1[0].Line1c[0].p1-t7c[0]',
+    cityState:   'topmostSubform[0].Page1[0].c1[0].Line1d[0].p1-t8d[0]',
+    zip:         'topmostSubform[0].Page1[0].c1[0].Line1d[0].p1-t9d[0]',
+    homePhone:   'topmostSubform[0].Page1[0].c1[0].Line1e[0].p1-t10e[0]',
+    cellPhone:   'topmostSubform[0].Page1[0].c1[0].Line1e[0].p1-t11e[0]',
+    idType:      'ssn',
+  },
+
+  // 433-B (Business) — Line 1a=business name, 1b=EIN, 1b street/city/state/zip
+  // EIN is split: first 2 digits (p1_9_1d_3digits) + last 7 (p1_10_1d_7digits)
+  // 1e=phone, 1f=cell, 1c=type of business entity
+  '433b': {
+    bizName:     'topmostSubform[0].Page1[0].Line1a-f[0].p1_1_1a[0]',
+    ein:         'topmostSubform[0].Page1[0].Line1a-f[0].p1_3_1b[0]',
+    street:      'topmostSubform[0].Page1[0].Line1a-f[0].p1_4_1bMailAdd[0]',
+    city:        'topmostSubform[0].Page1[0].Line1a-f[0].p1_5_1bCity[0]',
+    state:       'topmostSubform[0].Page1[0].Line1a-f[0].p1_6_1bstate[0]',
+    zip:         'topmostSubform[0].Page1[0].Line1a-f[0].p1_7_1bZIP[0]',
+    phone3:      'topmostSubform[0].Page1[0].Line1a-f[0].p1_9_1d_3digits[0]',
+    phone7:      'topmostSubform[0].Page1[0].Line1a-f[0].p1_10_1d_7digits[0]',
+    cellPhone:   'topmostSubform[0].Page1[0].Line1a-f[0].p1_11_1e[0]',
+    entityType:  'topmostSubform[0].Page1[0].Line1a-f[0].p1_8_1c[0]',
+    idType:      'ein',
+  },
+
+  // 433-D (Installment Agreement) — name+address combined, SSN, home/work phone
+  '433d': {
+    nameAddress: 'form1[0].Page1_Part1[0].NameAddressTaxpayer[0].NameAndAddress[0]',
+    ssn:         'form1[0].Page1_Part1[0].SSN_EIN[0].Taxpayer[0]',
+    homePhone:   'form1[0].Page1_Part1[0].SSN_EIN[0].Home[0]',
+    workPhone:   'form1[0].Page1_Part1[0].SSN_EIN[0].WorkCellBusiness[0]',
+    idType:      'ssn',
+  },
+
+  // 433-F (Collection Information Statement — General) — uses prefixed field names
+  // Master section has name + SSN; ClientInfo has phone numbers
+  '433f': {
+    name:        'Master.INCOME_EXPENSE_EQUITY_WORKSHEET_ACCOUNT_NAME_NAME',
+    ssn:         'Master.INCOME_EXPENSE_EQUITY_WORKSHEET_PRIMARY_SSN',
+    homePhone:   'ClientInfo.ACCOUNT_NAME1_PHONE',
+    cellPhone:   'ClientInfo.ACCOUNT_NAME1_CELL_PHONE',
+    workPhone:   'ClientInfo.ACCOUNT_NAME1_WORK_PHONE',
+    idType:      'ssn',
+  },
+
+  // 433-H (Installment Agreement Request + CIS) — name+address, SSN, home/work/cell
+  '433h': {
+    nameAddress: 'form1[0].page_1[0].address[0].NamesAddress[0]',
+    ssn:         'form1[0].page_1[0].ssn[0].YourSocialSecurityNu[0]',
+    homePhone:   'form1[0].page_1[0].your_telephone[0].Home11[0]',
+    workPhone:   'form1[0].page_1[0].your_telephone[0].Work11[0]',
+    cellPhone:   'form1[0].page_1[0].your_telephone[0].Cell11[0]',
+    county:      'form1[0].page_1[0].address[0].CountyResidence[0]',
+    idType:      'ssn',
+  },
 };
 
 // Map form type → which blank template filename to fetch
@@ -69,6 +137,11 @@ export const TEMPLATE_PATHS = {
   '2848_business': '2848_RC_Biz.pdf',
   '8821_personal': '8821_Pers_RC.pdf',
   '8821_business': '8821_Biz_RC.pdf',
+  '433a':          '433A_Blank.pdf',
+  '433b':          '433B_Blank.pdf',
+  '433d':          '433D_Blank.pdf',
+  '433f':          '433F_Blank.pdf',
+  '433h':          '433H_Blank.pdf',
 };
 
 // Human-readable labels for each form type
@@ -77,6 +150,11 @@ export const FORM_LABELS = {
   '2848_business': 'Form 2848 — Power of Attorney (Business)',
   '8821_personal': 'Form 8821 — Tax Information Authorization (Personal)',
   '8821_business': 'Form 8821 — Tax Information Authorization (Business)',
+  '433a':          'Form 433-A — Collection Information Statement (Individual)',
+  '433b':          'Form 433-B — Collection Information Statement (Business)',
+  '433d':          'Form 433-D — Installment Agreement',
+  '433f':          'Form 433-F — Collection Information Statement (General)',
+  '433h':          'Form 433-H — Installment Agreement Request & CIS',
   'cc_auth':       'Credit Card / Payment Method Authorization',
 };
 
@@ -328,6 +406,100 @@ export async function fillForm(formType, client, useEin = false) {
       form.removeField(btn);
     }
   } catch (_) { /* button absent in this template — fine */ }
+
+  // ─── 433-A (Individual CIS) ────────────────────────────────────────────────
+  // Fills the taxpayer identity block (Lines 1a-1e). Financial data is left
+  // blank for the client/staff to complete — it requires income/expense figures
+  // the CRM doesn't hold as structured fields.
+  if (formType === '433a') {
+    const m = FIELD_MAPS['433a'];
+    // Line 1a — full name
+    setText(m.name, client.name || '');
+    // Line 1b — SSN
+    setText(m.ssn, client.ssn || client.tin || '');
+    // Line 1c — street address + apt
+    setText(m.street, client.address || client.street || '');
+    // Line 1d — city + state + zip (city/state go in one field, zip in another)
+    const cityState = [client.city, client.state].filter(Boolean).join(', ');
+    setText(m.cityState, cityState);
+    setText(m.zip, client.zip || '');
+    // Line 1e — home phone and cell phone
+    setText(m.homePhone, client.phone || '');
+    setText(m.cellPhone, client.phone2 || '');
+    // Taxpayer name block (section 4 employment info — last/first name)
+    setText('topmostSubform[0].Page1[0].Taxpayer\\.L4a-h[0].p1_t15_4a[0]',
+      (client.name || '').split(' ').slice(-1)[0] || '');
+    setText('topmostSubform[0].Page1[0].Taxpayer\\.L4a-h[0].p1_t16_4b[0]',
+      (client.name || '').split(' ')[0] || '');
+  }
+
+  // ─── 433-B (Business CIS) ─────────────────────────────────────────────────
+  // Fills the business identity block (Lines 1a-1f).
+  // Phone is split into area code (3 digits) + number (7 digits) per IRS format.
+  else if (formType === '433b') {
+    const m = FIELD_MAPS['433b'];
+    const bizName = client.business_name || client.name || '';
+    setText(m.bizName, bizName);
+    setText(m.ein, client.ein || '');
+    // Address
+    const bizStreet = client.biz_street || client.address || client.street || '';
+    const bizCity   = client.biz_city   || client.city   || '';
+    const bizState  = client.biz_state  || client.state  || '';
+    const bizZip    = client.biz_zip    || client.zip    || '';
+    setText(m.street, bizStreet);
+    setText(m.city,   bizCity);
+    setText(m.state,  bizState);
+    setText(m.zip,    bizZip);
+    // Phone split: strip non-digits, take area code + 7-digit number
+    const phoneDigits = (client.phone || '').replace(/\D/g, '');
+    const areaCode = phoneDigits.length >= 10 ? phoneDigits.slice(0, 3)  : phoneDigits.slice(0, 3) || '';
+    const phoneNum = phoneDigits.length >= 10 ? phoneDigits.slice(3, 10) : phoneDigits.slice(3)    || '';
+    setText(m.phone3, areaCode);
+    setText(m.phone7, phoneNum);
+    setText(m.cellPhone, client.phone2 || '');
+    // Entity type — derive from clientType if not explicitly set
+    const entityTypeMap = {
+      'Business': 'Limited Liability Company (LLC)',
+      'Individual & Biz': 'Sole Proprietor',
+    };
+    setText(m.entityType, entityTypeMap[client.clientType] || '');
+  }
+
+  // ─── 433-D (Installment Agreement) ────────────────────────────────────────
+  // Fills name+address block and SSN/phone. Payment amount and terms are left
+  // for staff to complete — those require negotiation data the CRM doesn't hold.
+  else if (formType === '433d') {
+    const m = FIELD_MAPS['433d'];
+    setText(m.nameAddress, buildNameAddress(client, 'personal'));
+    setText(m.ssn,       client.ssn || client.tin || '');
+    setText(m.homePhone, client.phone  || '');
+    setText(m.workPhone, client.phone2 || '');
+  }
+
+  // ─── 433-F (General CIS) ──────────────────────────────────────────────────
+  // Uses prefixed field names in the Master and ClientInfo sections.
+  else if (formType === '433f') {
+    const m = FIELD_MAPS['433f'];
+    setText(m.name,      client.name || '');
+    setText(m.ssn,       client.ssn || client.tin || '');
+    setText(m.homePhone, client.phone  || '');
+    setText(m.cellPhone, client.phone2 || '');
+    // Business name and EIN if applicable
+    if (client.business_name) setText('Name of Business', client.business_name);
+    if (client.ein)           setText('Business EIN',     client.ein);
+  }
+
+  // ─── 433-H (Installment Agreement Request + CIS) ──────────────────────────
+  // Fills name+address, SSN, home/work/cell phones, and county of residence.
+  else if (formType === '433h') {
+    const m = FIELD_MAPS['433h'];
+    setText(m.nameAddress, buildNameAddress(client, 'personal'));
+    setText(m.ssn,       client.ssn || client.tin || '');
+    setText(m.homePhone, client.phone  || '');
+    setText(m.workPhone, client.phone2 || '');
+    // County is stored in the address county field if available
+    setText(m.county, client.county || '');
+  }
 
   const filledBytes = await pdfDoc.save();
   return filledBytes;

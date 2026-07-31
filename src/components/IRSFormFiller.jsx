@@ -231,6 +231,99 @@ export default function IRSFormFiller({ client, onClose }) {
               )}
             </div>
           </div>
+
+          {/* 433-A — Collection Info (Individual) */}
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>
+              Form 433-A — Collection Information Statement (Individual)
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 8 }}>
+              Pre-fills name, SSN, address, and phone. Financial data (income, expenses, assets) left blank for staff to complete.
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn sec" disabled={!!loading || !!sending} onClick={() => handleFill('433a')} style={{ flex: 1, justifyContent: 'flex-start', padding: '10px 14px' }}>
+                {loading === '433a' ? '⏳' : '📄'}&nbsp; Pre-fill 433-A
+              </button>
+              <button className="btn pri" disabled={!!loading || !!sending} onClick={() => handleSend('433a')} style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                {sending === '433a' ? '⏳' : '✍️'}&nbsp; Send
+              </button>
+            </div>
+          </div>
+
+          {/* 433-B — Collection Info (Business) */}
+          {isBiz && (
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>
+                Form 433-B — Collection Information Statement (Business)
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 8 }}>
+                Pre-fills business name, EIN, address, and phone.
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn sec" disabled={!!loading || !!sending} onClick={() => handleFill('433b')} style={{ flex: 1, justifyContent: 'flex-start', padding: '10px 14px' }}>
+                  {loading === '433b' ? '⏳' : '🏢'}&nbsp; Pre-fill 433-B (Business)
+                </button>
+                <button className="btn pri" disabled={!!loading || !!sending} onClick={() => handleSend('433b')} style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                  {sending === '433b' ? '⏳' : '✍️'}&nbsp; Send
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 433-D — Installment Agreement */}
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>
+              Form 433-D — Installment Agreement
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 8 }}>
+              Pre-fills name, address, and SSN. Payment amount and terms require staff input.
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn sec" disabled={!!loading || !!sending} onClick={() => handleFill('433d')} style={{ flex: 1, justifyContent: 'flex-start', padding: '10px 14px' }}>
+                {loading === '433d' ? '⏳' : '📄'}&nbsp; Pre-fill 433-D
+              </button>
+              <button className="btn pri" disabled={!!loading || !!sending} onClick={() => handleSend('433d')} style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                {sending === '433d' ? '⏳' : '✍️'}&nbsp; Send
+              </button>
+            </div>
+          </div>
+
+          {/* 433-F — Collection Info (General) */}
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>
+              Form 433-F — Collection Information Statement (General)
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 8 }}>
+              Pre-fills name, SSN, and phone numbers.
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn sec" disabled={!!loading || !!sending} onClick={() => handleFill('433f')} style={{ flex: 1, justifyContent: 'flex-start', padding: '10px 14px' }}>
+                {loading === '433f' ? '⏳' : '📄'}&nbsp; Pre-fill 433-F
+              </button>
+              <button className="btn pri" disabled={!!loading || !!sending} onClick={() => handleSend('433f')} style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                {sending === '433f' ? '⏳' : '✍️'}&nbsp; Send
+              </button>
+            </div>
+          </div>
+
+          {/* 433-H — Installment Agreement Request + CIS */}
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>
+              Form 433-H — Installment Agreement Request &amp; CIS
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 8 }}>
+              Pre-fills name, address, SSN, and phone. Payment details require staff input.
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn sec" disabled={!!loading || !!sending} onClick={() => handleFill('433h')} style={{ flex: 1, justifyContent: 'flex-start', padding: '10px 14px' }}>
+                {loading === '433h' ? '⏳' : '📄'}&nbsp; Pre-fill 433-H
+              </button>
+              <button className="btn pri" disabled={!!loading || !!sending} onClick={() => handleSend('433h')} style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                {sending === '433h' ? '⏳' : '✍️'}&nbsp; Send
+              </button>
+            </div>
+          </div>
+
         </div>
 
         {/* Footer */}

@@ -11,18 +11,18 @@ const IRS_FORMS = [
   { num: '12153',  label: 'CDP Hearing Request',          url: 'https://www.irs.gov/pub/irs-pdf/f12153.pdf' },
   { num: '12661',  label: 'Disputed Issue Verification',  url: 'https://www.irs.gov/pub/irs-pdf/f12661.pdf' },
   { num: '2553',   label: 'S-Corp Election',              url: 'https://www.irs.gov/pub/irs-pdf/f2553.pdf' },
-  { num: '2848',   label: 'Power of Attorney',            url: 'https://www.irs.gov/pub/irs-pdf/f2848.pdf' },
-  { num: '433-A',  label: 'Collection Info (Individual)', url: 'https://www.irs.gov/pub/irs-pdf/f433a.pdf' },
-  { num: '433-B',  label: 'Collection Info (Business)',   url: 'https://www.irs.gov/pub/irs-pdf/f433b.pdf' },
-  { num: '433-D',  label: 'Installment Agreement',          url: 'https://www.irs.gov/pub/irs-pdf/f433d.pdf' },
-  { num: '433-F',  label: 'Collection Info (General)',    url: 'https://www.irs.gov/pub/irs-pdf/f433f.pdf' },
-  { num: '433-H',  label: 'Installment Agreement Request & CIS', url: 'https://www.irs.gov/pub/irs-pdf/f433h.pdf' },
+  { num: '2848',   label: 'Power of Attorney',            url: 'https://www.irs.gov/pub/irs-pdf/f2848.pdf',   formType: '2848' },
+  { num: '433-A',  label: 'Collection Info (Individual)', url: 'https://www.irs.gov/pub/irs-pdf/f433a.pdf',   formType: '433a' },
+  { num: '433-B',  label: 'Collection Info (Business)',   url: 'https://www.irs.gov/pub/irs-pdf/f433b.pdf',   formType: '433b' },
+  { num: '433-D',  label: 'Installment Agreement',        url: 'https://www.irs.gov/pub/irs-pdf/f433d.pdf',   formType: '433d' },
+  { num: '433-F',  label: 'Collection Info (General)',    url: 'https://www.irs.gov/pub/irs-pdf/f433f.pdf',   formType: '433f' },
+  { num: '433-H',  label: 'Installment Agreement Request & CIS', url: 'https://www.irs.gov/pub/irs-pdf/f433h.pdf', formType: '433h' },
   { num: '4506-T', label: 'Request for Transcript',       url: 'https://www.irs.gov/pub/irs-pdf/f4506t.pdf' },
   { num: '4549',   label: 'Exam Changes (Audit)',         url: 'https://www.irs.gov/pub/irs-pdf/f4549.pdf' },
   { num: '656',    label: 'Offer in Compromise',          url: 'https://www.irs.gov/pub/irs-pdf/f656.pdf' },
   { num: '656-L',  label: 'OIC — Doubt as to Liability', url: 'https://www.irs.gov/pub/irs-pdf/f656l.pdf' },
   { num: '843',    label: 'Penalty Abatement',            url: 'https://www.irs.gov/pub/irs-pdf/f843.pdf' },
-  { num: '8821',   label: 'Tax Info Authorization',       url: 'https://www.irs.gov/pub/irs-pdf/f8821.pdf' },
+  { num: '8821',   label: 'Tax Info Authorization',       url: 'https://www.irs.gov/pub/irs-pdf/f8821.pdf',   formType: '8821' },
   { num: '8822',   label: 'Change of Address (Individual)', url: 'https://www.irs.gov/pub/irs-pdf/f8822.pdf' },
   { num: '8822-B', label: 'Change of Address (Business)', url: 'https://www.irs.gov/pub/irs-pdf/f8822b.pdf' },
   { num: '8832',   label: 'Entity Classification',        url: 'https://www.irs.gov/pub/irs-pdf/f8832.pdf' },
@@ -435,11 +435,11 @@ export default function IrsForms() {
                   onClick={() => {
                     const c = clients.find(x => x.id === selectedClientId)
                     if (!c) return
-                    // 2848 and 8821 use the full IRSFormFiller
-                    if (f.num === '2848' || f.num === '8821') {
-                      setFillerClient({...c, address: c.street, business_name: c.business_name, _formNum: f.num})
+                    // Forms with a formType key route to the IRSFormFiller (real pdf-lib pre-fill)
+                    if (f.formType) {
+                      setFillerClient({...c, address: c.street, business_name: c.business_name, _formType: f.formType})
                     } else {
-                      // All other forms: open branded cover sheet + the form
+                      // Forms without a formType key: open branded cover sheet + blank PDF
                       prefillGenericForm(c, f)
                     }
                   }}
