@@ -9,6 +9,8 @@
 
 import { createContext, useContext, useState, useRef, useEffect } from 'react'
 import { useWebRTCRoom } from '../lib/webrtcRoom'
+
+const Ctx = createContext(null)
 export const useScreenShare = () => useContext(Ctx)
 
 // Shared BroadcastChannel — same-origin, works across tabs/pop-outs
