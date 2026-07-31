@@ -107,7 +107,7 @@ export default function ScreenShareOverlay() {
   }, [ss.active])
 
   const joinUrl = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}`
-  const peers   = ss.webrtc.members.filter(n => n !== myName)
+  const peers   = ss.webrtc.members.filter(n => n !== myName && !n.endsWith('(view)'))
   const total   = peers.length + 1
 
   function openPopout() {
