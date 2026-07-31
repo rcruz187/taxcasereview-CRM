@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { fillForm, FORM_LABELS } from '../lib/irsFormUtils';
+import { fillForm, FORM_LABELS, TEMPLATE_PATHS } from '../lib/irsFormUtils';
 import { FIRM } from '../lib/firmBranding'
 
 function downloadPdf(bytes, filename) {
@@ -13,70 +13,105 @@ function downloadPdf(bytes, filename) {
   URL.revokeObjectURL(url);
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// All IRS forms with their types — drives both the full list and the routing
+const ALL_IRS_FORMS = [
+  { formType: '2848_personal', label: 'Form 2848 — Power of Attorney (Personal)',     needsSsn: true  },
+  { formType: '2848_business', label: 'Form 2848 — Power of Attorney (Business)',     needsEin: true  },
+  { formType: '8821_personal', label: 'Form 8821 — Tax Info Authorization (Personal)', needsSsn: true },
+  { formType: '8821_business', label: 'Form 8821 — Tax Info Authorization (Business)', needsEin: true },
+  { formType: '433a',  label: 'Form 433-A — Collection Info (Individual)',   needsSsn: true  },
+  { formType: '433b',  label: 'Form 433-B — Collection Info (Business)',     needsEin: true  },
+  { formType: '433d',  label: 'Form 433-D — Installment Agreement',          needsSsn: true  },
+  { formType: '433f',  label: 'Form 433-F — Collection Info (General)',      needsSsn: true  },
+  { formType: '433h',  label: 'Form 433-H — Installment Agreement Request & CIS', needsSsn: true },
+  { formType: '656l',  label: 'Form 656-L — OIC Doubt as to Liability',     needsSsn: true  },
+  { formType: '9465',  label: 'Form 9465 — Installment Agreement Request',   needsSsn: true  },
+  { formType: '843',   label: 'Form 843 — Penalty Abatement/Refund',         needsSsn: true  },
+  { formType: '8822',  label: 'Form 8822 — Change of Address (Individual)',  needsSsn: true  },
+  { formType: '8822b', label: 'Form 8822-B — Change of Address (Business)', needsEin: true  },
+  { formType: '4506t', label: 'Form 4506-T — Request for Transcript',        needsSsn: true  },
+  { formType: '12153', label: 'Form 12153 — CDP Hearing Request',            needsSsn: true  },
+  { formType: '656',   label: 'Form 656 — Offer in Compromise',             needsSsn: true  },
+  { formType: '4549',  label: 'Form 4549 — Exam Changes (Audit)',           needsSsn: true  },
+  { formType: '8832',  label: 'Form 8832 — Entity Classification',          needsEin: true  },
+  { formType: '911',   label: 'Form 911 — Taxpayer Advocate',               needsSsn: true  },
+  { formType: 'ss4',   label: 'Form SS-4 — Apply for EIN',                  needsEin: true  },
+  { formType: '2553',  label: 'Form 2553 — S-Corp Election',                needsEin: true  },
+  { formType: '12661', label: 'Form 12661 — Disputed Issue Verification',   needsSsn: true  },
+  { formType: '1128',  label: 'Form 1128 — Adopt/Change Tax Year',          needsEin: true  },
+];
 
 export default function IRSFormFiller({ client, onClose }) {
-  const [loading, setLoading] = useState(null); // which download button is loading
-  const [sending, setSending] = useState(null); // which send button is loading
-  const [sendVia, setSendVia] = useState('email');
-  const [sentMsg, setSentMsg] = useState('');
-  const [error, setError] = useState('');
+  const [loading,  setLoading]  = useState(null);
+  const [sending,  setSending]  = useState(null);
+  const [sendVia,  setSendVia]  = useState('email');
+  const [sentMsg,  setSentMsg]  = useState('');
+  const [error,    setError]    = useState('');
+  const [search,   setSearch]   = useState('');
 
   if (!client) return null;
 
   const clientName = client.business_name || client.name || 'Client';
-  const hasEin = !!(client.ein);
   const hasSsn = !!(client.ssn || client.tin);
+  const hasEin = !!client.ein;
   const isBiz  = hasEin || !!client.business_name || client.clientType === 'Business' || client.clientType === 'Individual & Biz';
-  const hasAddress = !!(client.address || client.street || client.city);
-  const hasPhone = !!client.phone;
   const hasEmail = !!client.email;
-  // Always allow generating Personal forms even if SSN isn't on file yet (e.g. for leads) —
-  // the field will just be left blank for the client to fill in by hand.
+  const hasPhone = !!client.phone;
 
-  const handleFill = async (formType, useEin = false) => {
-    setLoading(formType + (useEin ? '_ein' : ''));
+  // If opened from a specific form card (_formType), show only that form
+  const targetFormType = client._formType;
+  const targetForm = targetFormType ? ALL_IRS_FORMS.find(f => f.formType === targetFormType) : null;
+
+  const visibleForms = targetForm
+    ? [targetForm]
+    : ALL_IRS_FORMS.filter(f => {
+        if (search && !f.label.toLowerCase().includes(search.toLowerCase())) return false;
+        // Hide business forms for pure individual clients
+        if (f.needsEin && !isBiz) return false;
+        return true;
+      });
+
+  const handleFill = async (formType) => {
+    setLoading(formType);
     setError('');
     try {
-      const bytes = await fillForm(formType, client, useEin);
-      const label = formType.replace('_', '-').toUpperCase();
-      const idLabel = useEin ? 'EIN' : 'SSN';
-      downloadPdf(bytes, `${label}_${clientName.replace(/\s+/g, '_')}_${idLabel}.pdf`);
+      const bytes = await fillForm(formType, client);
+      const label = FORM_LABELS[formType] || formType;
+      const safeName = clientName.replace(/[^a-zA-Z0-9]+/g, '_');
+      downloadPdf(bytes, `${formType}_${safeName}.pdf`);
     } catch (e) {
-      setError(e.message);
+      setError(`${e.message} — if this is a newer IRS form, the field names may need updating. Contact support.`);
     } finally {
       setLoading(null);
     }
   };
 
-  // Sends a single pre-filled IRS form for e-signature — same pattern used for
-  // State POAs (build PDF, upload to storage, create esigns row, email/text the
-  // signing link). Lets IRS Forms mirror the State Forms tab's send flow.
-  const handleSend = async (formType, useEin = false) => {
-    const key = formType + (useEin ? '_ein' : '');
-    setSending(key);
+  const handleSend = async (formType) => {
+    setSending(formType);
     setError('');
     setSentMsg('');
     try {
       if (sendVia !== 'sms' && !hasEmail) throw new Error('Client has no email on file');
       if (sendVia !== 'email' && !hasPhone) throw new Error('Client has no phone on file');
 
-      const bytes = await fillForm(formType, client, useEin);
+      const bytes = await fillForm(formType, client);
       const blob = new Blob([bytes], { type: 'application/pdf' });
       const safeName = clientName.replace(/[^a-zA-Z0-9]+/g, '-');
       const path = `docs/${safeName}/irs-forms/${formType}_${Date.now()}.pdf`;
+
       const { error: upErr } = await supabase.storage.from('documents')
         .upload(path, blob, { upsert: true, contentType: 'application/pdf' });
       if (upErr) throw new Error(upErr.message);
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path);
 
+      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path);
       const label = FORM_LABELS[formType] || formType;
+
       const { data: esign, error: esignErr } = await supabase.from('esigns').insert([{
         doc_type: label,
         client_name: clientName,
         client_email: client.email || '',
         client_phone: client.phone || '',
-        message: `Please review and sign your ${label}. This authorizes Tax Case Review to represent you before the IRS.`,
+        message: `Please review and sign your ${label}.`,
         pdf_attachments: [{ formType, label, url: urlData.publicUrl }],
         priority: 'Normal',
         status: 'Awaiting',
@@ -89,29 +124,43 @@ export default function IRSFormFiller({ client, onClose }) {
       await navigator.clipboard.writeText(sigUrl).catch(() => {});
 
       let emailSent = false, smsSent = false;
+
       if ((sendVia === 'email' || sendVia === 'both') && client.email) {
         const { error: eErr } = await supabase.functions.invoke('send-email', {
           body: {
             to: client.email,
-            subject: `Action Required: Sign Your ${label} — Tax Case Review`,
-            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src="${FIRM.logoUrl}" alt="${FIRM.name}" style="max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px" onerror="this.style.display='none'"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${clientName}</strong>,</p><p>Your <strong>${label}</strong> is ready for your review and signature.</p><p style="text-align:center;margin:24px 0"><a href="${sigUrl}" style="background:#1d4ed8;color:#fff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Review &amp; Sign →</a></p><p style="font-size:12px;color:#64748b">${sigUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · ${FIRM.address}<br/>📞 ${FIRM.phone}</p></div>`
+            subject: `Action Required: Sign Your ${label}`,
+            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px">
+              <div style="text-align:center;margin-bottom:20px">
+                <img src="${FIRM.logoUrl}" alt="${FIRM.name}" style="max-height:56px;display:block;margin:0 auto 8px" onerror="this.style.display='none'"/>
+                <div style="font-size:12px;font-weight:800;color:#1d4ed8;text-transform:uppercase">${FIRM.name}</div>
+              </div>
+              <p>Dear <strong>${clientName}</strong>,</p>
+              <p>Your <strong>${label}</strong> is ready for your review and signature.</p>
+              <p style="text-align:center;margin:24px 0">
+                <a href="${sigUrl}" style="background:#1d4ed8;color:#fff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Review &amp; Sign →</a>
+              </p>
+              <p style="font-size:11px;color:#94a3b8;margin-top:24px">${FIRM.name} · ${FIRM.address}<br/>📞 ${FIRM.phone}</p>
+            </div>`
           }
         });
         emailSent = !eErr;
       }
+
       if ((sendVia === 'sms' || sendVia === 'both') && client.phone) {
         const { data: cfg } = await supabase.from('settings').select('signalwire_backend').limit(1).maybeSingle();
         if (cfg?.signalwire_backend) {
           try {
             await fetch(cfg.signalwire_backend + '/sms/send', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ to: client.phone, body: `Tax Case Review: please review and sign your ${label} here: ${sigUrl}` })
+              body: JSON.stringify({ to: client.phone, body: `${FIRM.name || 'Tax Case Review'}: please sign your ${label}: ${sigUrl}` })
             });
             smsSent = true;
           } catch (_) {}
         }
       }
-      setSentMsg(emailSent || smsSent ? `✅ Sent for signature!` : '✅ Signing link copied to clipboard');
+
+      setSentMsg(emailSent || smsSent ? '✅ Sent for signature!' : '✅ Signing link copied to clipboard');
       setTimeout(() => setSentMsg(''), 4000);
     } catch (e) {
       setError(e.message);
@@ -122,37 +171,44 @@ export default function IRSFormFiller({ client, onClose }) {
 
   return (
     <div className="modal-bg open" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={{ width: 460, maxHeight: '90vh', padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div className="modal" style={{ width: 520, maxHeight: '90vh', padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+
         {/* Header */}
         <div className="mh" style={{ padding: '14px 18px', borderBottom: '1px solid var(--br)', flexShrink: 0 }}>
           <div>
-            <span className="mt">IRS Form Pre-Fill</span>
+            <span className="mt">{targetForm ? targetForm.label : 'IRS Form Pre-Fill'}</span>
             <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{clientName}</div>
           </div>
           <button className="xbtn" onClick={onClose}>&times;</button>
         </div>
 
         {/* Body */}
-        <div style={{ padding: '16px 18px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ padding: '14px 18px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+
           {error && (
             <div style={{ background: 'rgba(192,32,47,.12)', border: '1px solid var(--bad)', color: 'var(--bad)', fontSize: 12, borderRadius: 8, padding: '10px 12px' }}>
               {error}
             </div>
           )}
-
-          {/* Info pill */}
-          <div style={{ background: 'var(--blt)', border: '1px solid var(--blue)', color: 'var(--b2)', fontSize: 12, borderRadius: 8, padding: '10px 12px', lineHeight: 1.5 }}>
-            Fills taxpayer name, address, tax ID, phone, and today's date only.
-            All rep info and tax matters stay exactly as pre-set on your templates.
-          </div>
-
           {sentMsg && (
             <div style={{ background: 'rgba(37,162,90,.12)', border: '1px solid var(--good)', color: 'var(--good)', fontSize: 12, borderRadius: 8, padding: '10px 12px' }}>
               {sentMsg}
             </div>
           )}
 
-          {/* Send Via — applies to the Send buttons below */}
+          {/* Info — what gets filled */}
+          <div style={{ background: 'var(--blt)', border: '1px solid var(--blue)', fontSize: 12, borderRadius: 8, padding: '10px 12px', lineHeight: 1.5 }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>Data filled into this form:</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '2px 8px', color: 'var(--b2)' }}>
+              <span style={{ color: 'var(--t3)' }}>Name</span>      <span style={{ fontWeight: 600 }}>{client.name || '—'}</span>
+              <span style={{ color: 'var(--t3)' }}>Address</span>   <span>{[client.address||client.street, client.city, client.state, client.zip].filter(Boolean).join(', ') || '—'}</span>
+              <span style={{ color: 'var(--t3)' }}>SSN</span>       <span style={{ color: hasSsn ? 'inherit' : 'var(--warn)' }}>{hasSsn ? (client.ssn||client.tin) : 'Not on file'}</span>
+              {isBiz && <><span style={{ color: 'var(--t3)' }}>EIN</span> <span style={{ color: hasEin ? 'inherit' : 'var(--warn)' }}>{hasEin ? client.ein : 'Not on file'}</span></>}
+              <span style={{ color: 'var(--t3)' }}>Phone</span>     <span>{client.phone || '—'}</span>
+            </div>
+          </div>
+
+          {/* Send via */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.05em' }}>Send Via</label>
             <select value={sendVia} onChange={e => setSendVia(e.target.value)}
@@ -163,171 +219,39 @@ export default function IRSFormFiller({ client, onClose }) {
             </select>
           </div>
 
-          {/* Data preview — shows exactly what will be written into the PDF */}
-          <div style={{ border: '1px solid var(--br)', borderRadius: 8, padding: '10px 12px', fontSize: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div style={{ fontWeight: 700, color: 'var(--t2)', marginBottom: 2 }}>Data that will be filled in:</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--t3)' }}>Name</span><span style={{ color: client.name ? 'var(--tx)' : 'var(--bad)', fontWeight: 600, textAlign: 'right' }}>{client.name || 'Missing!'}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--t3)' }}>Address</span><span style={{ color: hasAddress ? 'var(--tx)' : 'var(--warn)', fontWeight: 600, textAlign: 'right' }}>{hasAddress ? [client.address || client.street, client.city, client.state, client.zip].filter(Boolean).join(', ') : 'Blank — not on file'}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--t3)' }}>SSN</span><span style={{ color: hasSsn ? 'var(--tx)' : 'var(--warn)', fontWeight: 600, textAlign: 'right' }}>{hasSsn ? (client.ssn || client.tin) : 'Blank — not on file'}</span></div>
-            {isBiz && <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--t3)' }}>EIN</span><span style={{ color: hasEin ? 'var(--tx)' : 'var(--warn)', fontWeight: 600, textAlign: 'right' }}>{hasEin ? client.ein : 'Blank — not on file'}</span></div>}
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><span style={{ color: 'var(--t3)' }}>Phone</span><span style={{ color: hasPhone ? 'var(--tx)' : 'var(--warn)', fontWeight: 600, textAlign: 'right' }}>{hasPhone ? client.phone : 'Blank — not on file'}</span></div>
-          </div>
-
-          {/* Form 2848 */}
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>
-              Form 2848 — Power of Attorney
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn sec" disabled={!!loading || !!sending} onClick={() => handleFill('2848_personal', false)} style={{ flex: 1, justifyContent: 'flex-start', padding: '10px 14px' }}>
-                  {loading === '2848_personal' ? '⏳' : '📄'}&nbsp; Personal (SSN) — 2848
-                </button>
-                <button className="btn pri" disabled={!!loading || !!sending} onClick={() => handleSend('2848_personal', false)} style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
-                  {sending === '2848_personal' ? '⏳' : '✍️'}&nbsp; Send
-                </button>
-              </div>
-              {isBiz && (
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn sec" disabled={!!loading || !!sending} onClick={() => handleFill('2848_business', true)} style={{ flex: 1, justifyContent: 'flex-start', padding: '10px 14px' }}>
-                    {loading === '2848_business_ein' ? '⏳' : '🏢'}&nbsp; Business (EIN) — 2848
-                  </button>
-                  <button className="btn pri" disabled={!!loading || !!sending} onClick={() => handleSend('2848_business', true)} style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
-                    {sending === '2848_business_ein' ? '⏳' : '✍️'}&nbsp; Send
-                  </button>
-                </div>
-              )}
-              {!hasSsn && (
-                <div style={{ fontSize: 11, color: 'var(--warn)', background: 'rgba(212,147,10,.15)', borderRadius: 6, padding: '8px 10px' }}>
-                  No SSN on file yet — the SSN field will be left blank for the client to fill in.
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Form 8821 */}
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>
-              Form 8821 — Tax Information Authorization
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn sec" disabled={!!loading || !!sending} onClick={() => handleFill('8821_personal', false)} style={{ flex: 1, justifyContent: 'flex-start', padding: '10px 14px' }}>
-                  {loading === '8821_personal' ? '⏳' : '📄'}&nbsp; Personal (SSN) — 8821
-                </button>
-                <button className="btn pri" disabled={!!loading || !!sending} onClick={() => handleSend('8821_personal', false)} style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
-                  {sending === '8821_personal' ? '⏳' : '✍️'}&nbsp; Send
-                </button>
-              </div>
-              {isBiz && (
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn sec" disabled={!!loading || !!sending} onClick={() => handleFill('8821_business', true)} style={{ flex: 1, justifyContent: 'flex-start', padding: '10px 14px' }}>
-                    {loading === '8821_business_ein' ? '⏳' : '🏢'}&nbsp; Business (EIN) — 8821
-                  </button>
-                  <button className="btn pri" disabled={!!loading || !!sending} onClick={() => handleSend('8821_business', true)} style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
-                    {sending === '8821_business_ein' ? '⏳' : '✍️'}&nbsp; Send
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* 433-A — Collection Info (Individual) */}
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>
-              Form 433-A — Collection Information Statement (Individual)
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 8 }}>
-              Pre-fills name, SSN, address, and phone. Financial data (income, expenses, assets) left blank for staff to complete.
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn sec" disabled={!!loading || !!sending} onClick={() => handleFill('433a')} style={{ flex: 1, justifyContent: 'flex-start', padding: '10px 14px' }}>
-                {loading === '433a' ? '⏳' : '📄'}&nbsp; Pre-fill 433-A
-              </button>
-              <button className="btn pri" disabled={!!loading || !!sending} onClick={() => handleSend('433a')} style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
-                {sending === '433a' ? '⏳' : '✍️'}&nbsp; Send
-              </button>
-            </div>
-          </div>
-
-          {/* 433-B — Collection Info (Business) */}
-          {isBiz && (
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>
-                Form 433-B — Collection Information Statement (Business)
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 8 }}>
-                Pre-fills business name, EIN, address, and phone.
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn sec" disabled={!!loading || !!sending} onClick={() => handleFill('433b')} style={{ flex: 1, justifyContent: 'flex-start', padding: '10px 14px' }}>
-                  {loading === '433b' ? '⏳' : '🏢'}&nbsp; Pre-fill 433-B (Business)
-                </button>
-                <button className="btn pri" disabled={!!loading || !!sending} onClick={() => handleSend('433b')} style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
-                  {sending === '433b' ? '⏳' : '✍️'}&nbsp; Send
-                </button>
-              </div>
-            </div>
+          {/* Search (only when showing full list) */}
+          {!targetForm && (
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search forms…"
+              style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--tx)', fontSize: 13 }}
+            />
           )}
 
-          {/* 433-D — Installment Agreement */}
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>
-              Form 433-D — Installment Agreement
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 8 }}>
-              Pre-fills name, address, and SSN. Payment amount and terms require staff input.
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn sec" disabled={!!loading || !!sending} onClick={() => handleFill('433d')} style={{ flex: 1, justifyContent: 'flex-start', padding: '10px 14px' }}>
-                {loading === '433d' ? '⏳' : '📄'}&nbsp; Pre-fill 433-D
-              </button>
-              <button className="btn pri" disabled={!!loading || !!sending} onClick={() => handleSend('433d')} style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
-                {sending === '433d' ? '⏳' : '✍️'}&nbsp; Send
-              </button>
-            </div>
-          </div>
-
-          {/* 433-F — Collection Info (General) */}
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>
-              Form 433-F — Collection Information Statement (General)
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 8 }}>
-              Pre-fills name, SSN, and phone numbers.
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn sec" disabled={!!loading || !!sending} onClick={() => handleFill('433f')} style={{ flex: 1, justifyContent: 'flex-start', padding: '10px 14px' }}>
-                {loading === '433f' ? '⏳' : '📄'}&nbsp; Pre-fill 433-F
-              </button>
-              <button className="btn pri" disabled={!!loading || !!sending} onClick={() => handleSend('433f')} style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
-                {sending === '433f' ? '⏳' : '✍️'}&nbsp; Send
-              </button>
-            </div>
-          </div>
-
-          {/* 433-H — Installment Agreement Request + CIS */}
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>
-              Form 433-H — Installment Agreement Request &amp; CIS
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 8 }}>
-              Pre-fills name, address, SSN, and phone. Payment details require staff input.
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn sec" disabled={!!loading || !!sending} onClick={() => handleFill('433h')} style={{ flex: 1, justifyContent: 'flex-start', padding: '10px 14px' }}>
-                {loading === '433h' ? '⏳' : '📄'}&nbsp; Pre-fill 433-H
-              </button>
-              <button className="btn pri" disabled={!!loading || !!sending} onClick={() => handleSend('433h')} style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
-                {sending === '433h' ? '⏳' : '✍️'}&nbsp; Send
-              </button>
-            </div>
+          {/* Form list */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {visibleForms.map(f => (
+              <div key={f.formType} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--s1)', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--br)' }}>
+                <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--tx)' }}>{f.label}</span>
+                <button className="btn sec" disabled={!!loading || !!sending}
+                  onClick={() => handleFill(f.formType)}
+                  style={{ fontSize: 11, padding: '5px 12px', whiteSpace: 'nowrap' }}>
+                  {loading === f.formType ? '⏳' : '📄'} Download
+                </button>
+                <button className="btn pri" disabled={!!loading || !!sending}
+                  onClick={() => handleSend(f.formType)}
+                  style={{ fontSize: 11, padding: '5px 12px', whiteSpace: 'nowrap' }}>
+                  {sending === f.formType ? '⏳' : '✍️'} Send
+                </button>
+              </div>
+            ))}
           </div>
 
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '12px 18px', borderTop: '1px solid var(--br)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+        <div style={{ padding: '10px 18px', borderTop: '1px solid var(--br)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
           <button className="btn" onClick={onClose}>Close</button>
         </div>
       </div>
