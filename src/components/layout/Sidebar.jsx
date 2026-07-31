@@ -92,19 +92,18 @@ const SECTIONS = [
     ]
   },
   {
+    key: 'training',
+    label: 'Training',
+    items: [
+      { path: '/training', icon: ScreenIcon, label: 'Training', section: null },
+    ]
+  },
+  {
     key: 'crmcompanies',
     label: 'CRM Companies',
     platformOnly: true,
     items: [
       { path: '/new-office', icon: GearIcon, label: 'CRM Companies', section: null },
-    ]
-  },
-  {
-    key: 'training',
-    label: 'Training',
-    platformOnly: true,
-    items: [
-      { path: '/training', icon: ScreenIcon, label: 'Training', section: null },
     ]
   },
 ]

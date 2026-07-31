@@ -7,7 +7,6 @@ import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 
 const BASE = '/taxcasereview-CRM'
-const PLATFORM_ADMIN_EMAIL = 'romy@taxcasereview.org'
 
 function makeRoomId() {
   return Math.random().toString(36).slice(2, 7).toUpperCase()
@@ -24,8 +23,7 @@ function ScreenPreview({ stream }) {
 }
 
 export default function Training() {
-  const { user, showToast } = useApp()
-  const allowed = (user?.email || '').toLowerCase() === PLATFORM_ADMIN_EMAIL
+  const { showToast } = useApp()
 
   const [sessionActive,    setSessionActive]    = useState(false)
   const [roomId,           setRoomId]           = useState('')
@@ -131,15 +129,6 @@ export default function Training() {
 
   const joinUrl      = `${window.location.origin}${BASE}/screenshare?room=${roomId}`
   const participants = members.filter(n => n !== 'Me (host)').length
-
-  if (!allowed) {
-    return (
-      <div style={{ padding: '40px 32px', maxWidth: 520 }}>
-        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: 'var(--tx)' }}>Not available</div>
-        <div style={{ color: 'var(--t3)', fontSize: 13.5 }}>This page is platform-level and isn't available from this account.</div>
-      </div>
-    )
-  }
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 780 }}>
