@@ -1,10 +1,10 @@
-import DeleteConfirmModal from '../components/DeleteConfirmModal'
-import { formatMoneyInput, parseMoney } from '../lib/money'
-import ClientActivityReport from './ClientActivityReport'
-import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import ClientActivityReport from './ClientActivityReport'
+import { logActivity, getActor } from '../lib/activityLog'
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import { formatMoneyInput, parseMoney } from '../lib/money'
 import { NOTE_TEMPLATES } from '../lib/noteTemplates'
 import { triggerWorkflow, applyWorkflowTemplate } from '../lib/triggerWorkflow'
 import { useApp } from '../context/AppContext'
@@ -541,7 +541,7 @@ export default function Leads() {
 
   async function load() {
     const [{ data }, { data: emp }, { data: cats }, { data: sts }] = await Promise.all([
-      supabase.from('leads').select('id,name,status,"taxFee","assignedTo",created_at,"clientType",phone,email,"taxAssociate","pipelineStage",archived,deleted_at,"business_name","filingStatus",city,state,source').order('created_at', { ascending: false }),
+      supabase.from('leads').select('id,name,status,"taxFee","assignedTo",created_at,"clientType",phone,email,"taxAssociate","pipelineStage",archived,deleted_at,"business_name","filingStatus",city,state,source,"irsOrState","issueType","irsBalance"').order('created_at', { ascending: false }),
       supabase.from('employees').select('id,name,avatar_url,email,role').order('name'),
       supabase.from('workflow_status_categories').select('*').order('sort_order'),
       supabase.from('workflow_statuses').select('*').order('sort_order'),
@@ -1073,7 +1073,7 @@ export default function Leads() {
       }
     } else {
       // New lead — reload then navigate straight into the detail view
-      const { data: allLeads } = await supabase.from('leads').select('id,name,status,"taxFee","assignedTo",created_at,"clientType",phone,email,"taxAssociate","pipelineStage",archived,deleted_at,"business_name","filingStatus",city,state,source').order('created_at', { ascending: false })
+      const { data: allLeads } = await supabase.from('leads').select('id,name,status,"taxFee","assignedTo",created_at,"clientType",phone,email,"taxAssociate","pipelineStage",archived,deleted_at,"business_name","filingStatus",city,state,source,"irsOrState","issueType","irsBalance"').order('created_at', { ascending: false })
       if (allLeads) setLeads(allLeads)
       const newest = allLeads?.find(l => l.name === form.name)
       if (newest) {
