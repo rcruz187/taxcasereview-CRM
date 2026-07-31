@@ -9,8 +9,6 @@
 
 import { createContext, useContext, useState, useRef, useEffect } from 'react'
 import { useWebRTCRoom } from '../lib/webrtcRoom'
-
-const Ctx = createContext(null)
 export const useScreenShare = () => useContext(Ctx)
 
 // Shared BroadcastChannel — same-origin, works across tabs/pop-outs
@@ -35,7 +33,28 @@ export function ScreenShareProvider({ children }) {
   const webrtc         = useWebRTCRoom('screenshare')
   const screenTrackRef = useRef(null)
   const stateRef       = useRef({})
-  stateRef.current     = { webrtc, screenStream }
+  stateRef.current     = { webrtc, screenStream, sharingScreen }
+
+  // Broadcast member list to pop-out whenever it changes
+  useEffect(() => {
+    if (!active) return
+    getBC().postMessage({ type: 'state-snapshot', members: webrtc.members })
+  }, [webrtc.members, active])
+
+  // Handle request-snapshot from a newly opened pop-out
+  useEffect(() => {
+    const ch = getBC()
+    function onSnapshotRequest(e) {
+      if (e.data?.type === 'request-snapshot') {
+        ch.postMessage({ type: 'state-snapshot', members: stateRef.current.webrtc.members })
+        if (stateRef.current.sharingScreen) {
+          ch.postMessage({ type: 'screen-state', host: stateRef.current.myName, sharing: true })
+        }
+      }
+    }
+    ch.addEventListener('message', onSnapshotRequest)
+    return () => ch.removeEventListener('message', onSnapshotRequest)
+  }, [])
 
   // Listen for cross-window end signal so the overlay resets
   // when the pop-out's End button is pressed

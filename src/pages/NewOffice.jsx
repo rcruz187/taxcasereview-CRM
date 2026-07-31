@@ -442,6 +442,49 @@ function OfficeDetail({ tenantId, onBack, showToast, onImport }) {
           </div>
         )}
       </Section>
+
+      <Section title="Training Sessions">
+        <TrainingPanel firmName={t.firm_name} />
+      </Section>
+    </div>
+  )
+}
+
+function TrainingPanel({ firmName }) {
+  const BASE = '/taxcasereview-CRM'
+
+  function makeRoomId() {
+    return Math.random().toString(36).slice(2, 7).toUpperCase()
+  }
+
+  function startSession() {
+    // Open the screen-share launcher directly — same as clicking "Start session"
+    // in the overlay but scoped to this office's training tab.
+    // We post to BroadcastChannel so the main window's ScreenShareContext
+    // picks it up and shows the overlay.
+    const bc = new BroadcastChannel('tcr-screenshare')
+    bc.postMessage({ type: 'start-from-companies' })
+    bc.close()
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  return (
+    <div style={{ fontSize: 13, color: 'var(--t2)' }}>
+      <div style={{ marginBottom: 14, lineHeight: 1.6, color: 'var(--t3)' }}>
+        Start a screen-share training session with <strong style={{ color: 'var(--tx)' }}>{firmName}</strong> staff.
+        The session launches from the floating panel — participants join via a link you copy from there.
+      </div>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <button
+          className="btn pri"
+          onClick={startSession}
+          style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          📺 Start training session
+        </button>
+        <div style={{ fontSize: 12, color: 'var(--t3)', alignSelf: 'center' }}>
+          Session controls appear in the bottom-right overlay
+        </div>
+      </div>
     </div>
   )
 }

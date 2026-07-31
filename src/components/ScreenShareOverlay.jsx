@@ -67,7 +67,17 @@ export default function ScreenShareOverlay() {
 
   const myName = employeeName || 'Me'
 
-  // Active-speaker VAD
+  // Handle "Start training session" button from CRM Companies page
+  useEffect(() => {
+    const ch = new BroadcastChannel('tcr-screenshare')
+    async function onMsg(e) {
+      if (e.data?.type === 'start-from-companies' && !ss.active) {
+        await doStart()
+      }
+    }
+    ch.addEventListener('message', onMsg)
+    return () => ch.close()
+  }, [ss.active])
   useEffect(() => {
     if (!ss.active || !ss.webrtc.localStreamRef.current) return
     let ctx, interval
