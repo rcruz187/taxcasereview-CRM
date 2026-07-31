@@ -66,13 +66,15 @@ export default function ScreenShareOverlay() {
   const popoutRef = useRef(null)
 
   const myName = employeeName || 'Me'
+  const doStartRef = useRef(null)
 
   // Handle "Start training session" button from CRM Companies page
+  // Uses a ref so doStart doesn't need to be declared before this useEffect
   useEffect(() => {
     const ch = new BroadcastChannel('tcr-screenshare')
     async function onMsg(e) {
       if (e.data?.type === 'start-from-companies' && !ss.active) {
-        await doStart()
+        await doStartRef.current?.()
       }
     }
     ch.addEventListener('message', onMsg)
@@ -307,6 +309,7 @@ export default function ScreenShareOverlay() {
     const sResult = await ss.startScreenShare(myName)
     if (!sResult.ok) showToast(sResult.reason || 'Screen share unavailable — use the Share screen button')
   }
+  doStartRef.current = doStart
 
   async function doJoin() {
     const code = joinCode.trim().toUpperCase()
