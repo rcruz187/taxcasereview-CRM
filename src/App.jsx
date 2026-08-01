@@ -28,6 +28,7 @@ import FinancialIntakePage from './pages/FinancialIntakePage'
 import AuthCallback from './pages/AuthCallback'
 import NewOffice from './pages/NewOffice'
 import Training   from './pages/Training'
+import Support    from './pages/Support'
 
 // Everything behind login is lazy-loaded — each page's code only downloads
 // when you actually navigate to it, instead of all ~30 pages loading upfront
@@ -176,6 +177,7 @@ function Shell() {
             <Route path="/timeentry"   element={<Guard section="payments"><TimeEntry /></Guard>} />
             <Route path="/new-office"  element={<NewOffice />} />
             <Route path="/training"    element={<Training />} />
+            <Route path="/support"     element={<Support />} />
             <Route path="*"            element={<Navigate to="/" />} />
           </Routes>
           </Suspense>
