@@ -320,7 +320,8 @@ export default function Support() {
   const isRomy = user?.email === PLATFORM
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
-  const [view,    setView]    = useState('list') // 'list' | 'submit' | ticket_id
+  // Non-Romy users land on submit+history view by default — form always visible
+  const [view,    setView]    = useState('list') // 'list' | ticket_id (Romy) or always shows form+list (staff)
   const [filter,  setFilter]  = useState('Open')
 
   const load = useCallback(async () => {
@@ -361,17 +362,30 @@ export default function Support() {
           </div>
         </div>
         {!isRomy && (
-          <button onClick={() => setView(view === 'submit' ? 'list' : 'submit')}
+          <button onClick={() => setView('new')}
             style={{ background:'#2563eb', border:'none', borderRadius:8, padding:'9px 20px',
-                     color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer' }}>
-            {view === 'submit' ? '← My Tickets' : '+ New Ticket'}
+                     color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer',
+                     display: view === 'new' ? 'none' : 'block' }}>
+            + New Ticket
           </button>
         )}
       </div>
 
-      {/* Submit form for non-Romy users */}
-      {!isRomy && view === 'submit' && (
-        <SubmitForm user={user} onSubmitted={() => { load(); setView('list') }} />
+      {/* Submit form — always visible for non-Romy users */}
+      {!isRomy && view !== 'list' && view !== 'new' ? null : !isRomy && (
+        <>
+          {view === 'new'
+            ? <SubmitForm user={user} onSubmitted={() => { load(); setView('list') }} />
+            : <SubmitForm user={user} onSubmitted={load} />
+          }
+          {view === 'new' && (
+            <button onClick={() => setView('list')}
+              style={{ background:'none', border:'none', color:'var(--blue)', fontSize:13,
+                       cursor:'pointer', marginBottom:16, padding:0 }}>
+              ← View my tickets
+            </button>
+          )}
+        </>
       )}
 
       {/* Filter bar */}

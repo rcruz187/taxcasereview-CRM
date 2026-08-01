@@ -93,13 +93,6 @@ const SECTIONS = [
     ]
   },
   {
-    key: 'support',
-    label: 'Support',
-    items: [
-      { path: '/support', icon: GearIcon, label: 'Support Tickets', badge: 'support', section: null },
-    ]
-  },
-  {
     key: 'training',
     label: 'Training',
     items: [
@@ -112,6 +105,13 @@ const SECTIONS = [
     platformOnly: true,
     items: [
       { path: '/new-office', icon: GearIcon, label: 'CRM Companies', section: null },
+    ]
+  },
+  {
+    key: 'support',
+    label: 'Support',
+    items: [
+      { path: '/support', icon: GearIcon, label: 'Support Tickets', badge: 'support', section: null },
     ]
   },
 ]
