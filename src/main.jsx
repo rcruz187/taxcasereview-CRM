@@ -33,6 +33,21 @@ import App from './App.jsx'
   document.head.appendChild(s)
 })()
 
+// Restore deep-link URL after the GitHub Pages 404 SPA redirect.
+// 404.html saves the original URL to sessionStorage.redirect before bouncing
+// to the app root — we read it back here and replace the history entry so
+// React Router sees the correct path + query string on first render.
+;(function() {
+  const saved = sessionStorage.getItem('redirect')
+  if (saved) {
+    sessionStorage.removeItem('redirect')
+    // Only restore if it's under our basename to avoid open-redirect
+    if (saved.includes('/taxcasereview-CRM/')) {
+      window.history.replaceState(null, '', saved)
+    }
+  }
+})()
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />
