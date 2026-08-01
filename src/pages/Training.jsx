@@ -80,6 +80,10 @@ export default function Training() {
           body: {
             tenant_id: FIRM.tenantId || undefined,
             to,
+            // Training invites go out from the product address, not the tax
+            // practice's client-facing address.
+            from_email: 'romy@taxrescrm.net',
+            from_name: 'TaxRes CRM',
             subject: `Join the training session — ${firm}`,
             html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px">
 <div style="text-align:center;margin-bottom:20px">
