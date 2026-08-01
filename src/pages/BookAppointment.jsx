@@ -23,7 +23,16 @@ const fmt12 = (t) => {
 export default function BookAppointment() {
   const [params] = useSearchParams()
   const [cfg, setCfg] = useState(null)
-  const [meta, setMeta] = useState({ firm_name: 'Tax Case Review', logo_url: '', payment: { required: false } })
+  // ?demo=true on the URL → show TaxRes CRM product branding instead of
+  // the practice's logo. Used when the link comes from taxrescrm.net.
+  const isProductDemo = params.get('demo') === 'true' ||
+    new URLSearchParams(window.location.search).get('demo') === 'true'
+  const [meta, setMeta] = useState(
+    isProductDemo
+      ? { firm_name: 'TaxRes CRM', logo_url: 'https://taxrescrm.net/assets/img/logo.png',
+          subtitle: 'Schedule a Product Demonstration', payment: { required: false } }
+      : { firm_name: 'Tax Case Review', logo_url: '', payment: { required: false } }
+  )
   const [loadErr, setLoadErr] = useState('')
   const [type, setType] = useState('')
   const [date, setDate] = useState('')
@@ -53,9 +62,11 @@ export default function BookAppointment() {
     // Branding + payment config — additive RPC; safe fallback if not present yet.
     // Pass the tenant hint (?t=) so a demo /book link shows the demo's firm name and
     // logo; absent → the RPC's legacy first-row fallback (TCR) is preserved.
-    supabase.rpc('booking_get_public_meta', tid ? { p_tenant: tid } : {}).then(({ data }) => {
-      if (data) setMeta(m => ({ ...m, ...data, payment: { ...m.payment, ...(data.payment || {}) } }))
-    }).catch(() => {})
+    if (!isProductDemo) {
+      supabase.rpc('booking_get_public_meta', tid ? { p_tenant: tid } : {}).then(({ data }) => {
+        if (data) setMeta(m => ({ ...m, ...data, payment: { ...m.payment, ...(data.payment || {}) } }))
+      }).catch(() => {})
+    }
   }, [])
 
   // Next N days from config
@@ -138,6 +149,7 @@ export default function BookAppointment() {
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           {meta.logo_url && <img src={meta.logo_url} alt="" style={{ maxHeight: 56, maxWidth: 200, objectFit: 'contain', marginBottom: 10 }} onError={e => { e.target.style.display = 'none' }} />}
           <div style={{ fontSize: 24, fontWeight: 800 }}>{meta.firm_name || 'Tax Case Review'}</div>
+          {meta.subtitle && <div style={{ fontSize: 14, color: '#a0b0c8', marginTop: 4 }}>{meta.subtitle}</div>}
           <div style={{ color: C.dim, fontSize: 14, marginTop: 4 }}>Schedule an appointment</div>
         </div>
 
