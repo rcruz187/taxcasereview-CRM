@@ -107,6 +107,13 @@ const SECTIONS = [
       { path: '/new-office', icon: GearIcon, label: 'CRM Companies', section: null },
     ]
   },
+  {
+    key: 'support',
+    label: 'Support',
+    items: [
+      { path: '/support', icon: GearIcon, label: 'Support Tickets', badge: 'support', section: null },
+    ]
+  },
 ]
 
 export default function Sidebar() {
@@ -161,6 +168,7 @@ export default function Sidebar() {
   const [unreadInbox, setUnreadInbox] = useState(0)
   const [openTasks, setOpenTasks] = useState(0)
   const [unreadChat, setUnreadChat] = useState(0)
+  const [openTickets, setOpenTickets] = useState(0)
 
   useEffect(() => {
     async function loadPendingTimeOff() {
@@ -218,7 +226,7 @@ export default function Sidebar() {
     return () => { supabase.removeChannel(ch); clearInterval(poll); document.removeEventListener('visibilitychange', onVisible) }
   }, [user])
 
-  const BADGE_COUNTS = { leads: newLeads, clients: newClients, cases: openCases, deadlines: dueSoonDeadlines, fax: unreadFax, sms: unreadSms, voicemails: unreadVoicemails, esign: pendingEsign, email: unreadInbox, tasks: openTasks, chat: unreadChat, calendar: upcomingEvents }
+  const BADGE_COUNTS = { leads: newLeads, clients: newClients, cases: openCases, deadlines: dueSoonDeadlines, fax: unreadFax, sms: unreadSms, voicemails: unreadVoicemails, esign: pendingEsign, email: unreadInbox, tasks: openTasks, chat: unreadChat, calendar: upcomingEvents, support: openTickets }
 
   useEffect(() => {
     async function loadCommsCounts() {
@@ -260,6 +268,21 @@ export default function Sidebar() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sms_messages' }, loadCommsCounts)
       .subscribe()
     return () => { supabase.removeChannel(ch); clearInterval(poll); document.removeEventListener('visibilitychange', onVisible) }
+  }, [user])
+
+  // Support ticket badge
+  useEffect(() => {
+    async function loadTicketBadge() {
+      const { data } = await supabase.rpc('open_ticket_count')
+      setOpenTickets(data || 0)
+    }
+    if (!user) return
+    loadTicketBadge()
+    const poll = setInterval(loadTicketBadge, 60000)
+    const ch = supabase.channel('sidebar-tickets-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'support_tickets' }, loadTicketBadge)
+      .subscribe()
+    return () => { supabase.removeChannel(ch); clearInterval(poll) }
   }, [user])
 
   // Calendar badge — events starting today or in the next 24 hours

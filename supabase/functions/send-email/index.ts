@@ -61,7 +61,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const { to, subject, html, text, attachments, tenant_id } = await req.json()
+    const { to, subject, html, text, attachments, tenant_id, from_email, from_name } = await req.json()
 
     if (!to || !subject || (!html && !text)) {
       return new Response(JSON.stringify({ error: 'Missing required fields: to, subject, html/text' }), {
@@ -89,8 +89,15 @@ serve(async (req) => {
 
     const token = await getValidGmailToken(supabase, settings)
 
-    const fromDisplayName = settings.name || 'Tax Case Review'
-    const from = settings.email ? `${encodeHeaderValue(fromDisplayName)} <${settings.email}>` : encodeHeaderValue(fromDisplayName)
+    // from_email/from_name let a caller override the sender for a specific
+    // send (e.g. training invites go out as the TaxRes CRM product address,
+    // not the tax practice's client-facing address). The address MUST be a
+    // verified "Send mail as" alias on the connected Gmail account or Google
+    // silently rewrites the header back to the primary address.
+    const fromDisplayName = from_name || settings.name || 'Tax Case Review'
+    const fromAddress     = from_email || settings.email
+    const from = fromAddress ? `${encodeHeaderValue(fromDisplayName)} <${fromAddress}>` : encodeHeaderValue(fromDisplayName)
+    const replyTo = fromAddress ? `Reply-To: ${fromAddress}` : null
     const encodedSubject = encodeHeaderValue(subject)
     const isHtml = !!html
     const sig = settings.email_signature ? `\n\n${settings.email_signature}` : ''
@@ -119,6 +126,7 @@ serve(async (req) => {
       const headers = [
         `To: ${to}`,
         `From: ${from}`,
+        ...(replyTo ? [replyTo] : []),
         `Subject: ${encodedSubject}`,
         `Date: ${new Date().toUTCString()}`,
         'MIME-Version: 1.0',
@@ -139,6 +147,7 @@ serve(async (req) => {
       const headers = [
         `To: ${to}`,
         `From: ${from}`,
+        ...(replyTo ? [replyTo] : []),
         `Subject: ${encodedSubject}`,
         `Date: ${new Date().toUTCString()}`,
         `Content-Type: ${isHtml ? 'text/html' : 'text/plain'}; charset="UTF-8"`,

@@ -1,0 +1,1 @@
+TaxRes CRM marketing website — deployed through GitHub Pages from the main branch and root directory. The planned primary domain is taxrescrm.net. The CNAME file will be added only after DNS is configured and verified.

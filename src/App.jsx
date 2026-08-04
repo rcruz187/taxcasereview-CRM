@@ -28,6 +28,7 @@ import FinancialIntakePage from './pages/FinancialIntakePage'
 import AuthCallback from './pages/AuthCallback'
 import NewOffice from './pages/NewOffice'
 import Training   from './pages/Training'
+import Support    from './pages/Support'
 
 // Everything behind login is lazy-loaded — each page's code only downloads
 // when you actually navigate to it, instead of all ~30 pages loading upfront
@@ -176,6 +177,7 @@ function Shell() {
             <Route path="/timeentry"   element={<Guard section="payments"><TimeEntry /></Guard>} />
             <Route path="/new-office"  element={<NewOffice />} />
             <Route path="/training"    element={<Training />} />
+            <Route path="/support"     element={<Support />} />
             <Route path="*"            element={<Navigate to="/" />} />
           </Routes>
           </Suspense>
@@ -193,7 +195,15 @@ function Shell() {
 function AuthRouter() {
   const { user, checking } = useApp()
 
-  if (checking) return (
+  // Public routes must render immediately — never block them on the auth check.
+  // /book, /sign, /portal etc are anonymous; showing a spinner loses prospects.
+  const publicPaths = ['/book', '/sign', '/portal', '/clockin', '/kiosk',
+    '/employee', '/meet', '/screenshare', '/financial-intake', '/organizer']
+  const isPublicPath = publicPaths.some(p =>
+    window.location.pathname.replace('/taxcasereview-CRM', '').startsWith(p)
+  )
+
+  if (checking && !isPublicPath) return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg)' }}>
       <div style={{ color:'var(--t3)', fontSize:13 }}>Loading…</div>
     </div>
