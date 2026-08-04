@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import NewOffice from './NewOffice'
+import Support from './Support'
 
 const PLATFORM_ADMIN_EMAIL = 'romy@taxcasereview.org'
 const STATUS_COLORS = { active:'#10b981', trial:'#f59e0b', past_due:'#f97316', cancelled:'#ef4444' }
@@ -66,6 +67,7 @@ export default function AdminConsole() {
             {key:'overview',  label:'📊 Overview'},
             {key:'companies', label:'🏢 Companies'},
             {key:'search',    label:'🔍 Search'},
+            {key:'support',   label:'🎫 Support'},
           ].map(t => (
             <button key={t.key} onClick={()=>setTab(t.key)}
               style={{
@@ -81,6 +83,7 @@ export default function AdminConsole() {
       {tab === 'overview'  && <AdminOverview />}
       {tab === 'companies' && <NewOffice />}
       {tab === 'search'    && <AdminSearch />}
+      {tab === 'support'   && <Support />}
     </div>
   )
 }

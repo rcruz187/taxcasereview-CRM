@@ -99,21 +99,7 @@ const SECTIONS = [
       { path: '/training', icon: ScreenIcon, label: 'Training', section: null },
     ]
   },
-  {
-    key: 'crmcompanies',
-    label: 'Platform Admin',
-    platformOnly: true,
-    items: [
-      { path: '/admin', icon: GearIcon, label: '🛡️ Platform Admin', section: null },
-    ]
-  },
-  {
-    key: 'support',
-    label: 'Support',
-    items: [
-      { path: '/support', icon: GearIcon, label: 'Support Tickets', badge: 'support', section: null },
-    ]
-  },
+  // Platform Admin and Support removed from TCR — they live in the TaxRes CRM admin build
 ]
 
 export default function Sidebar() {
@@ -151,8 +137,6 @@ export default function Sidebar() {
   // anywhere (he was explicit: no one else should ever see this, even another
   // Super Admin on TCR or any other tenant). A plain email match is simpler
   // and stricter than the previous role+tenant lookup, and needs no query.
-  const PLATFORM_ADMIN_EMAIL = 'romy@taxcasereview.org'
-  const isPlatformAdmin = (user?.email || '').toLowerCase() === PLATFORM_ADMIN_EMAIL
   const [pendingTimeOff, setPendingTimeOff] = useState(0)
   const [newLeads, setNewLeads] = useState(0)
   const [newClients, setNewClients] = useState(0)
@@ -168,7 +152,6 @@ export default function Sidebar() {
   const [unreadInbox, setUnreadInbox] = useState(0)
   const [openTasks, setOpenTasks] = useState(0)
   const [unreadChat, setUnreadChat] = useState(0)
-  const [openTickets, setOpenTickets] = useState(0)
 
   useEffect(() => {
     async function loadPendingTimeOff() {
@@ -226,7 +209,7 @@ export default function Sidebar() {
     return () => { supabase.removeChannel(ch); clearInterval(poll); document.removeEventListener('visibilitychange', onVisible) }
   }, [user])
 
-  const BADGE_COUNTS = { leads: newLeads, clients: newClients, cases: openCases, deadlines: dueSoonDeadlines, fax: unreadFax, sms: unreadSms, voicemails: unreadVoicemails, esign: pendingEsign, email: unreadInbox, tasks: openTasks, chat: unreadChat, calendar: upcomingEvents, support: openTickets }
+  const BADGE_COUNTS = { leads: newLeads, clients: newClients, cases: openCases, deadlines: dueSoonDeadlines, fax: unreadFax, sms: unreadSms, voicemails: unreadVoicemails, esign: pendingEsign, email: unreadInbox, tasks: openTasks, chat: unreadChat, calendar: upcomingEvents }
 
   useEffect(() => {
     async function loadCommsCounts() {
@@ -268,21 +251,6 @@ export default function Sidebar() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sms_messages' }, loadCommsCounts)
       .subscribe()
     return () => { supabase.removeChannel(ch); clearInterval(poll); document.removeEventListener('visibilitychange', onVisible) }
-  }, [user])
-
-  // Support ticket badge
-  useEffect(() => {
-    async function loadTicketBadge() {
-      const { data } = await supabase.rpc('open_ticket_count')
-      setOpenTickets(data || 0)
-    }
-    if (!user) return
-    loadTicketBadge()
-    const poll = setInterval(loadTicketBadge, 60000)
-    const ch = supabase.channel('sidebar-tickets-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'support_tickets' }, loadTicketBadge)
-      .subscribe()
-    return () => { supabase.removeChannel(ch); clearInterval(poll) }
   }, [user])
 
   // Calendar badge — events starting today or in the next 24 hours
@@ -452,7 +420,7 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {SECTIONS.filter(section => !section.platformOnly || isPlatformAdmin).map(section => {
+      {SECTIONS.map(section => {
         const isOpen = section.always || openKey === section.key
         const hasActive = !section.always && section.items.some(i => i.path !== '/' && location.pathname.startsWith(i.path))
 
