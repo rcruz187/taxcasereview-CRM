@@ -7,7 +7,7 @@ import { supabase }   from '../lib/supabase'
 import { useApp }     from '../context/AppContext'
 import { FIRM }       from '../lib/firmBranding'
 
-const PLATFORM = 'romy@taxcasereview.org'
+const PLATFORM_EMAILS = ['romy@taxcasereview.org', 'romy@taxrescrm.net']
 const FROM_EMAIL = 'romy@taxrescrm.net'
 const FROM_NAME  = 'TaxRes CRM Support'
 
@@ -317,7 +317,7 @@ ${reply.trim().replace(/\n/g,'<br>')}
 // ── Main Support page ────────────────────────────────────────────────
 export default function Support() {
   const { user } = useApp()
-  const isRomy = user?.email === PLATFORM
+  const isRomy = PLATFORM_EMAILS.includes(user?.email || '')
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   // Non-Romy users land on submit+history view by default — form always visible

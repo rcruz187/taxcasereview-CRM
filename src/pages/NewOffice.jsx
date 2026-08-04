@@ -3,7 +3,7 @@ import Papa from 'papaparse'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 
-const PLATFORM_ADMIN_EMAIL = 'romy@taxcasereview.org'
+const PLATFORM_ADMIN_EMAILS = ['romy@taxcasereview.org', 'romy@taxrescrm.net']
 const TCR_TENANT = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
 const BLANK = { firm_name:'', tenant_code:'', admin_name:'', admin_email:'', firm_phone:'', brand_color:'#2563eb', plan_tier:'starter' }
 const STATUS_COLORS = { active:'#10b981', trial:'#f59e0b', past_due:'#f97316', cancelled:'#ef4444' }
@@ -23,7 +23,7 @@ function fmtBytes(n) {
 // every RPC and edge function this page calls.
 export default function NewOffice() {
   const { user, showToast } = useApp()
-  const allowed = (user?.email || '').toLowerCase() === PLATFORM_ADMIN_EMAIL
+  const allowed = PLATFORM_ADMIN_EMAILS.includes((user?.email || '').toLowerCase())
   const [offices, setOffices]   = useState(null) // null = not loaded yet
   const [view, setView]         = useState('list') // 'list' | 'form' | 'detail'
   const [selectedId, setSelectedId] = useState(null)

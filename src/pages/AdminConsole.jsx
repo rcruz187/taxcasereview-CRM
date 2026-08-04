@@ -15,7 +15,8 @@ import { useApp } from '../context/AppContext'
 import NewOffice from './NewOffice'
 import Support from './Support'
 
-const PLATFORM_ADMIN_EMAIL = 'romy@taxcasereview.org'
+const PLATFORM_ADMIN_EMAILS = ['romy@taxcasereview.org', 'romy@taxrescrm.net']
+const isTaxResCRM = (email) => (email||'').toLowerCase() === 'romy@taxrescrm.net'
 const STATUS_COLORS = { active:'#10b981', trial:'#f59e0b', past_due:'#f97316', cancelled:'#ef4444' }
 
 function fmtBytes(n) {
@@ -39,7 +40,8 @@ function timeAgo(d) {
 export default function AdminConsole() {
   const { user } = useApp()
   const navigate = useNavigate()
-  const allowed = (user?.email || '').toLowerCase() === PLATFORM_ADMIN_EMAIL
+  const allowed = PLATFORM_ADMIN_EMAILS.includes((user?.email || '').toLowerCase())
+  const asProduct = isTaxResCRM(user?.email) // logged in as TaxRes CRM identity
   const [tab, setTab] = useState('overview') // overview | companies | search
 
   if (!allowed) return (
@@ -59,8 +61,8 @@ export default function AdminConsole() {
       }}>
         <span style={{fontSize:22}}>🛡️</span>
         <div>
-          <div style={{fontSize:16,fontWeight:800,color:'#fff'}}>Platform Admin</div>
-          <div style={{fontSize:11.5,color:'#c4b5fd'}}>Visible only to romy@taxcasereview.org — every office, one place</div>
+          <div style={{fontSize:16,fontWeight:800,color:'#fff'}}>{asProduct ? 'TaxRes CRM' : 'Platform Admin'}</div>
+          <div style={{fontSize:11.5,color:'#c4b5fd'}}>{asProduct ? 'TaxRes CRM — Admin Console' : 'Visible only to romy@taxcasereview.org — every office, one place'}</div>
         </div>
         <div style={{marginLeft:'auto',display:'flex',gap:6}}>
           {[
