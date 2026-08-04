@@ -5,6 +5,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useScreenShare } from '../context/ScreenShareContext'
 import { useApp }         from '../context/AppContext'
+import { supabase }       from '../lib/supabase'
+import { FIRM, firmFooterLine } from '../lib/firmBranding'
 
 const BASE = '/taxcasereview-CRM'
 
@@ -25,6 +27,11 @@ export default function Training() {
 
   const [starting, setStarting] = useState(false)
   const [copied,   setCopied]   = useState(false)
+
+  // Email the invite link straight from this page
+  const [emailOpen,   setEmailOpen]   = useState(false)
+  const [emailTo,     setEmailTo]     = useState('')
+  const [emailSending,setEmailSending]= useState(false)
 
   // Screen label (Entire screen / Window / Browser tab)
   const [screenLabel, setScreenLabel] = useState('')
@@ -50,21 +57,76 @@ export default function Training() {
   }
 
   function copyLink() {
-    const url = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}`
+    const firmParam = FIRM.name ? `&firm=${encodeURIComponent(FIRM.name)}` : ''
+    const logoParam = FIRM.logoUrl ? `&logo=${encodeURIComponent(FIRM.logoUrl)}` : ''
+    const url = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${firmParam}${logoParam}`
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true); setTimeout(() => setCopied(false), 2000)
     })
   }
 
+  // Email the join link to one or more people, using the same send-email
+  // edge function every other transactional email in the CRM goes through.
+  async function sendInviteEmail() {
+    const raw = emailTo.split(',').map(v => v.trim()).filter(Boolean)
+    if (!raw.length) return
+    const bad = raw.filter(v => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))
+    if (bad.length) { showToast?.(`Not a valid email: ${bad[0]}`, 'error'); return }
+
+    const firmParam2 = FIRM.name ? `&firm=${encodeURIComponent(FIRM.name)}` : ''
+    const logoParam2 = FIRM.logoUrl ? `&logo=${encodeURIComponent(FIRM.logoUrl)}` : ''
+    const url  = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${firmParam2}${logoParam2}`
+    const firm = FIRM.name || 'Tax Case Review'
+    setEmailSending(true)
+    try {
+      for (const to of raw) {
+        const { error } = await supabase.functions.invoke('send-email', {
+          body: {
+            tenant_id: FIRM.tenantId || undefined,
+            to,
+            // Use the tenant's own email settings so the invite comes from the right firm
+            subject: `Join the training session — ${firm}`,
+            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px">
+<div style="text-align:center;margin-bottom:20px">
+<img src="${FIRM.logoUrl}" alt="${firm}" style="max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px" onerror="this.style.display='none'"/>
+<div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${firm}</div>
+</div>
+<p>You've been invited to a live training session with <strong>${myName}</strong>.</p>
+<p style="text-align:center;margin:24px 0">
+<a href="${url}" style="background:#7c3aed;color:#fff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Join session &rarr;</a>
+</p>
+<p style="font-size:13px;color:#475569">No account or download needed — the link opens straight in your browser. Room code <strong>${ss.roomId}</strong>.</p>
+<p style="font-size:12px;color:#64748b">${url}</p>
+<p style="font-size:11px;color:#94a3b8;margin-top:24px">${firmFooterLine()}</p>
+</div>`
+          }
+        })
+        if (error) throw error
+      }
+      showToast?.(`Invite sent to ${raw.length} recipient${raw.length > 1 ? 's' : ''}`, 'success')
+      setEmailTo(''); setEmailOpen(false)
+    } catch (e) {
+      // Offices with no email connected fall back to the copy button.
+      navigator.clipboard.writeText(url).catch(() => {})
+      showToast?.('Could not send email — link copied to clipboard instead', 'error')
+    } finally {
+      setEmailSending(false)
+    }
+  }
+
   function openPopout() {
-    const url  = `${window.location.origin}${BASE}/screenshare-host?room=${ss.roomId}&name=${encodeURIComponent(myName)}`
+    const hostFirmParam = FIRM.name ? `&firm=${encodeURIComponent(FIRM.name)}` : ''
+    const hostLogoParam = FIRM.logoUrl ? `&logo=${encodeURIComponent(FIRM.logoUrl)}` : ''
+    const url  = `${window.location.origin}${BASE}/screenshare-host?room=${ss.roomId}&name=${encodeURIComponent(myName)}${hostFirmParam}${hostLogoParam}`
     const w = 960, h = 680
     const left = Math.max(0, window.screen.width - w - 20)
     const top  = Math.max(0, window.screen.height - h - 60)
     window.open(url, `tcr-training-${ss.roomId}`, `width=${w},height=${h},left=${left},top=${top},resizable=yes`)
   }
 
-  const joinUrl      = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}`
+  const joinFirmParam = FIRM.name ? `&firm=${encodeURIComponent(FIRM.name)}` : ''
+  const joinLogoParam = FIRM.logoUrl ? `&logo=${encodeURIComponent(FIRM.logoUrl)}` : ''
+  const joinUrl      = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${joinFirmParam}${joinLogoParam}`
   const participants = ss.webrtc.members.filter(n => !n.endsWith('(view)') && n !== myName).length
 
   // ── Not started ──────────────────────────────────────────────────────────
@@ -175,7 +237,34 @@ export default function Training() {
                      cursor: 'pointer', flexShrink: 0, transition: 'background .2s' }}>
             {copied ? '✓ Copied!' : '📋 Copy'}
           </button>
+          <button onClick={() => setEmailOpen(o => !o)}
+            style={{ background: emailOpen ? 'var(--s3)' : '#7c3aed', border: 'none', borderRadius: 8,
+                     padding: '8px 16px', color: '#fff', fontWeight: 700, fontSize: 13,
+                     cursor: 'pointer', flexShrink: 0 }}>
+            ✉️ Email
+          </button>
         </div>
+
+        {emailOpen && (
+          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="email"
+              value={emailTo}
+              onChange={e => setEmailTo(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') sendInviteEmail() }}
+              placeholder="name@firm.com — separate multiple with commas"
+              style={{ flex: 1, fontSize: 13, padding: '9px 11px', borderRadius: 6,
+                       border: '1px solid var(--br)', background: 'var(--bg)', color: 'var(--tx)' }} />
+            <button onClick={sendInviteEmail} disabled={emailSending || !emailTo.trim()}
+              style={{ background: '#16a34a', border: 'none', borderRadius: 8, padding: '9px 18px',
+                       color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0,
+                       cursor: emailSending || !emailTo.trim() ? 'not-allowed' : 'pointer',
+                       opacity: emailSending || !emailTo.trim() ? .55 : 1 }}>
+              {emailSending ? 'Sending…' : 'Send invite'}
+            </button>
+          </div>
+        )}
+
         <div style={{ marginTop: 8, fontSize: 12, color: 'var(--t3)' }}>
           Share in Chat, email, or SMS. Anyone who clicks joins instantly — no account needed.
         </div>

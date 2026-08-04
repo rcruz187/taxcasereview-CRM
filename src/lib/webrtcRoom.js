@@ -49,7 +49,8 @@ const MAX_PARTICIPANTS = 6
 
 export function useWebRTCRoom(channelPrefix) {
   const [members, setMembers] = useState([])
-  const [remoteStreams, setRemoteStreams] = useState({}) // { name: MediaStream }
+  const [remoteStreams,       setRemoteStreams]       = useState({})
+  const [remoteScreenStreams, setRemoteScreenStreams] = useState({}) // { name: MediaStream }
   const [micOn, setMicOn] = useState(true)
   const [cameraOn, setCameraOn] = useState(true)
   const [joined, setJoined] = useState(false)
@@ -62,6 +63,10 @@ export function useWebRTCRoom(channelPrefix) {
   const iceServersRef = useRef(FALLBACK_ICE) // refreshed in join() from turn-credentials
   const fullyJoinedRef = useRef(false) // true only after this client has tracked its own presence
   const viewerOnlyRef  = useRef(false)  // true when joined with viewerOnly — no local tracks sent
+  // When a screen share is running, this holds the screen track. Anyone who
+  // joins AFTER the share started must be given the screen track instead of
+  // the camera track — replaceTrack() only rewires peers that already exist.
+  const screenTrackRef = useRef(null)
 
 
   function createPC(peerName) {
@@ -69,14 +74,36 @@ export function useWebRTCRoom(channelPrefix) {
     const pc = new RTCPeerConnection(iceServersRef.current)
     peerConnsRef.current[peerName] = pc
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(t => pc.addTrack(t, localStreamRef.current))
+      localStreamRef.current.getTracks().forEach(t => {
+        // Skip the camera video track when screen sharing — the screen track
+        // is added in its place below, so late joiners see the screen.
+        if (t.kind === 'video' && screenTrackRef.current) return
+        pc.addTrack(t, localStreamRef.current)
+      })
+      if (screenTrackRef.current) pc.addTrack(screenTrackRef.current, localStreamRef.current)
     } else if (viewerOnlyRef.current) {
       // Viewer-only: explicitly request incoming streams without sending anything
       pc.addTransceiver('video', { direction: 'recvonly' })
       pc.addTransceiver('audio', { direction: 'recvonly' })
     }
     pc.ontrack = (e) => {
-      setRemoteStreams(prev => ({ ...prev, [peerName]: e.streams[0] }))
+      const track = e.track
+      // Distinguish screen tracks from camera tracks.
+      // Screen tracks have label like "screen:..." OR contentHint "detail".
+      // We store screen streams separately so the viewer can show both
+      // the camera tile AND the screen share tile independently.
+      const isScreen = track.kind === 'video' && (
+        track.label?.toLowerCase().includes('screen') ||
+        track.label?.toLowerCase().includes('display') ||
+        track.contentHint === 'detail' ||
+        track.label?.startsWith('0:')  // Chrome screen track format
+      )
+      if (isScreen) {
+        const screenStream = new MediaStream([track])
+        setRemoteScreenStreams(prev => ({ ...prev, [peerName]: screenStream }))
+      } else {
+        setRemoteStreams(prev => ({ ...prev, [peerName]: e.streams[0] }))
+      }
     }
     pc.onicecandidate = (e) => {
       if (e.candidate) {
@@ -243,6 +270,7 @@ export function useWebRTCRoom(channelPrefix) {
   const leave = useCallback(async () => {
     fullyJoinedRef.current = false
     viewerOnlyRef.current = false
+    screenTrackRef.current = null
     if (channelRef.current) {
       await channelRef.current.untrack().catch(() => {})
       await supabase.removeChannel(channelRef.current)
@@ -267,6 +295,7 @@ export function useWebRTCRoom(channelPrefix) {
 
   return {
     members, remoteStreams, micOn, cameraOn, joined, error,
-    localStreamRef, peerConnsRef, channelRef, join, leave, toggleMic, toggleCamera,
+    localStreamRef, peerConnsRef, channelRef, screenTrackRef, join, leave, toggleMic, toggleCamera,
+    remoteScreenStreams, setRemoteScreenStreams,
   }
 }

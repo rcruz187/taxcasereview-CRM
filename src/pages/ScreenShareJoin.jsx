@@ -46,8 +46,14 @@ function CamTile({ stream, name, muted = false, mirror = false }) {
 export default function ScreenShareJoin() {
   const [params] = useSearchParams()
   const roomId   = (params.get('room') || '').trim().toUpperCase()
+  // Branding from URL params (passed by Training.jsx) — falls back to loaded FIRM
+  const urlFirm  = params.get('firm') || ''
+  const urlLogo  = params.get('logo') || ''
 
   const [ready,         setReady]         = useState(false)
+  // Prefer URL-passed branding; fall back to loaded FIRM once ready
+  const displayName = urlFirm || (ready ? (FIRM.name || 'Training session') : 'Training session')
+  const displayLogo = urlLogo || (ready ? FIRM.logoUrl : '')
   const [name,          setName]          = useState('')
   const [entered,       setEntered]       = useState(false)
   const [joining,       setJoining]       = useState(false)
@@ -55,6 +61,7 @@ export default function ScreenShareJoin() {
   const [screenState,   setScreenState]   = useState(null)
 
   const webrtc = useWebRTCRoom('screenshare')
+  // remoteScreenStreams is available on webrtc object from webrtcRoom.js
 
   useEffect(() => { loadFirmBrandingPublic().finally(() => setReady(true)) }, [])
   useEffect(() => () => { webrtc.leave() }, []) // eslint-disable-line
@@ -70,6 +77,10 @@ export default function ScreenShareJoin() {
     webrtc.channelRef.current?.on('broadcast', { event: 'screen-state' }, ({ payload }) => {
       setScreenState(payload)  // { host, sharing }
     })
+    // Request the current screen state immediately in case we joined after sharing started
+    webrtc.channelRef.current?.send({
+      type: 'broadcast', event: 'request-screen-state', payload: { from: name.trim() }
+    })
 
     setEntered(true)
   }
@@ -77,9 +88,11 @@ export default function ScreenShareJoin() {
   const myName = name.trim()
   const peers  = webrtc.members.filter(n => n !== myName)
 
-  // The host's stream — determined by broadcast, not by resolution guessing
-  const hostStream = screenState?.sharing && screenState?.host
-    ? webrtc.remoteStreams[screenState.host] || null
+  // The screen stream — from the dedicated screen track (separated from camera in ontrack)
+  // Falls back to broadcast-flagged stream if label-detection didn't catch it
+  const hostName   = screenState?.host || ''
+  const hostStream = screenState?.sharing && hostName
+    ? (webrtc.remoteScreenStreams[hostName] || webrtc.remoteStreams[hostName] || null)
     : null
 
   // ── Pre-join ──────────────────────────────────────────────────────────────
@@ -89,13 +102,13 @@ export default function ScreenShareJoin() {
                     alignItems: 'center', justifyContent: 'center', fontFamily: 'Arial, sans-serif' }}>
         <div style={{ background: '#1e293b', borderRadius: 16, padding: '40px 48px',
                       width: 360, boxShadow: '0 8px 40px rgba(0,0,0,.5)' }}>
-          {ready && FIRM.logoUrl && (
-            <img src={FIRM.logoUrl} alt={FIRM.name}
+          {displayLogo && (
+            <img src={displayLogo} alt={displayName}
               style={{ height: 44, objectFit: 'contain', marginBottom: 14, display: 'block' }}
               onError={e => { e.target.style.display = 'none' }} />
           )}
           <div style={{ fontSize: 22, fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>
-            {ready ? (FIRM.name || 'Training session') : 'Training session'}
+            {displayName}
           </div>
           <div style={{ fontSize: 13, color: '#64748b', marginBottom: 28 }}>
             {roomId
@@ -138,12 +151,12 @@ export default function ScreenShareJoin() {
       {/* Header */}
       <div style={{ background: '#1e293b', borderBottom: '1px solid #334155',
                     padding: '11px 20px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-        {FIRM.logoUrl && (
-          <img src={FIRM.logoUrl} alt="" style={{ height: 30, objectFit: 'contain' }}
+        {displayLogo && (
+          <img src={displayLogo} alt="" style={{ height: 30, objectFit: 'contain' }}
             onError={e => { e.target.style.display = 'none' }} />
         )}
         <span style={{ color: '#f8fafc', fontWeight: 700, fontSize: 15 }}>
-          {FIRM.name || 'Training session'}
+          {displayName}
         </span>
         <span style={{ color: '#64748b', fontSize: 12 }}>
           · Room <span style={{ fontFamily: 'monospace', color: '#93c5fd', letterSpacing: 2 }}>{roomId}</span>
