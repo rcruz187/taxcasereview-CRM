@@ -806,6 +806,9 @@ export default function Settings() {
 
       {tab === 'booking' && isPrivileged && <BookingSettings />}
 
+      {/* Email Accounts — personal IMAP/SMTP connections for each employee */}
+      {tab === 'integrations' && <EmailAccountsSection />}
+
       {tab === 'branding' && isPrivileged && (
         <div className="card">
           <div className="card-header"><span className="card-title">Branding</span></div>
@@ -1921,6 +1924,161 @@ function BillingRatesTab() {
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Email Accounts — personal IMAP/SMTP per employee ────────────────────────
+function EmailAccountsSection() {
+  const { user, showToast } = useApp()
+  const [accounts, setAccounts] = useState([])
+  const [loading,  setLoading]  = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [testing,  setTesting]  = useState(false)
+  const [saving,   setSaving]   = useState(false)
+  const DEFAULTS = {
+    email_address: '', display_name: '', password: '',
+    imap_host: 'mail.taxrescrm.net', imap_port: 993,
+    smtp_host: 'mail.taxrescrm.net', smtp_port: 587, use_ssl: true,
+  }
+  const [form, setForm] = useState(DEFAULTS)
+  function fld(k, v) { setForm(f => ({ ...f, [k]: v })) }
+
+  useEffect(() => { load() }, [])
+
+  async function load() {
+    setLoading(true)
+    const { data } = await supabase.from('email_accounts')
+      .select('id,email_address,display_name,imap_host,imap_port,smtp_host,smtp_port,is_active,last_sync_at,sync_status,sync_error')
+      .eq('employee_email', user?.email || '')
+      .order('created_at')
+    setAccounts(data || [])
+    setLoading(false)
+  }
+
+  async function save() {
+    if (!form.email_address || !form.password) {
+      showToast('Email address and password are required'); return
+    }
+    setSaving(true)
+    const { error } = await supabase.functions.invoke('save-email-account', {
+      body: {
+        email_address: form.email_address.trim(),
+        display_name:  form.display_name.trim() || form.email_address.trim(),
+        imap_host: form.imap_host, imap_port: Number(form.imap_port),
+        smtp_host: form.smtp_host, smtp_port: Number(form.smtp_port),
+        use_ssl: form.use_ssl, password: form.password,
+      }
+    })
+    setSaving(false)
+    if (error) { showToast('❌ ' + error.message); return }
+    showToast('✅ Email account saved')
+    setShowForm(false); setForm(DEFAULTS); load()
+  }
+
+  async function remove(id) {
+    if (!confirm('Remove this email account? Synced emails will remain.')) return
+    await supabase.from('email_accounts').update({ is_active: false }).eq('id', id)
+    load()
+  }
+
+  async function syncNow(id) {
+    setTesting(true)
+    const { data, error } = await supabase.functions.invoke('imap-sync', { body: { account_id: id } })
+    setTesting(false)
+    if (error) { showToast('❌ ' + error.message); return }
+    const r = data?.results?.[0]
+    showToast(r ? `✅ Synced — ${r.synced} new message${r.synced !== 1 ? 's' : ''}` : '✅ Sync complete')
+    load()
+  }
+
+  const STATUS_COLOR = { ok: '#10b981', error: '#ef4444', pending: '#f59e0b' }
+
+  return (
+    <div className="card" style={{ marginTop: 20 }}>
+      <div className="card-header">
+        <span className="card-title">📧 Connected Email Accounts</span>
+        <button className="btn sec" style={{ fontSize: 12 }} onClick={() => { setShowForm(true); setForm(DEFAULTS) }}>
+          + Connect Mailbox
+        </button>
+      </div>
+      <div style={{ padding: '0 20px 20px' }}>
+        <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 16 }}>
+          Connect your IMAP/SMTP mailbox to send and receive emails directly inside client records.
+          Each rep connects their own mailbox — passwords are encrypted at rest, never stored in plaintext.
+        </div>
+
+        {showForm && (
+          <div style={{ background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Connect a Mailbox</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="field" style={{ gridColumn: '1/-1' }}>
+                <label>Email Address *</label>
+                <input value={form.email_address} onChange={e => fld('email_address', e.target.value)} placeholder="romy@taxrescrm.net" type="email"/>
+              </div>
+              <div className="field" style={{ gridColumn: '1/-1' }}>
+                <label>Display Name</label>
+                <input value={form.display_name} onChange={e => fld('display_name', e.target.value)} placeholder="Romy Cruz — TaxRes CRM"/>
+              </div>
+              <div className="field" style={{ gridColumn: '1/-1' }}>
+                <label>Password / App Password *</label>
+                <input value={form.password} onChange={e => fld('password', e.target.value)} type="password" placeholder="••••••••"/>
+              </div>
+              <div className="field"><label>IMAP Host</label>
+                <input value={form.imap_host} onChange={e => fld('imap_host', e.target.value)}/>
+              </div>
+              <div className="field"><label>IMAP Port</label>
+                <input value={form.imap_port} onChange={e => fld('imap_port', e.target.value)} type="number"/>
+              </div>
+              <div className="field"><label>SMTP Host</label>
+                <input value={form.smtp_host} onChange={e => fld('smtp_host', e.target.value)}/>
+              </div>
+              <div className="field"><label>SMTP Port</label>
+                <input value={form.smtp_port} onChange={e => fld('smtp_port', e.target.value)} type="number"/>
+              </div>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--t3)', margin: '8px 0 12px' }}>
+              Stalwart defaults: IMAP 993 SSL · SMTP 587 STARTTLS or 465 SSL
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn pri" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save & Connect'}</button>
+              <button className="btn sec" onClick={() => setShowForm(false)}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {loading ? (
+          <div style={{ color: 'var(--t3)', fontSize: 13 }}>Loading…</div>
+        ) : accounts.length === 0 ? (
+          <div style={{ color: 'var(--t3)', fontSize: 13, padding: '12px 0' }}>No email accounts connected yet.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {accounts.map(a => (
+              <div key={a.id} style={{ background: 'var(--s2)', border: '1px solid var(--br)', borderRadius: 8, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)' }}>{a.email_address}</div>
+                  <div style={{ fontSize: 11, color: 'var(--t3)' }}>
+                    IMAP {a.imap_host}:{a.imap_port} · SMTP {a.smtp_host}:{a.smtp_port}
+                    {a.last_sync_at && ` · Last sync: ${new Date(a.last_sync_at).toLocaleString()}`}
+                  </div>
+                  {a.sync_error && <div style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>{a.sync_error}</div>}
+                </div>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, textTransform: 'uppercase',
+                  background: (STATUS_COLOR[a.sync_status] || '#64748b') + '22',
+                  color: STATUS_COLOR[a.sync_status] || '#64748b' }}>
+                  {a.sync_status || 'pending'}
+                </span>
+                <button className="btn sec" style={{ fontSize: 11 }} disabled={testing} onClick={() => syncNow(a.id)}>
+                  {testing ? '⏳' : '🔄'} Sync
+                </button>
+                <button className="btn sec" style={{ fontSize: 11, color: 'var(--bad)' }} onClick={() => remove(a.id)}>
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
