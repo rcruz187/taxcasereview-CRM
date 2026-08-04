@@ -38,7 +38,7 @@ export default function ScreenShareHost() {
   const selfStreamRef = useRef(null)
   const bcRef         = useRef(null)
 
-  useEffect(() => { loadFirmBrandingPublic().finally(() => setReady(true)) }, [])
+  useEffect(() => { loadFirmBrandingPublic(params.get('t')).finally(() => setReady(true)) }, [])
 
   // Pull screen stream from window.opener (same-origin, set by ScreenShareContext)
   function syncScreenStream() {

@@ -59,7 +59,8 @@ export default function Training() {
   function copyLink() {
     const firmParam = FIRM.name ? `&firm=${encodeURIComponent(FIRM.name)}` : ''
     const logoParam = FIRM.logoUrl ? `&logo=${encodeURIComponent(FIRM.logoUrl)}` : ''
-    const url = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${firmParam}${logoParam}`
+    const tParam = FIRM.tenantId ? `&t=${encodeURIComponent(FIRM.tenantId)}` : ''
+    const url = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${firmParam}${logoParam}${tParam}`
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true); setTimeout(() => setCopied(false), 2000)
     })
@@ -75,7 +76,8 @@ export default function Training() {
 
     const firmParam2 = FIRM.name ? `&firm=${encodeURIComponent(FIRM.name)}` : ''
     const logoParam2 = FIRM.logoUrl ? `&logo=${encodeURIComponent(FIRM.logoUrl)}` : ''
-    const url  = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${firmParam2}${logoParam2}`
+    const tParam2 = FIRM.tenantId ? `&t=${encodeURIComponent(FIRM.tenantId)}` : ''
+    const url  = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${firmParam2}${logoParam2}${tParam2}`
     const firm = FIRM.name || 'Tax Case Review'
     setEmailSending(true)
     try {
@@ -117,7 +119,8 @@ export default function Training() {
   function openPopout() {
     const hostFirmParam = FIRM.name ? `&firm=${encodeURIComponent(FIRM.name)}` : ''
     const hostLogoParam = FIRM.logoUrl ? `&logo=${encodeURIComponent(FIRM.logoUrl)}` : ''
-    const url  = `${window.location.origin}${BASE}/screenshare-host?room=${ss.roomId}&name=${encodeURIComponent(myName)}${hostFirmParam}${hostLogoParam}`
+    const hostTParam    = FIRM.tenantId ? `&t=${encodeURIComponent(FIRM.tenantId)}` : ''
+    const url  = `${window.location.origin}${BASE}/screenshare-host?room=${ss.roomId}&name=${encodeURIComponent(myName)}${hostFirmParam}${hostLogoParam}${hostTParam}`
     const w = 960, h = 680
     const left = Math.max(0, window.screen.width - w - 20)
     const top  = Math.max(0, window.screen.height - h - 60)
@@ -126,7 +129,8 @@ export default function Training() {
 
   const joinFirmParam = FIRM.name ? `&firm=${encodeURIComponent(FIRM.name)}` : ''
   const joinLogoParam = FIRM.logoUrl ? `&logo=${encodeURIComponent(FIRM.logoUrl)}` : ''
-  const joinUrl      = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${joinFirmParam}${joinLogoParam}`
+  const joinTParam    = FIRM.tenantId ? `&t=${encodeURIComponent(FIRM.tenantId)}` : ''
+  const joinUrl      = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${joinFirmParam}${joinLogoParam}${joinTParam}`
   const participants = ss.webrtc.members.filter(n => !n.endsWith('(view)') && n !== myName).length
 
   // ── Not started ──────────────────────────────────────────────────────────

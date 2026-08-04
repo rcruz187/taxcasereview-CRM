@@ -63,7 +63,7 @@ export default function ScreenShareJoin() {
   const webrtc = useWebRTCRoom('screenshare')
   // remoteScreenStreams is available on webrtc object from webrtcRoom.js
 
-  useEffect(() => { loadFirmBrandingPublic().finally(() => setReady(true)) }, [])
+  useEffect(() => { loadFirmBrandingPublic(params.get('t')).finally(() => setReady(true)) }, [])
   useEffect(() => () => { webrtc.leave() }, []) // eslint-disable-line
 
   async function handleJoin() {
