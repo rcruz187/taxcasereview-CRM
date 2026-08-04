@@ -101,10 +101,10 @@ const SECTIONS = [
   },
   {
     key: 'crmcompanies',
-    label: 'CRM Companies',
+    label: 'Platform Admin',
     platformOnly: true,
     items: [
-      { path: '/new-office', icon: GearIcon, label: 'CRM Companies', section: null },
+      { path: '/admin', icon: GearIcon, label: '🛡️ Platform Admin', section: null },
     ]
   },
   {

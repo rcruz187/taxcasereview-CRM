@@ -27,6 +27,7 @@ import OrganizerPage from './pages/OrganizerPage'
 import FinancialIntakePage from './pages/FinancialIntakePage'
 import AuthCallback from './pages/AuthCallback'
 import NewOffice from './pages/NewOffice'
+import AdminConsole from './pages/AdminConsole'
 import Training   from './pages/Training'
 import Support    from './pages/Support'
 
@@ -176,6 +177,7 @@ function Shell() {
             <Route path="/workflows"   element={<Guard section="workflows"><Workflows /></Guard>} />
             <Route path="/timeentry"   element={<Guard section="payments"><TimeEntry /></Guard>} />
             <Route path="/new-office"  element={<NewOffice />} />
+            <Route path="/admin"       element={<AdminConsole />} />
             <Route path="/training"    element={<Training />} />
             <Route path="/support"     element={<Support />} />
             <Route path="*"            element={<Navigate to="/" />} />
