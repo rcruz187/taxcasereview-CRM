@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { Suspense, lazy, useEffect } from 'react'
 import { AppProvider, useApp } from './context/AppContext'
@@ -27,7 +27,8 @@ import OrganizerPage from './pages/OrganizerPage'
 import FinancialIntakePage from './pages/FinancialIntakePage'
 import AuthCallback from './pages/AuthCallback'
 import NewOffice from './pages/NewOffice'
-import AdminConsole from './pages/AdminConsole'
+import AdminConsole   from './pages/AdminConsole'
+const AdminPortal = lazy(() => import('./pages/AdminPortal'))
 import Training   from './pages/Training'
 import Support    from './pages/Support'
 
@@ -194,6 +195,23 @@ function Shell() {
   )
 }
 
+const ADMIN_EMAIL = 'romy@taxrescrm.net'
+
+// Renders the admin portal for the product owner, regular CRM for everyone else.
+function AdminGate() {
+  const { user } = useApp()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (user?.email?.toLowerCase() === ADMIN_EMAIL) {
+      navigate('/portal', { replace: true })
+    }
+  }, [user])
+
+  if (user?.email?.toLowerCase() === ADMIN_EMAIL) return null
+  return <Shell />
+}
+
 function AuthRouter() {
   const { user, checking } = useApp()
 
@@ -227,7 +245,19 @@ function AuthRouter() {
       <Route path="/portal/:id" element={<ClientPortal />} />
       <Route path="/organizer/:id" element={<OrganizerPage />} />
       <Route path="/financial-intake/:id" element={<FinancialIntakePage />} />
-      <Route path="*" element={<RequireAuth><Shell /></RequireAuth>} />
+      <Route path="/portal/*" element={
+        <RequireAuth adminOnly>
+          <Suspense fallback={<div style={{minHeight:'100vh',background:'#0d0c1a'}}/>}>
+            <AdminPortal />
+          </Suspense>
+        </RequireAuth>
+      } />
+      <Route path="*" element={
+        <RequireAuth>
+          {/* romy@taxrescrm.net always goes to the admin portal */}
+          <AdminGate />
+        </RequireAuth>
+      } />
     </Routes>
   )
 }
