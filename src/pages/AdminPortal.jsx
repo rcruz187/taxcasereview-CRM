@@ -238,7 +238,7 @@ function OfficePage() {
     if (error) { toast_(error.message,'error'); return }
     // Open the CRM in a new tab with the impersonation token in the URL
     // The CRM reads this token on load and sets the tenant context
-    const url = `${window.location.origin}/taxcasereview-CRM/?admin_token=${token}`
+    const url = `${window.location.origin}/taxcasereview-CRM/impersonate?admin_token=${token}`
     window.open(url, '_blank')
     toast_(`✅ Jumping into ${data?.tenant?.firm_name} — token valid 15 min`)
   }
@@ -793,7 +793,7 @@ function LiveDemo() {
     const { data:token, error } = await supabase.rpc('create_impersonation_token',{ p_tenant_id:tenantId })
     setLaunching(null)
     if (error) { toast_(error.message,'error'); return }
-    const url = `${window.location.origin}/taxcasereview-CRM/?admin_token=${token}`
+    const url = `${window.location.origin}/taxcasereview-CRM/impersonate?admin_token=${token}`
     window.open(url, '_blank')
     toast_(`✅ Demo opened for ${firmName} — token valid 15 min`)
   }

@@ -27,7 +27,9 @@ import OrganizerPage from './pages/OrganizerPage'
 import FinancialIntakePage from './pages/FinancialIntakePage'
 import AuthCallback from './pages/AuthCallback'
 import NewOffice from './pages/NewOffice'
-import AdminConsole   from './pages/AdminConsole'
+import AdminConsole      from './pages/AdminConsole'
+import ImpersonateGate   from './pages/ImpersonateGate'
+import ImpersonationBanner from './components/ImpersonationBanner'
 const AdminPortal = lazy(() => import('./pages/AdminPortal'))
 import Training   from './pages/Training'
 import Support    from './pages/Support'
@@ -231,6 +233,7 @@ function AuthRouter() {
 
   return (
     <Routes>
+      <Route path="/impersonate" element={<ImpersonateGate />} />
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/kiosk" element={<Kiosk />} />

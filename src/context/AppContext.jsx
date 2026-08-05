@@ -83,6 +83,14 @@ const ROLE_DEFAULTS = {
   },
 }
 
+// Read impersonation context set by ImpersonateGate
+function getImpersonation() {
+  try {
+    const stored = sessionStorage.getItem('admin_impersonation')
+    return stored ? JSON.parse(stored) : null
+  } catch (_) { return null }
+}
+
 export function AppProvider({ children }) {
   const [user, setUser]         = useState(null)
   const [role, setRole]         = useState('Admin')
