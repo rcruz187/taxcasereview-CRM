@@ -48,13 +48,12 @@ export default function ImpersonateGate() {
       setInfo(data)
       setStatus('ok')
 
-      // Small delay so the user sees the confirmation, then redirect to CRM
+      // After 1.5s, do a hard redirect to the CRM home.
+      // We use window.location.href (not React Router navigate) so the entire
+      // app re-initializes and AppContext reads the sessionStorage impersonation.
+      // The '?imp=1' param tells AdminGate NOT to redirect to /crm-admin.
       setTimeout(() => {
-        // Remove token from URL and navigate to the CRM home
-        window.history.replaceState({}, '', '/taxcasereview-CRM/')
-        navigate('/', { replace: true })
-        // Force a full reload so AppContext picks up the sessionStorage impersonation
-        window.location.reload()
+        window.location.href = window.location.origin + '/taxcasereview-CRM/?imp=1'
       }, 1500)
 
     } catch (e) {

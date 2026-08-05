@@ -200,17 +200,26 @@ function Shell() {
 const ADMIN_EMAIL = 'romy@taxrescrm.net'
 
 // Renders the admin portal for the product owner, regular CRM for everyone else.
+// When ?imp=1 is in the URL, we're in an impersonation session — skip the
+// redirect to /crm-admin and render the CRM shell with the tenant override.
 function AdminGate() {
   const { user } = useApp()
   const navigate = useNavigate()
 
+  // Check for active impersonation session
+  const isImpersonating = !!sessionStorage.getItem('admin_impersonation')
+  const impParam = new URLSearchParams(window.location.search).get('imp')
+
   useEffect(() => {
-    if (user?.email?.toLowerCase() === ADMIN_EMAIL) {
+    // Only redirect to admin portal if NOT in an impersonation session
+    if (user?.email?.toLowerCase() === ADMIN_EMAIL && !isImpersonating && !impParam) {
       navigate('/crm-admin', { replace: true })
     }
   }, [user])
 
-  if (user?.email?.toLowerCase() === ADMIN_EMAIL) return null
+  // If impersonating, always show the CRM shell regardless of email
+  if (isImpersonating || impParam) return <Shell />
+  if (user?.email?.toLowerCase() === ADMIN_EMAIL && !isImpersonating) return null
   return <Shell />
 }
 

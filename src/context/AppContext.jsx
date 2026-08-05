@@ -417,7 +417,17 @@ export function AppProvider({ children }) {
 
   async function loadRole(email) {
     if (!email) return
-    if (email === 'romy@taxcasereview.org') {
+
+    // During impersonation, always Super Admin regardless of actual employee record
+    const imp = getImpersonation()
+    if (imp) {
+      setRole('Super Admin')
+      setPerms(null)
+      setEmployeeName('Admin (Impersonating)')
+      return
+    }
+
+    if (email === 'romy@taxcasereview.org' || email === 'romy@taxrescrm.net') {
       setRole('Super Admin')
       setPerms(null)
       setEmployeeName('')
@@ -432,7 +442,6 @@ export function AppProvider({ children }) {
     if (data) {
       setRole(data.access || 'Tax Associate')
       setEmployeeName(data.name || '')
-      // Store per-section perms if they exist
       const hasCustomPerms = Object.keys(data).some(k => k.startsWith('perm_') && data[k] !== null)
       setPerms(hasCustomPerms ? data : null)
     } else {
