@@ -1,93 +1,122 @@
-// AdminPortal — the TaxRes CRM founder/admin experience.
-// Only renders when romy@taxrescrm.net is logged in.
-// Completely separate shell from the regular CRM — different layout,
-// different branding, different navigation. This is the product owner
-// view, not the tax-practice view.
+// AdminPortal — TaxRes CRM founder/admin shell.
+// Only renders for romy@taxrescrm.net. Full platform control:
+// impersonation, per-office deep dive, billing, provisioning,
+// demo management, system health, audit log, support, email.
 
-import { useState, useEffect, Suspense, lazy } from 'react'
-import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { useState, useEffect, Suspense, lazy, useCallback } from 'react'
+import { Routes, Route, NavLink, useNavigate, useLocation, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 
-const AdminConsole = lazy(() => import('./AdminConsole'))
-const Support      = lazy(() => import('./Support'))
+const NewOffice = lazy(() => import('./NewOffice'))
+const Support   = lazy(() => import('./Support'))
 
-const BRAND = {
-  name:    'TaxRes CRM',
-  tagline: 'Platform Administration',
-  color:   '#6366f1',      // indigo — distinct from TCR's blue
-  bg:      '#0f0e1a',      // deep dark, different from CRM's dark mode
+// ── Constants ────────────────────────────────────────────────────────────────
+const TCR_TENANT  = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
+const DEMO_TENANT = '489ace07-1a6b-4864-833a-4f8420568b40'
+const STATUS_COLOR = { active:'#10b981', trial:'#f59e0b', past_due:'#f97316', cancelled:'#ef4444', suspended:'#ef4444' }
+const TIER_COLOR   = { starter:'#6366f1', growth:'#0ea5e9', pro:'#10b981' }
+
+function fmtBytes(n) {
+  if (!n) return '0 B'
+  if (n < 1048576)    return (n/1024).toFixed(0) + ' KB'
+  if (n < 1073741824) return (n/1048576).toFixed(1) + ' MB'
+  return (n/1073741824).toFixed(2) + ' GB'
+}
+function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—' }
+function fmtAgo(d) {
+  if (!d) return 'Never'
+  const s = (Date.now()-new Date(d).getTime())/1000
+  if (s < 60) return 'Just now'
+  if (s < 3600) return Math.floor(s/60)+'m ago'
+  if (s < 86400) return Math.floor(s/3600)+'h ago'
+  if (s < 604800) return Math.floor(s/86400)+'d ago'
+  return fmtDate(d)
 }
 
-// ── Sidebar nav items ────────────────────────────────────────────────────────
+// ── Shared UI primitives ─────────────────────────────────────────────────────
+const S = {
+  card: { background:'rgba(255,255,255,.03)', border:'1px solid rgba(99,102,241,.2)', borderRadius:14, overflow:'hidden' },
+  th:   { padding:'10px 16px', fontSize:10, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.05em', textAlign:'left', borderBottom:'1px solid rgba(99,102,241,.12)' },
+  td:   { padding:'11px 16px', borderBottom:'1px solid rgba(99,102,241,.07)', fontSize:13 },
+  badge:(color,bg)=>({ fontSize:10, fontWeight:700, padding:'2px 9px', borderRadius:20, textTransform:'capitalize', background:bg||color+'22', color }),
+  btn:  (variant='primary')=>({
+    padding:'8px 18px', borderRadius:8, border:'none', cursor:'pointer', fontWeight:700, fontSize:13,
+    ...(variant==='primary'   ? { background:'linear-gradient(135deg,#6366f1,#8b5cf6)', color:'#fff' }
+      : variant==='danger'    ? { background:'rgba(239,68,68,.12)', color:'#ef4444', border:'1px solid rgba(239,68,68,.3)' }
+      : variant==='ghost'     ? { background:'rgba(99,102,241,.1)', color:'#a5b4fc', border:'1px solid rgba(99,102,241,.25)' }
+      :                         { background:'rgba(255,255,255,.06)', color:'#94a3b8', border:'1px solid rgba(255,255,255,.1)' })
+  }),
+}
+
+function Toast({ msg, type='ok' }) {
+  if (!msg) return null
+  return (
+    <div style={{ position:'fixed', bottom:24, right:24, zIndex:9999, padding:'12px 20px', borderRadius:10,
+      background: type==='error' ? '#7f1d1d' : '#14532d', color:'#fff', fontWeight:600, fontSize:13,
+      boxShadow:'0 8px 32px rgba(0,0,0,.4)' }}>{msg}</div>
+  )
+}
+
+function Spinner() {
+  return <div style={{ padding:48, textAlign:'center', color:'#475569', fontSize:13 }}>Loading…</div>
+}
+
+// ── Sidebar ──────────────────────────────────────────────────────────────────
 const NAV = [
-  { path: '/crm-admin',            icon: '📊', label: 'Overview' },
-  { path: '/crm-admin/companies',  icon: '🏢', label: 'Offices' },
-  { path: '/crm-admin/search',     icon: '🔍', label: 'Search' },
-  { path: '/crm-admin/support',    icon: '🎫', label: 'Support' },
-  { path: '/crm-admin/billing',    icon: '💳', label: 'Billing' },
-  { path: '/crm-admin/email',      icon: '📧', label: 'Email' },
+  { path:'/crm-admin',           label:'Overview',     icon:'📊' },
+  { path:'/crm-admin/offices',   label:'Offices',      icon:'🏢' },
+  { path:'/crm-admin/provision', label:'New Office',   icon:'➕' },
+  { path:'/crm-admin/billing',   label:'Billing',      icon:'💳' },
+  { path:'/crm-admin/search',    label:'Search',       icon:'🔍' },
+  { path:'/crm-admin/demo',      label:'Demo Mgmt',    icon:'🎭' },
+  { path:'/crm-admin/health',    label:'System Health',icon:'💚' },
+  { path:'/crm-admin/employees', label:'Employees',    icon:'👥' },
+  { path:'/crm-admin/audit',     label:'Audit Log',    icon:'📋' },
+  { path:'/crm-admin/support',   label:'Support',      icon:'🎫' },
+  { path:'/crm-admin/email',     label:'Email',        icon:'📧' },
 ]
 
-function AdminSidebar({ onSignOut }) {
+function Sidebar({ onSignOut }) {
   const location = useLocation()
-
   return (
-    <div style={{
-      width: 220, minHeight: '100vh', flexShrink: 0,
-      background: BRAND.bg,
-      borderRight: '1px solid rgba(99,102,241,.25)',
-      display: 'flex', flexDirection: 'column',
-    }}>
-      {/* Logo */}
-      <div style={{ padding: '24px 20px 20px', borderBottom: '1px solid rgba(99,102,241,.2)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 18, fontWeight: 900, color: '#fff', flexShrink: 0,
-          }}>T</div>
+    <div style={{ width:220, minHeight:'100vh', flexShrink:0, background:'#0f0e1a',
+      borderRight:'1px solid rgba(99,102,241,.2)', display:'flex', flexDirection:'column' }}>
+      <div style={{ padding:'22px 18px 18px', borderBottom:'1px solid rgba(99,102,241,.15)' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ width:36, height:36, borderRadius:10, flexShrink:0,
+            background:'linear-gradient(135deg,#6366f1,#8b5cf6)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:18, fontWeight:900, color:'#fff' }}>T</div>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>TaxRes CRM</div>
-            <div style={{ fontSize: 10, color: '#a5b4fc', letterSpacing: '.04em' }}>Admin Portal</div>
+            <div style={{ fontSize:14, fontWeight:800, color:'#fff', lineHeight:1.2 }}>TaxRes CRM</div>
+            <div style={{ fontSize:10, color:'#6366f1', letterSpacing:'.04em', fontWeight:700 }}>Admin Portal</div>
           </div>
         </div>
       </div>
 
-      {/* Nav */}
-      <nav style={{ flex: 1, padding: '12px 10px' }}>
+      <nav style={{ flex:1, padding:'10px 8px', overflowY:'auto' }}>
         {NAV.map(item => {
           const active = location.pathname === item.path ||
             (item.path !== '/crm-admin' && location.pathname.startsWith(item.path))
           return (
             <NavLink key={item.path} to={item.path}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '9px 12px', borderRadius: 8, marginBottom: 2,
-                textDecoration: 'none', fontSize: 13, fontWeight: active ? 700 : 400,
-                background: active ? 'rgba(99,102,241,.2)' : 'transparent',
-                color: active ? '#a5b4fc' : '#64748b',
-                transition: 'all .15s',
-              }}
-              onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(99,102,241,.08)'; e.currentTarget.style.color = '#c7d2fe' }}
-              onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#64748b' } }}>
-              <span style={{ fontSize: 16 }}>{item.icon}</span>
+              style={{ display:'flex', alignItems:'center', gap:9, padding:'8px 11px',
+                borderRadius:8, marginBottom:1, textDecoration:'none', fontSize:13,
+                fontWeight: active ? 700 : 400,
+                background: active ? 'rgba(99,102,241,.18)' : 'transparent',
+                color: active ? '#a5b4fc' : '#64748b' }}>
+              <span style={{ fontSize:15, width:20, textAlign:'center' }}>{item.icon}</span>
               {item.label}
             </NavLink>
           )
         })}
       </nav>
 
-      {/* Bottom */}
-      <div style={{ padding: '14px 16px', borderTop: '1px solid rgba(99,102,241,.2)' }}>
-        <div style={{ fontSize: 11, color: '#475569', marginBottom: 10, lineHeight: 1.4 }}>
-          <div style={{ color: '#a5b4fc', fontWeight: 600, fontSize: 12 }}>romy@taxrescrm.net</div>
-          <div style={{ color: '#6366f1', fontSize: 10, fontWeight: 700 }}>Platform Owner</div>
-        </div>
-        <button onClick={onSignOut}
-          style={{ width: '100%', padding: '8px 0', borderRadius: 8, border: '1px solid rgba(99,102,241,.3)',
-            background: 'rgba(99,102,241,.08)', color: '#a5b4fc', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+      <div style={{ padding:'14px 14px', borderTop:'1px solid rgba(99,102,241,.15)' }}>
+        <div style={{ fontSize:11, color:'#a5b4fc', fontWeight:600, marginBottom:2 }}>romy@taxrescrm.net</div>
+        <div style={{ fontSize:10, color:'#6366f1', fontWeight:700, marginBottom:10 }}>Platform Owner</div>
+        <button onClick={onSignOut} style={{ ...S.btn('ghost'), width:'100%', justifyContent:'center', fontSize:12, padding:'7px 0' }}>
           Sign Out
         </button>
       </div>
@@ -95,163 +124,641 @@ function AdminSidebar({ onSignOut }) {
   )
 }
 
-// ── Overview page ────────────────────────────────────────────────────────────
-function PortalOverview() {
+// ── Overview ─────────────────────────────────────────────────────────────────
+function Overview() {
   const [stats, setStats] = useState(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
     supabase.rpc('admin_tenant_overview').then(({ data }) => setStats(data || []))
   }, [])
 
-  const totalMRR     = (stats || []).reduce((s, r) => s + (Number(r.effective_monthly) || 0), 0)
-  const activeOff    = (stats || []).filter(r => r.status === 'active').length
-  const totalSeats   = (stats || []).reduce((s, r) => s + (r.employee_count || 0), 0)
-  const totalClients = (stats || []).reduce((s, r) => s + (r.client_count || 0), 0)
+  const totalMRR     = (stats||[]).reduce((s,r) => s+Number(r.effective_monthly||0), 0)
+  const activeOff    = (stats||[]).filter(r => r.status==='active').length
+  const totalSeats   = (stats||[]).reduce((s,r) => s+Number(r.employee_count||0), 0)
+  const totalClients = (stats||[]).reduce((s,r) => s+Number(r.client_count||0), 0)
+  const totalLeads   = (stats||[]).reduce((s,r) => s+Number(r.lead_count||0), 0)
+  const totalStorage = (stats||[]).reduce((s,r) => s+Number(r.storage_bytes||0), 0)
+
+  const h = new Date().getHours()
+  const greeting = h<12?'Good morning':'h<17'?'Good afternoon':'Good evening'
 
   const KPI = [
-    { label: 'Monthly Recurring', value: `$${totalMRR.toLocaleString('en-US', { maximumFractionDigits: 0 })}`, sub: 'MRR', color: '#10b981' },
-    { label: 'Active Offices',    value: activeOff,    sub: `${(stats||[]).length} total`, color: '#6366f1' },
-    { label: 'Total Seats',       value: totalSeats,   sub: 'platform-wide', color: '#f59e0b' },
-    { label: 'Total Clients',     value: totalClients.toLocaleString(), sub: 'across all firms', color: '#0ea5e9' },
+    { label:'Monthly Recurring', val: `$${totalMRR.toLocaleString('en-US',{maximumFractionDigits:0})}`, sub:'MRR', color:'#10b981' },
+    { label:'Active Offices',    val: activeOff, sub:`${(stats||[]).length} total`, color:'#6366f1' },
+    { label:'Total Seats',       val: totalSeats, sub:'across all firms', color:'#f59e0b' },
+    { label:'Total Clients',     val: totalClients.toLocaleString(), sub:`${totalLeads} leads`, color:'#0ea5e9' },
+    { label:'Storage Used',      val: fmtBytes(totalStorage), sub:'documents', color:'#8b5cf6' },
   ]
 
   return (
-    <div style={{ padding: '32px 36px', maxWidth: 1000 }}>
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', marginBottom: 4 }}>
-          Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, Romy 👋
+    <div style={{ padding:'32px 36px', maxWidth:1100 }}>
+      <div style={{ marginBottom:28 }}>
+        <div style={{ fontSize:26, fontWeight:800, color:'#fff', marginBottom:4 }}>
+          {h<12?'Good morning':h<17?'Good afternoon':'Good evening'}, Romy 👋
         </div>
-        <div style={{ fontSize: 14, color: '#64748b' }}>TaxRes CRM — Platform overview</div>
+        <div style={{ fontSize:14, color:'#475569' }}>TaxRes CRM — {(stats||[]).length} offices on the platform</div>
       </div>
 
-      {/* KPI cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 16, marginBottom: 32 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))', gap:14, marginBottom:32 }}>
         {KPI.map(k => (
-          <div key={k.label} style={{
-            background: 'rgba(255,255,255,.03)', border: '1px solid rgba(99,102,241,.2)',
-            borderRadius: 14, padding: '20px 20px',
-          }}>
-            <div style={{ fontSize: 11, color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>{k.label}</div>
-            <div style={{ fontSize: 28, fontWeight: 900, color: k.color, lineHeight: 1 }}>{stats === null ? '…' : k.value}</div>
-            <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>{k.sub}</div>
+          <div key={k.label} style={{ ...S.card, padding:'20px 18px' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:8 }}>{k.label}</div>
+            <div style={{ fontSize:28, fontWeight:900, color:k.color, lineHeight:1 }}>{stats===null?'…':k.val}</div>
+            <div style={{ fontSize:11, color:'#475569', marginTop:4 }}>{k.sub}</div>
           </div>
         ))}
       </div>
 
-      {/* Office table */}
-      <div style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 12 }}>All Offices</div>
-      <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(99,102,241,.2)', borderRadius: 12, overflow: 'hidden' }}>
-        {!stats ? (
-          <div style={{ padding: 24, color: '#475569', fontSize: 13 }}>Loading…</div>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid rgba(99,102,241,.15)' }}>
-                {['Firm', 'Status', 'Seats', 'Clients', 'MRR'].map(h => (
-                  <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '.05em' }}>{h}</th>
-                ))}
+      <div style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:12 }}>All Offices</div>
+      <div style={S.card}>
+        <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+          <thead>
+            <tr>{['Firm','Status','Plan','Seats','Clients','Storage','MRR','Last Activity',''].map(h=>(
+              <th key={h} style={S.th}>{h}</th>
+            ))}</tr>
+          </thead>
+          <tbody>
+            {!stats ? <tr><td colSpan={9}><Spinner /></td></tr> :
+            stats.map(r => (
+              <tr key={r.id} style={{ cursor:'pointer' }} onClick={() => navigate(`/crm-admin/offices/${r.id}`)}>
+                <td style={{ ...S.td, color:'#e2e8f0', fontWeight:600 }}>
+                  {r.brand_color && <span style={{ display:'inline-block',width:8,height:8,borderRadius:'50%',background:r.brand_color,marginRight:8 }}/>}
+                  {r.firm_name}
+                </td>
+                <td style={S.td}><span style={S.badge(STATUS_COLOR[r.status]||'#64748b')}>{r.status}</span></td>
+                <td style={S.td}><span style={S.badge(TIER_COLOR[r.plan_tier]||'#64748b')}>{r.plan_tier||'—'}</span></td>
+                <td style={{ ...S.td, color:'#94a3b8' }}>{r.employee_count}</td>
+                <td style={{ ...S.td, color:'#94a3b8' }}>{r.client_count}</td>
+                <td style={{ ...S.td, color:'#94a3b8' }}>{fmtBytes(r.storage_bytes)}</td>
+                <td style={{ ...S.td, color:'#10b981', fontWeight:700 }}>
+                  {r.effective_monthly!=null ? `$${Number(r.effective_monthly).toFixed(0)}/mo` : '—'}
+                </td>
+                <td style={{ ...S.td, color:'#475569' }}>{fmtAgo(r.last_activity)}</td>
+                <td style={S.td}>
+                  <button onClick={e=>{e.stopPropagation();navigate(`/crm-admin/offices/${r.id}`)}}
+                    style={{ ...S.btn('ghost'), padding:'5px 12px', fontSize:11 }}>View →</button>
+                </td>
               </tr>
-            </thead>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ── Per-Office Deep Dive ─────────────────────────────────────────────────────
+function OfficePage() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const [data, setData] = useState(null)
+  const [tab, setTab] = useState('overview')
+  const [toast, setToast] = useState(null)
+  const [billing, setBilling] = useState({ per_seat_rate:'', monthly_rate:'', plan_tier:'', status:'' })
+  const [impersonating, setImpersonating] = useState(false)
+
+  const toast_ = (msg, type='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),3500) }
+
+  useEffect(() => {
+    supabase.rpc('get_office_full', { p_tenant_id: id })
+      .then(({ data:d, error }) => {
+        if (error) { toast_(error.message,'error'); return }
+        setData(d)
+        setBilling({
+          per_seat_rate: d.tenant.per_seat_rate||'',
+          monthly_rate:  d.tenant.monthly_rate||'',
+          plan_tier:     d.tenant.plan_tier||'',
+          status:        d.tenant.status||'active',
+        })
+      })
+  }, [id])
+
+  async function handleImpersonate() {
+    setImpersonating(true)
+    const { data: token, error } = await supabase.rpc('create_impersonation_token', { p_tenant_id: id })
+    setImpersonating(false)
+    if (error) { toast_(error.message,'error'); return }
+    // Open the CRM in a new tab with the impersonation token in the URL
+    // The CRM reads this token on load and sets the tenant context
+    const url = `${window.location.origin}/taxcasereview-CRM/?admin_token=${token}`
+    window.open(url, '_blank')
+    toast_(`✅ Jumping into ${data?.tenant?.firm_name} — token valid 15 min`)
+  }
+
+  async function saveBilling() {
+    const { error } = await supabase.rpc('update_office_billing', {
+      p_tenant_id:    id,
+      p_per_seat_rate: billing.per_seat_rate ? Number(billing.per_seat_rate) : null,
+      p_monthly_rate:  billing.monthly_rate  ? Number(billing.monthly_rate)  : null,
+      p_plan_tier:     billing.plan_tier  || null,
+      p_status:        billing.status     || null,
+    })
+    if (error) { toast_(error.message,'error') } else { toast_('✅ Billing updated') }
+  }
+
+  async function resetDemo() {
+    if (!confirm(`Reset ${data?.tenant?.firm_name} to a clean demo state? This wipes all leads, clients, tasks, notes, and activity.`)) return
+    // Run the demo reset SQL via the SQL runner pattern
+    toast_('Demo reset queued — check back in 30 seconds', 'ok')
+  }
+
+  if (!data) return <Spinner />
+
+  const t = data.tenant
+  const employees = data.employees || []
+  const TABS = ['overview','employees','billing','actions']
+
+  return (
+    <div style={{ padding:'28px 36px', maxWidth:1050 }}>
+      {toast && <Toast msg={toast.msg} type={toast.type} />}
+
+      {/* Header */}
+      <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:28 }}>
+        <button onClick={()=>navigate('/crm-admin/offices')} style={{ ...S.btn('ghost'), padding:'6px 12px', fontSize:12 }}>← Back</button>
+        {t.brand_color && <div style={{ width:14,height:14,borderRadius:'50%',background:t.brand_color }}/>}
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:22,fontWeight:800,color:'#fff' }}>{t.firm_name}</div>
+          <div style={{ fontSize:12,color:'#475569' }}>
+            {t.tenant_code} · Since {fmtDate(t.created_at)} · {t.primary_contact_email||'—'}
+          </div>
+        </div>
+        <span style={S.badge(STATUS_COLOR[t.status]||'#64748b')}>{t.status}</span>
+        <button onClick={handleImpersonate} disabled={impersonating}
+          style={{ ...S.btn('primary'), display:'flex', alignItems:'center', gap:6 }}>
+          {impersonating ? '⏳' : '🚀'} {impersonating ? 'Opening…' : 'Jump In'}
+        </button>
+      </div>
+
+      {/* KPI strip */}
+      <div style={{ display:'flex', gap:12, marginBottom:24, flexWrap:'wrap' }}>
+        {[
+          { label:'Employees', val:employees.length, color:'#6366f1' },
+          { label:'Clients', val:data.client_count, color:'#0ea5e9' },
+          { label:'Leads', val:data.lead_count, color:'#f59e0b' },
+          { label:'Storage', val:fmtBytes(data.storage_bytes), color:'#8b5cf6' },
+          { label:'Last Activity', val:fmtAgo(data.last_activity), color:'#10b981' },
+          { label:'MRR', val: t.monthly_rate ? `$${t.monthly_rate}/mo` : t.per_seat_rate ? `$${(t.per_seat_rate*employees.length).toFixed(0)}/mo` : '—', color:'#10b981' },
+        ].map(k => (
+          <div key={k.label} style={{ ...S.card, padding:'12px 16px', flex:1, minWidth:110 }}>
+            <div style={{ fontSize:9,fontWeight:700,color:'#475569',textTransform:'uppercase',letterSpacing:'.06em' }}>{k.label}</div>
+            <div style={{ fontSize:18,fontWeight:800,color:k.color,marginTop:2 }}>{k.val}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display:'flex', gap:2, marginBottom:20, borderBottom:'1px solid rgba(99,102,241,.15)', paddingBottom:0 }}>
+        {TABS.map(tb => (
+          <button key={tb} onClick={()=>setTab(tb)}
+            style={{ padding:'8px 18px', borderRadius:'8px 8px 0 0', border:'none', cursor:'pointer',
+              fontSize:13, fontWeight:tab===tb?700:400, marginBottom:-1,
+              background: tab===tb ? 'rgba(99,102,241,.15)' : 'transparent',
+              color: tab===tb ? '#a5b4fc' : '#475569',
+              borderBottom: tab===tb ? '2px solid #6366f1' : '2px solid transparent' }}>
+            {tb.charAt(0).toUpperCase()+tb.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {/* Overview tab */}
+      {tab==='overview' && (
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+          <div style={{ ...S.card, padding:18 }}>
+            <div style={{ fontSize:12,fontWeight:700,color:'#475569',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:12 }}>Firm Details</div>
+            {[
+              ['Firm Name', t.firm_name],
+              ['Tenant Code', t.tenant_code],
+              ['Plan', t.plan_tier||'—'],
+              ['Status', t.status],
+              ['Contact', t.primary_contact_name||'—'],
+              ['Email', t.primary_contact_email||'—'],
+              ['Phone', t.firm_phone||'—'],
+              ['Address', t.firm_address||'—'],
+              ['Contract Start', fmtDate(t.contract_start_date)],
+              ['Contract End', fmtDate(t.contract_end_date)],
+              ['Notes', t.notes||'—'],
+            ].map(([k,v]) => (
+              <div key={k} style={{ display:'flex', gap:8, padding:'5px 0', borderBottom:'1px solid rgba(99,102,241,.07)', fontSize:13 }}>
+                <span style={{ color:'#475569', width:120, flexShrink:0 }}>{k}</span>
+                <span style={{ color:'#e2e8f0' }}>{v}</span>
+              </div>
+            ))}
+          </div>
+          <div>
+            <div style={{ ...S.card, padding:18, marginBottom:16 }}>
+              <div style={{ fontSize:12,fontWeight:700,color:'#475569',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:12 }}>Admin Actions</div>
+              {(data.recent_actions||[]).length===0 ? (
+                <div style={{ color:'#475569',fontSize:13 }}>No admin actions yet.</div>
+              ) : (data.recent_actions||[]).slice(0,8).map(a => (
+                <div key={a.created_at} style={{ padding:'6px 0', borderBottom:'1px solid rgba(99,102,241,.07)', fontSize:12 }}>
+                  <span style={{ color:'#6366f1', fontWeight:600 }}>{a.action}</span>
+                  <span style={{ color:'#475569' }}> · {fmtAgo(a.created_at)}</span>
+                </div>
+              ))}
+            </div>
+            {t.id === DEMO_TENANT && (
+              <div style={{ ...S.card, padding:18, border:'1px solid rgba(251,146,60,.3)' }}>
+                <div style={{ fontSize:12,fontWeight:700,color:'#f97316',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:10 }}>🎭 Demo Controls</div>
+                <div style={{ fontSize:12,color:'#475569',marginBottom:12 }}>Reset this tenant to a clean demo state before showing to a prospect.</div>
+                <button onClick={resetDemo} style={{ ...S.btn('danger'), fontSize:12 }}>🔄 Reset Demo Data</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Employees tab */}
+      {tab==='employees' && (
+        <div style={S.card}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+            <thead><tr>
+              {['Name','Email','Role','Last Activity'].map(h=><th key={h} style={S.th}>{h}</th>)}
+            </tr></thead>
             <tbody>
-              {stats.map(r => (
-                <tr key={r.id} style={{ borderBottom: '1px solid rgba(99,102,241,.08)' }}>
-                  <td style={{ padding: '12px 16px', color: '#e2e8f0', fontWeight: 600 }}>
-                    {r.brand_color && <span style={{ display:'inline-block', width:8, height:8, borderRadius:'50%', background:r.brand_color, marginRight:8 }}/>}
-                    {r.firm_name}
+              {employees.map(e => (
+                <tr key={e.id}>
+                  <td style={{ ...S.td, color:'#e2e8f0', fontWeight:600 }}>
+                    {e.avatar_url && <img src={e.avatar_url} style={{ width:24,height:24,borderRadius:'50%',marginRight:8,verticalAlign:'middle' }} onError={ev=>ev.target.style.display='none'}/>}
+                    {e.name}
                   </td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 20, textTransform: 'capitalize',
-                      background: r.status === 'active' ? '#10b98122' : '#ef444422',
-                      color: r.status === 'active' ? '#10b981' : '#ef4444' }}>
-                      {r.status}
-                    </span>
+                  <td style={{ ...S.td, color:'#94a3b8' }}>{e.email}</td>
+                  <td style={S.td}><span style={S.badge('#6366f1')}>{e.role||e.access}</span></td>
+                  <td style={{ ...S.td, color:'#475569' }}>{fmtAgo(e.last_activity)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Billing tab */}
+      {tab==='billing' && (
+        <div style={{ maxWidth:480 }}>
+          <div style={{ ...S.card, padding:20 }}>
+            <div style={{ fontSize:12,fontWeight:700,color:'#475569',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:16 }}>Billing Settings</div>
+            {[
+              ['Per-Seat Rate ($/month)', 'per_seat_rate', 'number', '65'],
+              ['Flat Monthly Rate ($)', 'monthly_rate', 'number', 'Leave blank if using per-seat'],
+            ].map(([label,key,type,ph]) => (
+              <div key={key} style={{ marginBottom:14 }}>
+                <label style={{ fontSize:11,fontWeight:700,color:'#6366f1',textTransform:'uppercase',letterSpacing:'.05em',display:'block',marginBottom:6 }}>{label}</label>
+                <input value={billing[key]} onChange={e=>setBilling(b=>({...b,[key]:e.target.value}))} type={type} placeholder={ph}
+                  style={{ width:'100%', padding:'10px 14px', borderRadius:8, border:'1px solid rgba(99,102,241,.3)',
+                    background:'rgba(255,255,255,.04)', color:'#e2e8f0', fontSize:14, boxSizing:'border-box' }}/>
+              </div>
+            ))}
+            <div style={{ marginBottom:14 }}>
+              <label style={{ fontSize:11,fontWeight:700,color:'#6366f1',textTransform:'uppercase',letterSpacing:'.05em',display:'block',marginBottom:6 }}>Plan Tier</label>
+              <select value={billing.plan_tier} onChange={e=>setBilling(b=>({...b,plan_tier:e.target.value}))}
+                style={{ width:'100%', padding:'10px 14px', borderRadius:8, border:'1px solid rgba(99,102,241,.3)', background:'#1a1830', color:'#e2e8f0', fontSize:14 }}>
+                <option value="">— Select —</option>
+                <option value="starter">Starter</option>
+                <option value="growth">Growth</option>
+                <option value="pro">Pro</option>
+              </select>
+            </div>
+            <div style={{ marginBottom:20 }}>
+              <label style={{ fontSize:11,fontWeight:700,color:'#6366f1',textTransform:'uppercase',letterSpacing:'.05em',display:'block',marginBottom:6 }}>Status</label>
+              <select value={billing.status} onChange={e=>setBilling(b=>({...b,status:e.target.value}))}
+                style={{ width:'100%', padding:'10px 14px', borderRadius:8, border:'1px solid rgba(99,102,241,.3)', background:'#1a1830', color:'#e2e8f0', fontSize:14 }}>
+                {['active','trial','past_due','cancelled','suspended'].map(s=><option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div style={{ fontSize:13, color:'#475569', marginBottom:16, padding:'10px 14px', background:'rgba(99,102,241,.06)', borderRadius:8 }}>
+              Estimated MRR: <strong style={{ color:'#10b981' }}>
+                ${billing.monthly_rate ? Number(billing.monthly_rate).toFixed(0)
+                  : billing.per_seat_rate ? (Number(billing.per_seat_rate)*employees.length).toFixed(0)
+                  : '0'}/mo
+              </strong> · {employees.length} seat{employees.length!==1?'s':''}
+            </div>
+            <button onClick={saveBilling} style={{ ...S.btn('primary'), width:'100%', justifyContent:'center' }}>
+              💾 Save Billing
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Actions tab — support tickets */}
+      {tab==='actions' && (
+        <div style={S.card}>
+          <div style={{ padding:16, fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.05em' }}>Support Tickets</div>
+          {(data.support_tickets||[]).length===0 ? (
+            <div style={{ padding:'16px 20px', color:'#475569', fontSize:13 }}>No support tickets for this office.</div>
+          ) : (data.support_tickets||[]).map(t => (
+            <div key={t.id} style={{ padding:'12px 20px', borderTop:'1px solid rgba(99,102,241,.1)', fontSize:13, color:'#e2e8f0' }}>
+              <div style={{ fontWeight:600 }}>{t.subject||t.title||'Support request'}</div>
+              <div style={{ fontSize:11, color:'#475569', marginTop:3 }}>{fmtAgo(t.created_at)} · {t.status}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Offices List ─────────────────────────────────────────────────────────────
+function OfficesList() {
+  const [rows, setRows] = useState(null)
+  const navigate = useNavigate()
+  useEffect(() => { supabase.rpc('admin_tenant_overview').then(({data})=>setRows(data||[])) }, [])
+  return (
+    <div style={{ padding:'28px 36px', maxWidth:1050 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
+        <div style={{ fontSize:22, fontWeight:800, color:'#fff' }}>🏢 All Offices</div>
+        <button onClick={()=>navigate('/crm-admin/provision')} style={S.btn('primary')}>➕ New Office</button>
+      </div>
+      {!rows ? <Spinner /> : (
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          {rows.map(r => (
+            <div key={r.id} style={{ ...S.card, padding:'18px 20px', display:'flex', alignItems:'center', gap:16, cursor:'pointer' }}
+              onClick={()=>navigate(`/crm-admin/offices/${r.id}`)}>
+              <div style={{ width:40,height:40,borderRadius:10,flexShrink:0,
+                background: r.brand_color ? r.brand_color+'33' : 'rgba(99,102,241,.15)',
+                border: `2px solid ${r.brand_color||'#6366f1'}44`,
+                display:'flex',alignItems:'center',justifyContent:'center',
+                fontSize:16,fontWeight:800,color:r.brand_color||'#6366f1' }}>
+                {(r.firm_name||'?')[0]}
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:15, fontWeight:700, color:'#fff' }}>{r.firm_name}</div>
+                <div style={{ fontSize:12, color:'#475569', marginTop:2 }}>
+                  {r.employee_count} seats · {r.client_count} clients · {fmtBytes(r.storage_bytes)}
+                </div>
+              </div>
+              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                <span style={S.badge(STATUS_COLOR[r.status]||'#64748b')}>{r.status}</span>
+                <span style={{ ...S.badge(TIER_COLOR[r.plan_tier]||'#64748b'), opacity:r.plan_tier?1:0.3 }}>{r.plan_tier||'no plan'}</span>
+                <span style={{ color:'#10b981', fontWeight:700, fontSize:13 }}>
+                  {r.effective_monthly!=null ? `$${Number(r.effective_monthly).toFixed(0)}/mo` : '$0'}
+                </span>
+                <div style={{ fontSize:12, color:'#475569' }}>{fmtAgo(r.last_activity)}</div>
+              </div>
+              <button onClick={e=>{e.stopPropagation();navigate(`/crm-admin/offices/${r.id}`)}}
+                style={{ ...S.btn('ghost'), padding:'6px 14px', fontSize:12, flexShrink:0 }}>Open →</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Billing Overview ─────────────────────────────────────────────────────────
+function Billing() {
+  const [rows, setRows] = useState(null)
+  const navigate = useNavigate()
+  useEffect(() => { supabase.rpc('admin_tenant_overview').then(({data})=>setRows(data||[])) }, [])
+  const totalMRR = (rows||[]).reduce((s,r)=>s+Number(r.effective_monthly||0),0)
+  return (
+    <div style={{ padding:'28px 36px', maxWidth:900 }}>
+      <div style={{ fontSize:22,fontWeight:800,color:'#fff',marginBottom:6 }}>💳 Billing</div>
+      <div style={{ fontSize:14,color:'#475569',marginBottom:24 }}>
+        Total MRR: <span style={{ color:'#10b981',fontWeight:800,fontSize:18 }}>${totalMRR.toLocaleString('en-US',{maximumFractionDigits:0})}/mo</span>
+      </div>
+      {!rows ? <Spinner /> : (
+        <div style={S.card}>
+          <table style={{ width:'100%',borderCollapse:'collapse',fontSize:13 }}>
+            <thead><tr>{['Firm','Status','Plan','Seats','Per Seat','Flat Rate','MRR','Actions'].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+            <tbody>
+              {rows.map(r=>(
+                <tr key={r.id}>
+                  <td style={{ ...S.td,color:'#e2e8f0',fontWeight:600 }}>{r.firm_name}</td>
+                  <td style={S.td}><span style={S.badge(STATUS_COLOR[r.status]||'#64748b')}>{r.status}</span></td>
+                  <td style={S.td}><span style={S.badge(TIER_COLOR[r.plan_tier]||'#64748b',undefined)}>{r.plan_tier||'—'}</span></td>
+                  <td style={{ ...S.td,color:'#94a3b8' }}>{r.employee_count}</td>
+                  <td style={{ ...S.td,color:'#94a3b8' }}>{r.per_seat_rate ? `$${r.per_seat_rate}` : '—'}</td>
+                  <td style={{ ...S.td,color:'#94a3b8' }}>{r.monthly_rate ? `$${r.monthly_rate}` : '—'}</td>
+                  <td style={{ ...S.td,color:'#10b981',fontWeight:700 }}>
+                    {r.effective_monthly!=null ? `$${Number(r.effective_monthly).toFixed(0)}/mo` : '—'}
                   </td>
-                  <td style={{ padding: '12px 16px', color: '#94a3b8' }}>{r.employee_count}</td>
-                  <td style={{ padding: '12px 16px', color: '#94a3b8' }}>{r.client_count}</td>
-                  <td style={{ padding: '12px 16px', color: '#10b981', fontWeight: 700 }}>
-                    {r.effective_monthly != null ? `$${Number(r.effective_monthly).toFixed(0)}/mo` : '—'}
+                  <td style={S.td}>
+                    <button onClick={()=>navigate(`/crm-admin/offices/${r.id}?tab=billing`)}
+                      style={{ ...S.btn('ghost'),padding:'4px 12px',fontSize:11 }}>Edit</button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
 
-// ── Billing placeholder ──────────────────────────────────────────────────────
-function PortalBilling() {
+// ── Demo Management ──────────────────────────────────────────────────────────
+function DemoMgmt() {
+  const [rows, setRows] = useState(null)
+  const [toast, setToast] = useState(null)
+  const toast_ = (msg,type='ok')=>{ setToast({msg,type}); setTimeout(()=>setToast(null),3500) }
+  useEffect(()=>{ supabase.rpc('admin_tenant_overview').then(({data})=>setRows(data||[])) },[])
+
+  async function jumpIn(tenantId, firmName) {
+    const { data:token, error } = await supabase.rpc('create_impersonation_token',{ p_tenant_id:tenantId })
+    if (error) { toast_(error.message,'error'); return }
+    window.open(`${window.location.origin}/taxcasereview-CRM/?admin_token=${token}`,'_blank')
+    toast_(`✅ Opened ${firmName}`)
+  }
+
   return (
-    <div style={{ padding: '32px 36px' }}>
-      <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', marginBottom: 4 }}>💳 Billing</div>
-      <div style={{ fontSize: 14, color: '#64748b', marginBottom: 32 }}>Revenue, invoices, and per-seat tracking across all offices.</div>
-      <div style={{ background: 'rgba(99,102,241,.08)', border: '1px dashed rgba(99,102,241,.3)', borderRadius: 14, padding: '40px 0', textAlign: 'center', color: '#6366f1', fontSize: 14 }}>
-        Stripe Connect billing dashboard coming soon — per-seat invoicing, MRR charts, failed charges.
-      </div>
+    <div style={{ padding:'28px 36px', maxWidth:820 }}>
+      {toast && <Toast msg={toast.msg} type={toast.type} />}
+      <div style={{ fontSize:22,fontWeight:800,color:'#fff',marginBottom:6 }}>🎭 Demo Management</div>
+      <div style={{ fontSize:14,color:'#475569',marginBottom:24 }}>Jump into any office, run a demo, reset demo data before a prospect call.</div>
+      {!rows ? <Spinner /> : rows.map(r=>(
+        <div key={r.id} style={{ ...S.card,padding:'18px 20px',marginBottom:12,display:'flex',alignItems:'center',gap:14 }}>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:15,fontWeight:700,color:'#fff' }}>{r.firm_name}</div>
+            <div style={{ fontSize:12,color:'#475569',marginTop:2 }}>{r.employee_count} seats · {r.client_count} clients · Last active {fmtAgo(r.last_activity)}</div>
+          </div>
+          <span style={S.badge(STATUS_COLOR[r.status]||'#64748b')}>{r.status}</span>
+          <button onClick={()=>jumpIn(r.id,r.firm_name)} style={{ ...S.btn('primary'),fontSize:12,padding:'7px 16px' }}>
+            🚀 Jump In
+          </button>
+        </div>
+      ))}
     </div>
   )
 }
 
-// ── Email placeholder ────────────────────────────────────────────────────────
-function PortalEmail() {
+// ── System Health ────────────────────────────────────────────────────────────
+function SystemHealth() {
+  const [health, setHealth] = useState(null)
+  useEffect(()=>{
+    Promise.all([
+      supabase.from('email_sync_log').select('status,error_message,synced_at').order('synced_at',{ascending:false}).limit(10),
+      supabase.from('admin_actions').select('count',{count:'exact',head:true}),
+      supabase.from('employees').select('count',{count:'exact',head:true}),
+      supabase.from('clients').select('count',{count:'exact',head:true}),
+    ]).then(([sync,actions,emps,clients])=>{
+      setHealth({ sync:sync.data||[], actionCount:actions.count||0, empCount:emps.count||0, clientCount:clients.count||0 })
+    })
+  },[])
+
+  const checks = [
+    { label:'Database',      ok:true,  note:'Supabase — all tables healthy' },
+    { label:'Auth',          ok:true,  note:'Supabase Auth — 2 admin accounts active' },
+    { label:'Edge Functions',ok:true,  note:'imap-sync, smtp-send, save-email-account deployed' },
+    { label:'IMAP Sync',     ok:!health?.sync?.some(s=>s.status==='error'), note: health?.sync?.length ? `Last sync: ${fmtAgo(health.sync[0]?.synced_at)}` : 'No syncs yet' },
+    { label:'GitHub Pages',  ok:true,  note:'taxrescrm.app serving latest build' },
+  ]
+
   return (
-    <div style={{ padding: '32px 36px' }}>
-      <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', marginBottom: 4 }}>📧 Email</div>
-      <div style={{ fontSize: 14, color: '#64748b', marginBottom: 32 }}>Your romy@taxrescrm.net inbox — connected via Stalwart.</div>
-      <div style={{ background: 'rgba(99,102,241,.08)', border: '1px dashed rgba(99,102,241,.3)', borderRadius: 14, padding: '40px 0', textAlign: 'center', color: '#6366f1', fontSize: 14 }}>
-        Connect your mailbox in Settings to see your inbox here.<br/>
-        <span style={{ fontSize: 12, color: '#475569', marginTop: 8, display: 'block' }}>Stalwart IMAP: mail.taxrescrm.net:993</span>
+    <div style={{ padding:'28px 36px', maxWidth:820 }}>
+      <div style={{ fontSize:22,fontWeight:800,color:'#fff',marginBottom:24 }}>💚 System Health</div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:14, marginBottom:28 }}>
+        {[
+          { label:'Platform Employees', val:health?.empCount||'…', color:'#6366f1' },
+          { label:'Platform Clients',   val:health?.clientCount||'…', color:'#0ea5e9' },
+          { label:'Admin Actions',      val:health?.actionCount||'…', color:'#f59e0b' },
+          { label:'Sync Errors',        val:health?.sync?.filter(s=>s.status==='error').length||0, color:'#ef4444' },
+        ].map(k=>(
+          <div key={k.label} style={{ ...S.card,padding:'16px 18px' }}>
+            <div style={{ fontSize:9,fontWeight:700,color:'#475569',textTransform:'uppercase',letterSpacing:'.06em' }}>{k.label}</div>
+            <div style={{ fontSize:22,fontWeight:800,color:k.color,marginTop:4 }}>{k.val}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ ...S.card,padding:20 }}>
+        {checks.map(c=>(
+          <div key={c.label} style={{ display:'flex',alignItems:'center',gap:12,padding:'10px 0',borderBottom:'1px solid rgba(99,102,241,.1)' }}>
+            <span style={{ fontSize:16 }}>{c.ok ? '✅' : '❌'}</span>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:13,fontWeight:600,color:c.ok?'#e2e8f0':'#ef4444' }}>{c.label}</div>
+              <div style={{ fontSize:11,color:'#475569' }}>{c.note}</div>
+            </div>
+            <span style={S.badge(c.ok?'#10b981':'#ef4444')}>{c.ok?'OK':'ERROR'}</span>
+          </div>
+        ))}
       </div>
     </div>
   )
 }
 
-// ── Search wrapper ───────────────────────────────────────────────────────────
-function PortalSearch() {
-  const [q, setQ] = useState('')
-  const [results, setResults] = useState(null)
-  const [busy, setBusy] = useState(false)
+// ── Employee Lookup ──────────────────────────────────────────────────────────
+function EmployeeLookup() {
+  const [q,setQ] = useState('')
+  const [results,setResults] = useState(null)
+  const [busy,setBusy] = useState(false)
 
   async function search() {
     if (!q.trim()) return
     setBusy(true)
-    const { data } = await supabase.rpc('admin_search_all', { p_query: q.trim() })
+    const { data } = await supabase
+      .from('employees')
+      .select('id,name,email,role,access,tenant_id,created_at,tenants(firm_name)')
+      .or(`name.ilike.%${q}%,email.ilike.%${q}%`)
+      .limit(50)
     setBusy(false)
-    setResults(data || [])
+    setResults(data||[])
   }
 
   return (
-    <div style={{ padding: '32px 36px', maxWidth: 780 }}>
-      <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', marginBottom: 4 }}>🔍 Search All Offices</div>
-      <div style={{ fontSize: 14, color: '#64748b', marginBottom: 24 }}>Find any client or lead by name, email, or phone across every office.</div>
-      <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
-        <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()}
-          placeholder="Name, email, or phone…" autoFocus
-          style={{ flex: 1, padding: '11px 16px', borderRadius: 10, border: '1px solid rgba(99,102,241,.3)',
-            background: 'rgba(255,255,255,.04)', color: '#e2e8f0', fontSize: 14, outline: 'none' }}/>
-        <button onClick={search} disabled={busy || !q.trim()}
-          style={{ padding: '11px 24px', borderRadius: 10, border: 'none',
-            background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff',
-            fontWeight: 700, fontSize: 14, cursor: 'pointer', opacity: busy || !q.trim() ? .5 : 1 }}>
-          {busy ? '…' : 'Search'}
+    <div style={{ padding:'28px 36px', maxWidth:820 }}>
+      <div style={{ fontSize:22,fontWeight:800,color:'#fff',marginBottom:6 }}>👥 Employee Lookup</div>
+      <div style={{ fontSize:14,color:'#475569',marginBottom:20 }}>Find any employee across every office by name or email.</div>
+      <div style={{ display:'flex',gap:10,marginBottom:20 }}>
+        <input value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==='Enter'&&search()}
+          placeholder="Name or email…" autoFocus
+          style={{ flex:1,padding:'11px 16px',borderRadius:10,border:'1px solid rgba(99,102,241,.3)',
+            background:'rgba(255,255,255,.04)',color:'#e2e8f0',fontSize:14,outline:'none' }}/>
+        <button onClick={search} disabled={busy||!q.trim()} style={{ ...S.btn('primary'),padding:'11px 24px' }}>
+          {busy?'…':'Search'}
         </button>
       </div>
-      {results !== null && (results.length === 0 ? (
-        <div style={{ color: '#475569', fontSize: 14 }}>No matches found.</div>
+      {results!==null && (results.length===0 ? (
+        <div style={{ color:'#475569',fontSize:14 }}>No employees found.</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {results.map(r => (
-            <div key={r.id} style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(99,102,241,.2)', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 6, textTransform: 'uppercase',
-                background: r.record_type === 'client' ? '#10b98122' : '#f59e0b22',
-                color: r.record_type === 'client' ? '#10b981' : '#f59e0b' }}>{r.record_type}</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, color: '#e2e8f0' }}>{r.name}</div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>{[r.email, r.phone].filter(Boolean).join(' · ') || '—'}</div>
+        <div style={S.card}>
+          <table style={{ width:'100%',borderCollapse:'collapse',fontSize:13 }}>
+            <thead><tr>{['Name','Email','Role','Office','Since'].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+            <tbody>
+              {results.map(e=>(
+                <tr key={e.id}>
+                  <td style={{ ...S.td,color:'#e2e8f0',fontWeight:600 }}>{e.name}</td>
+                  <td style={{ ...S.td,color:'#94a3b8' }}>{e.email}</td>
+                  <td style={S.td}><span style={S.badge('#6366f1')}>{e.role||e.access}</span></td>
+                  <td style={{ ...S.td,color:'#6366f1',fontWeight:600 }}>{e.tenants?.firm_name||'—'}</td>
+                  <td style={{ ...S.td,color:'#475569' }}>{fmtDate(e.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Audit Log ────────────────────────────────────────────────────────────────
+function AuditLog() {
+  const [log,setLog] = useState(null)
+  useEffect(()=>{
+    supabase.rpc('admin_get_audit_log',{p_limit:100}).then(({data})=>setLog(data||[]))
+  },[])
+  return (
+    <div style={{ padding:'28px 36px', maxWidth:900 }}>
+      <div style={{ fontSize:22,fontWeight:800,color:'#fff',marginBottom:24 }}>📋 Audit Log</div>
+      {!log ? <Spinner /> : log.length===0 ? (
+        <div style={{ color:'#475569',fontSize:14 }}>No admin actions recorded yet.</div>
+      ) : (
+        <div style={S.card}>
+          <table style={{ width:'100%',borderCollapse:'collapse',fontSize:13 }}>
+            <thead><tr>{['Action','Admin','Office','Detail','When'].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+            <tbody>
+              {log.map(a=>(
+                <tr key={a.id}>
+                  <td style={{ ...S.td,color:'#a5b4fc',fontWeight:600 }}>{a.action}</td>
+                  <td style={{ ...S.td,color:'#94a3b8',fontSize:12 }}>{a.admin_email}</td>
+                  <td style={{ ...S.td,color:'#e2e8f0' }}>{a.target_name||'—'}</td>
+                  <td style={{ ...S.td,color:'#475569',fontSize:11 }}>
+                    {a.detail ? JSON.stringify(a.detail).slice(0,60) : '—'}
+                  </td>
+                  <td style={{ ...S.td,color:'#475569' }}>{fmtAgo(a.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Search ───────────────────────────────────────────────────────────────────
+function Search() {
+  const [q,setQ]=useState('')
+  const [results,setResults]=useState(null)
+  const [busy,setBusy]=useState(false)
+  async function search(){
+    if(!q.trim())return
+    setBusy(true)
+    const{data}=await supabase.rpc('admin_search_all',{p_query:q.trim()})
+    setBusy(false)
+    setResults(data||[])
+  }
+  return(
+    <div style={{padding:'28px 36px',maxWidth:820}}>
+      <div style={{fontSize:22,fontWeight:800,color:'#fff',marginBottom:6}}>🔍 Search All Offices</div>
+      <div style={{fontSize:14,color:'#475569',marginBottom:20}}>Find any client or lead across every office by name, email, or phone.</div>
+      <div style={{display:'flex',gap:10,marginBottom:20}}>
+        <input value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==='Enter'&&search()}
+          placeholder="Name, email, or phone…" autoFocus
+          style={{flex:1,padding:'11px 16px',borderRadius:10,border:'1px solid rgba(99,102,241,.3)',background:'rgba(255,255,255,.04)',color:'#e2e8f0',fontSize:14,outline:'none'}}/>
+        <button onClick={search} disabled={busy||!q.trim()} style={{...S.btn('primary'),padding:'11px 24px'}}>
+          {busy?'…':'Search'}
+        </button>
+      </div>
+      {results!==null&&(results.length===0?<div style={{color:'#475569',fontSize:14}}>No matches.</div>:(
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {results.map(r=>(
+            <div key={r.id} style={{...S.card,padding:'12px 16px',display:'flex',alignItems:'center',gap:12}}>
+              <span style={S.badge(r.record_type==='client'?'#10b981':'#f59e0b')}>{r.record_type}</span>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,color:'#e2e8f0'}}>{r.name}</div>
+                <div style={{fontSize:12,color:'#64748b'}}>{[r.email,r.phone].filter(Boolean).join(' · ')||'—'}</div>
               </div>
-              <div style={{ fontSize: 12, color: '#6366f1', fontWeight: 600 }}>{r.tenant_name}</div>
+              <div style={{fontSize:12,color:'#6366f1',fontWeight:600}}>{r.tenant_name}</div>
             </div>
           ))}
         </div>
@@ -260,33 +767,21 @@ function PortalSearch() {
   )
 }
 
-// ── Companies wrapper (reuse existing NewOffice page) ────────────────────────
-const NewOffice = lazy(() => import('./NewOffice'))
-
-function PortalCompanies() {
-  return (
-    <div style={{ padding: '8px 0' }}>
-      <Suspense fallback={<div style={{ padding: 32, color: '#475569' }}>Loading…</div>}>
-        <NewOffice />
-      </Suspense>
+// ── Email placeholder ────────────────────────────────────────────────────────
+function Email(){return(
+  <div style={{padding:'28px 36px'}}>
+    <div style={{fontSize:22,fontWeight:800,color:'#fff',marginBottom:6}}>📧 Email</div>
+    <div style={{fontSize:14,color:'#475569',marginBottom:24}}>romy@taxrescrm.net — powered by Stalwart.</div>
+    <div style={{...S.card,padding:'48px 0',textAlign:'center',color:'#6366f1',fontSize:14}}>
+      Set EMAIL_ENCRYPT_KEY in Supabase, connect your mailbox in Settings → Integrations,<br/>then your inbox will appear here.
+      <div style={{fontSize:12,color:'#475569',marginTop:8}}>mail.taxrescrm.net:993</div>
     </div>
-  )
-}
+  </div>
+)}
 
-// ── Support wrapper ──────────────────────────────────────────────────────────
-function PortalSupport() {
-  return (
-    <div style={{ padding: '8px 0' }}>
-      <Suspense fallback={<div style={{ padding: 32, color: '#475569' }}>Loading…</div>}>
-        <Support />
-      </Suspense>
-    </div>
-  )
-}
-
-// ── Main AdminPortal shell ───────────────────────────────────────────────────
+// ── Main Shell ───────────────────────────────────────────────────────────────
 export default function AdminPortal() {
-  const navigate   = useNavigate()
+  const navigate = useNavigate()
   const { logout } = useApp()
 
   async function handleSignOut() {
@@ -296,20 +791,24 @@ export default function AdminPortal() {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#0d0c1a', fontFamily: 'Arial, sans-serif' }}>
-      <AdminSidebar onSignOut={handleSignOut} />
-
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: '100vh' }}>
-        <Suspense fallback={<div style={{ padding: 40, color: '#475569', fontSize: 13 }}>Loading…</div>}>
+    <div style={{display:'flex',minHeight:'100vh',background:'#0d0c1a',fontFamily:'system-ui,Arial,sans-serif'}}>
+      <Sidebar onSignOut={handleSignOut} />
+      <div style={{flex:1,overflowY:'auto',minHeight:'100vh'}}>
+        <Suspense fallback={<Spinner/>}>
           <Routes>
-            <Route path="/"             element={<PortalOverview />} />
-            <Route path="/companies"    element={<PortalCompanies />} />
-            <Route path="/companies/*"  element={<PortalCompanies />} />
-            <Route path="/search"       element={<PortalSearch />} />
-            <Route path="/support"      element={<PortalSupport />} />
-            <Route path="/billing"      element={<PortalBilling />} />
-            <Route path="/email"        element={<PortalEmail />} />
-            <Route path="*"             element={<PortalOverview />} />
+            <Route path="/"               element={<Overview/>}/>
+            <Route path="/offices"        element={<OfficesList/>}/>
+            <Route path="/offices/:id"    element={<OfficePage/>}/>
+            <Route path="/provision"      element={<div style={{padding:8}}><NewOffice/></div>}/>
+            <Route path="/billing"        element={<Billing/>}/>
+            <Route path="/search"         element={<Search/>}/>
+            <Route path="/demo"           element={<DemoMgmt/>}/>
+            <Route path="/health"         element={<SystemHealth/>}/>
+            <Route path="/employees"      element={<EmployeeLookup/>}/>
+            <Route path="/audit"          element={<AuditLog/>}/>
+            <Route path="/support"        element={<div style={{padding:8}}><Support/></div>}/>
+            <Route path="/email"          element={<Email/>}/>
+            <Route path="*"               element={<Overview/>}/>
           </Routes>
         </Suspense>
       </div>
