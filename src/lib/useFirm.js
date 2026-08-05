@@ -14,12 +14,15 @@ const BUCKET = 'firm-assets'
 let _cache = null   // module-level cache so we only hit DB once per session
 
 async function loadFirmData() {
-  let q = supabase.from('settings').select('*')
+  // During impersonation RLS blocks cross-tenant reads — read from sessionStorage instead.
   try {
     const imp = sessionStorage.getItem('admin_impersonation')
-    if (imp) { const { tenant_id } = JSON.parse(imp); if (tenant_id) q = q.eq('tenant_id', tenant_id) }
+    if (imp) {
+      const { firm_name, logo_url } = JSON.parse(imp)
+      return { firm: { name: firm_name, logourl: logo_url }, logoUrl: logo_url || '/taxcasereview-CRM/logo.png' }
+    }
   } catch (_) {}
-  const { data: s } = await q.limit(1).maybeSingle()
+  const { data: s } = await supabase.from('settings').select('*').limit(1).maybeSingle()
   // Each tenant shows ONLY its own uploaded logo (settings.logourl). We do NOT
   // fall back to the shared firm-assets/logo bucket file — that single file is
   // global and gets overwritten by whichever tenant last uploaded, which would

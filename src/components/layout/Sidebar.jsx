@@ -378,18 +378,28 @@ export default function Sidebar() {
 
   useEffect(() => {
     async function loadBranding() {
-      let q = supabase.from('settings').select('name,tagline,logourl')
+      // During admin impersonation, RLS scopes settings to TCR (romy's JWT) so
+      // a DB query always returns TCR's row regardless of any .eq() filter.
+      // The token was validated and tenant branding stored in sessionStorage by
+      // ImpersonateGate — read it directly, no DB call needed.
       try {
         const imp = sessionStorage.getItem('admin_impersonation')
-        if (imp) { const { tenant_id } = JSON.parse(imp); if (tenant_id) q = q.eq('tenant_id', tenant_id) }
+        if (imp) {
+          const { firm_name, logo_url } = JSON.parse(imp)
+          if (firm_name) setFirmName(firm_name)
+          if (logo_url) {
+            const img = new Image()
+            img.onload = () => setLogoUrl(logo_url)
+            img.onerror = () => setLogoUrl('')
+            img.src = logo_url
+          } else { setLogoUrl('') }
+          return
+        }
       } catch (_) {}
-      const { data: s } = await q.limit(1).maybeSingle()
+      // Normal path — RLS scopes to the logged-in tenant automatically.
+      const { data: s } = await supabase.from('settings').select('name,tagline,logourl').limit(1).maybeSingle()
       if (s?.name)    setFirmName(s.name)
       if (s?.tagline) setTagline(s.tagline)
-      // Per-tenant logo ONLY (settings.logourl). Never the shared
-      // firm-assets/logo file — that's one global object that whichever
-      // tenant uploaded last overwrites, which bled one firm's logo onto
-      // another's CRM.
       if (s?.logourl) {
         const img = new Image()
         img.onload = () => setLogoUrl(s.logourl)

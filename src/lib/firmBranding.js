@@ -35,23 +35,26 @@ export const FIRM = {
 
 export async function loadFirmBranding() {
   try {
-    // During admin impersonation, load the impersonated tenant's branding directly
-    // by tenant_id — bypassing RLS which would otherwise scope to TCR's settings.
-    let query = supabase
-      .from('settings')
-      .select('tenant_id,name,firmname,logourl,address,firmaddress,city,state,zip,phone,firmphone,email,firmemail,website,firm_fax_number')
-
+    // During admin impersonation, RLS on settings always returns TCR's row
+    // (romy's JWT never changes). Read branding from sessionStorage instead —
+    // it was populated by ImpersonateGate when the token was validated.
     try {
       const imp = sessionStorage.getItem('admin_impersonation')
       if (imp) {
-        const { tenant_id } = JSON.parse(imp)
-        if (tenant_id) {
-          query = query.eq('tenant_id', tenant_id)
-        }
+        const { firm_name, logo_url } = JSON.parse(imp)
+        if (firm_name) FIRM.name = firm_name
+        if (firm_name) FIRM.slug = firmSlug(firm_name)
+        FIRM.logoUrl = logo_url || ''
+        FIRM.loaded = true
+        try { document.title = `${FIRM.name} — IRS Resolution CRM` } catch (_) {}
+        return FIRM
       }
     } catch (_) {}
 
-    const { data: s } = await query.limit(1).maybeSingle()
+    const { data: s } = await supabase
+      .from('settings')
+      .select('tenant_id,name,firmname,logourl,address,firmaddress,city,state,zip,phone,firmphone,email,firmemail,website,firm_fax_number')
+      .limit(1).maybeSingle()
     if (!s) return FIRM
 
     const name = s.name || s.firmname || ''
