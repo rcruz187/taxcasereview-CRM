@@ -21,12 +21,12 @@ const BRAND = {
 
 // ── Sidebar nav items ────────────────────────────────────────────────────────
 const NAV = [
-  { path: '/portal',            icon: '📊', label: 'Overview' },
-  { path: '/portal/companies',  icon: '🏢', label: 'Offices' },
-  { path: '/portal/search',     icon: '🔍', label: 'Search' },
-  { path: '/portal/support',    icon: '🎫', label: 'Support' },
-  { path: '/portal/billing',    icon: '💳', label: 'Billing' },
-  { path: '/portal/email',      icon: '📧', label: 'Email' },
+  { path: '/crm-admin',            icon: '📊', label: 'Overview' },
+  { path: '/crm-admin/companies',  icon: '🏢', label: 'Offices' },
+  { path: '/crm-admin/search',     icon: '🔍', label: 'Search' },
+  { path: '/crm-admin/support',    icon: '🎫', label: 'Support' },
+  { path: '/crm-admin/billing',    icon: '💳', label: 'Billing' },
+  { path: '/crm-admin/email',      icon: '📧', label: 'Email' },
 ]
 
 function AdminSidebar({ onSignOut }) {
@@ -59,7 +59,7 @@ function AdminSidebar({ onSignOut }) {
       <nav style={{ flex: 1, padding: '12px 10px' }}>
         {NAV.map(item => {
           const active = location.pathname === item.path ||
-            (item.path !== '/portal' && location.pathname.startsWith(item.path))
+            (item.path !== '/crm-admin' && location.pathname.startsWith(item.path))
           return (
             <NavLink key={item.path} to={item.path}
               style={{

@@ -204,7 +204,7 @@ function AdminGate() {
 
   useEffect(() => {
     if (user?.email?.toLowerCase() === ADMIN_EMAIL) {
-      navigate('/portal', { replace: true })
+      navigate('/crm-admin', { replace: true })
     }
   }, [user])
 
@@ -245,7 +245,7 @@ function AuthRouter() {
       <Route path="/portal/:id" element={<ClientPortal />} />
       <Route path="/organizer/:id" element={<OrganizerPage />} />
       <Route path="/financial-intake/:id" element={<FinancialIntakePage />} />
-      <Route path="/portal/*" element={
+      <Route path="/crm-admin/*" element={
         <RequireAuth adminOnly>
           <Suspense fallback={<div style={{minHeight:'100vh',background:'#0d0c1a'}}/>}>
             <AdminPortal />
