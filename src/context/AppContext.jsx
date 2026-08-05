@@ -129,7 +129,12 @@ export function AppProvider({ children }) {
 
   async function loadBrandColor() {
     try {
-      const { data } = await supabase.from('settings').select('primary_color').limit(1).maybeSingle()
+      let q = supabase.from('settings').select('primary_color')
+      try {
+        const imp = sessionStorage.getItem('admin_impersonation')
+        if (imp) { const { tenant_id } = JSON.parse(imp); if (tenant_id) q = q.eq('tenant_id', tenant_id) }
+      } catch (_) {}
+      const { data } = await q.limit(1).maybeSingle()
       if (data?.primary_color) applyBrandColor(data.primary_color)
     } catch(e) {}
   }

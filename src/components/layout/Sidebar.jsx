@@ -378,7 +378,12 @@ export default function Sidebar() {
 
   useEffect(() => {
     async function loadBranding() {
-      const { data: s } = await supabase.from('settings').select('name,tagline,logourl').limit(1).maybeSingle()
+      let q = supabase.from('settings').select('name,tagline,logourl')
+      try {
+        const imp = sessionStorage.getItem('admin_impersonation')
+        if (imp) { const { tenant_id } = JSON.parse(imp); if (tenant_id) q = q.eq('tenant_id', tenant_id) }
+      } catch (_) {}
+      const { data: s } = await q.limit(1).maybeSingle()
       if (s?.name)    setFirmName(s.name)
       if (s?.tagline) setTagline(s.tagline)
       // Per-tenant logo ONLY (settings.logourl). Never the shared

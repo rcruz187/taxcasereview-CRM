@@ -14,7 +14,12 @@ const BUCKET = 'firm-assets'
 let _cache = null   // module-level cache so we only hit DB once per session
 
 async function loadFirmData() {
-  const { data: s } = await supabase.from('settings').select('*').limit(1).maybeSingle()
+  let q = supabase.from('settings').select('*')
+  try {
+    const imp = sessionStorage.getItem('admin_impersonation')
+    if (imp) { const { tenant_id } = JSON.parse(imp); if (tenant_id) q = q.eq('tenant_id', tenant_id) }
+  } catch (_) {}
+  const { data: s } = await q.limit(1).maybeSingle()
   // Each tenant shows ONLY its own uploaded logo (settings.logourl). We do NOT
   // fall back to the shared firm-assets/logo bucket file — that single file is
   // global and gets overwritten by whichever tenant last uploaded, which would
