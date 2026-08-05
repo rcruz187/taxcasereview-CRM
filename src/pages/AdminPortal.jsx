@@ -554,7 +554,7 @@ function DemoMgmt() {
   async function jumpIn(tenantId, firmName) {
     const { data:token, error } = await supabase.rpc('create_impersonation_token',{ p_tenant_id:tenantId })
     if (error) { toast_(error.message,'error'); return }
-    window.open(`${window.location.origin}/taxcasereview-CRM/?admin_token=${token}`,'_blank')
+    window.open(`${window.location.origin}/taxcasereview-CRM/impersonate?admin_token=${token}`,'_blank')
     toast_(`✅ Opened ${firmName}`)
   }
 
