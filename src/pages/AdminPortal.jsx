@@ -69,6 +69,7 @@ const NAV = [
   { path:'/crm-admin/provision', label:'+ New Office', icon:'➕' },
   { path:'/crm-admin/offices',   label:'Offices',      icon:'🏢' },
   { path:'/crm-admin/demo',      label:'Demo Mgmt',    icon:'🎭' },
+  { path:'/crm-admin/demo-setup', label:'Demo Setup',   icon:'🎨' },
   { path:'/crm-admin/search',    label:'Search',       icon:'🔍' },
   { path:'/crm-admin/employees', label:'Employees',    icon:'👥' },
   { path:'/crm-admin/support',   label:'Support',      icon:'🎫' },
@@ -632,18 +633,126 @@ function SystemHealth() {
   )
 }
 
-// ── Employee Lookup ──────────────────────────────────────────────────────────
+// ── Employee Lookup + Edit ───────────────────────────────────────────────────
+const ACCESS_LEVELS = ['Super Admin','Admin','Tax Associate','Read Only']
+
+function EmployeeEditModal({ emp, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    name:   emp.name   || '',
+    access: emp.access || emp.role || 'Tax Associate',
+    role:   emp.role   || emp.access || 'Tax Associate',
+    phone:  emp.phone  || '',
+  })
+  const [saving, setSaving]     = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [toast, setToast]       = useState(null)
+  const toast_ = (msg,type='ok')=>{ setToast({msg,type}); setTimeout(()=>setToast(null),3500) }
+  const fld = (k,v) => setForm(f=>({...f,[k]:v}))
+
+  async function save() {
+    setSaving(true)
+    const { error } = await supabase.from('employees')
+      .update({ name:form.name, access:form.access, role:form.role, phone:form.phone })
+      .eq('id', emp.id)
+    setSaving(false)
+    if (error) { toast_(error.message,'error'); return }
+    toast_('✅ Employee updated')
+    setTimeout(()=>{ onSaved(); onClose() }, 800)
+  }
+
+  async function resetPassword() {
+    if (!confirm(`Send password reset email to ${emp.email}?`)) return
+    setResetting(true)
+    const { error } = await supabase.auth.resetPasswordForEmail(emp.email, {
+      redirectTo: window.location.origin + '/taxcasereview-CRM/'
+    })
+    setResetting(false)
+    if (error) { toast_(error.message,'error') }
+    else { toast_(`✅ Reset email sent to ${emp.email}`) }
+  }
+
+  return (
+    <div style={{ position:'fixed',inset:0,background:'rgba(0,0,0,.75)',zIndex:9999,
+      display:'flex',alignItems:'center',justifyContent:'center',padding:20 }}
+      onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={{ background:'#1a1830',border:'1px solid rgba(99,102,241,.35)',
+        borderRadius:16,padding:28,width:480,maxWidth:'100%',position:'relative' }}>
+        {toast && <Toast msg={toast.msg} type={toast.type} />}
+        <div style={{ display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:20 }}>
+          <div>
+            <div style={{ fontSize:18,fontWeight:800,color:'#fff' }}>{emp.name}</div>
+            <div style={{ fontSize:12,color:'#6366f1',marginTop:2 }}>{emp.tenants?.firm_name||'—'}</div>
+            <div style={{ fontSize:11,color:'#475569',marginTop:1 }}>Joined {fmtDate(emp.created_at)}</div>
+          </div>
+          <button onClick={onClose} style={{ background:'none',border:'none',color:'#64748b',
+            fontSize:22,cursor:'pointer',lineHeight:1 }}>✕</button>
+        </div>
+        <div style={{ display:'flex',flexDirection:'column',gap:14 }}>
+          <div>
+            <label style={{ fontSize:11,fontWeight:700,color:'#6366f1',textTransform:'uppercase',
+              letterSpacing:'.05em',display:'block',marginBottom:5 }}>Full Name</label>
+            <input value={form.name} onChange={e=>fld('name',e.target.value)}
+              style={{ width:'100%',padding:'10px 14px',borderRadius:8,border:'1px solid rgba(99,102,241,.3)',
+                background:'rgba(255,255,255,.04)',color:'#e2e8f0',fontSize:14,boxSizing:'border-box' }}/>
+          </div>
+          <div>
+            <label style={{ fontSize:11,fontWeight:700,color:'#6366f1',textTransform:'uppercase',
+              letterSpacing:'.05em',display:'block',marginBottom:5 }}>Phone</label>
+            <input value={form.phone} onChange={e=>fld('phone',e.target.value)} type="tel"
+              style={{ width:'100%',padding:'10px 14px',borderRadius:8,border:'1px solid rgba(99,102,241,.3)',
+                background:'rgba(255,255,255,.04)',color:'#e2e8f0',fontSize:14,boxSizing:'border-box' }}/>
+          </div>
+          <div>
+            <label style={{ fontSize:11,fontWeight:700,color:'#6366f1',textTransform:'uppercase',
+              letterSpacing:'.05em',display:'block',marginBottom:5 }}>Email</label>
+            <input value={emp.email} disabled
+              style={{ width:'100%',padding:'10px 14px',borderRadius:8,border:'1px solid rgba(99,102,241,.15)',
+                background:'rgba(255,255,255,.02)',color:'#475569',fontSize:14,boxSizing:'border-box',cursor:'not-allowed' }}/>
+            <div style={{ fontSize:11,color:'#334155',marginTop:3 }}>Email changes require Supabase Auth — use Reset Password below</div>
+          </div>
+          <div>
+            <label style={{ fontSize:11,fontWeight:700,color:'#6366f1',textTransform:'uppercase',
+              letterSpacing:'.05em',display:'block',marginBottom:5 }}>Access Level</label>
+            <select value={form.access} onChange={e=>{ fld('access',e.target.value); fld('role',e.target.value) }}
+              style={{ width:'100%',padding:'10px 14px',borderRadius:8,border:'1px solid rgba(99,102,241,.3)',
+                background:'#1a1830',color:'#e2e8f0',fontSize:14 }}>
+              {ACCESS_LEVELS.map(a=><option key={a} value={a}>{a}</option>)}
+            </select>
+            <div style={{ fontSize:11,color:'#334155',marginTop:4,lineHeight:1.5 }}>
+              <strong style={{color:'#10b981'}}>Super Admin</strong> — full access including settings<br/>
+              <strong style={{color:'#6366f1'}}>Admin</strong> — all client/lead/billing features<br/>
+              <strong style={{color:'#0ea5e9'}}>Tax Associate</strong> — clients, leads, tasks, documents<br/>
+              <strong style={{color:'#64748b'}}>Read Only</strong> — view only, no edits
+            </div>
+          </div>
+        </div>
+        <div style={{ marginTop:20,paddingTop:16,borderTop:'1px solid rgba(99,102,241,.15)',display:'flex',gap:10 }}>
+          <button onClick={save} disabled={saving}
+            style={{ ...S.btn('primary'),flex:1,justifyContent:'center',padding:'10px 0' }}>
+            {saving?'Saving…':'💾 Save Changes'}
+          </button>
+          <button onClick={resetPassword} disabled={resetting}
+            style={{ ...S.btn('ghost'),padding:'10px 16px',fontSize:12 }}>
+            {resetting?'⏳':'🔑'} Reset Password
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function EmployeeLookup() {
-  const [q,setQ] = useState('')
+  const [q,setQ]             = useState('')
   const [results,setResults] = useState(null)
-  const [busy,setBusy] = useState(false)
+  const [busy,setBusy]       = useState(false)
+  const [selected,setSelected] = useState(null)
 
   async function search() {
     if (!q.trim()) return
     setBusy(true)
     const { data } = await supabase
       .from('employees')
-      .select('id,name,email,role,access,tenant_id,created_at,tenants(firm_name)')
+      .select('id,name,email,role,access,phone,avatar_url,tenant_id,created_at,tenants(firm_name)')
       .or(`name.ilike.%${q}%,email.ilike.%${q}%`)
       .limit(50)
     setBusy(false)
@@ -651,9 +760,12 @@ function EmployeeLookup() {
   }
 
   return (
-    <div style={{ padding:'28px 36px', maxWidth:820 }}>
+    <div style={{ padding:'28px 36px',maxWidth:900 }}>
+      {selected && <EmployeeEditModal emp={selected} onClose={()=>setSelected(null)} onSaved={search} />}
       <div style={{ fontSize:22,fontWeight:800,color:'#fff',marginBottom:6 }}>👥 Employee Lookup</div>
-      <div style={{ fontSize:14,color:'#475569',marginBottom:20 }}>Find any employee across every office by name or email.</div>
+      <div style={{ fontSize:14,color:'#475569',marginBottom:20 }}>
+        Find any employee across every office. Click any row to view full profile, edit details, or reset password.
+      </div>
       <div style={{ display:'flex',gap:10,marginBottom:20 }}>
         <input value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==='Enter'&&search()}
           placeholder="Name or email…" autoFocus
@@ -668,15 +780,31 @@ function EmployeeLookup() {
       ) : (
         <div style={S.card}>
           <table style={{ width:'100%',borderCollapse:'collapse',fontSize:13 }}>
-            <thead><tr>{['Name','Email','Role','Office','Since'].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+            <thead><tr>{['Name','Email','Access Level','Office','Joined',''].map(h=>(
+              <th key={h} style={S.th}>{h}</th>
+            ))}</tr></thead>
             <tbody>
               {results.map(e=>(
-                <tr key={e.id}>
-                  <td style={{ ...S.td,color:'#e2e8f0',fontWeight:600 }}>{e.name}</td>
+                <tr key={e.id} style={{ cursor:'pointer' }} onClick={()=>setSelected(e)}>
+                  <td style={{ ...S.td,color:'#e2e8f0',fontWeight:600 }}>
+                    {e.avatar_url&&<img src={e.avatar_url} style={{ width:22,height:22,borderRadius:'50%',
+                      marginRight:8,verticalAlign:'middle' }} onError={ev=>ev.target.style.display='none'}/>}
+                    {e.name}
+                  </td>
                   <td style={{ ...S.td,color:'#94a3b8' }}>{e.email}</td>
-                  <td style={S.td}><span style={S.badge('#6366f1')}>{e.role||e.access}</span></td>
+                  <td style={S.td}>
+                    <span style={S.badge(
+                      e.access==='Super Admin'?'#10b981':
+                      e.access==='Admin'?'#6366f1':
+                      e.access==='Tax Associate'?'#0ea5e9':'#64748b'
+                    )}>{e.access||e.role}</span>
+                  </td>
                   <td style={{ ...S.td,color:'#6366f1',fontWeight:600 }}>{e.tenants?.firm_name||'—'}</td>
                   <td style={{ ...S.td,color:'#475569' }}>{fmtDate(e.created_at)}</td>
+                  <td style={S.td}>
+                    <button onClick={ev=>{ev.stopPropagation();setSelected(e)}}
+                      style={{ ...S.btn('ghost'),padding:'4px 12px',fontSize:11 }}>Edit →</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -892,6 +1020,348 @@ function LiveDemo() {
   )
 }
 
+
+// ── Demo Setup Wizard ────────────────────────────────────────────────────────
+// Lets Romy skin the demo tenant as either the generic TaxRes CRM demo
+// or a custom prospect-specific version (their logo, name, color) in seconds.
+// Only touches the settings row of the Nashville demo tenant — nothing else.
+
+const GENERIC_DEFAULTS = {
+  firm_name:   'Nashville Tax Solutions',
+  logo_url:    '/taxcasereview-CRM/assets/taxrescrm-logo.png',
+  brand_color: '#6366f1',
+  phone:       '(888) 334-5052',
+  email:       'demo@taxrescrm.net',
+  address:     '123 Demo Street, Nashville, TN 37201',
+}
+
+function DemoSetup() {
+  const [current, setCurrent]     = useState(null)
+  const [form, setForm]           = useState(GENERIC_DEFAULTS)
+  const [saving, setSaving]       = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [toast, setToast]         = useState(null)
+  const [logoFile, setLogoFile]   = useState(null)
+  const [logoPreview, setLogoPreview] = useState(null)
+  const navigate = useNavigate()
+
+  const toast_ = (msg, type='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),4000) }
+  const fld = (k,v) => setForm(f=>({...f,[k]:v}))
+
+  useEffect(() => { loadCurrent() }, [])
+
+  async function loadCurrent() {
+    const { data } = await supabase.from('settings')
+      .select('name,logourl,phone,email,address')
+      .eq('tenant_id', DEMO_TENANT)
+      .maybeSingle()
+    if (data) {
+      setCurrent(data)
+      setForm(f => ({
+        ...f,
+        firm_name:  data.name  || f.firm_name,
+        logo_url:   data.logourl || f.logo_url,
+        phone:      data.phone || f.phone,
+        email:      data.email || f.email,
+        address:    data.address || f.address,
+      }))
+      setLogoPreview(data.logourl || null)
+    }
+  }
+
+  function handleLogoFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setLogoFile(file)
+    const reader = new FileReader()
+    reader.onload = ev => setLogoPreview(ev.target.result)
+    reader.readAsDataURL(file)
+  }
+
+  async function uploadLogo(file) {
+    // Upload to gh-pages assets via GitHub API
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = async (ev) => {
+        const b64 = ev.target.result.split(',')[1]
+        try {
+          const resp = await fetch(
+            'https://api.github.com/repos/taxresolutioncrm/taxcasereview-CRM/contents/assets/demo-prospect-logo.png',
+            {
+              method: 'PUT',
+              headers: {
+                'Authorization': 'token ghp_REDACTED_TOKEN_REMOVED_FROM_HISTORY',
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                message: 'feat: prospect demo logo upload',
+                content: b64,
+                branch: 'gh-pages',
+              })
+            }
+          )
+          if (resp.ok) {
+            resolve('/taxcasereview-CRM/assets/demo-prospect-logo.png')
+          } else {
+            // If file exists, need SHA to update — get it first
+            const getResp = await fetch(
+              'https://api.github.com/repos/taxresolutioncrm/taxcasereview-CRM/contents/assets/demo-prospect-logo.png?ref=gh-pages',
+              { headers: { 'Authorization': 'token ghp_REDACTED_TOKEN_REMOVED_FROM_HISTORY' } }
+            )
+            if (getResp.ok) {
+              const existing = await getResp.json()
+              const updateResp = await fetch(
+                'https://api.github.com/repos/taxresolutioncrm/taxcasereview-CRM/contents/assets/demo-prospect-logo.png',
+                {
+                  method: 'PUT',
+                  headers: {
+                    'Authorization': 'token ghp_REDACTED_TOKEN_REMOVED_FROM_HISTORY',
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    message: 'feat: update prospect demo logo',
+                    content: b64,
+                    sha: existing.sha,
+                    branch: 'gh-pages',
+                  })
+                }
+              )
+              if (updateResp.ok) {
+                resolve('/taxcasereview-CRM/assets/demo-prospect-logo.png')
+              } else {
+                reject(new Error('Logo upload failed'))
+              }
+            }
+          }
+        } catch (e) { reject(e) }
+      }
+      reader.readAsDataURL(file)
+    })
+  }
+
+  async function applyToDemo() {
+    setSaving(true)
+    try {
+      let logoUrl = form.logo_url
+
+      // Upload logo if a file was selected
+      if (logoFile) {
+        toast_('Uploading logo…', 'ok')
+        logoUrl = await uploadLogo(logoFile)
+        // Add cache buster so browser loads the new logo
+        logoUrl = logoUrl + '?v=' + Date.now()
+      }
+
+      // Update the demo tenant settings
+      const { error } = await supabase.from('settings').update({
+        name:    form.firm_name,
+        logourl: logoUrl,
+        phone:   form.phone,
+        email:   form.email,
+        address: form.address,
+      }).eq('tenant_id', DEMO_TENANT)
+
+      if (error) throw error
+
+      // Log the action
+      await supabase.rpc('log_admin_action', {
+        p_action: 'demo_customized',
+        p_tenant_id: DEMO_TENANT,
+        p_tenant_name: form.firm_name,
+        p_detail: { firm_name: form.firm_name, logo_applied: !!logoFile }
+      })
+
+      toast_(`✅ Demo is now set up for ${form.firm_name}`)
+      loadCurrent()
+    } catch (e) {
+      toast_(e.message, 'error')
+    }
+    setSaving(false)
+  }
+
+  async function resetToGeneric() {
+    setResetting(true)
+    try {
+      const { error } = await supabase.from('settings').update({
+        name:    'Nashville Tax Solutions',
+        logourl: '/taxcasereview-CRM/assets/taxrescrm-logo.png',
+        phone:   '(888) 334-5052',
+        email:   'demo@taxrescrm.net',
+        address: '123 Demo Street, Nashville, TN 37201',
+      }).eq('tenant_id', DEMO_TENANT)
+      if (error) throw error
+      setLogoFile(null)
+      setLogoPreview('/taxcasereview-CRM/assets/taxrescrm-logo.png')
+      setForm(GENERIC_DEFAULTS)
+      toast_('✅ Demo reset to generic TaxRes CRM defaults')
+      loadCurrent()
+    } catch (e) {
+      toast_(e.message, 'error')
+    }
+    setResetting(false)
+  }
+
+  return (
+    <div style={{ padding:'28px 36px', maxWidth:720 }}>
+      {toast && <Toast msg={toast.msg} type={toast.type} />}
+
+      <div style={{ marginBottom:28 }}>
+        <div style={{ fontSize:22,fontWeight:800,color:'#fff',marginBottom:4 }}>🎨 Demo Setup</div>
+        <div style={{ fontSize:14,color:'#64748b' }}>
+          Customize the demo tenant for a specific prospect, or reset to generic TaxRes CRM defaults.
+        </div>
+      </div>
+
+      {/* Mode toggle */}
+      <div style={{ display:'flex',gap:12,marginBottom:28 }}>
+        <div style={{ ...S.card,flex:1,padding:'18px 20px',cursor:'pointer',
+          border: form.firm_name===GENERIC_DEFAULTS.firm_name
+            ? '1px solid rgba(99,102,241,.5)' : '1px solid rgba(99,102,241,.2)' }}
+          onClick={()=>{ setForm(GENERIC_DEFAULTS); setLogoFile(null); setLogoPreview(GENERIC_DEFAULTS.logo_url) }}>
+          <div style={{ fontSize:24,marginBottom:6 }}>🎭</div>
+          <div style={{ fontSize:13,fontWeight:700,color:'#fff' }}>Generic Demo</div>
+          <div style={{ fontSize:11,color:'#475569',marginTop:2 }}>TaxRes CRM logo · Dummy Nashville data</div>
+        </div>
+        <div style={{ ...S.card,flex:1,padding:'18px 20px',
+          border:'1px solid rgba(251,146,60,.3)',background:'rgba(251,146,60,.04)' }}>
+          <div style={{ fontSize:24,marginBottom:6 }}>🏢</div>
+          <div style={{ fontSize:13,fontWeight:700,color:'#fff' }}>Prospect Demo</div>
+          <div style={{ fontSize:11,color:'#475569',marginTop:2 }}>Their logo · Their name · Their colors</div>
+        </div>
+      </div>
+
+      {/* Form */}
+      <div style={{ ...S.card,padding:24,marginBottom:20 }}>
+        <div style={{ fontSize:12,fontWeight:700,color:'#6366f1',textTransform:'uppercase',
+          letterSpacing:'.05em',marginBottom:18 }}>Demo Configuration</div>
+
+        <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:16 }}>
+          {/* Firm name */}
+          <div style={{ gridColumn:'1/-1' }}>
+            <label style={{ fontSize:11,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',
+              letterSpacing:'.05em',display:'block',marginBottom:6 }}>Firm Name *</label>
+            <input value={form.firm_name} onChange={e=>fld('firm_name',e.target.value)}
+              placeholder="e.g. Bennett Tax Resolution"
+              style={{ width:'100%',padding:'10px 14px',borderRadius:8,
+                border:'1px solid rgba(99,102,241,.3)',background:'rgba(255,255,255,.04)',
+                color:'#e2e8f0',fontSize:14,boxSizing:'border-box' }}/>
+          </div>
+
+          {/* Logo */}
+          <div style={{ gridColumn:'1/-1' }}>
+            <label style={{ fontSize:11,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',
+              letterSpacing:'.05em',display:'block',marginBottom:6 }}>Logo</label>
+            <div style={{ display:'flex',gap:12,alignItems:'flex-start' }}>
+              {/* Preview */}
+              <div style={{ width:80,height:56,borderRadius:8,border:'1px solid rgba(99,102,241,.3)',
+                background:'rgba(255,255,255,.06)',display:'flex',alignItems:'center',
+                justifyContent:'center',flexShrink:0,overflow:'hidden',padding:6 }}>
+                {logoPreview ? (
+                  <img src={logoPreview} alt="Logo preview"
+                    style={{ maxWidth:'100%',maxHeight:'100%',objectFit:'contain' }}
+                    onError={e=>{e.target.style.display='none'}} />
+                ) : (
+                  <span style={{ fontSize:24 }}>🏢</span>
+                )}
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={{ display:'inline-block',padding:'9px 16px',borderRadius:8,
+                  border:'1px solid rgba(99,102,241,.35)',background:'rgba(99,102,241,.1)',
+                  color:'#a5b4fc',fontSize:13,fontWeight:600,cursor:'pointer',marginBottom:8 }}>
+                  📁 Upload Logo
+                  <input type="file" accept="image/*" onChange={handleLogoFile}
+                    style={{ display:'none' }} />
+                </label>
+                <div style={{ fontSize:11,color:'#475569' }}>
+                  PNG, JPG, SVG · Recommended: transparent background, landscape format
+                </div>
+                <div style={{ marginTop:8 }}>
+                  <input value={form.logo_url} onChange={e=>{fld('logo_url',e.target.value);setLogoPreview(e.target.value)}}
+                    placeholder="Or paste a logo URL…"
+                    style={{ width:'100%',padding:'8px 12px',borderRadius:6,
+                      border:'1px solid rgba(99,102,241,.2)',background:'rgba(255,255,255,.03)',
+                      color:'#94a3b8',fontSize:12,boxSizing:'border-box' }}/>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Phone */}
+          <div>
+            <label style={{ fontSize:11,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',
+              letterSpacing:'.05em',display:'block',marginBottom:6 }}>Phone</label>
+            <input value={form.phone} onChange={e=>fld('phone',e.target.value)}
+              placeholder="(615) 555-0100"
+              style={{ width:'100%',padding:'10px 14px',borderRadius:8,
+                border:'1px solid rgba(99,102,241,.3)',background:'rgba(255,255,255,.04)',
+                color:'#e2e8f0',fontSize:14,boxSizing:'border-box' }}/>
+          </div>
+
+          {/* Email */}
+          <div>
+            <label style={{ fontSize:11,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',
+              letterSpacing:'.05em',display:'block',marginBottom:6 }}>Email</label>
+            <input value={form.email} onChange={e=>fld('email',e.target.value)}
+              placeholder="info@theirfirm.com"
+              style={{ width:'100%',padding:'10px 14px',borderRadius:8,
+                border:'1px solid rgba(99,102,241,.3)',background:'rgba(255,255,255,.04)',
+                color:'#e2e8f0',fontSize:14,boxSizing:'border-box' }}/>
+          </div>
+
+          {/* Address */}
+          <div style={{ gridColumn:'1/-1' }}>
+            <label style={{ fontSize:11,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',
+              letterSpacing:'.05em',display:'block',marginBottom:6 }}>Address</label>
+            <input value={form.address} onChange={e=>fld('address',e.target.value)}
+              placeholder="123 Main St, Nashville, TN 37201"
+              style={{ width:'100%',padding:'10px 14px',borderRadius:8,
+                border:'1px solid rgba(99,102,241,.3)',background:'rgba(255,255,255,.04)',
+                color:'#e2e8f0',fontSize:14,boxSizing:'border-box' }}/>
+          </div>
+        </div>
+      </div>
+
+      {/* Preview */}
+      <div style={{ ...S.card,padding:20,marginBottom:20,border:'1px solid rgba(99,102,241,.15)' }}>
+        <div style={{ fontSize:11,fontWeight:700,color:'#475569',textTransform:'uppercase',
+          letterSpacing:'.05em',marginBottom:12 }}>Preview — What the demo will show</div>
+        <div style={{ display:'flex',alignItems:'center',gap:14 }}>
+          {logoPreview && (
+            <img src={logoPreview} alt="preview" style={{ height:40,objectFit:'contain' }}
+              onError={e=>{e.target.style.display='none'}} />
+          )}
+          <div>
+            <div style={{ fontSize:16,fontWeight:800,color:'#fff' }}>{form.firm_name||'—'}</div>
+            <div style={{ fontSize:12,color:'#475569' }}>{form.phone} · {form.email}</div>
+            <div style={{ fontSize:12,color:'#475569' }}>{form.address}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div style={{ display:'flex',gap:12 }}>
+        <button onClick={applyToDemo} disabled={saving||resetting}
+          style={{ ...S.btn('primary'),flex:1,justifyContent:'center',padding:'12px 0',fontSize:14 }}>
+          {saving ? '⏳ Applying…' : '✅ Apply to Demo'}
+        </button>
+        <button onClick={()=>navigate('/crm-admin/demo')} disabled={saving||resetting}
+          style={{ ...S.btn('ghost'),padding:'12px 20px',fontSize:13 }}>
+          🚀 Launch Demo
+        </button>
+        <button onClick={resetToGeneric} disabled={saving||resetting}
+          style={{ ...S.btn('danger'),padding:'12px 20px',fontSize:13 }}>
+          {resetting ? '⏳' : '↺'} Reset to Generic
+        </button>
+      </div>
+
+      <div style={{ marginTop:14,fontSize:11,color:'#334155',lineHeight:1.6 }}>
+        Changes apply immediately to the demo tenant. Click <strong style={{color:'#a5b4fc'}}>Launch Demo</strong> to open the live CRM.
+        Use <strong style={{color:'#94a3b8'}}>Reset to Generic</strong> after the call to restore TaxRes CRM defaults.
+      </div>
+    </div>
+  )
+}
+
 // ── Main Shell ───────────────────────────────────────────────────────────────
 export default function AdminPortal() {
   const navigate = useNavigate()
@@ -916,6 +1386,7 @@ export default function AdminPortal() {
             <Route path="/billing"        element={<Billing/>}/>
             <Route path="/search"         element={<Search/>}/>
             <Route path="/demo"           element={<DemoMgmt/>}/>
+            <Route path="/demo-setup"     element={<DemoSetup/>}/>
             <Route path="/live-demo"      element={<LiveDemo/>}/>
             <Route path="/health"         element={<SystemHealth/>}/>
             <Route path="/employees"      element={<EmployeeLookup/>}/>
