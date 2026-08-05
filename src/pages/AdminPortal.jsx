@@ -1079,64 +1079,15 @@ function DemoSetup() {
   }
 
   async function uploadLogo(file) {
-    // Upload to gh-pages assets via GitHub API
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = async (ev) => {
-        const b64 = ev.target.result.split(',')[1]
-        try {
-          const resp = await fetch(
-            'https://api.github.com/repos/taxresolutioncrm/taxcasereview-CRM/contents/assets/demo-prospect-logo.png',
-            {
-              method: 'PUT',
-              headers: {
-                'Authorization': 'token ghp_REDACTED_TOKEN_REMOVED_FROM_HISTORY',
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                message: 'feat: prospect demo logo upload',
-                content: b64,
-                branch: 'gh-pages',
-              })
-            }
-          )
-          if (resp.ok) {
-            resolve('/taxcasereview-CRM/assets/demo-prospect-logo.png')
-          } else {
-            // If file exists, need SHA to update — get it first
-            const getResp = await fetch(
-              'https://api.github.com/repos/taxresolutioncrm/taxcasereview-CRM/contents/assets/demo-prospect-logo.png?ref=gh-pages',
-              { headers: { 'Authorization': 'token ghp_REDACTED_TOKEN_REMOVED_FROM_HISTORY' } }
-            )
-            if (getResp.ok) {
-              const existing = await getResp.json()
-              const updateResp = await fetch(
-                'https://api.github.com/repos/taxresolutioncrm/taxcasereview-CRM/contents/assets/demo-prospect-logo.png',
-                {
-                  method: 'PUT',
-                  headers: {
-                    'Authorization': 'token ghp_REDACTED_TOKEN_REMOVED_FROM_HISTORY',
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    message: 'feat: update prospect demo logo',
-                    content: b64,
-                    sha: existing.sha,
-                    branch: 'gh-pages',
-                  })
-                }
-              )
-              if (updateResp.ok) {
-                resolve('/taxcasereview-CRM/assets/demo-prospect-logo.png')
-              } else {
-                reject(new Error('Logo upload failed'))
-              }
-            }
-          }
-        } catch (e) { reject(e) }
-      }
-      reader.readAsDataURL(file)
-    })
+    // Upload logo to Supabase storage — accessible from the browser
+    const ext = file.name.split('.').pop() || 'png'
+    const path = `demo-logos/prospect-logo-${Date.now()}.${ext}`
+    const { data, error } = await supabase.storage
+      .from('firm-assets')
+      .upload(path, file, { upsert: true, contentType: file.type })
+    if (error) throw new Error(error.message)
+    const { data: urlData } = supabase.storage.from('firm-assets').getPublicUrl(path)
+    return urlData.publicUrl
   }
 
   async function applyToDemo() {
