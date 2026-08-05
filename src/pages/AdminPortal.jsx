@@ -64,18 +64,17 @@ function Spinner() {
 
 // ── Sidebar ──────────────────────────────────────────────────────────────────
 const NAV = [
-  { path:'/crm-admin',           label:'Overview',     icon:'📊' },
-  { path:'/crm-admin/offices',   label:'Offices',      icon:'🏢' },
-  { path:'/crm-admin/provision', label:'New Office',   icon:'➕' },
-  { path:'/crm-admin/billing',   label:'Billing',      icon:'💳' },
-  { path:'/crm-admin/search',    label:'Search',       icon:'🔍' },
-  { path:'/crm-admin/demo',      label:'Demo Mgmt',    icon:'🎭' },
-  { path:'/crm-admin/live-demo', label:'Live Demo',    icon:'🖥️' },
-  { path:'/crm-admin/health',    label:'System Health',icon:'💚' },
-  { path:'/crm-admin/employees', label:'Employees',    icon:'👥' },
-  { path:'/crm-admin/audit',     label:'Audit Log',    icon:'📋' },
-  { path:'/crm-admin/support',   label:'Support',      icon:'🎫' },
   { path:'/crm-admin/email',     label:'Email',        icon:'📧' },
+  { path:'/crm-admin',           label:'Overview',     icon:'📊' },
+  { path:'/crm-admin/provision', label:'+ New Office', icon:'➕' },
+  { path:'/crm-admin/offices',   label:'Offices',      icon:'🏢' },
+  { path:'/crm-admin/demo',      label:'Demo Mgmt',    icon:'🎭' },
+  { path:'/crm-admin/search',    label:'Search',       icon:'🔍' },
+  { path:'/crm-admin/employees', label:'Employees',    icon:'👥' },
+  { path:'/crm-admin/support',   label:'Support',      icon:'🎫' },
+  { path:'/crm-admin/audit',     label:'Audit Log',    icon:'📋' },
+  { path:'/crm-admin/billing',   label:'Billing',      icon:'💳' },
+  { path:'/crm-admin/health',    label:'System Health',icon:'💚' },
 ]
 
 function Sidebar({ onSignOut }) {
