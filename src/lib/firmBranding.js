@@ -35,10 +35,23 @@ export const FIRM = {
 
 export async function loadFirmBranding() {
   try {
-    const { data: s } = await supabase
+    // During admin impersonation, load the impersonated tenant's branding directly
+    // by tenant_id — bypassing RLS which would otherwise scope to TCR's settings.
+    let query = supabase
       .from('settings')
       .select('tenant_id,name,firmname,logourl,address,firmaddress,city,state,zip,phone,firmphone,email,firmemail,website,firm_fax_number')
-      .limit(1).maybeSingle()
+
+    try {
+      const imp = sessionStorage.getItem('admin_impersonation')
+      if (imp) {
+        const { tenant_id } = JSON.parse(imp)
+        if (tenant_id) {
+          query = query.eq('tenant_id', tenant_id)
+        }
+      }
+    } catch (_) {}
+
+    const { data: s } = await query.limit(1).maybeSingle()
     if (!s) return FIRM
 
     const name = s.name || s.firmname || ''

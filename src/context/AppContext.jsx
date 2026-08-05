@@ -147,6 +147,19 @@ export function AppProvider({ children }) {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
       if (session?.user) {
+        // If this is an admin impersonation session, set the tenant override
+        // so current_tenant_id() returns the impersonated tenant for ALL DB calls
+        try {
+          const imp = sessionStorage.getItem('admin_impersonation')
+          if (imp) {
+            const { tenant_id } = JSON.parse(imp)
+            if (tenant_id) {
+              supabase.rpc('set_admin_tenant_override', { p_tenant_id: tenant_id })
+                .then(() => { loadRole(session.user.email); loadBrandColor(); loadFirmBranding() })
+              return
+            }
+          }
+        } catch (_) {}
         loadRole(session.user.email); loadBrandColor(); loadFirmBranding()
         // Log login event
         if (_event === 'SIGNED_IN') {
