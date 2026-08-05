@@ -26,19 +26,28 @@ export default function Login() {
     }
   }
 
+  const TAXRESCRM_LOGO = "https://raw.githubusercontent.com/taxresolutioncrm/taxcasereview-CRM/gh-pages/taxrescrm-logo.png"
+  const isTaxResCRM = email.toLowerCase().includes('taxrescrm')
+
   return (
     <div className="login-wrap">
       <form className="login-box" onSubmit={submit}>
         <div className="login-logo">
-          <div style={{
-            width: 56, height: 56, borderRadius: 14,
-            background: 'var(--blue)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center',
-            fontSize: 26, fontWeight: 900, color: '#fff',
-          }}>T</div>
+          {isTaxResCRM ? (
+            <img src={TAXRESCRM_LOGO} alt="TaxRes CRM"
+              style={{ height: 52, objectFit: 'contain', display: 'block', margin: '0 auto' }}
+              onError={e => { e.target.style.display = 'none' }} />
+          ) : (
+            <div style={{
+              width: 56, height: 56, borderRadius: 14,
+              background: 'var(--blue)', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+              fontSize: 26, fontWeight: 900, color: '#fff',
+            }}>T</div>
+          )}
         </div>
-        <div className="login-title">Tax Resolution CRM</div>
-        <div className="login-sub">IRS Resolution Platform</div>
+        <div className="login-title">{isTaxResCRM ? 'TaxRes CRM' : 'Tax Resolution CRM'}</div>
+        <div className="login-sub">{isTaxResCRM ? 'Platform Administration' : 'IRS Resolution Platform'}</div>
 
         {error && <div className="login-err">{error}</div>}
 

@@ -70,6 +70,7 @@ const NAV = [
   { path:'/crm-admin/billing',   label:'Billing',      icon:'💳' },
   { path:'/crm-admin/search',    label:'Search',       icon:'🔍' },
   { path:'/crm-admin/demo',      label:'Demo Mgmt',    icon:'🎭' },
+  { path:'/crm-admin/live-demo', label:'Live Demo',    icon:'🖥️' },
   { path:'/crm-admin/health',    label:'System Health',icon:'💚' },
   { path:'/crm-admin/employees', label:'Employees',    icon:'👥' },
   { path:'/crm-admin/audit',     label:'Audit Log',    icon:'📋' },
@@ -82,17 +83,11 @@ function Sidebar({ onSignOut }) {
   return (
     <div style={{ width:220, minHeight:'100vh', flexShrink:0, background:'#0f0e1a',
       borderRight:'1px solid rgba(99,102,241,.2)', display:'flex', flexDirection:'column' }}>
-      <div style={{ padding:'22px 18px 18px', borderBottom:'1px solid rgba(99,102,241,.15)' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <div style={{ width:36, height:36, borderRadius:10, flexShrink:0,
-            background:'linear-gradient(135deg,#6366f1,#8b5cf6)',
-            display:'flex', alignItems:'center', justifyContent:'center',
-            fontSize:18, fontWeight:900, color:'#fff' }}>T</div>
-          <div>
-            <div style={{ fontSize:14, fontWeight:800, color:'#fff', lineHeight:1.2 }}>TaxRes CRM</div>
-            <div style={{ fontSize:10, color:'#6366f1', letterSpacing:'.04em', fontWeight:700 }}>Admin Portal</div>
-          </div>
-        </div>
+      <div style={{ padding:'18px 16px 16px', borderBottom:'1px solid rgba(99,102,241,.15)' }}>
+        <img src="https://raw.githubusercontent.com/taxresolutioncrm/taxcasereview-CRM/gh-pages/taxrescrm-logo.png" alt="TaxRes CRM"
+          style={{ height:38, objectFit:'contain', display:'block', marginBottom:6 }}
+          onError={e=>{e.target.style.display='none'}} />
+        <div style={{ fontSize:10, color:'#6366f1', letterSpacing:'.04em', fontWeight:700 }}>Admin Portal</div>
       </div>
 
       <nav style={{ flex:1, padding:'10px 8px', overflowY:'auto' }}>
@@ -154,6 +149,9 @@ function Overview() {
   return (
     <div style={{ padding:'32px 36px', maxWidth:1100 }}>
       <div style={{ marginBottom:28 }}>
+        <img src="https://raw.githubusercontent.com/taxresolutioncrm/taxcasereview-CRM/gh-pages/taxrescrm-logo.png" alt="TaxRes CRM"
+          style={{ height:44, objectFit:'contain', display:'block', marginBottom:16 }}
+          onError={e=>{e.target.style.display='none'}} />
         <div style={{ fontSize:26, fontWeight:800, color:'#fff', marginBottom:4 }}>
           {h<12?'Good morning':h<17?'Good afternoon':'Good evening'}, Romy 👋
         </div>
@@ -779,6 +777,122 @@ function Email(){return(
   </div>
 )}
 
+
+// ── Live Demo Launcher ───────────────────────────────────────────────────────
+function LiveDemo() {
+  const [rows, setRows] = useState(null)
+  const [toast, setToast] = useState(null)
+  const [launching, setLaunching] = useState(null)
+  const toast_ = (msg,type='ok')=>{ setToast({msg,type}); setTimeout(()=>setToast(null),4000) }
+
+  useEffect(()=>{
+    supabase.rpc('admin_tenant_overview').then(({data})=>setRows(data||[]))
+  },[])
+
+  async function launchDemo(tenantId, firmName) {
+    setLaunching(tenantId)
+    const { data:token, error } = await supabase.rpc('create_impersonation_token',{ p_tenant_id:tenantId })
+    setLaunching(null)
+    if (error) { toast_(error.message,'error'); return }
+    const url = `${window.location.origin}/taxcasereview-CRM/?admin_token=${token}`
+    window.open(url, '_blank')
+    toast_(`✅ Demo opened for ${firmName} — token valid 15 min`)
+  }
+
+  const DEMO_TENANT = '489ace07-1a6b-4864-833a-4f8420568b40'
+
+  return (
+    <div style={{ padding:'28px 36px', maxWidth:900 }}>
+      {toast && <Toast msg={toast.msg} type={toast.type} />}
+
+      {/* Header with logo */}
+      <div style={{ display:'flex', alignItems:'center', gap:20, marginBottom:32,
+        padding:'24px 28px', borderRadius:16, background:'rgba(99,102,241,.06)',
+        border:'1px solid rgba(99,102,241,.2)' }}>
+        <img src="https://raw.githubusercontent.com/taxresolutioncrm/taxcasereview-CRM/gh-pages/taxrescrm-logo.png" alt="TaxRes CRM"
+          style={{ height:52, objectFit:'contain', flexShrink:0 }}
+          onError={e=>{e.target.style.display='none'}} />
+        <div>
+          <div style={{ fontSize:22, fontWeight:800, color:'#fff', marginBottom:4 }}>🖥️ Live Demo Launcher</div>
+          <div style={{ fontSize:14, color:'#64748b' }}>
+            Jump into any office as an admin — opens a live CRM session in a new tab.
+            Perfect for prospect demos and support calls. Each token expires in 15 minutes.
+          </div>
+        </div>
+      </div>
+
+      {/* Quick launch — Nash Demo highlighted */}
+      {rows && rows.find(r=>r.id===DEMO_TENANT) && (() => {
+        const demo = rows.find(r=>r.id===DEMO_TENANT)
+        return (
+          <div style={{ ...S.card, padding:'20px 24px', marginBottom:20,
+            border:'1px solid rgba(251,146,60,.4)', background:'rgba(251,146,60,.04)' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+              <div style={{ fontSize:32 }}>🎭</div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:16, fontWeight:800, color:'#fff', marginBottom:2 }}>Nashville Tax Solutions</div>
+                <div style={{ fontSize:13, color:'#64748b' }}>
+                  Primary demo tenant · {demo.client_count} demo clients · {demo.employee_count} seats · Last active {fmtAgo(demo.last_activity)}
+                </div>
+              </div>
+              <div style={{ display:'flex', gap:10 }}>
+                <button onClick={()=>launchDemo(demo.id, demo.firm_name)}
+                  disabled={launching===demo.id}
+                  style={{ ...S.btn('primary'), fontSize:14, padding:'10px 24px',
+                    background:'linear-gradient(135deg,#f97316,#fb923c)' }}>
+                  {launching===demo.id ? '⏳ Opening…' : '🚀 Launch Demo'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* All offices */}
+      <div style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase',
+        letterSpacing:'.06em', marginBottom:14 }}>All Offices</div>
+
+      {!rows ? <Spinner /> : (
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          {rows.map(r => (
+            <div key={r.id} style={{ ...S.card, padding:'16px 20px', display:'flex', alignItems:'center', gap:14 }}>
+              <div style={{ width:40, height:40, borderRadius:10, flexShrink:0,
+                background: r.brand_color ? r.brand_color+'22' : 'rgba(99,102,241,.12)',
+                border: `2px solid ${r.brand_color||'#6366f1'}33`,
+                display:'flex', alignItems:'center', justifyContent:'center',
+                fontSize:18, fontWeight:800, color:r.brand_color||'#6366f1' }}>
+                {(r.firm_name||'?')[0]}
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:14, fontWeight:700, color:'#fff' }}>{r.firm_name}</div>
+                <div style={{ fontSize:12, color:'#475569', marginTop:2 }}>
+                  {r.employee_count} employees · {r.client_count} clients · {r.lead_count} leads · Last active {fmtAgo(r.last_activity)}
+                </div>
+              </div>
+              <span style={S.badge(STATUS_COLOR[r.status]||'#64748b')}>{r.status}</span>
+              <button onClick={()=>launchDemo(r.id, r.firm_name)}
+                disabled={!!launching}
+                style={{ ...S.btn('ghost'), fontSize:12, padding:'7px 18px', flexShrink:0 }}>
+                {launching===r.id ? '⏳' : '🚀'} {launching===r.id ? 'Opening…' : 'Open Session'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* How it works */}
+      <div style={{ marginTop:28, padding:'16px 20px', borderRadius:12,
+        background:'rgba(99,102,241,.05)', border:'1px solid rgba(99,102,241,.15)',
+        fontSize:12, color:'#475569', lineHeight:1.7 }}>
+        <div style={{ fontWeight:700, color:'#a5b4fc', marginBottom:4 }}>How it works</div>
+        Each session creates a signed 15-minute impersonation token and opens the full CRM pre-authenticated as a Super Admin inside that office.
+        You see exactly what the client sees — their data, their branding, their settings.
+        Every session is logged in the Audit Log with timestamp and which office you accessed.
+      </div>
+    </div>
+  )
+}
+
 // ── Main Shell ───────────────────────────────────────────────────────────────
 export default function AdminPortal() {
   const navigate = useNavigate()
@@ -803,6 +917,7 @@ export default function AdminPortal() {
             <Route path="/billing"        element={<Billing/>}/>
             <Route path="/search"         element={<Search/>}/>
             <Route path="/demo"           element={<DemoMgmt/>}/>
+            <Route path="/live-demo"      element={<LiveDemo/>}/>
             <Route path="/health"         element={<SystemHealth/>}/>
             <Route path="/employees"      element={<EmployeeLookup/>}/>
             <Route path="/audit"          element={<AuditLog/>}/>
