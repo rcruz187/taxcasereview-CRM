@@ -84,7 +84,7 @@ function Sidebar({ onSignOut }) {
     <div style={{ width:220, minHeight:'100vh', flexShrink:0, background:'#0f0e1a',
       borderRight:'1px solid rgba(99,102,241,.2)', display:'flex', flexDirection:'column' }}>
       <div style={{ padding:'18px 16px 16px', borderBottom:'1px solid rgba(99,102,241,.15)' }}>
-        <img src="https://raw.githubusercontent.com/taxresolutioncrm/taxcasereview-CRM/gh-pages/taxrescrm-logo.png" alt="TaxRes CRM"
+        <img src="/taxcasereview-CRM/assets/taxrescrm-logo.png" alt="TaxRes CRM"
           style={{ height:38, objectFit:'contain', display:'block', marginBottom:6 }}
           onError={e=>{e.target.style.display='none'}} />
         <div style={{ fontSize:10, color:'#6366f1', letterSpacing:'.04em', fontWeight:700 }}>Admin Portal</div>
@@ -149,7 +149,7 @@ function Overview() {
   return (
     <div style={{ padding:'32px 36px', maxWidth:1100 }}>
       <div style={{ marginBottom:28 }}>
-        <img src="https://raw.githubusercontent.com/taxresolutioncrm/taxcasereview-CRM/gh-pages/taxrescrm-logo.png" alt="TaxRes CRM"
+        <img src="/taxcasereview-CRM/assets/taxrescrm-logo.png" alt="TaxRes CRM"
           style={{ height:44, objectFit:'contain', display:'block', marginBottom:16 }}
           onError={e=>{e.target.style.display='none'}} />
         <div style={{ fontSize:26, fontWeight:800, color:'#fff', marginBottom:4 }}>
@@ -809,7 +809,7 @@ function LiveDemo() {
       <div style={{ display:'flex', alignItems:'center', gap:20, marginBottom:32,
         padding:'24px 28px', borderRadius:16, background:'rgba(99,102,241,.06)',
         border:'1px solid rgba(99,102,241,.2)' }}>
-        <img src="https://raw.githubusercontent.com/taxresolutioncrm/taxcasereview-CRM/gh-pages/taxrescrm-logo.png" alt="TaxRes CRM"
+        <img src="/taxcasereview-CRM/assets/taxrescrm-logo.png" alt="TaxRes CRM"
           style={{ height:52, objectFit:'contain', flexShrink:0 }}
           onError={e=>{e.target.style.display='none'}} />
         <div>

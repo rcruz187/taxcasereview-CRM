@@ -26,7 +26,7 @@ export default function Login() {
     }
   }
 
-  const TAXRESCRM_LOGO = "https://raw.githubusercontent.com/taxresolutioncrm/taxcasereview-CRM/gh-pages/taxrescrm-logo.png"
+  const TAXRESCRM_LOGO = "/taxcasereview-CRM/assets/taxrescrm-logo.png"
   const isTaxResCRM = email.toLowerCase().includes('taxrescrm')
 
   return (
