@@ -4,6 +4,7 @@
 // demo management, system health, audit log, support, email.
 
 import { useState, useEffect, Suspense, lazy, useCallback } from 'react'
+import { ScreenShareProvider } from '../context/ScreenShareContext'
 import { Routes, Route, NavLink, useNavigate, useLocation, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
@@ -1390,7 +1391,7 @@ export default function AdminPortal() {
             <Route path="/support"        element={<div style={{padding:8}}><Support/></div>}/>
             <Route path="/email"          element={<Email/>}/>
             <Route path="/calendar"       element={<AdminCalendar/>}/>
-            <Route path="/training"       element={<TrainingPage/>}/>
+            <Route path="/training"       element={<ScreenShareProvider><TrainingPage/></ScreenShareProvider>}/>
             <Route path="*"               element={<Overview/>}/>
           </Routes>
         </Suspense>

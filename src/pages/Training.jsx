@@ -83,7 +83,7 @@ export default function Training() {
     const logoParam2 = safeLogo ? `&logo=${encodeURIComponent(safeLogo)}` : ''
     const tParam2 = FIRM.tenantId ? `&t=${encodeURIComponent(FIRM.tenantId)}` : ''
     const url  = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${firmParam2}${logoParam2}${tParam2}`
-    const firm = FIRM.name || 'Tax Case Review'
+    const firm = FIRM.name || 'TaxRes CRM'
     setEmailSending(true)
     try {
       for (const to of raw) {
