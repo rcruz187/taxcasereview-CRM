@@ -1208,6 +1208,7 @@ export async function sendAddendumForSignature(record, opts, supabase, sentBy) {
     sent_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
     sent_by: sentBy || null,
+    tenant_id: FIRM.tenantId || undefined,
   }]).select().single()
 
   if (error) return { error: error.message }
