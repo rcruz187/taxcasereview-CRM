@@ -419,21 +419,20 @@ export default function Sidebar() {
     <>
       {mobileNavOpen && <div className="sidebar-backdrop" onClick={() => setMobileNavOpen(false)} />}
       <aside className={`sidebar${mobileNavOpen ? ' mobile-open' : ''}`}>
-      <div className="brand" onClick={() => navigate('/')} style={{flexDirection:'column',alignItems:'center',padding: logoUrl ? 0 : '8px 12px', gap:4, position:'relative', background: logoUrl ? '#0C1F35' : undefined}}>
-        <button
-          className="sidebar-close-btn"
-          onClick={(e) => { e.stopPropagation(); setMobileNavOpen(false) }}
-          aria-label="Close menu"
-        >×</button>
-        {logoUrl
-          ? <img src={logoUrl} alt={firmName} style={{width:'100%',height:'auto',display:'block'}}/>
-          : <div style={{fontWeight:900,fontSize:18,color:'var(--blue)',textAlign:'center',lineHeight:1.2}}>{firmName}</div>
-        }
-        {!logoUrl && <div style={{textAlign:'center'}}>
-          <div className="brand-name" style={{fontSize:13}}>{firmName}</div>
-          <div className="brand-sub" style={{fontSize:10}}>{tagline || 'IRS Resolution Services'}</div>
-        </div>}
-      </div>
+      {logoUrl
+        ? <div onClick={() => navigate('/')} style={{cursor:'pointer',background:'#0C1F35',position:'relative',flexShrink:0}}>
+            <button className="sidebar-close-btn" onClick={(e)=>{e.stopPropagation();setMobileNavOpen(false)}} aria-label="Close menu">×</button>
+            <img src={logoUrl} alt={firmName} style={{width:'100%',height:'auto',display:'block'}}/>
+          </div>
+        : <div className="brand" onClick={() => navigate('/')} style={{flexDirection:'column',alignItems:'center',padding:'8px 12px',gap:4,position:'relative'}}>
+            <button className="sidebar-close-btn" onClick={(e)=>{e.stopPropagation();setMobileNavOpen(false)}} aria-label="Close menu">×</button>
+            <div style={{fontWeight:900,fontSize:18,color:'var(--blue)',textAlign:'center',lineHeight:1.2}}>{firmName}</div>
+            <div style={{textAlign:'center'}}>
+              <div className="brand-name" style={{fontSize:13}}>{firmName}</div>
+              <div className="brand-sub" style={{fontSize:10}}>{tagline || 'IRS Resolution Services'}</div>
+            </div>
+          </div>
+      }
 
       {SECTIONS.map(section => {
         const isOpen = section.always || openKey === section.key
