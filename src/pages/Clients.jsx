@@ -1024,12 +1024,15 @@ export default function Clients() {
   const [savingPay,   setSavingPay]   = useState(false)
 
   useEffect(() => {
+    // Guard: don't load until auth session confirmed so current_tenant_id()
+    // is established before the first query — prevents wrong-tenant data on hard refresh.
+    if (!user) return
     load()
     const ch = supabase.channel('clients-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => load())
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [])
+  }, [user?.id])
 
   // Live-update the currently-open client's related data (notes, tasks,
   // payments, documents, cases) — these previously only loaded once when the

@@ -470,12 +470,16 @@ export default function Leads() {
   const [leadDocCount, setLeadDocCount] = useState(0)
 
   useEffect(() => {
+    // Guard: don't load until the auth session is confirmed so current_tenant_id()
+    // is established in the DB before the first query fires. Without this, a hard
+    // refresh can return the wrong tenant's records before RLS kicks in.
+    if (!user) return
     load()
     const ch = supabase.channel('leads-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => load())
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [])
+  }, [user?.id])
 
   // Live-update the currently-open lead's related data (notes, tasks, docs)
   // — same reasoning and same pattern as the equivalent addition in
