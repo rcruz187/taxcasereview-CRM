@@ -38,26 +38,17 @@ import App from './App.jsx'
 // to the app root — we read it back here and replace the history entry so
 // React Router sees the correct path + query string on first render.
 ;(function() {
-  // Method 1: restore from sessionStorage (set by 404.html on deep-link 404)
-  const saved = sessionStorage.getItem('redirect')
-  if (saved) {
-    sessionStorage.removeItem('redirect')
-    if (saved.includes('/taxcasereview-CRM/')) {
+  // Restore deep-link URL after the GitHub Pages 404 SPA redirect.
+  // 404.html saves the full URL to sessionStorage before bouncing to root.
+  // We read it back here BEFORE React Router initialises so Router sees /book.
+  try {
+    const saved = sessionStorage.getItem('redirect') || sessionStorage.redirect
+    if (saved && saved.includes('/taxcasereview-CRM/')) {
+      sessionStorage.removeItem('redirect')
+      try { delete sessionStorage.redirect } catch(e) {}
       window.history.replaceState(null, '', saved)
-      return
     }
-  }
-  // Method 2: ?route=/path&rest=params on the root URL
-  // Allows taxresolutioncrm.github.io/taxcasereview-CRM/?route=/book&demo=true
-  // without needing the 404.html redirect chain at all
-  const sp = new URLSearchParams(window.location.search)
-  const route = sp.get('route')
-  if (route && route.startsWith('/')) {
-    sp.delete('route')
-    const rest = sp.toString()
-    const newPath = '/taxcasereview-CRM' + route + (rest ? '?' + rest : '')
-    window.history.replaceState(null, '', newPath)
-  }
+  } catch(e) {}
 })()
 
 ReactDOM.createRoot(document.getElementById('root')).render(
