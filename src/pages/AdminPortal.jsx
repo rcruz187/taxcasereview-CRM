@@ -932,18 +932,9 @@ function AdminCalendar(){
       if (prev) sessionStorage.setItem('admin_impersonation', prev)
     }
   },[])
-  return(
-    <div style={{display:'flex',flexDirection:'column',height:'100vh'}}>
-      <div style={{padding:'16px 28px 10px',borderBottom:'1px solid #1e293b',display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
-        <span style={{fontSize:18,fontWeight:800,color:'#fff'}}>📅 Calendar</span>
-        <span style={{fontSize:13,color:'#475569'}}>TaxRes CRM — your appointments</span>
-      </div>
-      {/* position:relative is required — Calendar renders position:absolute inset:0 */}
-      <div className="page-content" style={{flex:1,minWidth:0,overflow:'hidden',padding:0,position:'relative'}}>
-        <CalendarPage />
-      </div>
-    </div>
-  )
+  // CalendarPage uses position:absolute inset:0 to fill its container.
+  // The admin shell content area is position:relative height:100vh so this works directly.
+  return <CalendarPage />
 }
 
 
@@ -1369,7 +1360,7 @@ export default function AdminPortal() {
   return (
     <div style={{display:'flex',minHeight:'100vh',background:'#0d0c1a',fontFamily:'system-ui,Arial,sans-serif'}}>
       <Sidebar onSignOut={handleSignOut} />
-      <div style={{flex:1,overflowY:'auto',minHeight:'100vh'}}>
+      <div style={{flex:1,position:'relative',height:'100vh',overflow:'hidden'}}>
         <Suspense fallback={<Spinner/>}>
           <Routes>
             <Route path="/"               element={<Overview/>}/>
