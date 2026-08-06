@@ -88,25 +88,17 @@ export function useWebRTCRoom(channelPrefix) {
     }
     pc.ontrack = (e) => {
       const track = e.track
-      // Distinguish screen tracks from camera tracks.
-      // Use track.label patterns that are specific to screen capture:
-      // - Contains 'screen:' or 'window:' or 'tab:' (Chrome getDisplayMedia format)
-      // - Is a getDisplayMedia track (displaySurface available via getSettings)
-      // - contentHint 'detail' AND not a typical camera label
-      // Explicitly exclude common camera labels to avoid misclassification.
+      // contentHint='detail' is set by the sender (ScreenShareContext.startScreenShare)
+      // specifically so we can identify screen tracks reliably on the receiver.
+      // This is the primary check — it propagates through WebRTC unlike getSettings().displaySurface.
+      // Label-based checks are secondary fallbacks for browsers that don't support contentHint.
       const labelLower = (track.label || '').toLowerCase()
-      const isCameraLabel = labelLower.includes('camera') || labelLower.includes('facetime') ||
-        labelLower.includes('webcam') || labelLower.includes('integrated') ||
-        labelLower.includes('front') || labelLower.includes('back') ||
-        /^\d+\.\d+/.test(track.label || '') // macOS camera format like "0.0 FaceTime"
-      const isScreenLabel = labelLower.startsWith('screen:') || labelLower.startsWith('window:') ||
-        labelLower.startsWith('tab:') || labelLower.includes('entire screen') ||
-        labelLower.includes('your entire screen')
-      const isScreen = track.kind === 'video' && !isCameraLabel && (
-        isScreenLabel ||
-        (track.contentHint === 'detail') ||
-        (track.getSettings?.()?.displaySurface !== undefined)
+      const isScreenByHint = track.kind === 'video' && track.contentHint === 'detail'
+      const isScreenByLabel = track.kind === 'video' && (
+        labelLower.startsWith('screen:') || labelLower.startsWith('window:') ||
+        labelLower.startsWith('tab:') || labelLower.includes('entire screen')
       )
+      const isScreen = isScreenByHint || isScreenByLabel
       if (isScreen) {
         const screenStream = new MediaStream([track])
         setRemoteScreenStreams(prev => ({ ...prev, [peerName]: screenStream }))

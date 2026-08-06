@@ -166,6 +166,10 @@ export function ScreenShareProvider({ children }) {
       const track    = stream.getVideoTracks()[0]
       const settings = track.getSettings?.() || {}
       track._surface = settings.displaySurface
+      // contentHint='detail' propagates through WebRTC to the receiver's ontrack handler.
+      // This is the only reliable cross-browser signal — getSettings().displaySurface
+      // is sender-only and not available on the received track.
+      track.contentHint = 'detail'
 
       screenTrackRef.current = track
       // Late joiners get this track at peer-connection creation time
