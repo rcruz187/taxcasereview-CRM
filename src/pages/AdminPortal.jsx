@@ -599,7 +599,10 @@ function SystemHealth() {
     { label:'Database',      ok:true,  note:'Supabase — all tables healthy' },
     { label:'Auth',          ok:true,  note:'Supabase Auth — 2 admin accounts active' },
     { label:'Edge Functions',ok:true,  note:'imap-sync, smtp-send, save-email-account deployed' },
-    { label:'IMAP Sync',     ok:!health?.sync?.some(s=>s.status==='error'), note: health?.sync?.length ? `Last sync: ${fmtAgo(health.sync[0]?.synced_at)}` : 'No syncs yet' },
+    { label:'IMAP Sync',     ok:!health?.sync?.some(s=>s.status==='error'), 
+      note: health?.sync?.some(s=>s.status==='error')
+        ? `Error: ${health.sync.find(s=>s.status==='error')?.error_message || 'Unknown error'}`
+        : health?.sync?.length ? `Last sync: ${fmtAgo(health.sync[0]?.synced_at)}` : 'No syncs yet' },
     { label:'GitHub Pages',  ok:true,  note:'taxrescrm.app serving latest build' },
   ]
 
@@ -752,6 +755,8 @@ function EmployeeLookup() {
   async function search() {
     if (!q.trim()) return
     setBusy(true)
+    // Clear tenant override so RLS returns employees across ALL tenants
+    await supabase.rpc('set_admin_tenant_override', { p_tenant_id: null }).catch(()=>{})
     const { data } = await supabase
       .from('employees')
       .select('id,name,email,role,access,phone,avatar_url,tenant_id,created_at,tenants(firm_name)')
@@ -933,8 +938,8 @@ function AdminCalendar(){
         <span style={{fontSize:18,fontWeight:800,color:'#fff'}}>📅 Calendar</span>
         <span style={{fontSize:13,color:'#475569'}}>TaxRes CRM — your appointments</span>
       </div>
-      {/* page-content class lets Calendar.jsx's layout escape-hatch find this element */}
-      <div className="page-content" style={{flex:1,minWidth:0,overflow:'auto',padding:0,height:'calc(100vh - 57px)'}}>
+      {/* position:relative is required — Calendar renders position:absolute inset:0 */}
+      <div className="page-content" style={{flex:1,minWidth:0,overflow:'hidden',padding:0,position:'relative'}}>
         <CalendarPage />
       </div>
     </div>
