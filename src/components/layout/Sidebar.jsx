@@ -419,14 +419,14 @@ export default function Sidebar() {
     <>
       {mobileNavOpen && <div className="sidebar-backdrop" onClick={() => setMobileNavOpen(false)} />}
       <aside className={`sidebar${mobileNavOpen ? ' mobile-open' : ''}`}>
-      <div className="brand" onClick={() => navigate('/')} style={{flexDirection:'column',alignItems:'center',padding:'16px 12px 12px',gap:8, position:'relative'}}>
+      <div className="brand" onClick={() => navigate('/')} style={{flexDirection:'column',alignItems:'center',padding: logoUrl ? '8px 8px 0' : '16px 12px 12px',gap: logoUrl ? 0 : 8, position:'relative'}}>
         <button
           className="sidebar-close-btn"
           onClick={(e) => { e.stopPropagation(); setMobileNavOpen(false) }}
           aria-label="Close menu"
         >×</button>
         {logoUrl
-          ? <img src={logoUrl} alt={firmName} style={{width:'100%',maxWidth:176,height:'auto',objectFit:'contain',display:'block',margin:'0 auto'}}/>
+          ? <img src={logoUrl} alt={firmName} style={{width:'calc(100% + 16px)',marginLeft:-8,marginRight:-8,height:'auto',objectFit:'cover',display:'block'}}/>
           : <div style={{fontWeight:900,fontSize:18,color:'var(--blue)',textAlign:'center',lineHeight:1.2}}>{firmName}</div>
         }
         {!logoUrl && <div style={{textAlign:'center'}}>
