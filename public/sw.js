@@ -1,5 +1,5 @@
 // Service Worker — forces all users to get fresh deploys immediately
-const CACHE = 'tcr-v1'
+const CACHE = 'tcr-v99'
 
 self.addEventListener('install', () => self.skipWaiting())
 
