@@ -934,7 +934,17 @@ function AdminCalendar(){
     }
   },[])
   if (!ready) return null
-  return <CalendarPage />
+  // Wrap in a div with className="page-content" so Calendar's useEffect
+  // escape hatch can find it and set overflow:hidden + padding:0.
+  // Pre-set those values so there's no flash before the effect runs.
+  return (
+    <div
+      className="page-content"
+      style={{ position:'relative', overflow:'hidden', padding:0, height:'100%', flex:1 }}
+    >
+      <CalendarPage />
+    </div>
+  )
 }
 
 
