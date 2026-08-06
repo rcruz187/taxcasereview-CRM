@@ -152,17 +152,24 @@ export function AppProvider({ children }) {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
       if (session?.user) {
-        // If this is an admin impersonation session, set the tenant override
-        // so current_tenant_id() returns the impersonated tenant for ALL DB calls
+        // If this is an admin impersonation session (arrived via ImpersonateGate),
+        // set the tenant override so current_tenant_id() returns the impersonated tenant.
+        // On a NORMAL login (SIGNED_IN without the ?imp=1 marker), always clear any
+        // stale impersonation so Nashville branding never bleeds into TCR's own session.
         try {
+          const isImpersonated = new URLSearchParams(window.location.search).get('imp') === '1'
           const imp = sessionStorage.getItem('admin_impersonation')
-          if (imp) {
+          if (imp && isImpersonated) {
             const { tenant_id } = JSON.parse(imp)
             if (tenant_id) {
               supabase.rpc('set_admin_tenant_override', { p_tenant_id: tenant_id })
                 .then(() => { loadRole(session.user.email); loadBrandColor(); loadFirmBranding() })
               return
             }
+          }
+          // Normal login — wipe any leftover impersonation context
+          if (_event === 'SIGNED_IN') {
+            sessionStorage.removeItem('admin_impersonation')
           }
         } catch (_) {}
         loadRole(session.user.email); loadBrandColor(); loadFirmBranding()

@@ -912,17 +912,33 @@ function Email(){return(
 )}
 
 // ── Calendar (real CRM Calendar component, contained in the admin shell) ──────
-function AdminCalendar(){return(
-  <div style={{display:'flex',flexDirection:'column',minHeight:'100vh'}}>
-    <div style={{padding:'16px 28px 10px',borderBottom:'1px solid #1e293b',display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
-      <span style={{fontSize:18,fontWeight:800,color:'#fff'}}>📅 Calendar</span>
-      <span style={{fontSize:13,color:'#475569'}}>TaxRes CRM — your appointments</span>
+// Must override to TCR tenant before rendering — romy@taxrescrm.net's own
+// current_tenant_id() resolves TCR automatically, but if a demo impersonation
+// was active in the same session this ensures the DB context is correct.
+function AdminCalendar(){
+
+  useEffect(()=>{
+    // Temporarily clear any impersonation context so CalendarPage reads TCR data
+    const prev = sessionStorage.getItem('admin_impersonation')
+    sessionStorage.removeItem('admin_impersonation')
+    supabase.rpc('set_admin_tenant_override',{ p_tenant_id: TCR_TENANT }).catch(()=>{})
+    return ()=>{
+      // Restore if there was an active impersonation session
+      if (prev) sessionStorage.setItem('admin_impersonation', prev)
+    }
+  },[])
+  return(
+    <div style={{display:'flex',flexDirection:'column',minHeight:'100vh'}}>
+      <div style={{padding:'16px 28px 10px',borderBottom:'1px solid #1e293b',display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
+        <span style={{fontSize:18,fontWeight:800,color:'#fff'}}>📅 Calendar</span>
+        <span style={{fontSize:13,color:'#475569'}}>TaxRes CRM — your appointments</span>
+      </div>
+      <div style={{flex:1,minWidth:0,overflowX:'hidden'}}>
+        <CalendarPage />
+      </div>
     </div>
-    <div style={{flex:1,minWidth:0,overflowX:'hidden'}}>
-      <CalendarPage />
-    </div>
-  </div>
-)}
+  )
+}
 
 
 // ── Live Demo Launcher ───────────────────────────────────────────────────────
