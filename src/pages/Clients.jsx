@@ -391,13 +391,15 @@ function InlinePortalForm({ client, onClose, showToast }) {
     await navigator.clipboard.writeText(url).catch(() => {})
     let emailSent = false, smsSent = false
     const cfg = await getSettings()
+    // Safety net: never leave "Sending..." stuck if email/SMS are not configured
+    const sendTimeout = setTimeout(() => { setSending(false); setDone({ sent: [], timedOut: true }) }, 12000)
 
     if ((sendVia === 'email' || sendVia === 'both') && client?.email) {
       try {
         const { error } = await supabase.functions.invoke('send-email', {
           body: { tenant_id: FIRM.tenantId || undefined,
             to: client.email,
-            subject: `Your Tax Case Review Client Portal Is Ready — Welcome, ${client.name}!`,
+            subject: `Your ${firmName()} Client Portal Is Ready — Welcome, ${client.name}!`,
             html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px">
 <tr><td align="center">
@@ -494,7 +496,7 @@ function InlinePortalForm({ client, onClose, showToast }) {
 
   <!-- Footer -->
   <tr><td style="background:#0f172a;border-radius:0 0 16px 16px;padding:24px 40px;text-align:center">
-    <div style="font-size:12px;color:#60a5fa;font-weight:700;margin-bottom:6px">Tax Case Review & Resolution Services</div>
+    <div style="font-size:12px;color:#60a5fa;font-weight:700;margin-bottom:6px">${firmName()}</div>
     <div style="font-size:11px;color:#475569;line-height:1.7">
       ${FIRM.address}<br/>
       Toll-Free: ${FIRM.phone}<br/>
@@ -515,12 +517,13 @@ function InlinePortalForm({ client, onClose, showToast }) {
       try {
         const r = await fetch(cfg.signalwire_backend + '/sms/send', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: client.phone, body: `Hi ${client.name}, your Tax Case Review Client Portal is ready! View your case, documents, invoices, and more here: ${url} (you'll need your email + last 4 of your SSN to log in)` })
+          body: JSON.stringify({ to: client.phone, body: `Hi ${client.name}, your ${firmName()} Client Portal is ready! View your case, documents, invoices, and more here: ${url} (you'll need your email + last 4 of your SSN to log in)` })
         })
         const d = await r.json()
         if (d.success) smsSent = true
       } catch (e) { console.error('SMS error:', e) }
     }
+    clearTimeout(sendTimeout)
     setSending(false)
     const sent = [emailSent && 'email', smsSent && 'SMS'].filter(Boolean)
     setDone({ sent })

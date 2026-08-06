@@ -48,7 +48,8 @@ export default function Cases() {
   const [addingNote,  setAddingNote]  = useState(false)
   const [showAllCaseNotes, setShowAllCaseNotes] = useState(false)
 
-  useEffect(() => { load() }, [])
+  // Guard: don't load until auth session confirmed — prevents wrong-tenant data on hard refresh
+  useEffect(() => { if (user) load() }, [user?.id])
 
   useEffect(() => {
     if (!urlCaseId || detail) return
