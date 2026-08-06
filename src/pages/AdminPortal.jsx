@@ -8,8 +8,9 @@ import { Routes, Route, NavLink, useNavigate, useLocation, useParams } from 'rea
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 
-const NewOffice = lazy(() => import('./NewOffice'))
-const Support   = lazy(() => import('./Support'))
+const NewOffice    = lazy(() => import('./NewOffice'))
+const Support      = lazy(() => import('./Support'))
+const CalendarPage = lazy(() => import('./Calendar'))
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const TCR_TENANT  = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
@@ -65,6 +66,7 @@ function Spinner() {
 // ── Sidebar ──────────────────────────────────────────────────────────────────
 const NAV = [
   { path:'/crm-admin/email',     label:'Email',        icon:'📧' },
+  { path:'/crm-admin/calendar',  label:'Calendar',     icon:'📅' },
   { path:'/crm-admin',           label:'Overview',     icon:'📊' },
   { path:'/crm-admin/provision', label:'+ New Office', icon:'➕' },
   { path:'/crm-admin/offices',   label:'Offices',      icon:'🏢' },
@@ -892,14 +894,32 @@ function Search() {
   )
 }
 
-// ── Email placeholder ────────────────────────────────────────────────────────
+// ── Email (SnappyMail embed) ─────────────────────────────────────────────────
+const WEBMAIL_URL = 'https://webmail.taxrescrm.net:7443'
+
 function Email(){return(
-  <div style={{padding:'28px 36px'}}>
-    <div style={{fontSize:22,fontWeight:800,color:'#fff',marginBottom:6}}>📧 Email</div>
-    <div style={{fontSize:14,color:'#475569',marginBottom:24}}>romy@taxrescrm.net — powered by Stalwart.</div>
-    <div style={{...S.card,padding:'48px 0',textAlign:'center',color:'#6366f1',fontSize:14}}>
-      Set EMAIL_ENCRYPT_KEY in Supabase, connect your mailbox in Settings → Integrations,<br/>then your inbox will appear here.
-      <div style={{fontSize:12,color:'#475569',marginTop:8}}>mail.taxrescrm.net:993</div>
+  <div style={{display:'flex',flexDirection:'column',height:'100vh'}}>
+    <div style={{padding:'16px 28px 10px',borderBottom:'1px solid #1e293b',display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
+      <span style={{fontSize:18,fontWeight:800,color:'#fff'}}>📧 Email</span>
+      <span style={{fontSize:13,color:'#475569'}}>romy@taxrescrm.net — powered by Stalwart</span>
+      <a href={WEBMAIL_URL} target="_blank" rel="noreferrer"
+        style={{marginLeft:'auto',fontSize:12,color:'#6366f1',textDecoration:'none'}}>Open in new tab ↗</a>
+    </div>
+    <iframe src={WEBMAIL_URL} title="SnappyMail"
+      style={{flex:1,border:'none',width:'100%',background:'#0f172a'}}
+      allow="clipboard-read; clipboard-write" />
+  </div>
+)}
+
+// ── Calendar (real CRM Calendar component, contained in the admin shell) ──────
+function AdminCalendar(){return(
+  <div style={{display:'flex',flexDirection:'column',minHeight:'100vh'}}>
+    <div style={{padding:'16px 28px 10px',borderBottom:'1px solid #1e293b',display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
+      <span style={{fontSize:18,fontWeight:800,color:'#fff'}}>📅 Calendar</span>
+      <span style={{fontSize:13,color:'#475569'}}>TaxRes CRM — your appointments</span>
+    </div>
+    <div style={{flex:1,minWidth:0,overflowX:'hidden'}}>
+      <CalendarPage />
     </div>
   </div>
 )}
@@ -1344,6 +1364,7 @@ export default function AdminPortal() {
             <Route path="/audit"          element={<AuditLog/>}/>
             <Route path="/support"        element={<div style={{padding:8}}><Support/></div>}/>
             <Route path="/email"          element={<Email/>}/>
+            <Route path="/calendar"       element={<AdminCalendar/>}/>
             <Route path="*"               element={<Overview/>}/>
           </Routes>
         </Suspense>
