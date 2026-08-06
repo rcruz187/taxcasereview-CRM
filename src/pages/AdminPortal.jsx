@@ -928,12 +928,13 @@ function AdminCalendar(){
     }
   },[])
   return(
-    <div style={{display:'flex',flexDirection:'column',minHeight:'100vh'}}>
+    <div style={{display:'flex',flexDirection:'column',height:'100vh'}}>
       <div style={{padding:'16px 28px 10px',borderBottom:'1px solid #1e293b',display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
         <span style={{fontSize:18,fontWeight:800,color:'#fff'}}>📅 Calendar</span>
         <span style={{fontSize:13,color:'#475569'}}>TaxRes CRM — your appointments</span>
       </div>
-      <div style={{flex:1,minWidth:0,overflowX:'hidden'}}>
+      {/* page-content class lets Calendar.jsx's layout escape-hatch find this element */}
+      <div className="page-content" style={{flex:1,minWidth:0,overflow:'auto',padding:0,height:'calc(100vh - 57px)'}}>
         <CalendarPage />
       </div>
     </div>
