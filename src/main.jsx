@@ -55,28 +55,4 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 )
 
 // Register service worker to ensure all users always get fresh deploys
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/taxcasereview-CRM/sw.js')
-      .then(reg => {
-        // Check for updates every time the app loads
-        reg.update()
-        // When a new version is waiting, activate it immediately
-        reg.addEventListener('updatefound', () => {
-          const newWorker = reg.installing
-          newWorker?.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // New version ready — reload all tabs automatically
-              navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' })
-              window.location.reload()
-            }
-          })
-        })
-      })
-  })
-  // Listen for the service worker telling us to reload
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    window.location.reload()
-  })
-}
-// cache bust Thu Jun 25 00:02:46 UTC 2026
+// service worker removed
