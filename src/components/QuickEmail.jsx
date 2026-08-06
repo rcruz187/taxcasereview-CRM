@@ -21,10 +21,14 @@ export default function QuickEmail({ contact, kind, leadId, onSent, onClose }) {
   // Same resolution as the Email page: personal signature first, firm fallback.
   useEffect(() => {
     (async () => {
-      let sigText = '', sigLogo = ''
+      let sigText = '', sigLogo = '', firmLogo = ''
       try {
-        const { data: st } = await supabase.from('settings').select('email_signature,email_signature_logo_url').limit(1).maybeSingle()
-        sigText = st?.email_signature || ''; sigLogo = st?.email_signature_logo_url || ''
+        // Also fetch logourl — RLS scopes this to the logged-in tenant automatically.
+        // logourl is per-tenant since 7/21; email_signature_logo_url may be null.
+        const { data: st } = await supabase.from('settings').select('email_signature,email_signature_logo_url,logourl').limit(1).maybeSingle()
+        sigText = st?.email_signature || ''
+        sigLogo = st?.email_signature_logo_url || ''
+        firmLogo = st?.logourl || ''
         if (user?.email) {
           const { data: emp } = await supabase.from('employees')
             .select('email_signature,email_signature_logo_url').eq('email', user.email).maybeSingle()
@@ -32,10 +36,9 @@ export default function QuickEmail({ contact, kind, leadId, onSent, onClose }) {
           if (emp?.email_signature_logo_url) sigLogo = emp.email_signature_logo_url
         }
       } catch { /* preview only — send still appends server-side */ }
-      // The signature image is its own settings field. When a tenant hasn't set
-      // one, fall back to their firm logo rather than leaving the shared default,
-      // which showed Tax Case Review's logo on every other firm's signature.
-      setSignature({ text: sigText, logoUrl: sigLogo || FIRM.logoUrl || '' })
+      // Prefer explicit sig logo → per-tenant firm logo → FIRM module fallback.
+      // Never fall through to a shared path — that bleeds one tenant's logo onto another.
+      setSignature({ text: sigText, logoUrl: sigLogo || firmLogo || FIRM.logoUrl || '' })
     })()
   }, [user])
 

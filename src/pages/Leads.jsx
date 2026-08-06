@@ -2272,9 +2272,11 @@ export default function Leads() {
                     <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:8}}>{sec.label}</div>
                     <div style={{display:'flex',flexDirection:'column',gap:8}}>
                       {sec.notes.map((n,i) => {
-                        const authorLower = (n.author||'').toLowerCase().trim()
+                        // Strip org suffix e.g. "Romy Cruz (TaxRes CRM)" → "romy cruz"
+                        const authorLower = (n.author||'').replace(/\s*\(.*?\)\s*$/,'').toLowerCase().trim()
                         const emp = employees.find(e => e.name && e.name.toLowerCase()===authorLower)
                           || employees.find(e => e.name && e.name.toLowerCase().split(' ')[0]===authorLower)
+                          || employees.find(e => e.email && e.email.toLowerCase().split('@')[0]===authorLower)
                         return (
                           <div key={n.id||i} style={{display:'flex',gap:10,padding:'12px 14px',borderRadius:10,border:'1px solid var(--br)',background:'var(--s2)'}}>
                             <div style={{width:34,height:34,borderRadius:'50%',flexShrink:0,overflow:'hidden',background:avatarColor(n.author),display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:800,color:'#fff'}}>
