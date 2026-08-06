@@ -106,7 +106,7 @@ export default function Sidebar() {
   const { user, logout, can, role, mobileNavOpen, setMobileNavOpen, employeeName } = useApp()
   const location = useLocation()
   const navigate = useNavigate()
-  const [logoUrl, setLogoUrl] = useState(LOGO)
+  const [logoUrl, setLogoUrl] = useState(null)
 
   // Determine which section contains the active route
   function activeSection() {
@@ -422,7 +422,7 @@ export default function Sidebar() {
       {logoUrl
         ? <div onClick={() => navigate('/')} style={{cursor:'pointer',background:'#0C1F35',position:'relative',flexShrink:0}}>
             <button className="sidebar-close-btn" onClick={(e)=>{e.stopPropagation();setMobileNavOpen(false)}} aria-label="Close menu">×</button>
-            <img src={logoUrl} alt={firmName} style={{width:'100%',height:'auto',display:'block'}}/>
+            <img src={logoUrl} alt={firmName} style={{width:'100%',maxHeight:160,objectFit:'contain',display:'block'}}/>
           </div>
         : <div className="brand" onClick={() => navigate('/')} style={{flexDirection:'column',alignItems:'center',padding:'8px 12px',gap:4,position:'relative'}}>
             <button className="sidebar-close-btn" onClick={(e)=>{e.stopPropagation();setMobileNavOpen(false)}} aria-label="Close menu">×</button>
