@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useFirm } from '../lib/useFirm'
+import { useApp } from '../context/AppContext'
 import IRSFormFiller from '../components/IRSFormFiller'
 import { FIRM } from '../lib/firmBranding'
 
@@ -247,6 +248,7 @@ function generatePOALetter() {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function IrsForms() {
+  const { user } = useApp()
   const [items, setItems]   = useState([])
   const [modal, setModal]   = useState(false)
   const [form, setForm]     = useState(BLANK)
@@ -258,7 +260,8 @@ export default function IrsForms() {
   const [clientSearch, setClientSearch] = useState('')
   const [showClientDrop, setShowClientDrop] = useState(false)
 
-  useEffect(() => { load(); loadClients() }, [])
+  // Guard: don't load until auth confirmed — prevents wrong-tenant clients on hard refresh
+  useEffect(() => { if (user) { load(); loadClients() } }, [user?.id])
 
   async function load() {
     const { data } = await supabase.from('irsforms').select('*').order('created_at', { ascending: false })
@@ -266,7 +269,7 @@ export default function IrsForms() {
   }
 
   async function loadClients() {
-    const { data, error } = await supabase.from('clients').select('id, name, business_name, street, city, state, zip, phone, ssn, ein').order('name')
+    const { data, error } = await supabase.from('clients').select('id, name, business_name, street, city, state, zip, phone, email, ssn, ein').order('name')
     if (error) { console.error('loadClients error:', error.message); return }
     if (data) setClients(data)
   }

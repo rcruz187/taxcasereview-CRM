@@ -69,13 +69,15 @@ export default function StateForms() {
   async function saveStateItem() { setStateSaving(true); await supabase.from('state_form_tracker').insert([{...stateForm,created_at:new Date().toISOString()}]); const {data}=await supabase.from('state_form_tracker').select('*').order('created_at',{ascending:false}); setStateItems(data||[]); setStateForm(SBLANK); setStateModal(false); setStateSaving(false) }
   async function deleteStateItem(id) { const { error } = await supabase.from('state_form_tracker').delete().eq('id',id); if (error) { showToast('Error: ' + error.message); return } setStateItems(s=>s.filter(x=>x.id!==id)) }
 
+  // Guard: don't load until auth confirmed — prevents wrong-tenant data on hard refresh
   useEffect(() => {
+    if (!user) return
     supabase.from('state_form_tracker').select('*').order('created_at',{ascending:false}).then(({data})=>setStateItems(data||[]))
     supabase.from('clients').select('id,name,ssn,ein,street,city,state,zip,dob,phone,email,spouseName,spouseSsn,filingStatus')
       .then(({ data }) => setClients(data || []))
     supabase.from('leads').select('id,name,ssn,ein,street,city,state,zip,dob,phone,email')
       .then(({ data }) => setLeads(data || []))
-  }, [])
+  }, [user?.id])
 
   // Auto-select client or lead from URL param
   useEffect(() => {
