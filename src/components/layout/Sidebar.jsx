@@ -426,13 +426,13 @@ export default function Sidebar() {
           aria-label="Close menu"
         >×</button>
         {logoUrl
-          ? <img src={logoUrl} alt={firmName} style={{maxWidth:160,maxHeight:120,width:'auto',height:'auto',objectFit:'contain',display:'block',margin:'0 auto',borderRadius:8}}/>
+          ? <img src={logoUrl} alt={firmName} style={{width:'100%',maxWidth:176,height:'auto',objectFit:'contain',display:'block',margin:'0 auto'}}/>
           : <div style={{fontWeight:900,fontSize:18,color:'var(--blue)',textAlign:'center',lineHeight:1.2}}>{firmName}</div>
         }
-        <div style={{textAlign:'center'}}>
+        {!logoUrl && <div style={{textAlign:'center'}}>
           <div className="brand-name" style={{fontSize:13}}>{firmName}</div>
           <div className="brand-sub" style={{fontSize:10}}>{tagline || 'IRS Resolution Services'}</div>
-        </div>
+        </div>}
       </div>
 
       {SECTIONS.map(section => {
