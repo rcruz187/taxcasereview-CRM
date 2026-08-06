@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { stampSignature, buildCertificatePage, addTearDropStamp, appendPdfPages } from '../lib/irsFormUtils'
-import { useFirm } from '../lib/useFirm'
 import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 
 // Mirrors docUtils.js — tenant-resolved firm name and contact email so the
@@ -72,7 +71,8 @@ function printCancellationNotice(doc) {
 
 export default function SignPage() {
   const { id } = useParams()
-  const { logoUrl } = useFirm()
+  const [firmLogo, setFirmLogo] = useState('')
+  const [firmName, setFirmName] = useState('')
   const [doc,      setDoc]      = useState(null)
   const [loading,  setLoading]  = useState(true)
   const [error,    setError]    = useState('')
@@ -94,12 +94,16 @@ export default function SignPage() {
         // No record to source a tenant from → legacy first-row fallback keeps the
         // error page from being unbranded.
         await loadFirmBrandingPublic()
+        setFirmLogo(FIRM.logoUrl || '')
+        setFirmName(FIRM.name || '')
         setError('Signing request not found or expired.'); setLoading(false); return
       }
       // Load the signing tenant's branding BEFORE we render (FIRM is a mutable
       // module-level object; without the await the first paint uses whatever
       // was last set, i.e. TCR on the demo).
       await loadFirmBrandingPublic(data.tenant_id)
+      setFirmLogo(FIRM.logoUrl || '')
+      setFirmName(FIRM.name || '')
       if (data.status === 'Signed') { setDone(true); setDoc(data); setLoading(false); return }
       setDoc(data); setLoading(false)
     }
@@ -377,7 +381,7 @@ export default function SignPage() {
     <div style={styles.page}>
       {/* Header */}
       <div style={{ textAlign:'center', marginBottom:24, paddingBottom:18, borderBottom:'1px solid #1e3a5f', width:'100%', maxWidth:660 }}>
-        {logoUrl && <img src={logoUrl} alt="" style={{ height:48, marginBottom:10, objectFit:'contain' }}/>}
+        {firmLogo && <img src={firmLogo} alt="" style={{ height:48, marginBottom:10, objectFit:'contain' }}/>}
         <div style={{ fontSize:12, fontWeight:800, color:'#60a5fa', letterSpacing:'.12em', textTransform:'uppercase', marginBottom:4 }}>${FIRM.name}</div>
         <div style={{ fontSize:11, color:'#475569' }}>Secure Document Signing Portal</div>
       </div>

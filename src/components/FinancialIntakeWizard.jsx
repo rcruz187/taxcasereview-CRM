@@ -68,6 +68,7 @@ async function sendIntakeCopyEmail(record, answers) {
 // resolution-case financial breakdown, sent once when a lead becomes a client).
 // Persists answers to `financial_intake_responses`, autosaving on every change.
 export default function FinancialIntakeWizard({ intakeId, embedded = false, onComplete }) {
+  const [firmLogo, setFirmLogo] = useState('')
   const [record, setRecord] = useState(null)
   const [answers, setAnswers] = useState({})
   const [stepIdx, setStepIdx] = useState(0)
@@ -86,6 +87,7 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
         // No record to source a tenant from → legacy first-row fallback so the
         // error page keeps its branding.
         await loadFirmBrandingPublic()
+        setFirmLogo(FIRM.logoUrl || '')
         setError('Financial intake form not found or expired.')
         setLoading(false)
         return
@@ -96,6 +98,7 @@ export default function FinancialIntakeWizard({ intakeId, embedded = false, onCo
       // to return tenant_id yet, tenantHint is undefined and the RPC falls back
       // to the legacy first-row (TCR) — same as before this change.
       await loadFirmBrandingPublic(rec?.tenant_id)
+      setFirmLogo(FIRM.logoUrl || '')
       setRecord(rec)
       setAnswers(rec.answers || {})
       if (rec.status === 'Submitted') setSubmitted(true)
