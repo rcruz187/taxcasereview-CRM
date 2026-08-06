@@ -420,7 +420,7 @@ export default function Sidebar() {
       {mobileNavOpen && <div className="sidebar-backdrop" onClick={() => setMobileNavOpen(false)} />}
       <aside className={`sidebar${mobileNavOpen ? ' mobile-open' : ''}`}>
       {logoUrl
-        ? <div onClick={() => navigate('/')} style={{cursor:'pointer',background:'#0C1F35',position:'relative',flexShrink:0}}>
+        ? <div onClick={() => navigate('/')} style={{cursor:'pointer',background:'#0C1F35',position:'relative',width:'100%',flexShrink:0,overflow:'hidden'}}>
             <button className="sidebar-close-btn" onClick={(e)=>{e.stopPropagation();setMobileNavOpen(false)}} aria-label="Close menu">×</button>
             <img src={logoUrl} alt={firmName} style={{width:'100%',height:120,objectFit:'cover',objectPosition:'center top',display:'block'}}/>
           </div>
