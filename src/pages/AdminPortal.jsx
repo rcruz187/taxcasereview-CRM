@@ -921,19 +921,19 @@ function Email(){return(
 // current_tenant_id() resolves TCR automatically, but if a demo impersonation
 // was active in the same session this ensures the DB context is correct.
 function AdminCalendar(){
+  const [ready, setReady] = useState(false)
 
   useEffect(()=>{
-    // Temporarily clear any impersonation context so CalendarPage reads TCR data
     const prev = sessionStorage.getItem('admin_impersonation')
     sessionStorage.removeItem('admin_impersonation')
-    supabase.rpc('set_admin_tenant_override',{ p_tenant_id: TCR_TENANT }).catch(()=>{})
+    // Await the override so Calendar's first DB query runs under TCR tenant context
+    supabase.rpc('set_admin_tenant_override',{ p_tenant_id: TCR_TENANT })
+      .then(()=>setReady(true)).catch(()=>setReady(true))
     return ()=>{
-      // Restore if there was an active impersonation session
       if (prev) sessionStorage.setItem('admin_impersonation', prev)
     }
   },[])
-  // CalendarPage uses position:absolute inset:0 to fill its container.
-  // The admin shell content area is position:relative height:100vh so this works directly.
+  if (!ready) return null
   return <CalendarPage />
 }
 
