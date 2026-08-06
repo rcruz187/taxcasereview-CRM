@@ -89,14 +89,23 @@ export function useWebRTCRoom(channelPrefix) {
     pc.ontrack = (e) => {
       const track = e.track
       // Distinguish screen tracks from camera tracks.
-      // Screen tracks have label like "screen:..." OR contentHint "detail".
-      // We store screen streams separately so the viewer can show both
-      // the camera tile AND the screen share tile independently.
-      const isScreen = track.kind === 'video' && (
-        track.label?.toLowerCase().includes('screen') ||
-        track.label?.toLowerCase().includes('display') ||
-        track.contentHint === 'detail' ||
-        track.label?.startsWith('0:')  // Chrome screen track format
+      // Use track.label patterns that are specific to screen capture:
+      // - Contains 'screen:' or 'window:' or 'tab:' (Chrome getDisplayMedia format)
+      // - Is a getDisplayMedia track (displaySurface available via getSettings)
+      // - contentHint 'detail' AND not a typical camera label
+      // Explicitly exclude common camera labels to avoid misclassification.
+      const labelLower = (track.label || '').toLowerCase()
+      const isCameraLabel = labelLower.includes('camera') || labelLower.includes('facetime') ||
+        labelLower.includes('webcam') || labelLower.includes('integrated') ||
+        labelLower.includes('front') || labelLower.includes('back') ||
+        /^\d+\.\d+/.test(track.label || '') // macOS camera format like "0.0 FaceTime"
+      const isScreenLabel = labelLower.startsWith('screen:') || labelLower.startsWith('window:') ||
+        labelLower.startsWith('tab:') || labelLower.includes('entire screen') ||
+        labelLower.includes('your entire screen')
+      const isScreen = track.kind === 'video' && !isCameraLabel && (
+        isScreenLabel ||
+        (track.contentHint === 'detail') ||
+        (track.getSettings?.()?.displaySurface !== undefined)
       )
       if (isScreen) {
         const screenStream = new MediaStream([track])

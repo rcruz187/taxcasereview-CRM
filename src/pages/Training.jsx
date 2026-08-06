@@ -58,7 +58,7 @@ export default function Training() {
 
   function copyLink() {
     const firmParam = FIRM.name ? `&firm=${encodeURIComponent(FIRM.name)}` : ''
-    const logoParam = FIRM.logoUrl ? `&logo=${encodeURIComponent(FIRM.logoUrl)}` : ''
+    const logoParam = safeLogo ? `&logo=${encodeURIComponent(safeLogo)}` : ''
     const tParam = FIRM.tenantId ? `&t=${encodeURIComponent(FIRM.tenantId)}` : ''
     const url = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${firmParam}${logoParam}${tParam}`
     navigator.clipboard.writeText(url).then(() => {
@@ -68,6 +68,11 @@ export default function Training() {
 
   // Email the join link to one or more people, using the same send-email
   // edge function every other transactional email in the CRM goes through.
+  // Only pass logo to join URL if it's an absolute https URL (Supabase storage).
+  // Relative paths like /taxcasereview-CRM/nashville-logo.png are now deleted
+  // and would show a broken image to the recipient.
+  const safeLogo = FIRM.logoUrl?.startsWith('https://') ? FIRM.logoUrl : ''
+
   async function sendInviteEmail() {
     const raw = emailTo.split(',').map(v => v.trim()).filter(Boolean)
     if (!raw.length) return
@@ -75,7 +80,7 @@ export default function Training() {
     if (bad.length) { showToast?.(`Not a valid email: ${bad[0]}`, 'error'); return }
 
     const firmParam2 = FIRM.name ? `&firm=${encodeURIComponent(FIRM.name)}` : ''
-    const logoParam2 = FIRM.logoUrl ? `&logo=${encodeURIComponent(FIRM.logoUrl)}` : ''
+    const logoParam2 = safeLogo ? `&logo=${encodeURIComponent(safeLogo)}` : ''
     const tParam2 = FIRM.tenantId ? `&t=${encodeURIComponent(FIRM.tenantId)}` : ''
     const url  = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${firmParam2}${logoParam2}${tParam2}`
     const firm = FIRM.name || 'Tax Case Review'
@@ -90,7 +95,7 @@ export default function Training() {
             subject: `Join the training session — ${firm}`,
             html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px">
 <div style="text-align:center;margin-bottom:20px">
-<img src="${FIRM.logoUrl}" alt="${firm}" style="max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px" onerror="this.style.display='none'"/>
+${safeLogo ? `<img src="${safeLogo}" alt="${firm}" style="max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px" onerror="this.style.display='none'"/>` : ''}
 <div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${firm}</div>
 </div>
 <p>You've been invited to a live training session with <strong>${myName}</strong>.</p>
@@ -118,7 +123,7 @@ export default function Training() {
 
   function openPopout() {
     const hostFirmParam = FIRM.name ? `&firm=${encodeURIComponent(FIRM.name)}` : ''
-    const hostLogoParam = FIRM.logoUrl ? `&logo=${encodeURIComponent(FIRM.logoUrl)}` : ''
+    const hostLogoParam = safeLogo ? `&logo=${encodeURIComponent(safeLogo)}` : ''
     const hostTParam    = FIRM.tenantId ? `&t=${encodeURIComponent(FIRM.tenantId)}` : ''
     const url  = `${window.location.origin}${BASE}/screenshare-host?room=${ss.roomId}&name=${encodeURIComponent(myName)}${hostFirmParam}${hostLogoParam}${hostTParam}`
     const w = 960, h = 680
@@ -128,7 +133,7 @@ export default function Training() {
   }
 
   const joinFirmParam = FIRM.name ? `&firm=${encodeURIComponent(FIRM.name)}` : ''
-  const joinLogoParam = FIRM.logoUrl ? `&logo=${encodeURIComponent(FIRM.logoUrl)}` : ''
+  const joinLogoParam = safeLogo ? `&logo=${encodeURIComponent(safeLogo)}` : ''
   const joinTParam    = FIRM.tenantId ? `&t=${encodeURIComponent(FIRM.tenantId)}` : ''
   const joinUrl      = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${joinFirmParam}${joinLogoParam}${joinTParam}`
   const participants = ss.webrtc.members.filter(n => !n.endsWith('(view)') && n !== myName).length
