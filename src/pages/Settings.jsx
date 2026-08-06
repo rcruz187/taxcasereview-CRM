@@ -129,11 +129,13 @@ export default function Settings() {
   const [pw, setPw] = useState({ next: '', confirm: '' })
   const [employees, setEmployees] = useState([])
 
-  useEffect(() => { loadFirm(); loadLogo(); loadEmployees() }, [])
+  // Guard: wait for auth — prevents TCR settings loading in Nashville
+  useEffect(() => { if (user) { loadFirm(); loadLogo(); loadEmployees() } }, [user?.id])
 
   async function loadEmployees() {
     const { data } = await supabase.from('employees').select('id,name,email,role,access,status,created_at,avatar_url').order('created_at', { ascending: true })
-    if (data) setEmployees(data)
+    // Exclude platform admin — never shows in any office's team list
+    if (data) setEmployees(data.filter(e => e.email !== 'romy@taxrescrm.net'))
   }
 
   function applyBrandColor(hex) {

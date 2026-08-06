@@ -153,7 +153,8 @@ export default function Employees() {
   const [docUploading, setDocUploading] = useState(false)
   const [nextDocLabel, setNextDocLabel] = useState('W-4')
 
-  useEffect(() => { load() }, [])
+  // Guard: wait for auth before loading — prevents TCR employees showing in Nashville
+  useEffect(() => { if (user) load() }, [user?.id])
 
   useEffect(() => {
     if (showForm && editing && form.name) {
@@ -167,7 +168,9 @@ export default function Employees() {
   async function load() {
     setLoading(true)
     const { data } = await supabase.from('employees').select('*').order('name')
-    setEmployees(data || [])
+    // Exclude platform admin account — romy@taxrescrm.net is the TaxRes CRM
+    // product owner account and must never appear in any office's employee list
+    setEmployees((data || []).filter(e => e.email !== 'romy@taxrescrm.net'))
     setLoading(false)
   }
 

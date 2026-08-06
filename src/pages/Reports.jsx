@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useApp } from '../context/AppContext'
 import { exportPDF, exportExcel } from '../lib/exportUtils'
 import { OPEN_STATUSES, PIPELINE_STAGE_KEYS as PIPELINE_STAGES, PIPELINE_STAGE_LABELS as STAGE_LABELS, DEFAULT_PIPELINE_STAGE } from '../lib/caseStatuses'
 
@@ -29,7 +30,8 @@ export default function Reports() {
     esigns:[], formacorp:[], bookkeeping:[]
   })
 
-  useEffect(() => { loadAll() }, [])
+  // Guard: wait for auth — prevents TCR data showing in Nashville
+  useEffect(() => { if (user) loadAll() }, [user?.id])
 
   async function loadAll() {
     setLoading(true)
