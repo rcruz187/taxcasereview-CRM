@@ -11,6 +11,7 @@ import { useApp } from '../context/AppContext'
 const NewOffice    = lazy(() => import('./NewOffice'))
 const Support      = lazy(() => import('./Support'))
 const CalendarPage = lazy(() => import('./Calendar'))
+const TrainingPage = lazy(() => import('./Training'))
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const TCR_TENANT  = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
@@ -67,6 +68,7 @@ function Spinner() {
 const NAV = [
   { path:'/crm-admin/email',     label:'Email',        icon:'📧' },
   { path:'/crm-admin/calendar',  label:'Calendar',     icon:'📅' },
+  { path:'/crm-admin/training',  label:'Training',     icon:'🖥️' },
   { path:'/crm-admin',           label:'Overview',     icon:'📊' },
   { path:'/crm-admin/provision', label:'+ New Office', icon:'➕' },
   { path:'/crm-admin/offices',   label:'Offices',      icon:'🏢' },
@@ -1388,6 +1390,7 @@ export default function AdminPortal() {
             <Route path="/support"        element={<div style={{padding:8}}><Support/></div>}/>
             <Route path="/email"          element={<Email/>}/>
             <Route path="/calendar"       element={<AdminCalendar/>}/>
+            <Route path="/training"       element={<TrainingPage/>}/>
             <Route path="*"               element={<Overview/>}/>
           </Routes>
         </Suspense>
