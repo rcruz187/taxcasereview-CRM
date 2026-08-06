@@ -31,7 +31,7 @@ export default function BookAppointment() {
     isProductDemo
       ? { firm_name: 'TaxRes CRM', logo_url: 'https://taxrescrm.net/assets/img/logo.png',
           subtitle: 'Schedule a Product Demonstration', payment: { required: false } }
-      : { firm_name: 'Tax Case Review', logo_url: '', payment: { required: false } }
+      : { firm_name: 'TaxRes CRM', logo_url: '/taxcasereview-CRM/assets/taxrescrm-logo.png', payment: { required: false } }
   )
   const [loadErr, setLoadErr] = useState('')
   const [type, setType] = useState('')
@@ -63,9 +63,14 @@ export default function BookAppointment() {
     // Pass the tenant hint (?t=) so a demo /book link shows the demo's firm name and
     // logo; absent → the RPC's legacy first-row fallback (TCR) is preserved.
     if (!isProductDemo) {
-      supabase.rpc('booking_get_public_meta', tid ? { p_tenant: tid } : {}).then(({ data }) => {
-        if (data) setMeta(m => ({ ...m, ...data, payment: { ...m.payment, ...(data.payment || {}) } }))
-      }).catch(() => {})
+      // Only fetch branding from RPC if a specific tenant hint (?t=) is in the URL.
+      // Without a hint this is the TaxRes CRM product booking page — keep TaxRes CRM branding.
+      // With a hint (?t=<tenant uuid>) it's a specific office's booking link — use their branding.
+      if (tid) {
+        supabase.rpc('booking_get_public_meta', { p_tenant: tid }).then(({ data }) => {
+          if (data) setMeta(m => ({ ...m, ...data, payment: { ...m.payment, ...(data.payment || {}) } }))
+        }).catch(() => {})
+      }
     }
   }, [])
 
