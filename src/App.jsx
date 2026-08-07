@@ -8,6 +8,7 @@ import { ScreenShareProvider } from './context/ScreenShareContext'
 import Sidebar  from './components/layout/Sidebar'
 import TopBar   from './components/layout/TopBar'
 import { Modal, Toast } from './components/ui'
+import ActiveCallBar from './components/calling/ActiveCallBar'
 
 // Public, unauthenticated entry points stay eager — loaded immediately on
 // first paint with no extra network round-trip, since these are the very
@@ -188,6 +189,7 @@ function Shell() {
           </Suspense>
         </div>
       </div>
+      <ActiveCallBar />
       <Modal />
       <Toast />
     </div>
