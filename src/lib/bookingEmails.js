@@ -8,20 +8,21 @@ import { emailHtml } from './emailTemplate'
 // from the public anon pages (/book, /book/manage) or from inside the app.
 // Falls back to the Tax Case Review defaults on any error — never blocks a
 // send over a branding lookup.
-let _firmMetaCache = null
-async function getFirmMeta() {
-  if (_firmMetaCache) return _firmMetaCache
+const _firmMetaCache = {}
+async function getFirmMeta(tenantId) {
+  const key = tenantId || 'default'
+  if (_firmMetaCache[key]) return _firmMetaCache[key]
   try {
     // Inside the app FIRM is already the signed-in tenant's branding; the
-    // public meta RPC returns the FIRST settings row for every caller and is
-    // only a fallback for anon contexts where FIRM never loaded.
-    if (FIRM.loaded && FIRM.name) return { firmName: FIRM.name, logoUrl: FIRM.logoUrl || '' }
-    const { data } = await supabase.rpc('booking_get_public_meta')
-    _firmMetaCache = data && data.firm_name ? { firmName: data.firm_name, logoUrl: data.logo_url } : {}
+    // public meta RPC accepts an optional tenant hint for anon contexts.
+    if (!tenantId && FIRM.loaded && FIRM.name) return { firmName: FIRM.name, logoUrl: FIRM.logoUrl || '' }
+    const args = tenantId ? { p_tenant: String(tenantId) } : {}
+    const { data } = await supabase.rpc('booking_get_public_meta', args)
+    _firmMetaCache[key] = data && data.firm_name ? { firmName: data.firm_name, logoUrl: data.logo_url } : {}
   } catch (_) {
-    _firmMetaCache = {}
+    _firmMetaCache[key] = {}
   }
-  return _firmMetaCache
+  return _firmMetaCache[key]
 }
 
 export const fmt12 = (t) => {
@@ -38,11 +39,11 @@ export const whenShort = (date, time) =>
 
 // Confirmation to the person who booked. Best-effort — never blocks the booking.
 // With a token, includes Calendly-style self-serve Reschedule / Cancel links.
-export function sendClientConfirmation({ name, email, type, date, time, token }) {
+export function sendClientConfirmation({ name, email, type, date, time, token, tenantId }) {
   if (!email) return
   const manage = token ? `${window.location.origin}${import.meta.env.BASE_URL}book/manage/${token}` : null
   ;(async () => {
-    const firm = await getFirmMeta()
+    const firm = await getFirmMeta(tenantId)
     await supabase.functions.invoke('send-email', { body: { tenant_id: FIRM.tenantId || undefined,
       to: email,
       subject: `Appointment Confirmed — ${type}, ${whenShort(date, time)}`,
@@ -66,7 +67,7 @@ export function sendClientConfirmation({ name, email, type, date, time, token })
 // Cancellation notices (client + firm/rep). Best-effort.
 export function sendCancelEmails({ name, email, type, date, time, notifyEmail }) {
   (async () => {
-    const firm = await getFirmMeta()
+    const firm = await getFirmMeta(tenantId)
     if (email) await supabase.functions.invoke('send-email', { body: { tenant_id: FIRM.tenantId || undefined,
       to: email,
       subject: `Appointment Canceled — ${type}, ${whenShort(date, time)}`,
@@ -88,7 +89,7 @@ export function sendCancelEmails({ name, email, type, date, time, notifyEmail })
 // Reschedule notice to the firm/rep (client gets a fresh confirmation instead).
 export function sendRescheduleNotice({ name, type, oldDate, oldTime, date, time, notifyEmail }) {
   (async () => {
-    const firm = await getFirmMeta()
+    const firm = await getFirmMeta(tenantId)
     await supabase.functions.invoke('send-email', { body: { tenant_id: FIRM.tenantId || undefined,
       to: notifyEmail || FIRM.email || 'info@taxcasereview.org',
       subject: `🔁 Rescheduled: ${name} — now ${whenShort(date, time)}`,
@@ -98,9 +99,9 @@ export function sendRescheduleNotice({ name, type, oldDate, oldTime, date, time,
 }
 
 // Heads-up to the assigned rep (or the firm inbox). Best-effort.
-export function sendFirmNotification({ name, email, phone, notes, type, date, time, notifyEmail, bookedBy }) {
+export function sendFirmNotification({ name, email, phone, notes, type, date, time, notifyEmail, bookedBy, tenantId }) {
   (async () => {
-    const firm = await getFirmMeta()
+    const firm = await getFirmMeta(tenantId)
     await supabase.functions.invoke('send-email', { body: { tenant_id: FIRM.tenantId || undefined,
       to: notifyEmail || FIRM.email || 'info@taxcasereview.org',
       subject: `📅 New booking: ${name} — ${whenShort(date, time)}`,
@@ -133,7 +134,7 @@ export async function sendBookingInvite({ name, email, phone }) {
   if ((email || '').trim()) q.set('email', email.trim())
   if ((phone || '').trim()) q.set('phone', phone.trim())
   const link = q.toString() ? `${BOOK_URL}?${q.toString()}` : BOOK_URL
-  const firm = await getFirmMeta()
+  const firm = await getFirmMeta(tenantId)
   const fName = firm.firmName || FIRM.name || 'TaxRes CRM'
   const { error } = await supabase.functions.invoke('send-email', { body: { tenant_id: FIRM.tenantId || undefined,
     to: email,

@@ -133,11 +133,13 @@ export default function BookAppointment() {
     }
 
     // Confirmation to the client + notification to the firm/rep — best-effort.
-    sendClientConfirmation({ name: form.name.trim(), email: form.email.trim(), type, date, time, token: data && data.booking_token })
+    const bookingTenant = tid || TAXRESCRM_TENANT
+    sendClientConfirmation({ name: form.name.trim(), email: form.email.trim(), type, date, time, token: data && data.booking_token, tenantId: bookingTenant })
     sendFirmNotification({
       name: form.name.trim(), email: form.email.trim(), phone: form.phone.trim(),
       notes: form.notes.trim(), type, date, time,
       notifyEmail: data && data.notify_email,
+      tenantId: bookingTenant,
     })
 
     setDone({ date, time, type })
