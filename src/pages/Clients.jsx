@@ -33,7 +33,8 @@ import { FIRM } from '../lib/firmBranding'
 
 // Tenant-resolved firm name so onboarding email + POA/addendum SMS bodies
 // read for whichever firm is signed in. Mirrors Leads.jsx and docUtils.
-const firmName = () => FIRM.name || 'Tax Case Review'
+const firmName  = () => FIRM.name || 'Tax Case Review'
+const firmEmail = () => (FIRM.email || '').trim() || 'info@' + firmName().toLowerCase().replace(/[^a-z0-9]+/g, '') + '.com'
 
 const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -611,7 +612,7 @@ function InlineOrganizerForm({ client, onClose, showToast }) {
           body: { tenant_id: FIRM.tenantId || undefined,
             to: client.email,
             subject: `Your ${year.trim()} Tax Organizer — ${FIRM.name || 'Tax Case Review'}`,
-            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${client.name}</strong>,</p><p>Please complete your ${year.trim()} tax organizer so we can begin preparing your return. It only takes a few minutes, and you can save your progress and come back anytime.</p><p style="text-align:center;margin:24px 0"><a href="${url}" style="background:#9333ea;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Tax Organizer</a></p><p style="font-size:12px;color:#64748b">Link: ${url}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · ${FIRM.address}</p></div>`
+            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${client.name}</strong>,</p><p>Please complete your ${year.trim()} tax organizer so we can begin preparing your return. It only takes a few minutes, and you can save your progress and come back anytime.</p><p style="text-align:center;margin:24px 0"><a href="${url}" style="background:#9333ea;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block">Start My Tax Organizer</a></p><p style="font-size:12px;color:#64748b">Link: ${url}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">${firmName()} · ${FIRM.address}</p></div>`
           }
         })
         if (!error) emailSent = true
@@ -1540,7 +1541,7 @@ export default function Clients() {
       await navigator.clipboard.writeText(sigUrl).catch(()=>{})
       let emailSent=false, smsSent=false
       if ((via==='email'||via==='both') && client.email) {
-        const { error:eErr } = await supabase.functions.invoke('send-email', { body: { tenant_id: FIRM.tenantId || undefined, to:client.email, subject:`Action Required: Sign Your ${formDef.state} Power of Attorney — ${FIRM.name}`, html:`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${client.name}</strong>,</p><p>Your <strong>${formDef.state} Power of Attorney (${formDef.num})</strong> is ready for your review and signature.</p><p style="text-align:center;margin:24px 0"><a href="${sigUrl}" style="background:#1d4ed8;color:#fff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Review &amp; Sign →</a></p><p style="font-size:12px;color:#64748b">${sigUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review · ${FIRM.address}<br/>📞 ${FIRM.phone}</p></div>` }})
+        const { error:eErr } = await supabase.functions.invoke('send-email', { body: { tenant_id: FIRM.tenantId || undefined, to:client.email, subject:`Action Required: Sign Your ${formDef.state} Power of Attorney — ${FIRM.name}`, html:`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px"><div style="text-align:center;margin-bottom:20px"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px\" onerror=\"this.style.display='none'\"/><div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${FIRM.name}</div></div><p>Dear <strong>${client.name}</strong>,</p><p>Your <strong>${formDef.state} Power of Attorney (${formDef.num})</strong> is ready for your review and signature.</p><p style="text-align:center;margin:24px 0"><a href="${sigUrl}" style="background:#1d4ed8;color:#fff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Review &amp; Sign →</a></p><p style="font-size:12px;color:#64748b">${sigUrl}</p><p style="font-size:11px;color:#94a3b8;margin-top:24px">${firmName()} · ${FIRM.address}<br/>📞 ${FIRM.phone}</p></div>` }})
         emailSent = !eErr
       }
       if ((via==='sms'||via==='both') && client.phone) {
@@ -1621,7 +1622,7 @@ export default function Clients() {
     <p style="margin:0 0 24px;font-size:12px;color:#94a3b8;text-align:center;word-break:break-all"><a href="${url}" style="color:#3b82f6">${url}</a></p>
     ${paymentSection}
     <div style="background:#f8fafc;border-radius:8px;padding:16px 20px;border-left:4px solid #3b82f6">
-      <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> We're here to help.<br>📞 <strong>${FIRM.phone}</strong> &nbsp;·&nbsp; ✉️ <strong>info@taxcasereview.org</strong></p>
+      <p style="margin:0;font-size:13px;color:#475569;line-height:1.6">💬 <strong>Questions?</strong> We're here to help.<br>📞 <strong>${FIRM.phone}</strong> &nbsp;·&nbsp; ✉️ <strong>${firmEmail()}</strong></p>
     </div>
   </td></tr>
   <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center">
