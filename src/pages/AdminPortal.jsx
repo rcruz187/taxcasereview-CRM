@@ -4,7 +4,7 @@
 // demo management, system health, audit log, support, email.
 
 import { useState, useEffect, Suspense, lazy, useCallback } from 'react'
-import { ScreenShareProvider } from '../context/ScreenShareContext'
+import { ScreenShareProvider, useScreenShare } from '../context/ScreenShareContext'
 import { Routes, Route, NavLink, useNavigate, useLocation, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { FIRM, loadFirmBranding } from '../lib/firmBranding'
@@ -927,12 +927,17 @@ function Email(){return(
 // ── Training (screen-share training, admin context) ──────────────────────────
 // Clears the TCR tenant override so FIRM loads TaxRes CRM branding (the admin's
 // own settings row), not Tax Case Review the practice. Restores on unmount.
+// Uses useScreenShare to detect an active session — if one is already running,
+// render immediately without waiting for the branding load so navigation away
+// and back never kills a live session.
 function AdminTraining(){
   const [ready, setReady] = useState(false)
+  const ss = useScreenShare()
 
   useEffect(()=>{
-    // Await the override AND branding reload before rendering TrainingPage so
-    // FIRM.tenantId / FIRM.email are correct when the user hits Email.
+    // If a session is already active, render immediately — don't gate on branding.
+    // The branding was already loaded when the session started.
+    if (ss.active) { setReady(true); return }
     supabase.rpc('set_admin_tenant_override',{ p_tenant_id: TAXRESCRM_TENANT })
       .then(()=> loadFirmBranding())
       .then(()=> setReady(true))
