@@ -1388,18 +1388,25 @@ function CommandCenter() {
   const [activityPoll, setActivityPoll] = useState(0)
 
   // ── Data load ──────────────────────────────────────────────────────────────
+  const [loadError, setLoadError] = useState(null)
+
   useEffect(() => {
     async function load() {
       const now = new Date()
       const h = now.getHours()
 
-      // Two parallel calls: cross-tenant stats RPC + admin_tenant_overview
-      const [{ data: stats, error }, { data: tenants }] = await Promise.all([
-        supabase.rpc('admin_command_center_stats'),
-        supabase.rpc('admin_tenant_overview').then(r => ({ data: r.data || [] })),
-      ])
+      try {
+        // Two parallel calls: cross-tenant stats RPC + admin_tenant_overview
+        const [statsRes, tenantsRes] = await Promise.all([
+          supabase.rpc('admin_command_center_stats'),
+          supabase.rpc('admin_tenant_overview'),
+        ])
 
-      if (error || !stats) { console.error('Command Center RPC error:', error); return }
+        const stats   = statsRes.data
+        const tenants = tenantsRes.data || []
+
+        if (statsRes.error) throw new Error('RPC error: ' + JSON.stringify(statsRes.error))
+        if (!stats || stats.error) throw new Error('Stats unavailable: ' + JSON.stringify(stats))
 
       const activeTenants = (tenants||[]).filter(r=>r.status==='active')
       const totalMRR      = (tenants||[]).reduce((s,r)=>s+Number(r.effective_monthly||0),0)
@@ -1516,6 +1523,10 @@ function CommandCenter() {
           { label:'Microsoft Clarity',   ok:null  },
         ],
       })
+      } catch(err) {
+        console.error('Command Center load error:', err)
+        setLoadError(String(err))
+      }
     }
     load()
   }, [])
@@ -1595,6 +1606,17 @@ function CommandCenter() {
     const t = setInterval(() => setActivityPoll(p=>p+1), 30000)
     return () => clearInterval(t)
   }, [])
+
+  if (loadError) return (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'80vh' }}>
+      <div style={{ textAlign:'center', maxWidth:500 }}>
+        <div style={{ fontSize:32, marginBottom:12 }}>⚠️</div>
+        <div style={{ fontSize:16, color:'#ef4444', fontWeight:700, marginBottom:8 }}>Command Center failed to load</div>
+        <div style={{ fontSize:12, color:'#475569', fontFamily:'monospace', background:'rgba(0,0,0,.3)', padding:12, borderRadius:8, textAlign:'left', wordBreak:'break-all' }}>{loadError}</div>
+        <button onClick={() => { setLoadError(null); setData(null); }} style={{ ...S.btn('primary'), marginTop:16 }}>Retry</button>
+      </div>
+    </div>
+  )
 
   if (!data) return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'80vh' }}>
