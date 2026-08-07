@@ -58,7 +58,7 @@ export function sendClientConfirmation({ name, email, type, date, time, token })
           <a href="${manage}" style="background:#1d4ed8;color:#ffffff;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:700;font-size:13.5px;display:inline-block;margin:0 6px">🔁 Reschedule</a>
           <a href="${manage}?cancel=1" style="background:#f1f5f9;color:#b91c1c;border:1px solid #e2e8f0;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:700;font-size:13.5px;display:inline-block;margin:0 6px">Cancel</a>
         </p>` : `<p>Need to reschedule or cancel? Just reply to this email or call us and we'll take care of it.</p>`}
-        <p style="margin-top:20px">Talk soon,<br><strong>${firm.firmName || 'Tax Case Review'}</strong></p>` }),
+        <p style="margin-top:20px">Talk soon,<br><strong>${firm.firmName || FIRM.name || 'TaxRes CRM'}</strong></p>` }),
     } })
   })().catch(() => {})
 }
@@ -75,10 +75,10 @@ export function sendCancelEmails({ name, email, type, date, time, notifyEmail })
         <p>Your <strong>${type}</strong> on ${whenLong(date, time)} has been canceled.</p>
         <p>Changed your mind? You can grab a new time any time:</p>
         <p style="text-align:center;margin:20px 0"><a href="${bookUrl()}" style="background:#1d4ed8;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;font-size:14px;display:inline-block">📅 Book Again</a></p>
-        <p style="margin-top:20px"><strong>${firm.firmName || 'Tax Case Review'}</strong></p>` }),
+        <p style="margin-top:20px"><strong>${firm.firmName || FIRM.name || 'TaxRes CRM'}</strong></p>` }),
     } })
     await supabase.functions.invoke('send-email', { body: { tenant_id: FIRM.tenantId || undefined,
-      to: notifyEmail || 'info@taxcasereview.org',
+      to: notifyEmail || FIRM.email || 'info@taxcasereview.org',
       subject: `❌ Booking canceled: ${name} — ${whenShort(date, time)}`,
       html: emailHtml({ firmName: firm.firmName, logoUrl: firm.logoUrl, body: `<p><strong>${name}</strong> canceled their <strong>${type}</strong> on ${whenLong(date, time)}. The slot is open again.</p>` }),
     } })
@@ -90,7 +90,7 @@ export function sendRescheduleNotice({ name, type, oldDate, oldTime, date, time,
   (async () => {
     const firm = await getFirmMeta()
     await supabase.functions.invoke('send-email', { body: { tenant_id: FIRM.tenantId || undefined,
-      to: notifyEmail || 'info@taxcasereview.org',
+      to: notifyEmail || FIRM.email || 'info@taxcasereview.org',
       subject: `🔁 Rescheduled: ${name} — now ${whenShort(date, time)}`,
       html: emailHtml({ firmName: firm.firmName, logoUrl: firm.logoUrl, body: `<p><strong>${name}</strong> moved their <strong>${type}</strong>:</p><p style="line-height:1.9">Was: ${whenLong(oldDate, oldTime)}<br>Now: <strong>${whenLong(date, time)}</strong></p><p>The calendar is already updated.</p>` }),
     } })
@@ -102,7 +102,7 @@ export function sendFirmNotification({ name, email, phone, notes, type, date, ti
   (async () => {
     const firm = await getFirmMeta()
     await supabase.functions.invoke('send-email', { body: { tenant_id: FIRM.tenantId || undefined,
-      to: notifyEmail || 'info@taxcasereview.org',
+      to: notifyEmail || FIRM.email || 'info@taxcasereview.org',
       subject: `📅 New booking: ${name} — ${whenShort(date, time)}`,
       html: emailHtml({ firmName: firm.firmName, logoUrl: firm.logoUrl, body: `
         <p><strong>${name}</strong> ${bookedBy ? `was booked by ${bookedBy}` : 'just booked online'}:</p>
@@ -134,7 +134,7 @@ export async function sendBookingInvite({ name, email, phone }) {
   if ((phone || '').trim()) q.set('phone', phone.trim())
   const link = q.toString() ? `${BOOK_URL}?${q.toString()}` : BOOK_URL
   const firm = await getFirmMeta()
-  const fName = firm.firmName || 'Tax Case Review'
+  const fName = firm.firmName || FIRM.name || 'TaxRes CRM'
   const { error } = await supabase.functions.invoke('send-email', { body: { tenant_id: FIRM.tenantId || undefined,
     to: email,
     subject: `Schedule Your Appointment — ${fName}`,

@@ -93,7 +93,7 @@ export default function ClientPortal() {
   // Firm logo for this portal — pulled via the anon-safe public-meta RPC so a
   // logged-out client still sees THEIR firm's branding (not a shared file).
   const [firmLogo, setFirmLogo] = useState('')
-  const [firmMeta, setFirmMeta] = useState({ name: 'Tax Case Review', phone: '(888) 334-5052' })
+  const [firmMeta, setFirmMeta] = useState({ name: '', phone: '' })
   useEffect(() => {
     // Pass the client id from the portal URL so the RPC resolves THIS client's
     // tenant branding; without it the RPC's legacy fallback is the first
