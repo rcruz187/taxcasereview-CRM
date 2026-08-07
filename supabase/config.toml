@@ -95,3 +95,6 @@ verify_jwt = true
 verify_jwt = true
 [functions.ga4-sync]
 verify_jwt = true
+
+[functions.content-generator]
+verify_jwt = true
