@@ -2182,54 +2182,112 @@ const STATUS_COLORS = {
   published: '#0ea5e9',
   archived:  '#334155',
 }
+const GENERATION_STEPS = [
+  { key:'linkedin',     label:'LinkedIn Post',       icon:'💼' },
+  { key:'article_idea', label:'Resource Article Idea',icon:'📝' },
+  { key:'email',        label:'Email Newsletter',    icon:'📧' },
+  { key:'edu_tip',      label:'Education Tip',       icon:'💡' },
+  { key:'outreach_1',   label:'Outreach Message 1',  icon:'📨' },
+  { key:'outreach_2',   label:'Outreach Message 2',  icon:'📨' },
+  { key:'outreach_3',   label:'Outreach Message 3',  icon:'📨' },
+]
 
 function ContentCenter() {
-  const [drafts, setDrafts]         = useState([])
-  const [loading, setLoading]       = useState(true)
-  const [generating, setGenerating] = useState(false)
-  const [filter, setFilter]         = useState('all')
-  const [selected, setSelected]     = useState(null)
-  const [editing, setEditing]       = useState(false)
-  const [editBody, setEditBody]     = useState('')
-  const [saving, setSaving]         = useState(false)
-  const [toast, setToast]           = useState(null)
+  const [drafts, setDrafts]           = useState([])
+  const [loading, setLoading]         = useState(true)
+  const [genSteps, setGenSteps]       = useState(null)  // null=idle, array=generating
+  const [filter, setFilter]           = useState('all')
+  const [weekFilter, setWeekFilter]   = useState('all')
+  const [selected, setSelected]       = useState(null)
+  const [editing, setEditing]         = useState(false)
+  const [editBody, setEditBody]       = useState('')
+  const [saving, setSaving]           = useState(false)
+  const [regenId, setRegenId]         = useState(null)
+  const [toast, setToast]             = useState(null)
+  const [useCrmData, setUseCrmData]   = useState(true)
+  const [scores, setScores]           = useState({})
 
   function showToast(msg, ok=true) {
     setToast({ msg, ok })
-    setTimeout(() => setToast(null), 3000)
+    setTimeout(() => setToast(null), 3500)
   }
 
   async function loadDrafts() {
     setLoading(true)
-    const { data } = await supabase.rpc('get_content_drafts', { p_limit: 100 })
+    const { data } = await supabase.rpc('get_content_drafts', { p_limit: 200 })
     setDrafts(data || [])
     setLoading(false)
   }
 
   useEffect(() => { loadDrafts() }, [])
 
+  // Simulate step-by-step progress during generation
   async function generate(force=false) {
-    setGenerating(true)
+    // Start progress animation
+    setGenSteps(GENERATION_STEPS.map(s => ({ ...s, status:'pending' })))
+    let stepIdx = 0
+
+    const timer = setInterval(() => {
+      setGenSteps(prev => {
+        if (!prev) return prev
+        const next = [...prev]
+        // Complete current, start next
+        if (stepIdx > 0) next[stepIdx-1] = { ...next[stepIdx-1], status:'done' }
+        if (stepIdx < next.length) next[stepIdx] = { ...next[stepIdx], status:'active' }
+        stepIdx++
+        if (stepIdx > next.length) clearInterval(timer)
+        return next
+      })
+    }, 3500)
+
     try {
       const { data, error } = await supabase.functions.invoke('content-generator', {
+        body: { useCrmData },
         headers: force ? { 'x-force-regenerate': 'true' } : {}
+      })
+      clearInterval(timer)
+      // Mark all done
+      setGenSteps(GENERATION_STEPS.map(s => ({ ...s, status:'done' })))
+      await loadDrafts()
+      setTimeout(() => setGenSteps(null), 1200)
+      showToast(data?.message === 'Already generated this week'
+        ? 'Already generated this week. Use ↺ to overwrite.'
+        : `Content pack ready — ${data?.drafts || 7} drafts created`)
+    } catch(e) {
+      clearInterval(timer)
+      setGenSteps(null)
+      showToast('Generation failed: ' + String(e), false)
+    }
+  }
+
+  // Regenerate a single draft
+  async function regenerateOne(draft) {
+    setRegenId(draft.id)
+    try {
+      const { data, error } = await supabase.functions.invoke('content-generator', {
+        body: { useCrmData, regenerateType: draft.content_type, regenerateId: draft.id }
       })
       if (error) throw error
       await loadDrafts()
-      showToast(data?.message === 'Already generated this week'
-        ? 'Already generated this week. Use Force Regenerate to overwrite.'
-        : `Generated ${data?.drafts || 7} drafts for week of ${data?.weekOf}`)
+      showToast('Regenerated ✓')
     } catch(e) {
-      showToast('Generation failed: ' + String(e), false)
+      showToast('Regeneration failed: ' + String(e), false)
     }
-    setGenerating(false)
+    setRegenId(null)
   }
 
   async function updateStatus(id, status) {
     await supabase.rpc('update_content_status', { p_id: id, p_status: status, p_actor: 'romy@taxrescrm.net' })
     setDrafts(prev => prev.map(d => d.id===id ? {...d, status} : d))
     if (selected?.id === id) setSelected(s => ({...s, status}))
-    showToast(status === 'approved' ? 'Approved ✓' : status === 'archived' ? 'Archived' : status === 'published' ? 'Marked published' : 'Updated')
+    showToast(status==='approved'?'Approved ✓':status==='archived'?'Archived':status==='published'?'Marked published':'Updated')
+  }
+
+  async function deleteDraft(id) {
+    await supabase.from('content_drafts').delete().eq('id', id)
+    setDrafts(prev => prev.filter(d => d.id !== id))
+    if (selected?.id === id) setSelected(null)
+    showToast('Deleted')
   }
 
   async function saveEdit() {
@@ -2243,20 +2301,46 @@ function ContentCenter() {
     showToast('Saved')
   }
 
+  // Generate content score for a draft (once, cached)
+  async function scoreContent(draft) {
+    if (scores[draft.id]) return
+    const { data } = await supabase.functions.invoke('content-generator', {
+      body: { scoreOnly: true, body: draft.body, contentType: draft.content_type }
+    })
+    if (data?.scores) setScores(prev => ({ ...prev, [draft.id]: data.scores }))
+  }
+
+  useEffect(() => {
+    if (selected && !scores[selected.id]) scoreContent(selected)
+  }, [selected])
+
   function copyToClipboard(text) {
     navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard'))
   }
 
-  const filtered = filter === 'all' ? drafts : drafts.filter(d => d.status === filter)
+  const filtered = drafts.filter(d => {
+    if (filter !== 'all' && d.status !== filter) return false
+    if (weekFilter !== 'all' && d.week_of !== weekFilter) return false
+    return true
+  })
   const weekGroups = filtered.reduce((acc, d) => {
     const w = d.week_of
     if (!acc[w]) acc[w] = []
     acc[w].push(d)
     return acc
   }, {})
+  const allWeeks = [...new Set(drafts.map(d => d.week_of))].sort((a,b) => b.localeCompare(a))
 
-  const CC = {
-    card: { background:'rgba(255,255,255,.04)', border:'1px solid rgba(99,102,241,.18)', borderRadius:12 },
+  const CC = { card: { background:'rgba(255,255,255,.04)', border:'1px solid rgba(99,102,241,.18)', borderRadius:12 } }
+
+  function StarRating({ n }) {
+    return (
+      <span>
+        {[1,2,3,4,5].map(i => (
+          <span key={i} style={{ color: i<=n ? '#f59e0b' : '#334155', fontSize:12 }}>★</span>
+        ))}
+      </span>
+    )
   }
 
   return (
@@ -2271,71 +2355,127 @@ function ContentCenter() {
         </div>
       )}
 
-      {/* Left: list panel */}
-      <div style={{ width:320, borderRight:'1px solid rgba(99,102,241,.15)', overflowY:'auto', padding:'24px 0' }}>
+      {/* Generation progress overlay */}
+      {genSteps && (
+        <div style={{ position:'fixed', inset:0, zIndex:9998, background:'rgba(10,9,24,.85)',
+          display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <div style={{ ...CC.card, padding:'32px 40px', minWidth:340 }}>
+            <div style={{ fontSize:16, fontWeight:800, color:'#fff', marginBottom:6 }}>Creating Content Pack</div>
+            <div style={{ fontSize:12, color:'#475569', marginBottom:24 }}>Generating with TaxRes CRM brand voice…</div>
+            {genSteps.map((step, i) => (
+              <div key={i} style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
+                <div style={{ width:22, textAlign:'center', fontSize:14 }}>
+                  {step.status==='done'   ? '✅' :
+                   step.status==='active' ? <span style={{ animation:'spin 1s linear infinite', display:'inline-block' }}>⟳</span> :
+                   '⏳'}
+                </div>
+                <div style={{ fontSize:13, color: step.status==='done'?'#10b981':step.status==='active'?'#e2e8f0':'#475569',
+                  fontWeight: step.status==='active' ? 700 : 400 }}>
+                  {step.icon} {step.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-        {/* Header */}
-        <div style={{ padding:'0 20px 20px' }}>
-          <div style={{ fontSize:18, fontWeight:900, color:'#fff', marginBottom:4 }}>✍️ Content Center</div>
-          <div style={{ fontSize:11, color:'#475569' }}>Drafts require approval before use</div>
+      {/* Left: list panel */}
+      <div style={{ width:300, borderRight:'1px solid rgba(99,102,241,.15)', overflowY:'auto', padding:'24px 0', flexShrink:0 }}>
+
+        <div style={{ padding:'0 20px 16px' }}>
+          <div style={{ fontSize:18, fontWeight:900, color:'#fff', marginBottom:2 }}>✍️ Content Center</div>
+          <div style={{ fontSize:11, color:'#475569' }}>Approve drafts before publishing</div>
         </div>
 
         {/* Generate button */}
-        <div style={{ padding:'0 20px 16px', display:'flex', gap:8 }}>
-          <button onClick={() => generate(false)} disabled={generating} style={{
+        <div style={{ padding:'0 20px 12px', display:'flex', gap:8 }}>
+          <button onClick={() => generate(false)} disabled={!!genSteps} style={{
             flex:1, padding:'9px 0', borderRadius:8, border:'none', cursor:'pointer',
-            background: generating ? 'rgba(99,102,241,.3)' : 'rgba(99,102,241,.8)',
+            background: genSteps ? 'rgba(99,102,241,.3)' : 'rgba(99,102,241,.85)',
             color:'#fff', fontWeight:700, fontSize:12,
-          }}>
-            {generating ? '⟳ Generating…' : '⚡ Generate This Week'}
-          </button>
-          <button onClick={() => generate(true)} disabled={generating} title="Force regenerate even if already done this week" style={{
-            padding:'9px 12px', borderRadius:8, border:'1px solid rgba(99,102,241,.3)',
-            background:'transparent', color:'#6366f1', cursor:'pointer', fontSize:12,
-          }}>↺</button>
+          }}>✨ Create Content Pack</button>
+          <button onClick={() => generate(true)} disabled={!!genSteps} title="Force regenerate this week"
+            style={{ padding:'9px 12px', borderRadius:8, border:'1px solid rgba(99,102,241,.3)',
+              background:'transparent', color:'#6366f1', cursor:'pointer', fontSize:12 }}>↺</button>
         </div>
 
-        {/* Status filter */}
-        <div style={{ padding:'0 20px 16px', display:'flex', gap:4, flexWrap:'wrap' }}>
-          {['all','draft','approved','scheduled','published','archived'].map(s => (
+        {/* CRM data toggle */}
+        <div style={{ padding:'0 20px 16px', display:'flex', alignItems:'center', gap:8 }}>
+          <div onClick={() => setUseCrmData(v=>!v)} style={{ width:32, height:18, borderRadius:9, cursor:'pointer',
+            background: useCrmData ? '#6366f1' : '#334155', position:'relative', transition:'background .2s', flexShrink:0 }}>
+            <div style={{ position:'absolute', top:2, left: useCrmData?14:2, width:14, height:14,
+              borderRadius:'50%', background:'#fff', transition:'left .2s' }} />
+          </div>
+          <span style={{ fontSize:11, color: useCrmData ? '#a5b4fc' : '#475569' }}>
+            Use recent CRM activity
+          </span>
+        </div>
+
+        {/* Filters */}
+        <div style={{ padding:'0 20px 8px', display:'flex', gap:3, flexWrap:'wrap' }}>
+          {['all','draft','approved','published','archived'].map(s => (
             <button key={s} onClick={() => setFilter(s)} style={{
-              padding:'4px 10px', borderRadius:20, border:'none', cursor:'pointer', fontSize:11, fontWeight:600,
-              background: filter===s ? 'rgba(99,102,241,.4)' : 'rgba(255,255,255,.06)',
+              padding:'3px 9px', borderRadius:20, border:'none', cursor:'pointer', fontSize:11, fontWeight:600,
+              background: filter===s ? 'rgba(99,102,241,.4)' : 'rgba(255,255,255,.05)',
               color: filter===s ? '#a5b4fc' : '#64748b',
-            }}>{s.charAt(0).toUpperCase()+s.slice(1)}</button>
+            }}>{s==='all'?'All':s.charAt(0).toUpperCase()+s.slice(1)}</button>
           ))}
         </div>
+
+        {/* Week filter (content history) */}
+        {allWeeks.length > 1 && (
+          <div style={{ padding:'4px 20px 12px' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#334155', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:6 }}>
+              History
+            </div>
+            <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+              <button onClick={() => setWeekFilter('all')} style={{
+                padding:'3px 9px', borderRadius:20, border:'none', cursor:'pointer', fontSize:10, fontWeight:600,
+                background: weekFilter==='all' ? 'rgba(99,102,241,.3)' : 'rgba(255,255,255,.04)',
+                color: weekFilter==='all' ? '#a5b4fc' : '#475569',
+              }}>All weeks</button>
+              {allWeeks.map(w => (
+                <button key={w} onClick={() => setWeekFilter(w)} style={{
+                  padding:'3px 9px', borderRadius:20, border:'none', cursor:'pointer', fontSize:10, fontWeight:600,
+                  background: weekFilter===w ? 'rgba(99,102,241,.3)' : 'rgba(255,255,255,.04)',
+                  color: weekFilter===w ? '#a5b4fc' : '#475569',
+                }}>{new Date(w+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Draft list */}
         {loading ? (
           <div style={{ padding:'20px', color:'#475569', fontSize:13 }}>Loading…</div>
         ) : Object.keys(weekGroups).length === 0 ? (
           <div style={{ padding:'20px', color:'#475569', fontSize:13 }}>
-            No drafts yet. Click "Generate This Week" to create this week's content.
+            No drafts yet. Click "✨ Create Content Pack" to generate this week's content.
           </div>
         ) : Object.entries(weekGroups).sort((a,b) => b[0].localeCompare(a[0])).map(([week, items]) => (
           <div key={week}>
-            <div style={{ padding:'8px 20px', fontSize:10, fontWeight:800, color:'#475569',
-              textTransform:'uppercase', letterSpacing:'.08em', background:'rgba(255,255,255,.02)' }}>
+            <div style={{ padding:'6px 20px', fontSize:9, fontWeight:800, color:'#334155',
+              textTransform:'uppercase', letterSpacing:'.08em', background:'rgba(255,255,255,.015)' }}>
               Week of {new Date(week+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}
             </div>
             {items.map((d) => {
               const meta = CONTENT_LABELS[d.content_type] || { label:d.content_type, icon:'📄', color:'#64748b' }
-              const isSelected = selected?.id === d.id
+              const isSel = selected?.id === d.id
               return (
                 <div key={d.id} onClick={() => { setSelected(d); setEditing(false); setEditBody(d.body) }}
-                  style={{ padding:'12px 20px', cursor:'pointer', borderLeft: isSelected ? '2px solid #6366f1' : '2px solid transparent',
-                    background: isSelected ? 'rgba(99,102,241,.1)' : 'transparent',
-                    borderBottom:'1px solid rgba(99,102,241,.08)' }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-                    <span style={{ fontSize:14 }}>{meta.icon}</span>
+                  style={{ padding:'10px 20px', cursor:'pointer',
+                    borderLeft: isSel ? '2px solid #6366f1' : '2px solid transparent',
+                    background: isSel ? 'rgba(99,102,241,.1)' : 'transparent',
+                    borderBottom:'1px solid rgba(99,102,241,.06)' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:3 }}>
+                    <span style={{ fontSize:13 }}>{meta.icon}</span>
                     <span style={{ fontSize:12, fontWeight:700, color:'#e2e8f0' }}>{meta.label}</span>
-                    <span style={{ marginLeft:'auto', fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20,
-                      background:`${STATUS_COLORS[d.status]}20`, color:STATUS_COLORS[d.status] }}>
+                    <span style={{ marginLeft:'auto', fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:20,
+                      background:`${STATUS_COLORS[d.status]}18`, color:STATUS_COLORS[d.status] }}>
                       {d.status}
                     </span>
                   </div>
-                  <div style={{ fontSize:11, color:'#475569', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  <div style={{ fontSize:10, color:'#475569', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                     {d.title}
                   </div>
                 </div>
@@ -2345,16 +2485,16 @@ function ContentCenter() {
         ))}
       </div>
 
-      {/* Right: detail / editor */}
+      {/* Right: detail panel */}
       <div style={{ flex:1, overflowY:'auto', padding:'28px 32px' }}>
         {!selected ? (
           <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', flexDirection:'column', gap:12 }}>
             <div style={{ fontSize:40 }}>✍️</div>
-            <div style={{ fontSize:16, color:'#475569' }}>Select a draft to review</div>
-            <div style={{ fontSize:12, color:'#334155' }}>or generate this week's content</div>
+            <div style={{ fontSize:15, color:'#475569' }}>Select a draft to review</div>
+            <div style={{ fontSize:12, color:'#334155' }}>or click "✨ Create Content Pack" to generate</div>
           </div>
         ) : (
-          <div style={{ maxWidth:760 }}>
+          <div style={{ maxWidth:780 }}>
 
             {/* Header */}
             <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:20, gap:16 }}>
@@ -2363,62 +2503,66 @@ function ContentCenter() {
                   textTransform:'uppercase', letterSpacing:'.08em', marginBottom:4 }}>
                   {CONTENT_LABELS[selected.content_type]?.icon} {CONTENT_LABELS[selected.content_type]?.label}
                 </div>
-                <div style={{ fontSize:20, fontWeight:800, color:'#fff' }}>{selected.title}</div>
-                <div style={{ fontSize:11, color:'#475569', marginTop:4 }}>
-                  Status: <span style={{ color: STATUS_COLORS[selected.status], fontWeight:700 }}>{selected.status}</span>
+                <div style={{ fontSize:20, fontWeight:800, color:'#fff', marginBottom:4 }}>{selected.title}</div>
+                <div style={{ fontSize:11, color:'#475569' }}>
+                  Status: <span style={{ color:STATUS_COLORS[selected.status], fontWeight:700 }}>{selected.status}</span>
                   {selected.approved_by && ` · Approved by ${selected.approved_by}`}
+                  {selected.published_at && ` · Published ${new Date(selected.published_at).toLocaleDateString()}`}
                 </div>
               </div>
 
-              {/* Action buttons */}
-              <div style={{ display:'flex', gap:8, flexShrink:0, flexWrap:'wrap', justifyContent:'flex-end' }}>
-                <button onClick={() => copyToClipboard(selected.body)} style={{ ...S.btn('ghost'), fontSize:12, padding:'7px 14px' }}>
-                  Copy
+              {/* Actions */}
+              <div style={{ display:'flex', gap:6, flexShrink:0, flexWrap:'wrap', justifyContent:'flex-end' }}>
+                <button onClick={() => copyToClipboard(selected.body)} style={{ ...S.btn('ghost'), fontSize:11, padding:'6px 12px' }}>Copy</button>
+                {!editing && <button onClick={() => { setEditing(true); setEditBody(selected.body) }} style={{ ...S.btn('ghost'), fontSize:11, padding:'6px 12px' }}>Edit</button>}
+                {editing && <>
+                  <button onClick={() => setEditing(false)} style={{ ...S.btn('ghost'), fontSize:11, padding:'6px 12px' }}>Cancel</button>
+                  <button onClick={saveEdit} disabled={saving} style={{ ...S.btn('primary'), fontSize:11, padding:'6px 12px' }}>{saving?'Saving…':'Save'}</button>
+                </>}
+                <button onClick={() => regenerateOne(selected)} disabled={regenId===selected.id}
+                  style={{ ...S.btn('ghost'), fontSize:11, padding:'6px 12px', color:'#6366f1', border:'1px solid rgba(99,102,241,.3)' }}>
+                  {regenId===selected.id ? '⟳ Regenerating…' : '↺ Regenerate'}
                 </button>
-                {!editing && (
-                  <button onClick={() => { setEditing(true); setEditBody(selected.body) }}
-                    style={{ ...S.btn('ghost'), fontSize:12, padding:'7px 14px' }}>
-                    Edit
-                  </button>
-                )}
-                {editing && (
-                  <>
-                    <button onClick={() => setEditing(false)} style={{ ...S.btn('ghost'), fontSize:12, padding:'7px 14px' }}>Cancel</button>
-                    <button onClick={saveEdit} disabled={saving} style={{ ...S.btn('primary'), fontSize:12, padding:'7px 14px' }}>
-                      {saving ? 'Saving…' : 'Save'}
-                    </button>
-                  </>
-                )}
                 {selected.status === 'draft' && (
-                  <button onClick={() => updateStatus(selected.id, 'approved')}
-                    style={{ ...S.btn('primary'), fontSize:12, padding:'7px 14px', background:'rgba(16,185,129,.8)' }}>
-                    ✓ Approve
-                  </button>
+                  <button onClick={() => updateStatus(selected.id,'approved')}
+                    style={{ ...S.btn('primary'), fontSize:11, padding:'6px 12px', background:'rgba(16,185,129,.8)' }}>✓ Approve</button>
                 )}
                 {selected.status === 'approved' && (
-                  <button onClick={() => updateStatus(selected.id, 'published')}
-                    style={{ ...S.btn('primary'), fontSize:12, padding:'7px 14px' }}>
-                    Mark Published
-                  </button>
+                  <button onClick={() => updateStatus(selected.id,'published')}
+                    style={{ ...S.btn('primary'), fontSize:11, padding:'6px 12px' }}>Mark Published</button>
                 )}
                 {selected.status !== 'archived' && (
-                  <button onClick={() => updateStatus(selected.id, 'archived')}
-                    style={{ ...S.btn('ghost'), fontSize:12, padding:'7px 14px', color:'#475569' }}>
-                    Archive
-                  </button>
+                  <button onClick={() => updateStatus(selected.id,'archived')}
+                    style={{ ...S.btn('ghost'), fontSize:11, padding:'6px 12px', color:'#475569' }}>Archive</button>
                 )}
+                <button onClick={() => deleteDraft(selected.id)}
+                  style={{ ...S.btn('ghost'), fontSize:11, padding:'6px 12px', color:'#ef4444', border:'1px solid rgba(239,68,68,.2)' }}>Delete</button>
               </div>
             </div>
 
+            {/* Content score */}
+            {scores[selected.id] && (
+              <div style={{ ...CC.card, padding:'16px 20px', marginBottom:16 }}>
+                <div style={{ fontSize:10, fontWeight:800, color:'#475569', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:10 }}>
+                  Content Score
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
+                  {Object.entries(scores[selected.id]).map(([label, n]) => (
+                    <div key={label}>
+                      <div style={{ fontSize:10, color:'#64748b', marginBottom:3 }}>{label}</div>
+                      <StarRating n={n} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Body */}
-            <div style={{ ...CC.card, padding:'24px 28px' }}>
+            <div style={{ ...CC.card, padding:'24px 28px', marginBottom:16 }}>
               {editing ? (
-                <textarea
-                  value={editBody}
-                  onChange={e => setEditBody(e.target.value)}
+                <textarea value={editBody} onChange={e => setEditBody(e.target.value)}
                   style={{ width:'100%', minHeight:400, background:'transparent', border:'none', outline:'none',
-                    color:'#e2e8f0', fontSize:14, lineHeight:1.7, resize:'vertical', fontFamily:'inherit' }}
-                />
+                    color:'#e2e8f0', fontSize:14, lineHeight:1.7, resize:'vertical', fontFamily:'inherit' }} />
               ) : (
                 <pre style={{ whiteSpace:'pre-wrap', wordBreak:'break-word', color:'#e2e8f0',
                   fontSize:14, lineHeight:1.7, fontFamily:'inherit', margin:0 }}>
@@ -2427,30 +2571,27 @@ function ContentCenter() {
               )}
             </div>
 
-            {/* Publishing calendar strip */}
-            <div style={{ marginTop:20, ...CC.card, padding:'16px 20px' }}>
-              <div style={{ fontSize:10, fontWeight:800, color:'#475569', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:12 }}>
-                Publishing Calendar
-              </div>
-              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                {['draft','approved','scheduled','published','archived'].map(s => {
-                  const count = drafts.filter(d => d.status === s).length
-                  return (
-                    <div key={s} style={{ padding:'6px 14px', borderRadius:20,
-                      background:`${STATUS_COLORS[s]}15`, border:`1px solid ${STATUS_COLORS[s]}30` }}>
+            {/* Calendar + phase 2 */}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:12, alignItems:'start' }}>
+              <div style={{ ...CC.card, padding:'14px 18px' }}>
+                <div style={{ fontSize:10, fontWeight:800, color:'#475569', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:10 }}>
+                  Publishing Calendar
+                </div>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                  {['draft','approved','scheduled','published','archived'].map(s => (
+                    <div key={s} style={{ padding:'5px 12px', borderRadius:20,
+                      background:`${STATUS_COLORS[s]}12`, border:`1px solid ${STATUS_COLORS[s]}28` }}>
                       <span style={{ fontSize:11, fontWeight:700, color:STATUS_COLORS[s] }}>
-                        {s.charAt(0).toUpperCase()+s.slice(1)} ({count})
+                        {s.charAt(0).toUpperCase()+s.slice(1)} ({drafts.filter(d=>d.status===s).length})
                       </span>
                     </div>
-                  )
-                })}
+                  ))}
+                </div>
               </div>
-            </div>
-
-            {/* Phase 2 note */}
-            <div style={{ marginTop:16, padding:'14px 18px', borderRadius:8,
-              background:'rgba(99,102,241,.06)', border:'1px dashed rgba(99,102,241,.25)', fontSize:12, color:'#475569' }}>
-              Phase 2: Direct publish to LinkedIn, Facebook, X, and email newsletter from this screen.
+              <div style={{ padding:'12px 16px', borderRadius:10, background:'rgba(99,102,241,.05)',
+                border:'1px dashed rgba(99,102,241,.2)', fontSize:11, color:'#475569', maxWidth:220 }}>
+                Phase 2: Auto-publish to LinkedIn, email newsletter
+              </div>
             </div>
           </div>
         )}
