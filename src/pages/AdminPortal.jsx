@@ -7,7 +7,7 @@ import { useState, useEffect, Suspense, lazy, useCallback } from 'react'
 import { ScreenShareProvider, useScreenShare } from '../context/ScreenShareContext'
 import { Routes, Route, NavLink, useNavigate, useLocation, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { FIRM, loadFirmBranding } from '../lib/firmBranding'
+import { FIRM, loadFirmBranding, loadFirmBrandingPublic } from '../lib/firmBranding'
 import { useApp } from '../context/AppContext'
 
 const NewOffice    = lazy(() => import('./NewOffice'))
@@ -939,7 +939,7 @@ function AdminTraining(){
     // The branding was already loaded when the session started.
     if (ss.active) { setReady(true); return }
     supabase.rpc('set_admin_tenant_override',{ p_tenant_id: TAXRESCRM_TENANT })
-      .then(()=> loadFirmBranding())
+      .then(()=> loadFirmBrandingPublic(TAXRESCRM_TENANT))
       .then(()=> setReady(true))
       .catch(()=> setReady(true))
     return ()=>{
