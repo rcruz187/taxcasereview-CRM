@@ -924,16 +924,20 @@ function Email(){return(
 // Clears the TCR tenant override so FIRM loads TaxRes CRM branding (the admin's
 // own settings row), not Tax Case Review the practice. Restores on unmount.
 function AdminTraining(){
+  const [ready, setReady] = useState(false)
   useEffect(()=>{
-    // Clear TCR override so FIRM loads TaxRes CRM branding for email/invite links
+    // Clear TCR override → loadFirmBranding reads admin's own settings (TaxRes CRM)
+    // Render only after FIRM is loaded so Training sees correct name/logo in URLs/emails
+    const timer = setTimeout(()=>setReady(true), 3000) // absolute fallback
     supabase.rpc('set_admin_tenant_override',{ p_tenant_id: null })
       .then(()=> loadFirmBranding())
-      .catch(()=>{})
+      .then(()=>{ clearTimeout(timer); setReady(true) })
+      .catch(()=>{ clearTimeout(timer); setReady(true) })
     return ()=>{
       supabase.rpc('set_admin_tenant_override',{ p_tenant_id: TCR_TENANT }).catch(()=>{})
     }
   },[])
-  // Render immediately — no ready gate. Branding loads async in background.
+  if (!ready) return <div style={{padding:32,color:'var(--t3)',fontSize:13}}>Loading…</div>
   return <TrainingPage/>
 }
 
@@ -1389,6 +1393,7 @@ export default function AdminPortal() {
   }
 
   return (
+    <ScreenShareProvider>
     <div style={{display:'flex',minHeight:'100vh',background:'#0d0c1a',fontFamily:'system-ui,Arial,sans-serif'}}>
       <Sidebar onSignOut={handleSignOut} />
       <div style={{flex:1,position:'relative',height:'100vh',overflow:'hidden'}}>
@@ -1409,11 +1414,12 @@ export default function AdminPortal() {
             <Route path="/support"        element={<div style={{padding:8}}><Support/></div>}/>
             <Route path="/email"          element={<Email/>}/>
             <Route path="/calendar"       element={<AdminCalendar/>}/>
-            <Route path="/training"       element={<ScreenShareProvider><AdminTraining/></ScreenShareProvider>}/>
+            <Route path="/training"       element={<AdminTraining/>}/>
             <Route path="*"               element={<Overview/>}/>
           </Routes>
         </Suspense>
       </div>
     </div>
+    </ScreenShareProvider>
   )
 }

@@ -194,16 +194,19 @@ export default function ScreenShareJoin() {
           </div>
         )}
 
-        {/* Camera strip — all participants */}
+        {/* Camera strip — all participants except host when they're sharing screen
+             (host's stream = screen content after replaceTrack, not their camera) */}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <div style={{ width: 160 }}>
             <CamTile stream={webrtc.localStreamRef.current} name={`${myName} (you)`} muted mirror />
           </div>
-          {peers.map(pName => (
-            <div key={pName} style={{ width: 160 }}>
-              <CamTile stream={webrtc.remoteStreams[pName]} name={pName} />
-            </div>
-          ))}
+          {peers
+            .filter(pName => !(screenState?.sharing && pName === hostName))
+            .map(pName => (
+              <div key={pName} style={{ width: 160 }}>
+                <CamTile stream={webrtc.remoteStreams[pName]} name={pName} />
+              </div>
+            ))}
         </div>
 
         {/* Controls */}
