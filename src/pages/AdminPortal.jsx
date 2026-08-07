@@ -7,7 +7,7 @@ import { useState, useEffect, Suspense, lazy, useCallback } from 'react'
 import { ScreenShareProvider } from '../context/ScreenShareContext'
 import { Routes, Route, NavLink, useNavigate, useLocation, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { loadFirmBranding } from '../lib/firmBranding'
+import { FIRM, loadFirmBranding } from '../lib/firmBranding'
 import { useApp } from '../context/AppContext'
 
 const NewOffice    = lazy(() => import('./NewOffice'))
@@ -923,21 +923,23 @@ function Email(){return(
 // ── Training (screen-share training, admin context) ──────────────────────────
 // Clears the TCR tenant override so FIRM loads TaxRes CRM branding (the admin's
 // own settings row), not Tax Case Review the practice. Restores on unmount.
+// TaxRes CRM branding for admin-portal Training — no DB row exists for romy@taxrescrm.net
+// so we set FIRM directly. Logo is the static asset already on gh-pages.
+const TAXRESCRM_LOGO = `${window.location.origin}/taxcasereview-CRM/taxrescrm-logo.png`
+const TAXRESCRM_NAME = 'TaxRes CRM'
+
 function AdminTraining(){
-  const [ready, setReady] = useState(false)
   useEffect(()=>{
-    // Clear TCR override → loadFirmBranding reads admin's own settings (TaxRes CRM)
-    // Render only after FIRM is loaded so Training sees correct name/logo in URLs/emails
-    const timer = setTimeout(()=>setReady(true), 3000) // absolute fallback
-    supabase.rpc('set_admin_tenant_override',{ p_tenant_id: null })
-      .then(()=> loadFirmBranding())
-      .then(()=>{ clearTimeout(timer); setReady(true) })
-      .catch(()=>{ clearTimeout(timer); setReady(true) })
+    // Set FIRM to TaxRes CRM values so Training builds correct invite URLs and emails
+    FIRM.name    = TAXRESCRM_NAME
+    FIRM.logoUrl = TAXRESCRM_LOGO
+    FIRM.tenantId = ''
+    FIRM.loaded  = true
     return ()=>{
-      supabase.rpc('set_admin_tenant_override',{ p_tenant_id: TCR_TENANT }).catch(()=>{})
+      // Restore TCR branding when leaving Training
+      loadFirmBranding()
     }
   },[])
-  if (!ready) return <div style={{padding:32,color:'var(--t3)',fontSize:13}}>Loading…</div>
   return <TrainingPage/>
 }
 
