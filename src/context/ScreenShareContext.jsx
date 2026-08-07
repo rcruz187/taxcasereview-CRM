@@ -29,13 +29,14 @@ export function ScreenShareProvider({ children }) {
   const [roomId,        setRoomId]        = useState('')
   const [minimized,     setMinimized]     = useState(false)
   const [sharingScreen, setSharingScreen] = useState(false)
+  const [myName,        setMyName       ] = useState('')
   const [screenStream,  setScreenStream]  = useState(null)
   const [remoteScreenState, setRemoteScreenState] = useState(null)
 
   const webrtc         = useWebRTCRoom('screenshare')
   const screenTrackRef = useRef(null)
   const stateRef       = useRef({})
-  stateRef.current     = { webrtc, screenStream, sharingScreen }
+  stateRef.current     = { webrtc, screenStream, sharingScreen, myName }
 
   // Expose screen state on window so the pop-out can read it directly (same-origin)
   useEffect(() => {
@@ -135,6 +136,7 @@ export function ScreenShareProvider({ children }) {
   async function startSession(myName) {
     const id = makeRoomId()
     setRoomId(id); setActive(true); setMinimized(false)
+    setMyName(myName)
     const result = await webrtc.join(id, myName, true)
     if (!result.ok) { setActive(false); return { ok: false, reason: result.reason } }
     // Listen for screen-state from other participants
@@ -152,6 +154,7 @@ export function ScreenShareProvider({ children }) {
 
   async function joinSession(id, myName) {
     setRoomId(id); setActive(true); setMinimized(false)
+    setMyName(myName)
     const result = await webrtc.join(id, myName, true)
     if (!result.ok) { setActive(false); return { ok: false, reason: result.reason } }
     return { ok: true }
