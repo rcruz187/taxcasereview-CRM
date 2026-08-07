@@ -1391,79 +1391,41 @@ function CommandCenter() {
   useEffect(() => {
     async function load() {
       const now = new Date()
-      const todayStr   = now.toISOString().slice(0,10)
-      const thisMonth  = now.toISOString().slice(0,7)
-      const yesterday  = new Date(now - 86400000).toISOString().slice(0,10)
       const h = now.getHours()
 
-      const [
-        { data: leads },
-        { data: clients },
-        { data: cases },
-        { data: tasks },
-        { data: calevents },
-        { data: esigns },
-        { data: payments },
-        { data: deadlines },
-        { data: tenants },
-        { data: leadNotes },
-        { data: clientNotes },
-      ] = await Promise.all([
-        supabase.from('leads').select('id,status,created_at,assignedTo,pipeline_stage').order('created_at',{ascending:false}),
-        supabase.from('clients').select('id,status,created_at,name').order('created_at',{ascending:false}),
-        supabase.from('cases').select('id,status,created_at').order('created_at',{ascending:false}),
-        supabase.from('tasks').select('id,done,dueDate,created_at,assignedTo,title').not('deleted','is',true),
-        supabase.from('calevents').select('id,title,start,end,type,created_at').order('start',{ascending:true}),
-        supabase.from('esigns').select('id,status,created_at,doc_type').order('created_at',{ascending:false}),
-        supabase.from('payments').select('id,amount,status,created_at,source').order('created_at',{ascending:false}),
-        supabase.from('deadlines').select('id,title,dueDate,status').order('dueDate',{ascending:true}),
+      // Two parallel calls: cross-tenant stats RPC + admin_tenant_overview
+      const [{ data: stats, error }, { data: tenants }] = await Promise.all([
+        supabase.rpc('admin_command_center_stats'),
         supabase.rpc('admin_tenant_overview').then(r => ({ data: r.data || [] })),
-        supabase.from('lead_notes').select('id,note,created_at,created_by').order('created_at',{ascending:false}).limit(20),
-        supabase.from('client_notes').select('id,note,created_at,created_by').order('created_at',{ascending:false}).limit(20),
       ])
 
-      const OPEN_S = ['Active','In Progress','Under Review','Pending','Awaiting','Open','New Case']
-      const todayStart = todayStr+'T00:00:00'
-      const todayEnd   = todayStr+'T23:59:59'
-      const yestStart  = yesterday+'T00:00:00'
-      const yestEnd    = yesterday+'T23:59:59'
+      if (error || !stats) { console.error('Command Center RPC error:', error); return }
 
-      const todayLeads     = (leads||[]).filter(l => l.created_at >= todayStart)
-      const yestLeads      = (leads||[]).filter(l => l.created_at >= yestStart && l.created_at <= yestEnd)
-      const openLeads      = (leads||[]).filter(l => !['Converted to Client','Dead','Do Not Contact'].includes(l.status))
-      const todayClients   = (clients||[]).filter(c => c.created_at >= todayStart)
-      const activeCases    = (cases||[]).filter(c => OPEN_S.some(s => c.status?.includes(s)))
-      const openTasks      = (tasks||[]).filter(t => !t.done)
-      const dueTodayTasks  = openTasks.filter(t => t.dueDate?.startsWith(todayStr))
-      const todayDemos     = (calevents||[]).filter(e => e.start >= todayStart && e.start <= todayEnd)
-      const pendingEsigns  = (esigns||[]).filter(e => e.status === 'pending' || e.status === 'sent')
-      const mtdRevenue     = (payments||[]).filter(p => p.created_at?.startsWith(thisMonth) && p.status==='succeeded').reduce((s,p)=>s+Number(p.amount||0),0)
-      const yestRevenue    = (payments||[]).filter(p=>p.created_at>=yestStart&&p.created_at<=yestEnd&&p.status==='succeeded').reduce((s,p)=>s+Number(p.amount||0),0)
-      const activeClients  = (clients||[]).filter(c=>c.status==='Active'||!c.status)
-      const upcomingDl     = (deadlines||[]).filter(d=>d.status!=='Completed'&&d.dueDate>=todayStr).slice(0,5)
-      const activeTenants  = (tenants||[]).filter(r=>r.status==='active')
-      const totalMRR       = (tenants||[]).reduce((s,r)=>s+Number(r.effective_monthly||0),0)
+      const activeTenants = (tenants||[]).filter(r=>r.status==='active')
+      const totalMRR      = (tenants||[]).reduce((s,r)=>s+Number(r.effective_monthly||0),0)
 
-      // What changed yesterday
+      // Build what-changed list from yesterday stats
       const changes = []
-      if (yestLeads.length>0) changes.push({ dir:'up', label:`${yestLeads.length} new lead${yestLeads.length>1?'s':''} yesterday` })
-      if (yestRevenue>0) changes.push({ dir:'up', label:`Revenue +$${yestRevenue.toLocaleString('en-US',{maximumFractionDigits:0})} yesterday` })
-      const yestEsigns = (esigns||[]).filter(e=>e.created_at>=yestStart&&e.created_at<=yestEnd&&e.status==='signed')
-      if (yestEsigns.length>0) changes.push({ dir:'up', label:`${yestEsigns.length} document${yestEsigns.length>1?'s':''} signed` })
-      const yestDemos  = (calevents||[]).filter(e=>e.start>=yestStart&&e.start<=yestEnd)
-      if (yestDemos.length>0) changes.push({ dir:'up', label:`${yestDemos.length} demo${yestDemos.length>1?'s':''} scheduled yesterday` })
-      if (pendingEsigns.length>0) changes.push({ dir:'down', label:`${pendingEsigns.length} e-sign${pendingEsigns.length>1?'s':''} pending signature` })
-      const overdueTasks = openTasks.filter(t=>t.dueDate&&t.dueDate<todayStr)
-      if (overdueTasks.length>0) changes.push({ dir:'down', label:`${overdueTasks.length} overdue task${overdueTasks.length>1?'s':''}` })
+      const yL = Number(stats.yesterday_new_leads||0)
+      const yC = Number(stats.yesterday_new_clients||0)
+      const yS = Number(stats.yesterday_signed||0)
+      const yR = Number(stats.yesterday_revenue||0)
+      const yD = Number(stats.yesterday_demos||0)
+      if (yL>0) changes.push({ dir:'up',   label:`${yL} new lead${yL>1?'s':''} yesterday` })
+      if (yC>0) changes.push({ dir:'up',   label:`${yC} new customer${yC>1?'s':''} signed` })
+      if (yR>0) changes.push({ dir:'up',   label:`Revenue +$${yR.toLocaleString('en-US',{maximumFractionDigits:0})} yesterday` })
+      if (yS>0) changes.push({ dir:'up',   label:`${yS} document${yS>1?'s':''} signed` })
+      if (yD>0) changes.push({ dir:'up',   label:`${yD} demo${yD>1?'s':''} yesterday` })
+      const pe = Number(stats.pending_esigns||0)
+      if (pe>0) changes.push({ dir:'down', label:`${pe} e-sign${pe>1?'s':''} pending signature` })
 
-      // Live activity feed — merge notes, esigns, leads, payments newest first
+      // Build activity feed by merging the separate recent_* arrays from RPC
       const feed = [
-        ...(leadNotes||[]).map(n=>({ ts:n.created_at, icon:'📝', text:`Note added by ${n.created_by||'team'}`, sub:'Lead file' })),
-        ...(clientNotes||[]).map(n=>({ ts:n.created_at, icon:'📋', text:`Note added by ${n.created_by||'team'}`, sub:'Client file' })),
-        ...(esigns||[]).filter(e=>e.status==='signed').slice(0,5).map(e=>({ ts:e.created_at, icon:'✍️', text:`Document signed`, sub:e.doc_type||'E-Signature' })),
-        ...(leads||[]).slice(0,5).map(l=>({ ts:l.created_at, icon:'👤', text:'Lead created', sub:l.assignedTo||'Unassigned' })),
-        ...(payments||[]).filter(p=>p.status==='succeeded').slice(0,5).map(p=>({ ts:p.created_at, icon:'💰', text:`Payment $${Number(p.amount||0).toLocaleString()}`, sub:'Collected' })),
-        ...(calevents||[]).filter(e=>new Date(e.start)>new Date(now-7*86400000)).slice(0,5).map(e=>({ ts:e.created_at||e.start, icon:'📅', text:'Demo scheduled', sub:e.title||'Meeting' })),
+        ...(stats.recent_lead_notes||[]).map(n=>({ ts:n.ts, icon:'📝', text:`Note added by ${n.sub||'team'}`, sub:'Lead file' })),
+        ...(stats.recent_client_notes||[]).map(n=>({ ts:n.ts, icon:'📋', text:`Note added by ${n.sub||'team'}`, sub:'Client file' })),
+        ...(stats.recent_esigns||[]).map(e=>({ ts:e.ts, icon:'✍️', text:'Document signed', sub:e.sub||'E-Signature' })),
+        ...(stats.recent_leads||[]).map(l=>({ ts:l.ts, icon:'👤', text:'Lead created', sub:l.sub||'Unassigned' })),
+        ...(stats.recent_payments||[]).map(p=>({ ts:p.ts, icon:'💰', text:'Payment collected', sub:p.sub||'' })),
       ].sort((a,b)=>new Date(b.ts)-new Date(a.ts)).slice(0,18)
 
       setActivity(feed)
@@ -1471,22 +1433,22 @@ function CommandCenter() {
         greeting: h<12?'Good morning':h<17?'Good afternoon':'Good evening',
         todayDate: now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}),
         kpis: {
-          activeCases:   activeCases.length,
-          openTasks:     openTasks.length,
-          todayDemos:    todayDemos.length,
-          newLeads:      todayLeads.length,
-          revenue:       mtdRevenue,
-          activeClients: activeClients.length,
-          openLeads:     openLeads.length,
-          dueTodayTasks: dueTodayTasks.length,
-          pendingEsigns: pendingEsigns.length,
+          activeCases:   Number(stats.active_cases||0),
+          openTasks:     Number(stats.open_tasks||0),
+          todayDemos:    Number(stats.today_demos||0),
+          newLeads:      Number(stats.new_leads_today||0),
+          revenue:       Number(stats.mtd_revenue||0),
+          activeClients: Number(stats.active_clients||0),
+          openLeads:     Number(stats.open_leads||0),
+          dueTodayTasks: Number(stats.due_today_tasks||0),
+          pendingEsigns: Number(stats.pending_esigns||0),
           activeTenants: activeTenants.length,
           totalMRR,
         },
         changes,
-        upcomingDl,
-        todaySchedule: (calevents||[]).filter(e=>e.start>=todayStart&&e.start<=todayEnd).slice(0,6),
-        upcomingDemos: (calevents||[]).filter(e=>e.start>now.toISOString()).slice(0,5),
+        upcomingDl:   (stats.upcoming_deadlines||[]).slice(0,5),
+        todaySchedule:(stats.today_schedule||[]).slice(0,6),
+        upcomingDemos:(stats.today_schedule||[]).filter(e=>new Date(e.start)>new Date()).slice(0,5),
         // Marketing mock data (live when GA4 is connected)
         marketing: {
           visitorsToday: 247,  visitorsChange: 18,
