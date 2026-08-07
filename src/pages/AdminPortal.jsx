@@ -927,15 +927,20 @@ function Email(){return(
 // Clears the TCR tenant override so FIRM loads TaxRes CRM branding (the admin's
 // own settings row), not Tax Case Review the practice. Restores on unmount.
 function AdminTraining(){
+  const [ready, setReady] = useState(false)
+
   useEffect(()=>{
-    // Set TaxRes CRM tenant override so FIRM loads correct branding from DB
+    // Await the override AND branding reload before rendering TrainingPage so
+    // FIRM.tenantId / FIRM.email are correct when the user hits Email.
     supabase.rpc('set_admin_tenant_override',{ p_tenant_id: TAXRESCRM_TENANT })
       .then(()=> loadFirmBranding())
-      .catch(()=>{})
+      .then(()=> setReady(true))
+      .catch(()=> setReady(true))
     return ()=>{
       supabase.rpc('set_admin_tenant_override',{ p_tenant_id: TCR_TENANT }).catch(()=>{})
     }
   },[])
+  if (!ready) return null
   return <TrainingPage/>
 }
 
