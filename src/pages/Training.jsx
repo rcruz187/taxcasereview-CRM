@@ -97,9 +97,9 @@ export default function Training() {
   // except for the TaxRes CRM logo which lives in gh-pages assets — build absolute URL.
   const safeLogo = firmLogo?.startsWith('https://')
     ? firmLogo
-    : firmLogo?.startsWith('/')
+    : firmLogo
       ? `${window.location.origin}${firmLogo}`
-      : ''
+      : `${window.location.origin}/taxcasereview-CRM/assets/taxrescrm-logo.png`
 
   async function sendInviteEmail() {
     const raw = emailTo.split(',').map(v => v.trim()).filter(Boolean)
