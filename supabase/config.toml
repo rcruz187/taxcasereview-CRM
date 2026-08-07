@@ -98,3 +98,6 @@ verify_jwt = true
 
 [functions.content-generator]
 verify_jwt = true
+
+[functions.linkedin-publish]
+verify_jwt = true

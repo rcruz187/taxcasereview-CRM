@@ -71,6 +71,7 @@ function Spinner() {
 const NAV = [
   { path:'/crm-admin/command-center', label:'Command Center', icon:'⚡' },
   { path:'/crm-admin/content',        label:'Content Center', icon:'✍️' },
+  { path:'/crm-admin/linkedin',       label:'LinkedIn',       icon:'💼' },
   { path:'/crm-admin/email',     label:'Email',        icon:'📧' },
   { path:'/crm-admin/calendar',  label:'Calendar',     icon:'📅' },
   { path:'/crm-admin/training',  label:'Training',     icon:'🖥️' },
@@ -2649,8 +2650,377 @@ function ContentCenter() {
               </div>
               <div style={{ padding:'12px 16px', borderRadius:10, background:'rgba(99,102,241,.05)',
                 border:'1px dashed rgba(99,102,241,.2)', fontSize:11, color:'#475569', maxWidth:220 }}>
-                Phase 2: Auto-publish to LinkedIn, email newsletter
+                Phase 2: Scheduled publishing, queue management, analytics
               </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── LinkedIn Publisher ─────────────────────────────────────────────────────
+const LI_STATUS_COLORS = { draft:'#475569', scheduled:'#6366f1', published:'#10b981', failed:'#ef4444' }
+
+function LinkedInPublisher() {
+  const [connection, setConnection]   = useState(null)  // null=loading, false=disconnected, obj=connected
+  const [posts, setPosts]             = useState([])
+  const [loading, setLoading]         = useState(true)
+  const [selected, setSelected]       = useState(null)
+  const [filter, setFilter]           = useState('all')
+  const [composing, setComposing]     = useState(false)
+  const [composeBody, setComposeBody] = useState('')
+  const [scheduleDate, setScheduleDate] = useState('')
+  const [publishing, setPublishing]   = useState(null)
+  const [saving, setSaving]           = useState(false)
+  const [toast, setToast]             = useState(null)
+
+  const LINKEDIN_CLIENT_ID = 'YOUR_CLIENT_ID' // replaced after OAuth app approved
+  const REDIRECT_URI = `${window.location.origin}/crm-admin/linkedin/callback`
+
+  function showToast(msg, ok=true) {
+    setToast({ msg, ok })
+    setTimeout(() => setToast(null), 3500)
+  }
+
+  async function load() {
+    setLoading(true)
+    const [connRes, postsRes] = await Promise.all([
+      supabase.rpc('get_linkedin_connection'),
+      supabase.rpc('get_linkedin_posts', { p_limit: 100 }),
+    ])
+    setConnection(connRes.data?.[0] || false)
+    setPosts(postsRes.data || [])
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  function connectLinkedIn() {
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: LINKEDIN_CLIENT_ID,
+      redirect_uri: REDIRECT_URI,
+      scope: 'openid profile w_member_social',
+      state: Math.random().toString(36).slice(2),
+    })
+    window.open(`https://www.linkedin.com/oauth/v2/authorization?${params}`, '_blank', 'width=600,height=700')
+    showToast('LinkedIn OAuth window opened. Complete sign-in there.', true)
+  }
+
+  async function disconnect() {
+    await supabase.functions.invoke('linkedin-publish', { body: { action: 'disconnect' } })
+    setConnection(false)
+    showToast('LinkedIn disconnected')
+  }
+
+  async function savePost(status='draft') {
+    if (!composeBody.trim()) { showToast('Post body is required', false); return }
+    setSaving(true)
+    const { data } = await supabase.rpc('upsert_linkedin_post', {
+      p_body: composeBody,
+      p_status: status,
+      p_scheduled_at: status==='scheduled' && scheduleDate ? new Date(scheduleDate).toISOString() : null,
+    })
+    if (data) {
+      setPosts(prev => [data, ...prev])
+      setSelected(data)
+      setComposing(false)
+      setComposeBody('')
+      setScheduleDate('')
+      showToast(status==='scheduled' ? 'Scheduled ✓' : 'Saved as draft ✓')
+    }
+    setSaving(false)
+  }
+
+  async function publishNow(post) {
+    if (!connection?.connected) { showToast('Connect LinkedIn first', false); return }
+    setPublishing(post.id)
+    const { data, error } = await supabase.functions.invoke('linkedin-publish', {
+      body: { action: 'publish', post_id: post.id }
+    })
+    if (data?.ok) {
+      setPosts(prev => prev.map(p => p.id===post.id ? {...p, status:'published', linkedin_url:data.url, published_at:new Date().toISOString()} : p))
+      if (selected?.id === post.id) setSelected(s => ({...s, status:'published', linkedin_url:data.url}))
+      showToast('Published to LinkedIn ✓')
+    } else {
+      setPosts(prev => prev.map(p => p.id===post.id ? {...p, status:'failed'} : p))
+      showToast('Publish failed — check LinkedIn connection', false)
+    }
+    setPublishing(null)
+  }
+
+  async function deletePost(id) {
+    await supabase.from('linkedin_posts').delete().eq('id', id)
+    setPosts(prev => prev.filter(p => p.id!==id))
+    if (selected?.id===id) setSelected(null)
+    showToast('Deleted')
+  }
+
+  const filtered = filter==='all' ? posts : posts.filter(p => p.status===filter)
+
+  const CC = { card: { background:'rgba(255,255,255,.04)', border:'1px solid rgba(99,102,241,.18)', borderRadius:12 } }
+
+  const charCount = composeBody.length
+  const charLimit = 3000
+  const charOk = charCount <= charLimit
+
+  return (
+    <div style={{ display:'flex', height:'100vh', overflow:'hidden', background:'#0a0918' }}>
+
+      {/* Toast */}
+      {toast && (
+        <div style={{ position:'fixed', top:20, right:20, zIndex:9999, padding:'10px 18px', borderRadius:8,
+          background: toast.ok ? 'rgba(16,185,129,.9)' : 'rgba(239,68,68,.9)',
+          color:'#fff', fontSize:13, fontWeight:600, boxShadow:'0 4px 20px rgba(0,0,0,.4)' }}>
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Left panel */}
+      <div style={{ width:300, borderRight:'1px solid rgba(99,102,241,.15)', overflowY:'auto', padding:'24px 0', flexShrink:0 }}>
+
+        {/* Header */}
+        <div style={{ padding:'0 20px 16px' }}>
+          <div style={{ fontSize:18, fontWeight:900, color:'#fff', marginBottom:2 }}>💼 LinkedIn</div>
+          <div style={{ fontSize:11, color:'#475569' }}>Manual approval required before publishing</div>
+        </div>
+
+        {/* Connection status */}
+        <div style={{ padding:'0 20px 16px' }}>
+          {loading ? (
+            <div style={{ fontSize:12, color:'#475569' }}>Checking connection…</div>
+          ) : connection?.connected ? (
+            <div style={{ ...CC.card, padding:'12px 14px' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                <span style={{ width:8, height:8, borderRadius:'50%', background:'#10b981', display:'inline-block', boxShadow:'0 0 6px #10b98160' }} />
+                <span style={{ fontSize:12, fontWeight:700, color:'#10b981' }}>Connected</span>
+              </div>
+              <div style={{ fontSize:11, color:'#e2e8f0', marginBottom:2 }}>{connection.display_name}</div>
+              <div style={{ fontSize:10, color:'#475569', marginBottom:10 }}>
+                Expires {new Date(connection.expires_at).toLocaleDateString()}
+              </div>
+              <button onClick={disconnect} style={{ ...S.btn('ghost'), fontSize:11, padding:'5px 12px', color:'#ef4444', border:'1px solid rgba(239,68,68,.2)' }}>
+                Disconnect
+              </button>
+            </div>
+          ) : (
+            <div style={{ ...CC.card, padding:'14px' }}>
+              <div style={{ fontSize:12, color:'#94a3b8', marginBottom:10, lineHeight:1.5 }}>
+                Connect your LinkedIn account to publish posts directly from TaxRes CRM.
+              </div>
+              <button onClick={connectLinkedIn} style={{ ...S.btn('primary'), fontSize:12, padding:'8px 16px', width:'100%' }}>
+                Connect LinkedIn
+              </button>
+              <div style={{ fontSize:10, color:'#334155', marginTop:8, lineHeight:1.5 }}>
+                Requires LinkedIn Developer App approval. See setup guide →
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* New post */}
+        <div style={{ padding:'0 20px 16px' }}>
+          <button onClick={() => { setComposing(true); setSelected(null) }}
+            style={{ ...S.btn('primary'), width:'100%', padding:'9px 0', fontSize:12 }}>
+            + New Post
+          </button>
+        </div>
+
+        {/* Filter */}
+        <div style={{ padding:'0 20px 12px', display:'flex', gap:4, flexWrap:'wrap' }}>
+          {['all','draft','scheduled','published','failed'].map(s => (
+            <button key={s} onClick={() => setFilter(s)} style={{
+              padding:'3px 9px', borderRadius:20, border:'none', cursor:'pointer', fontSize:11, fontWeight:600,
+              background: filter===s ? 'rgba(99,102,241,.4)' : 'rgba(255,255,255,.05)',
+              color: filter===s ? '#a5b4fc' : '#64748b',
+            }}>{s.charAt(0).toUpperCase()+s.slice(1)}</button>
+          ))}
+        </div>
+
+        {/* Post list */}
+        {loading ? (
+          <div style={{ padding:'20px', color:'#475569', fontSize:13 }}>Loading…</div>
+        ) : filtered.length===0 ? (
+          <div style={{ padding:'20px', color:'#475569', fontSize:13 }}>
+            No posts yet. Click "+ New Post" to draft your first LinkedIn post.
+          </div>
+        ) : filtered.map(p => (
+          <div key={p.id} onClick={() => { setSelected(p); setComposing(false) }}
+            style={{ padding:'12px 20px', cursor:'pointer',
+              borderLeft: selected?.id===p.id ? '2px solid #6366f1' : '2px solid transparent',
+              background: selected?.id===p.id ? 'rgba(99,102,241,.1)' : 'transparent',
+              borderBottom:'1px solid rgba(99,102,241,.06)' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+              <span style={{ fontSize:9, fontWeight:700, padding:'2px 8px', borderRadius:20,
+                background:`${LI_STATUS_COLORS[p.status]}18`, color:LI_STATUS_COLORS[p.status] }}>
+                {p.status}
+              </span>
+              {p.scheduled_at && (
+                <span style={{ fontSize:10, color:'#475569' }}>
+                  {new Date(p.scheduled_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize:12, color:'#94a3b8', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', lineHeight:1.4 }}>
+              {p.body.slice(0,80)}{p.body.length>80?'…':''}
+            </div>
+            <div style={{ fontSize:10, color:'#334155', marginTop:3 }}>
+              {new Date(p.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Right panel */}
+      <div style={{ flex:1, overflowY:'auto', padding:'28px 32px' }}>
+
+        {/* Compose */}
+        {composing && (
+          <div style={{ maxWidth:700 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+              <div style={{ fontSize:18, fontWeight:800, color:'#fff' }}>New LinkedIn Post</div>
+              <button onClick={() => setComposing(false)} style={{ ...S.btn('ghost'), fontSize:12 }}>Cancel</button>
+            </div>
+
+            <div style={{ ...CC.card, padding:'20px 22px', marginBottom:14 }}>
+              <textarea
+                value={composeBody}
+                onChange={e => setComposeBody(e.target.value)}
+                placeholder="Write your LinkedIn post here…&#10;&#10;120–160 words works best for engagement. Open with a specific insight, end with a question or CTA."
+                style={{ width:'100%', minHeight:280, background:'transparent', border:'none', outline:'none',
+                  color:'#e2e8f0', fontSize:14, lineHeight:1.75, resize:'vertical', fontFamily:'inherit' }}
+              />
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:10, paddingTop:10, borderTop:'1px solid rgba(99,102,241,.1)' }}>
+                <span style={{ fontSize:11, color: charOk ? '#475569' : '#ef4444' }}>
+                  {charCount} / {charLimit} characters
+                </span>
+                <span style={{ fontSize:11, color:'#475569' }}>LinkedIn max: 3,000 characters</span>
+              </div>
+            </div>
+
+            {/* Schedule */}
+            <div style={{ ...CC.card, padding:'16px 20px', marginBottom:18 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:10 }}>
+                Schedule (optional)
+              </div>
+              <input type="datetime-local" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)}
+                style={{ background:'rgba(255,255,255,.06)', border:'1px solid rgba(99,102,241,.2)', borderRadius:8,
+                  color:'#e2e8f0', fontSize:13, padding:'8px 12px', width:'100%', boxSizing:'border-box' }} />
+              <div style={{ fontSize:11, color:'#475569', marginTop:6 }}>
+                Leave blank to save as a draft without a scheduled time.
+              </div>
+            </div>
+
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={() => savePost('draft')} disabled={saving || !charOk}
+                style={{ ...S.btn('ghost'), fontSize:12, padding:'9px 18px' }}>
+                Save as Draft
+              </button>
+              {scheduleDate && (
+                <button onClick={() => savePost('scheduled')} disabled={saving || !charOk}
+                  style={{ ...S.btn('primary'), fontSize:12, padding:'9px 18px', background:'rgba(99,102,241,.8)' }}>
+                  {saving ? 'Scheduling…' : 'Schedule Post'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Post detail */}
+        {!composing && selected && (
+          <div style={{ maxWidth:700 }}>
+            <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:20, gap:16 }}>
+              <div>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                  <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20,
+                    background:`${LI_STATUS_COLORS[selected.status]}18`, color:LI_STATUS_COLORS[selected.status] }}>
+                    {selected.status}
+                  </span>
+                  {selected.published_at && (
+                    <span style={{ fontSize:11, color:'#475569' }}>
+                      Published {new Date(selected.published_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}
+                    </span>
+                  )}
+                  {selected.scheduled_at && selected.status==='scheduled' && (
+                    <span style={{ fontSize:11, color:'#6366f1' }}>
+                      Scheduled {new Date(selected.scheduled_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize:11, color:'#334155' }}>
+                  Created {new Date(selected.created_at).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}
+                </div>
+              </div>
+
+              <div style={{ display:'flex', gap:6, flexShrink:0, flexWrap:'wrap', justifyContent:'flex-end' }}>
+                <button onClick={() => navigator.clipboard.writeText(selected.body).then(()=>showToast('Copied'))}
+                  style={{ ...S.btn('ghost'), fontSize:11, padding:'6px 12px' }}>Copy</button>
+                {selected.status !== 'published' && (
+                  <button onClick={() => publishNow(selected)} disabled={publishing===selected.id || !connection?.connected}
+                    style={{ ...S.btn('primary'), fontSize:11, padding:'6px 14px',
+                      background: connection?.connected ? 'rgba(16,185,129,.8)' : 'rgba(99,102,241,.3)' }}>
+                    {publishing===selected.id ? '⟳ Publishing…' : '▶ Publish Now'}
+                  </button>
+                )}
+                {selected.linkedin_url && (
+                  <a href={selected.linkedin_url} target="_blank" rel="noreferrer"
+                    style={{ ...S.btn('ghost'), fontSize:11, padding:'6px 12px', textDecoration:'none', color:'#0ea5e9' }}>
+                    View on LinkedIn ↗
+                  </a>
+                )}
+                {selected.status !== 'published' && (
+                  <button onClick={() => deletePost(selected.id)}
+                    style={{ ...S.btn('ghost'), fontSize:11, padding:'6px 12px', color:'#ef4444', border:'1px solid rgba(239,68,68,.2)' }}>
+                    Delete
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Error */}
+            {selected.status==='failed' && selected.error_msg && (
+              <div style={{ padding:'12px 16px', borderRadius:8, background:'rgba(239,68,68,.08)', border:'1px solid rgba(239,68,68,.2)', marginBottom:14, fontSize:12, color:'#ef4444' }}>
+                Publish failed. Check your LinkedIn connection and try again.
+              </div>
+            )}
+
+            {/* Body */}
+            <div style={{ ...CC.card, padding:'24px 26px', marginBottom:14 }}>
+              <pre style={{ whiteSpace:'pre-wrap', wordBreak:'break-word', color:'#e2e8f0', fontSize:14, lineHeight:1.75, fontFamily:'inherit', margin:0 }}>
+                {selected.body}
+              </pre>
+            </div>
+
+            {/* Stats placeholder */}
+            {selected.status==='published' && (
+              <div style={{ ...CC.card, padding:'16px 20px', opacity:.7 }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:8 }}>
+                  Post Analytics
+                </div>
+                <div style={{ fontSize:12, color:'#475569' }}>
+                  Impressions, reactions, and click data available in Phase 2 once LinkedIn analytics API access is approved.
+                </div>
+              </div>
+            )}
+
+            {/* Not connected warning */}
+            {!connection?.connected && selected.status!=='published' && (
+              <div style={{ padding:'12px 16px', borderRadius:8, background:'rgba(245,158,11,.06)', border:'1px solid rgba(245,158,11,.2)', fontSize:12, color:'#f59e0b' }}>
+                Connect your LinkedIn account to publish this post.
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Empty */}
+        {!composing && !selected && (
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', flexDirection:'column', gap:12 }}>
+            <div style={{ fontSize:40 }}>💼</div>
+            <div style={{ fontSize:15, color:'#475569' }}>LinkedIn Publisher</div>
+            <div style={{ fontSize:12, color:'#334155', textAlign:'center', maxWidth:320 }}>
+              Draft, schedule, and publish LinkedIn posts directly from TaxRes CRM. Every post requires manual approval before publishing.
             </div>
           </div>
         )}
@@ -2706,6 +3076,7 @@ export default function AdminPortal() {
           <Routes>
             <Route path="/command-center" element={<CommandCenter/>}/>
             <Route path="/content"         element={<ContentCenter/>}/>
+            <Route path="/linkedin"        element={<LinkedInPublisher/>}/>
             <Route path="/"               element={<Overview/>}/>
             <Route path="/offices"        element={<OfficesList/>}/>
             <Route path="/offices/:id"    element={<OfficePage/>}/>
