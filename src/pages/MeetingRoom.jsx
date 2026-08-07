@@ -121,7 +121,7 @@ export default function MeetingRoom() {
     <div style={{ minHeight: '100vh', background: '#0a0f1a', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #1e293b' }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9' }}>Tax Case Review — Meeting</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9' }}>{FIRM.name || 'Tax Case Review'} — Meeting</div>
         <div style={{ fontSize: 12, color: '#86efac' }}>{webrtc.members.length} in the call</div>
       </div>
 
