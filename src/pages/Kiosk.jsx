@@ -9,6 +9,7 @@ const CLOCKIN_URL = window.location.origin + '/taxcasereview-CRM/clockin'
 export default function Kiosk() {
   const [now, setNow] = useState(new Date())
   const [logoUrl, setLogoUrl] = useState(LOGO)
+  const [firmName, setFirmName] = useState('')
   const [lockdown, setLockdown] = useState(true)
   const [params] = useSearchParams()
 
@@ -21,6 +22,7 @@ export default function Kiosk() {
     (async () => {
       const tenantHint = params.get('t')
       const { data } = await supabase.rpc('booking_get_public_meta', tenantHint ? { p_tenant: tenantHint } : {})
+      if (data?.firm_name) setFirmName(data.firm_name)
       const url = data?.logo_url
       if (url) {
         const img = new Image()
@@ -88,11 +90,11 @@ export default function Kiosk() {
         {/* Logo */}
         <img
           src={logoUrl}
-          alt="Tax Case Review"
+          alt={firmName || 'Tax Case Review'}
           style={{ height: 64, objectFit: 'contain', background: '#fff', borderRadius: 12, padding: '6px 14px', marginBottom: 14 }}
           onError={e => { e.target.src = LOGO }}
         />
-        <div style={{ fontSize: 20, fontWeight: 700, color: '#fff', marginBottom: 2 }}>Tax Case Review CRM</div>
+        <div style={{ fontSize: 20, fontWeight: 700, color: '#fff', marginBottom: 2 }}>{firmName || 'Tax Case Review'} CRM</div>
         <div style={{ fontSize: 12, color: 'rgba(255,255,255,.4)', marginBottom: 18 }}>Employee Time Clock</div>
 
         {/* Live Clock */}

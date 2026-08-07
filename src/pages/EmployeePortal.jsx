@@ -348,7 +348,7 @@ export default function EmployeePortal() {
           value={loginEmail}
           onChange={e => { setLoginEmail(e.target.value); setLoginErr('') }}
           onKeyDown={e => e.key === 'Enter' && handleLogin()}
-          placeholder="you@taxcasereview.org"
+          placeholder="your@workemail.com"
           autoComplete="off"
           style={{ width: '100%', padding: '14px 16px', background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 12, color: '#f1f5f9', fontSize: 15, outline: 'none', boxSizing: 'border-box', marginBottom: 14, fontFamily: 'inherit', colorScheme: 'dark' }}
           autoFocus
