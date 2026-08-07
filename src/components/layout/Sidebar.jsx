@@ -423,8 +423,8 @@ export default function Sidebar() {
         <button className="sidebar-close-btn" onClick={(e)=>{e.stopPropagation();setMobileNavOpen(false)}} aria-label="Close menu">×</button>
         {logoUrl
           ? <img src={logoUrl} alt={firmName}
-                  style={{ width:'100%', maxHeight:120, objectFit:'contain',
-                           display:'block', padding:'8px 12px', boxSizing:'border-box' }} />
+                  style={{ display:'block', width:'100%', padding:'6px 10px',
+                           boxSizing:'border-box' }} />
           : <>
               <div style={{fontWeight:900,fontSize:18,color:'var(--blue)',textAlign:'center',lineHeight:1.2}}>{firmName}</div>
               <div style={{textAlign:'center'}}>
