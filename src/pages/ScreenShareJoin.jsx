@@ -52,8 +52,10 @@ export default function ScreenShareJoin() {
 
   const [ready,         setReady]         = useState(false)
   // Prefer URL-passed branding; fall back to loaded FIRM once ready
-  const displayName = urlFirm || (ready ? (FIRM.name || 'TaxRes CRM') : 'TaxRes CRM')
-  const displayLogo = urlLogo || (ready ? FIRM.logoUrl : '') || `${window.location.origin}/taxcasereview-CRM/assets/taxrescrm-logo.png`
+  // Wait for loadFirmBrandingPublic to finish before showing branding.
+  // ?firm= and ?logo= are fallbacks if the tenant param isn't set.
+  const displayName = ready ? (FIRM.name || urlFirm || 'TaxRes CRM') : (urlFirm || '')
+  const displayLogo = ready ? (FIRM.logoUrl || urlLogo || `${window.location.origin}/taxcasereview-CRM/assets/taxrescrm-logo.png`) : (urlLogo || '')
   const [name,          setName]          = useState('')
   const [entered,       setEntered]       = useState(false)
   const [joining,       setJoining]       = useState(false)
