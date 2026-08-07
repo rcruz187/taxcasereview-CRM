@@ -1382,16 +1382,6 @@ export default function AdminPortal() {
   const navigate = useNavigate()
   const { logout } = useApp()
 
-  // Load TaxRes CRM branding (admin's own settings) on mount.
-  // Must run BEFORE AdminCalendar sets the TCR tenant override,
-  // so FIRM = TaxRes CRM for Training, booking emails, and invite links.
-  useEffect(()=>{
-    supabase.rpc('set_admin_tenant_override',{ p_tenant_id: null })
-      .catch(()=>{})
-      .then(()=> loadFirmBranding())
-      .catch(()=>{})
-  },[])
-
   async function handleSignOut() {
     await supabase.auth.signOut()
     logout?.()
