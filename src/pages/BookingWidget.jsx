@@ -41,6 +41,7 @@ export default function BookingWidget({ contact, onClose, mode = 'lead' }) {
     setLinkSent('sending')
     const first = (contact.name || '').split(' ')[0] || 'there'
     const { error } = await supabase.functions.invoke('send-email', { body: {
+      tenant_id: FIRM.tenantId || undefined,
       to: contact.email,
       subject: `Schedule Your Appointment — ${FIRM.name || 'Tax Case Review'}`,
       html: emailHtml({ body: `<p>Hi <strong>${first}</strong>,</p><p>Pick whichever time works best for you — it takes less than a minute:</p><p style="text-align:center;margin:24px 0"><a href="${BOOK_URL}" style="background:#1d4ed8;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:700;font-size:15px;display:inline-block">📅 Choose a Time</a></p><p>You'll see our live availability and get an instant confirmation. If nothing there works, just reply to this email or give us a call.</p><p style="margin-top:20px">Talk soon,<br><strong>${FIRM.name || 'Tax Case Review'}</strong></p>` }),

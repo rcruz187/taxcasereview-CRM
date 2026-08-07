@@ -128,6 +128,7 @@ export default function IRSFormFiller({ client, onClose }) {
       if ((sendVia === 'email' || sendVia === 'both') && client.email) {
         const { error: eErr } = await supabase.functions.invoke('send-email', {
           body: {
+            tenant_id: FIRM.tenantId || undefined,
             to: client.email,
             subject: `Action Required: Sign Your ${label}`,
             html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px">
