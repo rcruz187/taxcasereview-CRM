@@ -1510,7 +1510,7 @@ function CommandCenter() {
           { label:'Email (Stalwart)',     ok:true  },
           { label:'taxrescrm.net',        ok:true  },
           { label:'taxrescrm.app',        ok:true  },
-          { label:'GA4 Sync',            ok:null  },  // null = not connected yet
+          { label:'GA4 Sync',            ok:true  },
           { label:'Search Console',      ok:null  },
           { label:'Bing',                ok:null  },
           { label:'Microsoft Clarity',   ok:null  },
@@ -1519,6 +1519,76 @@ function CommandCenter() {
     }
     load()
   }, [])
+
+  // ── GA4 real data load ─────────────────────────────────────────────────────
+  const [ga4Data, setGa4Data] = useState(null)
+  const [ga4Loading, setGa4Loading] = useState(false)
+
+  async function loadGA4() {
+    setGa4Loading(true)
+    try {
+      // Trigger a fresh sync first
+      await supabase.functions.invoke('ga4-sync')
+
+      // Read results from cache tables
+      const today = new Date().toISOString().slice(0,10)
+      const [{ data: traffic }, { data: pages }, { data: syncLog }] = await Promise.all([
+        supabase.from('marketing_ga4_traffic').select('*').gte('date', new Date(Date.now()-7*86400000).toISOString().slice(0,10)).order('date',{ascending:false}),
+        supabase.from('marketing_ga4_pages').select('*').eq('date', today).order('sessions',{ascending:false}).limit(10),
+        supabase.from('marketing_sync_log').select('*').eq('source','ga4').order('synced_at',{ascending:false}).limit(1),
+      ])
+
+      // Aggregate totals for today
+      const todayRows = (traffic||[]).filter(r=>r.date===today)
+      const totalSessions   = todayRows.reduce((s,r)=>s+Number(r.sessions||0),0)
+      const totalUsers      = todayRows.reduce((s,r)=>s+Number(r.users||0),0)
+      const totalNewUsers   = todayRows.reduce((s,r)=>s+Number(r.new_users||0),0)
+      const totalPageViews  = todayRows.reduce((s,r)=>s+Number(r.page_views||0),0)
+      const avgBounce       = todayRows.length ? todayRows.reduce((s,r)=>s+Number(r.bounce_rate||0),0)/todayRows.length : 0
+      const avgPages        = todayRows.length ? todayRows.reduce((s,r)=>s+Number(r.pages_per_session||0),0)/todayRows.length : 0
+
+      // Yesterday comparison
+      const yest = new Date(Date.now()-86400000).toISOString().slice(0,10)
+      const yestRows = (traffic||[]).filter(r=>r.date===yest)
+      const yestSessions = yestRows.reduce((s,r)=>s+Number(r.sessions||0),0)
+      const sessionChange = yestSessions>0 ? Math.round(((totalSessions-yestSessions)/yestSessions)*100) : 0
+
+      // Channel breakdown
+      const channels = []
+      const channelMap = {}
+      for (const r of todayRows) {
+        channelMap[r.channel||'Direct'] = (channelMap[r.channel||'Direct']||0) + Number(r.sessions||0)
+      }
+      const totalCh = Object.values(channelMap).reduce((s,v)=>s+v,0)||1
+      const COLORS = {
+        'Organic Search':'#6366f1','Direct':'#0ea5e9','Referral':'#10b981',
+        'Organic Social':'#f59e0b','Email':'#ec4899','Paid Search':'#8b5cf6','Unassigned':'#64748b'
+      }
+      for (const [ch,count] of Object.entries(channelMap).sort((a,b)=>b[1]-a[1]).slice(0,6)) {
+        channels.push({ label:ch, pct:Math.round((count/totalCh)*100), color:COLORS[ch]||'#64748b' })
+      }
+
+      const lastSync = syncLog?.[0]
+      setGa4Data({
+        sessions: totalSessions,
+        users: totalUsers,
+        newUsers: totalNewUsers,
+        pageViews: totalPageViews,
+        bounceRate: avgBounce.toFixed(1),
+        pagesPerSession: avgPages.toFixed(1),
+        sessionChange,
+        channels: channels.length ? channels : [{ label:'No data yet', pct:100, color:'#334155' }],
+        topPages: (pages||[]).map(p=>({ path:p.page_path, views:p.sessions, avgTime: Math.round(p.avg_time_sec||0)+'s' })),
+        lastSync: lastSync ? new Date(lastSync.synced_at).toLocaleTimeString() : 'never',
+        status: lastSync?.status || 'pending',
+      })
+    } catch(e) {
+      console.error('GA4 load error:', e)
+    }
+    setGa4Loading(false)
+  }
+
+  useEffect(() => { if (tab==='marketing') loadGA4() }, [tab])
 
   // Poll activity every 30s
   useEffect(() => {
@@ -1787,48 +1857,63 @@ function CommandCenter() {
 
         {/* ═══ MARKETING TAB ═══ */}
         {tab==='marketing' && (<>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24 }}>
-            {[
-              { label:'Visitors Today',   value:'247',   sub:'↑ 18% vs last week',  icon:'🌐', color:'#6366f1' },
-              { label:'Sessions',         value:'312',   sub:'↑ 14% vs last week',  icon:'📊', color:'#0ea5e9' },
-              { label:'Bounce Rate',      value:'38.2%', sub:'↓ 4% improvement',    icon:'↩️', color:'#10b981' },
-              { label:'Pages / Session',  value:'3.1',   sub:'avg engagement',       icon:'📄', color:'#f59e0b' },
-            ].map(k => <KPICard key={k.label} {...k} />)}
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+            <div style={{ fontSize:11, color:'#475569' }}>
+              {ga4Data ? `Last synced: ${ga4Data.lastSync}` : 'Loading GA4 data…'}
+            </div>
+            <button onClick={loadGA4} disabled={ga4Loading} style={{ ...S.btn('ghost'), fontSize:12, padding:'6px 16px' }}>
+              {ga4Loading ? '⟳ Syncing…' : '⟳ Refresh'}
+            </button>
           </div>
 
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18, marginBottom:24 }}>
-            {/* Traffic sources */}
-            <div style={CC.card({padding:'22px 24px'})}>
-              <div style={CC.sectionLabel}>Traffic sources</div>
-              {data.marketing.topSources.map((s,i) => (
-                <div key={i} style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
-                  <div style={{ fontSize:12, color:'#94a3b8', width:120, flexShrink:0 }}>{s.label}</div>
-                  <MiniBar pct={s.pct} color={s.color} />
-                  <div style={{ fontSize:12, fontWeight:700, color:s.color, width:36, textAlign:'right' }}>{s.pct}%</div>
-                </div>
-              ))}
+          {ga4Loading && !ga4Data ? (
+            <div style={{ textAlign:'center', padding:60, color:'#475569' }}>
+              <div style={{ fontSize:28, marginBottom:12 }}>📊</div>
+              <div>Pulling data from Google Analytics…</div>
+            </div>
+          ) : ga4Data ? (<>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24 }}>
+              {[
+                { label:'Sessions Today',    value: ga4Data.sessions.toLocaleString(), sub: ga4Data.sessionChange!==0 ? `${ga4Data.sessionChange>0?'↑':'↓'} ${Math.abs(ga4Data.sessionChange)}% vs yesterday` : 'vs yesterday', icon:'📊', color:'#6366f1' },
+                { label:'Users Today',       value: ga4Data.users.toLocaleString(),    sub:`${ga4Data.newUsers.toLocaleString()} new`,   icon:'👥', color:'#0ea5e9' },
+                { label:'Bounce Rate',       value:`${ga4Data.bounceRate}%`,            sub:'avg today',     icon:'↩️', color:'#10b981' },
+                { label:'Pages / Session',   value: ga4Data.pagesPerSession,            sub:'avg today',     icon:'📄', color:'#f59e0b' },
+              ].map(k => <KPICard key={k.label} {...k} />)}
             </div>
 
-            {/* Top pages */}
-            <div style={CC.card({padding:'22px 24px'})}>
-              <div style={CC.sectionLabel}>Top landing pages</div>
-              {data.marketing.topPages.map((p,i) => (
-                <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
-                  padding:'9px 0', borderBottom: i<data.marketing.topPages.length-1?'1px solid rgba(99,102,241,.1)':'none' }}>
-                  <div style={{ fontSize:12, color:'#e2e8f0', fontFamily:'monospace', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:260 }}>{p.path}</div>
-                  <div style={{ display:'flex', gap:12, flexShrink:0 }}>
-                    <span style={{ fontSize:12, color:'#94a3b8' }}>{p.views} views</span>
-                    <span style={{ fontSize:11, fontWeight:700, color:'#10b981' }}>{p.change}</span>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18, marginBottom:24 }}>
+              <div style={CC.card({padding:'22px 24px'})}>
+                <div style={CC.sectionLabel}>Traffic sources — today</div>
+                {ga4Data.channels.map((s,i) => (
+                  <div key={i} style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
+                    <div style={{ fontSize:12, color:'#94a3b8', width:130, flexShrink:0 }}>{s.label}</div>
+                    <MiniBar pct={s.pct} color={s.color} />
+                    <div style={{ fontSize:12, fontWeight:700, color:s.color, width:36, textAlign:'right' }}>{s.pct}%</div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
+                ))}
+              </div>
 
-          <div style={{ ...CC.card(), padding:'20px 24px', background:'rgba(99,102,241,.06)', border:'1px dashed rgba(99,102,241,.3)' }}>
-            <div style={{ fontSize:13, color:'#6366f1', fontWeight:700, marginBottom:4 }}>⚡ Connect GA4 to see live data</div>
-            <div style={{ fontSize:12, color:'#475569' }}>Currently showing mock data. Go to Admin → Command Center → System to connect Google Analytics.</div>
-          </div>
+              <div style={CC.card({padding:'22px 24px'})}>
+                <div style={CC.sectionLabel}>Top pages — last 7 days</div>
+                {ga4Data.topPages.length===0
+                  ? <div style={{ fontSize:13, color:'#475569' }}>No page data yet.</div>
+                  : ga4Data.topPages.map((p,i) => (
+                  <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                    padding:'9px 0', borderBottom: i<ga4Data.topPages.length-1?'1px solid rgba(99,102,241,.1)':'none' }}>
+                    <div style={{ fontSize:12, color:'#e2e8f0', fontFamily:'monospace', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:240 }}>{p.path}</div>
+                    <div style={{ display:'flex', gap:12, flexShrink:0 }}>
+                      <span style={{ fontSize:12, color:'#94a3b8' }}>{p.views} sessions</span>
+                      <span style={{ fontSize:11, color:'#475569' }}>{p.avgTime}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>) : (
+            <div style={{ ...CC.card(), padding:'24px', textAlign:'center', color:'#475569' }}>
+              GA4 sync failed. Check System tab for details.
+            </div>
+          )}
         </>)}
 
         {/* ═══ SEARCH TAB ═══ */}
@@ -2076,7 +2161,7 @@ export default function AdminPortal() {
       link.href = href
       document.head.appendChild(link)
     }
-    setFavicon('/taxcasereview-CRM/taxrescrm-favicon.png')
+    setFavicon('/taxcasereview-CRM/assets/taxrescrm-logo.png')
     return () => {
       document.title = prev
       setFavicon('/taxcasereview-CRM/taxrescrm-favicon.png')
