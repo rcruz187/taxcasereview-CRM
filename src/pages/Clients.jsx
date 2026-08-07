@@ -1226,10 +1226,21 @@ export default function Clients() {
     .filter(c => filter==='All' || c.clientType===filter)
 
   function buildPayload(f) {
-    const {dobM,dobD,dobY,id,created_at,pipelineStage,...rest}=f
-    const dob=dobM&&dobD&&dobY?`${dobM}/${dobD}/${dobY}`:f.dob||''
+    const {
+      dobM, dobD, dobY, id, created_at, pipelineStage,
+      // Fields returned by select('*') that must never be in an update payload:
+      tenant_id, deleted_at, archived, dnd,
+      autopay_last_charged_at, autopay_last_result,
+      stripe_checkout_sent_at, payment_plan_changes,
+      qb_id, qb_synced_at, xero_id, xero_synced_at,
+      // Lowercase duplicate columns — Postgres has both cases; only update the canonical ones
+      assignedto, clientsince, clienttype, filingstatus, irsbalance, irsorstate,
+      issuetype, pipelinestage, spousedob, spousename, spousessn, spouseoccupation,
+      ...rest
+    } = f
+    const dob = dobM && dobD && dobY ? `${dobM}/${dobD}/${dobY}` : f.dob || ''
     // pipelineStage excluded from main payload — updated separately
-    const safe={...rest,dob,dependents:JSON.stringify(f.dependents||[]),filingRequirements:JSON.stringify(f.filingRequirements||[])}
+    const safe = { ...rest, dob, dependents: JSON.stringify(f.dependents || []), filingRequirements: JSON.stringify(f.filingRequirements || []) }
     // Empty-string values blow up non-text columns (date, numeric) with
     // "invalid input syntax" — Postgres wants null for "no value", not ''.
     Object.keys(safe).forEach(k => { if (safe[k] === '') safe[k] = null })
