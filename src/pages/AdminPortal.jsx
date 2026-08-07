@@ -2076,7 +2076,7 @@ export default function AdminPortal() {
       link.href = href
       document.head.appendChild(link)
     }
-    setFavicon('/taxcasereview-CRM/assets/taxrescrm-logo.png')
+    setFavicon('/taxcasereview-CRM/taxrescrm-favicon.png')
     return () => {
       document.title = prev
       setFavicon('/taxcasereview-CRM/taxrescrm-favicon.png')
