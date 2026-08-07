@@ -2063,6 +2063,26 @@ export default function AdminPortal() {
   const navigate = useNavigate()
   const { logout } = useApp()
 
+  // Swap favicon + title to TaxRes CRM brand while in the admin portal
+  useEffect(() => {
+    const prev = document.title
+    document.title = 'TaxRes CRM — Admin'
+    // Force favicon to the TaxRes CRM logo
+    const setFavicon = (href) => {
+      document.querySelectorAll("link[rel*='icon']").forEach(el => el.remove())
+      const link = document.createElement('link')
+      link.rel = 'icon'
+      link.type = 'image/png'
+      link.href = href
+      document.head.appendChild(link)
+    }
+    setFavicon('/taxcasereview-CRM/assets/taxrescrm-logo.png')
+    return () => {
+      document.title = prev
+      setFavicon('/taxcasereview-CRM/taxrescrm-favicon.png')
+    }
+  }, [])
+
   async function handleSignOut() {
     await supabase.auth.signOut()
     logout?.()
