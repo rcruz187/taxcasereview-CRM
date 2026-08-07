@@ -216,17 +216,6 @@ export default function TimeEntry({ clientId, clientName, embed = false }) {
 
       {/* Toolbar */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button className="btn pri" style={{ fontSize: 12, padding: '7px 14px' }} onClick={openNew}>+ Log Time</button>
-        <div style={{ display: 'flex', gap: 4, background: 'var(--s1)', border: '1px solid var(--br)', borderRadius: 7, padding: 3 }}>
-          {['all', 'wip', 'billed'].map(v => (
-            <button key={v} onClick={() => setFilterBilled(v)}
-              style={{ padding: '4px 12px', borderRadius: 5, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                       background: filterBilled === v ? 'var(--blue)' : 'transparent',
-                       color: filterBilled === v ? '#fff' : 'var(--t2)' }}>
-              {v === 'all' ? 'All' : v === 'wip' ? '⏳ WIP' : '✅ Billed'}
-            </button>
-          ))}
-        </div>
         <button onClick={() => setShowReport(r => !r)}
           style={{ padding: '7px 14px', background: showReport ? '#1e3a8a' : 'var(--s1)', border: '1px solid var(--br)', borderRadius: 8, color: showReport ? '#fff' : 'var(--t2)', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
           📊 {showReport ? 'Hide Report' : 'Billing Report'}

@@ -1616,6 +1616,16 @@ export default function Leads() {
       }
     } catch (e) { console.error('Financial intake carry-over/auto-send error:', e) }
 
+    // ── Write a conversion note on the new client record ──────────────────
+    try {
+      const actor = resolveActorName(user, employees)
+      await supabase.from('client_notes').insert({
+        clientname: l.name,
+        text: `🔄 Converted from lead to client by ${actor}.`,
+        author: actor, visible_to_client: false, created_at: new Date().toISOString()
+      })
+    } catch (e) { console.error('Conversion note failed:', e) }
+
     // ── Transfer signed documents from lead to client file ─────────────────
     // Copies all document rows (signed agreements, e-sign certs, etc.) that
     // were saved under this lead's name so they appear in the client file.
