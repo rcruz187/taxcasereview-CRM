@@ -47,6 +47,7 @@ export async function loadFirmBranding() {
         FIRM.logoUrl = logo_url || ''
         FIRM.loaded = true
         try { document.title = `${FIRM.name} — IRS Resolution CRM` } catch (_) {}
+        setFavicon('', FIRM.name) // impersonation = non-TCR tenant → taxrescrm favicon
         return FIRM
       }
     } catch (_) {}
@@ -70,6 +71,7 @@ export async function loadFirmBranding() {
     // their demo should not see another firm's name above their own CRM. The
     // static index.html title remains the pre-login fallback.
     try { document.title = `${name} — IRS Resolution CRM` } catch (_) {}
+    setFavicon(s.tenant_id, name)
     FIRM.logoUrl = s.logourl || ''
     FIRM.address = address
     FIRM.phone = s.phone || s.firmphone || ''
@@ -100,6 +102,23 @@ export async function loadFirmBrandingPublic(tenantHint) {
     }
   } catch (_) { /* keep defaults */ }
   return FIRM
+}
+
+// Dynamically swap the browser favicon to match the current tenant.
+// TCR keeps its own favicon; TaxRes CRM admin gets the taxrescrm favicon;
+// other tenants use taxrescrm favicon as the platform favicon.
+function setFavicon(tenantId, name) {
+  try {
+    const BASE = '/taxcasereview-CRM/'
+    const TCR_TENANT  = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
+    const TAXRESCRM   = 'a0000000-0000-0000-0000-000000000001'
+    const href = (tenantId === TCR_TENANT)
+      ? BASE + 'favicon.png'          // Tax Case Review — TCR favicon
+      : BASE + 'taxrescrm-favicon.png' // TaxRes CRM + all other tenant offices
+    document.querySelectorAll('link[rel*="icon"]').forEach(el => {
+      el.href = href
+    })
+  } catch (_) {}
 }
 
 export function firmFooterLine() {
