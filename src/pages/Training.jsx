@@ -90,8 +90,9 @@ export default function Training() {
         const { error } = await supabase.functions.invoke('send-email', {
           body: {
             tenant_id: FIRM.tenantId || undefined,
+            from_name: firm,
+            from_email: FIRM.email || undefined,
             to,
-            // Use the tenant's own email settings so the invite comes from the right firm
             subject: `Join the training session — ${firm}`,
             html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px">
 <div style="text-align:center;margin-bottom:20px">
