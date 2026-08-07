@@ -46,13 +46,14 @@ export function ScreenShareProvider({ children }) {
       // The pop-out must drive the REAL session mic/camera, not a second
       // getUserMedia of its own — otherwise its mute button silences a
       // stream nobody is listening to and participants still hear the host.
-      localStream:  webrtc.localStreamRef.current,
-      micOn:        webrtc.micOn,
-      cameraOn:     webrtc.cameraOn,
-      toggleMic:    webrtc.toggleMic,
-      toggleCamera: webrtc.toggleCamera,
+      localStream:   webrtc.localStreamRef.current,
+      remoteStreams:  webrtc.remoteStreams,
+      micOn:         webrtc.micOn,
+      cameraOn:      webrtc.cameraOn,
+      toggleMic:     webrtc.toggleMic,
+      toggleCamera:  webrtc.toggleCamera,
     }
-  }, [sharingScreen, screenStream, webrtc.members, webrtc.micOn, webrtc.cameraOn, webrtc.joined])
+  }, [sharingScreen, screenStream, webrtc.members, webrtc.remoteStreams, webrtc.micOn, webrtc.cameraOn, webrtc.joined])
 
   // Broadcast member list to pop-out whenever it changes
   useEffect(() => {
