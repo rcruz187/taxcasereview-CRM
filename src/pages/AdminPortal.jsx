@@ -924,25 +924,17 @@ function Email(){return(
 // Clears the TCR tenant override so FIRM loads TaxRes CRM branding (the admin's
 // own settings row), not Tax Case Review the practice. Restores on unmount.
 function AdminTraining(){
-  const [ready, setReady] = useState(false)
-
   useEffect(()=>{
-    // Clear override → current_tenant_id() resolves admin's own tenant → TaxRes CRM settings
+    // Clear TCR override so FIRM loads TaxRes CRM branding for email/invite links
     supabase.rpc('set_admin_tenant_override',{ p_tenant_id: null })
       .then(()=> loadFirmBranding())
-      .then(()=> setReady(true))
-      .catch(()=> setReady(true))
+      .catch(()=>{})
     return ()=>{
-      // Restore TCR override when leaving Training
       supabase.rpc('set_admin_tenant_override',{ p_tenant_id: TCR_TENANT }).catch(()=>{})
     }
   },[])
-  if (!ready) return null
-  return (
-    <div className="page-content" style={{position:'relative',overflow:'hidden',padding:0}}>
-      <TrainingPage/>
-    </div>
-  )
+  // Render immediately — no ready gate. Branding loads async in background.
+  return <TrainingPage/>
 }
 
 // ── Calendar (real CRM Calendar component, contained in the admin shell) ──────
