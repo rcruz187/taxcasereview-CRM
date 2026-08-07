@@ -99,6 +99,8 @@ export async function loadFirmBrandingPublic(tenantHint) {
       if (data.firm_name) FIRM.name = data.firm_name
       if (data.logo_url) FIRM.logoUrl = data.logo_url
       FIRM.loaded = true
+      setFavicon(FIRM.tenantId, FIRM.name)
+      try { document.title = `${FIRM.name} — IRS Resolution CRM` } catch (_) {}
     }
   } catch (_) { /* keep defaults */ }
   return FIRM
