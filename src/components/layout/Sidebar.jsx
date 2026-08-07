@@ -422,7 +422,9 @@ export default function Sidebar() {
       <div className="brand" onClick={() => navigate('/')} style={{flexDirection:'column',alignItems:'center',padding: logoUrl ? 0 : '8px 12px',gap:4,position:'relative',background:'#0C1F35'}}>
         <button className="sidebar-close-btn" onClick={(e)=>{e.stopPropagation();setMobileNavOpen(false)}} aria-label="Close menu">×</button>
         {logoUrl
-          ? <img src={logoUrl} alt={firmName} />
+          ? <img src={logoUrl} alt={firmName}
+                  style={{ width:'100%', maxHeight:120, objectFit:'contain',
+                           display:'block', padding:'8px 12px', boxSizing:'border-box' }} />
           : <>
               <div style={{fontWeight:900,fontSize:18,color:'var(--blue)',textAlign:'center',lineHeight:1.2}}>{firmName}</div>
               <div style={{textAlign:'center'}}>
