@@ -1476,20 +1476,14 @@ function CommandCenter() {
             { path:'/about',                    views:38, change:'+5%'  },
           ],
         },
-        // Search mock data (live when GSC is connected)
+        // Search data — populated from gscData state after fetch
         search: {
-          impressions: 4820,  impressionsChange: 9,
-          clicks: 312,        clicksChange: 18,
-          ctr: 6.5,           ctrChange: 0.8,
-          avgPosition: 11.2,  posChange: -1.4,
-          indexedPages: 18,
-          topQueries: [
-            { query:'tax resolution crm', pos:8.2,  clicks:47, impressions:320 },
-            { query:'irs case management software', pos:12.1, clicks:28, impressions:210 },
-            { query:'tax resolution software', pos:14.8, clicks:19, impressions:180 },
-            { query:'canopy alternative tax crm', pos:9.3,  clicks:16, impressions:140 },
-            { query:'tax professional crm',  pos:11.7, clicks:14, impressions:120 },
-          ],
+          impressions: 0, impressionsChange: 0,
+          clicks: 0, clicksChange: 0,
+          ctr: 0, ctrChange: 0,
+          avgPosition: 0, posChange: 0,
+          indexedPages: 0,
+          topQueries: [],
         },
         // Goals mock (live when goals table exists)
         goals: [
@@ -1531,6 +1525,46 @@ function CommandCenter() {
     }
     load()
   }, [])
+
+  // ── GSC state + fetch ──
+  const [gscData, setGscData]         = useState(null)
+  const [gscLoading, setGscLoading]   = useState(false)
+  const [gscConnected, setGscConnected] = useState(false)
+
+  useEffect(() => {
+    // Handle GSC OAuth callback (?code= in URL after redirect)
+    const urlParams = new URLSearchParams(window.location.search)
+    const gscCode = urlParams.get('code')
+    if (gscCode) {
+      window.history.replaceState({}, '', window.location.pathname)
+      const redirect = window.location.origin + '/taxcasereview-CRM/crm-admin/command-center'
+      supabase.functions.invoke('gsc-data', {
+        body: { action: 'connect', code: gscCode, redirect_uri: redirect }
+      }).then(({ data: r }) => {
+        if (r?.success) fetchGSC()
+      }).catch(e => console.error('GSC connect:', e))
+    } else {
+      fetchGSC()
+    }
+  }, [])
+
+  async function fetchGSC() {
+    setGscLoading(true)
+    try {
+      const { data: gsc } = await supabase.functions.invoke('gsc-data', { body: {} })
+      if (gsc && !gsc.mock && !gsc.error) {
+        setGscData(gsc)
+        setGscConnected(true)
+      }
+    } catch(e) { console.error('GSC fetch:', e) } finally { setGscLoading(false) }
+  }
+
+  function handleGSCConnect() {
+    const CLIENT_ID = '823434895788-jtckeodk2cq0ff4kbevaqmm35j73m8dd.apps.googleusercontent.com'
+    const redirect  = window.location.origin + '/taxcasereview-CRM/crm-admin/command-center'
+    const scope     = 'https://www.googleapis.com/auth/webmasters.readonly'
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent`
+  }
 
   // ── GA4 real data load ─────────────────────────────────────────────────────
   const [ga4Data, setGa4Data] = useState(null)
@@ -1941,43 +1975,63 @@ function CommandCenter() {
 
         {/* ═══ SEARCH TAB ═══ */}
         {tab==='search' && (<>
+          {/* Live GSC data when connected, zeros when not */}
+          {(()=>{ const sd = gscConnected && gscData ? gscData : null; return (
           <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24 }}>
             {[
-              { label:'Impressions',    value:data.search.impressions.toLocaleString(), sub:`↑ ${data.search.impressionsChange}% vs last week`, icon:'👁', color:'#6366f1' },
-              { label:'Clicks',         value:data.search.clicks.toLocaleString(),      sub:`↑ ${data.search.clicksChange}% vs last week`,      icon:'🖱', color:'#0ea5e9' },
-              { label:'CTR',            value:`${data.search.ctr}%`,                    sub:`↑ ${data.search.ctrChange}% improvement`,          icon:'📈', color:'#10b981' },
-              { label:'Avg Position',   value:data.search.avgPosition,                  sub:`↑ ${Math.abs(data.search.posChange)} positions`,   icon:'🎯', color:'#f59e0b' },
-            ].map(k => <KPICard key={k.label} {...k} />)}
+              { label:'Impressions',  value: sd ? sd.impressions.toLocaleString() : '—',  sub: sd ? `${sd.impressionsChange>=0?'↑':'↓'} ${Math.abs(sd.impressionsChange)}% vs prev 28d` : 'No data', icon:'👁',  color:'#6366f1' },
+              { label:'Clicks',       value: sd ? sd.clicks.toLocaleString() : '—',        sub: sd ? `${sd.clicksChange>=0?'↑':'↓'} ${Math.abs(sd.clicksChange)}% vs prev 28d` : 'No data',   icon:'🖱️', color:'#10b981' },
+              { label:'CTR',          value: sd ? `${sd.ctr}%` : '—',                      sub: sd ? `${sd.ctrChange>=0?'↑':'↓'} ${Math.abs(sd.ctrChange)}% improvement` : 'No data',         icon:'📊', color:'#f59e0b' },
+              { label:'Avg Position', value: sd ? String(sd.avgPosition) : '—',            sub: sd ? `${sd.posChange>=0?'↑':'↓'} ${Math.abs(sd.posChange)} positions` : 'No data',             icon:'🎯', color:'#f97316' },
+            ].map((m,i)=>(
+              <div key={i} style={{ background:'var(--bg2)', borderRadius:10, padding:'18px 20px', border:'1px solid var(--border)' }}>
+                <div style={{ fontSize:11, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:6 }}>{m.label}</div>
+                <div style={{ fontSize:28, fontWeight:800, color:m.color, marginBottom:4 }}>{m.value}</div>
+                <div style={{ fontSize:12, color:'var(--t3)' }}>{m.sub}</div>
+              </div>
+            ))}
           </div>
+          )})()}
 
-          <div style={CC.card({padding:'22px 24px'})}>
-            <div style={CC.sectionLabel}>Top keywords</div>
-            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
-              <thead>
-                <tr>
-                  {['Keyword','Position','Clicks','Impressions','CTR'].map(h => (
-                    <th key={h} style={{ padding:'8px 12px', fontSize:10, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.05em', textAlign: h==='Keyword'?'left':'right', borderBottom:'1px solid rgba(99,102,241,.15)' }}>{h}</th>
+          {/* Top queries table */}
+          {gscConnected && gscData?.topQueries?.length > 0 && (
+            <div style={{ background:'var(--bg2)', borderRadius:10, border:'1px solid var(--border)', overflow:'hidden', marginBottom:16 }}>
+              <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', fontWeight:700, fontSize:13 }}>TOP KEYWORDS</div>
+              <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                <thead><tr style={{ background:'rgba(0,0,0,.2)' }}>
+                  {['KEYWORD','POSITION','CLICKS','IMPRESSIONS'].map(h=>(
+                    <th key={h} style={{ padding:'8px 16px', textAlign:'left', fontSize:11, color:'var(--t3)', letterSpacing:'.06em' }}>{h}</th>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {data.search.topQueries.map((q,i) => (
-                  <tr key={i}>
-                    <td style={{ padding:'10px 12px', color:'#e2e8f0', fontWeight:500 }}>{q.query}</td>
-                    <td style={{ padding:'10px 12px', textAlign:'right', color: q.pos<=10?'#10b981':'#f59e0b', fontWeight:700 }}>{q.pos}</td>
-                    <td style={{ padding:'10px 12px', textAlign:'right', color:'#94a3b8' }}>{q.clicks}</td>
-                    <td style={{ padding:'10px 12px', textAlign:'right', color:'#64748b' }}>{q.impressions}</td>
-                    <td style={{ padding:'10px 12px', textAlign:'right', color:'#6366f1', fontWeight:600 }}>{((q.clicks/q.impressions)*100).toFixed(1)}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </tr></thead>
+                <tbody>
+                  {gscData.topQueries.map((q,i)=>(
+                    <tr key={i} style={{ borderTop:'1px solid var(--border)' }}>
+                      <td style={{ padding:'12px 16px', fontSize:14, fontWeight:500 }}>{q.query}</td>
+                      <td style={{ padding:'12px 16px', fontSize:14, color: q.pos<=10?'#10b981':q.pos<=20?'#f59e0b':'#f97316', fontWeight:700 }}>{q.pos}</td>
+                      <td style={{ padding:'12px 16px', fontSize:14, color:'var(--t2)' }}>{q.clicks}</td>
+                      <td style={{ padding:'12px 16px', fontSize:14, color:'#6366f1' }}>{q.impressions}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-          <div style={{ ...CC.card(), padding:'20px 24px', background:'rgba(99,102,241,.06)', border:'1px dashed rgba(99,102,241,.3)', marginTop:18 }}>
-            <div style={{ fontSize:13, color:'#6366f1', fontWeight:700, marginBottom:4 }}>⚡ Connect Search Console for live rankings</div>
-            <div style={{ fontSize:12, color:'#475569' }}>Currently showing mock data. Real-time keyword tracking activates when GSC is connected.</div>
-          </div>
+          {/* Connect / status banner */}
+          {!gscConnected && (
+            <div style={{ padding:'20px 24px', background:'rgba(99,102,241,.06)', border:'1px dashed rgba(99,102,241,.3)', borderRadius:8, marginTop:18 }}>
+              <div style={{ fontSize:13, color:'#6366f1', fontWeight:700, marginBottom:8 }}>⚡ Connect Google Search Console for live rankings</div>
+              {gscLoading
+                ? <div style={{ fontSize:12, color:'var(--t3)' }}>Checking connection…</div>
+                : <button onClick={handleGSCConnect} style={{ background:'#6366f1', color:'#fff', border:'none', borderRadius:6, padding:'8px 20px', fontSize:13, fontWeight:600, cursor:'pointer' }}>Connect Search Console</button>
+              }
+            </div>
+          )}
+          {gscConnected && gscData?.siteUrl && (
+            <div style={{ fontSize:12, color:'var(--t3)', marginTop:8 }}>
+              ✅ Live data from {gscData.siteUrl} — last 28 days
+            </div>
+          )}
         </>)}
 
         {/* ═══ SALES TAB ═══ */}
@@ -2623,6 +2677,14 @@ export default function AdminPortal() {
       setFavicon('/taxcasereview-CRM/taxrescrm-favicon.png')
     }
   }, [])
+
+  async function handleGSCConnect() {
+    const CLIENT_ID = '823434895788-jtckeodk2cq0ff4kbevaqmm35j73m8dd.apps.googleusercontent.com'
+    const redirect  = window.location.origin + '/taxcasereview-CRM/crm-admin/command-center'
+    const scope     = 'https://www.googleapis.com/auth/webmasters.readonly'
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent`
+    window.location.href = url
+  }
 
   async function handleSignOut() {
     await supabase.auth.signOut()
