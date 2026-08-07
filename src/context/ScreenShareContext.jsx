@@ -99,18 +99,39 @@ export function ScreenShareProvider({ children }) {
     getBC().postMessage({ type: 'screen-state', host: myName, sharing })
   }
 
-  function replacePeerTracks(newTrack) {
+  // screenSendersRef tracks the extra sender added for the screen track
+  // so we can remove it cleanly when screen sharing stops.
+  const screenSendersRef = { current: [] }
+
+  function addScreenTrackToPeers(track) {
     const pcs = stateRef.current.webrtc.peerConnsRef.current
+    const stream = stateRef.current.webrtc.localStreamRef.current
+    screenSendersRef.current = []
     Object.values(pcs).forEach(pc => {
-      const sender = pc.getSenders().find(s => s.track?.kind === 'video')
-      if (!sender) return
-      if (newTrack) {
-        sender.replaceTrack(newTrack).catch(() => {})
-      } else {
-        const cam = stateRef.current.webrtc.localStreamRef.current?.getVideoTracks()[0]
-        if (cam) sender.replaceTrack(cam).catch(() => {})
-      }
+      try {
+        const sender = pc.addTrack(track, stream || new MediaStream([track]))
+        screenSendersRef.current.push(sender)
+      } catch (_) {}
     })
+  }
+
+  function removeScreenTrackFromPeers() {
+    const pcs = stateRef.current.webrtc.peerConnsRef.current
+    screenSendersRef.current.forEach(sender => {
+      Object.values(pcs).forEach(pc => {
+        try { pc.removeTrack(sender) } catch (_) {}
+      })
+    })
+    screenSendersRef.current = []
+  }
+
+  // Keep replacePeerTracks for stop-share camera restore
+  function replacePeerTracks(newTrack) {
+    if (newTrack) {
+      addScreenTrackToPeers(newTrack)
+    } else {
+      removeScreenTrackFromPeers()
+    }
   }
 
   function _resetState() {

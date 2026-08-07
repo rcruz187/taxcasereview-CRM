@@ -51,6 +51,7 @@ export function useWebRTCRoom(channelPrefix) {
   const [members, setMembers] = useState([])
   const [remoteStreams,       setRemoteStreams]       = useState({})
   const [remoteScreenStreams, setRemoteScreenStreams] = useState({}) // { name: MediaStream }
+  const remoteStreamsRef = useRef({}) // tracks which peers already have a camera stream
   const [micOn, setMicOn] = useState(true)
   const [cameraOn, setCameraOn] = useState(true)
   const [joined, setJoined] = useState(false)
@@ -90,22 +91,27 @@ export function useWebRTCRoom(channelPrefix) {
     }
     pc.ontrack = (e) => {
       const track = e.track
-      // contentHint='detail' is set by the sender (ScreenShareContext.startScreenShare)
-      // specifically so we can identify screen tracks reliably on the receiver.
-      // This is the primary check — it propagates through WebRTC unlike getSettings().displaySurface.
-      // Label-based checks are secondary fallbacks for browsers that don't support contentHint.
+      if (track.kind !== 'video') return  // audio is handled by streams[0] automatically
+
+      // Primary: contentHint='detail' set by sender on the screen track
+      const isScreenByHint  = track.contentHint === 'detail'
+      // Secondary: label-based detection
       const labelLower = (track.label || '').toLowerCase()
-      const isScreenByHint = track.kind === 'video' && track.contentHint === 'detail'
-      const isScreenByLabel = track.kind === 'video' && (
+      const isScreenByLabel = (
         labelLower.startsWith('screen:') || labelLower.startsWith('window:') ||
         labelLower.startsWith('tab:') || labelLower.includes('entire screen')
       )
-      const isScreen = isScreenByHint || isScreenByLabel
+      // Tertiary: if this peer already has a camera stream, a second video track must be the screen
+      const alreadyHasCamera = !!remoteStreamsRef.current[peerName]
+      const isScreen = isScreenByHint || isScreenByLabel || alreadyHasCamera
+
       if (isScreen) {
         const screenStream = new MediaStream([track])
         setRemoteScreenStreams(prev => ({ ...prev, [peerName]: screenStream }))
       } else {
-        setRemoteStreams(prev => ({ ...prev, [peerName]: e.streams[0] }))
+        // First video track for this peer = camera
+        setRemoteStreams(prev => ({ ...prev, [peerName]: e.streams[0] || new MediaStream([track]) }))
+        remoteStreamsRef.current = { ...remoteStreamsRef.current, [peerName]: true }
       }
     }
     pc.onicecandidate = (e) => {
