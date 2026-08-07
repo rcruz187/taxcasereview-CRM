@@ -200,13 +200,11 @@ export default function ScreenShareJoin() {
           <div style={{ width: 160 }}>
             <CamTile stream={webrtc.localStreamRef.current} name={`${myName} (you)`} muted mirror />
           </div>
-          {peers
-            .filter(pName => !(screenState?.sharing && pName === hostName))
-            .map(pName => (
-              <div key={pName} style={{ width: 160 }}>
-                <CamTile stream={webrtc.remoteStreams[pName]} name={pName} />
-              </div>
-            ))}
+          {peers.map(pName => (
+            <div key={pName} style={{ width: 160 }}>
+              <CamTile stream={webrtc.remoteStreams[pName]} name={pName} />
+            </div>
+          ))}
         </div>
 
         {/* Controls */}

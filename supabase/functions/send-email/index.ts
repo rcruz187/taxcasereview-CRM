@@ -81,21 +81,26 @@ serve(async (req) => {
     else settingsQuery = settingsQuery.limit(1)
     const { data: settings } = await settingsQuery.maybeSingle()
 
+    // If this tenant has no Gmail connected, fall back to the platform Gmail (first settings row)
+    // but preserve the tenant's display name so emails show the right firm name.
+    let activeSettings = settings
     if (!settings?.gmail_refresh_token || !settings?.gmail_client_id || !settings?.gmail_client_secret) {
-      return new Response(JSON.stringify({ error: 'Gmail is not connected in Settings yet' }), {
-        status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+      const { data: platformSettings } = await supabase.from('settings')
+        .select('*').not('gmail_refresh_token', 'is', null).limit(1).maybeSingle()
+      if (!platformSettings?.gmail_refresh_token) {
+        return new Response(JSON.stringify({ error: 'Gmail is not connected in Settings yet' }), {
+          status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+      activeSettings = platformSettings
     }
 
-    const token = await getValidGmailToken(supabase, settings)
+    const token = await getValidGmailToken(supabase, activeSettings)
 
-    // from_email/from_name let a caller override the sender for a specific
-    // send (e.g. training invites go out as the TaxRes CRM product address,
-    // not the tax practice's client-facing address). The address MUST be a
-    // verified "Send mail as" alias on the connected Gmail account or Google
-    // silently rewrites the header back to the primary address.
-    const fromDisplayName = from_name || settings.name || 'Tax Case Review'
-    const fromAddress     = from_email || settings.email
+    // from_email/from_name let a caller override the sender for a specific send.
+    // Display name comes from the requested tenant; address from the active Gmail account.
+    const fromDisplayName = from_name || settings?.name || 'Tax Case Review'
+    const fromAddress     = from_email || settings?.email || activeSettings.email
     const from = fromAddress ? `${encodeHeaderValue(fromDisplayName)} <${fromAddress}>` : encodeHeaderValue(fromDisplayName)
     const replyTo = fromAddress ? `Reply-To: ${fromAddress}` : null
     const encodedSubject = encodeHeaderValue(subject)

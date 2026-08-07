@@ -74,12 +74,14 @@ export function useWebRTCRoom(channelPrefix) {
     const pc = new RTCPeerConnection(iceServersRef.current)
     peerConnsRef.current[peerName] = pc
     if (localStreamRef.current) {
+      // Always send all local tracks (camera + audio) to every peer.
       localStreamRef.current.getTracks().forEach(t => {
-        // Skip the camera video track when screen sharing — the screen track
-        // is added in its place below, so late joiners see the screen.
-        if (t.kind === 'video' && screenTrackRef.current) return
         pc.addTrack(t, localStreamRef.current)
       })
+      // If screen sharing is active, also send the screen track as a separate track.
+      // The receiver's ontrack distinguishes it via contentHint='detail'.
+      // This means late joiners get BOTH camera and screen — camera in remoteStreams,
+      // screen in remoteScreenStreams.
       if (screenTrackRef.current) pc.addTrack(screenTrackRef.current, localStreamRef.current)
     } else if (viewerOnlyRef.current) {
       // Viewer-only: explicitly request incoming streams without sending anything
