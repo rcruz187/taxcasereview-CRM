@@ -36,10 +36,20 @@ export default function Training() {
   const [firmTenantId, setFirmTenantId] = useState(() => FIRM.tenantId || '')
   const [firmEmail,    setFirmEmail]    = useState(() => FIRM.email || '')
   useEffect(() => {
-    setFirmName(FIRM.name || '')
-    setFirmLogo(FIRM.logoUrl || '')
-    setFirmTenantId(FIRM.tenantId || '')
-    setFirmEmail(FIRM.email || '')
+    // AdminTraining awaits set_admin_tenant_override + loadFirmBranding before
+    // rendering us, but FIRM may still be mid-load. Poll briefly to capture it.
+    const apply = () => {
+      if (FIRM.name) {
+        setFirmName(FIRM.name)
+        setFirmLogo(FIRM.logoUrl || '')
+        setFirmTenantId(FIRM.tenantId || '')
+        setFirmEmail(FIRM.email || '')
+      }
+    }
+    apply()
+    const t = setTimeout(apply, 300)
+    const t2 = setTimeout(apply, 800)
+    return () => { clearTimeout(t); clearTimeout(t2) }
   }, [])
 
   // Email the invite link straight from this page
