@@ -93,3 +93,5 @@ verify_jwt = true
 
 [functions.xero-sync]
 verify_jwt = true
+[functions.ga4-sync]
+verify_jwt = true
