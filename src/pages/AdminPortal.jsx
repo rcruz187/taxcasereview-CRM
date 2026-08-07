@@ -70,6 +70,7 @@ function Spinner() {
 // ── Sidebar ──────────────────────────────────────────────────────────────────
 const NAV = [
   { path:'/crm-admin/command-center', label:'Command Center', icon:'⚡' },
+  { path:'/crm-admin/content',        label:'Content Center', icon:'✍️' },
   { path:'/crm-admin/email',     label:'Email',        icon:'📧' },
   { path:'/crm-admin/calendar',  label:'Calendar',     icon:'📅' },
   { path:'/crm-admin/training',  label:'Training',     icon:'🖥️' },
@@ -2166,6 +2167,298 @@ function CommandCenter() {
   )
 }
 
+// ── Content Center ────────────────────────────────────────────────────────────
+const CONTENT_LABELS = {
+  linkedin:     { label:'LinkedIn Post',      icon:'💼', color:'#0ea5e9' },
+  article_idea: { label:'Article Idea',       icon:'📝', color:'#6366f1' },
+  email:        { label:'Email Newsletter',   icon:'📧', color:'#10b981' },
+  edu_tip:      { label:'Education Tip',      icon:'💡', color:'#f59e0b' },
+  outreach:     { label:'Outreach Message',   icon:'📨', color:'#8b5cf6' },
+}
+const STATUS_COLORS = {
+  draft:     '#475569',
+  approved:  '#10b981',
+  scheduled: '#6366f1',
+  published: '#0ea5e9',
+  archived:  '#334155',
+}
+
+function ContentCenter() {
+  const [drafts, setDrafts]         = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [generating, setGenerating] = useState(false)
+  const [filter, setFilter]         = useState('all')
+  const [selected, setSelected]     = useState(null)
+  const [editing, setEditing]       = useState(false)
+  const [editBody, setEditBody]     = useState('')
+  const [saving, setSaving]         = useState(false)
+  const [toast, setToast]           = useState(null)
+
+  function showToast(msg, ok=true) {
+    setToast({ msg, ok })
+    setTimeout(() => setToast(null), 3000)
+  }
+
+  async function loadDrafts() {
+    setLoading(true)
+    const { data } = await supabase.rpc('get_content_drafts', { p_limit: 100 })
+    setDrafts(data || [])
+    setLoading(false)
+  }
+
+  useEffect(() => { loadDrafts() }, [])
+
+  async function generate(force=false) {
+    setGenerating(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('content-generator', {
+        headers: force ? { 'x-force-regenerate': 'true' } : {}
+      })
+      if (error) throw error
+      await loadDrafts()
+      showToast(data?.message === 'Already generated this week'
+        ? 'Already generated this week. Use Force Regenerate to overwrite.'
+        : `Generated ${data?.drafts || 7} drafts for week of ${data?.weekOf}`)
+    } catch(e) {
+      showToast('Generation failed: ' + String(e), false)
+    }
+    setGenerating(false)
+  }
+
+  async function updateStatus(id, status) {
+    await supabase.rpc('update_content_status', { p_id: id, p_status: status, p_actor: 'romy@taxrescrm.net' })
+    setDrafts(prev => prev.map(d => d.id===id ? {...d, status} : d))
+    if (selected?.id === id) setSelected(s => ({...s, status}))
+    showToast(status === 'approved' ? 'Approved ✓' : status === 'archived' ? 'Archived' : status === 'published' ? 'Marked published' : 'Updated')
+  }
+
+  async function saveEdit() {
+    if (!selected) return
+    setSaving(true)
+    await supabase.rpc('save_content_draft', { p_id: selected.id, p_title: selected.title, p_body: editBody })
+    setDrafts(prev => prev.map(d => d.id===selected.id ? {...d, body: editBody} : d))
+    setSelected(s => ({...s, body: editBody}))
+    setEditing(false)
+    setSaving(false)
+    showToast('Saved')
+  }
+
+  function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard'))
+  }
+
+  const filtered = filter === 'all' ? drafts : drafts.filter(d => d.status === filter)
+  const weekGroups = filtered.reduce((acc, d) => {
+    const w = d.week_of
+    if (!acc[w]) acc[w] = []
+    acc[w].push(d)
+    return acc
+  }, {})
+
+  const CC = {
+    card: { background:'rgba(255,255,255,.04)', border:'1px solid rgba(99,102,241,.18)', borderRadius:12 },
+  }
+
+  return (
+    <div style={{ display:'flex', height:'100vh', overflow:'hidden', background:'#0a0918' }}>
+
+      {/* Toast */}
+      {toast && (
+        <div style={{ position:'fixed', top:20, right:20, zIndex:9999, padding:'10px 18px', borderRadius:8,
+          background: toast.ok ? 'rgba(16,185,129,.9)' : 'rgba(239,68,68,.9)',
+          color:'#fff', fontSize:13, fontWeight:600, boxShadow:'0 4px 20px rgba(0,0,0,.4)' }}>
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Left: list panel */}
+      <div style={{ width:320, borderRight:'1px solid rgba(99,102,241,.15)', overflowY:'auto', padding:'24px 0' }}>
+
+        {/* Header */}
+        <div style={{ padding:'0 20px 20px' }}>
+          <div style={{ fontSize:18, fontWeight:900, color:'#fff', marginBottom:4 }}>✍️ Content Center</div>
+          <div style={{ fontSize:11, color:'#475569' }}>Drafts require approval before use</div>
+        </div>
+
+        {/* Generate button */}
+        <div style={{ padding:'0 20px 16px', display:'flex', gap:8 }}>
+          <button onClick={() => generate(false)} disabled={generating} style={{
+            flex:1, padding:'9px 0', borderRadius:8, border:'none', cursor:'pointer',
+            background: generating ? 'rgba(99,102,241,.3)' : 'rgba(99,102,241,.8)',
+            color:'#fff', fontWeight:700, fontSize:12,
+          }}>
+            {generating ? '⟳ Generating…' : '⚡ Generate This Week'}
+          </button>
+          <button onClick={() => generate(true)} disabled={generating} title="Force regenerate even if already done this week" style={{
+            padding:'9px 12px', borderRadius:8, border:'1px solid rgba(99,102,241,.3)',
+            background:'transparent', color:'#6366f1', cursor:'pointer', fontSize:12,
+          }}>↺</button>
+        </div>
+
+        {/* Status filter */}
+        <div style={{ padding:'0 20px 16px', display:'flex', gap:4, flexWrap:'wrap' }}>
+          {['all','draft','approved','scheduled','published','archived'].map(s => (
+            <button key={s} onClick={() => setFilter(s)} style={{
+              padding:'4px 10px', borderRadius:20, border:'none', cursor:'pointer', fontSize:11, fontWeight:600,
+              background: filter===s ? 'rgba(99,102,241,.4)' : 'rgba(255,255,255,.06)',
+              color: filter===s ? '#a5b4fc' : '#64748b',
+            }}>{s.charAt(0).toUpperCase()+s.slice(1)}</button>
+          ))}
+        </div>
+
+        {/* Draft list */}
+        {loading ? (
+          <div style={{ padding:'20px', color:'#475569', fontSize:13 }}>Loading…</div>
+        ) : Object.keys(weekGroups).length === 0 ? (
+          <div style={{ padding:'20px', color:'#475569', fontSize:13 }}>
+            No drafts yet. Click "Generate This Week" to create this week's content.
+          </div>
+        ) : Object.entries(weekGroups).sort((a,b) => b[0].localeCompare(a[0])).map(([week, items]) => (
+          <div key={week}>
+            <div style={{ padding:'8px 20px', fontSize:10, fontWeight:800, color:'#475569',
+              textTransform:'uppercase', letterSpacing:'.08em', background:'rgba(255,255,255,.02)' }}>
+              Week of {new Date(week+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}
+            </div>
+            {items.map((d) => {
+              const meta = CONTENT_LABELS[d.content_type] || { label:d.content_type, icon:'📄', color:'#64748b' }
+              const isSelected = selected?.id === d.id
+              return (
+                <div key={d.id} onClick={() => { setSelected(d); setEditing(false); setEditBody(d.body) }}
+                  style={{ padding:'12px 20px', cursor:'pointer', borderLeft: isSelected ? '2px solid #6366f1' : '2px solid transparent',
+                    background: isSelected ? 'rgba(99,102,241,.1)' : 'transparent',
+                    borderBottom:'1px solid rgba(99,102,241,.08)' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                    <span style={{ fontSize:14 }}>{meta.icon}</span>
+                    <span style={{ fontSize:12, fontWeight:700, color:'#e2e8f0' }}>{meta.label}</span>
+                    <span style={{ marginLeft:'auto', fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20,
+                      background:`${STATUS_COLORS[d.status]}20`, color:STATUS_COLORS[d.status] }}>
+                      {d.status}
+                    </span>
+                  </div>
+                  <div style={{ fontSize:11, color:'#475569', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                    {d.title}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ))}
+      </div>
+
+      {/* Right: detail / editor */}
+      <div style={{ flex:1, overflowY:'auto', padding:'28px 32px' }}>
+        {!selected ? (
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', flexDirection:'column', gap:12 }}>
+            <div style={{ fontSize:40 }}>✍️</div>
+            <div style={{ fontSize:16, color:'#475569' }}>Select a draft to review</div>
+            <div style={{ fontSize:12, color:'#334155' }}>or generate this week's content</div>
+          </div>
+        ) : (
+          <div style={{ maxWidth:760 }}>
+
+            {/* Header */}
+            <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:20, gap:16 }}>
+              <div>
+                <div style={{ fontSize:11, fontWeight:700, color: CONTENT_LABELS[selected.content_type]?.color || '#64748b',
+                  textTransform:'uppercase', letterSpacing:'.08em', marginBottom:4 }}>
+                  {CONTENT_LABELS[selected.content_type]?.icon} {CONTENT_LABELS[selected.content_type]?.label}
+                </div>
+                <div style={{ fontSize:20, fontWeight:800, color:'#fff' }}>{selected.title}</div>
+                <div style={{ fontSize:11, color:'#475569', marginTop:4 }}>
+                  Status: <span style={{ color: STATUS_COLORS[selected.status], fontWeight:700 }}>{selected.status}</span>
+                  {selected.approved_by && ` · Approved by ${selected.approved_by}`}
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div style={{ display:'flex', gap:8, flexShrink:0, flexWrap:'wrap', justifyContent:'flex-end' }}>
+                <button onClick={() => copyToClipboard(selected.body)} style={{ ...S.btn('ghost'), fontSize:12, padding:'7px 14px' }}>
+                  Copy
+                </button>
+                {!editing && (
+                  <button onClick={() => { setEditing(true); setEditBody(selected.body) }}
+                    style={{ ...S.btn('ghost'), fontSize:12, padding:'7px 14px' }}>
+                    Edit
+                  </button>
+                )}
+                {editing && (
+                  <>
+                    <button onClick={() => setEditing(false)} style={{ ...S.btn('ghost'), fontSize:12, padding:'7px 14px' }}>Cancel</button>
+                    <button onClick={saveEdit} disabled={saving} style={{ ...S.btn('primary'), fontSize:12, padding:'7px 14px' }}>
+                      {saving ? 'Saving…' : 'Save'}
+                    </button>
+                  </>
+                )}
+                {selected.status === 'draft' && (
+                  <button onClick={() => updateStatus(selected.id, 'approved')}
+                    style={{ ...S.btn('primary'), fontSize:12, padding:'7px 14px', background:'rgba(16,185,129,.8)' }}>
+                    ✓ Approve
+                  </button>
+                )}
+                {selected.status === 'approved' && (
+                  <button onClick={() => updateStatus(selected.id, 'published')}
+                    style={{ ...S.btn('primary'), fontSize:12, padding:'7px 14px' }}>
+                    Mark Published
+                  </button>
+                )}
+                {selected.status !== 'archived' && (
+                  <button onClick={() => updateStatus(selected.id, 'archived')}
+                    style={{ ...S.btn('ghost'), fontSize:12, padding:'7px 14px', color:'#475569' }}>
+                    Archive
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Body */}
+            <div style={{ ...CC.card, padding:'24px 28px' }}>
+              {editing ? (
+                <textarea
+                  value={editBody}
+                  onChange={e => setEditBody(e.target.value)}
+                  style={{ width:'100%', minHeight:400, background:'transparent', border:'none', outline:'none',
+                    color:'#e2e8f0', fontSize:14, lineHeight:1.7, resize:'vertical', fontFamily:'inherit' }}
+                />
+              ) : (
+                <pre style={{ whiteSpace:'pre-wrap', wordBreak:'break-word', color:'#e2e8f0',
+                  fontSize:14, lineHeight:1.7, fontFamily:'inherit', margin:0 }}>
+                  {selected.body}
+                </pre>
+              )}
+            </div>
+
+            {/* Publishing calendar strip */}
+            <div style={{ marginTop:20, ...CC.card, padding:'16px 20px' }}>
+              <div style={{ fontSize:10, fontWeight:800, color:'#475569', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:12 }}>
+                Publishing Calendar
+              </div>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                {['draft','approved','scheduled','published','archived'].map(s => {
+                  const count = drafts.filter(d => d.status === s).length
+                  return (
+                    <div key={s} style={{ padding:'6px 14px', borderRadius:20,
+                      background:`${STATUS_COLORS[s]}15`, border:`1px solid ${STATUS_COLORS[s]}30` }}>
+                      <span style={{ fontSize:11, fontWeight:700, color:STATUS_COLORS[s] }}>
+                        {s.charAt(0).toUpperCase()+s.slice(1)} ({count})
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Phase 2 note */}
+            <div style={{ marginTop:16, padding:'14px 18px', borderRadius:8,
+              background:'rgba(99,102,241,.06)', border:'1px dashed rgba(99,102,241,.25)', fontSize:12, color:'#475569' }}>
+              Phase 2: Direct publish to LinkedIn, Facebook, X, and email newsletter from this screen.
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function AdminPortal() {
   const navigate = useNavigate()
   const { logout } = useApp()
@@ -2204,6 +2497,7 @@ export default function AdminPortal() {
         <Suspense fallback={<Spinner/>}>
           <Routes>
             <Route path="/command-center" element={<CommandCenter/>}/>
+            <Route path="/content"         element={<ContentCenter/>}/>
             <Route path="/"               element={<Overview/>}/>
             <Route path="/offices"        element={<OfficesList/>}/>
             <Route path="/offices/:id"    element={<OfficePage/>}/>
