@@ -16,8 +16,9 @@ const CalendarPage = lazy(() => import('./Calendar'))
 const TrainingPage = lazy(() => import('./Training'))
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const TCR_TENANT  = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
-const DEMO_TENANT = '489ace07-1a6b-4864-833a-4f8420568b40'
+const TCR_TENANT      = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
+const DEMO_TENANT     = '489ace07-1a6b-4864-833a-4f8420568b40'
+const TAXRESCRM_TENANT = 'a0000000-0000-0000-0000-000000000001'
 const STATUS_COLOR = { active:'#10b981', trial:'#f59e0b', past_due:'#f97316', cancelled:'#ef4444', suspended:'#ef4444' }
 const TIER_COLOR   = { starter:'#6366f1', growth:'#0ea5e9', pro:'#10b981' }
 
@@ -923,21 +924,14 @@ function Email(){return(
 // ── Training (screen-share training, admin context) ──────────────────────────
 // Clears the TCR tenant override so FIRM loads TaxRes CRM branding (the admin's
 // own settings row), not Tax Case Review the practice. Restores on unmount.
-// TaxRes CRM branding for admin-portal Training — no DB row exists for romy@taxrescrm.net
-// so we set FIRM directly. Logo is the static asset already on gh-pages.
-const TAXRESCRM_LOGO = `${window.location.origin}/taxcasereview-CRM/taxrescrm-logo.png`
-const TAXRESCRM_NAME = 'TaxRes CRM'
-
 function AdminTraining(){
   useEffect(()=>{
-    // Set FIRM to TaxRes CRM values so Training builds correct invite URLs and emails
-    FIRM.name    = TAXRESCRM_NAME
-    FIRM.logoUrl = TAXRESCRM_LOGO
-    FIRM.tenantId = ''
-    FIRM.loaded  = true
+    // Set TaxRes CRM tenant override so FIRM loads correct branding from DB
+    supabase.rpc('set_admin_tenant_override',{ p_tenant_id: TAXRESCRM_TENANT })
+      .then(()=> loadFirmBranding())
+      .catch(()=>{})
     return ()=>{
-      // Restore TCR branding when leaving Training
-      loadFirmBranding()
+      supabase.rpc('set_admin_tenant_override',{ p_tenant_id: TCR_TENANT }).catch(()=>{})
     }
   },[])
   return <TrainingPage/>
@@ -953,8 +947,8 @@ function AdminCalendar(){
   useEffect(()=>{
     const prev = sessionStorage.getItem('admin_impersonation')
     sessionStorage.removeItem('admin_impersonation')
-    // Await the override so Calendar's first DB query runs under TCR tenant context
-    supabase.rpc('set_admin_tenant_override',{ p_tenant_id: TCR_TENANT })
+    // Await the override so Calendar's first DB query runs under TaxRes CRM tenant
+    supabase.rpc('set_admin_tenant_override',{ p_tenant_id: TAXRESCRM_TENANT })
       .then(()=>setReady(true)).catch(()=>setReady(true))
     return ()=>{
       if (prev) sessionStorage.setItem('admin_impersonation', prev)

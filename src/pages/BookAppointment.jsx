@@ -50,18 +50,14 @@ export default function BookAppointment() {
   // (/book?t=x from emailed links) — so check both. Absent → the RPCs fall
   // back to the primary (TCR) tenant, exactly the pre-tenant behavior.
   const tid = (params.get('t') || new URLSearchParams(window.location.search).get('t') || '').trim()
-  const tenantArgs = tid ? { p_tenant: tid } : {}
-
-  // Product booking page types — shown when no tenant hint (?t=) is present.
-  // Overrides TCR's tax-practice types which are wrong for a product demo context.
-  const PRODUCT_TYPES = ['Free Consultation', 'Product Demo', 'Follow-Up Call']
+  // When no tenant hint, default to TaxRes CRM tenant (product booking page)
+  const TAXRESCRM_TENANT = 'a0000000-0000-0000-0000-000000000001'
+  const tenantArgs = { p_tenant: tid || TAXRESCRM_TENANT }
 
   useEffect(() => {
     (async () => {
       const { data, error } = await supabase.rpc('booking_get_config', tenantArgs)
       if (error || !data) { setLoadErr('Online booking is unavailable right now. Please call us instead.'); return }
-      // When no tenant hint, override types to product-appropriate options
-      if (!tid) data.types = PRODUCT_TYPES
       setCfg(data)
       if ((data.types || []).length) setType(data.types[0])
     })()
