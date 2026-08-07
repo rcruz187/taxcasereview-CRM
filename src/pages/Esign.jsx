@@ -95,7 +95,7 @@ export default function Esign() {
 
   async function sendLink(url, item) {
     const { sendVia, clientEmail, clientPhone, clientName } = item || form
-    const msg = `Hi ${clientName}, Tax Case Review sent you a Tax Service Agreement to sign. Please review and sign here: ${url}`
+    const msg = `Hi ${clientName}, ${FIRM.name || 'Tax Case Review'} sent you a Tax Service Agreement to sign. Please review and sign here: ${url}`
     let smsSent = false, emailSent = false
     const { data: cfg } = await supabase.from('settings').select('signalwire_backend,smtp_host,smtp_email').limit(1).maybeSingle()
     if ((sendVia === 'sms' || sendVia === 'both') && clientPhone) {
