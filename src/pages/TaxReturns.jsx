@@ -5,6 +5,7 @@ import { triggerWorkflow } from '../lib/triggerWorkflow'
 import TaxDocParser from '../components/TaxDocParser'
 import { generateTaxReturnPdf, downloadTaxReturnPdf } from '../lib/taxReturnPdf'
 import ClientLink from '../components/ClientLink'
+import { FIRM } from '../lib/firmBranding'
 
 const SQL_SETUP = `create table if not exists tax_returns (
   id uuid default gen_random_uuid() primary key,
@@ -1657,7 +1658,7 @@ export function generateMeFXML(ret, totals, preparer) {
     <TaxYr>${ret.taxYear || '2024'}</TaxYr>
     <PreparerFirmGrp>
       <PreparerFirmName>
-        <BusinessNameLine1Txt>Tax Case Review</BusinessNameLine1Txt>
+        <BusinessNameLine1Txt>${FIRM.name || 'Tax Case Review'}</BusinessNameLine1Txt>
       </PreparerFirmName>
       <PreparerFirmEIN>Applied For</PreparerFirmEIN>
     </PreparerFirmGrp>
