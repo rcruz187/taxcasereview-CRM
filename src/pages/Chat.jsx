@@ -2,6 +2,7 @@ import { validateFile, maybeCompressImage } from '../lib/uploadUtils'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
+import { FIRM } from '../lib/firmBranding'
 import { useWebRTCRoom } from '../lib/webrtcRoom'
 import { useVideoBackground } from '../lib/videoBackground'
 import VirtualBackground from '../components/VirtualBackground'
@@ -580,9 +581,11 @@ export default function Chat() {
 
         {/* Workspace header */}
         <div style={{ padding: '14px 14px 12px', borderBottom: '1px solid var(--br)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: '#1d4ed8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#fff', flexShrink: 0 }}>TC</div>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: '#1d4ed8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#fff', flexShrink: 0 }}>
+            {(FIRM.name || 'TC').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase() || 'TC'}
+          </div>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Tax Case Review</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{FIRM.name || 'Tax Case Review'}</div>
             <div style={{ fontSize: 11, color: '#22c55e', display: 'flex', alignItems: 'center', gap: 4 }}>
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }}/>
               {myName}
