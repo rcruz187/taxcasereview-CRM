@@ -303,6 +303,7 @@ export default function SignPage() {
       if (doc.client_email) {
         await supabase.functions.invoke('send-email', { body: {
           to: doc.client_email,
+          tenant_id: FIRM.tenantId,
           subject: `Signed Copy: ${doc.doc_type} — ${FIRM.name}`,
           // Attach the actual signed client-copy PDFs (send-email fetches each
           // url and embeds it as a multipart/mixed attachment); the links in
