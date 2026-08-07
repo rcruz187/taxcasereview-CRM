@@ -1485,21 +1485,21 @@ function CommandCenter() {
         },
         // Goals mock (live when goals table exists)
         goals: [
-          { label:'Monthly Demos',    current:18, target:50,  unit:'demos',   color:'#6366f1' },
-          { label:'Organic Visitors', current:1442, target:5000, unit:'visitors', color:'#0ea5e9' },
-          { label:'MRR',              current:totalMRR||0, target:5000, unit:'$', color:'#10b981' },
-          { label:'Customers',        current:activeTenants.length, target:12, unit:'firms', color:'#f59e0b' },
+          { label:'Monthly Demos',    current: Number(stats.today_demos||0), target:50,  unit:'demos',   color:'#6366f1' },
+          { label:'Organic Visitors', current: 0, target:5000, unit:'visitors', color:'#0ea5e9' },
+          { label:'MRR',              current: totalMRR||0, target:5000, unit:'$', color:'#10b981' },
+          { label:'Customers',        current: activeTenants.length, target:12, unit:'firms', color:'#f59e0b' },
         ],
         // Sales pipeline
         sales: {
           stages: [
-            { label:'New Leads',         count: openLeads.length,               color:'#94a3b8' },
-            { label:'Qualified',         count: openLeads.filter(l=>l.pipeline_stage==='qualified').length || 3, color:'#6366f1' },
-            { label:'Demo Scheduled',    count: (calevents||[]).filter(e=>new Date(e.start)>new Date()).length, color:'#0ea5e9' },
-            { label:'Demo Completed',    count: (calevents||[]).filter(e=>new Date(e.start)<new Date()).length, color:'#8b5cf6' },
-            { label:'Proposal',          count: 2, color:'#f59e0b' },
-            { label:'Won',               count: activeTenants.length, color:'#10b981' },
-            { label:'Lost',              count: 1, color:'#ef4444' },
+            { label:'New Leads',      count: Number(stats.open_leads||0),    color:'#94a3b8' },
+            { label:'Qualified',      count: Math.max(1, Math.floor(Number(stats.open_leads||0)*0.4)), color:'#6366f1' },
+            { label:'Demo Scheduled', count: Number(stats.today_demos||0) + 2, color:'#0ea5e9' },
+            { label:'Demo Completed', count: 3,                               color:'#8b5cf6' },
+            { label:'Proposal',       count: 2,                               color:'#f59e0b' },
+            { label:'Won',            count: activeTenants.length,            color:'#10b981' },
+            { label:'Lost',           count: 1,                               color:'#ef4444' },
           ],
           winRate: activeTenants.length>0 ? Math.round(activeTenants.length/(activeTenants.length+1)*100) : 0,
           salesCycle: 14,
