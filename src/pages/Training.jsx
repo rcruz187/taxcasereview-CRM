@@ -31,15 +31,15 @@ export default function Training() {
   // Capture FIRM into React state on mount — FIRM is a mutable module object that
   // may not be set yet as a plain const. Reading it in useEffect guarantees we get
   // the branding that AdminTraining loaded before rendering this component.
-  const [firmName,     setFirmName]     = useState(() => firmName || '')
-  const [firmLogo,     setFirmLogo]     = useState(() => firmLogo || '')
-  const [firmTenantId, setFirmTenantId] = useState(() => firmTenantId || '')
-  const [firmEmail,    setFirmEmail]    = useState(() => firmEmail || '')
+  const [firmName,     setFirmName]     = useState(() => FIRM.name || '')
+  const [firmLogo,     setFirmLogo]     = useState(() => FIRM.logoUrl || '')
+  const [firmTenantId, setFirmTenantId] = useState(() => FIRM.tenantId || '')
+  const [firmEmail,    setFirmEmail]    = useState(() => FIRM.email || '')
   useEffect(() => {
-    setFirmName(firmName || '')
-    setFirmLogo(firmLogo || '')
-    setFirmTenantId(firmTenantId || '')
-    setFirmEmail(firmEmail || '')
+    setFirmName(FIRM.name || '')
+    setFirmLogo(FIRM.logoUrl || '')
+    setFirmTenantId(FIRM.tenantId || '')
+    setFirmEmail(FIRM.email || '')
   }, [])
 
   // Email the invite link straight from this page
