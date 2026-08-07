@@ -100,8 +100,6 @@ export default function Training() {
     : firmLogo?.startsWith('/')
       ? `${window.location.origin}${firmLogo}`
       : ''
-  // and would show a broken image to the recipient.
-  const safeLogo = firmLogo?.startsWith('https://') ? firmLogo : ''
 
   async function sendInviteEmail() {
     const raw = emailTo.split(',').map(v => v.trim()).filter(Boolean)
