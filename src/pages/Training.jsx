@@ -81,9 +81,9 @@ export default function Training() {
   }
 
   function copyLink() {
-    const firmParam = firmName ? `&firm=${encodeURIComponent(firmName)}` : ''
-    const logoParam = safeLogo ? `&logo=${encodeURIComponent(safeLogo)}` : ''
-    const tParam = firmTenantId ? `&t=${encodeURIComponent(firmTenantId)}` : ''
+    const firmParam = (FIRM.name || firmName) ? `&firm=${encodeURIComponent(FIRM.name || firmName)}` : ''
+    const _logo = FIRM.logoUrl?.startsWith('https://') ? FIRM.logoUrl : FIRM.logoUrl ? `${window.location.origin}${FIRM.logoUrl}` : safeLogo; const logoParam = _logo ? `&logo=${encodeURIComponent(_logo)}` : ''
+    const tParam = (FIRM.tenantId || firmTenantId) ? `&t=${encodeURIComponent(FIRM.tenantId || firmTenantId)}` : ''
     const url = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${firmParam}${logoParam}${tParam}`
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true); setTimeout(() => setCopied(false), 2000)
@@ -107,9 +107,9 @@ export default function Training() {
     const bad = raw.filter(v => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))
     if (bad.length) { showToast?.(`Not a valid email: ${bad[0]}`, 'error'); return }
 
-    const firmParam2 = firmName ? `&firm=${encodeURIComponent(firmName)}` : ''
-    const logoParam2 = safeLogo ? `&logo=${encodeURIComponent(safeLogo)}` : ''
-    const tParam2 = firmTenantId ? `&t=${encodeURIComponent(firmTenantId)}` : ''
+    const firmParam2 = (FIRM.name || firmName) ? `&firm=${encodeURIComponent(FIRM.name || firmName)}` : ''
+    const _logo2 = FIRM.logoUrl?.startsWith('https://') ? FIRM.logoUrl : FIRM.logoUrl ? `${window.location.origin}${FIRM.logoUrl}` : safeLogo; const logoParam2 = _logo2 ? `&logo=${encodeURIComponent(_logo2)}` : ''
+    const tParam2 = (FIRM.tenantId || firmTenantId) ? `&t=${encodeURIComponent(FIRM.tenantId || firmTenantId)}` : ''
     const url  = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${firmParam2}${logoParam2}${tParam2}`
     const firm = firmName || 'TaxRes CRM'
     setEmailSending(true)
@@ -151,9 +151,9 @@ ${safeLogo ? `<img src="${safeLogo}" alt="${firm}" style="max-height:56px;max-wi
   }
 
   function openPopout() {
-    const hostFirmParam = firmName ? `&firm=${encodeURIComponent(firmName)}` : ''
-    const hostLogoParam = safeLogo ? `&logo=${encodeURIComponent(safeLogo)}` : ''
-    const hostTParam    = firmTenantId ? `&t=${encodeURIComponent(firmTenantId)}` : ''
+    const hostFirmParam = (FIRM.name || firmName) ? `&firm=${encodeURIComponent(FIRM.name || firmName)}` : ''
+    const _hostLogo = FIRM.logoUrl?.startsWith('https://') ? FIRM.logoUrl : FIRM.logoUrl ? `${window.location.origin}${FIRM.logoUrl}` : safeLogo; const hostLogoParam = _hostLogo ? `&logo=${encodeURIComponent(_hostLogo)}` : ''
+    const hostTParam = (FIRM.tenantId || firmTenantId) ? `&t=${encodeURIComponent(FIRM.tenantId || firmTenantId)}` : ''
     const url  = `${window.location.origin}${BASE}/screenshare-host?room=${ss.roomId}&name=${encodeURIComponent(myName)}${hostFirmParam}${hostLogoParam}${hostTParam}`
     const w = 960, h = 680
     const left = Math.max(0, window.screen.width - w - 20)
@@ -161,9 +161,9 @@ ${safeLogo ? `<img src="${safeLogo}" alt="${firm}" style="max-height:56px;max-wi
     window.open(url, `tcr-training-${ss.roomId}`, `width=${w},height=${h},left=${left},top=${top},resizable=yes`)
   }
 
-  const joinFirmParam = firmName ? `&firm=${encodeURIComponent(firmName)}` : ''
-  const joinLogoParam = safeLogo ? `&logo=${encodeURIComponent(safeLogo)}` : ''
-  const joinTParam    = firmTenantId ? `&t=${encodeURIComponent(firmTenantId)}` : ''
+  const joinFirmParam = (FIRM.name || firmName) ? `&firm=${encodeURIComponent(FIRM.name || firmName)}` : ''
+  const _joinLogo = FIRM.logoUrl?.startsWith('https://') ? FIRM.logoUrl : FIRM.logoUrl ? `${window.location.origin}${FIRM.logoUrl}` : safeLogo; const joinLogoParam = _joinLogo ? `&logo=${encodeURIComponent(_joinLogo)}` : ''
+  const joinTParam = (FIRM.tenantId || firmTenantId) ? `&t=${encodeURIComponent(FIRM.tenantId || firmTenantId)}` : ''
   const joinUrl      = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${joinFirmParam}${joinLogoParam}${joinTParam}`
   const participants = ss.webrtc.members.filter(n => !n.endsWith('(view)') && n !== myName).length
 
