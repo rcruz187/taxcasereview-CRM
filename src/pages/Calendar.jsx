@@ -86,7 +86,7 @@ export default function Calendar() {
     const ch = supabase.channel('calevents-booking-sync')
     ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'calevents' }, ({ new: row }) => {
       setEvents(prev => prev.some(e => e.id === row.id) ? prev : [...prev, row])
-      if (row.source === 'booking_widget') {
+      if (row.source === 'booking_widget' || row.source === 'online') {
         const who = row.clientName || row.title || 'New appointment'
         showToast(`📅 New appointment booked: ${who} — ${row.date} ${row.time || ''}`)
         if ('Notification' in window && Notification.permission === 'granted') {

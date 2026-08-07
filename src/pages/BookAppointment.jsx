@@ -52,10 +52,16 @@ export default function BookAppointment() {
   const tid = (params.get('t') || new URLSearchParams(window.location.search).get('t') || '').trim()
   const tenantArgs = tid ? { p_tenant: tid } : {}
 
+  // Product booking page types — shown when no tenant hint (?t=) is present.
+  // Overrides TCR's tax-practice types which are wrong for a product demo context.
+  const PRODUCT_TYPES = ['Free Consultation', 'Product Demo', 'Follow-Up Call']
+
   useEffect(() => {
     (async () => {
       const { data, error } = await supabase.rpc('booking_get_config', tenantArgs)
       if (error || !data) { setLoadErr('Online booking is unavailable right now. Please call us instead.'); return }
+      // When no tenant hint, override types to product-appropriate options
+      if (!tid) data.types = PRODUCT_TYPES
       setCfg(data)
       if ((data.types || []).length) setType(data.types[0])
     })()
