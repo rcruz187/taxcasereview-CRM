@@ -93,6 +93,7 @@ export async function loadFirmBrandingPublic(tenantHint) {
     const args = tenantHint ? { p_tenant: String(tenantHint) } : {}
     const { data } = await supabase.rpc('booking_get_public_meta', args)
     if (data) {
+      if (data.tenant_id) FIRM.tenantId = data.tenant_id
       if (data.firm_name) FIRM.name = data.firm_name
       if (data.logo_url) FIRM.logoUrl = data.logo_url
       FIRM.loaded = true
