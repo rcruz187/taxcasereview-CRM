@@ -6,6 +6,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const TOKEN_URL = 'https://oauth2.googleapis.com/token'
+const SEND_URL  = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send'
+
+function base64UrlEncode(str: string): string {
+  const utf8 = new TextEncoder().encode(str)
+  let binary = ''
+  utf8.forEach(b => { binary += String.fromCharCode(b) })
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
 function encodeHeaderValue(str: string): string {
   if (!str || /^[\x00-\x7F]*$/.test(str)) return str
   const utf8 = new TextEncoder().encode(str)
@@ -14,49 +24,75 @@ function encodeHeaderValue(str: string): string {
   return `=?UTF-8?B?${btoa(binary)}?=`
 }
 
-// Send via Brevo HTTP API — works from Supabase edge functions (HTTPS/443 only, no raw SMTP sockets)
-async function sendViaBrevo(opts: {
-  apiKey: string
-  from: string
-  fromName: string
-  to: string | string[]
-  subject: string
-  html?: string
-  text?: string
-  replyTo?: string
-  attachments?: { filename: string; b64: string }[]
-}): Promise<void> {
-  const toList = (Array.isArray(opts.to) ? opts.to : [opts.to]).map(e => ({ email: e }))
-
-  const body: Record<string, unknown> = {
-    sender: { name: opts.fromName, email: opts.from },
-    to: toList,
-    subject: opts.subject,
+async function getValidGmailToken(supabase: any, settings: any): Promise<string> {
+  const expiry = settings.gmail_token_expiry ? new Date(settings.gmail_token_expiry).getTime() : 0
+  if (settings.gmail_access_token && expiry > Date.now() + 60000) {
+    return settings.gmail_access_token
   }
-  if (opts.html) body.htmlContent = opts.html
-  else if (opts.text) body.textContent = opts.text
-  if (opts.replyTo) body.replyTo = { email: opts.replyTo }
-  if (opts.attachments?.length) {
-    body.attachment = opts.attachments.map(a => ({
-      name: a.filename,
-      content: a.b64,
-    }))
-  }
-
-  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-    method: 'POST',
-    headers: {
-      'api-key': opts.apiKey,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-    body: JSON.stringify(body),
+  const body = new URLSearchParams({
+    refresh_token: settings.gmail_refresh_token,
+    client_id:     settings.gmail_client_id,
+    client_secret: settings.gmail_client_secret,
+    grant_type:    'refresh_token',
   })
+  const res = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error_description || data.error || 'Gmail token refresh failed')
+  const expiresAt = new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString()
+  await supabase.from('settings').update({
+    gmail_access_token: data.access_token,
+    gmail_token_expiry: expiresAt,
+  }).eq('id', settings.id)
+  return data.access_token
+}
 
-  if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`Brevo error ${res.status}: ${err}`)
+function buildRawEmail(opts: {
+  from: string, fromName: string, to: string,
+  subject: string, body: string, isHtml: boolean,
+  replyTo?: string, atts?: { filename: string; b64: string }[]
+}): string {
+  const encodedFrom    = `${encodeHeaderValue(opts.fromName)} <${opts.from}>`
+  const encodedSubject = encodeHeaderValue(opts.subject)
+  const atts = opts.atts || []
+
+  if (atts.length > 0) {
+    const boundary = `tcr_${Date.now()}_${Math.random().toString(36).slice(2)}`
+    const headers = [
+      `To: ${opts.to}`,
+      `From: ${encodedFrom}`,
+      ...(opts.replyTo ? [`Reply-To: ${opts.replyTo}`] : []),
+      `Subject: ${encodedSubject}`,
+      `MIME-Version: 1.0`,
+      `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    ].join('\r\n')
+    const bodyPart =
+      `--${boundary}\r\n` +
+      `Content-Type: ${opts.isHtml ? 'text/html' : 'text/plain'}; charset="UTF-8"\r\n\r\n` +
+      opts.body + '\r\n'
+    const attParts = atts.map(a =>
+      `--${boundary}\r\n` +
+      `Content-Type: application/pdf\r\n` +
+      `Content-Transfer-Encoding: base64\r\n` +
+      `Content-Disposition: attachment; filename="${a.filename}"\r\n\r\n` +
+      a.b64.match(/.{1,76}/g)!.join('\r\n') + '\r\n'
+    ).join('')
+    return `${headers}\r\n\r\n${bodyPart}${attParts}--${boundary}--`
   }
+
+  const headers = [
+    `To: ${opts.to}`,
+    `From: ${encodedFrom}`,
+    ...(opts.replyTo ? [`Reply-To: ${opts.replyTo}`] : []),
+    `Subject: ${encodedSubject}`,
+    `Date: ${new Date().toUTCString()}`,
+    `Content-Type: ${opts.isHtml ? 'text/html' : 'text/plain'}; charset="UTF-8"`,
+    'MIME-Version: 1.0',
+  ].join('\r\n')
+  return `${headers}\r\n\r\n${opts.body}`
 }
 
 serve(async (req) => {
@@ -71,30 +107,22 @@ serve(async (req) => {
       })
     }
 
-    const BREVO_API_KEY = Deno.env.get('BREVO_API_KEY') ?? ''
-    if (!BREVO_API_KEY) {
-      return new Response(JSON.stringify({ error: 'BREVO_API_KEY not configured' }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Load settings for the requested tenant (first row = TCR fallback)
-    let settingsQuery = supabase.from('settings').select('name, email, smtp_email, email_signature')
+    // Load tenant settings
+    let settingsQuery = supabase.from('settings').select('*')
     if (tenant_id) settingsQuery = settingsQuery.eq('tenant_id', tenant_id)
     else settingsQuery = settingsQuery.limit(1)
-    const { data: settings } = await settingsQuery.maybeSingle()
+    const { data: tenantSettings } = await settingsQuery.maybeSingle()
 
-    // From address: explicit override → tenant smtp_email → tenant email → TCR fallback
-    const fromDisplayName = from_name || settings?.name || 'TaxRes CRM'
-    const fromAddress     = from_email || settings?.smtp_email || settings?.email || 'info@taxcasereview.org'
-
-    const sig = settings?.email_signature ? `\n\n${settings.email_signature}` : ''
-    const finalBody = html ?? `${text}${sig}`
+    const fromDisplayName = from_name || tenantSettings?.name || 'TaxRes CRM'
+    const fromAddress     = from_email || tenantSettings?.smtp_email || tenantSettings?.email || 'info@taxcasereview.org'
+    const isHtml          = !!html
+    const sig             = tenantSettings?.email_signature ? `\n\n${tenantSettings.email_signature}` : ''
+    const finalBody       = isHtml ? html : `${text}${sig}`
 
     // Fetch attachments
     const atts: { filename: string; b64: string }[] = []
@@ -108,23 +136,58 @@ serve(async (req) => {
           let bin = ''
           for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i])
           atts.push({ filename: a.filename || 'document.pdf', b64: btoa(bin) })
-        } catch (_) { /* skip failed attachment */ }
+        } catch (_) { /* skip */ }
       }
     }
 
-    await sendViaBrevo({
-      apiKey: BREVO_API_KEY,
-      from: fromAddress,
-      fromName: fromDisplayName,
-      to,
-      subject,
-      html: html ? finalBody : undefined,
-      text: !html ? finalBody : undefined,
-      replyTo: from_email && from_email !== fromAddress ? from_email : undefined,
-      attachments: atts.length ? atts : undefined,
-    })
+    // Always use TCR Gmail OAuth — it's the only transport that works from Supabase's cloud.
+    // from_name / from_email override the display name so non-TCR tenants
+    // (Nashville, TaxRes CRM admin) still show their own branding in the email header.
+    // Reply-To is set to the tenant's address so replies land in the right inbox.
+    const { data: gmailSettings } = await supabase.from('settings')
+      .select('*').not('gmail_refresh_token', 'is', null).limit(1).maybeSingle()
 
-    return new Response(JSON.stringify({ success: true, via: 'brevo' }), {
+    if (!gmailSettings?.gmail_refresh_token) {
+      return new Response(JSON.stringify({ error: 'No Gmail OAuth configured' }), {
+        status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    const accessToken = await getValidGmailToken(supabase, gmailSettings)
+
+    const toList = Array.isArray(to) ? to : [to]
+    for (const recipient of toList) {
+      const raw = buildRawEmail({
+        from:    gmailSettings.email || 'info@taxcasereview.org',
+        fromName: fromDisplayName,
+        to:      recipient,
+        subject,
+        body:    finalBody,
+        isHtml,
+        // Reply-To routes replies to the tenant's actual address
+        replyTo: fromAddress !== (gmailSettings.email || '') ? fromAddress : undefined,
+        atts,
+      })
+
+      const encoded = base64UrlEncode(raw)
+      const sendRes = await fetch(SEND_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ raw: encoded }),
+      })
+
+      const sendData = await sendRes.json()
+      if (!sendRes.ok) {
+        return new Response(JSON.stringify({ error: sendData.error?.message || 'Gmail send failed' }), {
+          status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+    }
+
+    return new Response(JSON.stringify({ success: true, via: 'gmail' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
