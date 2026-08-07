@@ -3039,6 +3039,7 @@ function LinkedInPublisher() {
 
 export default function AdminPortal() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { logout } = useApp()
 
   // Swap favicon + title to TaxRes CRM brand while in the admin portal
@@ -3080,6 +3081,23 @@ export default function AdminPortal() {
     <div style={{display:'flex',minHeight:'100vh',background:'#0d0c1a',fontFamily:'system-ui,Arial,sans-serif'}}>
       <Sidebar onSignOut={handleSignOut} />
       <div style={{flex:1,position:'relative',height:'100vh',overflow:'hidden'}}>
+        {/* Persistent SnappyMail iframe — always mounted so compose drafts survive tab switches.
+            Hidden via CSS when not on /email; shown only when on /email route. */}
+        <div style={{
+          position:'absolute', inset:0, zIndex:1,
+          display: location.pathname === '/crm-admin/email' ? 'flex' : 'none',
+          flexDirection:'column'
+        }}>
+          <div style={{padding:'16px 28px 10px',borderBottom:'1px solid #1e293b',display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
+            <span style={{fontSize:18,fontWeight:800,color:'#fff'}}>📧 Email</span>
+            <span style={{fontSize:13,color:'#475569'}}>romy@taxrescrm.net — powered by Stalwart</span>
+            <a href={WEBMAIL_URL} target="_blank" rel="noreferrer"
+              style={{marginLeft:'auto',fontSize:12,color:'#6366f1',textDecoration:'none'}}>Open in new tab ↗</a>
+          </div>
+          <iframe src={WEBMAIL_URL} title="SnappyMail"
+            style={{flex:1,border:'none',width:'100%',background:'#0f172a'}}
+            allow="clipboard-read; clipboard-write" />
+        </div>
         <Suspense fallback={<Spinner/>}>
           <Routes>
             <Route path="/command-center" element={<CommandCenter/>}/>
@@ -3098,7 +3116,7 @@ export default function AdminPortal() {
             <Route path="/employees"      element={<EmployeeLookup/>}/>
             <Route path="/audit"          element={<AuditLog/>}/>
             <Route path="/support"        element={<div style={{padding:8}}><Support/></div>}/>
-            <Route path="/email"          element={<Email/>}/>
+            <Route path="/email"          element={<div/>}/>
             <Route path="/calendar"       element={<AdminCalendar/>}/>
             <Route path="/training"       element={<AdminTraining/>}/>
             <Route path="*"               element={<Overview/>}/>
