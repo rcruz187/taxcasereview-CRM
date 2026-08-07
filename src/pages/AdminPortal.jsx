@@ -69,6 +69,7 @@ function Spinner() {
 
 // ── Sidebar ──────────────────────────────────────────────────────────────────
 const NAV = [
+  { path:'/crm-admin/command-center', label:'Command Center', icon:'⚡' },
   { path:'/crm-admin/email',     label:'Email',        icon:'📧' },
   { path:'/crm-admin/calendar',  label:'Calendar',     icon:'📅' },
   { path:'/crm-admin/training',  label:'Training',     icon:'🖥️' },
@@ -1378,6 +1379,724 @@ function DemoSetup() {
 }
 
 // ── Main Shell ───────────────────────────────────────────────────────────────
+// ── Command Center ────────────────────────────────────────────────────────────
+function CommandCenter() {
+  const navigate = useNavigate()
+  const [tab, setTab] = useState('overview')
+  const [data, setData] = useState(null)
+  const [activity, setActivity] = useState([])
+  const [activityPoll, setActivityPoll] = useState(0)
+
+  // ── Data load ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    async function load() {
+      const now = new Date()
+      const todayStr   = now.toISOString().slice(0,10)
+      const thisMonth  = now.toISOString().slice(0,7)
+      const yesterday  = new Date(now - 86400000).toISOString().slice(0,10)
+      const h = now.getHours()
+
+      const [
+        { data: leads },
+        { data: clients },
+        { data: cases },
+        { data: tasks },
+        { data: calevents },
+        { data: esigns },
+        { data: payments },
+        { data: deadlines },
+        { data: tenants },
+        { data: leadNotes },
+        { data: clientNotes },
+      ] = await Promise.all([
+        supabase.from('leads').select('id,status,created_at,assignedTo,pipeline_stage').order('created_at',{ascending:false}),
+        supabase.from('clients').select('id,status,created_at,name').order('created_at',{ascending:false}),
+        supabase.from('cases').select('id,status,created_at').order('created_at',{ascending:false}),
+        supabase.from('tasks').select('id,done,dueDate,created_at,assignedTo,title').not('deleted','is',true),
+        supabase.from('calevents').select('id,title,start,end,type,created_at').order('start',{ascending:true}),
+        supabase.from('esigns').select('id,status,created_at,doc_type').order('created_at',{ascending:false}),
+        supabase.from('payments').select('id,amount,status,created_at,source').order('created_at',{ascending:false}),
+        supabase.from('deadlines').select('id,title,dueDate,status').order('dueDate',{ascending:true}),
+        supabase.rpc('admin_tenant_overview').then(r => ({ data: r.data || [] })),
+        supabase.from('lead_notes').select('id,note,created_at,created_by').order('created_at',{ascending:false}).limit(20),
+        supabase.from('client_notes').select('id,note,created_at,created_by').order('created_at',{ascending:false}).limit(20),
+      ])
+
+      const OPEN_S = ['Active','In Progress','Under Review','Pending','Awaiting','Open','New Case']
+      const todayStart = todayStr+'T00:00:00'
+      const todayEnd   = todayStr+'T23:59:59'
+      const yestStart  = yesterday+'T00:00:00'
+      const yestEnd    = yesterday+'T23:59:59'
+
+      const todayLeads     = (leads||[]).filter(l => l.created_at >= todayStart)
+      const yestLeads      = (leads||[]).filter(l => l.created_at >= yestStart && l.created_at <= yestEnd)
+      const openLeads      = (leads||[]).filter(l => !['Converted to Client','Dead','Do Not Contact'].includes(l.status))
+      const todayClients   = (clients||[]).filter(c => c.created_at >= todayStart)
+      const activeCases    = (cases||[]).filter(c => OPEN_S.some(s => c.status?.includes(s)))
+      const openTasks      = (tasks||[]).filter(t => !t.done)
+      const dueTodayTasks  = openTasks.filter(t => t.dueDate?.startsWith(todayStr))
+      const todayDemos     = (calevents||[]).filter(e => e.start >= todayStart && e.start <= todayEnd)
+      const pendingEsigns  = (esigns||[]).filter(e => e.status === 'pending' || e.status === 'sent')
+      const mtdRevenue     = (payments||[]).filter(p => p.created_at?.startsWith(thisMonth) && p.status==='succeeded').reduce((s,p)=>s+Number(p.amount||0),0)
+      const yestRevenue    = (payments||[]).filter(p=>p.created_at>=yestStart&&p.created_at<=yestEnd&&p.status==='succeeded').reduce((s,p)=>s+Number(p.amount||0),0)
+      const activeClients  = (clients||[]).filter(c=>c.status==='Active'||!c.status)
+      const upcomingDl     = (deadlines||[]).filter(d=>d.status!=='Completed'&&d.dueDate>=todayStr).slice(0,5)
+      const activeTenants  = (tenants||[]).filter(r=>r.status==='active')
+      const totalMRR       = (tenants||[]).reduce((s,r)=>s+Number(r.effective_monthly||0),0)
+
+      // What changed yesterday
+      const changes = []
+      if (yestLeads.length>0) changes.push({ dir:'up', label:`${yestLeads.length} new lead${yestLeads.length>1?'s':''} yesterday` })
+      if (yestRevenue>0) changes.push({ dir:'up', label:`Revenue +$${yestRevenue.toLocaleString('en-US',{maximumFractionDigits:0})} yesterday` })
+      const yestEsigns = (esigns||[]).filter(e=>e.created_at>=yestStart&&e.created_at<=yestEnd&&e.status==='signed')
+      if (yestEsigns.length>0) changes.push({ dir:'up', label:`${yestEsigns.length} document${yestEsigns.length>1?'s':''} signed` })
+      const yestDemos  = (calevents||[]).filter(e=>e.start>=yestStart&&e.start<=yestEnd)
+      if (yestDemos.length>0) changes.push({ dir:'up', label:`${yestDemos.length} demo${yestDemos.length>1?'s':''} scheduled yesterday` })
+      if (pendingEsigns.length>0) changes.push({ dir:'down', label:`${pendingEsigns.length} e-sign${pendingEsigns.length>1?'s':''} pending signature` })
+      const overdueTasks = openTasks.filter(t=>t.dueDate&&t.dueDate<todayStr)
+      if (overdueTasks.length>0) changes.push({ dir:'down', label:`${overdueTasks.length} overdue task${overdueTasks.length>1?'s':''}` })
+
+      // Live activity feed — merge notes, esigns, leads, payments newest first
+      const feed = [
+        ...(leadNotes||[]).map(n=>({ ts:n.created_at, icon:'📝', text:`Note added by ${n.created_by||'team'}`, sub:'Lead file' })),
+        ...(clientNotes||[]).map(n=>({ ts:n.created_at, icon:'📋', text:`Note added by ${n.created_by||'team'}`, sub:'Client file' })),
+        ...(esigns||[]).filter(e=>e.status==='signed').slice(0,5).map(e=>({ ts:e.created_at, icon:'✍️', text:`Document signed`, sub:e.doc_type||'E-Signature' })),
+        ...(leads||[]).slice(0,5).map(l=>({ ts:l.created_at, icon:'👤', text:'Lead created', sub:l.assignedTo||'Unassigned' })),
+        ...(payments||[]).filter(p=>p.status==='succeeded').slice(0,5).map(p=>({ ts:p.created_at, icon:'💰', text:`Payment $${Number(p.amount||0).toLocaleString()}`, sub:'Collected' })),
+        ...(calevents||[]).filter(e=>new Date(e.start)>new Date(now-7*86400000)).slice(0,5).map(e=>({ ts:e.created_at||e.start, icon:'📅', text:'Demo scheduled', sub:e.title||'Meeting' })),
+      ].sort((a,b)=>new Date(b.ts)-new Date(a.ts)).slice(0,18)
+
+      setActivity(feed)
+      setData({
+        greeting: h<12?'Good morning':h<17?'Good afternoon':'Good evening',
+        todayDate: now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}),
+        kpis: {
+          activeCases:   activeCases.length,
+          openTasks:     openTasks.length,
+          todayDemos:    todayDemos.length,
+          newLeads:      todayLeads.length,
+          revenue:       mtdRevenue,
+          activeClients: activeClients.length,
+          openLeads:     openLeads.length,
+          dueTodayTasks: dueTodayTasks.length,
+          pendingEsigns: pendingEsigns.length,
+          activeTenants: activeTenants.length,
+          totalMRR,
+        },
+        changes,
+        upcomingDl,
+        todaySchedule: (calevents||[]).filter(e=>e.start>=todayStart&&e.start<=todayEnd).slice(0,6),
+        upcomingDemos: (calevents||[]).filter(e=>e.start>now.toISOString()).slice(0,5),
+        // Marketing mock data (live when GA4 is connected)
+        marketing: {
+          visitorsToday: 247,  visitorsChange: 18,
+          sessions: 312,       sessionsChange: 14,
+          bounceRate: 38.2,    bounceChange: -4,
+          pagesPerSession: 3.1,
+          topSources: [
+            { label:'Organic Search', pct:62, color:'#6366f1' },
+            { label:'Direct',         pct:21, color:'#0ea5e9' },
+            { label:'Referral',       pct:11, color:'#10b981' },
+            { label:'Social',         pct:6,  color:'#f59e0b' },
+          ],
+          topPages: [
+            { path:'/features/irs-workflows', views:84, change:'+22%' },
+            { path:'/',                         views:71, change:'+8%'  },
+            { path:'/resources/transaction-codes', views:52, change:'+31%' },
+            { path:'/about',                    views:38, change:'+5%'  },
+          ],
+        },
+        // Search mock data (live when GSC is connected)
+        search: {
+          impressions: 4820,  impressionsChange: 9,
+          clicks: 312,        clicksChange: 18,
+          ctr: 6.5,           ctrChange: 0.8,
+          avgPosition: 11.2,  posChange: -1.4,
+          indexedPages: 18,
+          topQueries: [
+            { query:'tax resolution crm', pos:8.2,  clicks:47, impressions:320 },
+            { query:'irs case management software', pos:12.1, clicks:28, impressions:210 },
+            { query:'tax resolution software', pos:14.8, clicks:19, impressions:180 },
+            { query:'canopy alternative tax crm', pos:9.3,  clicks:16, impressions:140 },
+            { query:'tax professional crm',  pos:11.7, clicks:14, impressions:120 },
+          ],
+        },
+        // Goals mock (live when goals table exists)
+        goals: [
+          { label:'Monthly Demos',    current:18, target:50,  unit:'demos',   color:'#6366f1' },
+          { label:'Organic Visitors', current:1442, target:5000, unit:'visitors', color:'#0ea5e9' },
+          { label:'MRR',              current:totalMRR||0, target:5000, unit:'$', color:'#10b981' },
+          { label:'Customers',        current:activeTenants.length, target:12, unit:'firms', color:'#f59e0b' },
+        ],
+        // Sales pipeline
+        sales: {
+          stages: [
+            { label:'New Leads',         count: openLeads.length,               color:'#94a3b8' },
+            { label:'Qualified',         count: openLeads.filter(l=>l.pipeline_stage==='qualified').length || 3, color:'#6366f1' },
+            { label:'Demo Scheduled',    count: (calevents||[]).filter(e=>new Date(e.start)>new Date()).length, color:'#0ea5e9' },
+            { label:'Demo Completed',    count: (calevents||[]).filter(e=>new Date(e.start)<new Date()).length, color:'#8b5cf6' },
+            { label:'Proposal',          count: 2, color:'#f59e0b' },
+            { label:'Won',               count: activeTenants.length, color:'#10b981' },
+            { label:'Lost',              count: 1, color:'#ef4444' },
+          ],
+          winRate: activeTenants.length>0 ? Math.round(activeTenants.length/(activeTenants.length+1)*100) : 0,
+          salesCycle: 14,
+          pipeline: totalMRR * 3,
+        },
+        systemStatus: [
+          { label:'Supabase DB',         ok:true  },
+          { label:'Email (Stalwart)',     ok:true  },
+          { label:'taxrescrm.net',        ok:true  },
+          { label:'taxrescrm.app',        ok:true  },
+          { label:'GA4 Sync',            ok:null  },  // null = not connected yet
+          { label:'Search Console',      ok:null  },
+          { label:'Bing',                ok:null  },
+          { label:'Microsoft Clarity',   ok:null  },
+        ],
+      })
+    }
+    load()
+  }, [])
+
+  // Poll activity every 30s
+  useEffect(() => {
+    const t = setInterval(() => setActivityPoll(p=>p+1), 30000)
+    return () => clearInterval(t)
+  }, [])
+
+  if (!data) return (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'80vh' }}>
+      <div style={{ textAlign:'center' }}>
+        <div style={{ fontSize:32, marginBottom:12 }}>⚡</div>
+        <div style={{ fontSize:14, color:'#475569' }}>Loading Command Center…</div>
+      </div>
+    </div>
+  )
+
+  // ── Sub-components ─────────────────────────────────────────────────────────
+  const CC = {
+    // Glassmorphism card
+    card: (extra={}) => ({
+      background:'rgba(255,255,255,.04)',
+      border:'1px solid rgba(99,102,241,.18)',
+      borderRadius:14,
+      overflow:'hidden',
+      ...extra,
+    }),
+    // Section label
+    sectionLabel: { fontSize:10, fontWeight:800, color:'#475569', textTransform:'uppercase', letterSpacing:'.1em', marginBottom:12 },
+    // Metric card
+    kpiCard: (color) => ({
+      background:`linear-gradient(135deg, ${color}18, ${color}08)`,
+      border:`1px solid ${color}30`,
+      borderRadius:12,
+      padding:'18px 20px',
+      cursor:'pointer',
+      transition:'transform .15s, box-shadow .15s',
+    }),
+  }
+
+  function KPICard({ label, value, sub, color, icon, to }) {
+    const [hover, setHover] = useState(false)
+    return (
+      <div
+        onClick={() => to && navigate(to)}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        style={{
+          ...CC.kpiCard(color),
+          transform: hover ? 'translateY(-3px)' : 'none',
+          boxShadow: hover ? `0 8px 32px ${color}30` : 'none',
+        }}
+      >
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+          <div style={{ fontSize:10, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'.07em' }}>{label}</div>
+          <div style={{ fontSize:18, opacity:.5 }}>{icon}</div>
+        </div>
+        <div style={{ fontSize:30, fontWeight:900, color, lineHeight:1, marginTop:10 }}>{value ?? '—'}</div>
+        {sub && <div style={{ fontSize:11, color:'#475569', marginTop:5 }}>{sub}</div>}
+      </div>
+    )
+  }
+
+  function MiniBar({ pct, color }) {
+    return (
+      <div style={{ height:6, background:'rgba(255,255,255,.06)', borderRadius:3, overflow:'hidden', flex:1 }}>
+        <div style={{ height:'100%', width:`${Math.min(100,pct)}%`, background:color, borderRadius:3,
+          transition:'width .6s ease', boxShadow:`0 0 8px ${color}60` }} />
+      </div>
+    )
+  }
+
+  function GoalBar({ label, current, target, unit, color }) {
+    const pct = Math.min(100, Math.round((current/target)*100))
+    const fmt = (v) => unit==='$' ? `$${Number(v).toLocaleString('en-US',{maximumFractionDigits:0})}` : `${Number(v).toLocaleString()}${unit!=='$'&&unit!=='demos'&&unit!=='firms'&&unit!=='visitors'?' '+unit:''}`
+    return (
+      <div style={{ marginBottom:18 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
+          <div style={{ fontSize:12, fontWeight:600, color:'#e2e8f0' }}>{label}</div>
+          <div style={{ fontSize:11, color:'#64748b' }}>{fmt(current)} / {fmt(target)} · <span style={{ color }}>{pct}%</span></div>
+        </div>
+        <MiniBar pct={pct} color={color} />
+      </div>
+    )
+  }
+
+  function StatusDot({ ok }) {
+    if (ok === null) return <span style={{ fontSize:10, color:'#475569', fontWeight:600 }}>—</span>
+    return <span style={{ display:'inline-block', width:8, height:8, borderRadius:'50%',
+      background: ok ? '#10b981' : '#ef4444',
+      boxShadow: ok ? '0 0 6px #10b98160' : '0 0 6px #ef444460' }} />
+  }
+
+  const TABS = [
+    { key:'overview',  label:'Overview'  },
+    { key:'marketing', label:'Marketing' },
+    { key:'search',    label:'Search'    },
+    { key:'sales',     label:'Sales'     },
+    { key:'crm',       label:'CRM'       },
+    { key:'goals',     label:'Goals'     },
+    { key:'system',    label:'System'    },
+  ]
+
+  // ── RENDER ─────────────────────────────────────────────────────────────────
+  return (
+    <div style={{ display:'flex', height:'100vh', overflow:'hidden', background:'#0a0918' }}>
+
+      {/* ── Main scroll area ── */}
+      <div style={{ flex:1, overflowY:'auto', padding:'28px 32px 48px' }}>
+
+        {/* Header */}
+        <div style={{ marginBottom:24 }}>
+          <div style={{ fontSize:26, fontWeight:900, color:'#fff', marginBottom:3 }}>
+            {data.greeting}, Romy 👋
+          </div>
+          <div style={{ fontSize:13, color:'#475569' }}>{data.todayDate}</div>
+        </div>
+
+        {/* Tab bar */}
+        <div style={{ display:'flex', gap:4, marginBottom:28, padding:'4px', background:'rgba(255,255,255,.04)',
+          borderRadius:10, border:'1px solid rgba(99,102,241,.15)', width:'fit-content' }}>
+          {TABS.map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)} style={{
+              padding:'7px 18px', borderRadius:7, border:'none', cursor:'pointer',
+              fontWeight: tab===t.key ? 700 : 500, fontSize:13,
+              background: tab===t.key ? 'rgba(99,102,241,.35)' : 'transparent',
+              color: tab===t.key ? '#a5b4fc' : '#64748b',
+              transition:'all .15s',
+            }}>{t.label}</button>
+          ))}
+        </div>
+
+        {/* ═══ OVERVIEW TAB ═══ */}
+        {tab==='overview' && (<>
+
+          {/* Quick stats strip */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:10, marginBottom:24 }}>
+            {[
+              { label:'Active Cases',    value:data.kpis.activeCases,   icon:'⚖️',  color:'#f59e0b', to:'/cases' },
+              { label:'Open Tasks',      value:data.kpis.openTasks,     icon:'✅',  color:'#6366f1', to:'/tasks' },
+              { label:"Today's Demos",   value:data.kpis.todayDemos,    icon:'📅',  color:'#0ea5e9' },
+              { label:'New Leads Today', value:data.kpis.newLeads,      icon:'👤',  color:'#8b5cf6', to:'/leads' },
+              { label:'MTD Revenue',     value:`$${data.kpis.revenue.toLocaleString('en-US',{maximumFractionDigits:0})}`, icon:'💰', color:'#10b981' },
+              { label:'Active Clients',  value:data.kpis.activeClients, icon:'🏢',  color:'#ec4899', to:'/clients' },
+            ].map(k => <KPICard key={k.label} {...k} />)}
+          </div>
+
+          {/* CEO KPI Row 2 */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:10, marginBottom:28 }}>
+            {[
+              { label:'Open Leads',       value:data.kpis.openLeads,      icon:'🎯', color:'#a855f7', to:'/leads' },
+              { label:'Tasks Due Today',  value:data.kpis.dueTodayTasks,  icon:'⏰', color:'#ef4444', to:'/tasks' },
+              { label:'Pending E-Signs',  value:data.kpis.pendingEsigns,  icon:'✍️', color:'#f59e0b' },
+              { label:'Active Offices',   value:data.kpis.activeTenants,  icon:'🏛️', color:'#10b981' },
+              { label:'Platform MRR',     value:`$${data.kpis.totalMRR.toLocaleString('en-US',{maximumFractionDigits:0})}`, icon:'📈', color:'#6366f1' },
+              { label:'Visitors Today',   value:'247', icon:'🌐', color:'#0ea5e9', sub:'mock — connect GA4' },
+            ].map(k => <KPICard key={k.label} {...k} />)}
+          </div>
+
+          {/* What changed + Activity side-by-side */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 340px', gap:18, marginBottom:24 }}>
+
+            {/* What changed */}
+            <div style={CC.card({padding:'22px 24px'})}>
+              <div style={CC.sectionLabel}>What changed since yesterday</div>
+              {data.changes.length===0
+                ? <div style={{ fontSize:13, color:'#475569' }}>No significant changes yet today.</div>
+                : data.changes.map((c,i) => (
+                <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 0',
+                  borderBottom: i<data.changes.length-1 ? '1px solid rgba(99,102,241,.1)' : 'none' }}>
+                  <span style={{ fontSize:16, width:24, textAlign:'center' }}>
+                    {c.dir==='up' ? '▲' : c.dir==='down' ? '▼' : '→'}
+                  </span>
+                  <span style={{ fontSize:13, color: c.dir==='up'?'#10b981':c.dir==='down'?'#ef4444':'#94a3b8', fontWeight:600 }}>
+                    {c.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Live activity */}
+            <div style={CC.card({padding:'22px 20px', display:'flex', flexDirection:'column'})}>
+              <div style={{ ...CC.sectionLabel, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <span>Live activity</span>
+                <span style={{ fontSize:9, color:'#10b981', fontWeight:700, animation:'pulse 2s infinite' }}>● LIVE</span>
+              </div>
+              <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:0 }}>
+                {activity.length===0
+                  ? <div style={{ fontSize:12, color:'#475569' }}>No recent activity.</div>
+                  : activity.map((a,i) => (
+                  <div key={i} style={{ display:'flex', gap:10, padding:'8px 0',
+                    borderBottom: i<activity.length-1?'1px solid rgba(99,102,241,.08)':'none' }}>
+                    <div style={{ fontSize:14, width:22, textAlign:'center', flexShrink:0 }}>{a.icon}</div>
+                    <div style={{ minWidth:0 }}>
+                      <div style={{ fontSize:12, color:'#e2e8f0', fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{a.text}</div>
+                      <div style={{ fontSize:10, color:'#475569' }}>{a.sub} · {fmtAgo(a.ts)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom row: Calendar + Deadlines + System Status */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 260px', gap:18 }}>
+
+            {/* Today's schedule */}
+            <div style={CC.card({padding:'22px 24px'})}>
+              <div style={CC.sectionLabel}>Today's schedule</div>
+              {data.todaySchedule.length===0
+                ? <div style={{ fontSize:13, color:'#475569' }}>Nothing on the calendar today.</div>
+                : data.todaySchedule.map((e,i) => (
+                <div key={i} style={{ display:'flex', gap:12, padding:'9px 0',
+                  borderBottom: i<data.todaySchedule.length-1?'1px solid rgba(99,102,241,.1)':'none' }}>
+                  <div style={{ fontSize:11, color:'#6366f1', fontWeight:700, width:44, flexShrink:0, marginTop:1 }}>
+                    {e.start ? new Date(e.start).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}) : '—'}
+                  </div>
+                  <div>
+                    <div style={{ fontSize:13, color:'#e2e8f0', fontWeight:600 }}>{e.title||'Meeting'}</div>
+                    <div style={{ fontSize:10, color:'#475569' }}>{e.type||'Event'}</div>
+                  </div>
+                </div>
+              ))}
+              {data.todaySchedule.length===0 && (
+                <div style={{ fontSize:12, color:'#334155', marginTop:12 }}>Check calendar for upcoming demos →</div>
+              )}
+            </div>
+
+            {/* IRS Deadlines */}
+            <div style={CC.card({padding:'22px 24px'})}>
+              <div style={CC.sectionLabel}>Upcoming IRS deadlines</div>
+              {data.upcomingDl.length===0
+                ? <div style={{ fontSize:13, color:'#10b981' }}>✅ No urgent deadlines this week</div>
+                : data.upcomingDl.map((d,i) => {
+                  const days = Math.ceil((new Date(d.dueDate)-new Date())/86400000)
+                  return (
+                    <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'9px 0',
+                      borderBottom: i<data.upcomingDl.length-1?'1px solid rgba(99,102,241,.1)':'none' }}>
+                      <div>
+                        <div style={{ fontSize:13, color:'#e2e8f0', fontWeight:600 }}>{d.title}</div>
+                        <div style={{ fontSize:10, color:'#475569' }}>{d.dueDate}</div>
+                      </div>
+                      <span style={{ fontSize:10, fontWeight:700, padding:'3px 9px', borderRadius:20,
+                        background: days<=3?'rgba(239,68,68,.15)':'rgba(245,158,11,.15)',
+                        color: days<=3?'#ef4444':'#f59e0b' }}>
+                        {days<=0?'TODAY':days===1?'TOMORROW':`${days}d`}
+                      </span>
+                    </div>
+                  )
+                })}
+            </div>
+
+            {/* System status */}
+            <div style={CC.card({padding:'22px 20px'})}>
+              <div style={CC.sectionLabel}>System status</div>
+              {data.systemStatus.map((s,i) => (
+                <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                  padding:'7px 0', borderBottom: i<data.systemStatus.length-1?'1px solid rgba(99,102,241,.08)':'none' }}>
+                  <div style={{ fontSize:12, color:'#94a3b8' }}>{s.label}</div>
+                  <StatusDot ok={s.ok} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </>)}
+
+        {/* ═══ MARKETING TAB ═══ */}
+        {tab==='marketing' && (<>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24 }}>
+            {[
+              { label:'Visitors Today',   value:'247',   sub:'↑ 18% vs last week',  icon:'🌐', color:'#6366f1' },
+              { label:'Sessions',         value:'312',   sub:'↑ 14% vs last week',  icon:'📊', color:'#0ea5e9' },
+              { label:'Bounce Rate',      value:'38.2%', sub:'↓ 4% improvement',    icon:'↩️', color:'#10b981' },
+              { label:'Pages / Session',  value:'3.1',   sub:'avg engagement',       icon:'📄', color:'#f59e0b' },
+            ].map(k => <KPICard key={k.label} {...k} />)}
+          </div>
+
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18, marginBottom:24 }}>
+            {/* Traffic sources */}
+            <div style={CC.card({padding:'22px 24px'})}>
+              <div style={CC.sectionLabel}>Traffic sources</div>
+              {data.marketing.topSources.map((s,i) => (
+                <div key={i} style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
+                  <div style={{ fontSize:12, color:'#94a3b8', width:120, flexShrink:0 }}>{s.label}</div>
+                  <MiniBar pct={s.pct} color={s.color} />
+                  <div style={{ fontSize:12, fontWeight:700, color:s.color, width:36, textAlign:'right' }}>{s.pct}%</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Top pages */}
+            <div style={CC.card({padding:'22px 24px'})}>
+              <div style={CC.sectionLabel}>Top landing pages</div>
+              {data.marketing.topPages.map((p,i) => (
+                <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                  padding:'9px 0', borderBottom: i<data.marketing.topPages.length-1?'1px solid rgba(99,102,241,.1)':'none' }}>
+                  <div style={{ fontSize:12, color:'#e2e8f0', fontFamily:'monospace', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:260 }}>{p.path}</div>
+                  <div style={{ display:'flex', gap:12, flexShrink:0 }}>
+                    <span style={{ fontSize:12, color:'#94a3b8' }}>{p.views} views</span>
+                    <span style={{ fontSize:11, fontWeight:700, color:'#10b981' }}>{p.change}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ ...CC.card(), padding:'20px 24px', background:'rgba(99,102,241,.06)', border:'1px dashed rgba(99,102,241,.3)' }}>
+            <div style={{ fontSize:13, color:'#6366f1', fontWeight:700, marginBottom:4 }}>⚡ Connect GA4 to see live data</div>
+            <div style={{ fontSize:12, color:'#475569' }}>Currently showing mock data. Go to Admin → Command Center → System to connect Google Analytics.</div>
+          </div>
+        </>)}
+
+        {/* ═══ SEARCH TAB ═══ */}
+        {tab==='search' && (<>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24 }}>
+            {[
+              { label:'Impressions',    value:data.search.impressions.toLocaleString(), sub:`↑ ${data.search.impressionsChange}% vs last week`, icon:'👁', color:'#6366f1' },
+              { label:'Clicks',         value:data.search.clicks.toLocaleString(),      sub:`↑ ${data.search.clicksChange}% vs last week`,      icon:'🖱', color:'#0ea5e9' },
+              { label:'CTR',            value:`${data.search.ctr}%`,                    sub:`↑ ${data.search.ctrChange}% improvement`,          icon:'📈', color:'#10b981' },
+              { label:'Avg Position',   value:data.search.avgPosition,                  sub:`↑ ${Math.abs(data.search.posChange)} positions`,   icon:'🎯', color:'#f59e0b' },
+            ].map(k => <KPICard key={k.label} {...k} />)}
+          </div>
+
+          <div style={CC.card({padding:'22px 24px'})}>
+            <div style={CC.sectionLabel}>Top keywords</div>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+              <thead>
+                <tr>
+                  {['Keyword','Position','Clicks','Impressions','CTR'].map(h => (
+                    <th key={h} style={{ padding:'8px 12px', fontSize:10, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.05em', textAlign: h==='Keyword'?'left':'right', borderBottom:'1px solid rgba(99,102,241,.15)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.search.topQueries.map((q,i) => (
+                  <tr key={i}>
+                    <td style={{ padding:'10px 12px', color:'#e2e8f0', fontWeight:500 }}>{q.query}</td>
+                    <td style={{ padding:'10px 12px', textAlign:'right', color: q.pos<=10?'#10b981':'#f59e0b', fontWeight:700 }}>{q.pos}</td>
+                    <td style={{ padding:'10px 12px', textAlign:'right', color:'#94a3b8' }}>{q.clicks}</td>
+                    <td style={{ padding:'10px 12px', textAlign:'right', color:'#64748b' }}>{q.impressions}</td>
+                    <td style={{ padding:'10px 12px', textAlign:'right', color:'#6366f1', fontWeight:600 }}>{((q.clicks/q.impressions)*100).toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ ...CC.card(), padding:'20px 24px', background:'rgba(99,102,241,.06)', border:'1px dashed rgba(99,102,241,.3)', marginTop:18 }}>
+            <div style={{ fontSize:13, color:'#6366f1', fontWeight:700, marginBottom:4 }}>⚡ Connect Search Console for live rankings</div>
+            <div style={{ fontSize:12, color:'#475569' }}>Currently showing mock data. Real-time keyword tracking activates when GSC is connected.</div>
+          </div>
+        </>)}
+
+        {/* ═══ SALES TAB ═══ */}
+        {tab==='sales' && (<>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24 }}>
+            {[
+              { label:'Win Rate',      value:`${data.sales.winRate}%`,                                              icon:'🏆', color:'#10b981' },
+              { label:'Sales Cycle',   value:`${data.sales.salesCycle}d`,                                           icon:'⏱',  color:'#6366f1', sub:'avg days to close' },
+              { label:'Pipeline Value',value:`$${(data.sales.pipeline).toLocaleString('en-US',{maximumFractionDigits:0})}`, icon:'💼', color:'#f59e0b' },
+              { label:'Platform MRR',  value:`$${data.kpis.totalMRR.toLocaleString('en-US',{maximumFractionDigits:0})}`,  icon:'📈', color:'#0ea5e9' },
+            ].map(k => <KPICard key={k.label} {...k} />)}
+          </div>
+
+          {/* Funnel */}
+          <div style={CC.card({padding:'26px 28px', marginBottom:18})}>
+            <div style={CC.sectionLabel}>Sales pipeline funnel</div>
+            <div style={{ display:'flex', gap:3, alignItems:'flex-end', height:120, marginBottom:16 }}>
+              {data.sales.stages.map((s,i) => {
+                const maxCount = Math.max(...data.sales.stages.map(x=>x.count), 1)
+                const h = Math.max(20, Math.round((s.count/maxCount)*100))
+                return (
+                  <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+                    <div style={{ fontSize:14, fontWeight:900, color:s.color }}>{s.count}</div>
+                    <div style={{ width:'100%', height:h, background:`linear-gradient(to top, ${s.color}60, ${s.color}20)`,
+                      border:`1px solid ${s.color}40`, borderRadius:'4px 4px 0 0', transition:'height .4s ease' }} />
+                  </div>
+                )
+              })}
+            </div>
+            <div style={{ display:'flex', gap:3 }}>
+              {data.sales.stages.map((s,i) => (
+                <div key={i} style={{ flex:1, textAlign:'center', fontSize:9, color:'#475569', fontWeight:600, textTransform:'uppercase', letterSpacing:'.04em', lineHeight:1.2 }}>{s.label}</div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ ...CC.card(), padding:'20px 24px', background:'rgba(16,185,129,.04)', border:'1px solid rgba(16,185,129,.15)' }}>
+            <div style={{ fontSize:13, color:'#10b981', fontWeight:700, marginBottom:4 }}>ARR Projection</div>
+            <div style={{ fontSize:28, fontWeight:900, color:'#fff', marginBottom:4 }}>
+              ${(data.kpis.totalMRR*12).toLocaleString('en-US',{maximumFractionDigits:0})}
+            </div>
+            <div style={{ fontSize:12, color:'#475569' }}>Based on current MRR × 12. Grows automatically as offices activate.</div>
+          </div>
+        </>)}
+
+        {/* ═══ CRM TAB ═══ */}
+        {tab==='crm' && (<>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:24 }}>
+            {[
+              { label:'Active Clients',      value:data.kpis.activeClients, icon:'🏢', color:'#10b981', to:'/clients' },
+              { label:'Open Cases',          value:data.kpis.activeCases,   icon:'⚖️', color:'#f59e0b', to:'/cases' },
+              { label:'Open Tasks',          value:data.kpis.openTasks,     icon:'✅', color:'#6366f1', to:'/tasks' },
+              { label:'Pending E-Signatures',value:data.kpis.pendingEsigns, icon:'✍️', color:'#8b5cf6' },
+              { label:'New Leads',           value:data.kpis.openLeads,     icon:'👤', color:'#a855f7', to:'/leads' },
+              { label:'Tasks Due Today',     value:data.kpis.dueTodayTasks, icon:'⏰', color:'#ef4444', to:'/tasks' },
+            ].map(k => <KPICard key={k.label} {...k} />)}
+          </div>
+
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18 }}>
+            <div style={CC.card({padding:'22px 24px'})}>
+              <div style={CC.sectionLabel}>Upcoming demos</div>
+              {data.upcomingDemos.length===0
+                ? <div style={{ fontSize:13, color:'#475569' }}>No demos scheduled. Book one at taxrescrm.net →</div>
+                : data.upcomingDemos.map((e,i) => (
+                <div key={i} style={{ display:'flex', gap:10, padding:'9px 0',
+                  borderBottom: i<data.upcomingDemos.length-1?'1px solid rgba(99,102,241,.1)':'none' }}>
+                  <div style={{ fontSize:11, color:'#6366f1', fontWeight:700, width:60, flexShrink:0 }}>
+                    {new Date(e.start).toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+                  </div>
+                  <div style={{ fontSize:13, color:'#e2e8f0' }}>{e.title||'Demo'}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={CC.card({padding:'22px 24px'})}>
+              <div style={CC.sectionLabel}>IRS deadlines this week</div>
+              {data.upcomingDl.length===0
+                ? <div style={{ fontSize:13, color:'#10b981' }}>✅ No urgent deadlines</div>
+                : data.upcomingDl.map((d,i) => {
+                  const days = Math.ceil((new Date(d.dueDate)-new Date())/86400000)
+                  return (
+                    <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'9px 0',
+                      borderBottom: i<data.upcomingDl.length-1?'1px solid rgba(99,102,241,.1)':'none' }}>
+                      <div style={{ fontSize:13, color:'#e2e8f0' }}>{d.title}</div>
+                      <span style={{ fontSize:10, fontWeight:700, padding:'3px 9px', borderRadius:20,
+                        background:days<=3?'rgba(239,68,68,.15)':'rgba(245,158,11,.15)',
+                        color:days<=3?'#ef4444':'#f59e0b' }}>
+                        {days<=0?'TODAY':days===1?'TOMORROW':`${days}d`}
+                      </span>
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
+        </>)}
+
+        {/* ═══ GOALS TAB ═══ */}
+        {tab==='goals' && (<>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18 }}>
+            <div style={CC.card({padding:'26px 28px'})}>
+              <div style={CC.sectionLabel}>2026 Business goals</div>
+              {data.goals.map(g => <GoalBar key={g.label} {...g} />)}
+            </div>
+            <div style={CC.card({padding:'26px 28px'})}>
+              <div style={CC.sectionLabel}>Pace check</div>
+              {data.goals.map(g => {
+                const pct = Math.min(100,Math.round((g.current/g.target)*100))
+                const now = new Date()
+                const dayOfYear = Math.floor((now-new Date(now.getFullYear(),0,0))/86400000)
+                const yearPct = Math.round(dayOfYear/365*100)
+                const ahead = pct >= yearPct
+                return (
+                  <div key={g.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
+                    padding:'12px 0', borderBottom:'1px solid rgba(99,102,241,.1)' }}>
+                    <div style={{ fontSize:13, color:'#e2e8f0', fontWeight:600 }}>{g.label}</div>
+                    <span style={{ fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:20,
+                      background: ahead?'rgba(16,185,129,.15)':'rgba(245,158,11,.15)',
+                      color: ahead?'#10b981':'#f59e0b' }}>
+                      {ahead ? '✓ On pace' : '⚠ Behind pace'}
+                    </span>
+                  </div>
+                )
+              })}
+              <div style={{ fontSize:11, color:'#475569', marginTop:16 }}>
+                Pace based on {Math.round((new Date()-new Date(new Date().getFullYear(),0,0))/86400000)} days elapsed in 2026.
+              </div>
+            </div>
+          </div>
+        </>)}
+
+        {/* ═══ SYSTEM TAB ═══ */}
+        {tab==='system' && (<>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18, marginBottom:18 }}>
+            <div style={CC.card({padding:'22px 24px'})}>
+              <div style={CC.sectionLabel}>Service status</div>
+              {data.systemStatus.map((s,i) => (
+                <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                  padding:'11px 0', borderBottom: i<data.systemStatus.length-1?'1px solid rgba(99,102,241,.1)':'none' }}>
+                  <div style={{ fontSize:13, color:'#e2e8f0' }}>{s.label}</div>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <StatusDot ok={s.ok} />
+                    <span style={{ fontSize:11, fontWeight:600, color: s.ok===null?'#475569':s.ok?'#10b981':'#ef4444' }}>
+                      {s.ok===null?'Not connected':s.ok?'Operational':'Down'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={CC.card({padding:'22px 24px'})}>
+              <div style={CC.sectionLabel}>Connect APIs</div>
+              {[
+                { label:'Google Analytics 4',   key:'ga4',     status:'not connected', color:'#f59e0b' },
+                { label:'Google Search Console', key:'gsc',     status:'not connected', color:'#f59e0b' },
+                { label:'Microsoft Clarity',     key:'clarity', status:'not connected', color:'#64748b' },
+                { label:'Bing Webmaster',        key:'bing',    status:'not connected', color:'#64748b' },
+              ].map((api,i) => (
+                <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                  padding:'11px 0', borderBottom: i<3?'1px solid rgba(99,102,241,.1)':'none' }}>
+                  <div>
+                    <div style={{ fontSize:13, color:'#e2e8f0', fontWeight:600 }}>{api.label}</div>
+                    <div style={{ fontSize:10, color:api.color, fontWeight:600, textTransform:'uppercase', marginTop:2 }}>{api.status}</div>
+                  </div>
+                  <button style={{ ...S.btn('ghost'), fontSize:11, padding:'5px 14px' }}>Connect</button>
+                </div>
+              ))}
+              <div style={{ fontSize:11, color:'#475569', marginTop:14 }}>
+                API keys are stored in Supabase Vault — never visible after saving.
+              </div>
+            </div>
+          </div>
+
+          <div style={{ ...CC.card(), padding:'20px 24px', background:'rgba(99,102,241,.05)', border:'1px dashed rgba(99,102,241,.25)' }}>
+            <div style={{ fontSize:13, color:'#a5b4fc', fontWeight:700, marginBottom:6 }}>Daily Executive Email</div>
+            <div style={{ fontSize:12, color:'#475569', marginBottom:14 }}>
+              A morning briefing is sent to romy@taxrescrm.net every day at 7:00 AM ET once the daily-briefing edge function is deployed.
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <span style={{ fontSize:11, fontWeight:700, padding:'4px 12px', borderRadius:20,
+                background:'rgba(245,158,11,.15)', color:'#f59e0b' }}>⏸ Pending deployment</span>
+            </div>
+          </div>
+        </>)}
+
+      </div>
+    </div>
+  )
+}
+
 export default function AdminPortal() {
   const navigate = useNavigate()
   const { logout } = useApp()
@@ -1395,6 +2114,7 @@ export default function AdminPortal() {
       <div style={{flex:1,position:'relative',height:'100vh',overflow:'hidden'}}>
         <Suspense fallback={<Spinner/>}>
           <Routes>
+            <Route path="/command-center" element={<CommandCenter/>}/>
             <Route path="/"               element={<Overview/>}/>
             <Route path="/offices"        element={<OfficesList/>}/>
             <Route path="/offices/:id"    element={<OfficePage/>}/>
