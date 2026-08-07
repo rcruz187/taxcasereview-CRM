@@ -7,6 +7,7 @@ import { useState, useEffect, Suspense, lazy, useCallback } from 'react'
 import { ScreenShareProvider } from '../context/ScreenShareContext'
 import { Routes, Route, NavLink, useNavigate, useLocation, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { loadFirmBranding } from '../lib/firmBranding'
 import { useApp } from '../context/AppContext'
 
 const NewOffice    = lazy(() => import('./NewOffice'))
@@ -919,6 +920,31 @@ function Email(){return(
   </div>
 )}
 
+// ── Training (screen-share training, admin context) ──────────────────────────
+// Clears the TCR tenant override so FIRM loads TaxRes CRM branding (the admin's
+// own settings row), not Tax Case Review the practice. Restores on unmount.
+function AdminTraining(){
+  const [ready, setReady] = useState(false)
+
+  useEffect(()=>{
+    // Clear override → current_tenant_id() resolves admin's own tenant → TaxRes CRM settings
+    supabase.rpc('set_admin_tenant_override',{ p_tenant_id: null })
+      .then(()=> loadFirmBranding())
+      .then(()=> setReady(true))
+      .catch(()=> setReady(true))
+    return ()=>{
+      // Restore TCR override when leaving Training
+      supabase.rpc('set_admin_tenant_override',{ p_tenant_id: TCR_TENANT }).catch(()=>{})
+    }
+  },[])
+  if (!ready) return null
+  return (
+    <div className="page-content" style={{position:'relative',overflow:'hidden',padding:0}}>
+      <TrainingPage/>
+    </div>
+  )
+}
+
 // ── Calendar (real CRM Calendar component, contained in the admin shell) ──────
 // Must override to TCR tenant before rendering — romy@taxrescrm.net's own
 // current_tenant_id() resolves TCR automatically, but if a demo impersonation
@@ -1364,6 +1390,16 @@ export default function AdminPortal() {
   const navigate = useNavigate()
   const { logout } = useApp()
 
+  // Load TaxRes CRM branding (admin's own settings) on mount.
+  // Must run BEFORE AdminCalendar sets the TCR tenant override,
+  // so FIRM = TaxRes CRM for Training, booking emails, and invite links.
+  useEffect(()=>{
+    supabase.rpc('set_admin_tenant_override',{ p_tenant_id: null })
+      .catch(()=>{})
+      .then(()=> loadFirmBranding())
+      .catch(()=>{})
+  },[])
+
   async function handleSignOut() {
     await supabase.auth.signOut()
     logout?.()
@@ -1391,7 +1427,7 @@ export default function AdminPortal() {
             <Route path="/support"        element={<div style={{padding:8}}><Support/></div>}/>
             <Route path="/email"          element={<Email/>}/>
             <Route path="/calendar"       element={<AdminCalendar/>}/>
-            <Route path="/training"       element={<ScreenShareProvider><TrainingPage/></ScreenShareProvider>}/>
+            <Route path="/training"       element={<ScreenShareProvider><AdminTraining/></ScreenShareProvider>}/>
             <Route path="*"               element={<Overview/>}/>
           </Routes>
         </Suspense>
