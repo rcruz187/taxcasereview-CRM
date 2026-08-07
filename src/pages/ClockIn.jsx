@@ -104,18 +104,17 @@ export default function ClockIn() {
   // Best-effort — never blocks the request from saving even if email isn't configured.
   // Recipients now come back from the kiosk_timeoff_submit RPC (employees table
   // is RLS-locked to anon), so this just fires the emails.
-  async function notifyTimeOffSubmitted(recipients, e, type, start, end, days) {
+  async function notifyTimeOffSubmitted(recipients, tenantId, e, type, start, end, days) {
     try {
       const toList = [...new Set((recipients || []).filter(Boolean))]
       if (toList.length === 0) return
       const subject = `Time off request — ${e.name}`
       const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">` +
-        `<div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">Tax Case Review</div>` +
         `<p><strong>${e.name}</strong> requested ${type.toUpperCase()} time off.</p>` +
         `<p>${start} to ${end} (${days} day${days === 1 ? '' : 's'})</p>` +
         `<p style="font-size:12px;color:#64748b">Submitted from the clock-in kiosk. Review and approve/deny in the CRM under Time Off.</p></div>`
       await Promise.all(toList.map(to =>
-        supabase.functions.invoke('send-email', { body: { to, subject, html } }).catch(() => {})
+        supabase.functions.invoke('send-email', { body: { tenant_id: tenantId || undefined, to, subject, html } }).catch(() => {})
       ))
     } catch {}
   }
@@ -138,7 +137,7 @@ export default function ClockIn() {
     })
     setReqSaving(false)
     if (error) { setReqMsg('❌ ' + error.message); return }
-    notifyTimeOffSubmitted(data?.admin_emails, reqEmp, reqType, reqStart, reqEnd, days)
+    notifyTimeOffSubmitted(data?.admin_emails, data?.tenant_id, reqEmp, reqType, reqStart, reqEnd, days)
     setDone({ name: reqEmp.name, action: 'timeoff' })
     setReqEmp(null)
   }

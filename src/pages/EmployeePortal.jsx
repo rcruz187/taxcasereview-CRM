@@ -283,7 +283,7 @@ export default function EmployeePortal() {
   // request from going through. Recipients now come back from the
   // emp_timeoff_submit RPC (employees is RLS-locked to anon); if send-email
   // isn't configured this silently no-ops and the request is still saved.
-  async function notifyTimeOffSubmitted(recipients, e, type, start, end, days) {
+  async function notifyTimeOffSubmitted(recipients, tenantId, e, type, start, end, days) {
     try {
       const toList = [...new Set((recipients || []).filter(Boolean))]
       if (toList.length === 0) return
@@ -294,7 +294,7 @@ export default function EmployeePortal() {
         `<p>${start} to ${end} (${days} day${days === 1 ? '' : 's'})</p>` +
         `<p style="font-size:12px;color:#64748b">Review and approve/deny in the CRM under Time Off.</p></div>`
       await Promise.all(toList.map(to =>
-        supabase.functions.invoke('send-email', { body: { to, subject, html } }).catch(() => {})
+        supabase.functions.invoke('send-email', { body: { tenant_id: tenantId || undefined, to, subject, html } }).catch(() => {})
       ))
     } catch {
       // Never let a notification failure block the employee's request.
@@ -316,7 +316,7 @@ export default function EmployeePortal() {
       setReqMsg('❌ ' + error.message)
     } else {
       setReqMsg('✅ Request submitted — waiting on approval.')
-      notifyTimeOffSubmitted(data?.admin_emails, emp, reqType, reqStart, reqEnd, days)
+      notifyTimeOffSubmitted(data?.admin_emails, data?.tenant_id, emp, reqType, reqStart, reqEnd, days)
       setReqStart(''); setReqEnd(''); setReqReason(''); setShowRequestForm(false)
       await loadTimeOff(empToken)
     }
