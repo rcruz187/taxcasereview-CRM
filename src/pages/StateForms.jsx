@@ -36,7 +36,7 @@ const STATE_FORMS = [
 const firmName  = () => FIRM.name || 'Tax Case Review'
 const firmEmail = () =>
   (FIRM.email || '').trim() ||
-  'info@' + firmName()().toLowerCase().replace(/[^a-z0-9]+/g, '') + '.com'
+  'info@' + firmName().toLowerCase().replace(/[^a-z0-9]+/g, '') + '.com'
 const LOGO_URL = ''  // replaced by FIRM.logoUrl
 function printHeader(title) { return `<div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #1A7FD4;padding-bottom:16px"><img src="${FIRM.logoUrl}" style="height:48px;margin-bottom:8px" onerror="this.style.display='none'"/><div style="font-size:20px;font-weight:700;color:#1A7FD4">${firmName()}</div><div style="font-size:11px;color:#666">${FIRM.address} · ${firmEmail()}</div><div style="font-size:16px;font-weight:700;margin-top:10px;color:#111">${title}</div></div>` }
 function sigBlock(l1='Client Signature',l2='Authorized Representative'){return `<div style="display:flex;gap:40px;margin-top:32px"><div style="flex:1;border-top:1px solid #333;padding-top:6px;font-size:11px;color:#555">${l1}<br/>Date: ___________________</div><div style="flex:1;border-top:1px solid #333;padding-top:6px;font-size:11px;color:#555">${l2} — ${firmName()}<br/>Date: ___________________</div></div>`}
