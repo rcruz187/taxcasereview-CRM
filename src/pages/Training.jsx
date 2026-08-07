@@ -94,6 +94,12 @@ export default function Training() {
   // edge function every other transactional email in the CRM goes through.
   // Only pass logo to join URL if it's an absolute https URL (Supabase storage).
   // Relative paths like /taxcasereview-CRM/nashville-logo.png are now deleted
+  // except for the TaxRes CRM logo which lives in gh-pages assets — build absolute URL.
+  const safeLogo = firmLogo?.startsWith('https://')
+    ? firmLogo
+    : firmLogo?.startsWith('/')
+      ? `${window.location.origin}${firmLogo}`
+      : ''
   // and would show a broken image to the recipient.
   const safeLogo = firmLogo?.startsWith('https://') ? firmLogo : ''
 
