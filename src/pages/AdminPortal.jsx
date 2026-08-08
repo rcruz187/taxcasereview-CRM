@@ -2075,6 +2075,46 @@ function CommandCenter() {
               ✅ Live data from {gscData.siteUrl} — last 28 days
             </div>
           )}
+
+          {/* ── Bing Webmaster Tools ── */}
+          <div style={{ marginTop:24 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:'#94a3b8', marginBottom:12 }}>Bing Webmaster Tools</div>
+            {bingConnected && bingData ? (<>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:16 }}>
+                {[
+                  { label:'Clicks',      value: bingData.clicks?.toLocaleString()||'0', color:'#6366f1' },
+                  { label:'Impressions', value: bingData.impressions?.toLocaleString()||'0', color:'#0ea5e9' },
+                  { label:'CTR',         value: `${bingData.ctr||0}%`, color:'#10b981' },
+                  { label:'Avg Position',value: bingData.avgPosition||'—', color:'#f59e0b' },
+                ].map(k=>(
+                  <div key={k.label} style={{ background:'rgba(255,255,255,.03)', borderRadius:8, padding:'14px 16px', border:'1px solid rgba(255,255,255,.06)' }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.06em' }}>{k.label}</div>
+                    <div style={{ fontSize:20, fontWeight:800, color:k.color, marginTop:4 }}>{k.value}</div>
+                  </div>
+                ))}
+              </div>
+              {bingData.topKeywords?.length > 0 && (
+                <div style={{ background:'rgba(255,255,255,.03)', borderRadius:8, padding:'14px 16px', border:'1px solid rgba(255,255,255,.06)' }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#475569', marginBottom:10 }}>TOP KEYWORDS</div>
+                  {bingData.topKeywords.slice(0,5).map((k,i)=>(
+                    <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:12, padding:'4px 0', borderBottom:'1px solid rgba(255,255,255,.04)', color:'#94a3b8' }}>
+                      <span style={{ color:'#e2e8f0' }}>{k.query}</span>
+                      <span>pos {k.avgPosition} · {k.clicks} clicks</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ fontSize:12, color:'var(--t3)', marginTop:8 }}>✅ Live data from {bingData.siteUrl} — last 28 days</div>
+            </>) : (
+              <div style={{ padding:'16px 20px', background:'rgba(99,102,241,.06)', border:'1px dashed rgba(99,102,241,.3)', borderRadius:8 }}>
+                <div style={{ fontSize:13, color:'#6366f1', fontWeight:700, marginBottom:8 }}>🔍 Connect Bing Webmaster Tools</div>
+                {bingLoading
+                  ? <div style={{ fontSize:12, color:'var(--t3)' }}>Checking connection…</div>
+                  : <div style={{ fontSize:12, color:'#64748b' }}>Add your Bing API key in Settings to see Bing search data here.</div>
+                }
+              </div>
+            )}
+          </div>
         </>)}
 
         {/* ═══ SALES TAB ═══ */}
