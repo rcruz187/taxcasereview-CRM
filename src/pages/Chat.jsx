@@ -179,11 +179,11 @@ export default function Chat() {
 
   // ── fetch all employees for DM list ──
   useEffect(() => {
-    supabase.from('employees').select('id, name, role, avatar_url, email').order('name').neq('email', 'romy@taxrescrm.net').then(({ data }) => {
+    supabase.from('employees').select('id, name, role, avatar_url, email').order('name').then(({ data }) => {
       if (!data) return
       const me = data.find(e => e.email && user?.email && e.email.toLowerCase() === user.email.toLowerCase())
       if (me) { setMyEmpId(me.id); setMyRealName(me.name) }
-      setTEAM(data.map(e => ({
+      let roster = data.map(e => ({
         id: 'dm_' + e.id,
         empId: e.id,
         name: e.name,
@@ -191,7 +191,21 @@ export default function Chat() {
         color: colorFor(e.name),
         avatarUrl: e.avatar_url || null,
         email: e.email || '',
-      })))
+      }))
+      // When platform admin is impersonating another tenant, inject Romy into
+      // that tenant's roster so their staff can DM him directly
+      try {
+        const imp = sessionStorage.getItem('admin_impersonation')
+        if (imp && user?.email === 'romy@taxrescrm.net') {
+          const alreadyInRoster = roster.some(r => r.email === 'romy@taxrescrm.net')
+          if (!alreadyInRoster) {
+            const adminEntry = { id: 'dm_taxrescrm-admin', empId: 'taxrescrm-admin', name: 'Romy Cruz', role: 'TaxRes CRM Admin', color: colorFor('Romy Cruz'), avatarUrl: null, email: 'romy@taxrescrm.net' }
+            roster = [adminEntry, ...roster]
+            if (!me) { setMyEmpId('taxrescrm-admin'); setMyRealName('Romy Cruz') }
+          }
+        }
+      } catch (_) {}
+      setTEAM(roster)
     })
   }, [user?.email])
 
@@ -754,7 +768,7 @@ export default function Chat() {
         <DraftsView TEAM={TEAM} myName={myName} channels={allChannels} />
       ) : active.id === 'directories' ? (
         <DirectoriesView TEAM={TEAM} myName={myName} myEmail={user?.email} onUpdated={() => {
-          supabase.from('employees').select('id, name, role, avatar_url, email').order('name').neq('email', 'romy@taxrescrm.net').then(({ data }) => {
+          supabase.from('employees').select('id, name, role, avatar_url, email').order('name').then(({ data }) => {
             if (!data) return
             setTEAM(data.map(e => ({ id: 'dm_' + e.id, empId: e.id, name: e.name, role: e.role || '', color: colorFor(e.name), avatarUrl: e.avatar_url || null, email: e.email || '' })))
           })
