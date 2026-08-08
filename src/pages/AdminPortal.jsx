@@ -1588,18 +1588,23 @@ function CommandCenter() {
   async function fetchGSC() {
     setGscLoading(true)
     try {
-      const { data: gsc } = await supabase.functions.invoke('gsc-data', { body: {} })
+      const { data: gsc, error } = await supabase.functions.invoke('gsc-data', { body: {} })
+      if (error) throw error
       if (gsc && !gsc.error) { setGscData(gsc); setGscConnected(true) }
-    } catch(e) { console.error('GSC fetch:', e) } finally { setGscLoading(false) }
+      else { setGscConnected(false) }
+    } catch(e) { console.error('GSC fetch:', e); setGscConnected(false) }
+    setGscLoading(false)
   }
 
   async function fetchBing() {
     setBingLoading(true)
     try {
-      const { data: bing } = await supabase.functions.invoke('bing-data', { body: {} })
+      const { data: bing, error } = await supabase.functions.invoke('bing-data', { body: {} })
+      if (error) throw error
       if (bing && !bing.error) { setBingData(bing); setBingConnected(true) }
-      else if (bing?.error === 'no_key') { setBingConnected(false) }
-    } catch(e) { console.error('Bing fetch:', e) } finally { setBingLoading(false) }
+      else { setBingConnected(false) }
+    } catch(e) { console.error('Bing fetch:', e); setBingConnected(false) }
+    setBingLoading(false)
   }
 
   function handleGSCConnect() {
