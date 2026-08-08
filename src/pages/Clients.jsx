@@ -2656,7 +2656,24 @@ export default function Clients() {
               <DR label="Email"   val={c.email ? <span style={{color:'var(--blue)',cursor:'pointer',textDecoration:'underline'}} title="Send email" onClick={()=>setQuickEmail({ name:c.name, email:c.email })}>{c.email} ✉️</span> : null}/>
               <DR label={c.business_name ? "Personal Address" : "Address"} val={[c.street,c.city,c.state,c.zip].filter(Boolean).join(', ')}/>
               <DR label="Business Address" val={[c.biz_street,c.biz_city,c.biz_state,c.biz_zip].filter(Boolean).join(', ')}/>
+              {c.contactPerson  && <DR label="Contact Person" val={c.contactPerson}/>}
+              {c.businessType   && <DR label="Business Type"  val={c.businessType}/>}
+              {c.industry       && <DR label="Industry"       val={c.industry}/>}
               <DR label="County"  val={c.county}/>
+              {c.occupation && <DR label="Occupation" val={c.occupation}/>}
+              {c.employer   && <DR label="Employer"   val={c.employer}/>}
+              {c.leadSource && <DR label="Lead Source" val={c.leadSource}/>}
+              {c.referredBy && <DR label="Referred By" val={c.referredBy}/>}
+              {c.tags && (
+                <div style={{padding:'8px 0',borderBottom:'1px solid var(--br)',display:'flex',alignItems:'flex-start',gap:10}}>
+                  <div style={{fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:'.04em',color:'var(--t3)',minWidth:130,paddingTop:2}}>Tags</div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                    {c.tags.split(',').map(t=>t.trim()).filter(Boolean).map(t=>(
+                      <span key={t} style={{background:'var(--blue)22',color:'var(--blue)',border:'1px solid var(--blue)44',borderRadius:4,padding:'1px 7px',fontSize:11,fontWeight:600}}>{t}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Taxpayer Info (+ Dependents, merged into one card) */}
@@ -2699,6 +2716,7 @@ export default function Clients() {
             {/* IRS / Case Info */}
             <div className="card">
               <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>IRS / Case Info</div>
+              {c.clientOwes && <DR label="Canopy Balance" val={c.clientOwes}/>}
               <DR label="IRS Balance"  val={formatBalance(c.irsBalance)}/>
               {(c.irsOrState||'IRS Federal')!=='IRS Federal' && (
                 <DR label="State Balance" val={formatBalance(c.stateBalance)}/>
