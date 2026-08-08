@@ -3,6 +3,10 @@ import { formatMoneyInput, parseMoney } from '../lib/money'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
+import { FIRM } from '../lib/firmBranding'
+
+// Scope queries to current tenant when FIRM.tenantId is available (platform admin sessions)
+function tf(q) { return FIRM.tenantId ? q.eq('tenant_id', FIRM.tenantId) : q }
 
 const ROLES = ['Super Admin', 'Admin', 'Manager', 'Tax Associate', 'Tax Advisor', 'View Only']
 const ROLE_COLORS = { 'Super Admin': '#ef4444', 'Admin': '#f59e0b', 'Tax Associate': '#3b82f6', 'View Only': '#64748b', 'Tax Advisor': '#10b981', 'Manager': '#06b6d4' }
@@ -167,7 +171,7 @@ export default function Employees() {
 
   async function load() {
     setLoading(true)
-    const { data } = await supabase.from('employees').select('*').order('name')
+    const { data } = await tf(supabase.from('employees').select('*')).order('name')
     // Exclude platform admin account — romy@taxrescrm.net is the TaxRes CRM
     // product owner account and must never appear in any office's employee list
     setEmployees((data || []).filter(e => e.email !== 'romy@taxrescrm.net'))
