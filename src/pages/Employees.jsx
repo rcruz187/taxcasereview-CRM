@@ -10,6 +10,8 @@ function tf(q) { return FIRM.tenantId ? q.eq('tenant_id', FIRM.tenantId) : q }
 
 const ROLES = ['Super Admin', 'Admin', 'Manager', 'Tax Associate', 'Tax Advisor', 'View Only']
 const ROLE_COLORS = { 'Super Admin': '#ef4444', 'Admin': '#f59e0b', 'Tax Associate': '#3b82f6', 'View Only': '#64748b', 'Tax Advisor': '#10b981', 'Manager': '#06b6d4' }
+// Role display colors (for the role badge — role is the title, access is the permission level)
+const TITLE_COLORS = { 'Super Admin': '#ef4444', 'Associate': '#10b981', 'Para': '#0ea5e9', 'Manager': '#06b6d4', 'Staff': '#64748b' }
 
 // perm levels: 0=No Access, 1=View Only, 2=Edit, 3=Full Admin
 const PERM_SECTIONS = [
@@ -330,7 +332,7 @@ export default function Employees() {
                 {/* Avatar */}
                 <div style={{
                   width: 48, height: 48, borderRadius: '50%',
-                  background: ROLE_COLORS[emp.access] || '#64748b',
+                  background: TITLE_COLORS[emp.role] || ROLE_COLORS[emp.access] || '#64748b',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 16, fontWeight: 800, color: '#fff', flexShrink: 0, overflow: 'hidden'
                 }}>
@@ -345,10 +347,10 @@ export default function Employees() {
                   <div style={{ marginTop: 8, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                     <span style={{
                       fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 20,
-                      background: (ROLE_COLORS[emp.access] || '#64748b') + '22',
-                      color: ROLE_COLORS[emp.access] || '#64748b',
-                      border: '1px solid ' + (ROLE_COLORS[emp.access] || '#64748b') + '44'
-                    }}>{emp.access || 'Tax Associate'}</span>
+                      background: (TITLE_COLORS[emp.role] || ROLE_COLORS[emp.access] || '#64748b') + '22',
+                      color: TITLE_COLORS[emp.role] || ROLE_COLORS[emp.access] || '#64748b',
+                      border: '1px solid ' + (TITLE_COLORS[emp.role] || ROLE_COLORS[emp.access] || '#64748b') + '44'
+                    }}>{emp.role || emp.title || emp.access || 'Staff'}</span>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
