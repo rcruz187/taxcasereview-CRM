@@ -960,9 +960,8 @@ function AdminCalendar(){
   useEffect(()=>{
     const prev = sessionStorage.getItem('admin_impersonation')
     sessionStorage.removeItem('admin_impersonation')
-    // Clear any override so current_tenant_id() resolves from Romy's login (TCR)
-    supabase.rpc('set_admin_tenant_override',{ p_tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a' })
-      .then(()=>setReady(true)).catch(()=>setReady(true))
+    // No override — current_tenant_id() resolves naturally from Romy's login (TCR)
+    setReady(true)
     return ()=>{
       if (prev) sessionStorage.setItem('admin_impersonation', prev)
     }
