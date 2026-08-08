@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const BING_BASE = 'https://ssl.bing.com/webmaster/api.svc/json'
+const BING_BASE = 'https://api.bing.com/webmaster/api'
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -28,47 +28,59 @@ serve(async (req) => {
     }
 
     const apiKey = settings.bing_api_key
-    const siteUrl = settings.bing_site_url || 'https://taxrescrm.app/'
+    const siteUrl = settings.bing_site_url || 'https://taxrescrm.net/'
+
+    const headers = {
+      'Ocp-Apim-Subscription-Key': apiKey,
+      'Content-Type': 'application/json',
+    }
 
     const today = new Date()
     const endDate = today.toISOString().slice(0, 10)
     const startDate = new Date(today.getTime() - 28 * 86400000).toISOString().slice(0, 10)
 
-    // Fetch traffic stats + top pages in parallel
-    const [trafficRes, pagesRes, keywordsRes] = await Promise.all([
-      fetch(`${BING_BASE}/GetUrlTrafficInfo?apikey=${apiKey}&siteUrl=${encodeURIComponent(siteUrl)}&startDate=${startDate}&endDate=${endDate}`),
-      fetch(`${BING_BASE}/GetTopPages?apikey=${apiKey}&siteUrl=${encodeURIComponent(siteUrl)}&startDate=${startDate}&endDate=${endDate}`),
-      fetch(`${BING_BASE}/GetKeywordStats?apikey=${apiKey}&siteUrl=${encodeURIComponent(siteUrl)}&startDate=${startDate}&endDate=${endDate}`),
+    // Bing Webmaster v3 REST API
+    const [statsRes, pagesRes, keywordsRes] = await Promise.all([
+      fetch(`${BING_BASE}/GetQueryStats?siteUrl=${encodeURIComponent(siteUrl)}&startDate=${startDate}&endDate=${endDate}`, { headers }),
+      fetch(`${BING_BASE}/GetPageStats?siteUrl=${encodeURIComponent(siteUrl)}&startDate=${startDate}&endDate=${endDate}`, { headers }),
+      fetch(`${BING_BASE}/GetKeywordStats?siteUrl=${encodeURIComponent(siteUrl)}&startDate=${startDate}&endDate=${endDate}`, { headers }),
     ])
 
-    const [trafficData, pagesData, keywordsData] = await Promise.all([
-      trafficRes.json().catch(() => ({})),
+    const [statsData, pagesData, keywordsData] = await Promise.all([
+      statsRes.json().catch(() => ({})),
       pagesRes.json().catch(() => ({})),
       keywordsRes.json().catch(() => ({})),
     ])
 
-    const traffic = trafficData.d || {}
-    const pages = (pagesData.d || []).slice(0, 10)
-    const keywords = (keywordsData.d || []).slice(0, 10)
+    // Aggregate totals
+    const stats = Array.isArray(statsData) ? statsData : (statsData.value || [])
+    const pages = Array.isArray(pagesData) ? pagesData : (pagesData.value || [])
+    const keywords = Array.isArray(keywordsData) ? keywordsData : (keywordsData.value || [])
+
+    const totalClicks = stats.reduce((s: number, r: any) => s + (r.Clicks || r.clicks || 0), 0)
+    const totalImpressions = stats.reduce((s: number, r: any) => s + (r.Impressions || r.impressions || 0), 0)
+    const avgCtr = totalImpressions > 0 ? Math.round((totalClicks / totalImpressions) * 10000) / 100 : 0
+    const avgPos = stats.length > 0 ? Math.round(stats.reduce((s: number, r: any) => s + (r.AveragePosition || r.avgPosition || 0), 0) / stats.length * 10) / 10 : 0
 
     return new Response(JSON.stringify({
-      clicks: traffic.Clicks || 0,
-      impressions: traffic.Impressions || 0,
-      ctr: traffic.Ctr ? Math.round(traffic.Ctr * 100) / 100 : 0,
-      avgPosition: traffic.AvgPosition ? Math.round(traffic.AvgPosition * 10) / 10 : 0,
-      topPages: pages.map((p: any) => ({
-        url: p.Url,
-        clicks: p.Clicks || 0,
-        impressions: p.Impressions || 0,
+      clicks: totalClicks,
+      impressions: totalImpressions,
+      ctr: avgCtr,
+      avgPosition: avgPos,
+      topPages: pages.slice(0, 10).map((p: any) => ({
+        url: p.Url || p.url,
+        clicks: p.Clicks || p.clicks || 0,
+        impressions: p.Impressions || p.impressions || 0,
       })),
-      topKeywords: keywords.map((k: any) => ({
-        query: k.Query,
-        clicks: k.Clicks || 0,
-        impressions: k.Impressions || 0,
-        avgPosition: k.AvgPosition ? Math.round(k.AvgPosition * 10) / 10 : 0,
+      topKeywords: keywords.slice(0, 10).map((k: any) => ({
+        query: k.Query || k.query,
+        clicks: k.Clicks || k.clicks || 0,
+        impressions: k.Impressions || k.impressions || 0,
+        avgPosition: Math.round((k.AveragePosition || k.avgPosition || 0) * 10) / 10,
       })),
       siteUrl,
       dateRange: { start: startDate, end: endDate },
+      raw: { statsStatus: statsRes.status, pagesStatus: pagesRes.status },
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
   } catch (err) {
