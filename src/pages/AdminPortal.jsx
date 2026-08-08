@@ -1607,7 +1607,8 @@ function CommandCenter() {
   const [sysStatus, setSysStatus] = useState(null)
   useEffect(()=>{
     async function checkSys(){
-      const dbOk = await supabase.from('tenants').select('id').limit(1).then(r=>!r.error).catch(()=>false)
+      let dbOk = false
+      try { const r = await supabase.from('tenants').select('id').limit(1); dbOk = !r.error } catch(_){}
       let mailOk=false,netOk=false,appOk=false
       try{await fetch('https://webmail.taxrescrm.net:7443',{mode:'no-cors',signal:AbortSignal.timeout(4000)});mailOk=true}catch(_){}
       try{await fetch('https://taxrescrm.net',{mode:'no-cors',signal:AbortSignal.timeout(4000)});netOk=true}catch(_){}
