@@ -2300,8 +2300,10 @@ function CommandCenter() {
                   { label:'Email (Stalwart)',   ok: sysStatus?.mailOk ?? null },
                   { label:'taxrescrm.net',      ok: sysStatus?.netOk ?? null },
                   { label:'taxrescrm.app',      ok: sysStatus?.appOk ?? null },
-                  { label:'Search Console',     ok: gscConnected ? true : null },
-                  { label:'Bing Webmaster',     ok: bingConnected ? true : null },
+                  { label:'GA4 Sync',          ok: ga4Data ? true : null },
+                  { label:'Search Console',     ok: gscConnected ? true : (gscData===null && !gscLoading ? null : null) },
+                  { label:'Bing Webmaster',     ok: bingConnected ? true : (bingData===null ? null : null) },
+                  { label:'Microsoft Clarity',  ok: null },
                 ]
                 return checks.map((s,i)=>(
                   <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
@@ -2321,10 +2323,10 @@ function CommandCenter() {
             <div style={CC.card({padding:'22px 24px'})}>
               <div style={CC.sectionLabel}>Connect APIs</div>
               {[
-                { label:'Google Analytics 4',   key:'ga4',     status:'not connected', color:'#f59e0b' },
-                { label:'Google Search Console', key:'gsc',     status:'not connected', color:'#f59e0b' },
+                { label:'Google Analytics 4',   key:'ga4',     status: ga4Data ? 'connected' : 'not connected', color: ga4Data ? '#10b981' : '#f59e0b' },
+                { label:'Google Search Console', key:'gsc',     status: gscConnected ? 'connected' : 'not connected', color: gscConnected ? '#10b981' : '#f59e0b' },
                 { label:'Microsoft Clarity',     key:'clarity', status:'not connected', color:'#64748b' },
-                { label:'Bing Webmaster',        key:'bing',    status:'not connected', color:'#64748b' },
+                { label:'Bing Webmaster',        key:'bing',    status: bingConnected ? 'connected' : 'not connected', color: bingConnected ? '#10b981' : '#64748b' },
               ].map((api,i) => (
                 <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
                   padding:'11px 0', borderBottom: i<3?'1px solid rgba(99,102,241,.1)':'none' }}>
