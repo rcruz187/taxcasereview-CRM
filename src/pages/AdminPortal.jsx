@@ -1519,25 +1519,8 @@ function CommandCenter() {
         upcomingDl:   (stats.upcoming_deadlines||[]).slice(0,5),
         todaySchedule:(stats.today_schedule||[]).slice(0,6),
         upcomingDemos:(stats.today_schedule||[]).filter(e=>new Date(e.start)>new Date()).slice(0,5),
-        // Marketing mock data (live when GA4 is connected)
-        marketing: {
-          visitorsToday: 247,  visitorsChange: 18,
-          sessions: 312,       sessionsChange: 14,
-          bounceRate: 38.2,    bounceChange: -4,
-          pagesPerSession: 3.1,
-          topSources: [
-            { label:'Organic Search', pct:62, color:'#6366f1' },
-            { label:'Direct',         pct:21, color:'#0ea5e9' },
-            { label:'Referral',       pct:11, color:'#10b981' },
-            { label:'Social',         pct:6,  color:'#f59e0b' },
-          ],
-          topPages: [
-            { path:'/features/irs-workflows', views:84, change:'+22%' },
-            { path:'/',                         views:71, change:'+8%'  },
-            { path:'/resources/transaction-codes', views:52, change:'+31%' },
-            { path:'/about',                    views:38, change:'+5%'  },
-          ],
-        },
+        // Marketing — live when GA4 connected
+        marketing: null,
         // Search data — populated from gscData state after fetch
         search: {
           impressions: 0, impressionsChange: 0,
@@ -1554,30 +1537,23 @@ function CommandCenter() {
           { label:'MRR',              current: totalMRR||0, target:5000, unit:'$', color:'#10b981' },
           { label:'Customers',        current: activeTenants.length, target:12, unit:'firms', color:'#f59e0b' },
         ],
-        // Sales pipeline
+        // Sales pipeline — real data from tenants
         sales: {
           stages: [
             { label:'New Leads',      count: Number(stats.open_leads||0),    color:'#94a3b8' },
-            { label:'Qualified',      count: Math.max(1, Math.floor(Number(stats.open_leads||0)*0.4)), color:'#6366f1' },
-            { label:'Demo Scheduled', count: Number(stats.today_demos||0) + 2, color:'#0ea5e9' },
-            { label:'Demo Completed', count: 3,                               color:'#8b5cf6' },
-            { label:'Proposal',       count: 2,                               color:'#f59e0b' },
+            { label:'Demo Scheduled', count: Number(stats.today_demos||0),   color:'#0ea5e9' },
             { label:'Won',            count: activeTenants.length,            color:'#10b981' },
-            { label:'Lost',           count: 1,                               color:'#ef4444' },
           ],
           winRate: activeTenants.length>0 ? Math.round(activeTenants.length/(activeTenants.length+1)*100) : 0,
-          salesCycle: 14,
           pipeline: totalMRR * 3,
         },
         systemStatus: [
-          { label:'Supabase DB',         ok:true  },
+          { label:'Supabase DB',         ok:!statsRes.error },
+          { label:'Edge Functions',      ok:true  },
           { label:'Email (Stalwart)',     ok:true  },
-          { label:'taxrescrm.net',        ok:true  },
-          { label:'taxrescrm.app',        ok:true  },
-          { label:'GA4 Sync',            ok:true  },
+          { label:'ICS Watcher',         ok:true  },
           { label:'Search Console',      ok:null  },
-          { label:'Bing',                ok:null  },
-          { label:'Microsoft Clarity',   ok:null  },
+          { label:'Bing Webmaster',      ok:null  },
         ],
       })
       } catch(err) {
