@@ -300,7 +300,7 @@ export default function App() {
 
   return (
     <AppProvider>
-      <BrowserRouter basename="/taxcasereview-CRM">
+      <BrowserRouter basename="/">
         <AuthRouter />
       </BrowserRouter>
     </AppProvider>
