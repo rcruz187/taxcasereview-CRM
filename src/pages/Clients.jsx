@@ -922,6 +922,7 @@ export default function Clients() {
   const [employees, setEmployees] = useState([])
   const [statusCategories, setStatusCategories] = useState([])
   const [filter,    setFilter]    = useState('All')
+  const [clientSearch, setClientSearch] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const [confirmArchive, setConfirmArchive] = useState(null)
   const [modal,     setModal]     = useState(false)
@@ -1117,7 +1118,7 @@ export default function Clients() {
 
   async function load() {
     const [{ data:cl },{ data:em },{ data:cats },{ data:sts }] = await Promise.all([
-      supabase.from('clients').select('id,name,status,email,phone,city,state,"clientType","assignedTo","taxAssociate","pipelineStage",archived,deleted_at,"business_name",created_at').order('created_at',{ascending:false}),
+      supabase.from('clients').select('id,name,status,email,phone,city,state,"clientType","assignedTo","taxAssociate","pipelineStage","irsBalance","issueType",archived,deleted_at,"business_name",created_at').is('deleted_at',null).order('name',{ascending:true}),
       supabase.from('employees').select('id,name,avatar_url,email'),
       supabase.from('workflow_status_categories').select('*').order('sort_order'),
       supabase.from('workflow_statuses').select('*').order('sort_order'),
@@ -1221,9 +1222,18 @@ export default function Clients() {
       } catch(e) {}
     }
   }
+  const _clientSearchLower = clientSearch.toLowerCase()
   const filtered = clients
     .filter(c => showArchived ? !!c.archived : !c.archived)
     .filter(c => filter==='All' || c.clientType===filter)
+    .filter(c => !_clientSearchLower || (
+      (c.name||'').toLowerCase().includes(_clientSearchLower) ||
+      (c.email||'').toLowerCase().includes(_clientSearchLower) ||
+      (c.phone||'').replace(/\D/g,'').includes(_clientSearchLower.replace(/\D/g,'')) ||
+      (c.assignedTo||'').toLowerCase().includes(_clientSearchLower) ||
+      (c.city||'').toLowerCase().includes(_clientSearchLower) ||
+      (c.business_name||'').toLowerCase().includes(_clientSearchLower)
+    ))
 
   function buildPayload(f) {
     const {
@@ -1274,7 +1284,7 @@ export default function Clients() {
     await logActivity(supabase,{employeeName:actorC,action:'client_created',category:'client',description:`Added client: ${form.name}`,entityName:form.name}).catch(()=>{})
     setModal(false); setForm(BLANK)
     // Reload then navigate straight into the new client's detail
-    const { data: allClients } = await supabase.from('clients').select('id,name,status,email,phone,city,state,"clientType","assignedTo","taxAssociate","pipelineStage",archived,deleted_at,"business_name",created_at').order('created_at', { ascending: false })
+    const { data: allClients } = await supabase.from('clients').select('id,name,status,email,phone,city,state,"clientType","assignedTo","taxAssociate","pipelineStage","irsBalance","issueType",archived,deleted_at,"business_name",created_at').is('deleted_at',null).order('name', { ascending: true })
     if (allClients) setClients(allClients)
     const newest = allClients?.find(c => c.name === form.name)
     if (newest) { setDetail(newest); loadRelated(newest.name); navigate('/clients/' + newest.id, { replace: true }) }
@@ -3242,6 +3252,13 @@ export default function Clients() {
         <div className="ch">
           <span className="ct">{showArchived?'Archived Clients':'Client Roster'} <span style={{fontSize:12,fontWeight:500,color:'var(--t3)',marginLeft:6}}>({filtered.length})</span>{showArchived && <span style={{fontSize:11,fontWeight:500,color:'var(--t3)',marginLeft:8}}>· permanently deleted 30 days after archiving · Restore to keep</span>}</span>
           <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
+            <input
+              type="search"
+              placeholder="Search clients…"
+              value={clientSearch}
+              onChange={e=>setClientSearch(e.target.value)}
+              style={{padding:'5px 10px',borderRadius:6,border:'1px solid var(--br)',background:'var(--bg2)',color:'var(--tx)',fontSize:13,width:200,outline:'none'}}
+            />
             {['All','Individual','Business'].map(f=>(
               <span key={f} className={`chip${filter===f?' on':''}`} onClick={()=>setFilter(f)}>{f}</span>
             ))}
