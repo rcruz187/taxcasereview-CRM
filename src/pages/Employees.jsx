@@ -336,7 +336,7 @@ export default function Employees() {
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--tx)' }}>{emp.name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{emp.title || 'Staff'}</div>
+                  <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{emp.title || emp.role || 'Staff'}</div>
                   <div style={{ fontSize: 12, color: 'var(--t3)' }}>{emp.email}</div>
                   <div style={{ marginTop: 8, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                     <span style={{
