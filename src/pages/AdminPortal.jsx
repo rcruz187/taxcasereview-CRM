@@ -2072,63 +2072,104 @@ function CommandCenter() {
 
         {/* ═══ SEARCH TAB ═══ */}
         {tab==='search' && (<>
-          {/* Live GSC data when connected, zeros when not */}
-          {(()=>{ const sd = gscConnected && gscData ? gscData : null; return (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24 }}>
-            {[
-              { label:'Impressions',  value: sd ? sd.impressions.toLocaleString() : '—',  sub: sd ? `${sd.impressionsChange>=0?'↑':'↓'} ${Math.abs(sd.impressionsChange)}% vs prev 28d` : 'No data', icon:'👁',  color:'#6366f1' },
-              { label:'Clicks',       value: sd ? sd.clicks.toLocaleString() : '—',        sub: sd ? `${sd.clicksChange>=0?'↑':'↓'} ${Math.abs(sd.clicksChange)}% vs prev 28d` : 'No data',   icon:'🖱️', color:'#10b981' },
-              { label:'CTR',          value: sd ? `${sd.ctr}%` : '—',                      sub: sd ? `${sd.ctrChange>=0?'↑':'↓'} ${Math.abs(sd.ctrChange)}% improvement` : 'No data',         icon:'📊', color:'#f59e0b' },
-              { label:'Avg Position', value: sd ? String(sd.avgPosition) : '—',            sub: sd ? `${sd.posChange>=0?'↑':'↓'} ${Math.abs(sd.posChange)} positions` : 'No data',             icon:'🎯', color:'#f97316' },
-            ].map((m,i)=>(
-              <div key={i} style={{ background:'var(--bg2)', borderRadius:10, padding:'18px 20px', border:'1px solid var(--border)' }}>
-                <div style={{ fontSize:11, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:6 }}>{m.label}</div>
-                <div style={{ fontSize:28, fontWeight:800, color:m.color, marginBottom:4 }}>{m.value}</div>
-                <div style={{ fontSize:12, color:'var(--t3)' }}>{m.sub}</div>
-              </div>
-            ))}
-          </div>
-          )})()}
 
-          {/* Top queries table */}
-          {gscConnected && gscData?.topQueries?.length > 0 && (
-            <div style={{ background:'var(--bg2)', borderRadius:10, border:'1px solid var(--border)', overflow:'hidden', marginBottom:16 }}>
-              <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', fontWeight:700, fontSize:13 }}>TOP KEYWORDS</div>
-              <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                <thead><tr style={{ background:'rgba(0,0,0,.2)' }}>
-                  {['KEYWORD','POSITION','CLICKS','IMPRESSIONS'].map(h=>(
-                    <th key={h} style={{ padding:'8px 16px', textAlign:'left', fontSize:11, color:'var(--t3)', letterSpacing:'.06em' }}>{h}</th>
-                  ))}
-                </tr></thead>
-                <tbody>
-                  {gscData.topQueries.map((q,i)=>(
-                    <tr key={i} style={{ borderTop:'1px solid var(--border)' }}>
-                      <td style={{ padding:'12px 16px', fontSize:14, fontWeight:500 }}>{q.query}</td>
-                      <td style={{ padding:'12px 16px', fontSize:14, color: q.pos<=10?'#10b981':q.pos<=20?'#f59e0b':'#f97316', fontWeight:700 }}>{q.pos}</td>
-                      <td style={{ padding:'12px 16px', fontSize:14, color:'var(--t2)' }}>{q.clicks}</td>
-                      <td style={{ padding:'12px 16px', fontSize:14, color:'#6366f1' }}>{q.impressions}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Connect / status banner */}
-          {!gscConnected && (
-            <div style={{ padding:'20px 24px', background:'rgba(99,102,241,.06)', border:'1px dashed rgba(99,102,241,.3)', borderRadius:8, marginTop:18 }}>
-              <div style={{ fontSize:13, color:'#6366f1', fontWeight:700, marginBottom:8 }}>⚡ Connect Google Search Console for live rankings</div>
-              {gscLoading
-                ? <div style={{ fontSize:12, color:'var(--t3)' }}>Checking connection…</div>
-                : <button onClick={handleGSCConnect} style={{ background:'#6366f1', color:'#fff', border:'none', borderRadius:6, padding:'8px 20px', fontSize:13, fontWeight:600, cursor:'pointer' }}>Connect Search Console</button>
+          {/* ── Google Search Console ── */}
+          <div style={CC.card({padding:'22px 24px', marginBottom:18})}>
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
+              <span style={{ fontSize:16 }}>🔵</span>
+              <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>Google Search Console</div>
+              {gscConnected
+                ? <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:10, background:'rgba(16,185,129,.15)', color:'#10b981', marginLeft:'auto' }}>✅ Connected</span>
+                : <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:10, background:'rgba(99,102,241,.15)', color:'#6366f1', marginLeft:'auto' }}>Not connected</span>
               }
             </div>
-          )}
-          {gscConnected && gscData?.siteUrl && (
-            <div style={{ fontSize:12, color:'var(--t3)', marginTop:8 }}>
-              ✅ Live data from {gscData.siteUrl} — last 28 days
+            {(()=>{ const sd = gscConnected && gscData ? gscData : null; return (<>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom: sd && gscData?.topQueries?.length > 0 ? 16 : 0 }}>
+                {[
+                  { label:'Impressions',  value: sd ? sd.impressions.toLocaleString() : '—', color:'#6366f1' },
+                  { label:'Clicks',       value: sd ? sd.clicks.toLocaleString() : '—',       color:'#10b981' },
+                  { label:'CTR',          value: sd ? `${sd.ctr}%` : '—',                     color:'#f59e0b' },
+                  { label:'Avg Position', value: sd ? String(sd.avgPosition) : '—',           color:'#f97316' },
+                ].map((m,i)=>(
+                  <div key={i} style={{ background:'rgba(255,255,255,.03)', borderRadius:8, padding:'14px 16px', border:'1px solid rgba(255,255,255,.06)' }}>
+                    <div style={{ fontSize:9, color:'#475569', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:4 }}>{m.label}</div>
+                    <div style={{ fontSize:22, fontWeight:800, color:m.color }}>{m.value}</div>
+                  </div>
+                ))}
+              </div>
+              {sd && gscData?.topQueries?.length > 0 && (
+                <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                  <thead><tr>{['Keyword','Position','Clicks','Impressions'].map(h=>(
+                    <th key={h} style={{ padding:'6px 10px', textAlign:'left', fontSize:10, color:'#475569', textTransform:'uppercase', letterSpacing:'.06em', borderBottom:'1px solid rgba(255,255,255,.06)' }}>{h}</th>
+                  ))}</tr></thead>
+                  <tbody>{gscData.topQueries.map((q,i)=>(
+                    <tr key={i} style={{ borderBottom:'1px solid rgba(255,255,255,.04)' }}>
+                      <td style={{ padding:'8px 10px', fontSize:13, color:'#e2e8f0' }}>{q.query}</td>
+                      <td style={{ padding:'8px 10px', fontSize:13, fontWeight:700, color: q.pos<=10?'#10b981':q.pos<=20?'#f59e0b':'#f97316' }}>{q.pos}</td>
+                      <td style={{ padding:'8px 10px', fontSize:13, color:'#94a3b8' }}>{q.clicks}</td>
+                      <td style={{ padding:'8px 10px', fontSize:13, color:'#6366f1' }}>{q.impressions}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              )}
+              {!gscConnected && (
+                <div style={{ marginTop:8 }}>
+                  {gscLoading
+                    ? <div style={{ fontSize:12, color:'#475569' }}>Checking connection…</div>
+                    : <button onClick={handleGSCConnect} style={{ background:'#6366f1', color:'#fff', border:'none', borderRadius:6, padding:'7px 16px', fontSize:12, fontWeight:600, cursor:'pointer' }}>Connect Google Search Console</button>
+                  }
+                </div>
+              )}
+              {gscConnected && gscData?.siteUrl && <div style={{ fontSize:11, color:'#475569', marginTop:8 }}>Last 28 days · {gscData.siteUrl}</div>}
+            </>)})()}
+          </div>
+
+          {/* ── Bing Webmaster Tools ── */}
+          <div style={CC.card({padding:'22px 24px'})}>
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
+              <span style={{ fontSize:16 }}>🟠</span>
+              <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>Bing Webmaster Tools</div>
+              {bingConnected
+                ? <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:10, background:'rgba(16,185,129,.15)', color:'#10b981', marginLeft:'auto' }}>✅ Connected</span>
+                : <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:10, background:'rgba(100,116,139,.15)', color:'#64748b', marginLeft:'auto' }}>Not connected</span>
+              }
             </div>
-          )}
+            {bingConnected && bingData ? (<>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom: bingData.topKeywords?.length > 0 ? 16 : 0 }}>
+                {[
+                  { label:'Impressions',  value: bingData.impressions?.toLocaleString() || '0', color:'#6366f1' },
+                  { label:'Clicks',       value: bingData.clicks?.toLocaleString() || '0',       color:'#10b981' },
+                  { label:'CTR',          value: `${bingData.ctr || 0}%`,                        color:'#f59e0b' },
+                  { label:'Avg Position', value: bingData.avgPosition || '—',                    color:'#f97316' },
+                ].map((m,i)=>(
+                  <div key={i} style={{ background:'rgba(255,255,255,.03)', borderRadius:8, padding:'14px 16px', border:'1px solid rgba(255,255,255,.06)' }}>
+                    <div style={{ fontSize:9, color:'#475569', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:4 }}>{m.label}</div>
+                    <div style={{ fontSize:22, fontWeight:800, color:m.color }}>{m.value}</div>
+                  </div>
+                ))}
+              </div>
+              {bingData.topKeywords?.length > 0 && (
+                <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                  <thead><tr>{['Keyword','Position','Clicks','Impressions'].map(h=>(
+                    <th key={h} style={{ padding:'6px 10px', textAlign:'left', fontSize:10, color:'#475569', textTransform:'uppercase', letterSpacing:'.06em', borderBottom:'1px solid rgba(255,255,255,.06)' }}>{h}</th>
+                  ))}</tr></thead>
+                  <tbody>{bingData.topKeywords.slice(0,8).map((k,i)=>(
+                    <tr key={i} style={{ borderBottom:'1px solid rgba(255,255,255,.04)' }}>
+                      <td style={{ padding:'8px 10px', fontSize:13, color:'#e2e8f0' }}>{k.query}</td>
+                      <td style={{ padding:'8px 10px', fontSize:13, fontWeight:700, color: k.avgPosition<=10?'#10b981':k.avgPosition<=20?'#f59e0b':'#f97316' }}>{k.avgPosition}</td>
+                      <td style={{ padding:'8px 10px', fontSize:13, color:'#94a3b8' }}>{k.clicks}</td>
+                      <td style={{ padding:'8px 10px', fontSize:13, color:'#6366f1' }}>{k.impressions}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              )}
+              <div style={{ fontSize:11, color:'#475569', marginTop:8 }}>Last 28 days · {bingData.siteUrl}</div>
+            </>) : (
+              <div style={{ fontSize:12, color:'#475569' }}>
+                {bingData === null ? 'Checking connection…' : 'API key configured — no data yet or site not yet indexed by Bing.'}
+              </div>
+            )}
+          </div>
         </>)}
 
         {/* ═══ SALES TAB ═══ */}
