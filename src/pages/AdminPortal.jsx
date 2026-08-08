@@ -2348,14 +2348,18 @@ function CommandCenter() {
             </div>
           </div>
 
-          <div style={{ ...CC.card(), padding:'20px 24px', background:'rgba(99,102,241,.05)', border:'1px dashed rgba(99,102,241,.25)' }}>
-            <div style={{ fontSize:13, color:'#a5b4fc', fontWeight:700, marginBottom:6 }}>Daily Executive Email</div>
+          <div style={{ ...CC.card(), padding:'20px 24px', background:'rgba(16,185,129,.04)', border:'1px solid rgba(16,185,129,.15)' }}>
+            <div style={{ fontSize:13, color:'#10b981', fontWeight:700, marginBottom:6 }}>Daily Executive Email</div>
             <div style={{ fontSize:12, color:'#475569', marginBottom:14 }}>
-              A morning briefing is sent to romy@taxrescrm.net every day at 7:00 AM ET once the daily-briefing edge function is deployed.
+              A morning briefing is sent to romy@taxrescrm.net every day at 7:00 AM ET with platform stats, upcoming calendar events, and MRR.
             </div>
-            <div style={{ display:'flex', gap:8 }}>
+            <div style={{ display:'flex', gap:8, alignItems:'center' }}>
               <span style={{ fontSize:11, fontWeight:700, padding:'4px 12px', borderRadius:20,
-                background:'rgba(245,158,11,.15)', color:'#f59e0b' }}>⏸ Pending deployment</span>
+                background:'rgba(16,185,129,.15)', color:'#10b981' }}>✅ Active</span>
+              <button onClick={async()=>{
+                const {error} = await supabase.functions.invoke('daily-briefing',{body:{}})
+                alert(error ? 'Error: '+error.message : 'Test briefing sent to romy@taxrescrm.net')
+              }} style={{ ...S.btn('ghost'), fontSize:11, padding:'4px 12px' }}>Send Test</button>
             </div>
           </div>
         </>)}
