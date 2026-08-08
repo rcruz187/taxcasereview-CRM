@@ -2338,14 +2338,14 @@ function CommandCenter() {
               <div style={CC.sectionLabel}>Service status</div>
               {(()=>{
                 const checks = [
-                  { label:'Supabase DB',       ok: sysStatus?.dbOk ?? null },
-                  { label:'Email (Stalwart)',   ok: sysStatus?.mailOk ?? null },
-                  { label:'taxrescrm.net',      ok: sysStatus?.netOk ?? null },
-                  { label:'taxrescrm.app',      ok: sysStatus?.appOk ?? null },
-                  { label:'GA4 (G-M6J80B65LG)', ok: true },
-                  { label:'Search Console',     ok: gscConnected ? true : (gscData===null && !gscLoading ? null : null) },
-                  { label:'Bing Webmaster',     ok: bingConnected ? true : (bingData===null ? null : null) },
-                  { label:'Microsoft Clarity',  ok: true },
+                  { label:'Supabase DB',          ok: sysStatus?.dbOk ?? null },
+                  { label:'Email (Stalwart)',      ok: sysStatus?.mailOk ?? null },
+                  { label:'taxrescrm.net',         ok: sysStatus?.netOk ?? null },
+                  { label:'taxrescrm.app',         ok: sysStatus?.appOk ?? null },
+                  { label:'GA4 (G-M6J80B65LG)',   ok: true },
+                  { label:'Clarity (xyck7g2mfl)', ok: true },
+                  { label:'Google Search Console', ok: gscConnected ? true : null },
+                  { label:'Bing Webmaster',        ok: bingConnected ? true : null },
                 ]
                 return checks.map((s,i)=>(
                   <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
