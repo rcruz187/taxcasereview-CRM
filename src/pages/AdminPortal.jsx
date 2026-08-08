@@ -1521,15 +1521,8 @@ function CommandCenter() {
         upcomingDemos:(stats.today_schedule||[]).filter(e=>new Date(e.start)>new Date()).slice(0,5),
         // Marketing — live when GA4 connected
         marketing: null,
-        // Search data — populated from gscData state after fetch
-        search: {
-          impressions: 0, impressionsChange: 0,
-          clicks: 0, clicksChange: 0,
-          ctr: 0, ctrChange: 0,
-          avgPosition: 0, posChange: 0,
-          indexedPages: 0,
-          topQueries: [],
-        },
+        // Search data — populated from gscData/bingData after fetch
+        search: { impressions:0, clicks:0, ctr:0, avgPosition:0, topQueries:[] },
         // Goals mock (live when goals table exists)
         goals: [
           { label:'Monthly Demos',    current: Number(stats.today_demos||0), target:50,  unit:'demos',   color:'#6366f1' },
@@ -1565,9 +1558,14 @@ function CommandCenter() {
   }, [])
 
   // ── GSC state + fetch ──
-  const [gscData, setGscData]         = useState(null)
-  const [gscLoading, setGscLoading]   = useState(false)
+  const [gscData, setGscData]           = useState(null)
+  const [gscLoading, setGscLoading]     = useState(false)
   const [gscConnected, setGscConnected] = useState(false)
+
+  // ── Bing state + fetch ──
+  const [bingData, setBingData]           = useState(null)
+  const [bingLoading, setBingLoading]     = useState(false)
+  const [bingConnected, setBingConnected] = useState(false)
 
   useEffect(() => {
     // Handle GSC OAuth callback (?code= in URL after redirect)
@@ -1584,17 +1582,24 @@ function CommandCenter() {
     } else {
       fetchGSC()
     }
+    fetchBing()
   }, [])
 
   async function fetchGSC() {
     setGscLoading(true)
     try {
       const { data: gsc } = await supabase.functions.invoke('gsc-data', { body: {} })
-      if (gsc && !gsc.mock && !gsc.error) {
-        setGscData(gsc)
-        setGscConnected(true)
-      }
+      if (gsc && !gsc.error) { setGscData(gsc); setGscConnected(true) }
     } catch(e) { console.error('GSC fetch:', e) } finally { setGscLoading(false) }
+  }
+
+  async function fetchBing() {
+    setBingLoading(true)
+    try {
+      const { data: bing } = await supabase.functions.invoke('bing-data', { body: {} })
+      if (bing && !bing.error) { setBingData(bing); setBingConnected(true) }
+      else if (bing?.error === 'no_key') { setBingConnected(false) }
+    } catch(e) { console.error('Bing fetch:', e) } finally { setBingLoading(false) }
   }
 
   function handleGSCConnect() {
