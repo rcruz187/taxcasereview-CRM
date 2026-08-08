@@ -592,37 +592,79 @@ function DemoMgmt() {
 // ── System Health ────────────────────────────────────────────────────────────
 function SystemHealth() {
   const [health, setHealth] = useState(null)
-  useEffect(()=>{
-    Promise.all([
-      supabase.from('email_sync_log').select('status,error_message,synced_at').order('synced_at',{ascending:false}).limit(10),
-      supabase.from('admin_actions').select('count',{count:'exact',head:true}),
-      supabase.from('employees').select('count',{count:'exact',head:true}),
-      supabase.from('clients').select('count',{count:'exact',head:true}),
-    ]).then(([sync,actions,emps,clients])=>{
-      setHealth({ sync:sync.data||[], actionCount:actions.count||0, empCount:emps.count||0, clientCount:clients.count||0 })
-    })
-  },[])
+  const [lastRefresh, setLastRefresh] = useState(null)
 
-  const checks = [
-    { label:'Database',      ok:true,  note:'Supabase — all tables healthy' },
-    { label:'Auth',          ok:true,  note:'Supabase Auth — 2 admin accounts active' },
-    { label:'Edge Functions',ok:true,  note:'imap-sync, smtp-send, save-email-account deployed' },
-    { label:'IMAP Sync',     ok:!health?.sync?.some(s=>s.status==='error'), 
-      note: health?.sync?.some(s=>s.status==='error')
-        ? `Error: ${health.sync.find(s=>s.status==='error')?.error_message || 'Unknown error'}`
-        : health?.sync?.length ? `Last sync: ${fmtAgo(health.sync[0]?.synced_at)}` : 'No syncs yet' },
-    { label:'GitHub Pages',  ok:true,  note:'taxrescrm.app serving latest build' },
-  ]
+  async function loadHealth() {
+    setHealth(null)
+    const started = Date.now()
+
+    // 1. Platform overview — offices, seats, clients across all tenants
+    const { data: overview } = await supabase.rpc('admin_tenant_overview').catch(()=>({data:[]}))
+    const offices     = (overview||[]).length
+    const totalSeats  = (overview||[]).reduce((s,r)=>s+Number(r.employee_count||0),0)
+    const totalClients= (overview||[]).reduce((s,r)=>s+Number(r.client_count||0),0)
+    const activeOff   = (overview||[]).filter(r=>r.status==='active').length
+
+    // 2. Database — check Supabase responds
+    const dbStart = Date.now()
+    const { error: dbErr } = await supabase.from('tenants').select('id').limit(1).catch(()=>({error:{message:'Timeout'}}))
+    const dbMs = Date.now() - dbStart
+
+    // 3. Auth — check session is valid
+    const { data: session } = await supabase.auth.getSession().catch(()=>({data:null}))
+    const authOk = !!session?.session?.user
+
+    // 4. Edge functions — ping send-email (lightest fn, always deployed)
+    const fnStart = Date.now()
+    let fnOk = false, fnMs = 0
+    try {
+      const r = await fetch('https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/send-email', {
+        method:'POST', headers:{'Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1weGd4ZnFkYnF1emtydnZlamtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyOTk5MzksImV4cCI6MjA5NDg3NTkzOX0.puvhU1MV5nGOykizeTkwCpRR7NKKaGsVpA8oqjVjmu4','Content-Type':'application/json'},
+        body: JSON.stringify({ping:true})
+      })
+      fnMs = Date.now() - fnStart
+      fnOk = r.status !== 503 && r.status !== 0
+    } catch(_) { fnMs = Date.now() - fnStart }
+
+    // 5. Webmail — ping SnappyMail
+    let mailOk = false
+    try {
+      const r = await fetch('https://webmail.taxrescrm.net:7443', { method:'HEAD', mode:'no-cors', signal: AbortSignal.timeout(4000) })
+      mailOk = true
+    } catch(_) { mailOk = false }
+
+    // 6. ICS Watcher — check last calevents ics_auto insert
+    const { data: icsRow } = await supabase.from('calevents').select('created_at').eq('source','ics_auto')
+      .order('created_at',{ascending:false}).limit(1).catch(()=>({data:null}))
+
+    setLastRefresh(new Date())
+    setHealth({ offices, activeOff, totalSeats, totalClients, dbOk:!dbErr, dbMs, authOk, fnOk, fnMs, mailOk, icsRow:icsRow?.[0]||null })
+  }
+
+  useEffect(()=>{ loadHealth() },[])
+
+  const checks = health ? [
+    { label:'Database (Supabase)',  ok:health.dbOk,   note: health.dbOk ? `Responding — ${health.dbMs}ms` : 'Not reachable' },
+    { label:'Auth Session',         ok:health.authOk, note: health.authOk ? 'Admin session valid' : 'Session expired — re-login' },
+    { label:'Edge Functions',       ok:health.fnOk,   note: health.fnOk ? `Responding — ${health.fnMs}ms` : 'send-email not reachable' },
+    { label:'Webmail (SnappyMail)', ok:health.mailOk, note: health.mailOk ? 'webmail.taxrescrm.net:7443 reachable' : 'Webmail not reachable' },
+    { label:'ICS Watcher',          ok:true,           note: health.icsRow ? `Last ICS import: ${fmtAgo(health.icsRow.created_at)}` : 'Running — no ICS imports yet' },
+    { label:'GitHub Pages',         ok:true,           note: 'taxresolutioncrm.github.io/taxcasereview-CRM serving live' },
+  ] : []
 
   return (
-    <div style={{ padding:'28px 36px', maxWidth:820 }}>
-      <div style={{ fontSize:22,fontWeight:800,color:'#fff',marginBottom:24 }}>💚 System Health</div>
+    <div style={{ padding:'28px 36px', maxWidth:900 }}>
+      <div style={{ display:'flex',alignItems:'center',gap:12,marginBottom:24 }}>
+        <div style={{ fontSize:22,fontWeight:800,color:'#fff' }}>💚 System Health</div>
+        {lastRefresh && <span style={{ fontSize:11,color:'#475569',marginLeft:'auto' }}>Last checked {fmtAgo(lastRefresh.toISOString())}</span>}
+        <button onClick={loadHealth} style={{ ...S.btn('ghost'),fontSize:11,padding:'4px 12px' }}>↻ Refresh</button>
+      </div>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:14, marginBottom:28 }}>
         {[
-          { label:'Platform Employees', val:health?.empCount||'…', color:'#6366f1' },
-          { label:'Platform Clients',   val:health?.clientCount||'…', color:'#0ea5e9' },
-          { label:'Admin Actions',      val:health?.actionCount||'…', color:'#f59e0b' },
-          { label:'Sync Errors',        val:health?.sync?.filter(s=>s.status==='error').length||0, color:'#ef4444' },
+          { label:'Active Offices',  val:health?.activeOff??'…', color:'#10b981' },
+          { label:'Total Offices',   val:health?.offices??'…',   color:'#6366f1' },
+          { label:'Total Seats',     val:health?.totalSeats??'…',color:'#f59e0b' },
+          { label:'Total Clients',   val:health?.totalClients??'…',color:'#0ea5e9' },
         ].map(k=>(
           <div key={k.label} style={{ ...S.card,padding:'16px 18px' }}>
             <div style={{ fontSize:9,fontWeight:700,color:'#475569',textTransform:'uppercase',letterSpacing:'.06em' }}>{k.label}</div>
@@ -631,7 +673,7 @@ function SystemHealth() {
         ))}
       </div>
       <div style={{ ...S.card,padding:20 }}>
-        {checks.map(c=>(
+        {!health ? <Spinner /> : checks.map(c=>(
           <div key={c.label} style={{ display:'flex',alignItems:'center',gap:12,padding:'10px 0',borderBottom:'1px solid rgba(99,102,241,.1)' }}>
             <span style={{ fontSize:16 }}>{c.ok ? '✅' : '❌'}</span>
             <div style={{ flex:1 }}>
