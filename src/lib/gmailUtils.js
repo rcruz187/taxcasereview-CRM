@@ -21,7 +21,7 @@ export function getRedirectUri() {
 export async function exchangeCodeForTokens(supabase, code, employeeEmail) {
   if (!employeeEmail) throw new Error('No logged-in employee to connect this Gmail account to')
 
-  const { data: settings } = await supabase.from('settings').select('*').limit(1).maybeSingle()
+  const { data: settings } = await supabase.from('settings').select('*').not('gmail_client_id', 'is', null).limit(1).maybeSingle()
   if (!settings?.gmail_client_id || !settings?.gmail_client_secret) {
     throw new Error('Gmail Client ID/Secret not configured in Settings')
   }
@@ -83,7 +83,7 @@ export async function getValidGmailToken(supabase, employeeEmail) {
   if (!acct?.gmail_refresh_token) throw new Error('Gmail not connected for this account')
 
   const { data: settings } = await supabase.from('settings')
-    .select('gmail_client_id,gmail_client_secret').limit(1).maybeSingle()
+    .select('gmail_client_id,gmail_client_secret').not('gmail_client_id', 'is', null).limit(1).maybeSingle()
   if (!settings?.gmail_client_id || !settings?.gmail_client_secret) {
     throw new Error('Gmail Client ID/Secret not configured in Settings')
   }

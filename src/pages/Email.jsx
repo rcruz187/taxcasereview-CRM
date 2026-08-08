@@ -96,7 +96,7 @@ export default function Email() {
     // gmail_client_id stays shared (the app's own OAuth registration, not a
     // personal secret) — but whether GMAIL IS CONNECTED is now per-employee,
     // not the old single shared settings.gmail_refresh_token check.
-    const { data } = await supabase.from('settings').select('gmail_client_id,email_signature,email_signature_logo_url').limit(1).maybeSingle()
+    const { data } = await supabase.from('settings').select('gmail_client_id,email_signature,email_signature_logo_url').not('gmail_client_id', 'is', null).limit(1).maybeSingle()
     if (data?.gmail_client_id) setGmailClientId(data.gmail_client_id)
     if (user?.email) {
       const { data: acct } = await supabase.from('employee_gmail_accounts')
