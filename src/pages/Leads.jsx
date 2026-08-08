@@ -28,7 +28,7 @@ import SendPaymentLinkModal from '../components/SendPaymentLinkModal'
 import SavedCardsPanel from '../components/SavedCardsPanel'
 import SplitPaymentModal from '../components/SplitPaymentModal'
 import { SMS_TEMPLATES, applySmsTemplate } from '../lib/smsTemplates'
-import { FIRM } from '../lib/firmBranding'
+import { FIRM, label } from '../lib/firmBranding'
 
 // Tenant-resolved firm name + contact email so the transactional email HTML,
 // SMS bodies, and subject lines below read as whichever firm is signed in,
@@ -388,7 +388,7 @@ export default function Leads() {
   const { user, role, employeeName } = useApp()
   const { id: urlLeadId } = useParams()
   const [searchParams] = useSearchParams()
-  const isTaxAdvisor = role === 'Associate'
+  const isTaxAdvisor = role === 'Tax Advisor'
 
   // Cache settings at load time — avoids re-fetching signalwire_backend on every action
   const settingsRef = useRef(null)
@@ -1936,7 +1936,7 @@ export default function Leads() {
             </div>
 
             <div className="fg2">
-              <div className="field"><label>Associate</label>
+              <div className="field"><label>{label("assignedTo","Tax Advisor")}</label>
                 <select value={form.assignedTo} onChange={e=>fld('assignedTo',e.target.value)}>
                   <option value="">Unassigned</option>
                   {(employees.length>0?employees.map(e=>e.name):['Romy Cruz','Dana Richard','Yesenia Gonzalez']).map(n=><option key={n}>{n}</option>)}
@@ -1945,7 +1945,7 @@ export default function Leads() {
               {/* The associate who works the case day to day. Workflow steps
                   marked ASSOCIATE go here when set; otherwise they fall back to
                   the round-robin pick, which is why this can stay blank. */}
-              <div className="field"><label>Para</label>
+              <div className="field"><label>{label("taxAssociate","Tax Associate")}</label>
                 <select value={form.taxAssociate||''} onChange={e=>fld('taxAssociate',e.target.value)}>
                   <option value="">Auto (round-robin)</option>
                   {(employees.length>0?employees.map(e=>e.name):['Romy Cruz','Dana Richard','Yesenia Gonzalez']).map(n=><option key={n}>{n}</option>)}
@@ -2608,8 +2608,8 @@ export default function Leads() {
                 ['State Status',   l.stateStatus==='Other'?l.stateStatusOther:l.stateStatus],
                 ['State Deadline', l.stateDeadline],
               ] : []),
-              ['Associate',  l.assignedTo||<span style={{color:'var(--warn)'}}>Unassigned</span>],
-              ['Para', l.taxAssociate||'—'],
+              ['Tax Advisor',  l.assignedTo||<span style={{color:'var(--warn)'}}>Unassigned</span>],
+              ['Tax Associate', l.taxAssociate||'—'],
               ['Tax Inv Fee',  l.taxFee?<span style={{fontWeight:700,color:'var(--ok)'}}>${l.taxFee}</span>:'Not set'],
             ].map(([label,val])=>(
               <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">{val||'—'}</span></div>

@@ -29,7 +29,7 @@ import ChargeResolutionFeeModal from '../components/ChargeResolutionFeeModal'
 import { RESOLUTION_SERVICES, resolveStateFormUrl } from '../lib/irsFormUtils'
 import { generatePOACoverLetterPdf } from '../lib/irsFormUtils'
 import { SMS_TEMPLATES, applySmsTemplate } from '../lib/smsTemplates'
-import { FIRM } from '../lib/firmBranding'
+import { FIRM, label } from '../lib/firmBranding'
 
 // Tenant-resolved firm name so onboarding email + POA/addendum SMS bodies
 // read for whichever firm is signed in. Mirrors Leads.jsx and docUtils.
@@ -2719,8 +2719,8 @@ export default function Clients() {
                   <DR label="State Deadline" val={c.stateDeadline}/>
                 </>
               )}
-              <DR label="Associate" val={c.assignedTo}/>
-              <DR label="Para" val={c.taxAssociate}/>
+              <DR label={label("assignedTo","Tax Advisor")} val={c.assignedTo}/>
+              <DR label={label("taxAssociate","Tax Associate")} val={c.taxAssociate}/>
               <DR label="Client Since" val={c.clientSince}/>
             </div>
 
@@ -3575,13 +3575,13 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
               <option>Active</option><option>Inactive</option><option>Prospect</option>
             </select>
           </div>
-          <div className="field"><label>Associate</label>
+          <div className="field"><label>{label("assignedTo","Tax Advisor")}</label>
             <select value={form.assignedTo||''} onChange={e=>fld('assignedTo',e.target.value)}>
               <option value="">Unassigned</option>{reps.map(r=><option key={r}>{r}</option>)}
             </select>
           </div>
           {/* Named associate overrides the round-robin pick on workflow steps. */}
-          <div className="field"><label>Para</label>
+          <div className="field"><label>{label("taxAssociate","Tax Associate")}</label>
             <select value={form.taxAssociate||''} onChange={e=>fld('taxAssociate',e.target.value)}>
               <option value="">Auto (round-robin)</option>{reps.map(r=><option key={r}>{r}</option>)}
             </select>

@@ -31,6 +31,12 @@ export const FIRM = {
   website: '',
   fax: '',
   loaded: false,
+  labels: {},    // per-tenant role/field label overrides e.g. {assignedTo:'Associate',taxAssociate:'Para'}
+}
+
+// Resolve a UI label — falls back to the default if the tenant hasn't overridden it
+export function label(key, defaultVal) {
+  return (FIRM.labels && FIRM.labels[key]) || defaultVal
 }
 
 export async function loadFirmBranding() {
@@ -54,7 +60,7 @@ export async function loadFirmBranding() {
 
     const { data: s } = await supabase
       .from('settings')
-      .select('tenant_id,name,firmname,logourl,address,firmaddress,city,state,zip,phone,firmphone,email,firmemail,website,firm_fax_number')
+      .select('tenant_id,name,firmname,logourl,address,firmaddress,city,state,zip,phone,firmphone,email,firmemail,website,firm_fax_number,labels')
       .limit(1).maybeSingle()
     if (!s) return FIRM
 
@@ -78,6 +84,7 @@ export async function loadFirmBranding() {
     FIRM.email = s.email || s.firmemail || ''
     FIRM.website = s.website || ''
     FIRM.fax = s.firm_fax_number || ''
+    FIRM.labels = s.labels || {}
     FIRM.loaded = true
   } catch (_) { /* leave whatever we have; templates degrade gracefully */ }
   return FIRM
