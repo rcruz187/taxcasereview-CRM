@@ -44,6 +44,7 @@ serve(async (req) => {
     const { data: settings, error: sErr } = await supabase
       .from('settings')
       .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did,tenant_id')
+      .not('sw_api_token', 'is', null)
       .limit(1)
       .maybeSingle()
 
