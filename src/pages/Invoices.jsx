@@ -123,7 +123,7 @@ export default function Invoices() {
     const tax      = subtotal * (taxRate/100)
     const paid     = parseFloat(inv.paid||0)
     const balance  = (subtotal + tax) - paid
-    const payLink  = client?.id ? `${window.location.origin}/taxcasereview-CRM/portal/${client.id}?section=payments` : null
+    const payLink  = client?.id ? `${window.location.origin}/portal/${client.id}?section=payments` : null
     const subject = isReminder
       ? `Payment Reminder — Invoice #${invNum} — ${firm.name}`
       : `Invoice #${invNum} — ${firm.name}`

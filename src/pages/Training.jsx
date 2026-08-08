@@ -8,7 +8,7 @@ import { useApp }         from '../context/AppContext'
 import { supabase }       from '../lib/supabase'
 import { FIRM, firmFooterLine } from '../lib/firmBranding'
 
-const BASE = '/taxcasereview-CRM'
+const BASE = '/'
 
 function ScreenPreview({ stream }) {
   const ref = useRef(null)
@@ -93,13 +93,13 @@ export default function Training() {
   // Email the join link to one or more people, using the same send-email
   // edge function every other transactional email in the CRM goes through.
   // Only pass logo to join URL if it's an absolute https URL (Supabase storage).
-  // Relative paths like /taxcasereview-CRM/nashville-logo.png are now deleted
+  // Relative paths like /nashville-logo.png are now deleted
   // except for the TaxRes CRM logo which lives in gh-pages assets — build absolute URL.
   const safeLogo = firmLogo?.startsWith('https://')
     ? firmLogo
     : firmLogo
       ? `${window.location.origin}${firmLogo}`
-      : `${window.location.origin}/taxcasereview-CRM/assets/taxrescrm-logo.png`
+      : `${window.location.origin}/assets/taxrescrm-logo.png`
 
   async function sendInviteEmail() {
     const raw = emailTo.split(',').map(v => v.trim()).filter(Boolean)

@@ -43,7 +43,7 @@ import App from './App.jsx'
   // We read it back here BEFORE React Router initialises so Router sees /book.
   try {
     const saved = sessionStorage.getItem('redirect') || sessionStorage.redirect
-    if (saved && saved.includes('/taxcasereview-CRM/')) {
+    if (saved && saved.includes('/')) {
       sessionStorage.removeItem('redirect')
       try { delete sessionStorage.redirect } catch(e) {}
       window.history.replaceState(null, '', saved)

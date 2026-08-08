@@ -1063,7 +1063,7 @@ export async function sendFullPackage(client, supabase) {
   const irsOrState  = client?.irsOrState || 'IRS Federal'
   const clientState = client?.state || ''
   const safeName    = (client?.name || 'client').replace(/[^a-zA-Z0-9]+/g, '-')
-  const base        = typeof import.meta !== 'undefined' ? import.meta.env?.BASE_URL?.replace(/\/$/, '') : '/taxcasereview-CRM'
+  const base        = typeof import.meta !== 'undefined' ? import.meta.env?.BASE_URL?.replace(/\/$/, '') : '/'
 
   // Determine which IRS forms to include based on irsOrState
   const includeIRS   = irsOrState !== 'State'       // IRS Federal or Both
@@ -1169,7 +1169,7 @@ export async function sendFullPackage(client, supabase) {
 
   if (error) return { error: error.message }
 
-  const url = `${window.location.origin}/taxcasereview-CRM/sign/${data.id}`
+  const url = `${window.location.origin}/sign/${data.id}`
   return { id: data.id, url, pdfAttachments }
 }
 
@@ -1213,7 +1213,7 @@ export async function sendAddendumForSignature(record, opts, supabase, sentBy) {
 
   if (error) return { error: error.message }
 
-  const url = `${window.location.origin}/taxcasereview-CRM/sign/${data.id}`
+  const url = `${window.location.origin}/sign/${data.id}`
   return { id: data.id, url, pdfAttachments }
 }
 

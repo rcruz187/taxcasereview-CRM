@@ -113,7 +113,7 @@ export async function loadFirmBrandingPublic(tenantHint) {
 // other tenants use taxrescrm favicon as the platform favicon.
 function setFavicon(tenantId, name) {
   try {
-    const BASE = '/taxcasereview-CRM/'
+    const BASE = '/'
     const TCR_TENANT  = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
     const TAXRESCRM   = 'a0000000-0000-0000-0000-000000000001'
     const href = (tenantId === TCR_TENANT)

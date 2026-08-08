@@ -403,7 +403,7 @@ export default function Email() {
             <div style={{ fontSize: 10, color: 'var(--t3)', marginBottom: 8, lineHeight: 1.5 }}>Link your Gmail account to send & receive emails directly.</div>
             {gmailClientId ? (
               <button onClick={() => {
-                const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${gmailClientId}&redirect_uri=${encodeURIComponent(window.location.origin + '/taxcasereview-CRM/auth/callback')}&response_type=code&scope=https://mail.google.com/&access_type=offline&prompt=consent`
+                const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${gmailClientId}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback')}&response_type=code&scope=https://mail.google.com/&access_type=offline&prompt=consent`
                 window.open(url, '_blank')
                 showToast('Complete authorization in the popup window')
               }} style={{ width: '100%', padding: '5px 0', borderRadius: 6, border: 'none', background: 'var(--blue)', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
@@ -733,7 +733,7 @@ export default function Email() {
             <div style={{ marginBottom: 14 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                 <label style={{ margin: 0 }}>Signature</label>
-                <a href="/taxcasereview-CRM/settings" style={{ fontSize: 11, color: 'var(--blue)' }}>Edit in Settings →</a>
+                <a href="/settings" style={{ fontSize: 11, color: 'var(--blue)' }}>Edit in Settings →</a>
               </div>
               {signature.text || signature.logoUrl ? (
                 <div style={{ background: 'var(--s2)', border: '1px dashed var(--br)', borderRadius: 8, padding: '12px 14px' }}>
@@ -743,7 +743,7 @@ export default function Email() {
                 </div>
               ) : (
                 <div style={{ fontSize: 12, color: 'var(--t3)', padding: '10px 14px', background: 'var(--s2)', borderRadius: 8 }}>
-                  No signature set yet — <a href="/taxcasereview-CRM/settings" style={{ color: 'var(--blue)' }}>add one in Settings</a> and it'll be appended to every email sent through Gmail.
+                  No signature set yet — <a href="/settings" style={{ color: 'var(--blue)' }}>add one in Settings</a> and it'll be appended to every email sent through Gmail.
                 </div>
               )}
             </div>

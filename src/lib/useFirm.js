@@ -19,7 +19,7 @@ async function loadFirmData() {
     const imp = sessionStorage.getItem('admin_impersonation')
     if (imp) {
       const { firm_name, logo_url } = JSON.parse(imp)
-      return { firm: { name: firm_name, logourl: logo_url }, logoUrl: logo_url || '/taxcasereview-CRM/logo.png' }
+      return { firm: { name: firm_name, logourl: logo_url }, logoUrl: logo_url || '/logo.png' }
     }
   } catch (_) {}
   const { data: s } = await supabase.from('settings').select('*').limit(1).maybeSingle()
@@ -27,7 +27,7 @@ async function loadFirmData() {
   // fall back to the shared firm-assets/logo bucket file — that single file is
   // global and gets overwritten by whichever tenant last uploaded, which would
   // bleed one firm's logo onto another. No logourl → neutral bundled default.
-  const logo = (s && s.logourl) ? s.logourl : '/taxcasereview-CRM/logo.png'
+  const logo = (s && s.logourl) ? s.logourl : '/logo.png'
   return { firm: s || {}, logoUrl: logo }
 }
 

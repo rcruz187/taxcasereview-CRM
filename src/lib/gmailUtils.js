@@ -11,7 +11,7 @@ const SEND_URL  = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send'
 const LIST_URL  = 'https://gmail.googleapis.com/gmail/v1/users/me/messages'
 
 export function getRedirectUri() {
-  return window.location.origin + '/taxcasereview-CRM/auth/callback'
+  return window.location.origin + '/auth/callback'
 }
 
 // Exchange an authorization code for access + refresh tokens, store against

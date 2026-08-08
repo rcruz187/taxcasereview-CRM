@@ -34,7 +34,7 @@ const BLANK = {
 }
 
 function signingUrl(id) {
-  return `${window.location.origin}/taxcasereview-CRM/sign/${id}`
+  return `${window.location.origin}/sign/${id}`
 }
 
 export default function Esign() {

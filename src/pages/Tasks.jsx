@@ -82,7 +82,7 @@ export default function Tasks() {
         const overdue = t.dueDate < today
         new Notification(`${overdue?'⚠️ OVERDUE':'📅 Due Today'}: ${t.title}`, {
           body: `${t.clientName ? 'Client: '+t.clientName+'\n' : ''}Priority: ${t.priority||'Normal'}`,
-          icon: '/taxcasereview-CRM/favicon.ico',
+          icon: '/favicon.ico',
           tag: 'task-'+t.id,
         })
       })

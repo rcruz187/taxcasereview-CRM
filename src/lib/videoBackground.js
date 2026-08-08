@@ -2,7 +2,7 @@ import { useRef, useState, useCallback, useEffect } from 'react'
 
 export const PRESETS = [
   { id: 'blur',     label: 'Blur',      icon: '🌫️', img: null, gradient: null },
-  { id: 'tcr',      label: 'TCR Brand', icon: '🏢', img: '/taxcasereview-CRM/tcr-bg.png', gradient: null },
+  { id: 'tcr',      label: 'TCR Brand', icon: '🏢', img: '/tcr-bg.png', gradient: null },
   { id: 'office1',  label: 'Office',    icon: '💼', img: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1280&q=80', gradient: null },
   { id: 'office2',  label: 'Modern',    icon: '🪟', img: 'https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=1280&q=80', gradient: null },
   { id: 'library',  label: 'Library',   icon: '📚', img: 'https://images.unsplash.com/photo-1507842217343-583bb7270b66?w=1280&q=80', gradient: null },

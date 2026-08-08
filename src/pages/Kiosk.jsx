@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
-const LOGO = '/taxcasereview-CRM/logo.png'
+const LOGO = '/logo.png'
 
-const CLOCKIN_URL = window.location.origin + '/taxcasereview-CRM/clockin'
+const CLOCKIN_URL = window.location.origin + '/clockin'
 
 export default function Kiosk() {
   const [now, setNow] = useState(new Date())
@@ -128,7 +128,7 @@ export default function Kiosk() {
 
         {/* Back to CRM button — always visible */}
         <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-          <a href="/taxcasereview-CRM/"
+          <a href="/"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               background: 'rgba(255,255,255,.12)',

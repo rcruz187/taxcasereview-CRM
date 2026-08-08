@@ -92,7 +92,7 @@ export default function MeetingRoom() {
       <div style={S.page}>
         <div style={S.card}>
           <div style={{ textAlign: 'center', marginBottom: 20 }}>
-            <img src={FIRM.logoUrl || '/taxcasereview-CRM/logo.png'} alt={FIRM.name || 'Tax Case Review'} style={{ height: 48, objectFit: 'contain', marginBottom: 14 }} onError={e => e.target.style.display='none'} />
+            <img src={FIRM.logoUrl || '/logo.png'} alt={FIRM.name || 'Tax Case Review'} style={{ height: 48, objectFit: 'contain', marginBottom: 14 }} onError={e => e.target.style.display='none'} />
             <div style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: 4 }}>Join your meeting</div>
             <div style={{ fontSize: 13, color: '#94a3b8' }}>{FIRM.name || 'Tax Case Review'} — secure video meeting</div>
           </div>

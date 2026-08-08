@@ -488,11 +488,11 @@ export async function fetchTemplate(filename) {
   const slug = FIRM.slug || '';
   const paths = [
     ...(slug ? [
-      `/taxcasereview-CRM/templates/${slug}/${filename}`,
-      `https://raw.githubusercontent.com/taxresolutioncrm/taxcasereview-CRM/gh-pages/templates/${slug}/${filename}`,
+      `/templates/${slug}/${filename}`,
+      `https://raw.githubusercontent.com/taxresolutioncrm/gh-pages/templates/${slug}/${filename}`,
     ] : []),
-    `/taxcasereview-CRM/templates/${filename}`,
-    `https://raw.githubusercontent.com/taxresolutioncrm/taxcasereview-CRM/gh-pages/templates/${filename}`,
+    `/templates/${filename}`,
+    `https://raw.githubusercontent.com/taxresolutioncrm/gh-pages/templates/${filename}`,
   ];
   for (const url of paths) {
     if (tenantPathMemo.get(url) === false) continue;

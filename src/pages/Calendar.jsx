@@ -92,7 +92,7 @@ export default function Calendar() {
         if ('Notification' in window && Notification.permission === 'granted') {
           new Notification('📅 New Appointment Booked', {
             body: `${who} — ${row.date} ${fmtTime(row.time||'')}`,
-            icon: '/taxcasereview-CRM/icon-192.png'
+            icon: '/icon-192.png'
           })
         }
         supabase.from('chat_messages').insert([{
@@ -131,7 +131,7 @@ export default function Calendar() {
   // same pattern as the e-sign and client portal links.
   function meetingLinkFor(ev) {
     // window.location.origin alone is missing the GitHub Pages project
-    // path (this app deploys under /taxcasereview-CRM/, not the bare
+    // path (this app deploys under /, not the bare
     // domain root) -- import.meta.env.BASE_URL is Vite's own resolved
     // base path, so this stays correct even if that ever changes.
     // Carry the sender tenant's uuid so the join page shows the firm's

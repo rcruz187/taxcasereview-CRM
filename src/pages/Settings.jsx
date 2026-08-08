@@ -36,7 +36,7 @@ export default function Settings() {
     if (!myTenantId) { showToast('Still loading your account — try again in a moment'); return }
     if (!firm.qb_client_id) { showToast('Save your QuickBooks Client ID/Secret first'); return }
     const state = btoa(myTenantId)
-    const redirectUri = window.location.origin + '/taxcasereview-CRM/auth/quickbooks-callback'
+    const redirectUri = window.location.origin + '/auth/quickbooks-callback'
     const authorizeUrl = `https://appcenter.intuit.com/connect/oauth2?client_id=${encodeURIComponent(firm.qb_client_id)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=com.intuit.quickbooks.accounting&state=${encodeURIComponent(state)}`
     window.location.href = authorizeUrl
   }
@@ -45,7 +45,7 @@ export default function Settings() {
     if (!myTenantId) { showToast('Still loading your account — try again in a moment'); return }
     if (!firm.xero_client_id) { showToast('Save your Xero Client ID/Secret first'); return }
     const state = btoa(myTenantId)
-    const redirectUri = window.location.origin + '/taxcasereview-CRM/auth/xero-callback'
+    const redirectUri = window.location.origin + '/auth/xero-callback'
     const authorizeUrl = `https://login.xero.com/identity/connect/authorize?response_type=code&client_id=${encodeURIComponent(firm.xero_client_id)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent('accounting.transactions accounting.contacts offline_access')}&state=${encodeURIComponent(state)}`
     window.location.href = authorizeUrl
   }
@@ -482,7 +482,7 @@ export default function Settings() {
                   ['2', 'Enable the Gmail API under APIs & Services → Library'],
                   ['3', 'Go to APIs & Services → Credentials → Create OAuth 2.0 Client ID'],
                   ['4', 'Set Application Type to "Web application"'],
-                  ['5', `Add Authorized Redirect URI: ${window.location.origin}/taxcasereview-CRM/auth/callback`],
+                  ['5', `Add Authorized Redirect URI: ${window.location.origin}/auth/callback`],
                   ['6', 'Copy your Client ID and Client Secret below, then save. After that, each employee connects their own account from the Email page.'],
                 ].map(([step, text]) => (
                   <div key={step} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
@@ -501,7 +501,7 @@ export default function Settings() {
                 </div>
               </div>
               <div className="field"><label>Redirect URI (copy this exactly into Google Console)</label>
-                <input readOnly value={window.location.origin + '/taxcasereview-CRM/auth/callback'} style={{ color: 'var(--t3)', cursor: 'text' }} onClick={e => { e.target.select(); document.execCommand('copy'); }} />
+                <input readOnly value={window.location.origin + '/auth/callback'} style={{ color: 'var(--t3)', cursor: 'text' }} onClick={e => { e.target.select(); document.execCommand('copy'); }} />
               </div>
               <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 14 }}>Click the Redirect URI field to copy it.</div>
 
@@ -688,7 +688,7 @@ export default function Settings() {
                   ['1', 'Go to developer.intuit.com and sign in with your QuickBooks account'],
                   ['2', 'Create a new app → choose "QuickBooks Online and Payments"'],
                   ['3', 'In the app\'s Keys & OAuth section, grab your Client ID and Client Secret (use the Production keys, not Sandbox)'],
-                  ['4', `Add Redirect URI: ${window.location.origin}/taxcasereview-CRM/auth/quickbooks-callback`],
+                  ['4', `Add Redirect URI: ${window.location.origin}/auth/quickbooks-callback`],
                   ['5', 'Copy your Client ID and Client Secret below, then save'],
                 ].map(([step, text]) => (
                   <div key={step} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
@@ -707,7 +707,7 @@ export default function Settings() {
                 </div>
               </div>
               <div className="field"><label>Redirect URI (copy this exactly into the Intuit Developer app)</label>
-                <input readOnly value={window.location.origin + '/taxcasereview-CRM/auth/quickbooks-callback'} style={{ color: 'var(--t3)', cursor: 'text' }} onClick={e => { e.target.select(); document.execCommand('copy'); }} />
+                <input readOnly value={window.location.origin + '/auth/quickbooks-callback'} style={{ color: 'var(--t3)', cursor: 'text' }} onClick={e => { e.target.select(); document.execCommand('copy'); }} />
               </div>
               <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 14 }}>Click the Redirect URI field to copy it.</div>
 
@@ -748,7 +748,7 @@ export default function Settings() {
                 {[
                   ['1', 'Go to developer.xero.com/app/manage and sign in with your Xero account'],
                   ['2', 'Create a new app → choose "Web app"'],
-                  ['3', `Add Redirect URI: ${window.location.origin}/taxcasereview-CRM/auth/xero-callback`],
+                  ['3', `Add Redirect URI: ${window.location.origin}/auth/xero-callback`],
                   ['4', 'In the app\'s Configuration, grab your Client ID and generate a Client Secret'],
                   ['5', 'Copy your Client ID and Client Secret below, then save'],
                 ].map(([step, text]) => (
@@ -768,7 +768,7 @@ export default function Settings() {
                 </div>
               </div>
               <div className="field"><label>Redirect URI (copy this exactly into the Xero app)</label>
-                <input readOnly value={window.location.origin + '/taxcasereview-CRM/auth/xero-callback'} style={{ color: 'var(--t3)', cursor: 'text' }} onClick={e => { e.target.select(); document.execCommand('copy'); }} />
+                <input readOnly value={window.location.origin + '/auth/xero-callback'} style={{ color: 'var(--t3)', cursor: 'text' }} onClick={e => { e.target.select(); document.execCommand('copy'); }} />
               </div>
               <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 14 }}>Click the Redirect URI field to copy it.</div>
 

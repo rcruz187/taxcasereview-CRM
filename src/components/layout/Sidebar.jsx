@@ -4,7 +4,7 @@ import { useApp } from '../../context/AppContext'
 import { supabase } from '../../lib/supabase'
 import { OPEN_STATUSES } from '../../lib/caseStatuses'
 
-const LOGO = '/taxcasereview-CRM/logo.png'
+const LOGO = '/logo.png'
 
 // Karbon-style accordion sections
 const SECTIONS = [

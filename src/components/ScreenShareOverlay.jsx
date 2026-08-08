@@ -10,7 +10,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useScreenShare } from '../context/ScreenShareContext'
 import { useApp }         from '../context/AppContext'
 
-const BASE   = '/taxcasereview-CRM'
+const BASE   = '/'
 const ACCENT = '#2563eb'
 
 function StreamVideo({ stream, muted = false, mirror = false, contain = false }) {

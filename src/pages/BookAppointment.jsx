@@ -31,7 +31,7 @@ export default function BookAppointment() {
     isProductDemo
       ? { firm_name: 'TaxRes CRM', logo_url: 'https://taxrescrm.net/assets/img/logo.png',
           subtitle: 'Schedule a Product Demonstration', payment: { required: false } }
-      : { firm_name: 'TaxRes CRM', logo_url: '/taxcasereview-CRM/assets/taxrescrm-logo.png', payment: { required: false } }
+      : { firm_name: 'TaxRes CRM', logo_url: '/assets/taxrescrm-logo.png', payment: { required: false } }
   )
   const [loadErr, setLoadErr] = useState('')
   const [type, setType] = useState('')

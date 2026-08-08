@@ -55,7 +55,7 @@ export default function OrganizerView({ clientName }) {
 
   const record = records.find(r => r.id === selectedId) || records[0]
   const answers = record.answers || {}
-  const organizerUrl = window.location.origin + '/taxcasereview-CRM/organizer/' + record.id
+  const organizerUrl = window.location.origin + '/organizer/' + record.id
 
   return (
     <div style={{padding:16}}>

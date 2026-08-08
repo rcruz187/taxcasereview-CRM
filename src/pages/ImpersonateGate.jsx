@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
-const LOGO = '/taxcasereview-CRM/assets/taxrescrm-logo.png'
+const LOGO = '/assets/taxrescrm-logo.png'
 
 export default function ImpersonateGate() {
   const [status, setStatus] = useState('validating') // validating | ok | error
@@ -53,7 +53,7 @@ export default function ImpersonateGate() {
       // app re-initializes and AppContext reads the sessionStorage impersonation.
       // The '?imp=1' param tells AdminGate NOT to redirect to /crm-admin.
       setTimeout(() => {
-        window.location.href = window.location.origin + '/taxcasereview-CRM/?imp=1'
+        window.location.href = window.location.origin + '/?imp=1'
       }, 1500)
 
     } catch (e) {

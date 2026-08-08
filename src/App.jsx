@@ -234,7 +234,7 @@ function AuthRouter() {
   const publicPaths = ['/book', '/sign', '/portal', '/clockin', '/kiosk',
     '/employee', '/meet', '/screenshare', '/financial-intake', '/organizer']
   const isPublicPath = publicPaths.some(p =>
-    window.location.pathname.replace('/taxcasereview-CRM', '').startsWith(p)
+    window.location.pathname.replace('/', '').startsWith(p)
   )
 
   if (checking && !isPublicPath) return (
@@ -286,7 +286,7 @@ export default function App() {
       clearTimeout(timer)
       timer = setTimeout(async () => {
         await supabase.auth.signOut()
-        window.location.href = '/taxcasereview-CRM/'
+        window.location.href = '/'
       }, IDLE_MS)
     }
     const events = ['mousedown','mousemove','keydown','scroll','touchstart','click']

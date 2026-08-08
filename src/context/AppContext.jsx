@@ -232,7 +232,7 @@ export function AppProvider({ children }) {
 
   function openChatConversation(channel) {
     // BrowserRouter picks up a pushState + popstate without a full reload.
-    const base = '/taxcasereview-CRM'
+    const base = '/'
     window.history.pushState({}, '', `${base}/chat?c=${encodeURIComponent(channel || '')}`)
     window.dispatchEvent(new PopStateEvent('popstate'))
   }
@@ -272,7 +272,7 @@ export function AppProvider({ children }) {
       if ('Notification' in window && Notification.permission === 'granted') {
         const n = new Notification(`💬 ${who}`, {
           body,
-          icon: '/taxcasereview-CRM/icon-192.png',
+          icon: '/icon-192.png',
           tag: `chat-${deepLinkTarget}`, // collapses a burst from one conversation
         })
         n.onclick = () => { window.focus(); openChatConversation(deepLinkTarget); n.close() }
@@ -421,7 +421,7 @@ export function AppProvider({ children }) {
         if ('Notification' in window && Notification.permission === 'granted') {
           const n = new Notification('📅 Upcoming Appointment', {
             body: `${who} at ${fmtTime}${type} (in ~${REMINDER_MINUTES_BEFORE} min)\nClick to snooze 10 min`,
-            icon: '/taxcasereview-CRM/icon-192.png',
+            icon: '/icon-192.png',
             tag: `appt-${ev.id}`, // prevents duplicate OS-level popups
             requireInteraction: false,
           })

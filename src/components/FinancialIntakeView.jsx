@@ -47,7 +47,7 @@ export default function FinancialIntakeView({ clientName }) {
   )
 
   const answers = record.answers || {}
-  const intakeUrl = window.location.origin + '/taxcasereview-CRM/financial-intake/' + record.id
+  const intakeUrl = window.location.origin + '/financial-intake/' + record.id
 
   return (
     <div style={{padding:16}}>

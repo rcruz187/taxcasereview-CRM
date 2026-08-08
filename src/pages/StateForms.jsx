@@ -171,7 +171,7 @@ export default function StateForms() {
       }]).select().single()
       if (esignErr) throw new Error(esignErr.message)
 
-      const sigUrl = `${window.location.origin}/taxcasereview-CRM/sign/${esign.id}`
+      const sigUrl = `${window.location.origin}/sign/${esign.id}`
       await navigator.clipboard.writeText(sigUrl).catch(() => {})
 
       let emailSent = false, smsSent = false

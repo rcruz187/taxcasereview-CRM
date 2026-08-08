@@ -277,7 +277,7 @@ function LeadInlineEsign({ lead, onClose }) {
       sent_at:new Date().toISOString(),created_at:new Date().toISOString()
     }]).select().single()
     if(error){set2(false);alert('Error: '+error.message);return}
-    const url=window.location.origin+'/taxcasereview-CRM/sign/'+data.id
+    const url=window.location.origin+'/sign/'+data.id
     await navigator.clipboard.writeText(url).catch(()=>{})
     let smsSent=false,emailSent=false
     const cfg = await getSettings()
@@ -746,7 +746,7 @@ export default function Leads() {
         priority:'Normal', status:'Awaiting', sent_at:new Date().toISOString(), created_at:new Date().toISOString(), sent_by:actor,
       }]).select().single()
       if (esignErr) throw new Error(esignErr.message)
-      const sigUrl = `${window.location.origin}/taxcasereview-CRM/sign/${esign.id}`
+      const sigUrl = `${window.location.origin}/sign/${esign.id}`
       await navigator.clipboard.writeText(sigUrl).catch(()=>{})
       let emailSent=false, smsSent=false
       if ((via==='email'||via==='both') && lead.email) {
@@ -1307,7 +1307,7 @@ export default function Leads() {
       if (createErr) { setIntakeSending(false); showToast('Error: '+createErr.message); return }
       intakeId = created.id
     }
-    const intakeUrl = window.location.origin + '/taxcasereview-CRM/financial-intake/' + intakeId
+    const intakeUrl = window.location.origin + '/financial-intake/' + intakeId
     const { error: emailErr } = await supabase.functions.invoke('send-email', {
       body: { tenant_id: FIRM.tenantId || undefined,
         to: l.email,
@@ -1365,8 +1365,8 @@ export default function Leads() {
       }
     } catch(e) { console.error('Intake record lookup error:', e) }
     const intakeUrl = intakeId
-      ? `${window.location.origin}/taxcasereview-CRM/financial-intake/${intakeId}`
-      : `${window.location.origin}/taxcasereview-CRM/financial-intake/${l.id}`
+      ? `${window.location.origin}/financial-intake/${intakeId}`
+      : `${window.location.origin}/financial-intake/${l.id}`
 
     // Generate Stripe Checkout link for the 1st Trade investigation fee
     let stripePayUrl = null
@@ -1586,7 +1586,7 @@ export default function Leads() {
             }
           } catch (e) { console.error('Financial intake PDF snapshot error:', e) }
         } else if (l.email) {
-          const intakeUrl = window.location.origin + '/taxcasereview-CRM/financial-intake/' + existingIntake.id
+          const intakeUrl = window.location.origin + '/financial-intake/' + existingIntake.id
           const { error: emailErr } = await supabase.functions.invoke('send-email', {
             body: { tenant_id: FIRM.tenantId || undefined,
               to: l.email,
@@ -1602,7 +1602,7 @@ export default function Leads() {
           answers: {}, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
         }]).select().single()
         if (!intakeErr && intakeRec) {
-          const intakeUrl = window.location.origin + '/taxcasereview-CRM/financial-intake/' + intakeRec.id
+          const intakeUrl = window.location.origin + '/financial-intake/' + intakeRec.id
           if (l.email) {
             const { error: emailErr } = await supabase.functions.invoke('send-email', {
               body: { tenant_id: FIRM.tenantId || undefined,

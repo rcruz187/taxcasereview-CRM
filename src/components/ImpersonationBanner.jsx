@@ -14,7 +14,7 @@ export default function ImpersonationBanner() {
   function exitSession() {
     sessionStorage.removeItem('admin_impersonation')
     // Navigate back to admin portal
-    window.location.href = '/taxcasereview-CRM/crm-admin'
+    window.location.href = '/crm-admin'
   }
 
   const elapsed = Math.floor((Date.now() - new Date(impersonation.started_at).getTime()) / 60000)

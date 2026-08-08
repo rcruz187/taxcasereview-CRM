@@ -94,7 +94,7 @@ function Sidebar({ onSignOut }) {
     <div style={{ width:220, minHeight:'100vh', flexShrink:0, background:'#0f0e1a',
       borderRight:'1px solid rgba(99,102,241,.2)', display:'flex', flexDirection:'column' }}>
       <div style={{ padding:'18px 16px 16px', borderBottom:'1px solid rgba(99,102,241,.15)' }}>
-        <img src="/taxcasereview-CRM/assets/taxrescrm-logo.png" alt="TaxRes CRM"
+        <img src="/assets/taxrescrm-logo.png" alt="TaxRes CRM"
           style={{ height:38, objectFit:'contain', display:'block', marginBottom:6 }}
           onError={e=>{e.target.style.display='none'}} />
         <div style={{ fontSize:10, color:'#6366f1', letterSpacing:'.04em', fontWeight:700 }}>Admin Portal</div>
@@ -161,7 +161,7 @@ function Overview() {
   return (
     <div style={{ padding:'32px 36px', maxWidth:1100 }}>
       <div style={{ marginBottom:28 }}>
-        <img src="/taxcasereview-CRM/assets/taxrescrm-logo.png" alt="TaxRes CRM"
+        <img src="/assets/taxrescrm-logo.png" alt="TaxRes CRM"
           style={{ height:44, objectFit:'contain', display:'block', marginBottom:16 }}
           onError={e=>{e.target.style.display='none'}} />
         <div style={{ fontSize:26, fontWeight:800, color:'#fff', marginBottom:4 }}>
@@ -251,7 +251,7 @@ function OfficePage() {
     if (error) { toast_(error.message,'error'); return }
     // Open the CRM in a new tab with the impersonation token in the URL
     // The CRM reads this token on load and sets the tenant context
-    const url = `${window.location.origin}/taxcasereview-CRM/impersonate?admin_token=${token}`
+    const url = `${window.location.origin}/impersonate?admin_token=${token}`
     window.open(url, '_blank')
     toast_(`✅ Jumping into ${data?.tenant?.firm_name} — token valid 15 min`)
   }
@@ -566,7 +566,7 @@ function DemoMgmt() {
   async function jumpIn(tenantId, firmName) {
     const { data:token, error } = await supabase.rpc('create_impersonation_token',{ p_tenant_id:tenantId })
     if (error) { toast_(error.message,'error'); return }
-    window.open(`${window.location.origin}/taxcasereview-CRM/impersonate?admin_token=${token}`,'_blank')
+    window.open(`${window.location.origin}/impersonate?admin_token=${token}`,'_blank')
     toast_(`✅ Opened ${firmName}`)
   }
 
@@ -726,7 +726,7 @@ function EmployeeEditModal({ emp, onClose, onSaved }) {
     if (!confirm(`Send password reset email to ${emp.email}?`)) return
     setResetting(true)
     const { error } = await supabase.auth.resetPasswordForEmail(emp.email, {
-      redirectTo: window.location.origin + '/taxcasereview-CRM/'
+      redirectTo: window.location.origin + '/'
     })
     setResetting(false)
     if (error) { toast_(error.message,'error') }
@@ -1049,7 +1049,7 @@ function LiveDemo() {
     const { data:token, error } = await supabase.rpc('create_impersonation_token',{ p_tenant_id:tenantId })
     setLaunching(null)
     if (error) { toast_(error.message,'error'); return }
-    const url = `${window.location.origin}/taxcasereview-CRM/impersonate?admin_token=${token}`
+    const url = `${window.location.origin}/impersonate?admin_token=${token}`
     window.open(url, '_blank')
     toast_(`✅ Demo opened for ${firmName} — token valid 15 min`)
   }
@@ -1064,7 +1064,7 @@ function LiveDemo() {
       <div style={{ display:'flex', alignItems:'center', gap:20, marginBottom:32,
         padding:'24px 28px', borderRadius:16, background:'rgba(99,102,241,.06)',
         border:'1px solid rgba(99,102,241,.2)' }}>
-        <img src="/taxcasereview-CRM/assets/taxrescrm-logo.png" alt="TaxRes CRM"
+        <img src="/assets/taxrescrm-logo.png" alt="TaxRes CRM"
           style={{ height:52, objectFit:'contain', flexShrink:0 }}
           onError={e=>{e.target.style.display='none'}} />
         <div>
@@ -1156,7 +1156,7 @@ function LiveDemo() {
 
 const GENERIC_DEFAULTS = {
   firm_name:   'Nashville Tax Solutions',
-  logo_url:    '/taxcasereview-CRM/assets/taxrescrm-logo.png',
+  logo_url:    '/assets/taxrescrm-logo.png',
   brand_color: '#6366f1',
   phone:       '(888) 334-5052',
   email:       'demo@taxrescrm.net',
@@ -1263,14 +1263,14 @@ function DemoSetup() {
     try {
       const { error } = await supabase.from('settings').update({
         name:    'Nashville Tax Solutions',
-        logourl: '/taxcasereview-CRM/assets/taxrescrm-logo.png',
+        logourl: '/assets/taxrescrm-logo.png',
         phone:   '(888) 334-5052',
         email:   'demo@taxrescrm.net',
         address: '123 Demo Street, Nashville, TN 37201',
       }).eq('tenant_id', DEMO_TENANT)
       if (error) throw error
       setLogoFile(null)
-      setLogoPreview('/taxcasereview-CRM/assets/taxrescrm-logo.png')
+      setLogoPreview('/assets/taxrescrm-logo.png')
       setForm(GENERIC_DEFAULTS)
       toast_('✅ Demo reset to generic TaxRes CRM defaults')
       loadCurrent()
@@ -1624,7 +1624,7 @@ function CommandCenter() {
     const gscCode = urlParams.get('code')
     if (gscCode) {
       window.history.replaceState({}, '', window.location.pathname)
-      const redirect = window.location.origin + '/taxcasereview-CRM/crm-admin/command-center'
+      const redirect = window.location.origin + '/crm-admin/command-center'
       supabase.functions.invoke('gsc-data', {
         body: { action: 'connect', code: gscCode, redirect_uri: redirect }
       }).then(({ data: r }) => {
@@ -1658,7 +1658,7 @@ function CommandCenter() {
 
   function handleGSCConnect() {
     const CLIENT_ID = '70057646964-vimoia1qkjtml9n3mplo0hme82m3t2qs.apps.googleusercontent.com'
-    const redirect  = window.location.origin + '/taxcasereview-CRM/crm-admin/command-center'
+    const redirect  = window.location.origin + '/crm-admin/command-center'
     const scope     = 'https://www.googleapis.com/auth/webmasters.readonly'
     window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent`
   }
@@ -3231,16 +3231,16 @@ export default function AdminPortal() {
       link.href = href
       document.head.appendChild(link)
     }
-    setFavicon('/taxcasereview-CRM/assets/taxrescrm-logo.png')
+    setFavicon('/assets/taxrescrm-logo.png')
     return () => {
       document.title = prev
-      setFavicon('/taxcasereview-CRM/taxrescrm-favicon.png')
+      setFavicon('/taxrescrm-favicon.png')
     }
   }, [])
 
   async function handleGSCConnect() {
     const CLIENT_ID = '70057646964-vimoia1qkjtml9n3mplo0hme82m3t2qs.apps.googleusercontent.com'
-    const redirect  = window.location.origin + '/taxcasereview-CRM/crm-admin/command-center'
+    const redirect  = window.location.origin + '/crm-admin/command-center'
     const scope     = 'https://www.googleapis.com/auth/webmasters.readonly'
     const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent`
     window.location.href = url

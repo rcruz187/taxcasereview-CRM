@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { PRESETS } from '../lib/videoBackground'
 
-const TCR_BG = '/taxcasereview-CRM/tcr-bg.png'
+const TCR_BG = '/tcr-bg.png'
 
 export default function VirtualBackground({ bgMode, bgPreset, segStatus, onSelect }) {
   const fileRef = useRef()

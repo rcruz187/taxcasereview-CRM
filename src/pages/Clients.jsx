@@ -325,7 +325,7 @@ function InlineEsignForm({ client, onClose, showToast }) {
     }]).select().single()
     setSaving(false)
     if (error) { showToast('Error: '+error.message,'err'); return }
-    const url = window.location.origin+'/taxcasereview-CRM/sign/'+data.id
+    const url = window.location.origin+'/sign/'+data.id
     setLink(url)
     navigator.clipboard.writeText(url).catch(()=>{})
     showToast('✅ Signing link copied!')
@@ -384,7 +384,7 @@ function InlinePortalForm({ client, onClose, showToast }) {
   const [sending, setSending] = useState(false)
   const [done, setDone] = useState(null)
 
-  const url = window.location.origin + '/taxcasereview-CRM/portal/' + client?.id
+  const url = window.location.origin + '/portal/' + client?.id
   const last4 = (client?.ssn || '').replace(/\D/g, '').slice(-4)
 
   async function send() {
@@ -601,7 +601,7 @@ function InlineOrganizerForm({ client, onClose, showToast }) {
       orgId = created.id
     }
 
-    const url = window.location.origin + '/taxcasereview-CRM/organizer/' + orgId
+    const url = window.location.origin + '/organizer/' + orgId
     await navigator.clipboard.writeText(url).catch(() => {})
     let emailSent = false, smsSent = false
     const cfg = await getSettings()
@@ -1558,7 +1558,7 @@ export default function Clients() {
         priority:'Normal', status:'Awaiting', sent_at:new Date().toISOString(), created_at:new Date().toISOString(), sent_by:actor,
       }]).select().single()
       if (esignErr) throw new Error(esignErr.message)
-      const sigUrl = `${window.location.origin}/taxcasereview-CRM/sign/${esign.id}`
+      const sigUrl = `${window.location.origin}/sign/${esign.id}`
       await navigator.clipboard.writeText(sigUrl).catch(()=>{})
       let emailSent=false, smsSent=false
       if ((via==='email'||via==='both') && client.email) {
