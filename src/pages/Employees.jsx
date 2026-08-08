@@ -167,6 +167,7 @@ export default function Employees() {
   const [form, setForm]           = useState(blankEmp)
   const [tab, setTab]             = useState('info')
   const [saving, setSaving]       = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [resetEmail, setResetEmail] = useState('')
   const [showReset, setShowReset]   = useState(false)
   const [resetSending, setResetSending] = useState(false)
@@ -225,6 +226,7 @@ export default function Employees() {
   async function save(silent = false) {
     if (!form.name || !form.email) { if (!silent) showToast('Name and email required', 'err'); return false }
     setSaving(true)
+    setSaveError('')
     const payload = toDbPayload(form)
     let error, data
     if (editing) {
@@ -235,7 +237,7 @@ export default function Employees() {
       if (!error && data?.id) setEditing(data.id)
     }
     setSaving(false)
-    if (error) { if (!silent) showToast(error.message, 'err'); return false }
+    if (error) { setSaveError(error.message); if (!silent) showToast(error.message, 'err'); return false }
     if (!silent) {
       showToast(editing ? 'Employee updated!' : 'Employee added!')
       setShowForm(false)
@@ -811,7 +813,8 @@ export default function Employees() {
               )}
 
               {/* Footer */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--br)' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--br)', flexWrap: 'wrap' }}>
+                {saveError && <div style={{ width: '100%', fontSize: 12, color: '#ef4444', marginBottom: 6, padding: '6px 10px', background: '#ef444418', borderRadius: 6, border: '1px solid #ef444444' }}>⚠️ {saveError}</div>}
                 <button className="btn" onClick={() => setShowForm(false)}>Cancel</button>
                 <button className="btn pri" onClick={save} disabled={saving}>
                   {saving ? 'Saving…' : (editing ? 'Save Changes' : 'Add Employee')}
