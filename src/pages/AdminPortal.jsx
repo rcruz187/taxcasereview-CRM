@@ -655,7 +655,7 @@ function SystemHealth() {
     { label:'Edge Functions',       ok:health.fnOk,   note: health.fnOk ? `Deployed & responding — ${health.fnMs}ms` : 'send-email unreachable' },
     { label:'Webmail (SnappyMail)', ok:health.mailOk, note: health.mailOk ? 'webmail.taxrescrm.net:7443 reachable' : 'Not reachable — check OCI server' },
     { label:'ICS Watcher',          ok:true,           note: health.icsRow ? `Last auto-import: ${fmtAgo(health.icsRow.created_at)}` : 'Running — no imports yet' },
-    { label:'GitHub Pages',         ok:true,           note: 'taxresolutioncrm.github.io/taxcasereview-CRM live' },
+    { label:'GitHub Pages',         ok:true,           note: 'taxrescrm.app live' },
   ] : []
 
   return (
@@ -1670,8 +1670,8 @@ function CommandCenter() {
   async function loadGA4() {
     setGa4Loading(true)
     try {
-      // Trigger a fresh sync first
-      await supabase.functions.invoke('ga4-sync')
+      // Trigger a fresh sync first (no-op if fn not yet deployed)
+      await supabase.functions.invoke('ga4-sync').catch(() => {})
 
       // Read results from cache tables
       const today = new Date().toISOString().slice(0,10)
@@ -2458,7 +2458,7 @@ function ContentCenter() {
 
   async function loadDrafts() {
     setLoading(true)
-    const { data } = await supabase.rpc('get_content_drafts', { p_limit: 200 })
+    const { data } = await supabase.rpc('get_content_drafts', { p_limit: 200 }).catch(() => ({ data: [] }))
     setDrafts(data || [])
     setLoading(false)
   }
@@ -2870,12 +2870,17 @@ function LinkedInPublisher() {
 
   async function load() {
     setLoading(true)
-    const [connRes, postsRes] = await Promise.all([
-      supabase.rpc('get_linkedin_connection'),
-      supabase.rpc('get_linkedin_posts', { p_limit: 100 }),
-    ])
-    setConnection(connRes.data?.[0] || false)
-    setPosts(postsRes.data || [])
+    try {
+      const [connRes, postsRes] = await Promise.all([
+        supabase.rpc('get_linkedin_connection').catch(() => ({ data: null })),
+        supabase.rpc('get_linkedin_posts', { p_limit: 100 }).catch(() => ({ data: [] })),
+      ])
+      setConnection(connRes.data?.[0] || false)
+      setPosts(postsRes.data || [])
+    } catch (_) {
+      setConnection(false)
+      setPosts([])
+    }
     setLoading(false)
   }
 
@@ -3231,10 +3236,10 @@ export default function AdminPortal() {
       link.href = href
       document.head.appendChild(link)
     }
-    setFavicon('/assets/taxrescrm-logo.png')
+    setFavicon('/favicon.ico')
     return () => {
       document.title = prev
-      setFavicon('/taxrescrm-favicon.png')
+      setFavicon('/favicon.ico')
     }
   }, [])
 
