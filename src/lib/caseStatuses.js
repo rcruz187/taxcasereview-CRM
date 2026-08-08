@@ -87,12 +87,15 @@ export const PIPELINE_STAGES = [
   { key: 'investigation',      label: 'Investigation' },
   { key: 'transcripts',        label: 'Transcripts' },
   { key: 'analysis',           label: 'Analysis' },
+  { key: 'collection_hold',    label: 'Collection Hold' },
   { key: 'compliance',         label: 'Compliance (Filing/Payment)' },
   { key: 'financials',         label: 'Financials' },
   { key: 'proposal',           label: 'Proposal' },
   { key: 'negotiation',        label: 'Negotiation' },
   { key: 'resolution_pending', label: 'Resolution Pending' },
+  { key: 'penalty_abatement',  label: 'Penalty Abatement' },
   { key: 'resolved',           label: 'Resolved' },
+  { key: 'monitoring_review',  label: 'Monitoring/Review' },
   { key: 'close_file',         label: 'Close File' },
 ]
 

@@ -123,7 +123,9 @@ export default function Settings() {
     website: '', ein: '', primary_color: '#2563eb',
     preparer_name: '', ptin: '', caf_number: '', efin: '',
     gmail_client_id: '', gmail_client_secret: '', gmail_redirect_uri: '',
-    email_signature: '', email_signature_logo_url: ''
+    email_signature: '', email_signature_logo_url: '',
+    verizon_api_key: '', verizon_account_id: '', verizon_phone_number: '',
+    verizon_api_url: 'https://api.verizon.com/v1', calling_provider: 'signalwire'
   })
 
   const [pw, setPw] = useState({ next: '', confirm: '' })
@@ -563,6 +565,43 @@ export default function Settings() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
                 <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save SignalWire'}</button>
+              </div>
+            </div>
+          </div>
+
+
+          {/* Verizon Business Calling */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">📞 Verizon Business Calling</span></div>
+            <div style={{ padding: '0 20px 20px' }}>
+              <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.6 }}>
+                Connect your Verizon Business account for click-to-call, inbound routing, and call logging.
+                Contact your Verizon Business rep to get your API credentials, or email <strong>businesssupport@verizon.com</strong>.
+                Once connected, set Calling Provider to "Verizon" below to activate.
+              </div>
+              <div className="fg2">
+                <div className="field"><label>Verizon Account ID</label>
+                  <input value={firm.verizon_account_id || ''} onChange={set('verizon_account_id')} placeholder="Your Verizon Business account ID" />
+                </div>
+                <div className="field"><label>Verizon API Key</label>
+                  <input type="password" value={firm.verizon_api_key || ''} onChange={set('verizon_api_key')} placeholder="API key from Verizon Business portal" />
+                </div>
+              </div>
+              <div className="fg2">
+                <div className="field"><label>Verizon Business Phone Number</label>
+                  <input value={firm.verizon_phone_number || ''} onChange={set('verizon_phone_number')} placeholder="+16155022250" />
+                </div>
+                <div className="field"><label>Calling Provider</label>
+                  <select value={firm.calling_provider || 'signalwire'} onChange={set('calling_provider')}>
+                    <option value="signalwire">SignalWire (default)</option>
+                    <option value="verizon">Verizon Business</option>
+                    <option value="none">None / Manual</option>
+                  </select>
+                  <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Switch to Verizon after entering credentials above. SignalWire remains active for TCR and any office without Verizon configured.</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Verizon'}</button>
               </div>
             </div>
           </div>
