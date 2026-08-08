@@ -10,7 +10,7 @@ import ClientLink from '../components/ClientLink'
 import { CASE_STATUSES as STATUSES, CASE_STATUS_COLORS as STATUS_C, ACTIVE_STATUSES, PENDING_STATUSES, RESOLVED_STATUSES } from '../lib/caseStatuses'
 const CASE_TYPES = ['OIC','Installment Agreement','CNC','Penalty Abatement','Lien Withdrawal','TFRP','Appeals','Payroll Tax','Audit','Liens/Levies','Unfiled Returns','Tax Investigation','Other']
 
-const BLANK = { clientName:'', caseType:'OIC', irsBalance:'', status:'Open', assignedTo:'', deadline:'', taxYears:'', resolutionAmount:'', notes:'' }
+const BLANK = { clientName:'', caseType:'OIC', irsBalance:'', status:'Open', assignedTo:'', taxAssociate:'', deadline:'', taxYears:'', resolutionAmount:'', notes:'' }
 
 // ── Small helpers ─────────────────────────────────────────────────────────────
 function fmt$(n) { return n ? '$' + Number(n).toLocaleString() : '—' }
@@ -36,6 +36,12 @@ export default function Cases() {
   const [employees,   setEmployees]   = useState([])
   const [filter,      setFilter]      = useState('All')
   const [repFilter,   setRepFilter]   = useState('All')
+  const [sortCol, setSortCol] = useState('clientName')
+  const [sortDir, setSortDir] = useState('asc')
+  function toggleSort(col) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
   const [modal,       setModal]       = useState(false)
   const [editCase,    setEditCase]    = useState(null)
   const [form,        setForm]        = useState(BLANK)
@@ -123,6 +129,21 @@ export default function Cases() {
 
   const reps = employees.length > 0 ? employees.map(e => e.name) : ['Romy Cruz', 'Dana Richard', 'Yesenia Gonzalez']
 
+  const sortedCases = [...filtered].sort((a, b) => {
+    let av, bv
+    if (sortCol === 'clientName')  { av = a.clientName||''; bv = b.clientName||'' }
+    else if (sortCol === 'type')   { av = a.caseType||''; bv = b.caseType||'' }
+    else if (sortCol === 'balance'){ av = parseFloat(a.irsBalance)||0; bv = parseFloat(b.irsBalance)||0 }
+    else if (sortCol === 'resolution'){ av = a.resolutionAmount||''; bv = b.resolutionAmount||'' }
+    else if (sortCol === 'status') { av = a.status||''; bv = b.status||'' }
+    else if (sortCol === 'assigned'){ av = a.assignedTo||''; bv = b.assignedTo||'' }
+    else if (sortCol === 'para')   { av = a.taxAssociate||''; bv = b.taxAssociate||'' }
+    else if (sortCol === 'deadline'){ av = a.deadline||''; bv = b.deadline||'' }
+    else { av = a.clientName||''; bv = b.clientName||'' }
+    if (typeof av === 'number') return sortDir === 'asc' ? av - bv : bv - av
+    return sortDir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av))
+  })
+
   async function save() {
     if (!form.clientName.trim()) { showToast('Client name is required'); return }
     setSaving(true)
@@ -205,6 +226,7 @@ export default function Cases() {
                 <span className="bdg bb">{c.caseType}</span>
                 <span className="bdg bn" style={{ fontSize: 10, letterSpacing: '.03em' }}>{c.caseNum}</span>
                 {c.assignedTo && <span className="bdg bn">👤 {c.assignedTo}</span>}
+                {c.taxAssociate && c.taxAssociate !== c.assignedTo && <span className="bdg bb" style={{fontSize:11}}>🤝 {c.taxAssociate}</span>}
               </div>
             </div>
             {pct && (
@@ -421,13 +443,14 @@ export default function Cases() {
             <thead>
               <tr>
                 <th style={{ width: 90 }}>#</th>
-                <th>Client</th>
-                <th>Type</th>
-                <th>Balance</th>
-                <th>Resolution</th>
-                <th>Status</th>
-                <th>Assigned</th>
-                <th>Deadline</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('clientName')}>Client{sortCol==='clientName'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('type')}>Type{sortCol==='type'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('balance')}>Balance{sortCol==='balance'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('resolution')}>Resolution{sortCol==='resolution'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('status')}>Status{sortCol==='status'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('assigned')}>Associate{sortCol==='assigned'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('para')}>Para{sortCol==='para'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('deadline')}>Deadline{sortCol==='deadline'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
                 <th style={{ width: 40 }}></th>
               </tr>
             </thead>
@@ -446,7 +469,7 @@ export default function Cases() {
                     </td>
                   </tr>
                 )
-                : filtered.map(c => {
+                : sortedCases.map(c => {
                   const overdue = isOverdue(c.deadline)
                   const pct = savings(c.irsBalance, c.resolutionAmount)
                   return (
@@ -466,6 +489,7 @@ export default function Cases() {
                       </td>
                       <td><span className={`bdg ${STATUS_C[c.status] || 'bn'}`} style={{fontSize:12,padding:'3px 9px'}}>{c.status}</span></td>
                       <td style={{ color: 'var(--t2)', fontSize: 12 }}>{c.assignedTo || '—'}</td>
+                      <td style={{ color: 'var(--t2)', fontSize: 12 }}>{c.taxAssociate || '—'}</td>
                       <td style={{ color: overdue ? 'var(--bad)' : 'var(--t2)', fontSize: 12, fontWeight: overdue ? 700 : 400 }}>
                         {overdue && '⚠️ '}{c.deadline ? fmtDate(c.deadline) : '—'}
                       </td>
@@ -555,6 +579,12 @@ function CaseModal({ form, fld, reps, saving, onSave, onClose, title, sug, searc
           <div className="field">
             <label>Tax Years</label>
             <input value={form.taxYears} onChange={e => fld('taxYears', e.target.value)} placeholder="2020, 2021, 2022" />
+          </div>
+          <div className="field"><label>Para</label>
+            <select value={form.taxAssociate||''} onChange={e => fld('taxAssociate', e.target.value)}>
+              <option value="">— None —</option>
+              {employees.map(e=><option key={e.id||e.name} value={e.name}>{e.name}</option>)}
+            </select>
           </div>
         </div>
 

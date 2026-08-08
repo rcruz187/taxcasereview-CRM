@@ -511,7 +511,7 @@ export default function Sidebar() {
       {user && (
         <div style={{ padding: '10px 14px', borderTop: '1px solid var(--br)', flexShrink: 0 }}>
           <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 2 }}>Signed in as</div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--tx)', marginBottom: 2 }}>{user.user_metadata?.name || user.email}</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--tx)', marginBottom: 2 }}>{user.email?.startsWith('admin@') ? 'Administrator' : (employeeName || user.user_metadata?.name || user.email)}</div>
           <div style={{ fontSize: 10, color: 'var(--blue)', marginBottom: 8 }}>{role}</div>
           <button className="btn sm full" onClick={logout}>Sign Out</button>
         </div>

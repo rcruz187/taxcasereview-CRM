@@ -29,7 +29,7 @@ import ChargeResolutionFeeModal from '../components/ChargeResolutionFeeModal'
 import { RESOLUTION_SERVICES, resolveStateFormUrl } from '../lib/irsFormUtils'
 import { generatePOACoverLetterPdf } from '../lib/irsFormUtils'
 import { SMS_TEMPLATES, applySmsTemplate } from '../lib/smsTemplates'
-import { FIRM } from '../lib/firmBranding'
+import { FIRM, label } from '../lib/firmBranding'
 
 // Tenant-resolved firm name so onboarding email + POA/addendum SMS bodies
 // read for whichever firm is signed in. Mirrors Leads.jsx and docUtils.
@@ -923,6 +923,13 @@ export default function Clients() {
   const [statusCategories, setStatusCategories] = useState([])
   const [filter,    setFilter]    = useState('All')
   const [clientSearch, setClientSearch] = useState('')
+  const [sortCol, setSortCol] = useState('name')
+  const [sortDir, setSortDir] = useState('asc')
+
+  function toggleSort(col) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
   const [showArchived, setShowArchived] = useState(false)
   const [confirmArchive, setConfirmArchive] = useState(null)
   const [modal,     setModal]     = useState(false)
@@ -1096,7 +1103,7 @@ export default function Clients() {
     if (!urlId || detail) return
     let cancelled = false
     supabase.from('clients').select('*').eq('id', urlId).single().then(({ data }) => {
-      if (!cancelled && data) openDetail(data, { preserveTab: true })
+      if (!cancelled && data) openDetail(data, { preserveTab: true, full: true })
     })
     return () => { cancelled = true }
   }, [urlId])
@@ -1118,7 +1125,7 @@ export default function Clients() {
 
   async function load() {
     const [{ data:cl },{ data:em },{ data:cats },{ data:sts }] = await Promise.all([
-      supabase.from('clients').select('id,name,status,email,phone,city,state,"clientType","assignedTo","taxAssociate","pipelineStage","irsBalance","issueType",archived,deleted_at,"business_name",created_at').is('deleted_at',null).order('name',{ascending:true}),
+      supabase.from('clients').select('id,name,status,email,phone,city,state,"clientType","assignedTo","taxAssociate","pipelineStage","irsBalance","issueType","spouseName",tags,ssn,archived,deleted_at,"business_name",created_at').is('deleted_at',null).order('name',{ascending:true}),
       supabase.from('employees').select('id,name,avatar_url,email'),
       supabase.from('workflow_status_categories').select('*').order('sort_order'),
       supabase.from('workflow_statuses').select('*').order('sort_order'),
@@ -1231,9 +1238,28 @@ export default function Clients() {
       (c.email||'').toLowerCase().includes(_clientSearchLower) ||
       (c.phone||'').replace(/\D/g,'').includes(_clientSearchLower.replace(/\D/g,'')) ||
       (c.assignedTo||'').toLowerCase().includes(_clientSearchLower) ||
+      (c.taxAssociate||'').toLowerCase().includes(_clientSearchLower) ||
       (c.city||'').toLowerCase().includes(_clientSearchLower) ||
-      (c.business_name||'').toLowerCase().includes(_clientSearchLower)
+      (c.business_name||'').toLowerCase().includes(_clientSearchLower) ||
+      (c.spouseName||'').toLowerCase().includes(_clientSearchLower) ||
+      (c.tags||'').toLowerCase().includes(_clientSearchLower) ||
+      (c.ssn||'').replace(/-/g,'').includes(_clientSearchLower.replace(/-/g,''))
     ))
+
+  // Sort
+  const sortedFiltered = [...filtered].sort((a, b) => {
+    let av, bv
+    if (sortCol === 'name')         { av = a.name||''; bv = b.name||'' }
+    else if (sortCol === 'type')    { av = a.clientType||''; bv = b.clientType||'' }
+    else if (sortCol === 'balance') { av = parseFloat(a.irsBalance)||0; bv = parseFloat(b.irsBalance)||0 }
+    else if (sortCol === 'issue')   { av = a.issueType||''; bv = b.issueType||'' }
+    else if (sortCol === 'assigned'){ av = a.assignedTo||''; bv = b.assignedTo||'' }
+    else if (sortCol === 'pipeline'){ av = a.pipelineStage||''; bv = b.pipelineStage||'' }
+    else if (sortCol === 'status')  { av = a.status||''; bv = b.status||'' }
+    else                            { av = a.name||''; bv = b.name||'' }
+    if (typeof av === 'number') return sortDir === 'asc' ? av - bv : bv - av
+    return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
+  })
 
   function buildPayload(f) {
     const {
@@ -1284,7 +1310,7 @@ export default function Clients() {
     await logActivity(supabase,{employeeName:actorC,action:'client_created',category:'client',description:`Added client: ${form.name}`,entityName:form.name}).catch(()=>{})
     setModal(false); setForm(BLANK)
     // Reload then navigate straight into the new client's detail
-    const { data: allClients } = await supabase.from('clients').select('id,name,status,email,phone,city,state,"clientType","assignedTo","taxAssociate","pipelineStage","irsBalance","issueType",archived,deleted_at,"business_name",created_at').is('deleted_at',null).order('name', { ascending: true })
+    const { data: allClients } = await supabase.from('clients').select('id,name,status,email,phone,city,state,"clientType","assignedTo","taxAssociate","pipelineStage","irsBalance","issueType","spouseName",tags,ssn,archived,deleted_at,"business_name",created_at').is('deleted_at',null).order('name', { ascending: true })
     if (allClients) setClients(allClients)
     const newest = allClients?.find(c => c.name === form.name)
     if (newest) { setDetail(newest); loadRelated(newest.name); navigate('/clients/' + newest.id, { replace: true }) }
@@ -1776,6 +1802,12 @@ export default function Clients() {
     loadRelated(c.name)
     const qs = opts.preserveTab ? searchParams.toString() : ''
     navigate(`/clients/${c.id}${qs ? `?${qs}` : ''}`, { replace: true })
+    // If opened from the list (narrow columns), upgrade to full row in background
+    if (!opts.full) {
+      supabase.from('clients').select('*').eq('id', c.id).single().then(({ data }) => {
+        if (data) setDetail(data)
+      })
+    }
   }
 
   const reps=employees.length>0?employees.map(e=>e.name):['Romy Cruz','Dana Richard','Yesenia Gonzalez']
@@ -2039,7 +2071,7 @@ export default function Clients() {
               } catch (err) { showToast('Error opening form: ' + err.message) }
             }}/>
             <ActionBtn color="#0f766e" icon="🏛️" label="Pre-Fill State POA" sub={c.state ? c.state+' Form' : 'State Form'} onClick={()=>{ setPoaClient(c); setPoaModal(true) }}/>
-            <ActionBtn color="#d97706" icon="📋" label="Addendum" sub="Add Services" onClick={()=>{setAddForm({resolutionFee:'',paymentPlan:'',startDate:'',notes:'',services:[],sendVia:'email'});setAddModal(true)}}/>
+            <ActionBtn color="#d97706" icon="📋" label="Addendum" sub="Add Services" onClick={()=>{setAddForm({resolutionFee:String(c.contractFee||''),paymentPlan:'',startDate:'',notes:'',services:(()=>{try{return JSON.parse(c.services||'[]')}catch{return []}})(),sendVia:'email',trade1Amount:c.trade1Amount||'',trade1Date:c.trade1Date||'',trade2Amount:c.trade2Amount||'',trade2Date:c.trade2Date||'',trade3Amount:c.trade3Amount||'',trade3Date:c.trade3Date||''});setAddModal(true)}}/>
             <ActionBtn color="#0ea5e9" icon="🔓" label="Client Portal" sub="Compliance Access" onClick={()=>{setPortalClient(c);setPortalModal(true)}}/>
             <ActionBtn color="#4338ca" icon="🧾" label="Tax Organizer" sub="Send for Filing" onClick={()=>{setOrgClient(c);setOrgModal(true)}}/>
           </div>
@@ -2656,7 +2688,24 @@ export default function Clients() {
               <DR label="Email"   val={c.email ? <span style={{color:'var(--blue)',cursor:'pointer',textDecoration:'underline'}} title="Send email" onClick={()=>setQuickEmail({ name:c.name, email:c.email })}>{c.email} ✉️</span> : null}/>
               <DR label={c.business_name ? "Personal Address" : "Address"} val={[c.street,c.city,c.state,c.zip].filter(Boolean).join(', ')}/>
               <DR label="Business Address" val={[c.biz_street,c.biz_city,c.biz_state,c.biz_zip].filter(Boolean).join(', ')}/>
+              {c.contactPerson  && <DR label="Contact Person" val={c.contactPerson}/>}
+              {c.businessType   && <DR label="Business Type"  val={c.businessType}/>}
+              {c.industry       && <DR label="Industry"       val={c.industry}/>}
               <DR label="County"  val={c.county}/>
+              {c.occupation && <DR label="Occupation" val={c.occupation}/>}
+              {c.employer   && <DR label="Employer"   val={c.employer}/>}
+              {c.leadSource && <DR label="Lead Source" val={c.leadSource}/>}
+              {c.referredBy && <DR label="Referred By" val={c.referredBy}/>}
+              {c.tags && (
+                <div style={{padding:'8px 0',borderBottom:'1px solid var(--br)',display:'flex',alignItems:'flex-start',gap:10}}>
+                  <div style={{fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:'.04em',color:'var(--t3)',minWidth:130,paddingTop:2}}>Tags</div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                    {c.tags.split(',').map(t=>t.trim()).filter(Boolean).map(t=>(
+                      <span key={t} style={{background:'var(--blue)22',color:'var(--blue)',border:'1px solid var(--blue)44',borderRadius:4,padding:'1px 7px',fontSize:11,fontWeight:600}}>{t}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Taxpayer Info (+ Dependents, merged into one card) */}
@@ -2699,6 +2748,7 @@ export default function Clients() {
             {/* IRS / Case Info */}
             <div className="card">
               <div style={{fontWeight:700,fontSize:12,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t3)',marginBottom:10}}>IRS / Case Info</div>
+              {c.clientOwes && <DR label="Canopy Balance" val={c.clientOwes}/>}
               <DR label="IRS Balance"  val={formatBalance(c.irsBalance)}/>
               {(c.irsOrState||'IRS Federal')!=='IRS Federal' && (
                 <DR label="State Balance" val={formatBalance(c.stateBalance)}/>
@@ -2719,8 +2769,8 @@ export default function Clients() {
                   <DR label="State Deadline" val={c.stateDeadline}/>
                 </>
               )}
-              <DR label="Tax Advisor" val={c.assignedTo}/>
-              <DR label="Tax Associate" val={c.taxAssociate}/>
+              <DR label={label("assignedTo","Tax Advisor")} val={c.assignedTo}/>
+              <DR label={label("taxAssociate","Tax Associate")} val={c.taxAssociate}/>
               <DR label="Client Since" val={c.clientSince}/>
             </div>
 
@@ -3269,7 +3319,18 @@ export default function Clients() {
         <div className="ovx">
           <table>
             <thead>
-              <tr><th>Name</th><th>Type</th><th>Phone</th><th>Email</th><th>IRS Balance</th><th>Issue</th><th>Assigned</th><th>Pipeline</th><th>Status</th><th></th></tr>
+              <tr>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('name')}>Name{sortCol==='name'?(sortDir==='asc'?' ↑':' ↓'):''  }</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('type')}>Type{sortCol==='type'?(sortDir==='asc'?' ↑':' ↓'):''  }</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('balance')}>IRS Balance{sortCol==='balance'?(sortDir==='asc'?' ↑':' ↓'):''  }</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('issue')}>Issue{sortCol==='issue'?(sortDir==='asc'?' ↑':' ↓'):''  }</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('assigned')}>Assigned{sortCol==='assigned'?(sortDir==='asc'?' ↑':' ↓'):''  }</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('pipeline')}>Pipeline{sortCol==='pipeline'?(sortDir==='asc'?' ↑':' ↓'):''  }</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('status')}>Status{sortCol==='status'?(sortDir==='asc'?' ↑':' ↓'):''  }</th>
+                <th></th>
+              </tr>
             </thead>
             <tbody>
               {filtered.length===0?(
@@ -3280,7 +3341,7 @@ export default function Clients() {
                     <div style={{fontSize:13}}>Add your first client to get started.</div>
                   </div>
                 </td></tr>
-              ):filtered.map(c=>(
+              ):sortedFiltered.map(c=>(
                 <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>openDetail(c)}>
                   <td style={{fontWeight:700,color:'var(--tx)',fontSize:13}}>{c.name}</td>
                   <td><span className="bdg bb" style={{fontSize:12,padding:'3px 9px'}}>{c.clientType||'Individual'}</span></td>
@@ -3575,13 +3636,13 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
               <option>Active</option><option>Inactive</option><option>Prospect</option>
             </select>
           </div>
-          <div className="field"><label>Tax Advisor</label>
+          <div className="field"><label>{label("assignedTo","Tax Advisor")}</label>
             <select value={form.assignedTo||''} onChange={e=>fld('assignedTo',e.target.value)}>
               <option value="">Unassigned</option>{reps.map(r=><option key={r}>{r}</option>)}
             </select>
           </div>
           {/* Named associate overrides the round-robin pick on workflow steps. */}
-          <div className="field"><label>Tax Associate</label>
+          <div className="field"><label>{label("taxAssociate","Tax Associate")}</label>
             <select value={form.taxAssociate||''} onChange={e=>fld('taxAssociate',e.target.value)}>
               <option value="">Auto (round-robin)</option>{reps.map(r=><option key={r}>{r}</option>)}
             </select>

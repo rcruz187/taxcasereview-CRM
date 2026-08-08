@@ -28,7 +28,7 @@ import SendPaymentLinkModal from '../components/SendPaymentLinkModal'
 import SavedCardsPanel from '../components/SavedCardsPanel'
 import SplitPaymentModal from '../components/SplitPaymentModal'
 import { SMS_TEMPLATES, applySmsTemplate } from '../lib/smsTemplates'
-import { FIRM } from '../lib/firmBranding'
+import { FIRM, label } from '../lib/firmBranding'
 
 // Tenant-resolved firm name + contact email so the transactional email HTML,
 // SMS bodies, and subject lines below read as whichever firm is signed in,
@@ -86,7 +86,8 @@ const BLANK = {
   filingRequirements:[],
   irsStatus:'', irsStatusOther:'', irsDeadline:'',
   stateStatus:'', stateStatusOther:'', stateDeadline:'',
-  taxYearsCustom:'', notes:'', assignedTo:'', status:'New Lead', taxFee:'', taxFeeOverride:''
+  taxYearsCustom:'', notes:'', assignedTo:'', status:'New Lead', taxFee:'', taxFeeOverride:'',
+  services:[], salesRep:'', contractFee:'', trade1Amount:'', trade1Date:'', trade2Amount:'', trade2Date:'', trade3Amount:'', trade3Date:''
 }
 
 const IRS_STATUS_OPTIONS = ['ACS','Notice Status','Queue for ACS','Currently Not Collectible','Installment Agreement','Garnishment','Levy Issued','Levied','Lien Filed','Appeals','Litigation','Released','Other']
@@ -411,6 +412,14 @@ export default function Leads() {
   const [leads, setLeads]   = useState([])
   const [filter, setFilter] = useState('All')
   const [repFilter, setRepFilter] = useState('All')
+  const [leadSearch, setLeadSearch] = useState('')
+  const [sortCol, setSortCol] = useState('name')
+  const [sortDir, setSortDir] = useState('asc')
+
+  function toggleSort(col) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
   // Tax Advisors only ever see their own leads — lock the existing rep
   // filter to their name instead of building a separate filter path.
   useEffect(() => {
@@ -1012,6 +1021,34 @@ export default function Leads() {
     .filter(l => filter === 'Converted to Client' || l.status !== 'Converted to Client')
     .filter(l => filter === 'All' || l.status === filter)
     .filter(l => repFilter === 'All' || (repFilter === 'Unassigned' ? !l.assignedTo : l.assignedTo === repFilter))
+    .filter(l => {
+      if (!leadSearch.trim()) return true
+      const q = leadSearch.toLowerCase()
+      return (
+        (l.name||'').toLowerCase().includes(q) ||
+        (l.email||'').toLowerCase().includes(q) ||
+        (l.phone||'').replace(/\D/g,'').includes(q.replace(/\D/g,'')) ||
+        (l.business_name||'').toLowerCase().includes(q) ||
+        (l.spouseName||'').toLowerCase().includes(q) ||
+        (l.city||'').toLowerCase().includes(q) ||
+        (l.assignedTo||'').toLowerCase().includes(q) ||
+        (l.taxAssociate||'').toLowerCase().includes(q) ||
+        (l.ssn||'').replace(/-/g,'').includes(q.replace(/-/g,''))
+      )
+    })
+
+  const sortedFiltered = [...filtered].sort((a, b) => {
+    let av, bv
+    if (sortCol === 'name')         { av = a.name||''; bv = b.name||'' }
+    else if (sortCol === 'type')    { av = a.clientType||''; bv = b.clientType||'' }
+    else if (sortCol === 'issue')   { av = a.issueType||''; bv = b.issueType||'' }
+    else if (sortCol === 'balance') { av = a.irsBalance||''; bv = b.irsBalance||'' }
+    else if (sortCol === 'source')  { av = a.source||''; bv = b.source||'' }
+    else if (sortCol === 'status')  { av = a.status||''; bv = b.status||'' }
+    else if (sortCol === 'assigned'){ av = a.assignedTo||''; bv = b.assignedTo||'' }
+    else                            { av = a.name||''; bv = b.name||'' }
+    return sortDir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av))
+  })
 
   async function save() {
     if (form.clientType !== 'Business' && !composeName(form.first,form.mi,form.last)) {
@@ -1024,7 +1061,7 @@ export default function Leads() {
     setSaving(true)
     const actor = resolveActorName(user, employees)
     const beforeEdit = modal === 'edit' ? leads.find(l=>l.id===form.id) : null
-    let payload = { ...form, taxYears: JSON.stringify(form.taxYears), filingRequirements: JSON.stringify(form.filingRequirements||[]) }
+    let payload = { ...form, taxYears: JSON.stringify(form.taxYears), filingRequirements: JSON.stringify(form.filingRequirements||[]), services: JSON.stringify(form.services||[]) }
     // Empty-string values blow up non-text columns (date, numeric) with
     // "invalid input syntax" — Postgres wants null for "no value", not ''.
     Object.keys(payload).forEach(k => { if (payload[k] === '') payload[k] = null })
@@ -1508,9 +1545,15 @@ export default function Leads() {
       irsBalance: l.irsBalance, stateBalance: l.stateBalance, issueType: l.issueType, irsOrState: l.irsOrState,
       irsStatus: l.irsStatus, irsStatusOther: l.irsStatusOther, irsDeadline: l.irsDeadline || null,
       stateStatus: l.stateStatus, stateStatusOther: l.stateStatusOther, stateDeadline: l.stateDeadline || null,
-      spouseDob: l.spouseDob || null,
+    
       filingRequirements: l.filingRequirements,
       taxYears: taxYearsStr,
+      services: l.services || null,
+      salesRep: l.salesRep || null,
+      contractFee: l.contractFee || null,
+      trade1Amount: l.trade1Amount || null, trade1Date: l.trade1Date || null,
+      trade2Amount: l.trade2Amount || null, trade2Date: l.trade2Date || null,
+      trade3Amount: l.trade3Amount || null, trade3Date: l.trade3Date || null,
       notes: l.notes, status: 'Active',
       clientSince: new Date().toISOString().slice(0,10),
       created_at: new Date().toISOString()
@@ -1543,6 +1586,23 @@ export default function Leads() {
       { title: `Call IRS — ${l.name}`,             clientName: l.name, priority: 'High', dueDate: addDays(1), done: false, created_at: new Date().toISOString() },
       { title: `Schedule ${FIRM.name || 'CRM'} call — ${l.name}`, clientName: l.name, priority: 'Normal', dueDate: addDays(3), done: false, created_at: new Date().toISOString() },
     ])
+    // Auto-create a case for the new client with Associate + Para assigned
+    await supabase.from('cases').insert([{
+      id: 'case-' + newClient.id,
+      clientName: l.name,
+      clientid: newClient.id,
+      caseType: l.issueType || 'Tax Resolution',
+      irsBalance: l.irsBalance || null,
+      assignedTo: l.assignedTo || null,
+      taxAssociate: l.taxAssociate || null,
+      status: 'Active',
+      taxYears: taxYearsStr || null,
+      notes: 'Case opened on conversion from lead.',
+      created_at: new Date().toISOString(),
+    }]).then(({ error: cErr }) => {
+      if (cErr) console.warn('Case create failed:', cErr.message)
+    })
+
     // Carry over the lead's financial intake instead of always creating a
     // fresh blank one. The client page shows whichever row is most recent
     // for this name -- inserting a new empty row here unconditionally was
@@ -1880,8 +1940,56 @@ export default function Leads() {
               </div>
             </div>
             <div className="field"><label>Notes</label><textarea value={form.notes} onChange={e=>fld('notes',e.target.value)}/></div>
+
+            {/* ── Sales Contract ─────────────────────────────────────── */}
+            <div style={{background:'var(--s2)',border:'1px solid var(--br)',borderRadius:8,padding:'14px 16px',marginTop:4}}>
+              <div style={{fontSize:12,fontWeight:700,color:'var(--t2)',letterSpacing:.5,marginBottom:10,textTransform:'uppercase'}}>📋 Service Agreement</div>
+              <div style={{fontSize:12,color:'var(--t3)',marginBottom:10}}>Services selected for this client</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:'6px 20px',marginBottom:14}}>
+                {RESOLUTION_SERVICES.map(s=>(
+                  <label key={s.key} style={{display:'inline-flex',alignItems:'flex-start',gap:6,fontSize:12.5,cursor:'pointer',width:'calc(50% - 10px)'}}>
+                    <input type="checkbox" style={{width:'auto',marginTop:2,flexShrink:0}}
+                      checked={(form.services||[]).includes(s.key)}
+                      onChange={()=>fld('services',(form.services||[]).includes(s.key)
+                        ? (form.services||[]).filter(x=>x!==s.key)
+                        : [...(form.services||[]),s.key])}/>
+                    {s.label}
+                  </label>
+                ))}
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
+                <div className="field" style={{margin:0}}>
+                  <label>Sales Rep</label>
+                  <select value={form.salesRep||''} onChange={e=>fld('salesRep',e.target.value)}>
+                    <option value="">— Select —</option>
+                    {employees.map(e=><option key={e.name}>{e.name}</option>)}
+                  </select>
+                </div>
+                <div className="field" style={{margin:0}}>
+                  <label>Total Contract Fee ($)</label>
+                  <input type="number" value={form.contractFee||''} onChange={e=>fld('contractFee',e.target.value)} placeholder="e.g. 3950"/>
+                </div>
+              </div>
+              <div style={{fontSize:12,fontWeight:600,color:'var(--t2)',marginBottom:8}}>Payment Schedule</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:6}}>
+                <div className="field" style={{margin:0}}><label>1st Trade Amount</label><input type="number" value={form.trade1Amount||''} onChange={e=>fld('trade1Amount',e.target.value)} placeholder="e.g. 1000"/></div>
+                <div className="field" style={{margin:0}}><label>1st Trade Date</label><input type="date" value={form.trade1Date||''} onChange={e=>fld('trade1Date',e.target.value)}/></div>
+                <div className="field" style={{margin:0}}><label>&nbsp;</label></div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:6}}>
+                <div className="field" style={{margin:0}}><label>2nd Trade Amount</label><input type="number" value={form.trade2Amount||''} onChange={e=>fld('trade2Amount',e.target.value)} placeholder="e.g. 1000"/></div>
+                <div className="field" style={{margin:0}}><label>2nd Trade Date</label><input type="date" value={form.trade2Date||''} onChange={e=>fld('trade2Date',e.target.value)}/></div>
+                <div className="field" style={{margin:0}}><label>&nbsp;</label></div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+                <div className="field" style={{margin:0}}><label>3rd Trade Amount</label><input type="number" value={form.trade3Amount||''} onChange={e=>fld('trade3Amount',e.target.value)} placeholder="e.g. 1950"/></div>
+                <div className="field" style={{margin:0}}><label>3rd Trade Date</label><input type="date" value={form.trade3Date||''} onChange={e=>fld('trade3Date',e.target.value)}/></div>
+                <div className="field" style={{margin:0}}><label>&nbsp;</label></div>
+              </div>
+            </div>
+
             <div className="fg2">
-              <div className="field"><label>Tax Advisor</label>
+              <div className="field"><label>{label("assignedTo","Tax Advisor")}</label>
                 <select value={form.assignedTo} onChange={e=>fld('assignedTo',e.target.value)}>
                   <option value="">Unassigned</option>
                   {(employees.length>0?employees.map(e=>e.name):['Romy Cruz','Dana Richard','Yesenia Gonzalez']).map(n=><option key={n}>{n}</option>)}
@@ -1890,7 +1998,7 @@ export default function Leads() {
               {/* The associate who works the case day to day. Workflow steps
                   marked ASSOCIATE go here when set; otherwise they fall back to
                   the round-robin pick, which is why this can stay blank. */}
-              <div className="field"><label>Tax Associate</label>
+              <div className="field"><label>{label("taxAssociate","Tax Associate")}</label>
                 <select value={form.taxAssociate||''} onChange={e=>fld('taxAssociate',e.target.value)}>
                   <option value="">Auto (round-robin)</option>
                   {(employees.length>0?employees.map(e=>e.name):['Romy Cruz','Dana Richard','Yesenia Gonzalez']).map(n=><option key={n}>{n}</option>)}
@@ -2007,7 +2115,8 @@ export default function Leads() {
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,flexWrap:'wrap'}}>
           <button className="btn" style={{padding:'8px 16px',fontSize:13,fontWeight:600}} onClick={()=>{ setDetail(null); navigate('/leads',{replace:true}); document.querySelector('.page-content')?.scrollTo(0,0) }}>← Back</button>
           {(l.status !== 'Converted to Client' || user?.role === 'Admin' || user?.role === 'Manager') ? (
-            <button className="btn pri" style={{marginLeft:'auto',padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>{setForm({...BLANK,...l,business_name: l.business_name || (l.clientType && l.clientType!=='Individual' ? l.name : ''),taxYears:(() => {try{return JSON.parse(l.taxYears||'[]')}catch{return []}})(),filingRequirements:(() => {try{return JSON.parse(l.filingRequirements||'[]')}catch{return []}})()});setModal('edit')}}>✏️ Edit</button>
+            <button className="btn pri" style={{marginLeft:'auto',padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>{setForm({...BLANK,...l,business_name: l.business_name || (l.clientType && l.clientType!=='Individual' ? l.name : ''),taxYears:(() => {try{return JSON.parse(l.taxYears||'[]')}catch{return []}})(),filingRequirements:(() => {try{return JSON.parse(l.filingRequirements||'[]')}catch{return []}})()
+                ,services:(() => {try{return JSON.parse(l.services||'[]')}catch{return []}})()});setModal('edit')}}>✏️ Edit</button>
           ) : (
             <span style={{marginLeft:'auto',fontSize:11,color:'var(--t3)',padding:'8px 12px',background:'var(--s2)',borderRadius:6}}>🔒 Admin Only</span>
           )}
@@ -2098,7 +2207,7 @@ export default function Leads() {
             <ActionBtn color="#0f766e" icon="🏛️" label="Pre-Fill State POA" sub={l.state ? l.state+' Form' : 'State Form'} onClick={()=>{ setPoaLead(l); setPoaModal(true) }}/>
             <ActionBtn color="#1d4ed8" icon="📊" label={intakeSending?'Sending…':'Financial Intake'} sub="Send / Resend Link" onClick={()=>!intakeSending&&sendFinancialIntake(l)}/>
             <ActionBtn color="#0d9488" icon="💵" label="Charge Investigation Fee" sub={l.taxFee?`Quoted: $${l.taxFee}`:'Send Payment Link'} onClick={()=>setPaymentLinkModal({purpose:'investigation_fee', defaultAmount:l.taxFee||'', defaultDescription:'Tax Investigation Fee'})}/>
-            <ActionBtn color="#d97706" icon="📝" label="Addendum" sub="After IRS facts" onClick={()=>{setAddForm({resolutionFee:'',paymentPlan:'',startDate:'',notes:'',services:[],sendVia:'email'});setAddModal(true)}}/>
+            <ActionBtn color="#d97706" icon="📝" label="Addendum" sub="After IRS facts" onClick={()=>{setAddForm({resolutionFee:String(l.contractFee||''),paymentPlan:'',startDate:'',notes:'',services:(()=>{try{return JSON.parse(l.services||'[]')}catch{return []}})(),sendVia:'email',trade1Amount:l.trade1Amount||'',trade1Date:l.trade1Date||'',trade2Amount:l.trade2Amount||'',trade2Date:l.trade2Date||'',trade3Amount:l.trade3Amount||'',trade3Date:l.trade3Date||''});setAddModal(true)}}/>
             {l.status==='Addendum Signed' && (
               <ActionBtn color="#059669" icon="💰" label="Charge Resolution Fee" sub="& Convert to Client" onClick={()=>setResolutionFeeLead(l)}/>
             )}
@@ -2552,8 +2661,8 @@ export default function Leads() {
                 ['State Status',   l.stateStatus==='Other'?l.stateStatusOther:l.stateStatus],
                 ['State Deadline', l.stateDeadline],
               ] : []),
-              ['Tax Advisor',  l.assignedTo||<span style={{color:'var(--warn)'}}>Unassigned</span>],
-              ['Tax Associate', l.taxAssociate||'—'],
+              [label('assignedTo','Tax Advisor'),  l.assignedTo||<span style={{color:'var(--warn)'}}>Unassigned</span>],
+              [label('taxAssociate','Tax Associate'), l.taxAssociate||'—'],
               ['Tax Inv Fee',  l.taxFee?<span style={{fontWeight:700,color:'var(--ok)'}}>${l.taxFee}</span>:'Not set'],
             ].map(([label,val])=>(
               <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">{val||'—'}</span></div>
@@ -2864,6 +2973,15 @@ export default function Leads() {
         )
       })()}
 
+      <div style={{marginBottom:8}}>
+        <input
+          type="search"
+          placeholder="Search leads by name, spouse, phone, email, city…"
+          value={leadSearch}
+          onChange={e=>setLeadSearch(e.target.value)}
+          style={{width:'100%',maxWidth:380,padding:'6px 12px',borderRadius:6,border:'1px solid var(--br)',background:'var(--bg2)',color:'var(--tx)',fontSize:13,outline:'none'}}
+        />
+      </div>
       <div className="pipeline-chips" style={{marginBottom:10,display:'flex',flexWrap:'wrap',gap:4,alignItems:'center'}}>
         {['All',...STATUSES.slice(0,8)].map(s => (
           <span key={s} className={`chip${filter===s?' on':''}`} onClick={()=>setFilter(s)}>{s}</span>
@@ -2889,7 +3007,17 @@ export default function Leads() {
         <div className="ovx">
           <table>
             <thead>
-              <tr><th>Name</th><th>Type</th><th>Phone</th><th>Issue</th><th>Balance</th><th>Source</th><th>Status</th><th>Assigned</th><th></th></tr>
+              <tr>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('name')}>Name{sortCol==='name'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('type')}>Type{sortCol==='type'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th>Phone</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('issue')}>Issue{sortCol==='issue'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('balance')}>Balance{sortCol==='balance'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('source')}>Source{sortCol==='source'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('status')}>Status{sortCol==='status'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('assigned')}>Assigned{sortCol==='assigned'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th></th>
+              </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
@@ -2902,7 +3030,7 @@ export default function Leads() {
                     {!showArchived && filter === 'All' && <div style={{fontSize:13}}>Add your first lead to get started.</div>}
                   </div>
                 </td></tr>
-              ) : filtered.map(l => (
+              ) : sortedFiltered.map(l => (
                 <tr key={l.id} onClick={()=>{ setDetail(l); loadLeadNotes(l.id); navigate('/leads/'+l.id, {replace:true}) }} style={{cursor:'pointer'}}>
                   <td style={{fontWeight:700,color:'var(--tx)',fontSize:13}}>
                     {l.name}

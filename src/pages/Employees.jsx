@@ -3,9 +3,29 @@ import { formatMoneyInput, parseMoney } from '../lib/money'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
+import { FIRM, label } from '../lib/firmBranding'
 
-const ROLES = ['Super Admin', 'Admin', 'Manager', 'Tax Associate', 'Tax Advisor', 'View Only']
-const ROLE_COLORS = { 'Super Admin': '#ef4444', 'Admin': '#f59e0b', 'Tax Associate': '#3b82f6', 'View Only': '#64748b', 'Tax Advisor': '#10b981', 'Manager': '#06b6d4' }
+// Scope queries to current tenant when FIRM.tenantId is available (platform admin sessions)
+function tf(q) { return FIRM.tenantId ? q.eq('tenant_id', FIRM.tenantId) : q }
+
+// Base access levels — these are the actual permission presets (never change these keys)
+const ACCESS_LEVELS = ['Super Admin', 'Admin', 'Manager', 'Tax Associate', 'Tax Advisor', 'Sales Rep', 'View Only']
+// Display labels for each access level — pulled from FIRM.labels or defaults
+function getRoleLabels() {
+  const l = FIRM.labels || {}
+  return {
+    'Super Admin':   'Super Admin',
+    'Admin':         l.associateRole || 'Admin',
+    'Tax Associate': l.paraRole || 'Tax Associate',
+    'Tax Advisor':   l.taxAdvisorRole || 'Tax Advisor',
+    'Manager':       'Manager',
+    'Sales Rep':     l.salesRepRole || 'Sales',
+    'View Only':     'View Only',
+  }
+}
+const ROLE_COLORS = { 'Super Admin': '#ef4444', 'Admin': '#f59e0b', 'Tax Associate': '#3b82f6', 'View Only': '#64748b', 'Tax Advisor': '#10b981', 'Manager': '#06b6d4', 'Sales Rep': '#8b5cf6' }
+// Role display colors (for the role badge — role is the title, access is the permission level)
+const TITLE_COLORS = { 'Super Admin': '#ef4444', 'Associate': '#10b981', 'Para': '#0ea5e9', 'Manager': '#06b6d4', 'Staff': '#64748b', 'Sales': '#8b5cf6' }
 
 // perm levels: 0=No Access, 1=View Only, 2=Edit, 3=Full Admin
 const PERM_SECTIONS = [
@@ -40,6 +60,8 @@ const ROLE_PERM_DEFAULTS = {
   // scoped to "my assigned leads only" in Leads.jsx — that scoping is NOT a
   // perm level, it applies regardless of what perm_leads is set to here.
   'Tax Advisor': { perm_leads:2, perm_clients:0, perm_billing:0, perm_schedule:2, perm_documents:2, perm_irs:0, perm_comms:2, perm_reports:0, perm_hr:0, perm_settings:0 },
+  // Sales rep — leads pipeline + comms; no access to client files, billing, IRS, HR, or settings
+  'Sales Rep':   { perm_leads:2, perm_clients:0, perm_billing:0, perm_schedule:2, perm_documents:1, perm_irs:0, perm_comms:2, perm_reports:0, perm_hr:0, perm_settings:0 },
   // Sales manager — oversees Tax Advisors. Full Admin on Leads (sees every
   // rep's leads, unscoped — only 'Tax Advisor' gets the my-leads-only lock
   // in Leads.jsx) plus Reports visibility for team performance.
@@ -63,7 +85,7 @@ const EMP_DOC_LABELS = ['W-4', 'I-9', 'Direct Deposit', 'SSN Card', 'Driver Lice
 // Map camelCase form state → snake_case DB columns
 function toDbPayload(form) {
   const { hourlyRate, payType, paymentMethod, hireDate, emergencyContact, emergencyPhone,
-          filingStatus, sorShortId, sorUsername, employeeId,
+          filingStatus, sorShortId, sorUsername, employeeId, portalPin,
           pto_balance, sick_balance, vacation_balance, ...rest } = form
   // Postgres numeric columns reject '' outright (the error this fixes:
   // "invalid input syntax for type numeric: \"\""). An employee with no
@@ -145,6 +167,7 @@ export default function Employees() {
   const [form, setForm]           = useState(blankEmp)
   const [tab, setTab]             = useState('info')
   const [saving, setSaving]       = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [resetEmail, setResetEmail] = useState('')
   const [showReset, setShowReset]   = useState(false)
   const [resetSending, setResetSending] = useState(false)
@@ -167,7 +190,7 @@ export default function Employees() {
 
   async function load() {
     setLoading(true)
-    const { data } = await supabase.from('employees').select('*').order('name')
+    const { data } = await tf(supabase.from('employees').select('*')).order('name')
     // Exclude platform admin account — romy@taxrescrm.net is the TaxRes CRM
     // product owner account and must never appear in any office's employee list
     setEmployees((data || []).filter(e => e.email !== 'romy@taxrescrm.net'))
@@ -203,20 +226,34 @@ export default function Employees() {
   async function save(silent = false) {
     if (!form.name || !form.email) { if (!silent) showToast('Name and email required', 'err'); return false }
     setSaving(true)
-    const payload = toDbPayload(form)
+    setSaveError('')
+    let payload = toDbPayload(form)
     let error, data
-    if (editing) {
-      ({ error } = await supabase.from('employees').update(payload).eq('id', editing))
-    } else {
-      ({ error, data } = await supabase.from('employees').insert([payload]).select().single())
-      // After first insert, switch to edit mode so subsequent tab saves use update
-      if (!error && data?.id) setEditing(data.id)
+    // Retry loop: if PostgREST rejects an unknown column, strip it and retry (same pattern as Clients.jsx)
+    for (let attempt = 0; attempt < 12; attempt++) {
+      if (editing) {
+        ;({ error } = await supabase.from('employees').update(payload).eq('id', editing))
+      } else {
+        ;({ error, data } = await supabase.from('employees').insert([payload]).select().single())
+        if (!error && data?.id) setEditing(data.id)
+      }
+      if (!error) break
+      const match = error.message?.match(/column ['"]?(\w+)['"]? (of relation .* )?does not exist/i)
+        || error.message?.match(/Could not find the '(\w+)' column/i)
+      if (match && match[1] in payload) {
+        const { [match[1]]: _, ...rest } = payload
+        payload = rest
+        continue
+      }
+      break
     }
     setSaving(false)
-    if (error) { if (!silent) showToast(error.message, 'err'); return false }
+    if (error) { setSaveError(error.message); if (!silent) showToast('Save error: ' + error.message, 'err'); return false }
     if (!silent) {
       showToast(editing ? 'Employee updated!' : 'Employee added!')
       setShowForm(false)
+    } else {
+      showToast('Auto-saved', 'ok')
     }
     load()
     return true
@@ -326,7 +363,7 @@ export default function Employees() {
                 {/* Avatar */}
                 <div style={{
                   width: 48, height: 48, borderRadius: '50%',
-                  background: ROLE_COLORS[emp.access] || '#64748b',
+                  background: TITLE_COLORS[emp.role] || ROLE_COLORS[emp.access] || '#64748b',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 16, fontWeight: 800, color: '#fff', flexShrink: 0, overflow: 'hidden'
                 }}>
@@ -336,15 +373,15 @@ export default function Employees() {
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--tx)' }}>{emp.name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{emp.title || 'Staff'}</div>
+                  <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{emp.title || emp.role || 'Staff'}</div>
                   <div style={{ fontSize: 12, color: 'var(--t3)' }}>{emp.email}</div>
                   <div style={{ marginTop: 8, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                     <span style={{
                       fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 20,
-                      background: (ROLE_COLORS[emp.access] || '#64748b') + '22',
-                      color: ROLE_COLORS[emp.access] || '#64748b',
-                      border: '1px solid ' + (ROLE_COLORS[emp.access] || '#64748b') + '44'
-                    }}>{emp.access || 'Tax Associate'}</span>
+                      background: (TITLE_COLORS[emp.role] || ROLE_COLORS[emp.access] || '#64748b') + '22',
+                      color: TITLE_COLORS[emp.role] || ROLE_COLORS[emp.access] || '#64748b',
+                      border: '1px solid ' + (TITLE_COLORS[emp.role] || ROLE_COLORS[emp.access] || '#64748b') + '44'
+                    }}>{emp.role || emp.title || emp.access || 'Staff'}</span>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
@@ -610,18 +647,22 @@ export default function Employees() {
                   <div className="field">
                     <label>Role / Access Level</label>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
-                      {ROLES.map(r => (
-                        <button key={r} onClick={() => applyRoleDefaults(r)} style={{
-                          padding: '8px 16px', borderRadius: 8, cursor: 'pointer',
-                          border: '2px solid ' + (form.access === r ? ROLE_COLORS[r] : 'var(--br)'),
-                          background: form.access === r ? ROLE_COLORS[r] + '22' : 'var(--s2)',
-                          color: form.access === r ? ROLE_COLORS[r] : 'var(--t2)',
-                          fontWeight: form.access === r ? 700 : 400,
-                          fontSize: 13, transition: 'all .15s'
-                        }}>
-                          {r}
-                        </button>
-                      ))}
+                      {ACCESS_LEVELS.map(r => {
+                        const roleLabels = getRoleLabels()
+                        const displayLabel = roleLabels[r] || r
+                        return (
+                          <button key={r} onClick={() => applyRoleDefaults(r)} style={{
+                            padding: '8px 16px', borderRadius: 8, cursor: 'pointer',
+                            border: '2px solid ' + (form.access === r ? ROLE_COLORS[r] : 'var(--br)'),
+                            background: form.access === r ? ROLE_COLORS[r] + '22' : 'var(--s2)',
+                            color: form.access === r ? ROLE_COLORS[r] : 'var(--t2)',
+                            fontWeight: form.access === r ? 700 : 400,
+                            fontSize: 13, transition: 'all .15s'
+                          }}>
+                            {displayLabel}
+                          </button>
+                        )
+                      })}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 6 }}>
                       Selecting a role applies default permissions — you can customize them in the Permissions tab.
@@ -749,7 +790,7 @@ export default function Employees() {
                           {LEVEL_OPTIONS.map(opt => (
                             <div
                               key={opt.value}
-                              onClick={() => setForm(f => ({ ...f, [section.key]: opt.value }))}
+                              onClick={e => { e.stopPropagation(); setForm(f => ({ ...f, [section.key]: opt.value })) }}
                               style={{
                                 padding: '10px 12px', cursor: 'pointer', textAlign: 'center',
                                 borderRight: opt.value < 3 ? '1px solid var(--br)' : 'none',
@@ -785,7 +826,8 @@ export default function Employees() {
               )}
 
               {/* Footer */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--br)' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--br)', flexWrap: 'wrap' }}>
+                {saveError && <div style={{ width: '100%', fontSize: 12, color: '#ef4444', marginBottom: 6, padding: '6px 10px', background: '#ef444418', borderRadius: 6, border: '1px solid #ef444444' }}>⚠️ {saveError}</div>}
                 <button className="btn" onClick={() => setShowForm(false)}>Cancel</button>
                 <button className="btn pri" onClick={save} disabled={saving}>
                   {saving ? 'Saving…' : (editing ? 'Save Changes' : 'Add Employee')}
