@@ -1586,6 +1586,23 @@ export default function Leads() {
       { title: `Call IRS — ${l.name}`,             clientName: l.name, priority: 'High', dueDate: addDays(1), done: false, created_at: new Date().toISOString() },
       { title: `Schedule ${FIRM.name || 'CRM'} call — ${l.name}`, clientName: l.name, priority: 'Normal', dueDate: addDays(3), done: false, created_at: new Date().toISOString() },
     ])
+    // Auto-create a case for the new client with Associate + Para assigned
+    await supabase.from('cases').insert([{
+      id: 'case-' + newClient.id,
+      clientName: l.name,
+      clientid: newClient.id,
+      caseType: l.issueType || 'Tax Resolution',
+      irsBalance: l.irsBalance || null,
+      assignedTo: l.assignedTo || null,
+      taxAssociate: l.taxAssociate || null,
+      status: 'Active',
+      taxYears: taxYearsStr || null,
+      notes: 'Case opened on conversion from lead.',
+      created_at: new Date().toISOString(),
+    }]).then(({ error: cErr }) => {
+      if (cErr) console.warn('Case create failed:', cErr.message)
+    })
+
     // Carry over the lead's financial intake instead of always creating a
     // fresh blank one. The client page shows whichever row is most recent
     // for this name -- inserting a new empty row here unconditionally was
