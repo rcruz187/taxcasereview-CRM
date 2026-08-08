@@ -1622,7 +1622,7 @@ function CommandCenter() {
   }
 
   function handleGSCConnect() {
-    const CLIENT_ID = '823434895788-jtckeodk2cq0ff4kbevaqmm35j73m8dd.apps.googleusercontent.com'
+    const CLIENT_ID = '70057646964-vimoia1qkjtml9n3mplo0hme82m3t2qs.apps.googleusercontent.com'
     const redirect  = window.location.origin + '/taxcasereview-CRM/crm-admin/command-center'
     const scope     = 'https://www.googleapis.com/auth/webmasters.readonly'
     window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent`
@@ -3111,7 +3111,7 @@ export default function AdminPortal() {
   }, [])
 
   async function handleGSCConnect() {
-    const CLIENT_ID = '823434895788-jtckeodk2cq0ff4kbevaqmm35j73m8dd.apps.googleusercontent.com'
+    const CLIENT_ID = '70057646964-vimoia1qkjtml9n3mplo0hme82m3t2qs.apps.googleusercontent.com'
     const redirect  = window.location.origin + '/taxcasereview-CRM/crm-admin/command-center'
     const scope     = 'https://www.googleapis.com/auth/webmasters.readonly'
     const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent`
