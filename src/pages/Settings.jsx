@@ -117,6 +117,7 @@ export default function Settings() {
   }
 
   const [connectedGmailCount, setConnectedGmailCount] = useState(0)
+  const [connectedM365Count, setConnectedM365Count] = useState(0)
   const [firm, setFirm] = useState({
     name: '', tagline: '', phone: '', email: '',
     address: '', city: '', state: '', zip: '',
@@ -125,7 +126,8 @@ export default function Settings() {
     gmail_client_id: '', gmail_client_secret: '', gmail_redirect_uri: '',
     email_signature: '', email_signature_logo_url: '',
     verizon_api_key: '', verizon_account_id: '', verizon_phone_number: '',
-    verizon_api_url: 'https://api.verizon.com/v1', calling_provider: 'signalwire'
+    verizon_api_url: 'https://api.verizon.com/v1', calling_provider: 'signalwire',
+    m365_client_id: '', m365_client_secret: '', m365_tenant_id: 'common'
   })
 
   const [pw, setPw] = useState({ next: '', confirm: '' })
@@ -194,6 +196,9 @@ export default function Settings() {
     const { count } = await supabase.from('employee_gmail_accounts')
       .select('employee_email', { count: 'exact', head: true }).not('gmail_refresh_token', 'is', null)
     setConnectedGmailCount(count || 0)
+    const { count: m365Count } = await supabase.from('employee_m365_accounts')
+      .select('employee_email', { count: 'exact', head: true }).not('m365_refresh_token', 'is', null)
+    setConnectedM365Count(m365Count || 0)
   }
 
   async function loadLogo() {
@@ -217,6 +222,9 @@ export default function Settings() {
         gmail_client_id: firm.gmail_client_id,
         gmail_client_secret: firm.gmail_client_secret,
         gmail_redirect_uri: firm.gmail_redirect_uri,
+        m365_client_id: firm.m365_client_id,
+        m365_client_secret: firm.m365_client_secret,
+        m365_tenant_id: firm.m365_tenant_id || 'common',
         telnyx_api_key: firm.telnyx_api_key,
         firm_fax_number: firm.firm_fax_number,
         smtp_host: firm.smtp_host, smtp_port: firm.smtp_port,
@@ -508,6 +516,54 @@ export default function Settings() {
               <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 14 }}>Click the Redirect URI field to copy it.</div>
 
               <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Gmail Config'}</button>
+            </div>
+          </div>
+
+
+          {/* Microsoft 365 / Azure AD */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">📧 Microsoft 365 Integration (Email + Calendar)</span></div>
+            <div style={{ padding: '0 20px 20px' }}>
+              {connectedM365Count > 0 ? (
+                <div style={{background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.25)",borderRadius:8,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10,fontSize:12,color:"var(--ok)"}}>
+                  <span>✅</span><span>{connectedM365Count} employee{connectedM365Count === 1 ? ' has' : 's have'} connected their Microsoft 365 account.</span>
+                </div>
+              ) : (
+                <div style={{background:"rgba(250,204,21,.08)",border:"1px solid rgba(250,204,21,.25)",borderRadius:8,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10,fontSize:12,color:"var(--warn)"}}>
+                  <span>⚠️</span><span>No employees have connected Microsoft 365 yet. Complete the setup below, then each employee connects from the Email page.</span>
+                </div>
+              )}
+              <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.7 }}>
+                Connects each employee's Outlook inbox and Outlook Calendar to the CRM — emails auto-log to client files, meetings sync to the CRM calendar. Done once by an admin, then each employee connects their own account from the Email page.
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                {[
+                  ['1', 'Go to portal.azure.com → Azure Active Directory → App registrations → New registration'],
+                  ['2', 'Name it "Nashville Tax Solutions CRM" (or your firm name). Supported account types: "Accounts in any organizational directory and personal Microsoft accounts"'],
+                  ['3', `Under Redirect URIs, add: ${typeof window !== 'undefined' ? window.location.origin.replace('taxresolutioncrm.github.io/taxcasereview-CRM','taxresolutioncrm.github.io/taxcasereview-CRM') : ''}/auth/m365/callback — set type to "Web"`],
+                  ['4', 'Go to API permissions → Add permission → Microsoft Graph → Delegated → add: Mail.Read, Mail.Send, Calendars.ReadWrite, User.Read'],
+                  ['5', 'Go to Certificates & secrets → New client secret → copy the Value (shown once)'],
+                  ['6', 'Copy your Application (client) ID from the Overview page. Paste both below and save.'],
+                ].map(([step, text]) => (
+                  <div key={step} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#0078d4', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, flexShrink: 0 }}>{step}</div>
+                    <div style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, paddingTop: 2 }}>{text}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="fg2">
+                <div className="field"><label>Azure Application (Client) ID</label>
+                  <input value={firm.m365_client_id || ''} onChange={set('m365_client_id')} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+                </div>
+                <div className="field"><label>Azure Client Secret</label>
+                  <input type="password" value={firm.m365_client_secret || ''} onChange={set('m365_client_secret')} placeholder="Paste the secret Value from Azure" />
+                </div>
+              </div>
+              <div className="field"><label>Azure Tenant ID (leave as "common" unless single-tenant)</label>
+                <input value={firm.m365_tenant_id || 'common'} onChange={set('m365_tenant_id')} placeholder="common" />
+                <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Use "common" to allow any Microsoft account. For single-tenant (company accounts only), paste your Azure Directory (tenant) ID from the Azure AD Overview page.</div>
+              </div>
+              <button className="btn pri" onClick={saveFirm} disabled={saving} style={{marginTop:8}}>{saving ? 'Saving…' : 'Save M365 Config'}</button>
             </div>
           </div>
 

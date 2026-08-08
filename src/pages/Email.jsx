@@ -38,6 +38,9 @@ export default function Email() {
   const [gmailConnected, setGmailConnected] = useState(false)
   const [gmailConnectedEmail, setGmailConnectedEmail] = useState('')
   const [gmailClientId, setGmailClientId] = useState('')
+  const [m365Connected, setM365Connected] = useState(false)
+  const [m365ConnectedEmail, setM365ConnectedEmail] = useState('')
+  const [m365ClientId, setM365ClientId] = useState('')
   const [signature, setSignature] = useState({ text: '', logoUrl: '' })
   const { lastSyncAt, syncing, lastError, syncNow } = useGmailSync()
   const { user } = useApp()
@@ -103,7 +106,15 @@ export default function Email() {
         .select('gmail_refresh_token,gmail_connected_email').eq('employee_email', user.email).maybeSingle()
       setGmailConnected(!!acct?.gmail_refresh_token)
       setGmailConnectedEmail(acct?.gmail_connected_email || '')
+      // Check M365 connection
+      const { data: m365Acct } = await supabase.from('employee_m365_accounts')
+        .select('m365_refresh_token,m365_email').eq('employee_email', user.email).maybeSingle()
+      setM365Connected(!!m365Acct?.m365_refresh_token)
+      setM365ConnectedEmail(m365Acct?.m365_email || '')
     }
+    // Get M365 client ID for the connect button
+    const { data: m365Settings } = await supabase.from('settings').select('m365_client_id,m365_tenant_id').not('m365_client_id', 'is', null).limit(1).maybeSingle()
+    if (m365Settings?.m365_client_id) setM365ClientId(m365Settings.m365_client_id)
 
     // Each employee has their own signature now — fall back to the firm
     // default only if they haven't set a personal one yet.
@@ -411,6 +422,33 @@ export default function Email() {
               </button>
             ) : (
               <button onClick={() => showToast('Go to Settings → Integrations to add your Gmail Client ID first')} style={{ width: '100%', padding: '5px 0', borderRadius: 6, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--t3)', cursor: 'pointer', fontSize: 11 }}>
+                ⚙️ Setup in Settings
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Microsoft 365 connect */}
+        {m365Connected ? (
+          <div style={{ margin: '0 10px 10px', padding: '8px 12px', background: 'rgba(34,197,94,.08)', border: '1px solid rgba(34,197,94,.25)', borderRadius: 8, fontSize: 10, color: 'var(--ok)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>✅</span><span>Microsoft 365 connected{m365ConnectedEmail ? ` (${m365ConnectedEmail})` : ''}</span>
+          </div>
+        ) : (
+          <div style={{ margin: '0 10px 10px', padding: '10px 12px', background: 'rgba(0,120,212,.1)', borderRadius: 8, border: '1px solid rgba(0,120,212,.3)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#0078d4', marginBottom: 4 }}>📧 Connect Microsoft 365</div>
+            <div style={{ fontSize: 10, color: 'var(--t3)', marginBottom: 8, lineHeight: 1.5 }}>Link your Outlook inbox and calendar directly to the CRM.</div>
+            {m365ClientId ? (
+              <button onClick={() => {
+                const state = encodeURIComponent(JSON.stringify({ employeeEmail: user?.email, tenantId: FIRM.tenantId, origin: window.location.origin }))
+                const redirectUri = encodeURIComponent(`${window.location.origin.replace(/\/taxcasereview-CRM.*/, '')}/functions/v1/m365-oauth-callback`.replace('https://taxresolutioncrm.github.io', 'https://mpxgxfqdbquzkrvvejkh.supabase.co'))
+                const url = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${m365ClientId}&response_type=code&redirect_uri=${redirectUri}&scope=offline_access+Mail.Read+Mail.Send+Calendars.ReadWrite+User.Read&state=${state}`
+                window.open(url, '_blank')
+                showToast('Complete Microsoft sign-in in the popup window')
+              }} style={{ width: '100%', padding: '5px 0', borderRadius: 6, border: 'none', background: '#0078d4', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                🔗 Connect Microsoft 365
+              </button>
+            ) : (
+              <button onClick={() => showToast('Go to Settings → Integrations to set up Microsoft 365 first')} style={{ width: '100%', padding: '5px 0', borderRadius: 6, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--t3)', cursor: 'pointer', fontSize: 11 }}>
                 ⚙️ Setup in Settings
               </button>
             )}

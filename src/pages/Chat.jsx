@@ -319,12 +319,21 @@ export default function Chat() {
 
   useEffect(() => {
     loadMessages(); inputRef.current?.focus()
-    // Realtime subscription handles new messages — no polling needed.
-    // Keep a 60-second heartbeat only as a fallback for missed realtime events.
+    // Realtime subscription: new messages appear instantly without waiting for the poller.
+    // The channel name includes channelId so it rebuilds automatically when switching conversations.
+    const rt = supabase.channel('chat-active-' + channelId)
+    rt.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages',
+      filter: `channel=eq.${channelId}` }, () => {
+      loadMessages(true)
+    }).subscribe()
+    // 60-second heartbeat as a fallback for any missed realtime events.
     clearInterval(pollerRef.current)
     pollerRef.current = setInterval(() => loadMessages(true), 60000)
-    return () => clearInterval(pollerRef.current)
-  }, [loadMessages])
+    return () => {
+      clearInterval(pollerRef.current)
+      supabase.removeChannel(rt)
+    }
+  }, [loadMessages, channelId])
 
   useEffect(() => {
     if (!showSearch) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })

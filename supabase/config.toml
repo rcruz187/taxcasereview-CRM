@@ -101,3 +101,9 @@ verify_jwt = true
 
 [functions.linkedin-publish]
 verify_jwt = true
+
+[functions.m365-oauth-callback]
+verify_jwt = false
+
+[functions.m365-sync]
+verify_jwt = true
