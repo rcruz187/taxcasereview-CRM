@@ -2608,8 +2608,8 @@ export default function Leads() {
                 ['State Status',   l.stateStatus==='Other'?l.stateStatusOther:l.stateStatus],
                 ['State Deadline', l.stateDeadline],
               ] : []),
-              ['Tax Advisor',  l.assignedTo||<span style={{color:'var(--warn)'}}>Unassigned</span>],
-              ['Tax Associate', l.taxAssociate||'—'],
+              [label('assignedTo','Tax Advisor'),  l.assignedTo||<span style={{color:'var(--warn)'}}>Unassigned</span>],
+              [label('taxAssociate','Tax Associate'), l.taxAssociate||'—'],
               ['Tax Inv Fee',  l.taxFee?<span style={{fontWeight:700,color:'var(--ok)'}}>${l.taxFee}</span>:'Not set'],
             ].map(([label,val])=>(
               <div key={label} className="dr"><span className="dl">{label}</span><span className="dv">{val||'—'}</span></div>
