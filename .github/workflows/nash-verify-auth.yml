@@ -9,26 +9,30 @@ jobs:
       PROJECT_REF: mpxgxfqdbquzkrvvejkh
       USER_ID: 4f1f0d1a-eeec-41ef-9368-99a29cc83aee
     steps:
-      - name: Reset password and verify
+      - name: Check project health and user
         run: |
-          echo "=== Reset password ==="
-          RESULT=$(curl -s -X PUT \
+          echo "=== Project health ==="
+          curl -s "https://api.supabase.com/v1/projects/${PROJECT_REF}/health" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}"
+          echo ""
+          echo "=== Auth config ==="
+          curl -s "https://api.supabase.com/v1/projects/${PROJECT_REF}/config/auth" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print('site_url:', d.get('site_url'))
+print('external_email_enabled:', d.get('external_email_enabled'))
+print('mailer_autoconfirm:', d.get('mailer_autoconfirm'))
+print('disable_signup:', d.get('disable_signup'))
+"
+          echo "=== Delete and recreate user ==="
+          curl -s -o /dev/null -w "DELETE: %{http_code}\n" -X DELETE \
             "https://api.supabase.com/v1/projects/${PROJECT_REF}/auth/users/${USER_ID}" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}"
+          sleep 2
+          NEW=$(curl -s -X POST \
+            "https://api.supabase.com/v1/projects/${PROJECT_REF}/auth/users" \
             -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
             -H "Content-Type: application/json" \
-            -d '{"password":"Nashville2026!","email_confirm":true}')
-          echo "Result: $RESULT"
-          echo "=== Get user list ==="
-          curl -s "https://api.supabase.com/v1/projects/${PROJECT_REF}/auth/users?page=1&per_page=100" \
-            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" | \
-            python3 -c "
-import json,sys
-data=json.load(sys.stdin)
-users=data.get('users',[])
-print('Users:', len(users))
-for u in users:
-    if 'nashville' in u.get('email','').lower():
-        print('ID:', u['id'])
-        print('Updated:', u.get('updated_at'))
-        print('Identities:', len(u.get('identities',[])))
-"
+            -d '{"email":"admin@nashvilletaxsolutions.com","password":"Nashville2026!","email_confirm":true}')
+          echo "CREATE: $NEW"
