@@ -36,6 +36,12 @@ export default function Cases() {
   const [employees,   setEmployees]   = useState([])
   const [filter,      setFilter]      = useState('All')
   const [repFilter,   setRepFilter]   = useState('All')
+  const [sortCol, setSortCol] = useState('clientName')
+  const [sortDir, setSortDir] = useState('asc')
+  function toggleSort(col) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
   const [modal,       setModal]       = useState(false)
   const [editCase,    setEditCase]    = useState(null)
   const [form,        setForm]        = useState(BLANK)
@@ -122,6 +128,21 @@ export default function Cases() {
     .filter(c => repFilter === 'All' || (repFilter === 'Unassigned' ? !c.assignedTo : c.assignedTo === repFilter))
 
   const reps = employees.length > 0 ? employees.map(e => e.name) : ['Romy Cruz', 'Dana Richard', 'Yesenia Gonzalez']
+
+  const sortedCases = [...filtered].sort((a, b) => {
+    let av, bv
+    if (sortCol === 'clientName')  { av = a.clientName||''; bv = b.clientName||'' }
+    else if (sortCol === 'type')   { av = a.caseType||''; bv = b.caseType||'' }
+    else if (sortCol === 'balance'){ av = parseFloat(a.irsBalance)||0; bv = parseFloat(b.irsBalance)||0 }
+    else if (sortCol === 'resolution'){ av = a.resolutionAmount||''; bv = b.resolutionAmount||'' }
+    else if (sortCol === 'status') { av = a.status||''; bv = b.status||'' }
+    else if (sortCol === 'assigned'){ av = a.assignedTo||''; bv = b.assignedTo||'' }
+    else if (sortCol === 'para')   { av = a.taxAssociate||''; bv = b.taxAssociate||'' }
+    else if (sortCol === 'deadline'){ av = a.deadline||''; bv = b.deadline||'' }
+    else { av = a.clientName||''; bv = b.clientName||'' }
+    if (typeof av === 'number') return sortDir === 'asc' ? av - bv : bv - av
+    return sortDir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av))
+  })
 
   async function save() {
     if (!form.clientName.trim()) { showToast('Client name is required'); return }
@@ -422,14 +443,14 @@ export default function Cases() {
             <thead>
               <tr>
                 <th style={{ width: 90 }}>#</th>
-                <th>Client</th>
-                <th>Type</th>
-                <th>Balance</th>
-                <th>Resolution</th>
-                <th>Status</th>
-                <th>Associate</th>
-                <th>Para</th>
-                <th>Deadline</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('clientName')}>Client{sortCol==='clientName'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('type')}>Type{sortCol==='type'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('balance')}>Balance{sortCol==='balance'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('resolution')}>Resolution{sortCol==='resolution'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('status')}>Status{sortCol==='status'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('assigned')}>Associate{sortCol==='assigned'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('para')}>Para{sortCol==='para'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('deadline')}>Deadline{sortCol==='deadline'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
                 <th style={{ width: 40 }}></th>
               </tr>
             </thead>
@@ -448,7 +469,7 @@ export default function Cases() {
                     </td>
                   </tr>
                 )
-                : filtered.map(c => {
+                : sortedCases.map(c => {
                   const overdue = isOverdue(c.deadline)
                   const pct = savings(c.irsBalance, c.resolutionAmount)
                   return (
