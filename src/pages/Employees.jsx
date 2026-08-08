@@ -772,7 +772,7 @@ export default function Employees() {
                           {LEVEL_OPTIONS.map(opt => (
                             <div
                               key={opt.value}
-                              onClick={() => setForm(f => ({ ...f, [section.key]: opt.value }))}
+                              onClick={e => { e.stopPropagation(); setForm(f => ({ ...f, [section.key]: opt.value })) }}
                               style={{
                                 padding: '10px 12px', cursor: 'pointer', textAlign: 'center',
                                 borderRight: opt.value < 3 ? '1px solid var(--br)' : 'none',
