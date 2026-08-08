@@ -21,6 +21,94 @@ function fmtBytes(n) {
 // activate/deactivate. Gated on Romy specifically (not any Super Admin
 // anywhere) — checked here for UI purposes, and re-checked independently by
 // every RPC and edge function this page calls.
+
+
+// ── Slack History Importer ──────────────────────────────────────────────────
+// Reads a Slack workspace export (zip → channels/*.json) and bulk-inserts
+// messages into the CRM's chat_messages table for this tenant.
+function SlackImport({ tenantId, onBack, showToast }) {
+  const [importing, setImporting] = useState(false)
+  const [result, setResult]       = useState(null)
+  const [channelMap, setChannelMap] = useState('') // "slack-channel = crm-channel" per line
+  const [messages, setMessages]   = useState([])
+  const [fileNames, setFileNames] = useState([])
+
+  async function handleFiles(e) {
+    const files = Array.from(e.target.files)
+    setFileNames(files.map(f => f.name))
+    const allMsgs = []
+    for (const file of files) {
+      const channelName = file.name.replace('.json', '')
+      try {
+        const text = await file.text()
+        const rows = JSON.parse(text)
+        rows.forEach(m => { m._channel = channelName })
+        allMsgs.push(...rows)
+      } catch (_) { showToast('Could not parse ' + file.name, 'err') }
+    }
+    setMessages(allMsgs)
+  }
+
+  async function runImport() {
+    if (!messages.length) { showToast('Load Slack JSON files first', 'err'); return }
+    setImporting(true)
+    // Parse channel map
+    const map = {}
+    channelMap.split('\n').forEach(line => {
+      const [k, v] = line.split('=').map(s => s.trim())
+      if (k && v) map[k] = v
+    })
+
+    const { data, error } = await import('../lib/supabase').then(m => m.supabase)
+      .functions.invoke('slack-import', {
+        body: { tenant_id: tenantId, channel_map: Object.keys(map).length ? map : null, messages }
+      })
+    setImporting(false)
+    if (error) { showToast('Import failed: ' + error.message, 'err'); return }
+    setResult(data)
+    showToast(`✅ Imported ${data?.inserted} messages from Slack`)
+  }
+
+  return (
+    <div style={{ maxWidth: 700, margin: '0 auto', padding: 20 }}>
+      <button className="btn" onClick={onBack} style={{ marginBottom: 20 }}>← Back</button>
+      <h2 style={{ fontWeight: 800, fontSize: 20, color: 'var(--tx)', marginBottom: 6 }}>💬 Import Slack History</h2>
+      <p style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 20, lineHeight: 1.6 }}>
+        Import message history from a Slack workspace export into CRM Team Chat. In Slack: <strong>Settings → Import &amp; Export → Export → All Messages</strong>. Unzip the export, then upload the <code>.json</code> files from individual channel folders below.
+      </p>
+
+      <div className="card" style={{ padding: 20, marginBottom: 16 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>1. Upload Channel JSON Files</div>
+        <input type="file" accept=".json" multiple onChange={handleFiles}
+          style={{ fontSize: 13, color: 'var(--t2)' }} />
+        {fileNames.length > 0 && (
+          <div style={{ marginTop: 10, fontSize: 12, color: 'var(--t3)' }}>
+            {fileNames.length} file{fileNames.length !== 1 ? 's' : ''} loaded — {messages.length} messages total
+          </div>
+        )}
+      </div>
+
+      <div className="card" style={{ padding: 20, marginBottom: 16 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>2. Map Slack Channels → CRM Channels (optional)</div>
+        <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 8 }}>Leave blank to import each channel using its Slack name as the CRM channel name.</div>
+        <textarea rows={4} value={channelMap} onChange={e => setChannelMap(e.target.value)}
+          placeholder={"general = general\ntax-team = team-chat"}
+          style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--tx)', fontSize: 12, fontFamily: 'monospace', resize: 'vertical' }} />
+      </div>
+
+      {result && (
+        <div style={{ background: 'rgba(34,197,94,.08)', border: '1px solid rgba(34,197,94,.25)', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: 'var(--ok)' }}>
+          ✅ Import complete — {result.inserted} messages imported, {result.skipped} skipped (duplicates or system messages)
+        </div>
+      )}
+
+      <button className="btn pri" onClick={runImport} disabled={importing || !messages.length} style={{ padding: '10px 28px', fontSize: 14, fontWeight: 700 }}>
+        {importing ? 'Importing…' : `Import ${messages.length} Messages`}
+      </button>
+    </div>
+  )
+}
+
 export default function NewOffice() {
   const { user, showToast } = useApp()
   const allowed = PLATFORM_ADMIN_EMAILS.includes((user?.email || '').toLowerCase())
@@ -49,8 +137,9 @@ export default function NewOffice() {
   )
 
   if (view === 'form') return <NewOfficeForm onDone={backToList} onCancel={() => setView('list')} showToast={showToast} />
-  if (view === 'detail') return <OfficeDetail tenantId={selectedId} onBack={backToList} showToast={showToast} onImport={()=>setView('import')} />
+  if (view === 'detail') return <OfficeDetail tenantId={selectedId} onBack={backToList} showToast={showToast} onImport={()=>setView('import')} onSlackImport={()=>setView('slack-import')} />
   if (view === 'import') return <DataImport tenantId={selectedId} onBack={()=>setView('detail')} showToast={showToast} />
+  if (view === 'slack-import') return <SlackImport tenantId={selectedId} onBack={()=>setView('detail')} showToast={showToast} />
   return (
     <div style={{padding:'28px 32px',maxWidth:820}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
@@ -203,7 +292,7 @@ function NewOfficeForm({ onDone, onCancel, showToast }) {
 }
 
 // ── Office detail: contract/contact info, phone numbers, staff, agreements ──
-function OfficeDetail({ tenantId, onBack, showToast, onImport }) {
+function OfficeDetail({ tenantId, onBack, showToast, onImport, onSlackImport }) {
   const [detail, setDetail] = useState(null)
   const [edit, setEdit]     = useState(null) // draft patch while editing
   const [saving, setSaving] = useState(false)
@@ -310,6 +399,7 @@ function OfficeDetail({ tenantId, onBack, showToast, onImport }) {
           <div style={{display:'flex',gap:8}}>
             <button className="btn sec" onClick={startEdit}>✏️ Edit</button>
             <button className="btn sec" onClick={onImport}>📥 Import Data</button>
+            <button className="btn sec" onClick={onSlackImport}>💬 Import Slack History</button>
             {!isTCR && (t.status === 'cancelled'
               ? <button className="btn pri" onClick={()=>toggleStatus('active')}>Reactivate</button>
               : <button className="btn" style={{background:'#ef444422',color:'#ef4444',border:'1px solid #ef444455'}} onClick={()=>setConfirmDeactivate(true)}>Deactivate</button>)}

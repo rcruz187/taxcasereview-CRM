@@ -113,3 +113,6 @@ verify_jwt = false
 
 [functions.slack-send]
 verify_jwt = true
+
+[functions.slack-import]
+verify_jwt = true
