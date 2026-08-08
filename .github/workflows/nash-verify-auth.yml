@@ -10,11 +10,7 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       PROJECT_REF: mpxgxfqdbquzkrvvejkh
     steps:
-      - name: Create Nashville admin user
+      - name: Check auth config
         run: |
-          curl -s -X POST \
-            "https://api.supabase.com/v1/projects/${PROJECT_REF}/auth/users" \
-            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d '{"email":"admin@nashvilletaxsolutions.com","password":"Nashville2026!","email_confirm":true}' \
-            -w "\nHTTP:%{http_code}"
+          curl -s "https://api.supabase.com/v1/projects/${PROJECT_REF}/config/auth" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}"
