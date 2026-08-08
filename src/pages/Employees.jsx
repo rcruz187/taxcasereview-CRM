@@ -227,14 +227,25 @@ export default function Employees() {
     if (!form.name || !form.email) { if (!silent) showToast('Name and email required', 'err'); return false }
     setSaving(true)
     setSaveError('')
-    const payload = toDbPayload(form)
+    let payload = toDbPayload(form)
     let error, data
-    if (editing) {
-      ({ error } = await supabase.from('employees').update(payload).eq('id', editing))
-    } else {
-      ({ error, data } = await supabase.from('employees').insert([payload]).select().single())
-      // After first insert, switch to edit mode so subsequent tab saves use update
-      if (!error && data?.id) setEditing(data.id)
+    // Retry loop: if PostgREST rejects an unknown column, strip it and retry (same pattern as Clients.jsx)
+    for (let attempt = 0; attempt < 12; attempt++) {
+      if (editing) {
+        ;({ error } = await supabase.from('employees').update(payload).eq('id', editing))
+      } else {
+        ;({ error, data } = await supabase.from('employees').insert([payload]).select().single())
+        if (!error && data?.id) setEditing(data.id)
+      }
+      if (!error) break
+      const match = error.message?.match(/column ['"]?(\w+)['"]? (of relation .* )?does not exist/i)
+        || error.message?.match(/Could not find the '(\w+)' column/i)
+      if (match && match[1] in payload) {
+        const { [match[1]]: _, ...rest } = payload
+        payload = rest
+        continue
+      }
+      break
     }
     setSaving(false)
     if (error) { setSaveError(error.message); if (!silent) showToast(error.message, 'err'); return false }
