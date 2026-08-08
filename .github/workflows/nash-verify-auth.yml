@@ -1,36 +1,27 @@
-name: Nashville Auth Verify
+name: Nashville Auth Fix
 on:
   workflow_dispatch:
 jobs:
-  verify:
+  fix:
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       PROJECT_REF: mpxgxfqdbquzkrvvejkh
+      USER_ID: 4f1f0d1a-eeec-41ef-9368-99a29cc83aee
     steps:
-      - name: Check and fix user
+      - name: Delete and recreate user
         run: |
-          echo "=== GET USER ==="
-          curl -s "https://api.supabase.com/v1/projects/${PROJECT_REF}/auth/users/4f1f0d1a-eeec-41ef-9368-99a29cc83aee" \
-            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-print('email:', d.get('email'))
-print('updated_at:', d.get('updated_at'))
-print('identities:', len(d.get('identities',[])))
-if d.get('identities'):
-    print('identity provider_id:', d['identities'][0].get('provider_id'))
-"
-          echo ""
-          echo "=== RESET PASSWORD ==="
-          curl -s -X PUT \
-            "https://api.supabase.com/v1/projects/${PROJECT_REF}/auth/users/4f1f0d1a-eeec-41ef-9368-99a29cc83aee" \
+          echo "=== Deleting user ==="
+          DEL=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+            "https://api.supabase.com/v1/projects/${PROJECT_REF}/auth/users/${USER_ID}" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}")
+          echo "Delete HTTP: $DEL"
+          sleep 3
+          echo "=== Creating user ==="
+          CREATE=$(curl -s -X POST \
+            "https://api.supabase.com/v1/projects/${PROJECT_REF}/auth/users" \
             -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
             -H "Content-Type: application/json" \
-            -d '{"password":"Nashville2026!","email_confirm":true}' | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-print('updated email:', d.get('email'))
-print('updated_at:', d.get('updated_at'))
-print('error:', d.get('error_description', d.get('msg', 'none')))
-"
+            -d '{"email":"admin@nashvilletaxsolutions.com","password":"Nashville2026!","email_confirm":true}')
+          echo "Create response: $CREATE"
+          echo "$CREATE" | python3 -c "import json,sys; d=json.load(sys.stdin); print('New ID:', d.get('id')); print('email:', d.get('email'))" 2>/dev/null || true
