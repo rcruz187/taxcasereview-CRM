@@ -248,10 +248,12 @@ export default function Employees() {
       break
     }
     setSaving(false)
-    if (error) { setSaveError(error.message); if (!silent) showToast(error.message, 'err'); return false }
+    if (error) { setSaveError(error.message); if (!silent) showToast('Save error: ' + error.message, 'err'); return false }
     if (!silent) {
       showToast(editing ? 'Employee updated!' : 'Employee added!')
       setShowForm(false)
+    } else {
+      showToast('Auto-saved', 'ok')
     }
     load()
     return true
