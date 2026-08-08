@@ -1840,27 +1840,27 @@ function CommandCenter() {
         {/* ═══ OVERVIEW TAB ═══ */}
         {tab==='overview' && (<>
 
-          {/* Quick stats strip */}
+          {/* Platform KPIs */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:10, marginBottom:24 }}>
             {[
-              { label:'Active Cases',    value:data.kpis.activeCases,   icon:'⚖️',  color:'#f59e0b', to:'/cases' },
-              { label:'Open Tasks',      value:data.kpis.openTasks,     icon:'✅',  color:'#6366f1', to:'/tasks' },
-              { label:"Today's Demos",   value:data.kpis.todayDemos,    icon:'📅',  color:'#0ea5e9' },
-              { label:'New Leads Today', value:data.kpis.newLeads,      icon:'👤',  color:'#8b5cf6', to:'/leads' },
-              { label:'MTD Revenue',     value:`$${data.kpis.revenue.toLocaleString('en-US',{maximumFractionDigits:0})}`, icon:'💰', color:'#10b981' },
-              { label:'Active Clients',  value:data.kpis.activeClients, icon:'🏢',  color:'#ec4899', to:'/clients' },
+              { label:'Active Offices',  value:data.kpis.activeTenants,  icon:'🏢',  color:'#10b981' },
+              { label:'Total Offices',   value:data.kpis.totalTenants,   icon:'🏗️',  color:'#6366f1' },
+              { label:'Platform MRR',    value:`$${data.kpis.totalMRR.toLocaleString('en-US',{maximumFractionDigits:0})}`, icon:'📈', color:'#10b981' },
+              { label:'Total Seats',     value:data.kpis.totalSeats,     icon:'👥',  color:'#f59e0b' },
+              { label:'Total Clients',   value:data.kpis.totalClients.toLocaleString(), icon:'📋', color:'#0ea5e9' },
+              { label:'Total Leads',     value:data.kpis.totalLeads.toLocaleString(),   icon:'🎯', color:'#8b5cf6' },
             ].map(k => <KPICard key={k.label} {...k} />)}
           </div>
 
-          {/* CEO KPI Row 2 */}
+          {/* Platform KPIs Row 2 */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:10, marginBottom:28 }}>
             {[
-              { label:'Open Leads',       value:data.kpis.openLeads,      icon:'🎯', color:'#a855f7', to:'/leads' },
-              { label:'Tasks Due Today',  value:data.kpis.dueTodayTasks,  icon:'⏰', color:'#ef4444', to:'/tasks' },
-              { label:'Pending E-Signs',  value:data.kpis.pendingEsigns,  icon:'✍️', color:'#f59e0b' },
-              { label:'Active Offices',   value:data.kpis.activeTenants,  icon:'🏛️', color:'#10b981' },
-              { label:'Platform MRR',     value:`$${data.kpis.totalMRR.toLocaleString('en-US',{maximumFractionDigits:0})}`, icon:'📈', color:'#6366f1' },
-              { label:'Visitors Today',   value:'247', icon:'🌐', color:'#0ea5e9', sub:'mock — connect GA4' },
+              { label:'Storage Used',    value:fmtBytes(data.kpis.totalStorage), icon:'💾', color:'#8b5cf6' },
+              { label:'Pending E-Signs', value:data.kpis.pendingEsigns,  icon:'✍️', color:'#f59e0b' },
+              { label:'Demos Today',     value:data.kpis.todayDemos,     icon:'📅', color:'#ec4899' },
+              { label:'Visitors Today',  value:ga4Data?.users ?? 0,      icon:'🌐', color:'#0ea5e9', sub: ga4Data ? null : 'connect GA4' },
+              { label:'Clicks (GSC)',    value:gscConnected && gscData ? gscData.clicks : 0, icon:'🔍', color:'#6366f1', sub: gscConnected ? null : 'connect GSC' },
+              { label:'Impressions',     value:gscConnected && gscData ? gscData.impressions : 0, icon:'👁', color:'#0ea5e9', sub: gscConnected ? null : 'connect GSC' },
             ].map(k => <KPICard key={k.label} {...k} />)}
           </div>
 
