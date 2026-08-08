@@ -923,6 +923,13 @@ export default function Clients() {
   const [statusCategories, setStatusCategories] = useState([])
   const [filter,    setFilter]    = useState('All')
   const [clientSearch, setClientSearch] = useState('')
+  const [sortCol, setSortCol] = useState('name')
+  const [sortDir, setSortDir] = useState('asc')
+
+  function toggleSort(col) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
   const [showArchived, setShowArchived] = useState(false)
   const [confirmArchive, setConfirmArchive] = useState(null)
   const [modal,     setModal]     = useState(false)
@@ -1238,6 +1245,21 @@ export default function Clients() {
       (c.tags||'').toLowerCase().includes(_clientSearchLower) ||
       (c.ssn||'').replace(/-/g,'').includes(_clientSearchLower.replace(/-/g,''))
     ))
+
+  // Sort
+  const sortedFiltered = [...filtered].sort((a, b) => {
+    let av, bv
+    if (sortCol === 'name')         { av = a.name||''; bv = b.name||'' }
+    else if (sortCol === 'type')    { av = a.clientType||''; bv = b.clientType||'' }
+    else if (sortCol === 'balance') { av = parseFloat(a.irsBalance)||0; bv = parseFloat(b.irsBalance)||0 }
+    else if (sortCol === 'issue')   { av = a.issueType||''; bv = b.issueType||'' }
+    else if (sortCol === 'assigned'){ av = a.assignedTo||''; bv = b.assignedTo||'' }
+    else if (sortCol === 'pipeline'){ av = a.pipelineStage||''; bv = b.pipelineStage||'' }
+    else if (sortCol === 'status')  { av = a.status||''; bv = b.status||'' }
+    else                            { av = a.name||''; bv = b.name||'' }
+    if (typeof av === 'number') return sortDir === 'asc' ? av - bv : bv - av
+    return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
+  })
 
   function buildPayload(f) {
     const {
@@ -3291,7 +3313,18 @@ export default function Clients() {
         <div className="ovx">
           <table>
             <thead>
-              <tr><th>Name</th><th>Type</th><th>Phone</th><th>Email</th><th>IRS Balance</th><th>Issue</th><th>Assigned</th><th>Pipeline</th><th>Status</th><th></th></tr>
+              <tr>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('name')}>Name{sortCol==='name'?(sortDir==='asc'?' ↑':' ↓'):''  }</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('type')}>Type{sortCol==='type'?(sortDir==='asc'?' ↑':' ↓'):''  }</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('balance')}>IRS Balance{sortCol==='balance'?(sortDir==='asc'?' ↑':' ↓'):''  }</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('issue')}>Issue{sortCol==='issue'?(sortDir==='asc'?' ↑':' ↓'):''  }</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('assigned')}>Assigned{sortCol==='assigned'?(sortDir==='asc'?' ↑':' ↓'):''  }</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('pipeline')}>Pipeline{sortCol==='pipeline'?(sortDir==='asc'?' ↑':' ↓'):''  }</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('status')}>Status{sortCol==='status'?(sortDir==='asc'?' ↑':' ↓'):''  }</th>
+                <th></th>
+              </tr>
             </thead>
             <tbody>
               {filtered.length===0?(
@@ -3302,7 +3335,7 @@ export default function Clients() {
                     <div style={{fontSize:13}}>Add your first client to get started.</div>
                   </div>
                 </td></tr>
-              ):filtered.map(c=>(
+              ):sortedFiltered.map(c=>(
                 <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>openDetail(c)}>
                   <td style={{fontWeight:700,color:'var(--tx)',fontSize:13}}>{c.name}</td>
                   <td><span className="bdg bb" style={{fontSize:12,padding:'3px 9px'}}>{c.clientType||'Individual'}</span></td>

@@ -413,6 +413,13 @@ export default function Leads() {
   const [filter, setFilter] = useState('All')
   const [repFilter, setRepFilter] = useState('All')
   const [leadSearch, setLeadSearch] = useState('')
+  const [sortCol, setSortCol] = useState('name')
+  const [sortDir, setSortDir] = useState('asc')
+
+  function toggleSort(col) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
   // Tax Advisors only ever see their own leads — lock the existing rep
   // filter to their name instead of building a separate filter path.
   useEffect(() => {
@@ -1029,6 +1036,19 @@ export default function Leads() {
         (l.ssn||'').replace(/-/g,'').includes(q.replace(/-/g,''))
       )
     })
+
+  const sortedFiltered = [...filtered].sort((a, b) => {
+    let av, bv
+    if (sortCol === 'name')         { av = a.name||''; bv = b.name||'' }
+    else if (sortCol === 'type')    { av = a.clientType||''; bv = b.clientType||'' }
+    else if (sortCol === 'issue')   { av = a.issueType||''; bv = b.issueType||'' }
+    else if (sortCol === 'balance') { av = a.irsBalance||''; bv = b.irsBalance||'' }
+    else if (sortCol === 'source')  { av = a.source||''; bv = b.source||'' }
+    else if (sortCol === 'status')  { av = a.status||''; bv = b.status||'' }
+    else if (sortCol === 'assigned'){ av = a.assignedTo||''; bv = b.assignedTo||'' }
+    else                            { av = a.name||''; bv = b.name||'' }
+    return sortDir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av))
+  })
 
   async function save() {
     if (form.clientType !== 'Business' && !composeName(form.first,form.mi,form.last)) {
@@ -2970,7 +2990,17 @@ export default function Leads() {
         <div className="ovx">
           <table>
             <thead>
-              <tr><th>Name</th><th>Type</th><th>Phone</th><th>Issue</th><th>Balance</th><th>Source</th><th>Status</th><th>Assigned</th><th></th></tr>
+              <tr>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('name')}>Name{sortCol==='name'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('type')}>Type{sortCol==='type'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th>Phone</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('issue')}>Issue{sortCol==='issue'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('balance')}>Balance{sortCol==='balance'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('source')}>Source{sortCol==='source'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('status')}>Status{sortCol==='status'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>toggleSort('assigned')}>Assigned{sortCol==='assigned'?(sortDir==='asc'?' ↑':' ↓'):''}</th>
+                <th></th>
+              </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
@@ -2983,7 +3013,7 @@ export default function Leads() {
                     {!showArchived && filter === 'All' && <div style={{fontSize:13}}>Add your first lead to get started.</div>}
                   </div>
                 </td></tr>
-              ) : filtered.map(l => (
+              ) : sortedFiltered.map(l => (
                 <tr key={l.id} onClick={()=>{ setDetail(l); loadLeadNotes(l.id); navigate('/leads/'+l.id, {replace:true}) }} style={{cursor:'pointer'}}>
                   <td style={{fontWeight:700,color:'var(--tx)',fontSize:13}}>
                     {l.name}
