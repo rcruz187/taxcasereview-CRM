@@ -9,7 +9,7 @@ import { FIRM, label } from '../lib/firmBranding'
 function tf(q) { return FIRM.tenantId ? q.eq('tenant_id', FIRM.tenantId) : q }
 
 // Base access levels — these are the actual permission presets (never change these keys)
-const ACCESS_LEVELS = ['Super Admin', 'Admin', 'Manager', 'Tax Associate', 'Tax Advisor', 'View Only']
+const ACCESS_LEVELS = ['Super Admin', 'Admin', 'Manager', 'Tax Associate', 'Tax Advisor', 'Sales Rep', 'View Only']
 // Display labels for each access level — pulled from FIRM.labels or defaults
 function getRoleLabels() {
   const l = FIRM.labels || {}
@@ -19,12 +19,13 @@ function getRoleLabels() {
     'Tax Associate': l.paraRole || 'Tax Associate',
     'Tax Advisor':   l.taxAdvisorRole || 'Tax Advisor',
     'Manager':       'Manager',
+    'Sales Rep':     l.salesRepRole || 'Sales',
     'View Only':     'View Only',
   }
 }
-const ROLE_COLORS = { 'Super Admin': '#ef4444', 'Admin': '#f59e0b', 'Tax Associate': '#3b82f6', 'View Only': '#64748b', 'Tax Advisor': '#10b981', 'Manager': '#06b6d4' }
+const ROLE_COLORS = { 'Super Admin': '#ef4444', 'Admin': '#f59e0b', 'Tax Associate': '#3b82f6', 'View Only': '#64748b', 'Tax Advisor': '#10b981', 'Manager': '#06b6d4', 'Sales Rep': '#8b5cf6' }
 // Role display colors (for the role badge — role is the title, access is the permission level)
-const TITLE_COLORS = { 'Super Admin': '#ef4444', 'Associate': '#10b981', 'Para': '#0ea5e9', 'Manager': '#06b6d4', 'Staff': '#64748b' }
+const TITLE_COLORS = { 'Super Admin': '#ef4444', 'Associate': '#10b981', 'Para': '#0ea5e9', 'Manager': '#06b6d4', 'Staff': '#64748b', 'Sales': '#8b5cf6' }
 
 // perm levels: 0=No Access, 1=View Only, 2=Edit, 3=Full Admin
 const PERM_SECTIONS = [
@@ -59,6 +60,8 @@ const ROLE_PERM_DEFAULTS = {
   // scoped to "my assigned leads only" in Leads.jsx — that scoping is NOT a
   // perm level, it applies regardless of what perm_leads is set to here.
   'Tax Advisor': { perm_leads:2, perm_clients:0, perm_billing:0, perm_schedule:2, perm_documents:2, perm_irs:0, perm_comms:2, perm_reports:0, perm_hr:0, perm_settings:0 },
+  // Sales rep — leads pipeline + comms; no access to client files, billing, IRS, HR, or settings
+  'Sales Rep':   { perm_leads:2, perm_clients:0, perm_billing:0, perm_schedule:2, perm_documents:1, perm_irs:0, perm_comms:2, perm_reports:0, perm_hr:0, perm_settings:0 },
   // Sales manager — oversees Tax Advisors. Full Admin on Leads (sees every
   // rep's leads, unscoped — only 'Tax Advisor' gets the my-leads-only lock
   // in Leads.jsx) plus Reports visibility for team performance.
