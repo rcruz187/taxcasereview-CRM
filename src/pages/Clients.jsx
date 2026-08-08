@@ -1118,7 +1118,7 @@ export default function Clients() {
 
   async function load() {
     const [{ data:cl },{ data:em },{ data:cats },{ data:sts }] = await Promise.all([
-      supabase.from('clients').select('id,name,status,email,phone,city,state,"clientType","assignedTo","taxAssociate","pipelineStage","irsBalance","issueType",archived,deleted_at,"business_name",created_at').is('deleted_at',null).order('name',{ascending:true}),
+      supabase.from('clients').select('id,name,status,email,phone,city,state,"clientType","assignedTo","taxAssociate","pipelineStage","irsBalance","issueType","spouseName",tags,ssn,archived,deleted_at,"business_name",created_at').is('deleted_at',null).order('name',{ascending:true}),
       supabase.from('employees').select('id,name,avatar_url,email'),
       supabase.from('workflow_status_categories').select('*').order('sort_order'),
       supabase.from('workflow_statuses').select('*').order('sort_order'),
@@ -1231,8 +1231,12 @@ export default function Clients() {
       (c.email||'').toLowerCase().includes(_clientSearchLower) ||
       (c.phone||'').replace(/\D/g,'').includes(_clientSearchLower.replace(/\D/g,'')) ||
       (c.assignedTo||'').toLowerCase().includes(_clientSearchLower) ||
+      (c.taxAssociate||'').toLowerCase().includes(_clientSearchLower) ||
       (c.city||'').toLowerCase().includes(_clientSearchLower) ||
-      (c.business_name||'').toLowerCase().includes(_clientSearchLower)
+      (c.business_name||'').toLowerCase().includes(_clientSearchLower) ||
+      (c.spouseName||'').toLowerCase().includes(_clientSearchLower) ||
+      (c.tags||'').toLowerCase().includes(_clientSearchLower) ||
+      (c.ssn||'').replace(/-/g,'').includes(_clientSearchLower.replace(/-/g,''))
     ))
 
   function buildPayload(f) {
@@ -1284,7 +1288,7 @@ export default function Clients() {
     await logActivity(supabase,{employeeName:actorC,action:'client_created',category:'client',description:`Added client: ${form.name}`,entityName:form.name}).catch(()=>{})
     setModal(false); setForm(BLANK)
     // Reload then navigate straight into the new client's detail
-    const { data: allClients } = await supabase.from('clients').select('id,name,status,email,phone,city,state,"clientType","assignedTo","taxAssociate","pipelineStage","irsBalance","issueType",archived,deleted_at,"business_name",created_at').is('deleted_at',null).order('name', { ascending: true })
+    const { data: allClients } = await supabase.from('clients').select('id,name,status,email,phone,city,state,"clientType","assignedTo","taxAssociate","pipelineStage","irsBalance","issueType","spouseName",tags,ssn,archived,deleted_at,"business_name",created_at').is('deleted_at',null).order('name', { ascending: true })
     if (allClients) setClients(allClients)
     const newest = allClients?.find(c => c.name === form.name)
     if (newest) { setDetail(newest); loadRelated(newest.name); navigate('/clients/' + newest.id, { replace: true }) }

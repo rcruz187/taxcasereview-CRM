@@ -412,6 +412,7 @@ export default function Leads() {
   const [leads, setLeads]   = useState([])
   const [filter, setFilter] = useState('All')
   const [repFilter, setRepFilter] = useState('All')
+  const [leadSearch, setLeadSearch] = useState('')
   // Tax Advisors only ever see their own leads — lock the existing rep
   // filter to their name instead of building a separate filter path.
   useEffect(() => {
@@ -1013,6 +1014,21 @@ export default function Leads() {
     .filter(l => filter === 'Converted to Client' || l.status !== 'Converted to Client')
     .filter(l => filter === 'All' || l.status === filter)
     .filter(l => repFilter === 'All' || (repFilter === 'Unassigned' ? !l.assignedTo : l.assignedTo === repFilter))
+    .filter(l => {
+      if (!leadSearch.trim()) return true
+      const q = leadSearch.toLowerCase()
+      return (
+        (l.name||'').toLowerCase().includes(q) ||
+        (l.email||'').toLowerCase().includes(q) ||
+        (l.phone||'').replace(/\D/g,'').includes(q.replace(/\D/g,'')) ||
+        (l.business_name||'').toLowerCase().includes(q) ||
+        (l.spouseName||'').toLowerCase().includes(q) ||
+        (l.city||'').toLowerCase().includes(q) ||
+        (l.assignedTo||'').toLowerCase().includes(q) ||
+        (l.taxAssociate||'').toLowerCase().includes(q) ||
+        (l.ssn||'').replace(/-/g,'').includes(q.replace(/-/g,''))
+      )
+    })
 
   async function save() {
     if (form.clientType !== 'Business' && !composeName(form.first,form.mi,form.last)) {
@@ -2920,6 +2936,15 @@ export default function Leads() {
         )
       })()}
 
+      <div style={{marginBottom:8}}>
+        <input
+          type="search"
+          placeholder="Search leads by name, spouse, phone, email, city…"
+          value={leadSearch}
+          onChange={e=>setLeadSearch(e.target.value)}
+          style={{width:'100%',maxWidth:380,padding:'6px 12px',borderRadius:6,border:'1px solid var(--br)',background:'var(--bg2)',color:'var(--tx)',fontSize:13,outline:'none'}}
+        />
+      </div>
       <div className="pipeline-chips" style={{marginBottom:10,display:'flex',flexWrap:'wrap',gap:4,alignItems:'center'}}>
         {['All',...STATUSES.slice(0,8)].map(s => (
           <span key={s} className={`chip${filter===s?' on':''}`} onClick={()=>setFilter(s)}>{s}</span>
