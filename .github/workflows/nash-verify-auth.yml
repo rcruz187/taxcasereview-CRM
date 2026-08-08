@@ -10,16 +10,20 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       PROJECT_REF: mpxgxfqdbquzkrvvejkh
     steps:
-      - name: Restart auth service
+      - name: Delete user via Admin API
         run: |
-          echo '=== Restarting GoTrue auth service ==='
+          echo '=== DELETE ==='
+          curl -s -X DELETE \
+            "https://api.supabase.com/v1/projects/${PROJECT_REF}/auth/users/4f1f0d1a-eeec-41ef-9368-99a29cc83aee" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            -w "HTTP:%{http_code}"
+          sleep 3
+      - name: Create fresh user via Admin API
+        run: |
+          echo '=== CREATE ==='
           curl -s -X POST \
-            "https://api.supabase.com/v1/projects/${PROJECT_REF}/services/restart" \
+            "https://api.supabase.com/v1/projects/${PROJECT_REF}/auth/users" \
             -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
             -H "Content-Type: application/json" \
-            -d '{"service":"gotrue"}'
-          echo ''
-          echo '=== Also try general restart ==='
-          curl -s -X POST \
-            "https://api.supabase.com/v1/projects/${PROJECT_REF}/restart" \
-            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}"
+            -d '{"email":"admin@nashvilletaxsolutions.com","password":"Nashville2026!","email_confirm":true}' \
+            -w "\nHTTP:%{http_code}"
