@@ -85,7 +85,7 @@ const EMP_DOC_LABELS = ['W-4', 'I-9', 'Direct Deposit', 'SSN Card', 'Driver Lice
 // Map camelCase form state → snake_case DB columns
 function toDbPayload(form) {
   const { hourlyRate, payType, paymentMethod, hireDate, emergencyContact, emergencyPhone,
-          filingStatus, sorShortId, sorUsername, employeeId,
+          filingStatus, sorShortId, sorUsername, employeeId, portalPin,
           pto_balance, sick_balance, vacation_balance, ...rest } = form
   // Postgres numeric columns reject '' outright (the error this fixes:
   // "invalid input syntax for type numeric: \"\""). An employee with no
