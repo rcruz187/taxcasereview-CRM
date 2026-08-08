@@ -33,12 +33,19 @@ if not os.path.exists(dist_dir):
 current_assets = set(f"assets/{f}" for f in os.listdir(dist_dir))
 print(f"Current build has {len(current_assets)} assets")
 
+# Manually-placed assets that must NEVER be pruned (not produced by Vite build)
+KEEP_ALWAYS = {
+    "assets/taxrescrm-logo.png",  # Admin Portal sidebar logo
+    "assets/favicon.png",          # Browser tab favicon (also in root)
+}
+
 # Get gh-pages tree
 tree = gh(f"https://api.github.com/repos/{REPO}/git/trees/gh-pages?recursive=1")
 stale = [(f["path"], f["sha"]) for f in tree["tree"]
          if f["path"].startswith("assets/")
          and f["type"] == "blob"
-         and f["path"] not in current_assets]
+         and f["path"] not in current_assets
+         and f["path"] not in KEEP_ALWAYS]
 
 if not stale:
     print("✅ No stale assets — gh-pages is clean")
