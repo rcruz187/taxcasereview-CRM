@@ -1545,7 +1545,7 @@ export default function Leads() {
       irsBalance: l.irsBalance, stateBalance: l.stateBalance, issueType: l.issueType, irsOrState: l.irsOrState,
       irsStatus: l.irsStatus, irsStatusOther: l.irsStatusOther, irsDeadline: l.irsDeadline || null,
       stateStatus: l.stateStatus, stateStatusOther: l.stateStatusOther, stateDeadline: l.stateDeadline || null,
-      spouseDob: l.spouseDob || null,
+    
       filingRequirements: l.filingRequirements,
       taxYears: taxYearsStr,
       services: l.services || null,

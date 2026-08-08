@@ -3,7 +3,7 @@ import { formatMoneyInput, parseMoney } from '../lib/money'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
-import { FIRM } from '../lib/firmBranding'
+import { FIRM, label } from '../lib/firmBranding'
 
 // Scope queries to current tenant when FIRM.tenantId is available (platform admin sessions)
 function tf(q) { return FIRM.tenantId ? q.eq('tenant_id', FIRM.tenantId) : q }
@@ -25,8 +25,6 @@ function getRoleLabels() {
 const ROLE_COLORS = { 'Super Admin': '#ef4444', 'Admin': '#f59e0b', 'Tax Associate': '#3b82f6', 'View Only': '#64748b', 'Tax Advisor': '#10b981', 'Manager': '#06b6d4' }
 // Role display colors (for the role badge — role is the title, access is the permission level)
 const TITLE_COLORS = { 'Super Admin': '#ef4444', 'Associate': '#10b981', 'Para': '#0ea5e9', 'Manager': '#06b6d4', 'Staff': '#64748b' }
-
-import { FIRM, label } from '../lib/firmBranding'
 
 // perm levels: 0=No Access, 1=View Only, 2=Edit, 3=Full Admin
 const PERM_SECTIONS = [
