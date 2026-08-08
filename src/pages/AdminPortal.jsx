@@ -1546,12 +1546,12 @@ function CommandCenter() {
           indexedPages: 0,
           topQueries: [],
         },
-        // Goals mock (live when goals table exists)
+        // Goals — real data where available
         goals: [
-          { label:'Monthly Demos',    current: Number(stats.today_demos||0), target:50,  unit:'demos',   color:'#6366f1' },
-          { label:'Organic Visitors', current: 0, target:5000, unit:'visitors', color:'#0ea5e9' },
-          { label:'MRR',              current: totalMRR||0, target:5000, unit:'$', color:'#10b981' },
-          { label:'Customers',        current: activeTenants.length, target:12, unit:'firms', color:'#f59e0b' },
+          { label:'Monthly Demos',    current: Number(stats.today_demos||0), target:50,  unit:'demos',   color:'#6366f1', note:'demos today' },
+          { label:'Organic Visitors', current: ga4Data?.users ?? 0,          target:5000, unit:'visitors', color:'#0ea5e9', note: ga4Data ? null : 'connect GA4' },
+          { label:'Platform MRR',     current: totalMRR||0,                  target:5000, unit:'$',       color:'#10b981' },
+          { label:'Signed Offices',   current: activeTenants.length,         target:12,   unit:'firms',   color:'#f59e0b' },
         ],
         // Sales pipeline — real prospect data
         sales: (()=>{
@@ -2180,12 +2180,12 @@ function CommandCenter() {
         {tab==='crm' && (<>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:24 }}>
             {[
-              { label:'Active Clients',      value:data.kpis.activeClients, icon:'🏢', color:'#10b981', to:'/clients' },
-              { label:'Open Cases',          value:data.kpis.activeCases,   icon:'⚖️', color:'#f59e0b', to:'/cases' },
-              { label:'Open Tasks',          value:data.kpis.openTasks,     icon:'✅', color:'#6366f1', to:'/tasks' },
-              { label:'Pending E-Signatures',value:data.kpis.pendingEsigns, icon:'✍️', color:'#8b5cf6' },
-              { label:'New Leads',           value:data.kpis.openLeads,     icon:'👤', color:'#a855f7', to:'/leads' },
-              { label:'Tasks Due Today',     value:data.kpis.dueTodayTasks, icon:'⏰', color:'#ef4444', to:'/tasks' },
+              { label:'Total Clients (All Offices)',  value:data.kpis.totalClients.toLocaleString(), icon:'🏢', color:'#10b981' },
+              { label:'Total Leads (All Offices)',    value:data.kpis.totalLeads.toLocaleString(),   icon:'👤', color:'#a855f7' },
+              { label:'Total Seats (All Offices)',    value:data.kpis.totalSeats,                    icon:'👥', color:'#6366f1' },
+              { label:'Pending E-Signs',              value:data.kpis.pendingEsigns,                 icon:'✍️', color:'#8b5cf6' },
+              { label:'Demos Today',                  value:data.kpis.todayDemos,                    icon:'📅', color:'#0ea5e9' },
+              { label:'Storage Used',                 value:fmtBytes(data.kpis.totalStorage),        icon:'💾', color:'#f59e0b' },
             ].map(k => <KPICard key={k.label} {...k} />)}
           </div>
 
@@ -2266,18 +2266,28 @@ function CommandCenter() {
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18, marginBottom:18 }}>
             <div style={CC.card({padding:'22px 24px'})}>
               <div style={CC.sectionLabel}>Service status</div>
-              {data.systemStatus.map((s,i) => (
-                <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
-                  padding:'11px 0', borderBottom: i<data.systemStatus.length-1?'1px solid rgba(99,102,241,.1)':'none' }}>
-                  <div style={{ fontSize:13, color:'#e2e8f0' }}>{s.label}</div>
-                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                    <StatusDot ok={s.ok} />
-                    <span style={{ fontSize:11, fontWeight:600, color: s.ok===null?'#475569':s.ok?'#10b981':'#ef4444' }}>
-                      {s.ok===null?'Not connected':s.ok?'Operational':'Down'}
-                    </span>
+              {(()=>{
+                const checks = [
+                  { label:'Supabase DB',       ok: sysStatus?.dbOk ?? null },
+                  { label:'Email (Stalwart)',   ok: sysStatus?.mailOk ?? null },
+                  { label:'taxrescrm.net',      ok: sysStatus?.netOk ?? null },
+                  { label:'taxrescrm.app',      ok: sysStatus?.appOk ?? null },
+                  { label:'Search Console',     ok: gscConnected ? true : null },
+                  { label:'Bing Webmaster',     ok: bingConnected ? true : null },
+                ]
+                return checks.map((s,i)=>(
+                  <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                    padding:'11px 0', borderBottom: i<checks.length-1?'1px solid rgba(99,102,241,.1)':'none' }}>
+                    <div style={{ fontSize:13, color:'#e2e8f0' }}>{s.label}</div>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <StatusDot ok={s.ok} />
+                      <span style={{ fontSize:11, fontWeight:600, color: s.ok===null?'#475569':s.ok?'#10b981':'#ef4444' }}>
+                        {s.ok===null ? (sysStatus===null?'Checking…':'Not connected') : s.ok?'Operational':'Down'}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              })()}
             </div>
 
             <div style={CC.card({padding:'22px 24px'})}>
@@ -2294,7 +2304,12 @@ function CommandCenter() {
                     <div style={{ fontSize:13, color:'#e2e8f0', fontWeight:600 }}>{api.label}</div>
                     <div style={{ fontSize:10, color:api.color, fontWeight:600, textTransform:'uppercase', marginTop:2 }}>{api.status}</div>
                   </div>
-                  <button style={{ ...S.btn('ghost'), fontSize:11, padding:'5px 14px' }}>Connect</button>
+                  <button onClick={()=>{
+                    if(api.key==='gsc') handleGSCConnect()
+                    else if(api.key==='ga4') alert('GA4: Add your Measurement ID in Settings')
+                    else if(api.key==='bing') alert('Bing: Send your API key to connect')
+                    else if(api.key==='clarity') alert('Clarity: Add your Project ID in Settings')
+                  }} style={{ ...S.btn('ghost'), fontSize:11, padding:'5px 14px' }}>Connect</button>
                 </div>
               ))}
               <div style={{ fontSize:11, color:'#475569', marginTop:14 }}>
