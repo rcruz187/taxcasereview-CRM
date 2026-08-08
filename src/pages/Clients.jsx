@@ -2719,8 +2719,8 @@ export default function Clients() {
                   <DR label="State Deadline" val={c.stateDeadline}/>
                 </>
               )}
-              <DR label="Tax Advisor" val={c.assignedTo}/>
-              <DR label="Tax Associate" val={c.taxAssociate}/>
+              <DR label="Associate" val={c.assignedTo}/>
+              <DR label="Para" val={c.taxAssociate}/>
               <DR label="Client Since" val={c.clientSince}/>
             </div>
 
@@ -3575,13 +3575,13 @@ function ClientFormModal({form,fld,reps,saving,onSave,onClose,title}) {
               <option>Active</option><option>Inactive</option><option>Prospect</option>
             </select>
           </div>
-          <div className="field"><label>Tax Advisor</label>
+          <div className="field"><label>Associate</label>
             <select value={form.assignedTo||''} onChange={e=>fld('assignedTo',e.target.value)}>
               <option value="">Unassigned</option>{reps.map(r=><option key={r}>{r}</option>)}
             </select>
           </div>
           {/* Named associate overrides the round-robin pick on workflow steps. */}
-          <div className="field"><label>Tax Associate</label>
+          <div className="field"><label>Para</label>
             <select value={form.taxAssociate||''} onChange={e=>fld('taxAssociate',e.target.value)}>
               <option value="">Auto (round-robin)</option>{reps.map(r=><option key={r}>{r}</option>)}
             </select>
