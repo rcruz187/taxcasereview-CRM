@@ -1103,7 +1103,7 @@ export default function Clients() {
     if (!urlId || detail) return
     let cancelled = false
     supabase.from('clients').select('*').eq('id', urlId).single().then(({ data }) => {
-      if (!cancelled && data) openDetail(data, { preserveTab: true })
+      if (!cancelled && data) openDetail(data, { preserveTab: true, full: true })
     })
     return () => { cancelled = true }
   }, [urlId])
@@ -1802,6 +1802,12 @@ export default function Clients() {
     loadRelated(c.name)
     const qs = opts.preserveTab ? searchParams.toString() : ''
     navigate(`/clients/${c.id}${qs ? `?${qs}` : ''}`, { replace: true })
+    // If opened from the list (narrow columns), upgrade to full row in background
+    if (!opts.full) {
+      supabase.from('clients').select('*').eq('id', c.id).single().then(({ data }) => {
+        if (data) setDetail(data)
+      })
+    }
   }
 
   const reps=employees.length>0?employees.map(e=>e.name):['Romy Cruz','Dana Richard','Yesenia Gonzalez']
