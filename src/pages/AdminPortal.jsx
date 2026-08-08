@@ -1632,7 +1632,17 @@ function CommandCenter() {
     } else {
       fetchGSC()
     }
+    fetchBing()
   }, [])
+
+  async function fetchBing() {
+    try {
+      const { data: bing, error } = await supabase.functions.invoke('bing-data', { body: {} })
+      if (error) throw error
+      if (bing && !bing.error) { setBingData(bing); setBingConnected(true) }
+      else { setBingConnected(false) }
+    } catch(e) { console.error('Bing fetch:', e); setBingConnected(false) }
+  }
 
   async function fetchGSC() {
     setGscLoading(true)
