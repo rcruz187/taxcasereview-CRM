@@ -79,7 +79,8 @@ style.textContent = `@keyframes spin { to { transform: rotate(360deg) } }`
 document.head.appendChild(style)
 
 function RequireAuth({ children }) {
-  const { user } = useApp()
+  const { user, checking } = useApp()
+  if (checking) return null
   if (!user) return <Navigate to="/login" replace />
   return children
 }
