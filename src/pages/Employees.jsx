@@ -8,10 +8,25 @@ import { FIRM } from '../lib/firmBranding'
 // Scope queries to current tenant when FIRM.tenantId is available (platform admin sessions)
 function tf(q) { return FIRM.tenantId ? q.eq('tenant_id', FIRM.tenantId) : q }
 
-const ROLES = ['Super Admin', 'Admin', 'Manager', 'Tax Associate', 'Tax Advisor', 'View Only']
+// Base access levels — these are the actual permission presets (never change these keys)
+const ACCESS_LEVELS = ['Super Admin', 'Admin', 'Manager', 'Tax Associate', 'Tax Advisor', 'View Only']
+// Display labels for each access level — pulled from FIRM.labels or defaults
+function getRoleLabels() {
+  const l = FIRM.labels || {}
+  return {
+    'Super Admin':   'Super Admin',
+    'Admin':         l.associateRole || 'Admin',
+    'Tax Associate': l.paraRole || 'Tax Associate',
+    'Tax Advisor':   l.taxAdvisorRole || 'Tax Advisor',
+    'Manager':       'Manager',
+    'View Only':     'View Only',
+  }
+}
 const ROLE_COLORS = { 'Super Admin': '#ef4444', 'Admin': '#f59e0b', 'Tax Associate': '#3b82f6', 'View Only': '#64748b', 'Tax Advisor': '#10b981', 'Manager': '#06b6d4' }
 // Role display colors (for the role badge — role is the title, access is the permission level)
 const TITLE_COLORS = { 'Super Admin': '#ef4444', 'Associate': '#10b981', 'Para': '#0ea5e9', 'Manager': '#06b6d4', 'Staff': '#64748b' }
+
+import { FIRM, label } from '../lib/firmBranding'
 
 // perm levels: 0=No Access, 1=View Only, 2=Edit, 3=Full Admin
 const PERM_SECTIONS = [
@@ -616,18 +631,22 @@ export default function Employees() {
                   <div className="field">
                     <label>Role / Access Level</label>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
-                      {ROLES.map(r => (
-                        <button key={r} onClick={() => applyRoleDefaults(r)} style={{
-                          padding: '8px 16px', borderRadius: 8, cursor: 'pointer',
-                          border: '2px solid ' + (form.access === r ? ROLE_COLORS[r] : 'var(--br)'),
-                          background: form.access === r ? ROLE_COLORS[r] + '22' : 'var(--s2)',
-                          color: form.access === r ? ROLE_COLORS[r] : 'var(--t2)',
-                          fontWeight: form.access === r ? 700 : 400,
-                          fontSize: 13, transition: 'all .15s'
-                        }}>
-                          {r}
-                        </button>
-                      ))}
+                      {ACCESS_LEVELS.map(r => {
+                        const roleLabels = getRoleLabels()
+                        const displayLabel = roleLabels[r] || r
+                        return (
+                          <button key={r} onClick={() => applyRoleDefaults(r)} style={{
+                            padding: '8px 16px', borderRadius: 8, cursor: 'pointer',
+                            border: '2px solid ' + (form.access === r ? ROLE_COLORS[r] : 'var(--br)'),
+                            background: form.access === r ? ROLE_COLORS[r] + '22' : 'var(--s2)',
+                            color: form.access === r ? ROLE_COLORS[r] : 'var(--t2)',
+                            fontWeight: form.access === r ? 700 : 400,
+                            fontSize: 13, transition: 'all .15s'
+                          }}>
+                            {displayLabel}
+                          </button>
+                        )
+                      })}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 6 }}>
                       Selecting a role applies default permissions — you can customize them in the Permissions tab.
