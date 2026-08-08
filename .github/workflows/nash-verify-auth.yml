@@ -3,20 +3,23 @@ on:
   push:
     paths:
       - '.github/workflows/nash-verify-auth.yml'
+permissions:
+  issues: write
 jobs:
   fix:
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       PROJECT_REF: mpxgxfqdbquzkrvvejkh
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Check auth config and save
+      - name: Get auth config and post to issue
         run: |
-          mkdir -p out
-          curl -s "https://api.supabase.com/v1/projects/${PROJECT_REF}/config/auth" \
-            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" > out/config.json
-          cat out/config.json
-      - uses: actions/upload-artifact@v4
-        with:
-          name: auth-config
-          path: out/
+          CONFIG=$(curl -s "https://api.supabase.com/v1/projects/${PROJECT_REF}/config/auth" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" | \
+            python3 -c "import json,sys; d=json.load(sys.stdin); print(json.dumps({k:d[k] for k in ['disable_signup','mailer_autoconfirm','external_email_enabled','smtp_host','rate_limit_email_sent','smtp_admin_email'] if k in d}))") 
+          curl -s -X POST \
+            "https://api.github.com/repos/taxresolutioncrm/taxcasereview-CRM/issues" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"title\":\"auth-config-result\",\"body\":\"${CONFIG}\"}"
