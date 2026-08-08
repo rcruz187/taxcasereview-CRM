@@ -2107,7 +2107,7 @@ function CommandCenter() {
           <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24 }}>
             {[
               { label:'Win Rate',      value:`${data.sales.winRate}%`,                                              icon:'🏆', color:'#10b981' },
-              { label:'Sales Cycle',   value:`${data.sales.salesCycle}d`,                                           icon:'⏱',  color:'#6366f1', sub:'avg days to close' },
+              { label:'Active Prospects', value: data.sales.prospects.filter(p=>!['Won','Lost'].includes(p.stage)).length, icon:'🎯', color:'#6366f1' },
               { label:'Pipeline Value',value:`$${(data.sales.pipeline).toLocaleString('en-US',{maximumFractionDigits:0})}`, icon:'💼', color:'#f59e0b' },
               { label:'Platform MRR',  value:`$${data.kpis.totalMRR.toLocaleString('en-US',{maximumFractionDigits:0})}`,  icon:'📈', color:'#0ea5e9' },
             ].map(k => <KPICard key={k.label} {...k} />)}
@@ -2134,6 +2134,37 @@ function CommandCenter() {
                 <div key={i} style={{ flex:1, textAlign:'center', fontSize:9, color:'#475569', fontWeight:600, textTransform:'uppercase', letterSpacing:'.04em', lineHeight:1.2 }}>{s.label}</div>
               ))}
             </div>
+          </div>
+
+          {/* Prospect Pipeline Table */}
+          <div style={CC.card({padding:'22px 24px', marginBottom:18})}>
+            <div style={CC.sectionLabel}>Prospect Pipeline</div>
+            {data.sales.prospects.length === 0
+              ? <div style={{ fontSize:13, color:'#475569' }}>No prospects yet — add your first one.</div>
+              : <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+                  <thead>
+                    <tr>{['Firm','Contact','Stage','Seats','MRR Potential','Notes'].map(h=>(
+                      <th key={h} style={{ textAlign:'left', padding:'6px 10px', fontSize:10, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.05em', borderBottom:'1px solid rgba(99,102,241,.15)' }}>{h}</th>
+                    ))}</tr>
+                  </thead>
+                  <tbody>
+                    {data.sales.prospects.map((p,i)=>(
+                      <tr key={p.id} style={{ borderBottom:'1px solid rgba(99,102,241,.08)' }}>
+                        <td style={{ padding:'8px 10px', color:'#e2e8f0', fontWeight:600 }}>{p.firm_name}</td>
+                        <td style={{ padding:'8px 10px', color:'#94a3b8' }}>{p.contact_name||'—'}</td>
+                        <td style={{ padding:'8px 10px' }}>
+                          <span style={{ background: p.stage==='Won'?'rgba(16,185,129,.15)':p.stage==='Lost'?'rgba(239,68,68,.15)':'rgba(99,102,241,.15)',
+                            color: p.stage==='Won'?'#10b981':p.stage==='Lost'?'#ef4444':'#818cf8',
+                            padding:'2px 8px', borderRadius:4, fontSize:11, fontWeight:700 }}>{p.stage}</span>
+                        </td>
+                        <td style={{ padding:'8px 10px', color:'#94a3b8' }}>{p.seats||'—'}</td>
+                        <td style={{ padding:'8px 10px', color:'#10b981', fontWeight:700 }}>{p.mrr_potential ? `$${Number(p.mrr_potential).toLocaleString()}/mo` : '—'}</td>
+                        <td style={{ padding:'8px 10px', color:'#475569', fontSize:11 }}>{p.notes ? p.notes.slice(0,60)+(p.notes.length>60?'…':'') : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+            }
           </div>
 
           <div style={{ ...CC.card(), padding:'20px 24px', background:'rgba(16,185,129,.04)', border:'1px solid rgba(16,185,129,.15)' }}>
