@@ -86,7 +86,8 @@ const BLANK = {
   filingRequirements:[],
   irsStatus:'', irsStatusOther:'', irsDeadline:'',
   stateStatus:'', stateStatusOther:'', stateDeadline:'',
-  taxYearsCustom:'', notes:'', assignedTo:'', status:'New Lead', taxFee:'', taxFeeOverride:''
+  taxYearsCustom:'', notes:'', assignedTo:'', status:'New Lead', taxFee:'', taxFeeOverride:'',
+  services:[], salesRep:'', contractFee:'', trade1Amount:'', trade1Date:'', trade2Amount:'', trade2Date:'', trade3Amount:'', trade3Date:''
 }
 
 const IRS_STATUS_OPTIONS = ['ACS','Notice Status','Queue for ACS','Currently Not Collectible','Installment Agreement','Garnishment','Levy Issued','Levied','Lien Filed','Appeals','Litigation','Released','Other']
@@ -1024,7 +1025,7 @@ export default function Leads() {
     setSaving(true)
     const actor = resolveActorName(user, employees)
     const beforeEdit = modal === 'edit' ? leads.find(l=>l.id===form.id) : null
-    let payload = { ...form, taxYears: JSON.stringify(form.taxYears), filingRequirements: JSON.stringify(form.filingRequirements||[]) }
+    let payload = { ...form, taxYears: JSON.stringify(form.taxYears), filingRequirements: JSON.stringify(form.filingRequirements||[]), services: JSON.stringify(form.services||[]) }
     // Empty-string values blow up non-text columns (date, numeric) with
     // "invalid input syntax" — Postgres wants null for "no value", not ''.
     Object.keys(payload).forEach(k => { if (payload[k] === '') payload[k] = null })
@@ -1511,6 +1512,12 @@ export default function Leads() {
       spouseDob: l.spouseDob || null,
       filingRequirements: l.filingRequirements,
       taxYears: taxYearsStr,
+      services: l.services || null,
+      salesRep: l.salesRep || null,
+      contractFee: l.contractFee || null,
+      trade1Amount: l.trade1Amount || null, trade1Date: l.trade1Date || null,
+      trade2Amount: l.trade2Amount || null, trade2Date: l.trade2Date || null,
+      trade3Amount: l.trade3Amount || null, trade3Date: l.trade3Date || null,
       notes: l.notes, status: 'Active',
       clientSince: new Date().toISOString().slice(0,10),
       created_at: new Date().toISOString()
@@ -1880,6 +1887,54 @@ export default function Leads() {
               </div>
             </div>
             <div className="field"><label>Notes</label><textarea value={form.notes} onChange={e=>fld('notes',e.target.value)}/></div>
+
+            {/* ── Sales Contract ─────────────────────────────────────── */}
+            <div style={{background:'var(--s2)',border:'1px solid var(--br)',borderRadius:8,padding:'14px 16px',marginTop:4}}>
+              <div style={{fontSize:12,fontWeight:700,color:'var(--t2)',letterSpacing:.5,marginBottom:10,textTransform:'uppercase'}}>📋 Service Agreement</div>
+              <div style={{fontSize:12,color:'var(--t3)',marginBottom:10}}>Services selected for this client</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:'6px 20px',marginBottom:14}}>
+                {RESOLUTION_SERVICES.map(s=>(
+                  <label key={s.key} style={{display:'inline-flex',alignItems:'flex-start',gap:6,fontSize:12.5,cursor:'pointer',width:'calc(50% - 10px)'}}>
+                    <input type="checkbox" style={{width:'auto',marginTop:2,flexShrink:0}}
+                      checked={(form.services||[]).includes(s.key)}
+                      onChange={()=>fld('services',(form.services||[]).includes(s.key)
+                        ? (form.services||[]).filter(x=>x!==s.key)
+                        : [...(form.services||[]),s.key])}/>
+                    {s.label}
+                  </label>
+                ))}
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
+                <div className="field" style={{margin:0}}>
+                  <label>Sales Rep</label>
+                  <select value={form.salesRep||''} onChange={e=>fld('salesRep',e.target.value)}>
+                    <option value="">— Select —</option>
+                    {employees.map(e=><option key={e.name}>{e.name}</option>)}
+                  </select>
+                </div>
+                <div className="field" style={{margin:0}}>
+                  <label>Total Contract Fee ($)</label>
+                  <input type="number" value={form.contractFee||''} onChange={e=>fld('contractFee',e.target.value)} placeholder="e.g. 3950"/>
+                </div>
+              </div>
+              <div style={{fontSize:12,fontWeight:600,color:'var(--t2)',marginBottom:8}}>Payment Schedule</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:6}}>
+                <div className="field" style={{margin:0}}><label>1st Trade Amount</label><input type="number" value={form.trade1Amount||''} onChange={e=>fld('trade1Amount',e.target.value)} placeholder="e.g. 1000"/></div>
+                <div className="field" style={{margin:0}}><label>1st Trade Date</label><input type="date" value={form.trade1Date||''} onChange={e=>fld('trade1Date',e.target.value)}/></div>
+                <div className="field" style={{margin:0}}><label>&nbsp;</label></div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:6}}>
+                <div className="field" style={{margin:0}}><label>2nd Trade Amount</label><input type="number" value={form.trade2Amount||''} onChange={e=>fld('trade2Amount',e.target.value)} placeholder="e.g. 1000"/></div>
+                <div className="field" style={{margin:0}}><label>2nd Trade Date</label><input type="date" value={form.trade2Date||''} onChange={e=>fld('trade2Date',e.target.value)}/></div>
+                <div className="field" style={{margin:0}}><label>&nbsp;</label></div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+                <div className="field" style={{margin:0}}><label>3rd Trade Amount</label><input type="number" value={form.trade3Amount||''} onChange={e=>fld('trade3Amount',e.target.value)} placeholder="e.g. 1950"/></div>
+                <div className="field" style={{margin:0}}><label>3rd Trade Date</label><input type="date" value={form.trade3Date||''} onChange={e=>fld('trade3Date',e.target.value)}/></div>
+                <div className="field" style={{margin:0}}><label>&nbsp;</label></div>
+              </div>
+            </div>
+
             <div className="fg2">
               <div className="field"><label>Tax Advisor</label>
                 <select value={form.assignedTo} onChange={e=>fld('assignedTo',e.target.value)}>
@@ -2007,7 +2062,8 @@ export default function Leads() {
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,flexWrap:'wrap'}}>
           <button className="btn" style={{padding:'8px 16px',fontSize:13,fontWeight:600}} onClick={()=>{ setDetail(null); navigate('/leads',{replace:true}); document.querySelector('.page-content')?.scrollTo(0,0) }}>← Back</button>
           {(l.status !== 'Converted to Client' || user?.role === 'Admin' || user?.role === 'Manager') ? (
-            <button className="btn pri" style={{marginLeft:'auto',padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>{setForm({...BLANK,...l,business_name: l.business_name || (l.clientType && l.clientType!=='Individual' ? l.name : ''),taxYears:(() => {try{return JSON.parse(l.taxYears||'[]')}catch{return []}})(),filingRequirements:(() => {try{return JSON.parse(l.filingRequirements||'[]')}catch{return []}})()});setModal('edit')}}>✏️ Edit</button>
+            <button className="btn pri" style={{marginLeft:'auto',padding:'8px 18px',fontSize:13,fontWeight:700}} onClick={()=>{setForm({...BLANK,...l,business_name: l.business_name || (l.clientType && l.clientType!=='Individual' ? l.name : ''),taxYears:(() => {try{return JSON.parse(l.taxYears||'[]')}catch{return []}})(),filingRequirements:(() => {try{return JSON.parse(l.filingRequirements||'[]')}catch{return []}})()
+                ,services:(() => {try{return JSON.parse(l.services||'[]')}catch{return []}})()});setModal('edit')}}>✏️ Edit</button>
           ) : (
             <span style={{marginLeft:'auto',fontSize:11,color:'var(--t3)',padding:'8px 12px',background:'var(--s2)',borderRadius:6}}>🔒 Admin Only</span>
           )}
@@ -2098,7 +2154,7 @@ export default function Leads() {
             <ActionBtn color="#0f766e" icon="🏛️" label="Pre-Fill State POA" sub={l.state ? l.state+' Form' : 'State Form'} onClick={()=>{ setPoaLead(l); setPoaModal(true) }}/>
             <ActionBtn color="#1d4ed8" icon="📊" label={intakeSending?'Sending…':'Financial Intake'} sub="Send / Resend Link" onClick={()=>!intakeSending&&sendFinancialIntake(l)}/>
             <ActionBtn color="#0d9488" icon="💵" label="Charge Investigation Fee" sub={l.taxFee?`Quoted: $${l.taxFee}`:'Send Payment Link'} onClick={()=>setPaymentLinkModal({purpose:'investigation_fee', defaultAmount:l.taxFee||'', defaultDescription:'Tax Investigation Fee'})}/>
-            <ActionBtn color="#d97706" icon="📝" label="Addendum" sub="After IRS facts" onClick={()=>{setAddForm({resolutionFee:'',paymentPlan:'',startDate:'',notes:'',services:[],sendVia:'email'});setAddModal(true)}}/>
+            <ActionBtn color="#d97706" icon="📝" label="Addendum" sub="After IRS facts" onClick={()=>{setAddForm({resolutionFee:String(l.contractFee||''),paymentPlan:'',startDate:'',notes:'',services:(()=>{try{return JSON.parse(l.services||'[]')}catch{return []}})(),sendVia:'email',trade1Amount:l.trade1Amount||'',trade1Date:l.trade1Date||'',trade2Amount:l.trade2Amount||'',trade2Date:l.trade2Date||'',trade3Amount:l.trade3Amount||'',trade3Date:l.trade3Date||''});setAddModal(true)}}/>
             {l.status==='Addendum Signed' && (
               <ActionBtn color="#059669" icon="💰" label="Charge Resolution Fee" sub="& Convert to Client" onClick={()=>setResolutionFeeLead(l)}/>
             )}

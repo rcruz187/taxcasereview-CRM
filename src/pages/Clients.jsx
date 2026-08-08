@@ -2039,7 +2039,7 @@ export default function Clients() {
               } catch (err) { showToast('Error opening form: ' + err.message) }
             }}/>
             <ActionBtn color="#0f766e" icon="🏛️" label="Pre-Fill State POA" sub={c.state ? c.state+' Form' : 'State Form'} onClick={()=>{ setPoaClient(c); setPoaModal(true) }}/>
-            <ActionBtn color="#d97706" icon="📋" label="Addendum" sub="Add Services" onClick={()=>{setAddForm({resolutionFee:'',paymentPlan:'',startDate:'',notes:'',services:[],sendVia:'email'});setAddModal(true)}}/>
+            <ActionBtn color="#d97706" icon="📋" label="Addendum" sub="Add Services" onClick={()=>{setAddForm({resolutionFee:String(c.contractFee||''),paymentPlan:'',startDate:'',notes:'',services:(()=>{try{return JSON.parse(c.services||'[]')}catch{return []}})(),sendVia:'email',trade1Amount:c.trade1Amount||'',trade1Date:c.trade1Date||'',trade2Amount:c.trade2Amount||'',trade2Date:c.trade2Date||'',trade3Amount:c.trade3Amount||'',trade3Date:c.trade3Date||''});setAddModal(true)}}/>
             <ActionBtn color="#0ea5e9" icon="🔓" label="Client Portal" sub="Compliance Access" onClick={()=>{setPortalClient(c);setPortalModal(true)}}/>
             <ActionBtn color="#4338ca" icon="🧾" label="Tax Organizer" sub="Send for Filing" onClick={()=>{setOrgClient(c);setOrgModal(true)}}/>
           </div>
