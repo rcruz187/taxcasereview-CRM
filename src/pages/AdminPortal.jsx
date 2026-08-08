@@ -1553,21 +1553,28 @@ function CommandCenter() {
           { label:'MRR',              current: totalMRR||0, target:5000, unit:'$', color:'#10b981' },
           { label:'Customers',        current: activeTenants.length, target:12, unit:'firms', color:'#f59e0b' },
         ],
-        // Sales pipeline
-        sales: {
-          stages: [
-            { label:'New Leads',      count: Number(stats.open_leads||0),    color:'#94a3b8' },
-            { label:'Qualified',      count: Math.max(1, Math.floor(Number(stats.open_leads||0)*0.4)), color:'#6366f1' },
-            { label:'Demo Scheduled', count: Number(stats.today_demos||0) + 2, color:'#0ea5e9' },
-            { label:'Demo Completed', count: 3,                               color:'#8b5cf6' },
-            { label:'Proposal',       count: 2,                               color:'#f59e0b' },
-            { label:'Won',            count: activeTenants.length,            color:'#10b981' },
-            { label:'Lost',           count: 1,                               color:'#ef4444' },
-          ],
-          winRate: activeTenants.length>0 ? Math.round(activeTenants.length/(activeTenants.length+1)*100) : 0,
-          salesCycle: 14,
-          pipeline: totalMRR * 3,
-        },
+        // Sales pipeline — real prospect data
+        sales: (()=>{
+          const pros = (prospectsRes && prospectsRes.data) || []
+          const STAGES = ['New Lead','Contacted','Qualified','Demo Scheduled','Demo Completed','Proposal','Won','Lost']
+          const stageCounts = {}
+          STAGES.forEach(s => { stageCounts[s] = 0 })
+          pros.forEach(p => { if (stageCounts[p.stage] !== undefined) stageCounts[p.stage]++ })
+          const won = pros.filter(p=>p.stage==='Won').length
+          const lost = pros.filter(p=>p.stage==='Lost').length
+          const winRate = (won+lost) > 0 ? Math.round((won/(won+lost))*100) : 0
+          const pipeline = pros.filter(p=>!['Won','Lost'].includes(p.stage)).reduce((s,p)=>s+Number(p.mrr_potential||0),0)
+          return {
+            stages: STAGES.map((label,i) => ({
+              label,
+              count: stageCounts[label],
+              color: ['#94a3b8','#6366f1','#8b5cf6','#0ea5e9','#a855f7','#f59e0b','#10b981','#ef4444'][i]
+            })),
+            winRate,
+            pipeline,
+            prospects: pros,
+          }
+        })(),
         systemStatus: [
           { label:'Supabase DB',         ok:true  },
           { label:'Email (Stalwart)',     ok:true  },
