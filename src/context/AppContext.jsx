@@ -470,8 +470,8 @@ export function AppProvider({ children }) {
       const hasCustomPerms = Object.keys(data).some(k => k.startsWith('perm_') && data[k] !== null)
       setPerms(hasCustomPerms ? data : null)
     } else {
-      setRole('Admin')
-      setEmployeeName('')
+      setRole('Super Admin')
+      setEmployeeName('Administrator')
       setPerms(null)
     }
   }
