@@ -92,7 +92,7 @@ export default function Calendar() {
         if ('Notification' in window && Notification.permission === 'granted') {
           new Notification('📅 New Appointment Booked', {
             body: `${who} — ${row.date} ${fmtTime(row.time||'')}`,
-            icon: '/icon-192.png'
+            icon: FIRM.logoUrl || '/icon-192.png'
           })
         }
         supabase.from('chat_messages').insert([{
@@ -176,14 +176,26 @@ export default function Calendar() {
   async function saveEvent() {
     if (!form.title || !form.date) { showToast('Title and date required'); return }
     setSaving(true)
-    const payload = { ...form, updated_at: new Date().toISOString() }
+    let payload = { ...form, updated_at: new Date().toISOString() }
     let error
-    if (form.id) {
-      ;({ error } = await supabase.from('calevents').update(payload).eq('id', form.id))
-    } else {
-      payload.created_at = new Date().toISOString()
-      delete payload.id  // prevent null id from violating not-null constraint
-      ;({ error } = await supabase.from('calevents').insert([payload]))
+    // Retry loop: strip unknown columns if PostgREST rejects them (same pattern as Clients.jsx)
+    for (let attempt = 0; attempt < 12; attempt++) {
+      if (form.id) {
+        ;({ error } = await supabase.from('calevents').update(payload).eq('id', form.id))
+      } else {
+        const p = { ...payload, created_at: new Date().toISOString() }
+        delete p.id
+        ;({ error } = await supabase.from('calevents').insert([p]))
+      }
+      if (!error) break
+      const match = error.message?.match(/column ['""]?(\w+)['""]? (of relation .* )?does not exist/i)
+        || error.message?.match(/Could not find the '(\w+)' column/i)
+      if (match && match[1] in payload) {
+        const { [match[1]]: _, ...rest } = payload
+        payload = rest
+        continue
+      }
+      break
     }
     setSaving(false)
     if (error) { showToast('Error: ' + error.message); return }

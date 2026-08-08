@@ -419,9 +419,10 @@ export function AppProvider({ children }) {
         // Format time in 12-hour
         const fmtTime = evTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
         if ('Notification' in window && Notification.permission === 'granted') {
+          const notifIcon = FIRM.logoUrl || '/icon-192.png'
           const n = new Notification('📅 Upcoming Appointment', {
             body: `${who} at ${fmtTime}${type} (in ~${REMINDER_MINUTES_BEFORE} min)\nClick to snooze 10 min`,
-            icon: '/icon-192.png',
+            icon: notifIcon,
             tag: `appt-${ev.id}`, // prevents duplicate OS-level popups
             requireInteraction: false,
           })
