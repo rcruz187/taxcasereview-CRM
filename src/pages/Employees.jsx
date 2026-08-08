@@ -829,7 +829,7 @@ export default function Employees() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--br)', flexWrap: 'wrap' }}>
                 {saveError && <div style={{ width: '100%', fontSize: 12, color: '#ef4444', marginBottom: 6, padding: '6px 10px', background: '#ef444418', borderRadius: 6, border: '1px solid #ef444444' }}>⚠️ {saveError}</div>}
                 <button className="btn" onClick={() => setShowForm(false)}>Cancel</button>
-                <button className="btn pri" onClick={save} disabled={saving}>
+                <button className="btn pri" onClick={() => save()} disabled={saving}>
                   {saving ? 'Saving…' : (editing ? 'Save Changes' : 'Add Employee')}
                 </button>
               </div>
