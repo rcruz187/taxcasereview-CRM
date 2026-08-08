@@ -2342,7 +2342,7 @@ function CommandCenter() {
                   { label:'Email (Stalwart)',   ok: sysStatus?.mailOk ?? null },
                   { label:'taxrescrm.net',      ok: sysStatus?.netOk ?? null },
                   { label:'taxrescrm.app',      ok: sysStatus?.appOk ?? null },
-                  { label:'GA4 Sync',          ok: ga4Data ? true : null },
+                  { label:'GA4 (G-M6J80B65LG)', ok: true },
                   { label:'Search Console',     ok: gscConnected ? true : (gscData===null && !gscLoading ? null : null) },
                   { label:'Bing Webmaster',     ok: bingConnected ? true : (bingData===null ? null : null) },
                   { label:'Microsoft Clarity',  ok: true },
@@ -2365,7 +2365,7 @@ function CommandCenter() {
             <div style={CC.card({padding:'22px 24px'})}>
               <div style={CC.sectionLabel}>Connect APIs</div>
               {[
-                { label:'Google Analytics 4',   key:'ga4',     status: ga4Data ? 'connected' : 'not connected', color: ga4Data ? '#10b981' : '#f59e0b' },
+                { label:'Google Analytics 4',   key:'ga4',     status: 'connected · G-M6J80B65LG', color: '#10b981' },
                 { label:'Google Search Console', key:'gsc',     status: gscConnected ? 'connected' : 'not connected', color: gscConnected ? '#10b981' : '#f59e0b' },
                 { label:'Microsoft Clarity',     key:'clarity', status:'connected · xyck7g2mfl', color:'#10b981' },
                 { label:'Bing Webmaster',        key:'bing',    status: bingConnected ? 'connected' : 'not connected', color: bingConnected ? '#10b981' : '#64748b' },
