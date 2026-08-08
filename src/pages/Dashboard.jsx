@@ -3,6 +3,16 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import { OPEN_STATUSES } from '../lib/caseStatuses'
+import { FIRM } from '../lib/firmBranding'
+
+// When Romy is impersonating a tenant via the admin portal, his auth email
+// (romy@taxrescrm.net) has no employee row in that tenant, so current_tenant_id()
+// returns NULL and RLS returns 0 rows. Fix: scope every data query explicitly
+// to FIRM.tenantId when it's available — safe for all sessions since FIRM is
+// always loaded with the correct tenant before Dashboard mounts.
+function tf(q) {
+  return FIRM.tenantId ? q.eq('tenant_id', FIRM.tenantId) : q
+}
 
 const CARD_COLORS = {
     'Active Cases':        '#f59e0b',
@@ -96,14 +106,14 @@ export default function Dashboard() {
       { data: tasks }, { data: invoices }, { data: payments },
       { data: deadlines }, { data: arScheduled },
     ] = await Promise.all([
-      supabase.from('leads').select('*').order('created_at', { ascending: false }),
-      supabase.from('clients').select('*').order('created_at', { ascending: false }),
-      supabase.from('cases').select('*').order('created_at', { ascending: false }),
-      supabase.from('tasks').select('*').not('deleted','is',true).order('created_at', { ascending: false }),
-      supabase.from('invoices').select('id,total,status,clientName'),
-      supabase.from('payments').select('id,amount,status,created_at,source,enrolled_by'),
-      supabase.from('deadlines').select('*').order('dueDate', { ascending: true }),
-      supabase.from('payments').select('amount,payment_status,scheduled_date').eq('payment_status', 'Scheduled'),
+      tf(supabase.from('leads').select('*')).order('created_at', { ascending: false }),
+      tf(supabase.from('clients').select('*')).order('created_at', { ascending: false }),
+      tf(supabase.from('cases').select('*')).order('created_at', { ascending: false }),
+      tf(supabase.from('tasks').select('*').not('deleted','is',true)).order('created_at', { ascending: false }),
+      tf(supabase.from('invoices').select('id,total,status,clientName')),
+      tf(supabase.from('payments').select('id,amount,status,created_at,source,enrolled_by')),
+      tf(supabase.from('deadlines').select('*')).order('dueDate', { ascending: true }),
+      tf(supabase.from('payments').select('amount,payment_status,scheduled_date').eq('payment_status', 'Scheduled')),
     ])
 
     const now = new Date()
