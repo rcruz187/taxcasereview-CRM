@@ -10,7 +10,7 @@ import ClientLink from '../components/ClientLink'
 import { CASE_STATUSES as STATUSES, CASE_STATUS_COLORS as STATUS_C, ACTIVE_STATUSES, PENDING_STATUSES, RESOLVED_STATUSES } from '../lib/caseStatuses'
 const CASE_TYPES = ['OIC','Installment Agreement','CNC','Penalty Abatement','Lien Withdrawal','TFRP','Appeals','Payroll Tax','Audit','Liens/Levies','Unfiled Returns','Tax Investigation','Other']
 
-const BLANK = { clientName:'', caseType:'OIC', irsBalance:'', status:'Open', assignedTo:'', deadline:'', taxYears:'', resolutionAmount:'', notes:'' }
+const BLANK = { clientName:'', caseType:'OIC', irsBalance:'', status:'Open', assignedTo:'', taxAssociate:'', deadline:'', taxYears:'', resolutionAmount:'', notes:'' }
 
 // ── Small helpers ─────────────────────────────────────────────────────────────
 function fmt$(n) { return n ? '$' + Number(n).toLocaleString() : '—' }
@@ -205,6 +205,7 @@ export default function Cases() {
                 <span className="bdg bb">{c.caseType}</span>
                 <span className="bdg bn" style={{ fontSize: 10, letterSpacing: '.03em' }}>{c.caseNum}</span>
                 {c.assignedTo && <span className="bdg bn">👤 {c.assignedTo}</span>}
+                {c.taxAssociate && c.taxAssociate !== c.assignedTo && <span className="bdg bb" style={{fontSize:11}}>🤝 {c.taxAssociate}</span>}
               </div>
             </div>
             {pct && (
@@ -426,7 +427,8 @@ export default function Cases() {
                 <th>Balance</th>
                 <th>Resolution</th>
                 <th>Status</th>
-                <th>Assigned</th>
+                <th>Associate</th>
+                <th>Para</th>
                 <th>Deadline</th>
                 <th style={{ width: 40 }}></th>
               </tr>
@@ -466,6 +468,7 @@ export default function Cases() {
                       </td>
                       <td><span className={`bdg ${STATUS_C[c.status] || 'bn'}`} style={{fontSize:12,padding:'3px 9px'}}>{c.status}</span></td>
                       <td style={{ color: 'var(--t2)', fontSize: 12 }}>{c.assignedTo || '—'}</td>
+                      <td style={{ color: 'var(--t2)', fontSize: 12 }}>{c.taxAssociate || '—'}</td>
                       <td style={{ color: overdue ? 'var(--bad)' : 'var(--t2)', fontSize: 12, fontWeight: overdue ? 700 : 400 }}>
                         {overdue && '⚠️ '}{c.deadline ? fmtDate(c.deadline) : '—'}
                       </td>
@@ -555,6 +558,12 @@ function CaseModal({ form, fld, reps, saving, onSave, onClose, title, sug, searc
           <div className="field">
             <label>Tax Years</label>
             <input value={form.taxYears} onChange={e => fld('taxYears', e.target.value)} placeholder="2020, 2021, 2022" />
+          </div>
+          <div className="field"><label>Para</label>
+            <select value={form.taxAssociate||''} onChange={e => fld('taxAssociate', e.target.value)}>
+              <option value="">— None —</option>
+              {employees.map(e=><option key={e.id||e.name} value={e.name}>{e.name}</option>)}
+            </select>
           </div>
         </div>
 
