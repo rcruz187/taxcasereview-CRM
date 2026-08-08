@@ -107,3 +107,9 @@ verify_jwt = false
 
 [functions.m365-sync]
 verify_jwt = true
+
+[functions.slack-events]
+verify_jwt = false
+
+[functions.slack-send]
+verify_jwt = true

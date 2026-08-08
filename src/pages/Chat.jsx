@@ -348,6 +348,12 @@ export default function Chat() {
     await supabase.from('chat_messages').insert([payload])
     setSending(false); setInput(''); setThread(null)
     loadMessages(true)
+    // Forward to Slack if sync is enabled for this tenant (fire-and-forget, never blocks the UI)
+    if (FIRM.tenantId && isChannel) {
+      supabase.functions.invoke('slack-send', {
+        body: { tenant_id: FIRM.tenantId, channel: channelId, sender: myName, text }
+      }).catch(() => {})
+    }
   }
 
   async function sendFile(e) {

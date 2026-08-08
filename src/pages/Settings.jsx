@@ -127,7 +127,8 @@ export default function Settings() {
     email_signature: '', email_signature_logo_url: '',
     verizon_api_key: '', verizon_account_id: '', verizon_phone_number: '',
     verizon_api_url: 'https://api.verizon.com/v1', calling_provider: 'signalwire',
-    m365_client_id: '', m365_client_secret: '', m365_tenant_id: 'common'
+    m365_client_id: '', m365_client_secret: '', m365_tenant_id: 'common',
+    slack_bot_token: '', slack_signing_secret: '', slack_channel_map: null, slack_sync_enabled: false
   })
 
   const [pw, setPw] = useState({ next: '', confirm: '' })
@@ -225,6 +226,10 @@ export default function Settings() {
         m365_client_id: firm.m365_client_id,
         m365_client_secret: firm.m365_client_secret,
         m365_tenant_id: firm.m365_tenant_id || 'common',
+        slack_bot_token: firm.slack_bot_token,
+        slack_signing_secret: firm.slack_signing_secret,
+        slack_channel_map: firm.slack_channel_map,
+        slack_sync_enabled: firm.slack_sync_enabled || false,
         telnyx_api_key: firm.telnyx_api_key,
         firm_fax_number: firm.firm_fax_number,
         smtp_host: firm.smtp_host, smtp_port: firm.smtp_port,
@@ -625,6 +630,70 @@ export default function Settings() {
             </div>
           </div>
 
+
+
+          {/* Slack Integration */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">💬 Slack Integration</span></div>
+            <div style={{ padding: '0 20px 20px' }}>
+              <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.7 }}>
+                Two-way bridge between Slack and CRM Team Chat. Messages sent in mapped Slack channels appear in the CRM instantly, and CRM messages forward to Slack. Also supports importing Slack message history from a workspace export.
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                {[
+                  ['1', 'Go to api.slack.com/apps → Create New App → From scratch. Name it "TaxRes CRM".'],
+                  ['2', 'Under OAuth & Permissions → Scopes → Bot Token Scopes, add: channels:history, channels:read, chat:write, users:read'],
+                  ['3', 'Click "Install to Workspace" — copy the Bot User OAuth Token (starts with xoxb-)'],
+                  ['4', 'Under Basic Information → App Credentials, copy the Signing Secret'],
+                  ['5', 'Under Event Subscriptions → Enable Events. Request URL: paste your Supabase edge function URL (shown below). Subscribe to bot events: message.channels'],
+                  ['6', 'Map each Slack channel ID to a CRM channel name below (get channel IDs from Slack: right-click channel → View channel details → Channel ID at bottom)'],
+                ].map(([step, text]) => (
+                  <div key={step} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#4a154b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, flexShrink: 0 }}>{step}</div>
+                    <div style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, paddingTop: 2 }}>{text}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="field"><label>Slack Webhook URL (paste into Slack Event Subscriptions)</label>
+                <input readOnly value="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/slack-events"
+                  style={{ color: 'var(--t3)', cursor: 'text', fontSize: 11 }}
+                  onClick={e => { e.target.select(); document.execCommand('copy'); }} />
+                <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Click to copy. Paste this exactly into Slack's Event Subscriptions → Request URL field.</div>
+              </div>
+              <div className="fg2">
+                <div className="field"><label>Slack Bot Token (xoxb-...)</label>
+                  <input type="password" value={firm.slack_bot_token || ''} onChange={set('slack_bot_token')} placeholder="xoxb-xxxxxxxxxxxx" />
+                </div>
+                <div className="field"><label>Slack Signing Secret</label>
+                  <input type="password" value={firm.slack_signing_secret || ''} onChange={set('slack_signing_secret')} placeholder="From Basic Information → App Credentials" />
+                </div>
+              </div>
+              <div className="field"><label>Channel Mapping (Slack Channel ID → CRM channel name, one per line)</label>
+                <textarea rows={4}
+                  value={firm.slack_channel_map ? Object.entries(firm.slack_channel_map).map(([k,v]) => `${k} = ${v}`).join('\n') : ''}
+                  onChange={e => {
+                    const map = {}
+                    e.target.value.split('\n').forEach(line => {
+                      const [k, v] = line.split('=').map(s => s.trim())
+                      if (k && v) map[k] = v
+                    })
+                    setFirm(f => ({ ...f, slack_channel_map: Object.keys(map).length ? map : null }))
+                  }}
+                  placeholder={"C0123ABCDEF = general\nC0456GHIJKL = tax-team"}
+                  style={{ fontFamily: 'monospace', fontSize: 12 }}
+                />
+                <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Format: SlackChannelID = crm-channel-name. Right-click any Slack channel → View channel details to find the ID.</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, marginBottom: 16 }}>
+                <input type="checkbox" id="slack_sync" checked={!!firm.slack_sync_enabled}
+                  onChange={e => setFirm(f => ({ ...f, slack_sync_enabled: e.target.checked }))} />
+                <label htmlFor="slack_sync" style={{ fontSize: 13, color: 'var(--tx)', cursor: 'pointer' }}>
+                  Enable two-way Slack sync (messages bridge between Slack and CRM chat)
+                </label>
+              </div>
+              <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Slack Config'}</button>
+            </div>
+          </div>
 
           {/* Verizon Business Calling */}
           <div className="card">
