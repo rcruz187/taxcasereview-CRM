@@ -373,8 +373,11 @@ export default function Chat() {
     if (!result.ok) { showToast(result.reason || 'Could not start huddle'); return }
     rawHuddleRef.current = webrtc.localStreamRef.current
     setHuddleId(id)
+    // Post to the current active channel so it works for any tenant,
+    // not just ones that have a channel named 'general'
+    const notifyChannel = isChannel ? channelId : 'general'
     await supabase.from('chat_messages').insert([{
-      channel: 'general', sender: '🔔 System',
+      channel: notifyChannel, sender: '🔔 System',
       text: `📞 ${myName} started a Huddle! Click "Join Huddle" to join the call.`,
       huddle_id: id, created_at: new Date().toISOString()
     }])
@@ -416,8 +419,9 @@ export default function Chat() {
     // where we don't have a rep object with empId — just post to general
     const name = typeof rep === 'string' ? rep : rep.name
     if (!huddleMembers.includes(name)) {
+      const notifyChannel = isChannel ? channelId : 'general'
       await supabase.from('chat_messages').insert([{
-        channel: 'general', sender: '🔔 System',
+        channel: notifyChannel, sender: '🔔 System',
         text: `📞 ${myName} invited ${name} to join the Huddle!`,
         huddle_id: huddleId, created_at: new Date().toISOString()
       }])
