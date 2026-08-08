@@ -2122,7 +2122,7 @@ function CommandCenter() {
           <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24 }}>
             {[
               { label:'Win Rate',      value:`${data.sales.winRate}%`,                                              icon:'🏆', color:'#10b981' },
-              { label:'Sales Cycle',   value:`${data.sales.salesCycle}d`,                                           icon:'⏱',  color:'#6366f1', sub:'avg days to close' },
+
               { label:'Pipeline Value',value:`$${(data.sales.pipeline).toLocaleString('en-US',{maximumFractionDigits:0})}`, icon:'💼', color:'#f59e0b' },
               { label:'Platform MRR',  value:`$${data.kpis.totalMRR.toLocaleString('en-US',{maximumFractionDigits:0})}`,  icon:'📈', color:'#0ea5e9' },
             ].map(k => <KPICard key={k.label} {...k} />)}
