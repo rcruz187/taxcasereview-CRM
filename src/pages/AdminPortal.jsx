@@ -1459,10 +1459,11 @@ function CommandCenter() {
       const h = now.getHours()
 
       try {
-        // Two parallel calls: cross-tenant stats RPC + admin_tenant_overview
-        const [statsRes, tenantsRes] = await Promise.all([
+        // Three parallel calls: stats RPC + tenant overview + prospects pipeline
+        const [statsRes, tenantsRes, prospectsRes] = await Promise.all([
           supabase.rpc('admin_command_center_stats'),
           supabase.rpc('admin_tenant_overview'),
+          supabase.from('prospects').select('*').order('created_at', { ascending: false }),
         ])
 
         const stats   = statsRes.data
