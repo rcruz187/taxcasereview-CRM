@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { playSound } from '../lib/notifySound'
-import { loadFirmBranding } from '../lib/firmBranding'
+import { loadFirmBranding , clearFirmBrandingCache } from '../lib/firmBranding'
 
 const AppContext = createContext(null)
 
@@ -514,6 +514,7 @@ export function AppProvider({ children }) {
   const closeModal = useCallback(() => setModal({ open: false, title: '', body: null }), [])
   const login  = useCallback((u) => setUser(u), [])
   const logout = useCallback(async () => {
+    clearFirmBrandingCache()
     await supabase.auth.signOut()
     setUser(null)
     setRole('Tax Associate')

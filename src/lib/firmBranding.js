@@ -20,18 +20,34 @@ export function firmSlug(name) {
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 }
 
+// Pre-populate from localStorage synchronously so the first render shows the
+// correct tenant branding with zero flash. The async DB fetch below then
+// confirms/updates it in the background.
+function _loadCached() {
+  try {
+    const cached = localStorage.getItem('tcr_firm_branding')
+    if (cached) return JSON.parse(cached)
+  } catch (_) {}
+  return null
+}
+const _cached = _loadCached()
+
 export const FIRM = {
-  name: '',
-  slug: '',
-  tenantId: '',  // settings.tenant_id (uuid) — carried on public /book links as ?t=
-  logoUrl: '',
-  address: '',   // full one-line address
-  phone: '',
-  email: '',
-  website: '',
-  fax: '',
-  loaded: false,
-  labels: {},    // per-tenant role/field label overrides e.g. {assignedTo:'Associate',taxAssociate:'Para'}
+  name:     _cached?.name     || '',
+  slug:     _cached?.slug     || '',
+  tenantId: _cached?.tenantId || '',
+  logoUrl:  _cached?.logoUrl  || '',
+  address:  _cached?.address  || '',
+  phone:    _cached?.phone    || '',
+  email:    _cached?.email    || '',
+  website:  _cached?.website  || '',
+  fax:      _cached?.fax      || '',
+  loaded:   !!_cached,
+  labels:   _cached?.labels   || {},
+}
+// Apply cached branding immediately (title + favicon) before any async fetch
+if (_cached?.name) {
+  try { document.title = `${_cached.name} — IRS Resolution CRM` } catch (_) {}
 }
 
 // Resolve a UI label — falls back to the default if the tenant hasn't overridden it
@@ -86,6 +102,14 @@ export async function loadFirmBranding() {
     FIRM.fax = s.firm_fax_number || ''
     FIRM.labels = s.labels || {}
     FIRM.loaded = true
+    // Cache for instant next-load — eliminates the branding flash on hard refresh
+    try {
+      localStorage.setItem('tcr_firm_branding', JSON.stringify({
+        name: FIRM.name, slug: FIRM.slug, tenantId: FIRM.tenantId,
+        logoUrl: FIRM.logoUrl, address: FIRM.address, phone: FIRM.phone,
+        email: FIRM.email, website: FIRM.website, fax: FIRM.fax, labels: FIRM.labels
+      }))
+    } catch (_) {}
   } catch (_) { /* leave whatever we have; templates degrade gracefully */ }
   return FIRM
 }
@@ -95,6 +119,10 @@ export async function loadFirmBranding() {
 // Anonymous visitors can't read `settings` under RLS, so branding comes from
 // the anon-safe booking_get_public_meta RPC instead. Call this on mount of any
 // page a logged-out client can reach, or it will render the default firm.
+export function clearFirmBrandingCache() {
+  try { localStorage.removeItem('tcr_firm_branding') } catch (_) {}
+}
+
 export async function loadFirmBrandingPublic(tenantHint) {
   try {
     // Optional tenant hint (uuid as text) → RPC resolves this tenant's row.
