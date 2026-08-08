@@ -133,10 +133,12 @@ function Sidebar({ onSignOut }) {
 function Overview() {
   const [stats, setStats] = useState(null)
   const navigate = useNavigate()
+  const { user } = useApp()
 
   useEffect(() => {
+    if (!user) return
     supabase.rpc('admin_tenant_overview').then(({ data }) => setStats(data || []))
-  }, [])
+  }, [user])
 
   const totalMRR     = (stats||[]).reduce((s,r) => s+Number(r.effective_monthly||0), 0)
   const activeOff    = (stats||[]).filter(r => r.status==='active').length
