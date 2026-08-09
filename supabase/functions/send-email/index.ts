@@ -153,7 +153,7 @@ serve(async (req) => {
       })
     }
 
-    const accessToken = await getValidGmailToken(supabase, gmailSettings)
+    let accessToken = await getValidGmailToken(supabase, gmailSettings)
 
     const toList = Array.isArray(to) ? to : [to]
     for (const recipient of toList) {
@@ -170,20 +170,37 @@ serve(async (req) => {
       })
 
       const encoded = base64UrlEncode(raw)
-      const sendRes = await fetch(SEND_URL, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ raw: encoded }),
-      })
 
-      const sendData = await sendRes.json()
-      if (!sendRes.ok) {
-        return new Response(JSON.stringify({ error: sendData.error?.message || 'Gmail send failed' }), {
-          status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      // Retry with exponential backoff on 429 (rate limit) and 5xx errors
+      // Gmail API quota: 250 units/user/second — bursts from 16 users can hit this
+      let sendRes: Response | null = null
+      let sendData: any = null
+      for (let attempt = 0; attempt < 4; attempt++) {
+        if (attempt > 0) {
+          // Exponential backoff: 1s, 2s, 4s
+          await new Promise(r => setTimeout(r, Math.pow(2, attempt - 1) * 1000))
+          // Refresh token in case it expired during wait
+          try { accessToken = await getValidGmailToken(supabase, gmailSettings) } catch (_) {}
+        }
+        sendRes = await fetch(SEND_URL, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ raw: encoded }),
         })
+        sendData = await sendRes.json()
+        // Success or non-retryable error — stop retrying
+        if (sendRes.ok || (sendRes.status !== 429 && sendRes.status < 500)) break
+      }
+
+      if (!sendRes!.ok) {
+        const isRateLimit = sendRes!.status === 429
+        console.error(`send-email: Gmail ${sendRes!.status} after retries — ${sendData?.error?.message}`)
+        return new Response(JSON.stringify({
+          error: isRateLimit
+            ? 'Email queued — Gmail rate limit reached, retry in a moment'
+            : (sendData?.error?.message || 'Gmail send failed'),
+          retryable: isRateLimit,
+        }), { status: isRateLimit ? 429 : 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
     }
 

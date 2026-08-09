@@ -106,7 +106,7 @@ function Guard({ section, children }) {
 }
 
 function Shell() {
-  const { openModal } = useApp()
+  const { openModal, realtimeOk } = useApp()
 
   function handleNew() {
     openModal('Quick Add', (
@@ -190,6 +190,16 @@ function Shell() {
           </Suspense>
         </div>
       </div>
+      {!realtimeOk && (
+        <div style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999,
+          background: '#f59e0b', color: '#1c1917', padding: '8px 16px',
+          fontSize: 12, fontWeight: 700, textAlign: 'center', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', gap: 8,
+        }}>
+          ⚠️ Connection interrupted — real-time updates paused. Reconnecting...
+        </div>
+      )}
       <ActiveCallBar />
       <Modal />
       <Toast />

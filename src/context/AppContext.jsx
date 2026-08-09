@@ -318,9 +318,11 @@ export function AppProvider({ children }) {
               if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
                 supabase.removeChannel(ch)
                 attempt = 0 // successful subscribe happened before this drop — reset backoff
+                setRealtimeOk(false)
                 pendingTimeouts.push(setTimeout(create, 1500))
               } else if (status === 'SUBSCRIBED') {
                 attempt = 0
+                setRealtimeOk(true)
               }
             })
           channels.push(ch)
@@ -524,7 +526,7 @@ export function AppProvider({ children }) {
 
   return (
     <AppContext.Provider value={{
-      user, login, logout, checking,
+      user, login, logout, checking, realtimeOk,
       role, perms, can, employeeName,
       toast, showToast,
       modal, openModal, closeModal,
