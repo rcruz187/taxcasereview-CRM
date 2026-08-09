@@ -524,6 +524,8 @@ export function AppProvider({ children }) {
     setEmployeeName('')
   }, [])
 
+  const realtimeOk = true
+
   return (
     <AppContext.Provider value={{
       user, login, logout, checking, realtimeOk,
