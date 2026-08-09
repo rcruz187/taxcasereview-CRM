@@ -9,7 +9,7 @@ const INDEX_HTML = `<!DOCTYPE html>
     <meta http-equiv="Expires" content="0" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translacent" />
     <meta name="theme-color" content="#0a0f1a" />
     <script>
       (function(){
@@ -52,31 +52,39 @@ const MIME: Record<string, string> = {
 
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
-  let pathname = url.pathname;
+  // Full pathname e.g. /functions/v1/serve-app/assets/index-Dtmn5plU.js
+  const full = url.pathname;
 
-  const fnPrefix = '/functions/v1/serve-app';
-  if (pathname.startsWith(fnPrefix)) {
-    pathname = pathname.slice(fnPrefix.length) || '/';
+  // Strip the edge function prefix — everything after /functions/v1/serve-app is the asset path
+  const PREFIX = '/functions/v1/serve-app';
+  const asset = full.startsWith(PREFIX) ? full.slice(PREFIX.length) : full;
+  // asset is now e.g. /assets/index-Dtmn5plU.js or / or /dashboard
+
+  const ext = (asset.split('.').pop() ?? '').toLowerCase();
+
+  if (ext && MIME[ext]) {
+    // Proxy static asset from raw.githubusercontent.com with correct MIME type
+    const rawUrl = `${RAW_BASE}${asset}`;
+    try {
+      const upstream = await fetch(rawUrl);
+      if (!upstream.ok) {
+        return new Response(`Asset not found: ${asset} (${upstream.status})`, { status: 404 });
+      }
+      const body = await upstream.arrayBuffer();
+      return new Response(body, {
+        status: 200,
+        headers: {
+          'Content-Type': MIME[ext],
+          'Cache-Control': 'public, max-age=31536000, immutable',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    } catch (e) {
+      return new Response(`Proxy error: ${e}`, { status: 502 });
+    }
   }
-  if (!pathname || pathname === '') pathname = '/';
 
-  // Static file — proxy from raw.githubusercontent.com with correct MIME
-  const ext = pathname.split('.').pop()?.toLowerCase() ?? '';
-  if (MIME[ext]) {
-    const upstream = await fetch(`${RAW_BASE}${pathname}`);
-    if (!upstream.ok) return new Response('Not found', { status: 404 });
-    const body = await upstream.arrayBuffer();
-    return new Response(body, {
-      status: 200,
-      headers: {
-        'Content-Type': MIME[ext],
-        'Cache-Control': 'public, max-age=31536000, immutable',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
-  }
-
-  // All other routes → SPA shell
+  // Everything else → SPA shell
   return new Response(INDEX_HTML, {
     status: 200,
     headers: {
