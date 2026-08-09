@@ -8,12 +8,10 @@ import { useVideoBackground } from '../lib/videoBackground'
 import VirtualBackground from '../components/VirtualBackground'
 import VideoTile from '../components/VideoTile'
 
+// Channels are now loaded from the chat_channels table (per-tenant, persistent)
+// CHANNELS is kept as a fallback only for the very first render before the DB loads
 const CHANNELS = [
-  { id: 'general',  label: 'general',  desc: 'All staff announcements' },
-  { id: 'cases',    label: 'cases',    desc: 'Case updates and notes' },
-  { id: 'billing',  label: 'billing',  desc: 'Invoices, payments, collections' },
-  { id: 'irs',      label: 'irs',      desc: 'IRS notices and resolutions' },
-  { id: 'hr',       label: 'hr',       desc: 'HR and internal ops' },
+  { id: 'general', label: 'general', desc: 'All staff announcements' },
 ]
 
 // TEAM is now loaded dynamically from employees table — see useEffect in Chat()
@@ -111,7 +109,7 @@ export default function Chat() {
   const [showChannelsMobile, setShowChannelsMobile] = useState(false)
   const [newChanName, setNewChanName] = useState('')
   const [showNewChan, setShowNewChan] = useState(false)
-  const [extraChans, setExtraChans]   = useState([])
+  const [dbChannels, setDbChannels]   = useState([])   // all channels from DB (replaces hardcoded + extraChans)
   const [thread, setThread]     = useState(null)  // message being replied to
   const [repMenu, setRepMenu]   = useState(null)   // { rep, x, y } — right-click context menu
   const [repPrefs, setRepPrefs] = useState({})     // { repName: { hidden, vip } } — per-viewer
@@ -149,7 +147,8 @@ export default function Chat() {
   const pollerRef = useRef(null)
 
   const myName = myRealName || user?.user_metadata?.name || user?.email?.split('@')[0] || 'You'
-  const allChannels = [...CHANNELS, ...extraChans]
+  // Use DB channels if loaded, otherwise the single fallback CHANNELS entry
+  const allChannels = dbChannels.length > 0 ? dbChannels : CHANNELS
   // A DM lives in ONE symmetric channel keyed by BOTH employee ids (sorted),
   // so my view and the other person's view are the same conversation and nobody
   // can read a third party's DM wall by opening their roster entry. Legacy
@@ -556,7 +555,17 @@ export default function Chat() {
     if (!canManageChannels) return
     const name = newChanName.trim().toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
     if (!name) return
-    setExtraChans(c => [...c, { id: 'ch_'+name, label: name, desc: '' }])
+    const newChan = { id: 'ch_'+name.toLowerCase().replace(/\s+/g,'-'), label: name, desc: '' }
+    // Persist to DB
+    supabase.from('chat_channels').insert([{
+      id: newChan.id, label: newChan.label, description: '',
+      position: 99, tenant_id: undefined // DB default fills this via current_tenant_id()
+    }]).then(() => {
+      // Reload all channels to pick up the new one with correct tenant scoping
+      supabase.from('chat_channels').select('*').order('position').order('label')
+        .then(({ data }) => { if (data?.length) setDbChannels(data.map(c => ({ id: c.id, label: c.label, desc: c.description || '' }))) })
+    })
+    setDbChannels(c => [...c, newChan])
     setNewChanName(''); setShowNewChan(false)
   }
 
@@ -1112,10 +1121,16 @@ export default function Chat() {
           <MenuItem onClick={() => toggleConvPref(chanMenu.conv.id, 'channel', 'muted')}>
             {convPrefs[chanMenu.conv.id]?.muted ? '🔔 Notify: All new posts' : '🔕 Mute and hide'}
           </MenuItem>
-          {canManageChannels && !CHANNELS.find(c => c.id === chanMenu.conv.id) && (
+          {canManageChannels && !['general','cases','billing','irs','hr'].includes(chanMenu.conv.id) && (
             <>
               <MenuDivider/>
-              <MenuItem danger onClick={() => { setExtraChans(c => c.filter(ch => ch.id !== chanMenu.conv.id)); if (active.id === chanMenu.conv.id) switchTo(CHANNELS[0]); setChanMenu(null) }}>
+              <MenuItem danger onClick={() => { supabase.from('chat_channels').delete().eq('id', chanMenu.conv.id).then(() => {
+                  supabase.from('chat_channels').select('*').order('position').order('label')
+                    .then(({ data }) => { if (data?.length) setDbChannels(data.map(c => ({ id: c.id, label: c.label, desc: c.description || '' }))) })
+                })
+                setDbChannels(c => c.filter(ch => ch.id !== chanMenu.conv.id))
+                if (active.id === chanMenu.conv.id) switchTo(allChannels[0] || CHANNELS[0])
+                setChanMenu(null) }}>
                 Delete #{chanMenu.conv.label}
               </MenuItem>
             </>
