@@ -117,5 +117,3 @@ verify_jwt = true
 [functions.slack-import]
 verify_jwt = true
 
-[functions.serve-app]
-verify_jwt = false
