@@ -1,0 +1,39 @@
+name: Setup Supabase Custom Domain
+
+on:
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: mpxgxfqdbquzkrvvejkh
+    steps:
+      - name: Register custom domain
+        run: |
+          echo "Registering taxrescrm.app as custom domain..."
+          RESP=$(curl -sS -X POST \
+            "https://api.supabase.com/v1/projects/$PROJECT_REF/custom-hostname" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"custom_hostname":"taxrescrm.app"}')
+          echo "Response: $RESP"
+          
+      - name: Check domain status
+        run: |
+          sleep 5
+          RESP=$(curl -sS \
+            "https://api.supabase.com/v1/projects/$PROJECT_REF/custom-hostname" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN")
+          echo "Status: $RESP"
+
+      - name: Post result
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --repo taxresolutioncrm/taxcasereview-CRM \
+            --title "domain-setup-result" \
+            --body "Setup complete - check logs for details"
