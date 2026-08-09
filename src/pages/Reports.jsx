@@ -22,6 +22,7 @@ const TABS = [
 ]
 
 export default function Reports() {
+  const { user } = useApp()
   const [tab, setTab] = useState('overview')
   const [loading, setLoading] = useState(true)
   const [dateRange, setDateRange] = useState('all')
