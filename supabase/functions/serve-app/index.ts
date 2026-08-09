@@ -7,25 +7,23 @@ const MIME: Record<string, string> = {
   gif: 'image/gif', svg: 'image/svg+xml', ico: 'image/x-icon',
   woff: 'font/woff', woff2: 'font/woff2', ttf: 'font/ttf',
   pdf: 'application/pdf', webp: 'image/webp', map: 'application/json',
+  mjs: 'application/javascript; charset=utf-8',
 };
 
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
   const full = url.pathname;
 
-  // Supabase strips /functions/v1 but keeps the function name
-  // So path arrives as /serve-app/... or /serve-app
   const PREFIX = '/serve-app';
   let asset = full.startsWith(PREFIX) ? full.slice(PREFIX.length) : full;
   if (!asset || asset === '') asset = '/';
 
   const ext = (asset.split('.').pop() ?? '').toLowerCase();
 
-  // Static asset — proxy from GitHub raw with correct MIME
   if (ext && MIME[ext]) {
     try {
       const upstream = await fetch(`${RAW_BASE}${asset}`);
-      if (!upstream.ok) return new Response('Not found', { status: 404 });
+      if (!upstream.ok) return new Response(`Not found: ${asset}`, { status: 404 });
       const body = await upstream.arrayBuffer();
       return new Response(body, {
         status: 200,
@@ -40,19 +38,10 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  // All other routes → serve the React SPA index.html from GitHub raw
-  // Fetch it from raw.githubusercontent.com to get the real built index.html
-  // then rewrite the asset paths to go through this edge function
+  // SPA: fetch real index.html from gh-pages (now built with correct base path)
   try {
     const indexResp = await fetch(`${RAW_BASE}/index.html`);
-    let html = await indexResp.text();
-    
-    // Rewrite asset paths from /assets/ to /functions/v1/serve-app/assets/
-    // so the browser requests them through this edge function with correct MIME types
-    html = html.replace(/src="\/assets\//g, 'src="/functions/v1/serve-app/assets/');
-    html = html.replace(/href="\/assets\//g, 'href="/functions/v1/serve-app/assets/');
-    html = html.replace(/href="\/favicon/g, 'href="/functions/v1/serve-app/favicon');
-
+    const html = await indexResp.text();
     return new Response(html, {
       status: 200,
       headers: {
@@ -62,6 +51,6 @@ Deno.serve(async (req: Request) => {
       },
     });
   } catch (e) {
-    return new Response(`Error loading app: ${e}`, { status: 502 });
+    return new Response(`Error: ${e}`, { status: 502 });
   }
 });
