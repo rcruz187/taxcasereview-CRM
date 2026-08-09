@@ -11,6 +11,7 @@
 
 export const CASE_STATUSES = [
   'Open',
+  'Active',
   'Collection Hold',
   'Pending IRS',
   'Docs Needed',
