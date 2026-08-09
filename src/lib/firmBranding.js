@@ -46,20 +46,9 @@ export const FIRM = {
   labels:         _cached?.labels         || {},
   paymentProvider: _cached?.paymentProvider || 'stripe',
 }
-// Apply cached branding immediately (title + favicon) before any async fetch
+// Apply cached branding immediately (title only) before any async fetch
 if (_cached?.name) {
   try { document.title = `${_cached.name} — IRS Resolution CRM` } catch (_) {}
-  // Apply favicon from cache synchronously so it's right on first paint
-  if (_cached?.logoUrl) {
-    const TCR_TENANT = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
-    if (_cached?.tenantId && _cached.tenantId !== TCR_TENANT) {
-      try {
-        document.querySelectorAll('link[rel*="icon"]').forEach(el => {
-          el.setAttribute('href', _cached.logoUrl)
-        })
-      } catch (_) {}
-    }
-  }
 }
 
 // Resolve a UI label — falls back to the default if the tenant hasn't overridden it
