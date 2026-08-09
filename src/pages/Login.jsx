@@ -1,13 +1,42 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import { supabase } from '../lib/supabase'
 
 export default function Login() {
   const { login, showToast } = useApp()
-  const [email, setEmail]     = useState('')
+  const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError]     = useState('')
-  const [loading, setLoading] = useState(false)
+  const [error, setError]       = useState('')
+  const [loading, setLoading]   = useState(false)
+  const [branding, setBranding] = useState(null) // { firm_name, logo_url, sub }
+  const debounceRef = useRef(null)
+
+  // Lookup tenant branding by email domain as user types
+  useEffect(() => {
+    const domain = email.split('@')[1]?.toLowerCase()
+    if (!domain || !domain.includes('.')) {
+      setBranding(null)
+      return
+    }
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const { data } = await supabase.rpc('get_branding_by_email_domain', { p_domain: domain })
+        if (data && data.firm_name) {
+          setBranding({
+            firm_name: data.firm_name,
+            logo_url:  data.logo_url || null,
+            sub:       data.sub || 'IRS Resolution Platform',
+          })
+        } else {
+          setBranding(null)
+        }
+      } catch (_) {
+        setBranding(null)
+      }
+    }, 400)
+    return () => clearTimeout(debounceRef.current)
+  }, [email])
 
   async function submit(e) {
     e.preventDefault()
@@ -26,15 +55,16 @@ export default function Login() {
     }
   }
 
-  const TAXRESCRM_LOGO = "/assets/taxrescrm-logo.png"
-  const isTaxResCRM = email.toLowerCase().includes('taxrescrm')
+  const firmName = branding?.firm_name || 'TaxRes CRM'
+  const sub      = branding?.sub       || 'IRS Resolution Platform'
+  const logoUrl  = branding?.logo_url  || null
 
   return (
     <div className="login-wrap">
       <form className="login-box" onSubmit={submit}>
         <div className="login-logo">
-          {isTaxResCRM ? (
-            <img src={TAXRESCRM_LOGO} alt="TaxRes CRM"
+          {logoUrl ? (
+            <img src={logoUrl} alt={firmName}
               style={{ height: 52, objectFit: 'contain', display: 'block', margin: '0 auto' }}
               onError={e => { e.target.style.display = 'none' }} />
           ) : (
@@ -43,11 +73,11 @@ export default function Login() {
               background: 'var(--blue)', display: 'flex',
               alignItems: 'center', justifyContent: 'center',
               fontSize: 26, fontWeight: 900, color: '#fff',
-            }}>T</div>
+            }}>{firmName.charAt(0)}</div>
           )}
         </div>
-        <div className="login-title">{isTaxResCRM ? 'TaxRes CRM' : 'Tax Resolution CRM'}</div>
-        <div className="login-sub">{isTaxResCRM ? 'Platform Administration' : 'IRS Resolution Platform'}</div>
+        <div className="login-title">{firmName}</div>
+        <div className="login-sub">{sub}</div>
 
         {error && <div className="login-err">{error}</div>}
 
@@ -83,7 +113,7 @@ export default function Login() {
         </button>
 
         <div style={{ marginTop: 16, fontSize: 11, color: 'var(--t3)', textAlign: 'center' }}>
-          Tax Case Review SaaS Platform
+          Powered by TaxRes CRM
         </div>
       </form>
     </div>
