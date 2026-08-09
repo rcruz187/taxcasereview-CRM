@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { formatMoneyInput, parseMoney } from '../lib/money'
 import { supabase } from '../lib/supabase'
+import { FIRM } from '../lib/firmBranding'
 
 // Charges a total amount across one or more saved cards in one go — e.g.
 // $1,000 on card A and the remaining $500 on card B. Each leg is its own
@@ -53,7 +54,7 @@ export default function SplitPaymentModal({ record, recordType, onClose, showToa
         body: {
           clientId: record.id, recordType, amount: row.amount,
           paymentMethodRowId: row.cardId, source: 'split',
-          description: (description || `Tax Case Review payment — ${record.name}`) + ` (split — ${card ? card.brand+' ••••'+card.last4 : 'card'})`,
+          description: (description || `${FIRM.name || 'Payment'} — ${record.name}`) + ` (split — ${card ? card.brand+' ••••'+card.last4 : 'card'})`,
         }
       })
       const ok = !error && !data?.error

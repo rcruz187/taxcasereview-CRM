@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { FIRM } from '../lib/firmBranding'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { advanceLeadStatus } from '../lib/leadStatus'
 import { sendBookingInvite } from '../lib/bookingEmails'
@@ -138,7 +139,7 @@ export default function BookingWidget({ contact, onClose, mode = 'lead' }) {
             </div>
             <div>
               <div style={{ fontSize: 17, fontWeight: 800, color: '#fff' }}>{contact?.name || 'Client'}</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,.8)' }}>Tax Case Review</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,.8)' }}>{FIRM.name || 'Tax Resolution'}</div>
             </div>
           </div>
         </div>
