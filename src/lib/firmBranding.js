@@ -49,6 +49,17 @@ export const FIRM = {
 // Apply cached branding immediately (title + favicon) before any async fetch
 if (_cached?.name) {
   try { document.title = `${_cached.name} — IRS Resolution CRM` } catch (_) {}
+  // Apply favicon from cache synchronously so it's right on first paint
+  if (_cached?.logoUrl) {
+    const TCR_TENANT = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
+    if (_cached?.tenantId && _cached.tenantId !== TCR_TENANT) {
+      try {
+        document.querySelectorAll('link[rel*="icon"]').forEach(el => {
+          el.setAttribute('href', _cached.logoUrl)
+        })
+      } catch (_) {}
+    }
+  }
 }
 
 // Resolve a UI label — falls back to the default if the tenant hasn't overridden it
@@ -146,18 +157,22 @@ export async function loadFirmBrandingPublic(tenantHint) {
 }
 
 // Dynamically swap the browser favicon to match the current tenant.
-// TCR keeps its own favicon; TaxRes CRM admin gets the taxrescrm favicon;
-// other tenants use taxrescrm favicon as the platform favicon.
+// TCR keeps its own favicon; other tenants use their own logo URL as favicon
+// (set when the logo is uploaded in Settings). Falls back to taxrescrm favicon.
 function setFavicon(tenantId, name) {
   try {
     const BASE = '/'
-    const TCR_TENANT  = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
-    const TAXRESCRM   = 'a0000000-0000-0000-0000-000000000001'
-    const href = (tenantId === TCR_TENANT)
-      ? BASE + 'favicon.png'          // Tax Case Review — TCR favicon
-      : BASE + 'taxrescrm-favicon.png' // TaxRes CRM + all other tenant offices
+    const TCR_TENANT = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
+    let href
+    if (tenantId === TCR_TENANT) {
+      href = BASE + 'favicon.png'       // TCR keeps its own branded favicon
+    } else if (FIRM.logoUrl) {
+      href = FIRM.logoUrl               // tenant's own uploaded logo as favicon
+    } else {
+      href = BASE + 'taxrescrm-favicon.png' // fallback for tenants without a logo
+    }
     document.querySelectorAll('link[rel*="icon"]').forEach(el => {
-      el.href = href
+      el.setAttribute('href', href)
     })
   } catch (_) {}
 }
