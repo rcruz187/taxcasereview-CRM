@@ -3239,10 +3239,10 @@ export default function AdminPortal() {
       link.href = href
       document.head.appendChild(link)
     }
-    setFavicon('/favicon.ico')
+    setFavicon('/taxrescrm-favicon.png')
     return () => {
       document.title = prev
-      setFavicon('/favicon.ico')
+      setFavicon('/taxrescrm-favicon.png')
     }
   }, [])
 
