@@ -88,6 +88,7 @@ const NAV = [
   { path:'/crm-admin/health',    label:'System Health',icon:'💚' },
 ]
 
+// v2 — logoUrl prop
 function Sidebar({ onSignOut, logoUrl }) {
   const location = useLocation()
   return (
