@@ -2206,10 +2206,16 @@ export default function Leads() {
             }}/>
             <ActionBtn color="#0f766e" icon="🏛️" label="Pre-Fill State POA" sub={l.state ? l.state+' Form' : 'State Form'} onClick={()=>{ setPoaLead(l); setPoaModal(true) }}/>
             <ActionBtn color="#1d4ed8" icon="📊" label={intakeSending?'Sending…':'Financial Intake'} sub="Send / Resend Link" onClick={()=>!intakeSending&&sendFinancialIntake(l)}/>
-            <ActionBtn color="#0d9488" icon="💵" label="Charge Investigation Fee" sub={l.taxFee?`Quoted: $${l.taxFee}`:'Send Payment Link'} onClick={()=>setPaymentLinkModal({purpose:'investigation_fee', defaultAmount:l.taxFee||'', defaultDescription:'Tax Investigation Fee'})}/>
+            <ActionBtn color="#0d9488" icon="💵" label="Charge Investigation Fee" sub={l.taxFee?`Quoted: $${l.taxFee}`:'Send Payment Link'} onClick={()=>{
+                if (FIRM.paymentProvider === 'intuit') {
+                  showToast('📋 Intuit Payments — send client the QuickBooks invoice link or process via your QB Payments dashboard. Payment will sync back automatically once connected.')
+                } else {
+                  setPaymentLinkModal({purpose:'investigation_fee', defaultAmount:l.taxFee||'', defaultDescription:'Tax Investigation Fee'})
+                }
+              }}/>
             <ActionBtn color="#d97706" icon="📝" label="Addendum" sub="After IRS facts" onClick={()=>{setAddForm({resolutionFee:String(l.contractFee||''),paymentPlan:'',startDate:'',notes:'',services:(()=>{try{return JSON.parse(l.services||'[]')}catch{return []}})(),sendVia:'email',trade1Amount:l.trade1Amount||'',trade1Date:l.trade1Date||'',trade2Amount:l.trade2Amount||'',trade2Date:l.trade2Date||'',trade3Amount:l.trade3Amount||'',trade3Date:l.trade3Date||''});setAddModal(true)}}/>
             {l.status==='Addendum Signed' && (
-              <ActionBtn color="#059669" icon="💰" label="Charge Resolution Fee" sub="& Convert to Client" onClick={()=>setResolutionFeeLead(l)}/>
+              <ActionBtn color="#059669" icon="💰" label="Charge Resolution Fee" sub={FIRM.paymentProvider==='intuit'?'via Intuit Payments':'& Convert to Client'} onClick={()=>{ if(FIRM.paymentProvider==='intuit'){showToast('📋 Charge resolution fee via QuickBooks Payments dashboard. Once paid, convert this lead to a client manually.')}else{setResolutionFeeLead(l)} }}/>
             )}
 
             <ActionBtn color="#dc2626" icon="📠" label="Send Fax" sub="SignalWire Fax" onClick={()=>{setInlineFaxLead(l);setShowFaxModal(true)}}/>
@@ -2829,21 +2835,35 @@ export default function Leads() {
                 </button>
               </div>
 
-              {/* ── 2nd Trade Section ── */}
+              {/* ── Charge Trades Section ── */}
               <div style={{borderTop:'1px solid var(--br)',paddingTop:18}}>
-                <div style={{fontSize:11,fontWeight:700,color:'var(--ok)',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:10}}>💳 Charge 2nd Trade</div>
+                <div style={{fontSize:11,fontWeight:700,color:'var(--ok)',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:10}}>
+                  💳 Charge Trades {FIRM.paymentProvider==='intuit'&&<span style={{fontSize:9,fontWeight:400,color:'var(--t3)',textTransform:'none',marginLeft:6}}>via Intuit / QuickBooks Payments</span>}
+                </div>
                 <div style={{fontSize:12,color:'var(--t3)',marginBottom:12,lineHeight:1.6}}>
-                  Charge the resolution fee directly to the card on file. Commission goes to whoever sent the addendum.
+                  {FIRM.paymentProvider==='intuit' ? 'Charge through your QuickBooks Payments account — payments sync back to the CRM automatically once connected.' : 'Charge the resolution fee directly to the card on file.'}
                 </div>
                 <div style={{background:'var(--s2)',borderRadius:8,padding:'10px 14px',border:'1px solid var(--br)',marginBottom:12,fontSize:13}}>
                   <div style={{fontWeight:700}}>{detail.name}</div>
                   {detail.email&&<div style={{fontSize:12,color:'var(--t3)',marginTop:2}}>{detail.email}</div>}
-                  {addForm.resolutionFee&&<div style={{fontSize:12,color:'var(--ok)',marginTop:4,fontWeight:600}}>Fee entered: ${Number(addForm.resolutionFee).toLocaleString()}</div>}
+                  {addForm.trade2Amount&&<div style={{fontSize:12,color:'var(--ok)',marginTop:4,fontWeight:600}}>2nd Trade: ${Number(addForm.trade2Amount).toLocaleString()}{addForm.trade2Date?` — due ${addForm.trade2Date}`:''}</div>}
+                  {addForm.trade3Amount&&<div style={{fontSize:12,color:'var(--blue)',marginTop:2,fontWeight:600}}>3rd Trade: ${Number(addForm.trade3Amount).toLocaleString()}{addForm.trade3Date?` — due ${addForm.trade3Date}`:''}</div>}
+                  {!addForm.trade2Amount&&addForm.resolutionFee&&<div style={{fontSize:12,color:'var(--ok)',marginTop:4,fontWeight:600}}>Resolution fee: ${Number(addForm.resolutionFee).toLocaleString()}</div>}
                 </div>
-                <button className="btn pri" style={{width:'100%',padding:11,fontWeight:700,justifyContent:'center'}}
-                  onClick={()=>{setAddModal(false);setResolutionFeeLead(detail)}}>
-                  💳 Open Stripe Charge Form →
-                </button>
+                <div style={{display:'flex',gap:8}}>
+                  {(addForm.trade2Amount||addForm.resolutionFee) && (
+                    <button className="btn pri" style={{flex:1,padding:11,fontWeight:700,justifyContent:'center'}}
+                      onClick={()=>{setAddModal(false); FIRM.paymentProvider==='intuit' ? showToast('📋 Charge 2nd Trade ($'+Number(addForm.trade2Amount||addForm.resolutionFee||0).toLocaleString()+') via your QuickBooks Payments dashboard. It will sync back automatically.') : setResolutionFeeLead(detail)}}>
+                      {FIRM.paymentProvider==='intuit' ? `📋 Charge 2nd Trade via Intuit` : `💳 Charge 2nd Trade ($${Number(addForm.trade2Amount||addForm.resolutionFee||0).toLocaleString()})`}
+                    </button>
+                  )}
+                  {addForm.trade3Amount && (
+                    <button className="btn sec" style={{flex:1,padding:11,fontWeight:700,justifyContent:'center'}}
+                      onClick={()=>{setAddModal(false); FIRM.paymentProvider==='intuit' ? showToast('📋 Charge 3rd Trade ($'+Number(addForm.trade3Amount||0).toLocaleString()+') via your QuickBooks Payments dashboard. It will sync back automatically.') : setPaymentLinkModal({purpose:'resolution_fee',defaultAmount:addForm.trade3Amount,defaultDescription:'3rd Trade — Resolution Fee Balance'})}}>
+                      {FIRM.paymentProvider==='intuit' ? `📋 Charge 3rd Trade via Intuit` : `💳 Charge 3rd Trade ($${Number(addForm.trade3Amount||0).toLocaleString()})`}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

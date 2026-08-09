@@ -128,6 +128,7 @@ export default function Settings() {
     verizon_api_key: '', verizon_account_id: '', verizon_phone_number: '',
     verizon_api_url: 'https://api.verizon.com/v1', calling_provider: 'signalwire',
     m365_client_id: '', m365_client_secret: '', m365_tenant_id: 'common',
+    payment_provider: 'stripe',
     slack_bot_token: '', slack_signing_secret: '', slack_channel_map: null, slack_sync_enabled: false
   })
 
@@ -223,6 +224,7 @@ export default function Settings() {
         gmail_client_id: firm.gmail_client_id,
         gmail_client_secret: firm.gmail_client_secret,
         gmail_redirect_uri: firm.gmail_redirect_uri,
+        payment_provider: firm.payment_provider || 'stripe',
         m365_client_id: firm.m365_client_id,
         m365_client_secret: firm.m365_client_secret,
         m365_tenant_id: firm.m365_tenant_id || 'common',
@@ -790,6 +792,30 @@ export default function Settings() {
               <div style={{display:'flex',justifyContent:'flex-end'}}>
                 <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving?'Saving…':'Save Transcription Settings'}</button>
               </div>
+            </div>
+          </div>
+
+          {/* Payment Provider */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">💳 Payment Provider</span></div>
+            <div style={{ padding: '0 20px 20px' }}>
+              <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.6 }}>
+                Select how this office collects client payments. This controls which payment flow appears on charges throughout the CRM.
+              </div>
+              <div className="field">
+                <label>Payment Provider</label>
+                <select value={firm.payment_provider || 'stripe'} onChange={set('payment_provider')}>
+                  <option value="stripe">Stripe</option>
+                  <option value="intuit">Intuit / QuickBooks Payments</option>
+                  <option value="manual">Manual / External</option>
+                </select>
+                <div style={{fontSize:10,color:'var(--t3)',marginTop:4}}>
+                  {(firm.payment_provider || 'stripe') === 'intuit' && 'Connect QuickBooks below to activate Intuit Payments. Once connected, all charge buttons will route through your QuickBooks Payments account.'}
+                  {(firm.payment_provider || 'stripe') === 'stripe' && 'Enter your Stripe keys below to activate Stripe payments.'}
+                  {firm.payment_provider === 'manual' && 'No online payment processing. Staff will collect payments manually and record them in the CRM.'}
+                </div>
+              </div>
+              <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
             </div>
           </div>
 

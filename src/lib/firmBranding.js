@@ -42,8 +42,9 @@ export const FIRM = {
   email:    _cached?.email    || '',
   website:  _cached?.website  || '',
   fax:      _cached?.fax      || '',
-  loaded:   !!_cached,
-  labels:   _cached?.labels   || {},
+  loaded:         !!_cached,
+  labels:         _cached?.labels         || {},
+  paymentProvider: _cached?.paymentProvider || 'stripe',
 }
 // Apply cached branding immediately (title + favicon) before any async fetch
 if (_cached?.name) {
@@ -107,7 +108,8 @@ export async function loadFirmBranding() {
       localStorage.setItem('tcr_firm_branding', JSON.stringify({
         name: FIRM.name, slug: FIRM.slug, tenantId: FIRM.tenantId,
         logoUrl: FIRM.logoUrl, address: FIRM.address, phone: FIRM.phone,
-        email: FIRM.email, website: FIRM.website, fax: FIRM.fax, labels: FIRM.labels
+        email: FIRM.email, website: FIRM.website, fax: FIRM.fax, labels: FIRM.labels,
+        paymentProvider: FIRM.paymentProvider
       }))
     } catch (_) {}
   } catch (_) { /* leave whatever we have; templates degrade gracefully */ }
