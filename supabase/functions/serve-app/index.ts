@@ -21,12 +21,7 @@ const INDEX_HTML = `<!DOCTYPE html>
       })();
     </script>
     <title>TaxRes CRM</title>
-    <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="icon" type="image/x-icon" href="/favicon.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon.png" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/favicon.png" />
-    <link rel="icon" type="image/png" sizes="512x512" href="/favicon.png" />
-    <meta name="theme-color" content="#0f2150" />
+    <link rel="icon" type="image/png" href="/functions/v1/serve-app/favicon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -44,8 +39,8 @@ const INDEX_HTML = `<!DOCTYPE html>
       gtag('js', new Date());
       gtag('config', 'G-M6J80B65LG');
     </script>
-    <script type="module" crossorigin src="/assets/index-Dtmn5plU.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DVq7vtti.css">
+    <script type="module" crossorigin src="/functions/v1/serve-app/assets/index-Dtmn5plU.js"></script>
+    <link rel="stylesheet" crossorigin href="/functions/v1/serve-app/assets/index-DVq7vtti.css">
   </head>
   <body>
     <div id="root"></div>
@@ -64,23 +59,12 @@ function getExt(pathname: string): string {
 
 function getMimeType(ext: string): string {
   const mime: Record<string, string> = {
-    js: 'application/javascript',
-    css: 'text/css',
-    png: 'image/png',
-    jpg: 'image/jpeg',
-    jpeg: 'image/jpeg',
-    gif: 'image/gif',
-    svg: 'image/svg+xml',
-    ico: 'image/x-icon',
-    woff: 'font/woff',
-    woff2: 'font/woff2',
-    ttf: 'font/ttf',
-    pdf: 'application/pdf',
-    json: 'application/json',
-    webp: 'image/webp',
-    txt: 'text/plain',
-    xml: 'application/xml',
-    map: 'application/json',
+    js: 'application/javascript', css: 'text/css', png: 'image/png',
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
+    svg: 'image/svg+xml', ico: 'image/x-icon', woff: 'font/woff',
+    woff2: 'font/woff2', ttf: 'font/ttf', pdf: 'application/pdf',
+    json: 'application/json', webp: 'image/webp', txt: 'text/plain',
+    xml: 'application/xml', map: 'application/json',
   };
   return mime[ext] || 'application/octet-stream';
 }
@@ -89,23 +73,22 @@ Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
   let pathname = url.pathname;
 
-  // Strip the function prefix if called via Supabase functions URL
-  // e.g. /functions/v1/serve-app/assets/... -> /assets/...
+  // Strip function prefix
   const fnPrefix = '/functions/v1/serve-app';
   if (pathname.startsWith(fnPrefix)) {
     pathname = pathname.slice(fnPrefix.length) || '/';
   }
+  if (!pathname || pathname === '') pathname = '/';
 
   const ext = getExt(pathname);
   const isStatic = STATIC_EXTENSIONS.has(ext);
 
   if (isStatic || pathname.startsWith('/assets/') || pathname.startsWith('/state-forms/') || pathname.startsWith('/templates/')) {
-    // Proxy static files from raw.githubusercontent.com
     const rawUrl = `${RAW_BASE}${pathname}`;
     try {
       const upstream = await fetch(rawUrl);
       if (!upstream.ok) {
-        return new Response(`Asset not found: ${pathname}`, { status: 404 });
+        return new Response(`Not found: ${pathname}`, { status: 404 });
       }
       const body = await upstream.arrayBuffer();
       return new Response(body, {
@@ -121,13 +104,12 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  // All other routes: serve index.html (SPA)
+  // All routes → serve index.html (SPA)
   return new Response(INDEX_HTML, {
     status: 200,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'X-Frame-Options': 'DENY',
     },
   });
 });
