@@ -9,7 +9,7 @@ const INDEX_HTML = `<!DOCTYPE html>
     <meta http-equiv="Expires" content="0" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translacent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#0a0f1a" />
     <script>
       (function(){
@@ -52,23 +52,30 @@ const MIME: Record<string, string> = {
 
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
-  // Full pathname e.g. /functions/v1/serve-app/assets/index-Dtmn5plU.js
   const full = url.pathname;
 
-  // Strip the edge function prefix — everything after /functions/v1/serve-app is the asset path
+  // Supabase passes the path WITH the function prefix stripped already
+  // So req.url.pathname for /functions/v1/serve-app/assets/foo.js
+  // arrives as just /assets/foo.js inside the function
+  // BUT sometimes it arrives as /functions/v1/serve-app/assets/foo.js
+  // Handle both cases:
   const PREFIX = '/functions/v1/serve-app';
   const asset = full.startsWith(PREFIX) ? full.slice(PREFIX.length) : full;
-  // asset is now e.g. /assets/index-Dtmn5plU.js or / or /dashboard
+  const cleanAsset = asset || '/';
 
-  const ext = (asset.split('.').pop() ?? '').toLowerCase();
+  // Debug: return the path info for non-HTML requests to diagnose
+  const ext = (cleanAsset.split('.').pop() ?? '').toLowerCase();
 
   if (ext && MIME[ext]) {
-    // Proxy static asset from raw.githubusercontent.com with correct MIME type
-    const rawUrl = `${RAW_BASE}${asset}`;
+    const rawUrl = `${RAW_BASE}${cleanAsset}`;
     try {
       const upstream = await fetch(rawUrl);
       if (!upstream.ok) {
-        return new Response(`Asset not found: ${asset} (${upstream.status})`, { status: 404 });
+        // Return debug info to help trace the issue
+        return new Response(
+          `404: asset=${cleanAsset} full=${full} rawUrl=${rawUrl} upstream=${upstream.status}`,
+          { status: 404, headers: { 'Content-Type': 'text/plain' } }
+        );
       }
       const body = await upstream.arrayBuffer();
       return new Response(body, {
@@ -84,7 +91,6 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  // Everything else → SPA shell
   return new Response(INDEX_HTML, {
     status: 200,
     headers: {
