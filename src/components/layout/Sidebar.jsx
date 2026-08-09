@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { supabase } from '../../lib/supabase'
+import { FIRM } from '../../lib/firmBranding'
 import { OPEN_STATUSES } from '../../lib/caseStatuses'
 
 const LOGO = '/logo.png'
@@ -106,7 +107,7 @@ export default function Sidebar() {
   const { user, logout, can, role, mobileNavOpen, setMobileNavOpen, employeeName } = useApp()
   const location = useLocation()
   const navigate = useNavigate()
-  const [logoUrl, setLogoUrl] = useState(null)
+  const [logoUrl, setLogoUrl] = useState(() => FIRM.logoUrl || null)
 
   // Determine which section contains the active route
   function activeSection() {
@@ -132,7 +133,7 @@ export default function Sidebar() {
   // mobile nav drawer.
   useEffect(() => { setMobileNavOpen(false) }, [location.pathname])
 
-  const [firmName, setFirmName] = useState('Tax Case Review')
+  const [firmName, setFirmName] = useState(() => FIRM.name || 'Tax Case Review')
   // Gates the CRM Companies link — Romy specifically, not any Super Admin
   // anywhere (he was explicit: no one else should ever see this, even another
   // Super Admin on TCR or any other tenant). A plain email match is simpler
@@ -398,12 +399,19 @@ export default function Sidebar() {
       } catch (_) {}
       // Normal path — RLS scopes to the logged-in tenant automatically.
       const { data: s } = await supabase.from('settings').select('name,tagline,logourl').limit(1).maybeSingle()
-      if (s?.name)    setFirmName(s.name)
+      if (s?.name) {
+        setFirmName(s.name)
+        FIRM.name = s.name
+      }
       if (s?.tagline) setTagline(s.tagline)
       if (s?.logourl) {
-        const img = new Image()
-        img.onload = () => setLogoUrl(s.logourl)
-        img.src = s.logourl
+        FIRM.logoUrl = s.logourl
+        // Only update state if different from what's already showing (avoid re-render flicker)
+        if (s.logourl !== logoUrl) {
+          const img = new Image()
+          img.onload = () => setLogoUrl(s.logourl)
+          img.src = s.logourl
+        }
       } else {
         setLogoUrl('')
       }
