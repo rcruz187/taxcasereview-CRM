@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 
 // Same time math used by the admin TimeClock page, kept in sync
 function parseTimeToMins(t) {
@@ -42,10 +43,20 @@ export default function ClockIn() {
   const [reqReason, setReqReason] = useState('')
   const [reqSaving, setReqSaving] = useState(false)
   const [reqMsg, setReqMsg] = useState('')
+  const [firmName, setFirmName] = useState(FIRM.name || 'Time Clock')
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(t)
+  }, [])
+
+  useEffect(() => {
+    // Load branding using tenant hint from URL ?t= param
+    const params = new URLSearchParams(window.location.search)
+    const tenantHint = params.get('t')
+    loadFirmBrandingPublic(tenantHint).then(f => {
+      if (f?.name) setFirmName(f.name)
+    })
   }, [])
 
   useEffect(() => { load() }, [])
@@ -183,7 +194,7 @@ export default function ClockIn() {
     <div style={styles.page}>
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
         <div style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 4 }}>
-          Tax Case Review
+          {firmName}
         </div>
         <div style={{ fontSize: 28, fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{timeStr}</div>
         <div style={{ fontSize: 12, color: 'rgba(255,255,255,.4)', marginTop: 4 }}>{dateStr}</div>
