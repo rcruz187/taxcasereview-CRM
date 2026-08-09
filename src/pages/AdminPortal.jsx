@@ -88,18 +88,15 @@ const NAV = [
   { path:'/crm-admin/health',    label:'System Health',icon:'💚' },
 ]
 
-// v2 — logoUrl prop
-function Sidebar({ onSignOut, logoUrl }) {
+function Sidebar({ onSignOut }) {
   const location = useLocation()
   return (
     <div style={{ width:220, minHeight:'100vh', flexShrink:0, background:'#0f0e1a',
       borderRight:'1px solid rgba(99,102,241,.2)', display:'flex', flexDirection:'column' }}>
       <div style={{ padding:'18px 16px 16px', borderBottom:'1px solid rgba(99,102,241,.15)' }}>
-        {logoUrl && (
-          <img src={logoUrl} alt={FIRM.name || 'TaxRes CRM'}
-            style={{ height:38, objectFit:'contain', display:'block', marginBottom:6 }}
-            onError={e=>{e.target.style.display='none'}} />
-        )}
+        <img src="/taxrescrm-logo.png" alt="TaxRes CRM"
+          style={{ height:38, objectFit:'contain', display:'block', marginBottom:6 }}
+          onError={e=>{e.target.style.display='none'}} />
         <div style={{ fontSize:10, color:'#6366f1', letterSpacing:'.04em', fontWeight:700 }}>Admin Portal</div>
       </div>
 
@@ -3229,15 +3226,6 @@ export default function AdminPortal() {
   const navigate = useNavigate()
   const location = useLocation()
   const { logout } = useApp()
-  const [logoUrl, setLogoUrl] = useState(FIRM.logoUrl || '')
-
-  // Load TaxRes CRM branding so the sidebar logo is reactive
-  useEffect(() => {
-    loadFirmBrandingPublic(TAXRESCRM_TENANT)
-      .then(() => setLogoUrl(FIRM.logoUrl || ''))
-      .catch(() => {})
-  }, [])
-
   // Swap favicon + title to TaxRes CRM brand while in the admin portal
   useEffect(() => {
     const prev = document.title
@@ -3275,7 +3263,7 @@ export default function AdminPortal() {
   return (
     <ScreenShareProvider>
     <div style={{display:'flex',minHeight:'100vh',background:'#0d0c1a',fontFamily:'system-ui,Arial,sans-serif'}}>
-      <Sidebar onSignOut={handleSignOut} logoUrl={logoUrl} />
+      <Sidebar onSignOut={handleSignOut} />
       <div style={{flex:1,position:'relative',height:'100vh',overflow:'hidden'}}>
         {/* Persistent SnappyMail iframe — always mounted so compose drafts survive tab switches.
             Hidden via CSS when not on /email; shown only when on /email route. */}
