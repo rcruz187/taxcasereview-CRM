@@ -4,7 +4,7 @@ import { FIRM } from './firmBranding'
 
 const LOGO_URL = ''  // replaced by FIRM.logoUrl
 
-const FIRM_FAX = '(561) 420-6999'
+const FIRM_FAX = FIRM.fax || '(561) 420-6999'  // falls back to TCR fax if tenant has none set
 
 // Legal/body text renders the SIGNED-IN tenant's own firm, so a demo or
 // prospect tenant never sees Tax Case Review inside an agreement.
@@ -421,7 +421,7 @@ export function generatePOACoverLetter(c = null) {
       <div style="font-size:12px;font-weight:700">Authorized Representative</div>
       <div style="font-size:11.5px;margin-top:4px">${FIRM.name}</div>
       <div style="font-size:11px;color:#555;margin-top:2px">${FIRM.address}</div>
-      <div style="font-size:11px;color:#555">${FIRM.email} &nbsp;·&nbsp; ${FIRM.phone} &nbsp;·&nbsp; Fax (561) 420-6999</div>
+      <div style="font-size:11px;color:#555">${FIRM.email} &nbsp;·&nbsp; ${FIRM.phone}${FIRM.fax ? ' &nbsp;·&nbsp; Fax ' + FIRM.fax : ''}</div>
       <div style="font-size:11px;color:#888;margin-top:6px">Date: _______________________</div>
     </div>
   `)
