@@ -59,7 +59,7 @@ Deno.serve(async (req: Request) => {
   // arrives as just /assets/foo.js inside the function
   // BUT sometimes it arrives as /functions/v1/serve-app/assets/foo.js
   // Handle both cases:
-  const PREFIX = '/functions/v1/serve-app';
+  const PREFIX = '/serve-app';
   const asset = full.startsWith(PREFIX) ? full.slice(PREFIX.length) : full;
   const cleanAsset = asset || '/';
 
