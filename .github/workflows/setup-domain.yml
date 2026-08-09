@@ -10,30 +10,52 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       PROJECT_REF: mpxgxfqdbquzkrvvejkh
     steps:
+      - name: Get current domain status
+        run: |
+          echo "=== Current domain status ==="
+          curl -sS \
+            "https://api.supabase.com/v1/projects/$PROJECT_REF/custom-hostname" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" | tee /tmp/status.json
+          echo ""
+
       - name: Register custom domain
         run: |
-          echo "Registering taxrescrm.app as custom domain..."
-          RESP=$(curl -sS -X POST \
+          echo "=== Registering taxrescrm.app ==="
+          curl -sS -X POST \
             "https://api.supabase.com/v1/projects/$PROJECT_REF/custom-hostname" \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"custom_hostname":"taxrescrm.app"}')
-          echo "Response: $RESP"
-          
-      - name: Check domain status
+            -d '{"custom_hostname":"taxrescrm.app"}' | tee /tmp/register.json
+          echo ""
+
+      - name: Verify domain ownership
         run: |
-          sleep 5
-          RESP=$(curl -sS \
-            "https://api.supabase.com/v1/projects/$PROJECT_REF/custom-hostname" \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN")
-          echo "Status: $RESP"
+          echo "=== Running domain verification ==="
+          curl -sS -X POST \
+            "https://api.supabase.com/v1/projects/$PROJECT_REF/custom-hostname/reverify" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" | tee /tmp/verify.json
+          echo ""
+
+      - name: Activate domain
+        run: |
+          echo "=== Activating domain ==="
+          curl -sS -X POST \
+            "https://api.supabase.com/v1/projects/$PROJECT_REF/custom-hostname/activate" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" | tee /tmp/activate.json
+          echo ""
 
       - name: Post result
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          STATUS=$(cat /tmp/status.json 2>/dev/null || echo "{}")
+          REG=$(cat /tmp/register.json 2>/dev/null || echo "{}")
+          VER=$(cat /tmp/verify.json 2>/dev/null || echo "{}")
+          ACT=$(cat /tmp/activate.json 2>/dev/null || echo "{}")
           gh issue create \
             --repo taxresolutioncrm/taxcasereview-CRM \
-            --title "domain-setup-result" \
-            --body "Setup complete - check logs for details"
+            --title "domain-setup-$(date +%s)" \
+            --body "Status: $STATUS | Register: $REG | Verify: $VER | Activate: $ACT"
