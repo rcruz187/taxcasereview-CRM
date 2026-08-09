@@ -102,8 +102,9 @@ function Sidebar({ onSignOut }) {
 
       <nav style={{ flex:1, padding:'10px 8px', overflowY:'auto' }}>
         {NAV.map(item => {
-          const active = location.pathname === item.path ||
-            (item.path !== '/crm-admin' && location.pathname.startsWith(item.path))
+          const active = item.path === '/crm-admin'
+            ? location.pathname === '/crm-admin' || location.pathname === '/crm-admin/'
+            : location.pathname === item.path || location.pathname.startsWith(item.path + '/')
           return (
             <NavLink key={item.path} to={item.path}
               style={{ display:'flex', alignItems:'center', gap:9, padding:'8px 11px',
@@ -3287,7 +3288,7 @@ export default function AdminPortal() {
             <Route path="/command-center" element={<CommandCenter/>}/>
             <Route path="/content"         element={<ContentCenter/>}/>
             <Route path="/linkedin"        element={<LinkedInPublisher/>}/>
-            <Route path="/"               element={<Overview/>}/>
+            <Route index                   element={<Overview/>}/>
             <Route path="/offices"        element={<OfficesList/>}/>
             <Route path="/offices/:id"    element={<OfficePage/>}/>
             <Route path="/provision"      element={<div style={{padding:8}}><NewOffice/></div>}/>
