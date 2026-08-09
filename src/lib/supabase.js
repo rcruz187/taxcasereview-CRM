@@ -6,23 +6,8 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   realtime: {
     params: {
-      eventsPerSecond: 10,   // throttle client-side to stay under Supabase limits
+      eventsPerSecond: 10,
     },
-    reconnectAfterMs: (attempts) => {
-      // Exponential backoff capped at 30s: 1s, 2s, 4s, 8s, 16s, 30s, 30s, ...
-      return Math.min(1000 * Math.pow(2, attempts), 30000)
-    },
-  },
-  db: {
-    schema: 'public',
-  },
-  global: {
-    fetch: (...args) => {
-      // Add a 30s timeout to all Supabase fetches so hung requests don't block indefinitely
-      const controller = new AbortController()
-      const id = setTimeout(() => controller.abort(), 30000)
-      return fetch(args[0], { ...args[1], signal: controller.signal })
-        .finally(() => clearTimeout(id))
-    },
+    reconnectAfterMs: (attempts) => Math.min(1000 * Math.pow(2, attempts), 30000),
   },
 })

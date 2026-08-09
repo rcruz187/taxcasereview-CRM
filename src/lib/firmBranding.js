@@ -169,3 +169,4 @@ function setFavicon(tenantId, name) {
 export function firmFooterLine() {
   return [FIRM.name, FIRM.address, FIRM.phone].filter(Boolean).join(' · ')
 }
+
