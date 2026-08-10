@@ -1315,7 +1315,7 @@ export default function Clients() {
     const { data: allClients } = await supabase.from('clients').select('id,name,status,email,phone,city,state,"clientType","assignedTo","taxAssociate","pipelineStage","irsBalance","issueType","spouseName",tags,ssn,archived,deleted_at,"business_name",created_at').is('deleted_at',null).order('name', { ascending: true })
     if (allClients) setClients(allClients)
     const newest = allClients?.find(c => c.name === form.name)
-    if (newest) { setDetail(newest); loadRelated(newest.name); navigate('/clients/' + newest.id, { replace: true }) }
+    if (newest) { setDetail(newest); loadRelated(newest.name); navigate('/clients/' + newest.id, { replace: false }) }
   }
 
   async function saveEdit() {

@@ -185,7 +185,7 @@ export default function Cases() {
     setCases(prev => prev.filter(c => c.id !== id)); showToast('Deleted'); setDetail(null); navigate('/cases', { replace: true })
   }
 
-  function openDetail(c) { setDetail(c); loadCaseNotes(c.id); navigate('/cases/' + c.id, { replace: true }) }
+  function openDetail(c) { setDetail(c); loadCaseNotes(c.id); navigate('/cases/' + c.id, { replace: false }) }
   function openEdit(c) { setForm({ ...BLANK, ...c }); setEditCase(c) }
 
   // ── Stat summary for list header ─────────────────────────────────────────────
