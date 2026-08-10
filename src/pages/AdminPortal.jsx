@@ -3288,7 +3288,7 @@ export default function AdminPortal() {
             <Route path="/command-center" element={<CommandCenter/>}/>
             <Route path="/content"         element={<ContentCenter/>}/>
             <Route path="/linkedin"        element={<LinkedInPublisher/>}/>
-            <Route index                   element={<Overview/>}/>
+            <Route index                   element={<Overview key={window.location.pathname + window.location.search}/>}/>
             <Route path="/offices"        element={<OfficesList/>}/>
             <Route path="/offices/:id"    element={<OfficePage/>}/>
             <Route path="/provision"      element={<div style={{padding:8}}><NewOffice/></div>}/>
@@ -3304,7 +3304,7 @@ export default function AdminPortal() {
             <Route path="/email"          element={<div/>}/>
             <Route path="/calendar"       element={<AdminCalendar/>}/>
             <Route path="/training"       element={<AdminTraining/>}/>
-            <Route path="*"               element={<Overview/>}/>
+            <Route path="*"               element={<Overview key={window.location.pathname + window.location.search + "_fallback"}/>}/>
           </Routes>
         </Suspense>
       </div>
