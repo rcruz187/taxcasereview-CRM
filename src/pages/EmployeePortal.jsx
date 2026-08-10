@@ -125,6 +125,15 @@ export default function EmployeePortal() {
   const [periodEntries, setPeriodEntries] = useState([])
 
   const [timeOffReqs, setTimeOffReqs] = useState([])
+  const [empClients, setEmpClients] = useState([])
+  const [empCases, setEmpCases] = useState([])
+  const [empSmsThreads, setEmpSmsThreads] = useState([])
+  const [clientSearch, setClientSearch] = useState('')
+  const [caseSearch, setCaseSearch] = useState('')
+  const [smsClient, setSmsClient] = useState(null)
+  const [smsMessages, setSmsMessages] = useState([])
+  const [smsBody, setSmsBody] = useState('')
+  const [smsSending, setSmsSending] = useState(false)
   const [showRequestForm, setShowRequestForm] = useState(false)
   const [reqType, setReqType] = useState('pto')
   const [reqStart, setReqStart] = useState('')
@@ -207,9 +216,48 @@ export default function EmployeePortal() {
     await Promise.all([
       loadWeek(data.token, 0), loadPeriod(data.token, 0),
       loadTasks(data.token), loadEvents(data.token), loadTimeOff(data.token),
+      loadEmpClients(data.token), loadEmpCases(data.token), loadEmpSmsThreads(data.token),
     ])
     setScreen('home')
     setLogging(false)
+  }
+
+  async function loadEmpClients(token) {
+    const { data } = await supabase.rpc('emp_clients', { p_token: token })
+    if (Array.isArray(data)) setEmpClients(data)
+  }
+
+  async function loadEmpCases(token) {
+    const { data } = await supabase.rpc('emp_cases', { p_token: token })
+    if (Array.isArray(data)) setEmpCases(data)
+  }
+
+  async function loadEmpSmsThreads(token) {
+    const { data } = await supabase.rpc('emp_sms_threads', { p_token: token })
+    if (Array.isArray(data)) setEmpSmsThreads(data)
+  }
+
+  async function loadSmsThread(phone) {
+    if (!phone) return
+    const clean = phone.replace(/\D/g, '').slice(-10)
+    const { data } = await supabase
+      .from('sms_messages')
+      .select('*')
+      .or(`from_number.ilike.%${clean}%,to_number.ilike.%${clean}%`)
+      .order('created_at', { ascending: true })
+      .limit(50)
+    setSmsMessages(data || [])
+  }
+
+  async function sendSms(client) {
+    if (!smsBody.trim() || !client?.phone) return
+    setSmsSending(true)
+    await supabase.functions.invoke('send-sms', {
+      body: { to: client.phone, body: smsBody, client_id: client.client_id, tenant_id: emp.tenant_id }
+    })
+    setSmsBody('')
+    await loadSmsThread(client.phone)
+    setSmsSending(false)
   }
 
   async function loadWeek(token, wOffset = weekOffset) {
@@ -794,9 +842,121 @@ export default function EmployeePortal() {
         </div>
       )}
 
+      {/* ── CLIENTS ── */}
+      {screen === 'clients' && (
+        <div style={{ padding: 16 }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#f1f5f9', marginBottom: 12 }}>My Clients</div>
+          <input
+            value={clientSearch} onChange={e => setClientSearch(e.target.value)}
+            placeholder="Search clients..."
+            style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: 10, padding: '10px 14px', color: '#f1f5f9', fontSize: 14, boxSizing: 'border-box', marginBottom: 12, fontFamily: 'inherit' }}
+          />
+          {empClients.filter(c => !clientSearch || c.name?.toLowerCase().includes(clientSearch.toLowerCase())).map(c => (
+            <div key={c.id} style={{ background: '#0a1628', border: '1px solid #1e293b', borderRadius: 12, padding: 14, marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9' }}>{c.name}</div>
+                <span style={{ fontSize: 11, background: '#1e293b', color: '#94a3b8', borderRadius: 6, padding: '2px 8px' }}>{c.status || 'Active'}</span>
+              </div>
+              {c.phone && (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <a href={`tel:${c.phone}`} style={{ flex: 1, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 0', textAlign: 'center', fontSize: 13, fontWeight: 600, textDecoration: 'none', display: 'block' }}>
+                    📞 Call
+                  </a>
+                  <button onClick={() => { setSmsClient(c); setSmsMessages([]); loadSmsThread(c.phone); setScreen('sms') }}
+                    style={{ flex: 1, background: '#1e40af', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 0', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    💬 Text
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+          {empClients.length === 0 && <div style={{ textAlign: 'center', color: '#475569', fontSize: 13, padding: 32 }}>No clients assigned</div>}
+        </div>
+      )}
+
+      {/* ── CASES ── */}
+      {screen === 'cases' && (
+        <div style={{ padding: 16 }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#f1f5f9', marginBottom: 12 }}>My Cases</div>
+          <input
+            value={caseSearch} onChange={e => setCaseSearch(e.target.value)}
+            placeholder="Search cases..."
+            style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: 10, padding: '10px 14px', color: '#f1f5f9', fontSize: 14, boxSizing: 'border-box', marginBottom: 12, fontFamily: 'inherit' }}
+          />
+          {empCases.filter(c => !caseSearch || c.client_name?.toLowerCase().includes(caseSearch.toLowerCase())).map((c, i) => (
+            <div key={i} style={{ background: '#0a1628', border: '1px solid #1e293b', borderRadius: 12, padding: 14, marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9' }}>{c.client_name}</div>
+                <span style={{ fontSize: 11, background: '#1e293b', color: '#94a3b8', borderRadius: 6, padding: '2px 8px' }}>{c.status}</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>{c.type} {c.resolution ? '· ' + c.resolution : ''}</div>
+              {c.client_phone && (
+                <a href={`tel:${c.client_phone}`} style={{ display: 'block', background: '#16a34a', color: '#fff', borderRadius: 8, padding: '7px 0', textAlign: 'center', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
+                  📞 Call Client
+                </a>
+              )}
+            </div>
+          ))}
+          {empCases.length === 0 && <div style={{ textAlign: 'center', color: '#475569', fontSize: 13, padding: 32 }}>No cases assigned</div>}
+        </div>
+      )}
+
+      {/* ── SMS ── */}
+      {screen === 'sms' && !smsClient && (
+        <div style={{ padding: 16 }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#f1f5f9', marginBottom: 12 }}>Messages</div>
+          {empSmsThreads.map((t, i) => (
+            <div key={i} onClick={() => { setSmsClient(t); loadSmsThread(t.phone) }}
+              style={{ background: '#0a1628', border: '1px solid #1e293b', borderRadius: 12, padding: 14, marginBottom: 10, cursor: 'pointer' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9', marginBottom: 4 }}>{t.client_name}</div>
+              <div style={{ fontSize: 12, color: '#64748b' }}>{t.phone}</div>
+              {t.last_message && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.last_message}</div>}
+            </div>
+          ))}
+          {empSmsThreads.length === 0 && <div style={{ textAlign: 'center', color: '#475569', fontSize: 13, padding: 32 }}>No message threads</div>}
+        </div>
+      )}
+
+      {/* ── SMS THREAD ── */}
+      {screen === 'sms' && smsClient && (
+        <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 140px)' }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid #1e293b', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button onClick={() => setSmsClient(null)} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 20, cursor: 'pointer' }}>←</button>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9' }}>{smsClient.client_name}</div>
+              <div style={{ fontSize: 11, color: '#64748b' }}>{smsClient.phone}</div>
+            </div>
+            <a href={`tel:${smsClient.phone}`} style={{ marginLeft: 'auto', background: '#16a34a', color: '#fff', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>📞 Call</a>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {smsMessages.map((m, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: m.direction === 'outbound' ? 'flex-end' : 'flex-start' }}>
+                <div style={{ maxWidth: '80%', background: m.direction === 'outbound' ? '#16a34a' : '#1e293b', color: '#f1f5f9', borderRadius: 12, padding: '8px 12px', fontSize: 13, lineHeight: 1.5 }}>
+                  {m.body}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ padding: '10px 12px', borderTop: '1px solid #1e293b', display: 'flex', gap: 8 }}>
+            <input value={smsBody} onChange={e => setSmsBody(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') sendSms(smsClient) }}
+              placeholder="Type a message..."
+              style={{ flex: 1, background: '#1e293b', border: '1px solid #334155', borderRadius: 10, padding: '10px 14px', color: '#f1f5f9', fontSize: 14, fontFamily: 'inherit' }}
+            />
+            <button onClick={() => sendSms(smsClient)} disabled={smsSending || !smsBody.trim()}
+              style={{ background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10, padding: '0 16px', fontSize: 18, cursor: 'pointer' }}>
+              ↑
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Bottom nav */}
-      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, background: '#0a1628', borderTop: '1px solid #1e293b', display: 'flex' }}>
+      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, background: '#0a1628', borderTop: '1px solid #1e293b', display: 'flex', overflowX: 'auto' }}>
         {nav('Home', '🏠', 'home')}
+        {nav('Clients', '👥', 'clients')}
+        {nav('Cases', '📁', 'cases')}
+        {nav('Messages', '💬', 'sms')}
         {nav('Schedule', '📋', 'schedule')}
         {nav('Clock', '⏱', 'timeclock')}
         {nav('Pay', '💰', 'pay')}
