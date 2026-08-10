@@ -1286,11 +1286,12 @@ function StorageTab() {
       const now = new Date()
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
+      const tid = FIRM.tenantId
       const [{ count: callCount }, { count: smsCount }, { count: faxCount }, { count: emailCount }] = await Promise.all([
-        supabase.from('calllog').select('id', { count: 'exact', head: true }).gte('created_at', monthStart),
-        supabase.from('sms_messages').select('id', { count: 'exact', head: true }).gte('created_at', monthStart),
-        supabase.from('fax_logs').select('id', { count: 'exact', head: true }).gte('created_at', monthStart),
-        supabase.from('emails').select('id', { count: 'exact', head: true }).gte('created_at', monthStart),
+        supabase.from('calllog').select('id', { count: 'exact', head: true }).eq('tenant_id', tid).gte('created_at', monthStart),
+        supabase.from('sms_messages').select('id', { count: 'exact', head: true }).eq('tenant_id', tid).gte('created_at', monthStart),
+        supabase.from('fax_logs').select('id', { count: 'exact', head: true }).eq('tenant_id', tid).gte('created_at', monthStart),
+        supabase.from('emails').select('id', { count: 'exact', head: true }).eq('tenant_id', tid).gte('created_at', monthStart),
       ])
 
       setUsage({
