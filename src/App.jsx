@@ -34,6 +34,7 @@ const ImpersonateGate = lazy(() => import('./pages/ImpersonateGate'))
 import ImpersonationBanner from './components/ImpersonationBanner'
 const AdminPortal = lazy(() => import('./pages/AdminPortal'))
 const Training = lazy(() => import('./pages/Training'))
+const Manual   = lazy(() => import('./pages/Manual'))
 const Support = lazy(() => import('./pages/Support'))
 
 // Everything behind login is lazy-loaded — each page's code only downloads
@@ -187,6 +188,7 @@ function Shell() {
             <Route path="/new-office"  element={<NewOffice />} />
             <Route path="/admin"       element={<AdminConsole />} />
             <Route path="/training"    element={<Training />} />
+            <Route path="/manual"      element={<Manual />} />
             <Route path="/support"     element={<Support />} />
             <Route path="*"            element={<Navigate to="/" />} />
           </Routes>
