@@ -98,8 +98,48 @@ export default function Chat() {
   const [huddleScreenStream,  setHuddleScreenStream]  = useState(null)
   const [huddleSharingScreen, setHuddleSharingScreen] = useState(false)
   const huddleScreenTrackRef = useRef(null)
+  // Full-screen huddle overlay state
+  const [huddleFullscreen, setHuddleFullscreen] = useState(true)
+  const [raisedHand, setRaisedHand]             = useState(false)
+  const [raisedHands, setRaisedHands]           = useState({})
+  const [floatReactions, setFloatReactions]     = useState([])
+  const [huddleThread, setHuddleThread]         = useState([])
+  const [huddleThreadInput, setHuddleThreadInput] = useState('')
+  const [showHuddleThread, setShowHuddleThread] = useState(false)
+  const [showHuddleReactPicker, setShowHuddleReactPicker] = useState(false)
+  const floatReactionTimers = useRef({})
   const [chatToast, setChatToast] = useState('')
   function showToast(msg) { setChatToast(msg); setTimeout(() => setChatToast(''), 4000) }
+
+  // Floating emoji reactions in huddle
+  function fireHuddleReaction(emoji) {
+    const id = Date.now() + Math.random()
+    const x = 10 + Math.random() * 80 // % from left
+    setFloatReactions(r => [...r, { id, emoji, x }])
+    floatReactionTimers.current[id] = setTimeout(() => {
+      setFloatReactions(r => r.filter(i => i.id !== id))
+      delete floatReactionTimers.current[id]
+    }, 3000)
+    setShowHuddleReactPicker(false)
+  }
+
+  function toggleRaiseHand() {
+    const next = !raisedHand
+    setRaisedHand(next)
+    setRaisedHands(h => ({ ...h, [myName]: next }))
+    // Broadcast to huddle thread so others see it
+    if (next) {
+      const msg = { id: Date.now(), sender: myName, text: `✋ ${myName} raised their hand`, ts: new Date().toISOString(), system: true }
+      setHuddleThread(t => [...t, msg])
+    }
+  }
+
+  function sendHuddleThreadMsg() {
+    if (!huddleThreadInput.trim()) return
+    const msg = { id: Date.now(), sender: myName, text: huddleThreadInput.trim(), ts: new Date().toISOString() }
+    setHuddleThread(t => [...t, msg])
+    setHuddleThreadInput('')
+  }
   const [showEmoji, setShowEmoji]   = useState(false)
   const [showAllEmoji, setShowAllEmoji] = useState(false)
   const [hoverMsg, setHoverMsg]   = useState(null)
@@ -799,73 +839,190 @@ export default function Chat() {
         }} />
       ) : (
       <>
-        {/* Huddle banner */}
-        {huddle && (
-          <div>
-          <div style={{ background: 'linear-gradient(90deg,#14532d,#15803d)', padding: '7px 20px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, fontSize: 13, color: '#dcfce7', flexShrink: 0, borderBottom: '1px solid #16a34a' }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4ade80', display: 'inline-block' }}/>
-            <span style={{ fontWeight: 700 }}>Huddle</span>
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              {huddleMembers.map(n => <Avatar key={n} name={n} size={22}/>)}
-            </div>
-            <span style={{ color: '#86efac', fontSize: 12 }}>{huddleMembers.join(', ')}</span>
-            <button onClick={() => setShowHuddleInvite(h=>!h)} style={{ marginLeft: 4, padding: '2px 10px', borderRadius: 5, border: '1px solid #16a34a', background: 'rgba(255,255,255,.1)', color: '#dcfce7', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>+ Invite</button>
-            {showHuddleInvite && (
-              <div style={{ position: 'relative' }}>
-                <div style={{ position: 'absolute', top: 24, left: 0, background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: 8, padding: 4, zIndex: 50, minWidth: 180, boxShadow: '0 8px 24px rgba(0,0,0,.5)' }}>
-                  {TEAM.filter(t => !huddleMembers.includes(t.name)).map(t => (
-                    <div key={t.id} onClick={() => inviteToHuddle(t.name)} style={{ padding: '7px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--tx)', borderRadius: 5 }}
-                      onMouseEnter={e => e.currentTarget.style.background='var(--s2)'}
-                      onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-                      <Avatar name={t.name} size={24} color={t.color}/>{t.name}
-                    </div>
-                  ))}
-                  {TEAM.every(t => huddleMembers.includes(t.name)) && <div style={{ padding: '7px 12px', fontSize: 12, color: 'var(--t3)' }}>Everyone's in!</div>}
-                </div>
-              </div>
-            )}
-            <button onClick={webrtc.toggleMic} style={{ padding: '3px 12px', borderRadius: 5, background: 'rgba(255,255,255,.15)', border: '1px solid rgba(255,255,255,.3)', color: '#dcfce7', cursor: 'pointer', fontWeight: 600, fontSize: 12 }} title={micOn ? 'Mute' : 'Unmute'}>
-              {micOn ? '🎤 Mic On' : '🔇 Muted'}
-            </button>
-            <button onClick={webrtc.toggleCamera} style={{ padding: '3px 12px', borderRadius: 5, background: 'rgba(255,255,255,.15)', border: '1px solid rgba(255,255,255,.3)', color: '#dcfce7', cursor: 'pointer', fontWeight: 600, fontSize: 12 }} title={cameraOn ? 'Turn camera off' : 'Turn camera on'}>
-              {cameraOn ? '📹 Camera On' : '📷 Off'}
-            </button>
-            {!huddleSharingScreen
-              ? <button onClick={startHuddleScreenShare} style={{ padding: '3px 12px', borderRadius: 5, background: 'rgba(255,255,255,.15)', border: '1px solid rgba(255,255,255,.3)', color: '#dcfce7', cursor: 'pointer', fontWeight: 600, fontSize: 12 }} title="Share your screen">
-                  🖥️ Share Screen
-                </button>
-              : <button onClick={stopHuddleScreenShare} style={{ padding: '3px 12px', borderRadius: 5, background: 'rgba(124,58,237,.3)', border: '1px solid #7c3aed', color: '#c4b5fd', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
-                  ⏹ Stop Sharing
-                </button>
-            }
-            <button onClick={() => setShowBgPanel(p => !p)} style={{ padding: '3px 12px', borderRadius: 5, background: showBgPanel ? 'rgba(59,130,246,.3)' : 'rgba(255,255,255,.15)', border: showBgPanel ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,.3)', color: showBgPanel ? '#93c5fd' : '#dcfce7', cursor: 'pointer', fontWeight: 600, fontSize: 12 }} title="Virtual Background">
-              🖼️ BG
-            </button>
-            <button onClick={leaveHuddle} style={{ marginLeft: 4, padding: '3px 12px', borderRadius: 5, background: 'rgba(239,68,68,.2)', border: '1px solid #ef4444', color: '#fca5a5', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>Leave Huddle</button>
-          </div>
-          {webrtc.error && (
-            <div style={{ background: '#451a03', color: '#fdba74', fontSize: 12, padding: '6px 20px', borderBottom: '1px solid #92400e' }}>{webrtc.error}</div>
-          )}
-          {/* Virtual background panel */}
-          {showBgPanel && (
-            <VirtualBackground
-              bgMode={vbg.bgMode} bgPreset={vbg.bgPreset} segStatus={vbg.segStatus}
-              onSelect={handleHuddleBgSelect}
-            />
-          )}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: 14, background: 'var(--bg)', borderBottom: '1px solid var(--br)', maxHeight: 340, overflowY: 'auto', flexShrink: 0 }}>
-            <div className="chat-huddle-tile" style={{ width: 340, flexShrink: 0 }}>
-              <VideoTile stream={huddleProcessedStream || webrtc.localStreamRef.current} name={myName} label={`${myName} (you)`} muted mirror videoEnabled={cameraOn} />
-            </div>
-            {huddleMembers.filter(n => n !== myName).map(n => (
-              <div key={n} className="chat-huddle-tile" style={{ width: 340, flexShrink: 0 }}>
-                <VideoTile stream={webrtc.remoteStreams[n]} name={n} />
-              </div>
+        {/* Full-screen Huddle Overlay */}
+        {huddle && huddleFullscreen && (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 9000,
+            background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          }}>
+            {floatReactions.map(r => (
+              <div key={r.id} style={{
+                position: 'absolute', bottom: 80, left: `${r.x}%`,
+                fontSize: 36, pointerEvents: 'none', zIndex: 9010,
+                animation: 'huddleFloatUp 3s ease-out forwards',
+              }}>{r.emoji}</div>
             ))}
-          </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', flexShrink: 0, background: 'rgba(0,0,0,.3)' }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 8px #4ade80', display: 'inline-block' }}/>
+              <span style={{ fontWeight: 700, color: '#fff', fontSize: 14 }}>Huddle</span>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 4 }}>
+                {huddleMembers.map(n => (
+                  <div key={n} style={{ position: 'relative' }}>
+                    <Avatar name={n} size={26} color={colorFor(n)}/>
+                    {raisedHands[n] && <span style={{ position: 'absolute', top: -8, right: -8, fontSize: 14 }}>✋</span>}
+                  </div>
+                ))}
+              </div>
+              <span style={{ color: '#94a3b8', fontSize: 12 }}>{huddleMembers.join(', ')}</span>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                <button onClick={() => setShowHuddleThread(t => !t)}
+                  style={{ padding: '4px 12px', borderRadius: 6, border: `1px solid ${showHuddleThread ? '#6366f1' : 'rgba(255,255,255,.2)'}`, background: showHuddleThread ? 'rgba(99,102,241,.2)' : 'rgba(255,255,255,.08)', color: showHuddleThread ? '#a5b4fc' : '#e2e8f0', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                  💬 Thread {huddleThread.length > 0 && <span style={{ background: '#6366f1', color: '#fff', borderRadius: 10, padding: '0 5px', fontSize: 10, marginLeft: 4 }}>{huddleThread.length}</span>}
+                </button>
+                <button onClick={() => setHuddleFullscreen(false)}
+                  style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)', color: '#e2e8f0', cursor: 'pointer', fontSize: 12 }}>
+                  ⬇ Minimize
+                </button>
+              </div>
+            </div>
+            <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+              <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: 12, padding: 16, alignContent: 'center', overflowY: 'auto', alignItems: 'center', justifyContent: 'center' }}>
+                {huddleSharingScreen && huddleScreenStream && (
+                  <div style={{ width: '100%', borderRadius: 12, overflow: 'hidden', border: '2px solid #7c3aed', background: '#000', maxHeight: '55%', position: 'relative' }}>
+                    <video autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+                      ref={el => { if (el && huddleScreenStream) el.srcObject = huddleScreenStream }}/>
+                    <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(124,58,237,.85)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>You are sharing</div>
+                  </div>
+                )}
+                <div style={{ width: huddleMembers.length <= 2 ? 380 : 280, borderRadius: 12, overflow: 'hidden', flexShrink: 0, position: 'relative', border: '2px solid rgba(255,255,255,.12)' }}>
+                  <VideoTile stream={huddleProcessedStream || webrtc.localStreamRef.current} name={myName} label={`${myName} (you)`} muted mirror videoEnabled={cameraOn}/>
+                  {raisedHand && <div style={{ position: 'absolute', top: 8, right: 8, fontSize: 20, background: 'rgba(0,0,0,.55)', borderRadius: 8, padding: '2px 6px' }}>✋</div>}
+                  {!micOn && <div style={{ position: 'absolute', bottom: 8, left: 8, background: 'rgba(0,0,0,.6)', borderRadius: 20, padding: '2px 8px', fontSize: 11, color: '#fca5a5' }}>🔇</div>}
+                </div>
+                {huddleMembers.filter(n => n !== myName).map(n => (
+                  <div key={n} style={{ width: huddleMembers.length <= 2 ? 380 : 280, borderRadius: 12, overflow: 'hidden', flexShrink: 0, position: 'relative', border: '2px solid rgba(255,255,255,.12)' }}>
+                    <VideoTile stream={webrtc.remoteStreams[n]} name={n}/>
+                    {raisedHands[n] && <div style={{ position: 'absolute', top: 8, right: 8, fontSize: 20, background: 'rgba(0,0,0,.55)', borderRadius: 8, padding: '2px 6px' }}>✋</div>}
+                  </div>
+                ))}
+              </div>
+              {showHuddleThread && (
+                <div style={{ width: 300, flexShrink: 0, background: 'rgba(15,23,42,.95)', borderLeft: '1px solid rgba(255,255,255,.1)', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,.08)', fontWeight: 700, color: '#fff', fontSize: 14 }}>
+                    💬 Huddle Thread
+                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 400, marginTop: 2 }}>Saved after huddle ends</div>
+                  </div>
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {huddleThread.length === 0 && <div style={{ color: '#475569', fontSize: 12, textAlign: 'center', marginTop: 20 }}>No messages yet</div>}
+                    {huddleThread.map(m => (
+                      <div key={m.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                        <Avatar name={m.sender} size={24}/>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: m.system ? '#f59e0b' : '#a5b4fc', marginBottom: 2 }}>{m.sender}</div>
+                          <div style={{ fontSize: 13, color: m.system ? '#fde68a' : '#e2e8f0', lineHeight: 1.4 }}>{m.text}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 8 }}>
+                    <input value={huddleThreadInput} onChange={e => setHuddleThreadInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && sendHuddleThreadMsg()}
+                      placeholder="Message thread…"
+                      style={{ flex: 1, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)', borderRadius: 8, padding: '7px 10px', color: '#f1f5f9', fontSize: 13, outline: 'none' }}/>
+                    <button onClick={sendHuddleThreadMsg} style={{ background: '#6366f1', border: 'none', borderRadius: 8, padding: '7px 12px', color: '#fff', cursor: 'pointer', fontSize: 13 }}>↑</button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '12px 24px', background: 'rgba(0,0,0,.45)', flexShrink: 0, flexWrap: 'wrap' }}>
+              {[
+                { icon: micOn ? '🎤' : '🔇', label: micOn ? 'Mute' : 'Unmuted', onClick: webrtc.toggleMic, active: micOn, danger: !micOn },
+                { icon: cameraOn ? '📹' : '📷', label: cameraOn ? 'Camera' : 'Off', onClick: webrtc.toggleCamera, active: cameraOn, danger: !cameraOn },
+              ].map(b => (
+                <button key={b.label} onClick={b.onClick}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: b.danger ? 'rgba(239,68,68,.25)' : 'rgba(255,255,255,.12)', border: `1px solid ${b.danger ? '#ef4444' : 'rgba(255,255,255,.2)'}`, borderRadius: 12, padding: '8px 16px', cursor: 'pointer', color: b.danger ? '#fca5a5' : '#e2e8f0', minWidth: 64 }}>
+                  <span style={{ fontSize: 20 }}>{b.icon}</span>
+                  <span style={{ fontSize: 10, fontWeight: 600 }}>{b.label}</span>
+                </button>
+              ))}
+              <button onClick={huddleSharingScreen ? stopHuddleScreenShare : startHuddleScreenShare}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: huddleSharingScreen ? 'rgba(124,58,237,.3)' : 'rgba(255,255,255,.12)', border: `1px solid ${huddleSharingScreen ? '#7c3aed' : 'rgba(255,255,255,.2)'}`, borderRadius: 12, padding: '8px 16px', cursor: 'pointer', color: huddleSharingScreen ? '#c4b5fd' : '#e2e8f0', minWidth: 64 }}>
+                <span style={{ fontSize: 20 }}>🖥️</span>
+                <span style={{ fontSize: 10, fontWeight: 600 }}>{huddleSharingScreen ? 'Stop' : 'Share'}</span>
+              </button>
+              <div style={{ position: 'relative' }}>
+                <button onClick={() => setShowBgPanel(p => !p)}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: showBgPanel ? 'rgba(59,130,246,.25)' : 'rgba(255,255,255,.12)', border: `1px solid ${showBgPanel ? '#3b82f6' : 'rgba(255,255,255,.2)'}`, borderRadius: 12, padding: '8px 16px', cursor: 'pointer', color: showBgPanel ? '#93c5fd' : '#e2e8f0', minWidth: 64 }}>
+                  <span style={{ fontSize: 20 }}>🖼️</span>
+                  <span style={{ fontSize: 10, fontWeight: 600 }}>BG</span>
+                </button>
+                {showBgPanel && (
+                  <div style={{ position: 'absolute', bottom: 60, left: '50%', transform: 'translateX(-50%)', zIndex: 9020 }}>
+                    <VirtualBackground bgMode={vbg.bgMode} bgPreset={vbg.bgPreset} segStatus={vbg.segStatus} onSelect={handleHuddleBgSelect}/>
+                  </div>
+                )}
+              </div>
+              <button onClick={toggleRaiseHand}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: raisedHand ? 'rgba(245,158,11,.25)' : 'rgba(255,255,255,.12)', border: `1px solid ${raisedHand ? '#f59e0b' : 'rgba(255,255,255,.2)'}`, borderRadius: 12, padding: '8px 16px', cursor: 'pointer', color: raisedHand ? '#fde68a' : '#e2e8f0', minWidth: 64 }}>
+                <span style={{ fontSize: 20 }}>✋</span>
+                <span style={{ fontSize: 10, fontWeight: 600 }}>{raisedHand ? 'Lower' : 'Raise'}</span>
+              </button>
+              <div style={{ position: 'relative' }}>
+                <button onClick={() => setShowHuddleReactPicker(p => !p)}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.2)', borderRadius: 12, padding: '8px 16px', cursor: 'pointer', color: '#e2e8f0', minWidth: 64 }}>
+                  <span style={{ fontSize: 20 }}>😊</span>
+                  <span style={{ fontSize: 10, fontWeight: 600 }}>React</span>
+                </button>
+                {showHuddleReactPicker && (
+                  <div style={{ position: 'absolute', bottom: 60, left: '50%', transform: 'translateX(-50%)', background: '#1e293b', border: '1px solid rgba(255,255,255,.15)', borderRadius: 12, padding: 10, display: 'flex', gap: 6, flexWrap: 'wrap', width: 200, zIndex: 9020, boxShadow: '0 8px 32px rgba(0,0,0,.5)' }}>
+                    {['👍','❤️','😂','🎉','🔥','😮','👏','🙏','💯','🤝','✅','👀'].map(e => (
+                      <button key={e} onClick={() => fireHuddleReaction(e)}
+                        style={{ fontSize: 22, background: 'none', border: 'none', cursor: 'pointer', borderRadius: 6, padding: 3, lineHeight: 1 }}
+                        onMouseEnter={ev => ev.currentTarget.style.background='rgba(255,255,255,.12)'}
+                        onMouseLeave={ev => ev.currentTarget.style.background='none'}>
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div style={{ position: 'relative' }}>
+                <button onClick={() => setShowHuddleInvite(h => !h)}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.2)', borderRadius: 12, padding: '8px 16px', cursor: 'pointer', color: '#e2e8f0', minWidth: 64 }}>
+                  <span style={{ fontSize: 20 }}>👥</span>
+                  <span style={{ fontSize: 10, fontWeight: 600 }}>Invite</span>
+                </button>
+                {showHuddleInvite && (
+                  <div style={{ position: 'absolute', bottom: 60, left: '50%', transform: 'translateX(-50%)', background: '#1e293b', border: '1px solid rgba(255,255,255,.15)', borderRadius: 10, padding: 6, zIndex: 9020, minWidth: 200, boxShadow: '0 8px 32px rgba(0,0,0,.5)' }}>
+                    {TEAM.filter(t => !huddleMembers.includes(t.name)).map(t => (
+                      <div key={t.id} onClick={() => inviteToHuddle(t.name)}
+                        style={{ padding: '7px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#e2e8f0', borderRadius: 6 }}
+                        onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,.08)'}
+                        onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                        <Avatar name={t.name} size={24} color={t.color}/>{t.name}
+                      </div>
+                    ))}
+                    {TEAM.every(t => huddleMembers.includes(t.name)) && <div style={{ padding: '7px 12px', fontSize: 12, color: '#64748b' }}>Everyone's in!</div>}
+                  </div>
+                )}
+              </div>
+              <button onClick={leaveHuddle}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: 'rgba(239,68,68,.2)', border: '1px solid #ef4444', borderRadius: 12, padding: '8px 16px', cursor: 'pointer', color: '#fca5a5', minWidth: 64 }}>
+                <span style={{ fontSize: 20 }}>📵</span>
+                <span style={{ fontSize: 10, fontWeight: 600 }}>Leave</span>
+              </button>
+            </div>
           </div>
         )}
 
+        {/* Minimized huddle bar */}
+        {huddle && !huddleFullscreen && (
+          <div style={{ background: '#052e16', borderBottom: '1px solid #16a34a', padding: '6px 16px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#4ade80', display: 'inline-block', animation: 'pulse 2s infinite' }}/>
+            <span style={{ fontWeight: 700, color: '#dcfce7', fontSize: 13 }}>Huddle active</span>
+            <span style={{ color: '#86efac', fontSize: 12 }}>{huddleMembers.join(', ')}</span>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+              <button onClick={webrtc.toggleMic} style={{ padding: '3px 10px', borderRadius: 5, background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.2)', color: '#dcfce7', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>{micOn ? '🎤' : '🔇'}</button>
+              <button onClick={webrtc.toggleCamera} style={{ padding: '3px 10px', borderRadius: 5, background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.2)', color: '#dcfce7', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>{cameraOn ? '📹' : '📷'}</button>
+              <button onClick={() => setHuddleFullscreen(true)} style={{ padding: '3px 10px', borderRadius: 5, background: 'rgba(99,102,241,.2)', border: '1px solid #6366f1', color: '#a5b4fc', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>⬆ Open</button>
+              <button onClick={leaveHuddle} style={{ padding: '3px 10px', borderRadius: 5, background: 'rgba(239,68,68,.15)', border: '1px solid #ef4444', color: '#fca5a5', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>Leave</button>
+            </div>
+          </div>
+        )}
+        <style>{`@keyframes huddleFloatUp { 0%{opacity:1;transform:translateY(0) scale(1)} 80%{opacity:.8;transform:translateY(-120px) scale(1.3)} 100%{opacity:0;transform:translateY(-160px) scale(.8)} }`}</style>
+
+        {/* Channel header */}
         {/* Channel header */}
         <div style={{ height: 52, borderBottom: '1px solid var(--br)', display: 'flex', alignItems: 'center', padding: '0 20px', gap: 12, flexShrink: 0, background: 'var(--sf)' }}>
           <button onClick={() => setShowChannelsMobile(true)} title="Channels" className="chat-channel-toggle-btn"

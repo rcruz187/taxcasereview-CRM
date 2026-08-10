@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase'
 import { FIRM, loadFirmBranding, loadFirmBrandingPublic } from '../lib/firmBranding'
 import { useApp } from '../context/AppContext'
 import AIAssistant from '../components/AIAssistant'
+const AdminChatPage = lazy(() => import('./AdminChat'))
 
 const NewOffice    = lazy(() => import('./NewOffice'))
 const Support      = lazy(() => import('./Support'))
@@ -100,6 +101,7 @@ const NAV = [
   { path:'/crm-admin/email',     label:'Email',        icon:'📧' },
   { path:'/crm-admin/calendar',  label:'Calendar',     icon:'📅' },
   { path:'/crm-admin/training',  label:'Training',     icon:'🖥️' },
+  { path:'/crm-admin/chat',      label:'Chat (All)',   icon:'💬' },
   { path:'/crm-admin',           label:'Overview',     icon:'📊' },
   { path:'/crm-admin/provision', label:'+ New Office', icon:'➕' },
   { path:'/crm-admin/offices',   label:'Offices',      icon:'🏢' },
@@ -3335,6 +3337,7 @@ export default function AdminPortal() {
             <Route path="/email"          element={<div/>}/>
             <Route path="/calendar"       element={<AdminRouteErrorBoundary><AdminCalendar/></AdminRouteErrorBoundary>}/>
             <Route path="/training"       element={<AdminRouteErrorBoundary><AdminTraining/></AdminRouteErrorBoundary>}/>
+            <Route path="/chat"           element={<AdminRouteErrorBoundary><AdminChatPage/></AdminRouteErrorBoundary>}/>
             <Route path="*"               element={<Overview key={window.location.pathname + window.location.search + "_fallback"}/>}/>
           </Routes>
         </Suspense>
