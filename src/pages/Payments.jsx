@@ -156,12 +156,12 @@ export default function Payments() {
     setItems(prev => prev.filter(i => i.id !== confirmDel)); setConfirmDel(null); showToast('Deleted')
   }
 
-  const cleared = items.filter(p=>p.status==='Cleared').reduce((s,p)=>s+parseFloat(p.amount||0),0)
-  const pending = items.filter(p=>p.status==='Pending').reduce((s,p)=>s+parseFloat(p.amount||0),0)
+  const cleared = items.filter(p=>['Cleared','paid','Posted','completed'].includes(p.status)).reduce((s,p)=>s+parseFloat(p.amount||0),0)
+  const pending = items.filter(p=>['Pending','TBD','No Status','New Agmt'].includes(p.status)).reduce((s,p)=>s+parseFloat(p.amount||0),0)
 
   const filtered = items.filter(p=>{
     const q = search.toLowerCase()
-    const ms = !q || p.clientName?.toLowerCase().includes(q) || p.invNum?.includes(q)
+    const ms = !q || (p.clientName||p.clientname)?.toLowerCase().includes(q) || p.invNum?.includes(q)
     const mm = filterMethod==='All' || p.method===filterMethod
     const ms2 = filterStatus==='All' || p.status===filterStatus
     return ms && mm && ms2
@@ -204,7 +204,7 @@ export default function Payments() {
     <div class="amount">$${Number(pay.amount||0).toLocaleString('en-US',{minimumFractionDigits:2})}</div>
   </div>
   <div class="box">
-    <div class="row"><span class="label">Client</span><span class="value">${pay.clientName||'—'}</span></div>
+    <div class="row"><span class="label">Client</span><span class="value">${pay.clientName||pay.clientname||'—'}</span></div>
     <div class="row"><span class="label">Date</span><span class="value">${date}</span></div>
     <div class="row"><span class="label">Method</span><span class="value">${pay.method||'—'}</span></div>
     <div class="row"><span class="label">Status</span><span class="value">${pay.status||'Cleared'}</span></div>
@@ -334,7 +334,7 @@ export default function Payments() {
                 <tr key={p.id} style={{borderBottom:'1px solid var(--br)'}}
                   onMouseEnter={e=>e.currentTarget.style.background='var(--s2)'}
                   onMouseLeave={e=>e.currentTarget.style.background=''}>
-                  <td style={{padding:'9px 12px',fontWeight:600}}><ClientLink name={p.clientName} /></td>
+                  <td style={{padding:'9px 12px',fontWeight:600}}><ClientLink name={p.clientName || p.clientname} /></td>
                   <td style={{padding:'9px 12px',color:'var(--blue)',fontSize:11,fontWeight:600}}>{p.invNum||'—'}</td>
                   <td style={{padding:'9px 12px',fontWeight:700,color:'var(--ok)',fontSize:13}}>${parseFloat(p.amount||0).toLocaleString()}</td>
                   <td style={{padding:'9px 12px'}}><span className="bdg bn" style={{fontSize:10}}>{p.method}</span></td>
