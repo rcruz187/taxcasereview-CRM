@@ -10,6 +10,7 @@ import IRSFormFiller from '../components/IRSFormFiller'
 import ErrorBoundary from '../components/ErrorBoundary'
 import InPlaceCaller from '../components/InPlaceCaller'
 import CallAISummaries from '../components/CallAISummaries'
+import ClientTransactions from '../components/ClientTransactions'
 import BookingWidget from '../components/BookingWidget'
 import QuickEmail from '../components/QuickEmail'
 import { ESIGN_DOC_TYPES } from '../lib/esignDocTypes'
@@ -2098,6 +2099,7 @@ export default function Clients() {
               {key:'organizer',  icon:'🧾', text:'Tax-Organizer'},
               {key:'activity',   icon:'📋', text:'Activity Report'},
               {key:'calls',      icon:'📞', text:'Calls'},
+              {key:'transactions', icon:'💰', text:'Transactions'},
             ].map(t=>(
               <button key={t.key} onClick={()=>setDetailTab(t.key)}
                 style={{display:'inline-flex',alignItems:'center',gap:5,padding:'12px 9px',border:'none',borderBottom:detailTab===t.key?'2px solid var(--blue)':'2px solid transparent',
@@ -2220,6 +2222,13 @@ export default function Clients() {
           {detailTab==='calls'&&(
             <div style={{padding:'0 4px'}}>
               <CallAISummaries clientId={c.id} tenantId={c.tenant_id} />
+            </div>
+          )}
+
+          {/* Transactions Tab */}
+          {detailTab==='transactions'&&(
+            <div style={{padding:'0 4px'}}>
+              <ClientTransactions clientId={c.id} clientName={c.name} tenantId={c.tenant_id} />
             </div>
           )}
 
