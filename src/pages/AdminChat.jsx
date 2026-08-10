@@ -76,10 +76,7 @@ export default function AdminChat() {
   useEffect(() => {
     const rt = supabase.channel('admin-chat-all')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, ({ new: msg }) => {
-        // Update inbox recent
-        setAllRecent(prev => [msg, ...prev].slice(0, 200))
-        // Update unread count for office (we need to map tenant_id somehow)
-        // Messages don't always carry tenant_id but channel does via prefix
+        setAllRecent(prev => [msg, ...prev].slice(0, 300))
         if (selectedOffice && selectedChan && msg.channel === selectedChan) {
           setMessages(prev => [...prev, msg])
           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
@@ -91,13 +88,8 @@ export default function AdminChat() {
   }, [selectedOffice, selectedChan])
 
   async function loadInbox() {
-    // Fetch recent messages across all offices — admin has unrestricted access
     setLoading(true)
-    const { data } = await supabase
-      .from('chat_messages')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(300)
+    const { data } = await supabase.rpc('admin_get_all_chat_messages', { p_limit: 300 })
     setAllRecent(data || [])
     setLoading(false)
   }
@@ -121,18 +113,18 @@ export default function AdminChat() {
     // Auto-select first channel
     const first = (chans || [])[0] || { id: 'general', label: 'general' }
     setSelectedChan(first.id)
-    loadChannelMessages(first.id)
+    loadChannelMessages(first.id, office.id)
   }
 
-  async function loadChannelMessages(chanId) {
+  async function loadChannelMessages(chanId, officeId) {
     setLoading(true)
-    const { data } = await supabase
-      .from('chat_messages')
-      .select('*')
-      .eq('channel', chanId)
-      .order('created_at', { ascending: true })
-      .limit(200)
-    setMessages(data || [])
+    const { data } = await supabase.rpc('admin_get_all_chat_messages', {
+      p_limit: 200,
+      p_channel: chanId,
+      p_tenant_id: officeId || selectedOffice?.id || null,
+    })
+    // RPC returns DESC, reverse for chronological display
+    setMessages((data || []).reverse())
     setLoading(false)
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
   }
@@ -140,7 +132,7 @@ export default function AdminChat() {
   async function selectChannel(chan) {
     setSelectedChan(chan.id)
     setMessages([])
-    loadChannelMessages(chan.id)
+    loadChannelMessages(chan.id, selectedOffice?.id)
   }
 
   async function sendMessage() {
