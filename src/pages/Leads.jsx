@@ -1121,7 +1121,7 @@ export default function Leads() {
         const bizSuffix = newest.business_name && newest.business_name !== newest.name
           ? ` — ${newest.business_name}` : ''
         await logAction(newest.id, newest.name, `🆕 Lead created${bizSuffix} (${newest.clientType||'Individual'})`)
-        setDetail(newest); loadLeadNotes(newest.id); navigate('/leads/' + newest.id, { replace: true })
+        setDetail(newest); loadLeadNotes(newest.id); navigate('/leads/' + newest.id, { replace: false })
       }
     }
   }
@@ -3051,7 +3051,7 @@ export default function Leads() {
                   </div>
                 </td></tr>
               ) : sortedFiltered.map(l => (
-                <tr key={l.id} onClick={()=>{ setDetail(l); loadLeadNotes(l.id); navigate('/leads/'+l.id, {replace:true}) }} style={{cursor:'pointer'}}>
+                <tr key={l.id} onClick={()=>{ setDetail(l); loadLeadNotes(l.id); navigate('/leads/'+l.id, {replace:false}) }} style={{cursor:'pointer'}}>
                   <td style={{fontWeight:700,color:'var(--tx)',fontSize:13}}>
                     {l.name}
                     {l.business_name && l.business_name !== l.name && (

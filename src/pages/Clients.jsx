@@ -1803,7 +1803,7 @@ export default function Clients() {
     setRelCases([]);setRelTasks([]);setRelInvoices([]);setRelSms([]);setRelDeadlines([])
     loadRelated(c.name)
     const qs = opts.preserveTab ? searchParams.toString() : ''
-    navigate(`/clients/${c.id}${qs ? `?${qs}` : ''}`, { replace: true })
+    navigate(`/clients/${c.id}${qs ? `?${qs}` : ''}`, { replace: false })
     // If opened from the list (narrow columns), upgrade to full row in background
     if (!opts.full) {
       supabase.from('clients').select('*').eq('id', c.id).single().then(({ data }) => {
