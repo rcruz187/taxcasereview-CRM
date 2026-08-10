@@ -800,7 +800,7 @@ function SystemHealth() {
     { label:'Edge Functions',       ok:health.fnOk,   note: health.fnOk ? `Deployed & responding — ${health.fnMs}ms` : 'send-email unreachable' },
     { label:'Webmail (SnappyMail)', ok:health.mailOk, note: health.mailOk ? 'webmail.taxrescrm.net:7443 reachable' : 'Not reachable — check OCI server' },
     { label:'ICS Watcher',          ok:true,           note: health.icsRow ? `Last auto-import: ${fmtAgo(health.icsRow.created_at)}` : 'Running — no imports yet' },
-    { label:'GitHub Pages',         ok:true,           note: 'taxrescrm.app live' },
+    { label:'Cloudflare Pages',      ok:true,           note: 'taxrescrm.app live (Cloudflare)' },
   ] : []
 
   return (
