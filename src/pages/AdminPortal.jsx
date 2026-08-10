@@ -637,7 +637,8 @@ function SystemHealth() {
     setLoading(true)
     try {
       // 1. Platform overview via RPC
-      const { data: overview } = await supabase.rpc('admin_tenant_overview').catch(()=>({data:[]}))
+      let overview = []
+      try { const r = await supabase.rpc('admin_tenant_overview'); overview = r.data || [] } catch(_) {}
       const offices      = (overview||[]).length
       const totalSeats   = (overview||[]).reduce((s,r)=>s+Number(r.employee_count||0),0)
       const totalClients = (overview||[]).reduce((s,r)=>s+Number(r.client_count||0),0)
@@ -670,8 +671,8 @@ function SystemHealth() {
       } catch(_) { mailOk = false }
 
       // 6. ICS watcher — last ics_auto insert
-      const { data: icsRows } = await supabase.from('calevents').select('created_at')
-        .eq('source','ics_auto').order('created_at',{ascending:false}).limit(1).catch(()=>({data:[]}))
+      let icsRows = []
+      try { const r = await supabase.from('calevents').select('created_at').eq('source','ics_auto').order('created_at',{ascending:false}).limit(1); icsRows = r.data || [] } catch(_) {}
 
       setLastRefresh(new Date())
       setHealth({ offices, activeOff, totalSeats, totalClients, dbOk, dbMs, authOk, fnOk, fnMs, mailOk, icsRow: (icsRows||[])[0]||null })
@@ -849,7 +850,7 @@ function EmployeeLookup() {
     if (!q.trim()) return
     setBusy(true)
     // Clear tenant override so RLS returns employees across ALL tenants
-    await supabase.rpc('set_admin_tenant_override', { p_tenant_id: null }).catch(()=>{})
+    await supabase.rpc('set_admin_tenant_override', { p_tenant_id: null }).then(()=>{}).catch(()=>{})
     const { data } = await supabase
       .from('employees')
       .select('id,name,email,role,access,phone,avatar_url,tenant_id,created_at,tenants(firm_name)')
@@ -1028,7 +1029,7 @@ function AdminTraining(){
       .then(()=> setReady(true))
       .catch(()=> setReady(true))
     return ()=>{
-      supabase.rpc('set_admin_tenant_override',{ p_tenant_id: TCR_TENANT }).catch(()=>{})
+      supabase.rpc('set_admin_tenant_override',{ p_tenant_id: TCR_TENANT }).then(()=>{}).catch(()=>{})
     }
   },[])
   if (!ready) return null
@@ -2496,7 +2497,8 @@ function ContentCenter() {
 
   async function loadDrafts() {
     setLoading(true)
-    const { data } = await supabase.rpc('get_content_drafts', { p_limit: 200 }).catch(() => ({ data: [] }))
+    let data = []
+    try { const r = await supabase.rpc('get_content_drafts', { p_limit: 200 }); data = r.data || [] } catch(_) { data = [] }
     setDrafts(data || [])
     setLoading(false)
   }
@@ -2910,8 +2912,8 @@ function LinkedInPublisher() {
     setLoading(true)
     try {
       const [connRes, postsRes] = await Promise.all([
-        supabase.rpc('get_linkedin_connection').catch(() => ({ data: null })),
-        supabase.rpc('get_linkedin_posts', { p_limit: 100 }).catch(() => ({ data: [] })),
+        supabase.rpc('get_linkedin_connection').then(r=>r).catch(() => ({ data: null })),
+        supabase.rpc('get_linkedin_posts', { p_limit: 100 }).then(r=>r).catch(() => ({ data: [] })),
       ])
       setConnection(connRes.data?.[0] || false)
       setPosts(postsRes.data || [])
