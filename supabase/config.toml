@@ -116,4 +116,5 @@ verify_jwt = true
 
 [functions.slack-import]
 verify_jwt = true
-
+[functions.call-ai-summary]
+verify_jwt = false
