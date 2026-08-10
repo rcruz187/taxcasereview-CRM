@@ -459,6 +459,25 @@ export default function EmployeePortal() {
               Good {now.getHours() < 12 ? 'morning' : now.getHours() < 17 ? 'afternoon' : 'evening'}, {emp.name.split(' ')[0]}! 👋
             </div>
             <div style={{ fontSize: 13, color: '#64748b' }}>{now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</div>
+          {(emp.extension || emp.direct_number) && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+              {emp.extension && (
+                <span style={{ fontSize: 12, background: 'rgba(22,163,74,0.15)', color: '#4ade80', borderRadius: 6, padding: '3px 10px', fontWeight: 600 }}>
+                  📞 Ext. {emp.extension}
+                </span>
+              )}
+              {emp.direct_number && (
+                <a href={`tel:${emp.direct_number}`} style={{ fontSize: 12, background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', borderRadius: 6, padding: '3px 10px', fontWeight: 600, textDecoration: 'none' }}>
+                  📱 {emp.direct_number}
+                </a>
+              )}
+              {emp.team && (
+                <span style={{ fontSize: 12, background: 'rgba(245,158,11,0.15)', color: '#fbbf24', borderRadius: 6, padding: '3px 10px', fontWeight: 600 }}>
+                  👥 {emp.team} Team
+                </span>
+              )}
+            </div>
+          )}
           </div>
 
           <div style={{ ...CARD, marginBottom: 16, textAlign: 'center' }}>
