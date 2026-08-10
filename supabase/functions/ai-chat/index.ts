@@ -15,47 +15,45 @@ serve(async (req) => {
     const { message, context, history } = await req.json()
     if (!message) return new Response(JSON.stringify({ error: 'missing message' }), { status: 400, headers: CORS })
 
-    const GEMINI_KEY = Deno.env.get('GEMINI_API_KEY')!
-    const PROJECT_ID = '994655076278'
+    const GROQ_KEY = Deno.env.get('GROQ_API_KEY')!
 
-    const contents = []
+    const messages = [{ role: 'system', content: SYSTEM_PROMPT }]
+
     if (context) {
-      contents.push({ role: 'user', parts: [{ text: `Current CRM context:\n\n${context}` }] })
-      contents.push({ role: 'model', parts: [{ text: 'Got it. How can I help?' }] })
+      messages.push({ role: 'user', content: `Current CRM context:\n\n${context}` })
+      messages.push({ role: 'assistant', content: 'Got it. How can I help?' })
     }
+
     if (history && Array.isArray(history)) {
       for (const h of history) {
-        contents.push({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] })
+        messages.push({ role: h.role === 'user' ? 'user' : 'assistant', content: h.content })
       }
     }
-    contents.push({ role: 'user', parts: [{ text: message }] })
 
-    const body = JSON.stringify({
-      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-      contents,
-      generationConfig: { temperature: 0.3, maxOutputTokens: 2048 }
-    })
+    messages.push({ role: 'user', content: message })
 
-    // Vertex AI endpoint — works with OAuth2 AQ. bearer tokens
-    const endpoint = `https://us-central1-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/us-central1/publishers/google/models/gemini-1.5-flash:generateContent`
-
-    const geminiRes = await fetch(endpoint, {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${GEMINI_KEY}`,
+        'Authorization': `Bearer ${GROQ_KEY}`,
       },
-      body
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages,
+        max_tokens: 2048,
+        temperature: 0.3,
+      })
     })
 
-    if (!geminiRes.ok) {
-      const err = await geminiRes.text()
-      console.error('ai-chat: Vertex error', geminiRes.status, err)
-      return new Response(JSON.stringify({ error: 'AI service error', detail: err }), { status: 500, headers: CORS })
+    if (!res.ok) {
+      const err = await res.text()
+      console.error('ai-chat: Groq error', res.status, err)
+      return new Response(JSON.stringify({ error: 'AI service error' }), { status: 500, headers: CORS })
     }
 
-    const data = await geminiRes.json()
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response.'
+    const data = await res.json()
+    const reply = data.choices?.[0]?.message?.content || 'Sorry, I could not generate a response.'
 
     return new Response(JSON.stringify({ reply }), {
       status: 200,
