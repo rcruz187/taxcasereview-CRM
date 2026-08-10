@@ -177,6 +177,39 @@ const MANUAL_SECTIONS = [
       { type: 'tip', text: 'Click "Clear" to start a fresh conversation. The AI retains context for your current session so you can ask follow-up questions without repeating yourself.' },
     ]
   },
+,
+  {
+    id: 'training', icon: '🖥️', label: 'Training & Manual', category: 'Tools',
+    title: 'Training sessions & this manual',
+    content: [
+      { type: 'lead', text: 'The Training tab has two sections: Live Training for running screen-share sessions with your team, and this CRM Manual for on-demand reference.' },
+      { type: 'h3', text: 'Live Training sessions' },
+      { type: 'cards', items: [
+        { icon: '📺', title: 'Start a session', body: 'Click "Start training session" to launch a live screen-share. You can navigate anywhere in the CRM while the session stays live.' },
+        { icon: '🔗', title: 'Invite participants', body: 'Copy the invite link and send it to staff. They join in their browser — no install required. Works on any device.' },
+        { icon: '✉️', title: 'Email invite', body: 'Click the email button to send branded invitations directly to team members with a one-click join button.' },
+        { icon: '⧉', title: 'Pop out', body: 'Pop the session controls into a separate window so you can present the full CRM without the training panel in the way.' },
+      ]},
+      { type: 'steps', items: [
+        { title: 'Click "Start training session"', desc: 'A unique room code is generated. The session is live immediately.' },
+        { title: 'Share your screen', desc: 'Click "Share screen" and choose your window or the full screen. Participants see everything you see.' },
+        { title: 'Send the invite link', desc: 'Copy the link or use the Email Invite button. Staff click the link and join instantly.' },
+        { title: 'Navigate the CRM normally', desc: 'You can click through leads, clients, settings — anything. The session follows you.' },
+        { title: 'End the session when done', desc: 'Click "End session." All participants are disconnected automatically.' },
+      ]},
+      { type: 'h3', text: 'During a session' },
+      { type: 'table', headers: ['Control', 'What it does'], rows: [
+        ['Share screen', 'Broadcasts your screen to all participants in real time'],
+        ['Stop sharing', 'Pauses the screen share but keeps the session open'],
+        ['Pop out', 'Opens the host controls in a separate window — present the full CRM unobstructed'],
+        ['End session', 'Closes the room and disconnects all participants'],
+        ['Room code', 'The 5-character code shown in the session bar — participants need this to join manually'],
+      ]},
+      { type: 'h3', text: 'CRM Manual (this tab)' },
+      { type: 'info', text: 'The CRM Manual lives here permanently. Any team member can open Training → CRM Manual at any time to look up how a feature works, without leaving the CRM or asking a colleague.' },
+      { type: 'tip', text: 'Use the search box in the manual sidebar to find any topic instantly. Use the Prev / Next buttons at the bottom of each section to read through in order.' },
+    ]
+  }
 ]
 
 const CATEGORIES = ['Getting Started', 'Client Pipeline', 'Documents', 'Tasks & Workflows', 'Communications', 'Money', 'Portals', 'Tools']
