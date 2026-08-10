@@ -54,6 +54,7 @@ export const OPEN_STATUSES = CASE_STATUSES.filter(s => !CLOSED_STATUSES.includes
 // Actively being worked (in-flight). Non-overlapping with PENDING below.
 export const ACTIVE_STATUSES = [
   'Open',
+  'Active',
   'Collection Hold',
   'Pending IRS',
   'Compliance (Filing/Payment)',
