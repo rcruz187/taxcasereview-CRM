@@ -128,6 +128,7 @@ export default function TimeEntry({ clientId, clientName, embed = false }) {
       date:          form.date,
       hours:         Number(form.hours),
       rate:          parseMoney(String(form.rate)),
+      amount:        Number(form.hours) * parseMoney(String(form.rate)),
       description:   form.description.trim() || null,
       employee_name: employeeName || user?.email?.split('@')[0] || 'Staff',
       billed:        form.billed,
