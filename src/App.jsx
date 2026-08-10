@@ -15,26 +15,26 @@ import ActiveCallBar from './components/calling/ActiveCallBar'
 // first paint with no extra network round-trip, since these are the very
 // first thing a visitor (employee or client) sees.
 import Login      from './pages/Login'
-import Kiosk      from './pages/Kiosk'
-import BookAppointment from './pages/BookAppointment'
-import ManageBooking from './pages/ManageBooking'
-import SignPage     from './pages/SignPage'
-import MeetingRoom      from './pages/MeetingRoom'
-import ScreenShareJoin  from './pages/ScreenShareJoin'
-import ScreenShareHost  from './pages/ScreenShareHost'
-import ClockIn       from './pages/ClockIn'
-import EmployeePortal from './pages/EmployeePortal'
-import ClientPortal  from './pages/ClientPortal'
-import OrganizerPage from './pages/OrganizerPage'
-import FinancialIntakePage from './pages/FinancialIntakePage'
-import AuthCallback from './pages/AuthCallback'
-import NewOffice from './pages/NewOffice'
-import AdminConsole      from './pages/AdminConsole'
-import ImpersonateGate   from './pages/ImpersonateGate'
+const Kiosk = lazy(() => import('./pages/Kiosk'))
+const BookAppointment = lazy(() => import('./pages/BookAppointment'))
+const ManageBooking = lazy(() => import('./pages/ManageBooking'))
+const SignPage = lazy(() => import('./pages/SignPage'))
+const MeetingRoom = lazy(() => import('./pages/MeetingRoom'))
+const ScreenShareJoin = lazy(() => import('./pages/ScreenShareJoin'))
+const ScreenShareHost = lazy(() => import('./pages/ScreenShareHost'))
+const ClockIn = lazy(() => import('./pages/ClockIn'))
+const EmployeePortal = lazy(() => import('./pages/EmployeePortal'))
+const ClientPortal = lazy(() => import('./pages/ClientPortal'))
+const OrganizerPage = lazy(() => import('./pages/OrganizerPage'))
+const FinancialIntakePage = lazy(() => import('./pages/FinancialIntakePage'))
+const AuthCallback = lazy(() => import('./pages/AuthCallback'))
+const NewOffice = lazy(() => import('./pages/NewOffice'))
+const AdminConsole = lazy(() => import('./pages/AdminConsole'))
+const ImpersonateGate = lazy(() => import('./pages/ImpersonateGate'))
 import ImpersonationBanner from './components/ImpersonationBanner'
 const AdminPortal = lazy(() => import('./pages/AdminPortal'))
-import Training   from './pages/Training'
-import Support    from './pages/Support'
+const Training = lazy(() => import('./pages/Training'))
+const Support = lazy(() => import('./pages/Support'))
 
 // Everything behind login is lazy-loaded — each page's code only downloads
 // when you actually navigate to it, instead of all ~30 pages loading upfront
