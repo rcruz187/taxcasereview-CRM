@@ -6,6 +6,7 @@ import { CallProvider } from './context/CallContext'
 import { GmailSyncProvider } from './context/GmailSyncContext'
 import { ScreenShareProvider } from './context/ScreenShareContext'
 import Sidebar  from './components/layout/Sidebar'
+import AIAssistant from './components/AIAssistant'
 import TopBar   from './components/layout/TopBar'
 import { Modal, Toast } from './components/ui'
 import ActiveCallBar from './components/calling/ActiveCallBar'
@@ -206,6 +207,7 @@ function Shell() {
     </div>
     </GmailSyncProvider>
     </CallProvider>
+      <AIAssistant />
     </ScreenShareProvider>
   )
 }
