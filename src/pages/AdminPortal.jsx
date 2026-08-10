@@ -259,7 +259,7 @@ function OfficePage() {
   const [data, setData] = useState(null)
   const [tab, setTab] = useState('overview')
   const [toast, setToast] = useState(null)
-  const [billing, setBilling] = useState({ per_seat_rate:'', monthly_rate:'', plan_tier:'', status:'' })
+  const [billing, setBilling] = useState({ per_seat_rate:'', monthly_rate:'', plan_tier:'', status:'', primary_contact_name:'', primary_contact_email:'', contract_start_date:'', contract_end_date:'', notes:'' })
   const [impersonating, setImpersonating] = useState(false)
   const [offDocs, setOffDocs]     = useState([])
   const [docUploading, setDocUploading] = useState(false)
@@ -272,10 +272,15 @@ function OfficePage() {
         if (error) { toast_(error.message,'error'); return }
         setData(d)
         setBilling({
-          per_seat_rate: d.tenant.per_seat_rate||'',
-          monthly_rate:  d.tenant.monthly_rate||'',
-          plan_tier:     d.tenant.plan_tier||'',
-          status:        d.tenant.status||'active',
+          per_seat_rate:        d.tenant.per_seat_rate||'',
+          monthly_rate:         d.tenant.monthly_rate||'',
+          plan_tier:            d.tenant.plan_tier||'',
+          status:               d.tenant.status||'active',
+          primary_contact_name: d.tenant.primary_contact_name||'',
+          primary_contact_email:d.tenant.primary_contact_email||'',
+          contract_start_date:  d.tenant.contract_start_date?.slice(0,10)||'',
+          contract_end_date:    d.tenant.contract_end_date?.slice(0,10)||'',
+          notes:                d.tenant.notes||'',
         })
         // Load office documents
         supabase.from('office_documents').select('*').eq('tenant_id', id).order('created_at', { ascending: false })
@@ -296,6 +301,7 @@ function OfficePage() {
   }
 
   async function saveBilling() {
+    // Save billing fields via RPC
     const { error } = await supabase.rpc('update_office_billing', {
       p_tenant_id:    id,
       p_per_seat_rate: billing.per_seat_rate ? Number(billing.per_seat_rate) : null,
@@ -303,6 +309,14 @@ function OfficePage() {
       p_plan_tier:     billing.plan_tier  || null,
       p_status:        billing.status     || null,
     })
+    // Save contact/contract fields directly
+    await supabase.from('tenants').update({
+      primary_contact_name:  billing.primary_contact_name  || null,
+      primary_contact_email: billing.primary_contact_email || null,
+      contract_start_date:   billing.contract_start_date   || null,
+      contract_end_date:     billing.contract_end_date     || null,
+      notes:                 billing.notes                 || null,
+    }).eq('id', id)
     if (error) { toast_(error.message,'error') } else {
       const status = billing.status
       if (status === 'suspended') toast_('✅ Billing updated — account suspended. Staff will be blocked on next login.')
@@ -488,8 +502,35 @@ function OfficePage() {
                   : '0'}/mo
               </strong> · {employees.length} seat{employees.length!==1?'s':''}
             </div>
+            <div style={{ borderTop:'1px solid rgba(99,102,241,.15)', paddingTop:16, marginTop:4 }}>
+              <div style={{ fontSize:11,fontWeight:700,color:'#6366f1',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:12 }}>Contract & Contact</div>
+              {[
+                ['Primary Contact Name', 'primary_contact_name', 'text', 'e.g. Chris Bennett'],
+                ['Primary Contact Email', 'primary_contact_email', 'email', 'e.g. chris@firm.com'],
+              ].map(([label,key,type,ph]) => (
+                <div key={key} style={{ marginBottom:14 }}>
+                  <label style={{ fontSize:11,fontWeight:700,color:'#6366f1',textTransform:'uppercase',letterSpacing:'.05em',display:'block',marginBottom:6 }}>{label}</label>
+                  <input value={billing[key]} onChange={e=>setBilling(b=>({...b,[key]:e.target.value}))} type={type} placeholder={ph}
+                    style={{ width:'100%', padding:'10px 14px', borderRadius:8, border:'1px solid rgba(99,102,241,.3)', background:'rgba(255,255,255,.04)', color:'#e2e8f0', fontSize:14, boxSizing:'border-box' }}/>
+                </div>
+              ))}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
+                {[['Contract Start', 'contract_start_date'],['Contract End', 'contract_end_date']].map(([label,key]) => (
+                  <div key={key}>
+                    <label style={{ fontSize:11,fontWeight:700,color:'#6366f1',textTransform:'uppercase',letterSpacing:'.05em',display:'block',marginBottom:6 }}>{label}</label>
+                    <input value={billing[key]} onChange={e=>setBilling(b=>({...b,[key]:e.target.value}))} type="date"
+                      style={{ width:'100%', padding:'10px 14px', borderRadius:8, border:'1px solid rgba(99,102,241,.3)', background:'#1a1830', color:'#e2e8f0', fontSize:14, boxSizing:'border-box' }}/>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginBottom:14 }}>
+                <label style={{ fontSize:11,fontWeight:700,color:'#6366f1',textTransform:'uppercase',letterSpacing:'.05em',display:'block',marginBottom:6 }}>Notes</label>
+                <textarea value={billing.notes} onChange={e=>setBilling(b=>({...b,notes:e.target.value}))} rows={3} placeholder="Internal notes about this office..."
+                  style={{ width:'100%', padding:'10px 14px', borderRadius:8, border:'1px solid rgba(99,102,241,.3)', background:'rgba(255,255,255,.04)', color:'#e2e8f0', fontSize:14, boxSizing:'border-box', resize:'vertical', fontFamily:'inherit' }}/>
+              </div>
+            </div>
             <button onClick={saveBilling} style={{ ...S.btn('primary'), width:'100%', justifyContent:'center' }}>
-              💾 Save Billing
+              💾 Save Billing & Contact
             </button>
           </div>
         </div>
