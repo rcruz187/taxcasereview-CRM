@@ -1247,7 +1247,7 @@ export default function Settings() {
       )}
 
       {tab === 'import' && isPrivileged && <ImportTab />}
-      {tab === 'storage' && isPrivileged && <StorageTab />}
+      {tab === 'storage' && isPrivileged && <StorageTab tenantId={myTenantId} />}
       {tab === 'statuses' && isPrivileged && <StatusesTab />}
       {tab === 'billing' && isPrivileged && <BillingRatesTab />}
       {tab === 'uptime' && <UptimeTab />}
@@ -1257,7 +1257,7 @@ export default function Settings() {
 
 
 // ── Storage Tab ────────────────────────────────────────────────────────────
-function StorageTab() {
+function StorageTab({ tenantId }) {
   const [docs,    setDocs]    = useState([])
   const [esigns,  setEsigns]  = useState([])
   const [loading, setLoading] = useState(true)
@@ -1265,8 +1265,8 @@ function StorageTab() {
   const [usageLoading, setUsageLoading] = useState(true)
 
   useEffect(() => {
-    const tid = FIRM.tenantId
-    if (!tid) return  // Wait for branding to resolve
+    const tid = tenantId
+    if (!tid) return  // Wait for tenantId prop
     async function load() {
       const [{ data: d, error: docsErr }, { data: e }] = await Promise.all([
         supabase.from('documents').select('file_size, "docType", client, created_at').eq('tenant_id', tid).order('file_size', { ascending: false }),
@@ -1288,7 +1288,7 @@ function StorageTab() {
       const now = new Date()
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
-      const tid = FIRM.tenantId
+      const tid = tenantId
       if (!tid) { setUsageLoading(false); return }
       const [{ count: callCount }, { count: smsCount }, { count: faxCount }, { count: emailCount }] = await Promise.all([
         supabase.from('calllog').select('id', { count: 'exact', head: true }).eq('tenant_id', tid).gte('created_at', monthStart),
@@ -1307,7 +1307,7 @@ function StorageTab() {
       setUsageLoading(false)
     }
     loadUsage()
-  }, [FIRM.tenantId])
+  }, [tenantId])
 
   const FREE_LIMIT = 1024 * 1024 * 1024  // 1 GB Supabase free tier
   const totalBytes  = docs.reduce((s, d) => s + (d.file_size || 0), 0)
