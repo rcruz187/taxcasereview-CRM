@@ -8,11 +8,13 @@ import { applyPaymentToInvoice, reversePaymentFromInvoice } from '../lib/invoice
 import ClientLink from '../components/ClientLink'
 import { FIRM } from '../lib/firmBranding'
 
-const BLANK = { clientName:'', invNum:'', amount:'', method:'Credit Card', checkNum:'', date:'', status:'Cleared', notes:'' }
+const BLANK = { clientName:'', invNum:'', amount:'', method:'Credit Card', checkNum:'', date:'', status:'Cleared', notes:'', reference:'' }
 const METHODS = ['Credit Card','ACH / Bank Transfer','Check','Cash','Zelle','Venmo','PayPal','Money Order','Wire Transfer','Other']
 
 export default function Payments() {
   const [items,    setItems]    = useState([])
+  const [sortCol,  setSortCol]  = useState('date')
+  const [sortDir,  setSortDir]  = useState('desc')
   const [confirmDel, setConfirmDel] = useState(null)
   const [invoices, setInvoices] = useState([])
   const [clients,  setClients]  = useState([])
@@ -167,6 +169,21 @@ export default function Payments() {
     return ms && mm && ms2
   })
 
+  const sorted = [...filtered].sort((a, b) => {
+    let av = a[sortCol] || ''
+    let bv = b[sortCol] || ''
+    if (sortCol === 'amount') { av = parseFloat(av||0); bv = parseFloat(bv||0) }
+    else { av = String(av).toLowerCase(); bv = String(bv).toLowerCase() }
+    if (av < bv) return sortDir === 'asc' ? -1 : 1
+    if (av > bv) return sortDir === 'asc' ? 1 : -1
+    return 0
+  })
+
+  function toggleSort(col) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
+
   // Group by method for breakdown
   const byMethod = {}
   items.filter(p=>p.status==='Cleared').forEach(p=>{ byMethod[p.method||'Other']=(byMethod[p.method||'Other']||0)+parseFloat(p.amount||0) })
@@ -209,6 +226,7 @@ export default function Payments() {
     <div class="row"><span class="label">Method</span><span class="value">${pay.method||'—'}</span></div>
     <div class="row"><span class="label">Status</span><span class="value">${pay.status||'Cleared'}</span></div>
     ${pay.notes?`<div class="row"><span class="label">Notes</span><span class="value">${pay.notes}</span></div>`:''}
+    ${pay.reference?`<div class="row"><span class="label">Reference</span><span class="value">${pay.reference}</span></div>`:''}`
   </div>
   <div class="footer">${[FIRM.name, FIRM.address].filter(Boolean).join(' · ')} · Not a Law Firm</div>
 </body></html>`)
@@ -324,13 +342,25 @@ export default function Payments() {
           <div className="ovx"><table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
             <thead>
               <tr style={{borderBottom:'1px solid var(--br)',background:'var(--s2)'}}>
-                {['Client','Invoice #','Amount','Method','Check #','Date','Status',''].map(h=>(
-                  <th key={h} style={{padding:'9px 12px',textAlign:'left',fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.05em'}}>{h}</th>
+                {[
+                  {label:'Client', col:'clientName'},
+                  {label:'Invoice #', col:'invNum'},
+                  {label:'Amount', col:'amount'},
+                  {label:'Method', col:'method'},
+                  {label:'Check #', col:'checkNum'},
+                  {label:'Date', col:'date'},
+                  {label:'Status', col:'status'},
+                  {label:'', col:null},
+                ].map(({label, col}) => (
+                  <th key={label} onClick={col ? ()=>toggleSort(col) : undefined}
+                    style={{padding:'9px 12px',textAlign:'left',fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.05em',cursor:col?'pointer':'default',userSelect:'none',whiteSpace:'nowrap'}}>
+                    {label}{col && sortCol===col ? (sortDir==='asc'?' ↑':' ↓') : col ? ' ↕' : ''}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map(p=>(
+              {sorted.map(p=>(
                 <tr key={p.id} style={{borderBottom:'1px solid var(--br)'}}
                   onMouseEnter={e=>e.currentTarget.style.background='var(--s2)'}
                   onMouseLeave={e=>e.currentTarget.style.background=''}>
@@ -344,7 +374,7 @@ export default function Payments() {
                   <td style={{padding:'9px 12px'}}>
                     <div style={{display:'flex',gap:5}}>
                       <button className="btn sec" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>openEdit(p)}>Edit</button>
-                      <button className="btn sec" style={{fontSize:12,padding:'4px 10px',marginRight:2}} onClick={()=>printReceipt(pay)}>🖨️</button>
+                      <button className="btn sec" style={{fontSize:12,padding:'4px 10px',marginRight:2}} onClick={()=>printReceipt(p)}>🖨️</button>
                     <button className="btn del" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>deleteItem(p.id)}>Del</button>
                     </div>
                   </td>
@@ -430,6 +460,7 @@ export default function Payments() {
                 </select>
               </div>
               <div className="field"><label>Notes</label><input value={form.notes||''} onChange={e=>fld('notes',e.target.value)}/></div>
+              <div className="field"><label>Reference / Memo</label><input value={form.reference||''} onChange={e=>fld('reference',e.target.value)} placeholder="e.g. Canopy ID, check memo, confirmation #"/></div>
             </div>
 
             <button className="btn pri" style={{width:'100%',justifyContent:'center',padding:10}} onClick={save} disabled={saving}>
