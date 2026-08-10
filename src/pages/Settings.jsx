@@ -1267,8 +1267,8 @@ function StorageTab() {
   useEffect(() => {
     async function load() {
       const [{ data: d, error: docsErr }, { data: e }] = await Promise.all([
-        supabase.from('documents').select('file_size, "docType", client, created_at').order('file_size', { ascending: false }),
-        supabase.from('esigns').select('created_at').limit(200),
+        supabase.from('documents').select('file_size, "docType", client, created_at').eq('tenant_id', FIRM.tenantId).order('file_size', { ascending: false }),
+        supabase.from('esigns').select('created_at').eq('tenant_id', FIRM.tenantId).limit(200),
       ])
       if (docsErr) console.error('Storage Usage: failed to load documents —', docsErr.message)
       setDocs(d || [])
@@ -1287,6 +1287,7 @@ function StorageTab() {
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
       const tid = FIRM.tenantId
+      if (!tid) { setUsageLoading(false); return }
       const [{ count: callCount }, { count: smsCount }, { count: faxCount }, { count: emailCount }] = await Promise.all([
         supabase.from('calllog').select('id', { count: 'exact', head: true }).eq('tenant_id', tid).gte('created_at', monthStart),
         supabase.from('sms_messages').select('id', { count: 'exact', head: true }).eq('tenant_id', tid).gte('created_at', monthStart),
