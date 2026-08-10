@@ -29,39 +29,26 @@ serve(async (req) => {
     }
     contents.push({ role: 'user', parts: [{ text: message }] })
 
-    // Support both AIzaSy (API key) and AQ. (OAuth2 bearer) key formats
-    let geminiRes
-    const isOAuth = GEMINI_KEY.startsWith('AQ.')
+    const body = JSON.stringify({
+      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents,
+      generationConfig: { temperature: 0.3, maxOutputTokens: 2048 }
+    })
 
-    if (isOAuth) {
-      // OAuth2 bearer token format
+    // Try API key style first, fall back to bearer if 401
+    let geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
+    )
+
+    if (geminiRes.status === 400 || geminiRes.status === 401) {
+      // Try as OAuth2 bearer token
       geminiRes = await fetch(
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${GEMINI_KEY}`,
-          },
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-            contents,
-            generationConfig: { temperature: 0.3, maxOutputTokens: 2048 }
-          })
-        }
-      )
-    } else {
-      // Standard API key format
-      geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-            contents,
-            generationConfig: { temperature: 0.3, maxOutputTokens: 2048 }
-          })
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GEMINI_KEY}` },
+          body
         }
       )
     }
