@@ -15,46 +15,47 @@ serve(async (req) => {
     const { message, context, history } = await req.json()
     if (!message) return new Response(JSON.stringify({ error: 'missing message' }), { status: 400, headers: CORS })
 
-    const ANTHROPIC_KEY = Deno.env.get('ANTHROPIC_API_KEY')!
+    const GEMINI_KEY = Deno.env.get('GEMINI_API_KEY')!
+    const PROJECT_ID = '994655076278'
 
-    const messages = []
-
+    const contents = []
     if (context) {
-      messages.push({ role: 'user', content: `Current CRM context:\n\n${context}` })
-      messages.push({ role: 'assistant', content: 'Got it. How can I help?' })
+      contents.push({ role: 'user', parts: [{ text: `Current CRM context:\n\n${context}` }] })
+      contents.push({ role: 'model', parts: [{ text: 'Got it. How can I help?' }] })
     }
-
     if (history && Array.isArray(history)) {
       for (const h of history) {
-        messages.push({ role: h.role === 'user' ? 'user' : 'assistant', content: h.content })
+        contents.push({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] })
       }
     }
+    contents.push({ role: 'user', parts: [{ text: message }] })
 
-    messages.push({ role: 'user', content: message })
+    const body = JSON.stringify({
+      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents,
+      generationConfig: { temperature: 0.3, maxOutputTokens: 2048 }
+    })
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    // Vertex AI endpoint — works with OAuth2 AQ. bearer tokens
+    const endpoint = `https://us-central1-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/us-central1/publishers/google/models/gemini-1.5-flash:generateContent`
+
+    const geminiRes = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_KEY,
-        'anthropic-version': '2023-06-01',
+        'Authorization': `Bearer ${GEMINI_KEY}`,
       },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 2048,
-        system: SYSTEM_PROMPT,
-        messages,
-      })
+      body
     })
 
-    if (!res.ok) {
-      const err = await res.text()
-      console.error('ai-chat: Anthropic error', res.status, err)
-      return new Response(JSON.stringify({ error: 'AI service error' }), { status: 500, headers: CORS })
+    if (!geminiRes.ok) {
+      const err = await geminiRes.text()
+      console.error('ai-chat: Vertex error', geminiRes.status, err)
+      return new Response(JSON.stringify({ error: 'AI service error', detail: err }), { status: 500, headers: CORS })
     }
 
-    const data = await res.json()
-    const reply = data.content?.[0]?.text || 'Sorry, I could not generate a response.'
+    const data = await geminiRes.json()
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response.'
 
     return new Response(JSON.stringify({ reply }), {
       status: 200,
