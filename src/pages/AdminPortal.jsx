@@ -303,7 +303,12 @@ function OfficePage() {
       p_plan_tier:     billing.plan_tier  || null,
       p_status:        billing.status     || null,
     })
-    if (error) { toast_(error.message,'error') } else { toast_('✅ Billing updated') }
+    if (error) { toast_(error.message,'error') } else {
+      const status = billing.status
+      if (status === 'suspended') toast_('✅ Billing updated — account suspended. Staff will be blocked on next login.')
+      else if (status === 'cancelled') toast_('✅ Billing updated — account cancelled. Staff will be blocked on next login.')
+      else toast_('✅ Billing updated')
+    }
   }
 
   async function resetDemo() {

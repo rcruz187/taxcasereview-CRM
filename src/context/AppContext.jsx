@@ -163,7 +163,7 @@ export function AppProvider({ children }) {
             const { tenant_id } = JSON.parse(imp)
             if (tenant_id) {
               supabase.rpc('set_admin_tenant_override', { p_tenant_id: tenant_id })
-                .then(() => { loadRole(session.user.email); loadBrandColor(); loadFirmBranding() })
+                .then(() => { loadRole(session.user.email); loadBrandColor(); loadFirmBranding(); checkTenantStatus() })
               return
             }
           }
@@ -172,7 +172,7 @@ export function AppProvider({ children }) {
             sessionStorage.removeItem('admin_impersonation')
           }
         } catch (_) {}
-        loadRole(session.user.email); loadBrandColor(); loadFirmBranding()
+        loadRole(session.user.email); loadBrandColor(); loadFirmBranding(); checkTenantStatus()
         // Log login event
         if (_event === 'SIGNED_IN') {
           const name = session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Staff'
@@ -442,6 +442,28 @@ export function AppProvider({ children }) {
     const poll = setInterval(checkUpcoming, 60000)
     return () => clearInterval(poll)
   }, [user])
+
+  // Check if the tenant account is suspended or cancelled — block login if so
+  async function checkTenantStatus() {
+    try {
+      const { data } = await supabase
+        .from('tenants')
+        .select('status, firm_name')
+        .limit(1)
+        .maybeSingle()
+      if (!data) return
+      const blocked = ['suspended', 'cancelled']
+      if (blocked.includes(data.status)) {
+        await supabase.auth.signOut()
+        // Show a clear message
+        const msg = data.status === 'suspended'
+          ? `Your account (${data.firm_name}) has been suspended. Please contact TaxRes CRM support at romy@taxrescrm.net.`
+          : `Your account (${data.firm_name}) has been cancelled. Please contact TaxRes CRM support at romy@taxrescrm.net.`
+        alert(msg)
+        window.location.href = '/login'
+      }
+    } catch (_) {}
+  }
 
   async function loadRole(email) {
     if (!email) return
