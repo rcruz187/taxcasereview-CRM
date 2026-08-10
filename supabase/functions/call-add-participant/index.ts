@@ -48,11 +48,34 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    const { data: settings, error: sErr } = await supabase
+    // Resolve the caller's tenant from their JWT so we get the right SW creds.
+    const authHeader = req.headers.get('Authorization') || ''
+    const userJwt = authHeader.replace('Bearer ', '')
+    const userClient = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    )
+    const { data: { user } } = await userClient.auth.getUser()
+    const userId = user?.id
+
+    // Look up the tenant for this user
+    const { data: emp } = userId ? await supabase
+      .from('employees')
+      .select('tenant_id')
+      .eq('user_id', userId)
+      .maybeSingle() : { data: null }
+
+    const tenantId = emp?.tenant_id
+
+    const settingsQuery = supabase
       .from('settings')
       .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did')
-      .limit(1)
-      .maybeSingle()
+      .not('sw_api_token', 'is', null)
+
+    if (tenantId) settingsQuery.eq('tenant_id', tenantId)
+
+    const { data: settings, error: sErr } = await settingsQuery.limit(1).maybeSingle()
 
     if (sErr || !settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token || !settings?.sw_inbound_did) {
       console.error('call-add-participant: missing SignalWire credentials/DID', sErr)
