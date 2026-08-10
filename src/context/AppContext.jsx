@@ -91,6 +91,16 @@ function getImpersonation() {
   } catch (_) { return null }
 }
 
+// ── Plan tier constants (module-level — never change at runtime) ─────────────
+const TIER_ORDER = { starter: 0, growth: 1, pro: 2 }
+const TIER_REQUIRED = {
+  dialer: 'growth', workflows: 'growth', irsforms: 'growth',
+  irsreference: 'growth', taxreturns: 'growth', transcripts: 'growth',
+  payments: 'growth', invoices: 'growth', estimates: 'growth',
+  books: 'growth', stateforms: 'growth',
+  payroll: 'pro', timeoff: 'pro', employees: 'pro', reports: 'pro', deadlines: 'pro',
+}
+
 export function AppProvider({ children }) {
   const [user, setUser]         = useState(null)
   const [role, setRole]         = useState('Admin')
@@ -504,35 +514,11 @@ export function AppProvider({ children }) {
   }
 
 
-  // ── Plan tier feature gates ──────────────────────────────────────────────
-  // Sections gated by tier. 'starter' < 'growth' < 'pro'.
-  // Super Admin is always exempt. A section not listed here is always allowed.
-  const TIER_ORDER = { starter: 0, growth: 1, pro: 2 }
-  const TIER_REQUIRED = {
-    // growth+ features
-    dialer:      'growth',
-    workflows:   'growth',
-    irsforms:    'growth',
-    irsreference:'growth',
-    taxreturns:  'growth',
-    transcripts: 'growth',
-    payments:    'growth',
-    invoices:    'growth',
-    estimates:   'growth',
-    books:       'growth',
-    stateforms:  'growth',
-    // pro-only features
-    payroll:     'pro',
-    timeoff:     'pro',
-    employees:   'pro',
-    reports:     'pro',
-    deadlines:   'pro',
-  }
-  function tierAllows(section) {
+  const tierAllows = useCallback((section) => {
     const required = TIER_REQUIRED[section]
     if (!required) return true
     return (TIER_ORDER[planTier] || 0) >= (TIER_ORDER[required] || 0)
-  }
+  }, [planTier])
 
   const can = useCallback((action, section) => {
     // Super Admin always yes
@@ -542,7 +528,10 @@ export function AppProvider({ children }) {
     if (section === 'dashboard' || section === 'kiosk') return true
 
     // Plan tier gate — block access to features above the tenant's tier
-    if (action === 'view' && !tierAllows(section)) return false
+    if (action === 'view') {
+      const required = TIER_REQUIRED[section]
+      if (required && (TIER_ORDER[planTier] || 0) < (TIER_ORDER[required] || 0)) return false
+    }
 
     // If we have per-section perms, use them
     if (perms) {
@@ -560,7 +549,7 @@ export function AppProvider({ children }) {
     if (action === 'view') return defaults.canView.includes('*') || defaults.canView.includes(section)
     if (action === 'edit') return defaults.canEdit.includes('*') || defaults.canEdit.includes(section)
     return false
-  }, [role, perms])
+  }, [role, perms, planTier])
 
   const showToast = useCallback((msg, type = 'ok', onClick = null) => {
     if (toastTimer.current) clearTimeout(toastTimer.current)
