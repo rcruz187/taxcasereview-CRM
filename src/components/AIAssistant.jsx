@@ -21,13 +21,30 @@ const ADMIN_SUGGESTED = [
   'Draft a follow-up email to a prospect after a demo',
   'What should I price a 30-seat firm at?',
   'Help me write onboarding instructions for a new office',
-  'What features should I prioritize next for the platform?',
+  'Summarize my calendar today and flag anything urgent',
+  'What emails need my attention right now?',
+  'Draft a reply to the last email on screen',
 ]
 
 function getPageContext() {
   // Pull visible text from the current page as context
   const main = document.querySelector('.page-content') || document.querySelector('main') || document.body
-  const text = main?.innerText || ''
+  let text = main?.innerText || ''
+
+  // If we're on the email page, grab email subjects/senders for context
+  const emailRows = document.querySelectorAll('[data-email-row]')
+  if (emailRows.length > 0) {
+    const emailCtx = Array.from(emailRows).slice(0, 10).map(r => r.innerText?.trim()).filter(Boolean).join('\n')
+    text = 'INBOX EMAILS:\n' + emailCtx + '\n\n' + text
+  }
+
+  // If we're on the calendar page, grab event titles
+  const calEvents = document.querySelectorAll('[data-cal-event]')
+  if (calEvents.length > 0) {
+    const calCtx = Array.from(calEvents).slice(0, 15).map(r => r.innerText?.trim()).filter(Boolean).join('\n')
+    text = 'CALENDAR EVENTS:\n' + calCtx + '\n\n' + text
+  }
+
   // Limit to 3000 chars to avoid token overflow
   return text.slice(0, 3000)
 }

@@ -6,18 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Invoked every 5 minutes by a pg_cron job (see sql/appointment_reminders_migration.sql
-// note in the deploy checklist). Finds scheduled calevents rows whose start time falls
-// REMINDER_MINUTES_BEFORE from now (within a window wide enough to not miss one between
-// cron ticks), emails the assigned staff member, then marks reminder_sent so it doesn't
-// fire again on the next tick. Browser-side "popup" reminders are handled separately and
-// independently in AppContext.jsx (client-side poll, not tied to this flag).
 const REMINDER_MINUTES_BEFORE = 30
 const WINDOW_MINUTES = 5
 
-// Same DST-safe approach as receive-call/index.ts's isWithinBusinessHours — appointment
-// date/time are entered by staff as plain Eastern wall-clock values with no zone info,
-// but this function runs in UTC, so we have to convert deliberately rather than assume.
 function easternWallClockToUTC(dateStr, timeStr) {
   const guess = new Date(`${dateStr}T${timeStr}:00Z`)
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -39,6 +30,13 @@ function fmtTime(t) {
   return `${h12}:${String(m).padStart(2, '0')} ${period}`
 }
 
+function fmtDate(d) {
+  if (!d) return ''
+  const [y, mo, day] = d.split('-')
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  return `${months[parseInt(mo)-1]} ${parseInt(day)}, ${y}`
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -54,14 +52,20 @@ serve(async (req) => {
 
     const { data: events, error } = await supabase
       .from('calevents')
-      .select('id, title, "clientName", "assignedTo", date, time, "eventType", notes, status, reminder_sent')
+      .select('id, title, "clientName", "assignedTo", date, time, "eventType", notes, status, reminder_sent, tenant_id')
       .eq('status', 'scheduled')
       .or('reminder_sent.is.null,reminder_sent.eq.false')
 
     if (error) throw error
 
-    const { data: employees } = await supabase.from('employees').select('name, email')
-    const emailByName = Object.fromEntries((employees || []).filter(e => e.name && e.email).map(e => [e.name, e.email]))
+    // Load all employees and settings (all tenants — service role bypasses RLS)
+    const { data: employees } = await supabase.from('employees').select('name, email, tenant_id')
+    const { data: allSettings } = await supabase.from('settings').select('tenant_id, name, firmname, logourl, email, firmemail, phone, firmphone')
+
+    const emailByName = Object.fromEntries((employees || []).filter(e => e.name && e.email).map(e => [e.name, { email: e.email, tenant_id: e.tenant_id }]))
+
+    // Map tenant_id → settings row
+    const settingsByTenant = Object.fromEntries((allSettings || []).map(s => [s.tenant_id, s]))
 
     let sent = 0
     for (const ev of events || []) {
@@ -69,35 +73,65 @@ serve(async (req) => {
       const evUTC = easternWallClockToUTC(ev.date, ev.time)
       if (evUTC < targetStart || evUTC > targetEnd) continue
 
-      const recipientEmail = emailByName[ev.assignedTo] || null
-      if (recipientEmail) {
-        try {
-          await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-email`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-            },
-            body: JSON.stringify({
-              to: recipientEmail,
-              subject: `Reminder: ${ev.title || 'Appointment'} at ${fmtTime(ev.time)}`,
-              html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px">
-                <div style="font-size:16px;font-weight:700;color:#1d4ed8;margin-bottom:10px">📅 Appointment Reminder</div>
-                <p style="font-size:14px;color:#334155">You have an upcoming appointment in about ${REMINDER_MINUTES_BEFORE} minutes.</p>
-                <table style="font-size:13px;margin:14px 0;border-collapse:collapse">
-                  <tr><td style="color:#64748b;padding:3px 8px 3px 0">Client/Lead:</td><td><strong>${ev.clientName || '—'}</strong></td></tr>
-                  <tr><td style="color:#64748b;padding:3px 8px 3px 0">Type:</td><td>${ev.eventType || '—'}</td></tr>
-                  <tr><td style="color:#64748b;padding:3px 8px 3px 0">Date:</td><td>${ev.date}</td></tr>
-                  <tr><td style="color:#64748b;padding:3px 8px 3px 0">Time:</td><td>${fmtTime(ev.time)}</td></tr>
-                </table>
-                ${ev.notes ? `<p style="font-size:12px;color:#64748b">Notes: ${ev.notes}</p>` : ''}
-                <p style="font-size:11px;color:#94a3b8;margin-top:24px">Tax Case Review CRM — automatic appointment reminder</p>
-              </div>`,
-            }),
-          })
-        } catch (e) {
-          console.error('reminder email send error:', e)
-        }
+      const empInfo = emailByName[ev.assignedTo] || null
+      const recipientEmail = empInfo?.email || null
+      if (!recipientEmail) continue
+
+      // Get per-tenant branding
+      const tenantId = ev.tenant_id || empInfo?.tenant_id
+      const s = tenantId ? settingsByTenant[tenantId] : null
+      const firmName = s?.name || s?.firmname || 'TaxRes CRM'
+      const firmLogo = s?.logourl || ''
+      const firmEmail = s?.email || s?.firmemail || ''
+      const firmPhone = s?.phone || s?.firmphone || ''
+
+      try {
+        await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify({
+            to: recipientEmail,
+            subject: `📅 Reminder: ${ev.title || 'Appointment'} at ${fmtTime(ev.time)}`,
+            html: `
+<div style="font-family:Arial,sans-serif;max-width:540px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0">
+  <div style="background:#1e1b4b;padding:20px 24px;display:flex;align-items:center;gap:14px">
+    ${firmLogo ? `<img src="${firmLogo}" style="height:36px;width:auto;object-fit:contain" alt="${firmName}" />` : ''}
+    <div style="color:#fff;font-size:16px;font-weight:700">${firmName}</div>
+  </div>
+  <div style="padding:24px">
+    <div style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:6px">📅 Appointment in ${REMINDER_MINUTES_BEFORE} minutes</div>
+    <p style="font-size:14px;color:#475569;margin:0 0 20px">You have an upcoming appointment starting soon.</p>
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:20px">
+      <table style="font-size:13px;border-collapse:collapse;width:100%">
+        <tr>
+          <td style="color:#64748b;padding:5px 12px 5px 0;white-space:nowrap;font-weight:600">Client</td>
+          <td style="color:#1e293b;font-weight:700;padding:5px 0">${ev.clientName || ev.title || '—'}</td>
+        </tr>
+        <tr>
+          <td style="color:#64748b;padding:5px 12px 5px 0;white-space:nowrap;font-weight:600">Type</td>
+          <td style="color:#1e293b;padding:5px 0">${ev.eventType || '—'}</td>
+        </tr>
+        <tr>
+          <td style="color:#64748b;padding:5px 12px 5px 0;white-space:nowrap;font-weight:600">Date</td>
+          <td style="color:#1e293b;padding:5px 0">${fmtDate(ev.date)}</td>
+        </tr>
+        <tr>
+          <td style="color:#64748b;padding:5px 12px 5px 0;white-space:nowrap;font-weight:600">Time</td>
+          <td style="color:#1e293b;font-weight:700;padding:5px 0;color:#4f46e5">${fmtTime(ev.time)} ET</td>
+        </tr>
+        ${ev.notes ? `<tr><td style="color:#64748b;padding:5px 12px 5px 0;font-weight:600;vertical-align:top">Notes</td><td style="color:#475569;padding:5px 0">${ev.notes}</td></tr>` : ''}
+      </table>
+    </div>
+    <p style="font-size:12px;color:#94a3b8;margin:0">This is an automatic reminder from ${firmName}${firmEmail ? ` · ${firmEmail}` : ''}${firmPhone ? ` · ${firmPhone}` : ''}</p>
+  </div>
+</div>`,
+          }),
+        })
+      } catch (e) {
+        console.error('reminder email send error:', e)
       }
 
       await supabase.from('calevents').update({ reminder_sent: true }).eq('id', ev.id)

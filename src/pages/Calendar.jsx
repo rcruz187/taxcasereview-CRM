@@ -312,7 +312,7 @@ export default function Calendar() {
   const EventPill = ({ ev, onClick }) => {
     const sc = scOf(ev)
     return (
-      <div onClick={e => { e.stopPropagation(); onClick() }}
+      <div onClick={e => { e.stopPropagation(); onClick() }} data-cal-event
         style={{ background: sc.bg, borderLeft: `3px solid ${sc.border}`, borderRadius: 4, padding: '3px 6px', marginBottom: 2, cursor: 'pointer', overflow: 'hidden' }}>
         <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: sc.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {ev.time && <span style={{ opacity: .7 }}>{fmtTime(ev.time)} </span>}
