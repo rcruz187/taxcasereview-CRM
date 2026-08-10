@@ -1467,36 +1467,34 @@ const SERVICES = [
     logo: '🤖',
   },
   {
-    name: 'GitHub Pages',
+    name: 'Cloudflare',
     description: 'Hosts the CRM app (deploys)',
-    statusUrl: 'https://www.githubstatus.com/',
-    apiUrl: 'https://www.githubstatus.com/api/v2/status.json',
+    statusUrl: 'https://www.cloudflarestatus.com/',
+    apiUrl: 'https://www.cloudflarestatus.com/api/v2/status.json',
     indicatorPath: ['status', 'indicator'],
     descriptionPath: ['status', 'description'],
-    logo: '🐙',
+    logo: '🟠',
   },
   {
-    name: 'Gmail / Google',
-    description: 'Email sending and sync',
-    statusUrl: 'https://www.google.com/appsstatus/dashboard/',
-    apiUrl: null, // Google status has no public JSON API
-    logo: '📧',
+    name: 'Intuit / QuickBooks',
+    description: 'Payments and accounting sync',
+    statusUrl: 'https://status.developer.intuit.com/',
+    apiUrl: null,
+    logo: '💚',
+  },
+  {
+    name: 'Microsoft 365',
+    description: 'Email, calendar, and Teams integration',
+    statusUrl: 'https://status.office365.com/',
+    apiUrl: null,
+    logo: '🪟',
   },
   {
     name: 'SignalWire',
     description: 'Phone calls, SMS, fax, IVR',
     statusUrl: 'https://signalwire.trust.pagerduty.com/posts/dashboard',
-    apiUrl: null, // PagerDuty dashboard — no public JSON API, link only
+    apiUrl: null,
     logo: '📞',
-  },
-  {
-    name: 'Stripe',
-    description: 'Payments, invoices, autopay',
-    statusUrl: 'https://status.stripe.com/',
-    apiUrl: 'https://status.stripe.com/api/v2/status.json',
-    indicatorPath: ['status', 'indicator'],
-    descriptionPath: ['status', 'description'],
-    logo: '💳',
   },
   {
     name: 'Supabase',
@@ -1506,6 +1504,13 @@ const SERVICES = [
     indicatorPath: ['status', 'indicator'],
     descriptionPath: ['status', 'description'],
     logo: '⚡',
+  },
+  {
+    name: 'Groq',
+    description: 'AI assistant and call transcription',
+    statusUrl: 'https://groqstatus.com/',
+    apiUrl: null,
+    logo: '🧠',
   },
 ]
 
