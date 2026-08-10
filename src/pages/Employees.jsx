@@ -69,7 +69,7 @@ const ROLE_PERM_DEFAULTS = {
 }
 
 const blankEmp = {
-  name: '', email: '', phone: '', title: '', access: 'Tax Associate',
+  name: '', email: '', phone: '', title: '', access: 'Tax Associate', extension: '', direct_number: '', team: '',
   hourlyRate: '', payType: 'Hourly', paymentMethod: 'Direct Deposit',
   hireDate: '', emergencyContact: '', emergencyPhone: '',
   address: '', filingStatus: 'Single',
@@ -103,6 +103,9 @@ function toDbPayload(form) {
     hire_date:         hireDate || null,
     emergency_contact: emergencyContact,
     emergency_phone:   emergencyPhone,
+    extension:         form.extension || null,
+    direct_number:     form.direct_number || null,
+    team:              form.team || null,
     filing_status:     filingStatus,
     sor_short_id:      sorShortId,
     sor_username:      sorUsername,
@@ -120,6 +123,9 @@ function fromDbRow(emp) {
     name:             emp.name || '',
     email:            emp.email || '',
     phone:            emp.phone || '',
+    extension:        emp.extension || '',
+    direct_number:    emp.direct_number || '',
+    team:             emp.team || '',
     title:            emp.title ?? '',
     access:           emp.access || 'Tax Associate',
     hourlyRate:       emp.hourly_rate ?? emp.hourlyRate ?? '',
@@ -613,6 +619,20 @@ export default function Employees() {
                     <div className="field">
                       <label>Title</label>
                       <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Tax Analyst" />
+                    </div>
+                  </div>
+                  <div className="form-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+                    <div className="field">
+                      <label>Extension</label>
+                      <input value={form.extension} onChange={e => setForm(f => ({ ...f, extension: e.target.value }))} placeholder="101" />
+                    </div>
+                    <div className="field">
+                      <label>Direct Number</label>
+                      <input value={form.direct_number} onChange={e => setForm(f => ({ ...f, direct_number: e.target.value }))} placeholder="+17725551234" />
+                    </div>
+                    <div className="field">
+                      <label>Team</label>
+                      <input value={form.team} onChange={e => setForm(f => ({ ...f, team: e.target.value }))} placeholder="Resolution" />
                     </div>
                   </div>
                   <div className="form-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
