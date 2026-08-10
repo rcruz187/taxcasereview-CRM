@@ -106,6 +106,10 @@ export default function SignPage() {
       setFirmName(FIRM.name || '')
       if (data.status === 'Signed') { setDone(true); setDoc(data); setLoading(false); return }
       setDoc(data); setLoading(false)
+      // Track that the client opened the document (only set once)
+      if (!data.opened_at) {
+        supabase.from('esigns').update({ opened_at: new Date().toISOString() }).eq('id', id).then(() => {})
+      }
     }
     load()
     fetch('https://api.ipify.org?format=json').then(r=>r.json()).then(d=>setIp(d.ip)).catch(()=>{})
