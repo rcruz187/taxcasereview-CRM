@@ -8,7 +8,7 @@ import { FIRM } from './firmBranding';
 // settings hiccup never leaves a document with a blank letterhead.
 const fName = () => FIRM.name || 'Tax Case Review';
 const fAddr = () => FIRM.address || '631 US Highway One Ste 304, North Palm Beach, FL 33408';
-const fMail = () => FIRM.email || 'info@taxcasereview.com';
+const fMail = () => FIRM.email || 'info@taxcasereview.org';
 const fPhone = () => FIRM.phone || '(888) 334-5052';
 const fFax = () => FIRM.fax || '(561) 420-6999';
 const fContactLine = () => [fMail(), fPhone(), fFax() ? `Fax ${fFax()}` : null].filter(Boolean).join('  ·  ');
