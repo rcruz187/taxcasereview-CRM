@@ -1040,19 +1040,3 @@ html.light .cal-unscheduled-panel {
 /* Tasks page layout: roomy list + slim quick-add rail */
 .tasksg { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; align-items: start; }
 @media (max-width: 980px) { .tasksg { grid-template-columns: 1fr; } }
-
-/* ── Plan tier lock ─────────────────────────────────────────────────────── */
-.nav-item.tier-locked {
-  opacity: 0.45;
-  cursor: default;
-  pointer-events: none;
-  position: relative;
-}
-.nav-item.tier-locked::after {
-  content: '🔒';
-  font-size: 9px;
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-}
