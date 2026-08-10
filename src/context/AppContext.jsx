@@ -101,6 +101,7 @@ export function AppProvider({ children }) {
   const [modal, setModal]       = useState({ open: false, title: '', body: null })
   const [searchQ, setSearchQ]   = useState('')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [planTier, setPlanTier] = useState('pro') // starter | growth | pro — default pro so nothing breaks before load
   const toastTimer = useRef(null)
 
   function applyBrandColor(hex) {
@@ -448,10 +449,11 @@ export function AppProvider({ children }) {
     try {
       const { data } = await supabase
         .from('tenants')
-        .select('status, firm_name')
+        .select('status, firm_name, plan_tier')
         .limit(1)
         .maybeSingle()
       if (!data) return
+      if (data.plan_tier) setPlanTier(data.plan_tier)
       const blocked = ['suspended', 'cancelled']
       if (blocked.includes(data.status)) {
         await supabase.auth.signOut()
@@ -501,12 +503,46 @@ export function AppProvider({ children }) {
     }
   }
 
+
+  // ── Plan tier feature gates ──────────────────────────────────────────────
+  // Sections gated by tier. 'starter' < 'growth' < 'pro'.
+  // Super Admin is always exempt. A section not listed here is always allowed.
+  const TIER_ORDER = { starter: 0, growth: 1, pro: 2 }
+  const TIER_REQUIRED = {
+    // growth+ features
+    dialer:      'growth',
+    workflows:   'growth',
+    irsforms:    'growth',
+    irsreference:'growth',
+    taxreturns:  'growth',
+    transcripts: 'growth',
+    payments:    'growth',
+    invoices:    'growth',
+    estimates:   'growth',
+    books:       'growth',
+    stateforms:  'growth',
+    // pro-only features
+    payroll:     'pro',
+    timeoff:     'pro',
+    employees:   'pro',
+    reports:     'pro',
+    deadlines:   'pro',
+  }
+  function tierAllows(section) {
+    const required = TIER_REQUIRED[section]
+    if (!required) return true
+    return (TIER_ORDER[planTier] || 0) >= (TIER_ORDER[required] || 0)
+  }
+
   const can = useCallback((action, section) => {
     // Super Admin always yes
     if (role === 'Super Admin') return true
 
     // Dashboard/kiosk always visible
     if (section === 'dashboard' || section === 'kiosk') return true
+
+    // Plan tier gate — block access to features above the tenant's tier
+    if (action === 'view' && !tierAllows(section)) return false
 
     // If we have per-section perms, use them
     if (perms) {
@@ -552,6 +588,7 @@ export function AppProvider({ children }) {
     <AppContext.Provider value={{
       user, login, logout, checking, realtimeOk,
       role, perms, can, employeeName,
+      planTier, tierAllows,
       toast, showToast,
       modal, openModal, closeModal,
       searchQ, setSearchQ,
