@@ -1,12 +1,10 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Called BY SignalWire once an inbound call's recording is ready (set as
-// recordingStatusCallback on the <Dial record="record-from-answer"> in
-// receive-call). Downloads the recording and re-hosts it in our own
-// Storage — same pattern as voicemail-recorded — and saves a row so staff
-// can find and play it back from the CRM.
-// JWT verification must be OFF on this function (SignalWire calls it directly).
+// Called BY SignalWire once an inbound call's recording is ready.
+// Downloads the recording, re-hosts it in Supabase Storage, saves a row,
+// then async-fires call-ai-summary for Gemini transcription + action items.
+// JWT verification must be OFF (SignalWire calls this directly).
 
 serve(async (req) => {
   try {
@@ -21,6 +19,19 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    // Resolve tenant from the called number (to) — multi-tenant safe
+    let tenant_id = '61a89aef-0e7e-4ea2-b222-44ab2024655a' // fallback to TCR
+    if (to) {
+      const toClean = to.replace(/\D/g, '').slice(-10)
+      const { data: setting } = await supabase
+        .from('settings')
+        .select('tenant_id')
+        .ilike('signalwire_phone', `%${toClean}%`)
+        .limit(1)
+        .maybeSingle()
+      if (setting?.tenant_id) tenant_id = setting.tenant_id
+    }
 
     let storedUrl = recordingUrl
     if (recordingUrl) {
@@ -50,8 +61,23 @@ serve(async (req) => {
       recording_url: storedUrl,
       duration_seconds: duration ? Number(duration) : null,
       created_at: new Date().toISOString(),
-      tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a',
+      tenant_id,
     })
+
+    // Fire AI summary async — non-blocking so SignalWire gets 200 fast
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    fetch(`${supabaseUrl}/functions/v1/call-ai-summary`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recording_url: storedUrl,
+        call_sid: callSid,
+        from_number: from,
+        to_number: to,
+        tenant_id,
+        duration_seconds: duration ? Number(duration) : null,
+      }),
+    }).catch(e => console.error('call-recorded: failed to trigger ai-summary', e))
 
     return new Response('ok', { status: 200 })
 
