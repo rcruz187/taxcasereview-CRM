@@ -8,6 +8,28 @@ const CORS = {
 
 const SYSTEM_PROMPT = `You are an expert AI assistant embedded inside TaxRes CRM — a CRM built specifically for tax resolution firms. You have deep knowledge of IRS tax resolution processes, notices, transcript codes, forms, strategy, and case management. You can also help with general business, productivity, drafting, and any other questions. Be direct, concise, and practical.`
 
+async function getAccessToken(refreshToken: string): Promise<string> {
+  const clientId = Deno.env.get('GOOGLE_CLIENT_ID') || '764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com'
+  const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET') || 'd-FL95Q19q7MQmFpd7hHD0Ty'
+  
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+      client_id: clientId,
+      client_secret: clientSecret,
+    })
+  })
+  
+  const data = await res.json()
+  if (!data.access_token) {
+    throw new Error(`Token exchange failed: ${JSON.stringify(data)}`)
+  }
+  return data.access_token
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
@@ -35,23 +57,21 @@ serve(async (req) => {
       generationConfig: { temperature: 0.3, maxOutputTokens: 2048 }
     })
 
-    // Try API key style first, fall back to bearer if 401
-    let geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
-    )
+    // Exchange AQ. refresh token for access token
+    const accessToken = await getAccessToken(GEMINI_KEY)
 
-    if (geminiRes.status === 400 || geminiRes.status === 401) {
-      // Try as OAuth2 bearer token
-      geminiRes = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GEMINI_KEY}` },
-          body
-        }
-      )
-    }
+    const geminiRes = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+          'x-goog-user-project': Deno.env.get('GOOGLE_PROJECT_ID') || '994655076278',
+        },
+        body
+      }
+    )
 
     if (!geminiRes.ok) {
       const err = await geminiRes.text()
