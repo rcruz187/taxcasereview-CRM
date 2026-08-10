@@ -170,7 +170,9 @@ function Overview() {
   const totalSeats   = (stats||[]).reduce((s,r) => s+Number(r.employee_count||0), 0)
   const totalClients = (stats||[]).reduce((s,r) => s+Number(r.client_count||0), 0)
   const totalLeads   = (stats||[]).reduce((s,r) => s+Number(r.lead_count||0), 0)
-  const totalStorage = (stats||[]).reduce((s,r) => s+Number(r.storage_bytes||0), 0)
+  const totalStorage   = (stats||[]).reduce((s,r) => s+Number(r.storage_bytes||0), 0)
+  const totalCollected = (stats||[]).reduce((s,r) => s+Number(r.total_collected||0), 0)
+  const totalTx        = (stats||[]).reduce((s,r) => s+Number(r.transaction_count||0), 0)
 
   const h = new Date().getHours()
   const greeting = h<12?'Good morning':'h<17'?'Good afternoon':'Good evening'
@@ -181,6 +183,7 @@ function Overview() {
     { label:'Total Seats',       val: totalSeats, sub:'across all firms', color:'#f59e0b' },
     { label:'Total Clients',     val: totalClients.toLocaleString(), sub:`${totalLeads} leads`, color:'#0ea5e9' },
     { label:'Storage Used',      val: fmtBytes(totalStorage), sub:'documents', color:'#8b5cf6' },
+    { label:'Total Collected',    val: `$${totalCollected.toLocaleString('en-US',{maximumFractionDigits:0})}`, sub:`${totalTx.toLocaleString()} transactions`, color:'#10b981' },
   ]
 
   return (
@@ -211,7 +214,7 @@ function Overview() {
       <div style={S.card}>
         <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
           <thead>
-            <tr>{['Firm','Status','Plan','Seats','Clients','Storage','MRR','Last Activity',''].map(h=>(
+            <tr>{['Firm','Status','Plan','Seats','Clients','Storage','Collected','MRR','Last Activity',''].map(h=>(
               <th key={h} style={S.th}>{h}</th>
             ))}</tr>
           </thead>
@@ -228,6 +231,7 @@ function Overview() {
                 <td style={{ ...S.td, color:'#94a3b8' }}>{r.employee_count}</td>
                 <td style={{ ...S.td, color:'#94a3b8' }}>{r.client_count}</td>
                 <td style={{ ...S.td, color:'#94a3b8' }}>{fmtBytes(r.storage_bytes)}</td>
+                <td style={{ ...S.td, color:'#10b981', fontWeight:600 }}>{r.total_collected ? `$${Number(r.total_collected).toLocaleString('en-US',{maximumFractionDigits:0})}` : '—'}</td>
                 <td style={{ ...S.td, color:'#10b981', fontWeight:700 }}>
                   {r.effective_monthly!=null ? `$${Number(r.effective_monthly).toFixed(0)}/mo` : '—'}
                 </td>
@@ -334,6 +338,8 @@ function OfficePage() {
           { label:'Clients', val:data.client_count, color:'#0ea5e9' },
           { label:'Leads', val:data.lead_count, color:'#f59e0b' },
           { label:'Storage', val:fmtBytes(data.storage_bytes), color:'#8b5cf6' },
+          { label:'Collected', val:data.total_collected ? `$${Number(data.total_collected).toLocaleString('en-US',{maximumFractionDigits:0})}` : '$0', color:'#10b981' },
+          { label:'Transactions', val:(data.transaction_count||0).toLocaleString(), color:'#6366f1' },
           { label:'Last Activity', val:fmtAgo(data.last_activity), color:'#10b981' },
           { label:'MRR', val: t.monthly_rate ? `$${t.monthly_rate}/mo` : t.per_seat_rate ? `$${(t.per_seat_rate*employees.length).toFixed(0)}/mo` : '—', color:'#10b981' },
         ].map(k => (
