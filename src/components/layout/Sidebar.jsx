@@ -482,14 +482,16 @@ export default function Sidebar() {
 
             {/* Items — only show when open */}
             {isOpen && section.items.map(item => {
-              if (item.section && !can('view', item.section)) return null
+              const tierLocked = item.section && !tierAllows(item.section)
+              if (item.section && !can('view', item.section) && !tierLocked) return null
               const Icon = item.icon
               return (
                 <NavLink
                   key={item.path}
                   to={item.path}
                   end={item.path === '/'}
-                  className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+                  className={({ isActive }) => `nav-item${isActive ? ' active' : ''}${tierLocked ? ' tier-locked' : ''}`}
+                  title={tierLocked ? 'Upgrade your plan to unlock this feature' : undefined}
                   onClick={() => {
                     if (item.path === '/email') setUnreadInbox(0)
                     if (item.path === '/tasks') setOpenTasks(0)
