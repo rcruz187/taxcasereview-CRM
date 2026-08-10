@@ -96,11 +96,12 @@ serve(async (req) => {
     // Find matching client/case by phone number
     let case_id = null
     let client_id = null
+    let client_name = ""
     const searchPhone = (from_number || to_number || '').replace(/\D/g, '').slice(-10)
     if (searchPhone) {
       const { data: client } = await supabase
         .from('clients')
-        .select('id')
+        .select('id, name')
         .eq('tenant_id', tenant_id)
         .or(`phone.ilike.%${searchPhone}%,mobile.ilike.%${searchPhone}%`)
         .limit(1)
@@ -108,6 +109,7 @@ serve(async (req) => {
 
       if (client) {
         client_id = client.id
+        client_name = client.name || ""
         const { data: caseRow } = await supabase
           .from('cases')
           .select('id')
@@ -140,13 +142,16 @@ serve(async (req) => {
     })
 
     // Auto-create tasks from action items
-    if (action_items.length > 0 && case_id) {
+    if (action_items.length > 0 && client_id) {
       await supabase.from('tasks').insert(
         action_items.map((item: string) => ({
-          tenant_id, case_id, client_id,
-          title: item, status: 'Open',
-          source: 'ai_call_summary',
-          created_at: new Date().toISOString()
+          tenant_id,
+          client_id,
+          clientName: client_name,
+          linkedcase: case_id || null,
+          title: item,
+          status_label: 'Open',
+          created_at: new Date().toISOString(),
         }))
       )
     }
