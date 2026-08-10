@@ -9,9 +9,10 @@ serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
   try {
-    // Get service account JSON from vault
+    // Get service account JSON from vault using schema-qualified query
     const { data: secretData, error: secretErr } = await supabase
-      .from('vault.decrypted_secrets')
+      .schema('vault')
+      .from('decrypted_secrets')
       .select('decrypted_secret')
       .eq('name', 'GA4_SERVICE_ACCOUNT_JSON')
       .single()
