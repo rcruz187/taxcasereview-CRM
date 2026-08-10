@@ -15,6 +15,15 @@ const SUGGESTED = [
   'How do I request a Collection Due Process hearing?',
 ]
 
+const ADMIN_SUGGESTED = [
+  'Summarize the platform stats on this page',
+  'Which offices are closest to renewal or at risk of churn?',
+  'Draft a follow-up email to a prospect after a demo',
+  'What should I price a 30-seat firm at?',
+  'Help me write onboarding instructions for a new office',
+  'What features should I prioritize next for the platform?',
+]
+
 function getPageContext() {
   // Pull visible text from the current page as context
   const main = document.querySelector('.page-content') || document.querySelector('main') || document.body
@@ -23,7 +32,7 @@ function getPageContext() {
   return text.slice(0, 3000)
 }
 
-export default function AIAssistant() {
+export default function AIAssistant({ adminMode = false }) {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -123,8 +132,8 @@ export default function AIAssistant() {
           }}>
             <span style={{ fontSize: 20 }}>🤖</span>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9' }}>TaxRes AI Assistant</div>
-              <div style={{ fontSize: 11, color: '#64748b' }}>Powered by Gemini Flash · Tax resolution expert</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9' }}>{adminMode ? 'Platform AI Assistant' : 'TaxRes AI Assistant'}</div>
+              <div style={{ fontSize: 11, color: '#64748b' }}>{adminMode ? 'Powered by Groq · Platform & business strategy' : 'Powered by Groq · Tax resolution expert'}</div>
             </div>
             {messages.length > 0 && (
               <button
@@ -141,10 +150,12 @@ export default function AIAssistant() {
             {messages.length === 0 && (
               <div>
                 <p style={{ fontSize: 13, color: '#94a3b8', margin: '0 0 14px' }}>
-                  Ask me anything about this client, case, or tax resolution strategy. I can see what's on your screen.
+                  {adminMode
+                    ? 'Ask me anything about the platform, offices, billing, or business strategy. I can see what\'s on your screen.'
+                    : 'Ask me anything about this client, case, or tax resolution strategy. I can see what\'s on your screen.'}
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {SUGGESTED.map((s, i) => (
+                  {(adminMode ? ADMIN_SUGGESTED : SUGGESTED).map((s, i) => (
                     <button
                       key={i}
                       onClick={() => send(s)}

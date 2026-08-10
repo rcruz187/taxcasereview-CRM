@@ -226,7 +226,7 @@ export default function Payments() {
     <div class="row"><span class="label">Method</span><span class="value">${pay.method||'—'}</span></div>
     <div class="row"><span class="label">Status</span><span class="value">${pay.status||'Cleared'}</span></div>
     ${pay.notes?`<div class="row"><span class="label">Notes</span><span class="value">${pay.notes}</span></div>`:''}
-    ${pay.reference?`<div class="row"><span class="label">Reference</span><span class="value">${pay.reference}</span></div>`:''}`
+    ${pay.reference?`<div class="row"><span class="label">Reference</span><span class="value">${pay.reference}</span></div>`:''}
   </div>
   <div class="footer">${[FIRM.name, FIRM.address].filter(Boolean).join(' · ')} · Not a Law Firm</div>
 </body></html>`)

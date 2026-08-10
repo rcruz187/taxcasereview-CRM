@@ -9,6 +9,7 @@ import { Routes, Route, NavLink, useNavigate, useLocation, useParams } from 'rea
 import { supabase } from '../lib/supabase'
 import { FIRM, loadFirmBranding, loadFirmBrandingPublic } from '../lib/firmBranding'
 import { useApp } from '../context/AppContext'
+import AIAssistant from '../components/AIAssistant'
 
 const NewOffice    = lazy(() => import('./NewOffice'))
 const Support      = lazy(() => import('./Support'))
@@ -3338,6 +3339,7 @@ export default function AdminPortal() {
           </Routes>
         </Suspense>
       </div>
+      <AIAssistant adminMode />
     </div>
     </ScreenShareProvider>
   )
