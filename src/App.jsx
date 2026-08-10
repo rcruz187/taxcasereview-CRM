@@ -57,6 +57,7 @@ const Estimates     = lazy(() => import('./pages/Estimates'))
 const Invoices      = lazy(() => import('./pages/Invoices'))
 const Payments      = lazy(() => import('./pages/Payments'))
 const AccountsReceivable = lazy(() => import('./pages/AccountsReceivable'))
+const Transactions = lazy(() => import('./pages/Transactions'))
 const Sms           = lazy(() => import('./pages/Sms'))
 const Email         = lazy(() => import('./pages/Email'))
 const Documents     = lazy(() => import('./pages/Documents'))
@@ -164,6 +165,7 @@ function Shell() {
             <Route path="/invoices"    element={<Guard section="invoices"><Invoices /></Guard>} />
             <Route path="/payments"    element={<Guard section="payments"><Payments /></Guard>} />
             <Route path="/ar"          element={<Guard section="payments"><AccountsReceivable /></Guard>} />
+            <Route path="/transactions" element={<Guard section="payments"><Transactions /></Guard>} />
             <Route path="/sms"         element={<Guard section="sms"><Sms /></Guard>} />
             <Route path="/email"       element={<Guard section="email"><Email /></Guard>} />
             <Route path="/documents"   element={<Guard section="documents"><Documents /></Guard>} />
