@@ -1512,6 +1512,13 @@ const SERVICES = [
     apiUrl: null,
     logo: '🧠',
   },
+  {
+    name: 'Google Gemini',
+    description: 'AI call summaries and transcription',
+    statusUrl: 'https://status.cloud.google.com/',
+    apiUrl: null,
+    logo: '✨',
+  },
 ]
 
 function indicatorToStatus(indicator) {
