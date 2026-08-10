@@ -95,6 +95,41 @@ export default function Email() {
   // globally, not just on this page) picks up anything new.
   useEffect(() => { if (lastSyncAt) load() }, [lastSyncAt])
 
+  // Realtime subscription — fires immediately when a new inbound email arrives
+  useEffect(() => {
+    if (!user?.email) return
+    const channel = supabase
+      .channel('email-inbox-notify')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'emails',
+        filter: `triage=eq.Inbox`,
+      }, (payload) => {
+        const e = payload.new
+        // Reload inbox
+        load()
+        // Browser notification
+        if (Notification.permission === 'granted') {
+          new Notification('New Email', {
+            body: `From: ${e.clientName || e.recipient || 'Unknown'} — ${e.subject || '(no subject)'}`,
+            icon: '/favicon.png',
+          })
+        } else if (Notification.permission !== 'denied') {
+          Notification.requestPermission().then(perm => {
+            if (perm === 'granted') {
+              new Notification('New Email', {
+                body: `From: ${e.clientName || e.recipient || 'Unknown'} — ${e.subject || '(no subject)'}`,
+                icon: '/favicon.png',
+              })
+            }
+          })
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [user?.email])
+
   async function loadGmailConfig() {
     // gmail_client_id stays shared (the app's own OAuth registration, not a
     // personal secret) — but whether GMAIL IS CONNECTED is now per-employee,
@@ -764,7 +799,7 @@ export default function Email() {
             </div>
 
             <div className="field"><label>Body *</label>
-              <textarea value={form.body} onChange={e => fld('body', e.target.value)} rows={14} style={{ minHeight: 280, fontFamily: 'inherit', lineHeight: 1.7 }} placeholder="Email body…" />
+              <textarea value={form.body} onChange={e => fld('body', e.target.value)} rows={14} spellCheck={true} lang="en" style={{ minHeight: 280, fontFamily: 'inherit', lineHeight: 1.7 }} placeholder="Email body…" />
             </div>
 
             {/* Signature preview — not part of the editable body, appended automatically on send */}
