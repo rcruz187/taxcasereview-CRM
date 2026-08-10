@@ -20,7 +20,7 @@ export async function triggerWorkflow(event, entityType, entityName, actorName, 
       .from('workflow_templates')
       .select('id, name, trigger_event, trigger_value')
       .eq('active', true)
-      .eq('entity_type', entityType)
+      .in('entity_type', [entityType, 'both'])
       .eq('trigger_event', event)
 
     const { data: templates, error: tmplErr } = await query
