@@ -3,7 +3,7 @@
 // impersonation, per-office deep dive, billing, provisioning,
 // demo management, system health, audit log, support, email.
 
-import { useState, useEffect, Suspense, lazy, useCallback } from 'react'
+import React, { useState, useEffect, Suspense, lazy, useCallback } from 'react'
 import { ScreenShareProvider, useScreenShare } from '../context/ScreenShareContext'
 import { Routes, Route, NavLink, useNavigate, useLocation, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -21,6 +21,30 @@ const DEMO_TENANT     = '489ace07-1a6b-4864-833a-4f8420568b40'
 const TAXRESCRM_TENANT = 'a0000000-0000-0000-0000-000000000001'
 const STATUS_COLOR = { active:'#10b981', trial:'#f59e0b', past_due:'#f97316', cancelled:'#ef4444', suspended:'#ef4444' }
 const TIER_COLOR   = { starter:'#6366f1', growth:'#0ea5e9', pro:'#10b981' }
+
+// ── ErrorBoundary — catches crashes in individual routes without killing the portal ──
+class AdminRouteErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null } }
+  static getDerivedStateFromError(error) { return { hasError: true, error } }
+  componentDidCatch(error, info) { console.error('[AdminPortal] Route crashed:', error, info) }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 40, textAlign: 'center' }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>⚠️</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#f1f5f9', marginBottom: 8 }}>This page encountered an error</div>
+          <div style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>{this.state.error?.message || 'Unknown error'}</div>
+          <button onClick={() => this.setState({ hasError: false, error: null })}
+            style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', cursor: 'pointer', fontSize: 13 }}>
+            Try Again
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 
 function fmtBytes(n) {
   if (!n) return '0 B'
@@ -3285,25 +3309,25 @@ export default function AdminPortal() {
         </div>
         <Suspense fallback={<Spinner/>}>
           <Routes>
-            <Route path="/command-center" element={<CommandCenter/>}/>
-            <Route path="/content"         element={<ContentCenter/>}/>
-            <Route path="/linkedin"        element={<LinkedInPublisher/>}/>
+            <Route path="/command-center" element={<AdminRouteErrorBoundary><CommandCenter/></AdminRouteErrorBoundary>}/>
+            <Route path="/content"         element={<AdminRouteErrorBoundary><ContentCenter/></AdminRouteErrorBoundary>}/>
+            <Route path="/linkedin"        element={<AdminRouteErrorBoundary><LinkedInPublisher/></AdminRouteErrorBoundary>}/>
             <Route index                   element={<Overview key={window.location.pathname + window.location.search}/>}/>
             <Route path="/offices"        element={<OfficesList/>}/>
             <Route path="/offices/:id"    element={<OfficePage/>}/>
             <Route path="/provision"      element={<div style={{padding:8}}><NewOffice/></div>}/>
             <Route path="/billing"        element={<Billing/>}/>
             <Route path="/search"         element={<Search/>}/>
-            <Route path="/demo"           element={<DemoMgmt/>}/>
-            <Route path="/demo-setup"     element={<DemoSetup/>}/>
-            <Route path="/live-demo"      element={<LiveDemo/>}/>
-            <Route path="/health"         element={<SystemHealth/>}/>
-            <Route path="/employees"      element={<EmployeeLookup/>}/>
-            <Route path="/audit"          element={<AuditLog/>}/>
+            <Route path="/demo"           element={<AdminRouteErrorBoundary><DemoMgmt/></AdminRouteErrorBoundary>}/>
+            <Route path="/demo-setup"     element={<AdminRouteErrorBoundary><DemoSetup/></AdminRouteErrorBoundary>}/>
+            <Route path="/live-demo"      element={<AdminRouteErrorBoundary><LiveDemo/></AdminRouteErrorBoundary>}/>
+            <Route path="/health"         element={<AdminRouteErrorBoundary><SystemHealth/></AdminRouteErrorBoundary>}/>
+            <Route path="/employees"      element={<AdminRouteErrorBoundary><EmployeeLookup/></AdminRouteErrorBoundary>}/>
+            <Route path="/audit"          element={<AdminRouteErrorBoundary><AuditLog/></AdminRouteErrorBoundary>}/>
             <Route path="/support"        element={<div style={{padding:8}}><Support/></div>}/>
             <Route path="/email"          element={<div/>}/>
-            <Route path="/calendar"       element={<AdminCalendar/>}/>
-            <Route path="/training"       element={<AdminTraining/>}/>
+            <Route path="/calendar"       element={<AdminRouteErrorBoundary><AdminCalendar/></AdminRouteErrorBoundary>}/>
+            <Route path="/training"       element={<AdminRouteErrorBoundary><AdminTraining/></AdminRouteErrorBoundary>}/>
             <Route path="*"               element={<Overview key={window.location.pathname + window.location.search + "_fallback"}/>}/>
           </Routes>
         </Suspense>
