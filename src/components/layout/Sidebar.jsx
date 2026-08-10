@@ -49,6 +49,7 @@ const SECTIONS = [
       { path: '/invoices',  icon: InvIcon,     label: 'Invoices',              section: 'invoices' },
       { path: '/payments',  icon: PayIcon,     label: 'Payments',              section: 'payments' },
       { path: '/ar',        icon: ARIcon,      label: 'Accounts Receivable',   section: 'payments' },
+      { path: '/transactions', icon: PayIcon,  label: 'Transactions',          section: 'payments' },
       { path: '/timeentry',  icon: ClockIcon,   label: 'Time & Billing',        section: 'payments' },
       { path: '/books',     icon: BooksIcon,   label: 'Books & Ledger',        section: 'books' },
     ]
