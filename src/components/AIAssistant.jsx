@@ -103,7 +103,7 @@ export default function AIAssistant({ adminMode = false }) {
         onClick={() => setOpen(o => !o)}
         title="AI Assistant"
         style={{
-          position: 'fixed', bottom: 24, right: 24, zIndex: 10000,
+          position: 'fixed', bottom: 80, right: 24, zIndex: 10000,
           width: 52, height: 52, borderRadius: '50%',
           background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
           border: 'none', cursor: 'pointer', boxShadow: '0 4px 20px rgba(99,102,241,0.5)',
@@ -118,7 +118,7 @@ export default function AIAssistant({ adminMode = false }) {
       {/* Panel */}
       {open && (
         <div style={{
-          position: 'fixed', bottom: 88, right: 24, zIndex: 9999,
+          position: 'fixed', bottom: 144, right: 24, zIndex: 9999,
           width: 420, height: 560, maxHeight: 'calc(100vh - 120px)',
           background: '#0f172a', border: '1px solid #334155',
           borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
