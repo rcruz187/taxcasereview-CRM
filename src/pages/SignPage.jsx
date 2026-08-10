@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { stampSignature, buildCertificatePage, addTearDropStamp, appendPdfPages } from '../lib/irsFormUtils'
 import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 
@@ -325,6 +326,9 @@ export default function SignPage() {
           body: JSON.stringify({ to: doc.client_phone, body: `${FIRM.name}: your signature on ${doc.doc_type} was received and a copy has been saved to your file.` })
         }).catch(() => {})
       }
+      // Fire workflow trigger — esign_signed with doc_type as value
+      // triggerWorkflow handles 'both' entity_type so this hits client + lead templates
+      await triggerWorkflow('esign_signed', 'client', doc.client_name || '', '', doc.doc_type || '').catch(() => {})
     } catch (e) {
       console.error('Post-sign steps failed (signature already saved):', e)
     } finally {
