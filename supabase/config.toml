@@ -118,3 +118,6 @@ verify_jwt = true
 verify_jwt = true
 [functions.call-ai-summary]
 verify_jwt = false
+
+[functions.ai-chat]
+verify_jwt = true
