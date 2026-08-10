@@ -255,7 +255,7 @@ export default function Esign() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--br)', background: 'var(--s2)' }}>
-                  {['Client', 'Document', 'Sent', 'Pending', 'Status', 'Signed By', 'Actions'].map(h => (
+                  {['Client', 'Document', 'Sent', 'Opened', 'Reminders', 'Pending', 'Status', 'Signed By', 'Actions'].map(h => (
                     <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{h}</th>
                   ))}
                 </tr>
@@ -289,6 +289,26 @@ export default function Esign() {
                         {/* Sent */}
                         <td style={{ padding: '13px 14px', fontSize: 12, color: 'var(--t3)', whiteSpace: 'nowrap' }}>
                           {item.sent_at ? new Date(item.sent_at).toLocaleDateString() : '—'}
+                        </td>
+
+                        {/* Opened */}
+                        <td style={{ padding: '13px 14px', fontSize: 12, whiteSpace: 'nowrap' }}>
+                          {item.opened_at ? (
+                            <span style={{ color: 'var(--ok)', fontWeight: 600 }}>
+                              👁 {new Date(item.opened_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                          ) : <span style={{ color: 'var(--t3)' }}>Not opened</span>}
+                        </td>
+
+                        {/* Reminders */}
+                        <td style={{ padding: '13px 14px', fontSize: 12, whiteSpace: 'nowrap' }}>
+                          {item.reminder_count > 0 ? (
+                            <span style={{ color: item.reminder_count >= 3 ? 'var(--bad)' : 'var(--warn)', fontWeight: 600 }}>
+                              {item.reminder_count}/3 sent
+                            </span>
+                          ) : item.status === 'Awaiting' ? (
+                            <span style={{ color: 'var(--t3)' }}>None yet</span>
+                          ) : <span style={{ color: 'var(--t3)' }}>—</span>}
                         </td>
 
                         {/* Pending */}
