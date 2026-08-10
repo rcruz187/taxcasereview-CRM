@@ -1,5 +1,10 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
 
 const SYSTEM_PROMPT = `You are an expert AI assistant embedded inside TaxRes CRM — a CRM built specifically for tax resolution firms. You have deep knowledge of:
 - IRS tax resolution processes (OIC, IA, CNC, CDP, PPIA, TFRP)
@@ -7,22 +12,25 @@ const SYSTEM_PROMPT = `You are an expert AI assistant embedded inside TaxRes CRM
 - Forms 2848, 8821, 433-A, 433-B, 433-F, 656
 - Tax resolution strategy and case management
 - How to work with the IRS on behalf of clients
+- General business, legal, and productivity questions
 
-You have access to context about the current client or case the user is viewing. Use that context to give specific, actionable answers. Be direct, concise, and practical. You are speaking to an Enrolled Agent or tax professional.`
+You have access to context about the current client or case the user is viewing. Use that context to give specific, actionable answers. Be direct, concise, and practical.`
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'authorization, content-type',
-    }})
+    return new Response('ok', { headers: CORS })
   }
 
   try {
     const { message, context, history } = await req.json()
-    if (!message) return new Response(JSON.stringify({ error: 'missing message' }), { status: 400 })
+    if (!message) return new Response(JSON.stringify({ error: 'missing message' }), { status: 400, headers: CORS })
 
-    const GEMINI_KEY = Deno.env.get('GEMINI_API_KEY')!
+    const GEMINI_KEY = Deno.env.get('GEMINI_API_KEY')
+    if (!GEMINI_KEY) {
+      console.error('GEMINI_API_KEY not set')
+      return new Response(JSON.stringify({ error: 'AI service not configured' }), { status: 500, headers: CORS })
+    }
+
     const contents = []
 
     if (context) {
@@ -53,8 +61,8 @@ serve(async (req) => {
 
     if (!geminiRes.ok) {
       const err = await geminiRes.text()
-      console.error('ai-chat: Gemini error', err)
-      return new Response(JSON.stringify({ error: 'AI service error' }), { status: 500 })
+      console.error('ai-chat: Gemini error', geminiRes.status, err)
+      return new Response(JSON.stringify({ error: 'AI service error', detail: err }), { status: 500, headers: CORS })
     }
 
     const data = await geminiRes.json()
@@ -62,11 +70,11 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ reply }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      headers: { ...CORS, 'Content-Type': 'application/json' }
     })
 
   } catch (err) {
     console.error('ai-chat error:', err)
-    return new Response(JSON.stringify({ error: 'internal error' }), { status: 500 })
+    return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: CORS })
   }
 })
