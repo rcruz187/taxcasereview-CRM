@@ -33,6 +33,24 @@ export default function Documents() {
   const [customFolders,setCustomFolders] = useState([])
   const [addingFolder, setAddingFolder]  = useState(false)
   const [newFolderName,setNewFolderName] = useState('')
+  const [viewMode,     setViewMode]      = useState(() => localStorage.getItem('docs_view') || 'grid') // 'grid' | 'list' | 'table'
+  const [sortCol,      setSortCol]       = useState('created_at')
+  const [sortDir,      setSortDir]       = useState('desc')
+
+  function changeView(v) { setViewMode(v); localStorage.setItem('docs_view', v) }
+  function toggleSort(col) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
+  function sortedDocs(arr) {
+    return [...arr].sort((a, b) => {
+      let av = a[sortCol] || '', bv = b[sortCol] || ''
+      if (sortCol === 'file_size') { av = Number(av); bv = Number(bv) }
+      if (av < bv) return sortDir === 'asc' ? -1 : 1
+      if (av > bv) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+  }
   const fileRef = useRef(null)
 
   const ALL_FOLDERS = [...ROOT_FOLDERS, ...customFolders]
@@ -164,6 +182,17 @@ export default function Documents() {
           )}
         </div>
         <button className="btn pri" style={{gap:6}} onClick={()=>setModal(true)}>+ Upload Document</button>
+        {/* View toggle */}
+        <div style={{display:'flex',gap:0,border:'1px solid var(--br)',borderRadius:8,overflow:'hidden',flexShrink:0}}>
+          {[['grid','⊞'],['list','≡'],['table','▤']].map(([v,icon])=>(
+            <button key={v} onClick={()=>changeView(v)} title={v.charAt(0).toUpperCase()+v.slice(1)+' view'}
+              style={{padding:'7px 11px',border:'none',cursor:'pointer',fontSize:15,lineHeight:1,
+                background:viewMode===v?'var(--blue)':'var(--s2)',
+                color:viewMode===v?'#fff':'var(--t3)',transition:'all .15s'}}>
+              {icon}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* 2-pane layout */}
@@ -249,33 +278,24 @@ export default function Documents() {
               <div style={{fontSize:13}}>{clientFilter ? `No files on record for "${clientFilter}"` : folder === 'All' ? 'No documents uploaded yet.' : 'No files in this folder yet.'}</div>
               {clientFilter && <button onClick={()=>setClientFilter('')} className="btn sec" style={{marginTop:12}}>Clear Filter</button>}
             </div>
-          ) : (
+          ) : viewMode === 'grid' ? (
+            // ── GRID VIEW ──────────────────────────────────────────────────
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(190px,1fr))',gap:12}}>
-              {filtered.map(doc => (
+              {sortedDocs(filtered).map(doc => (
                 <div key={doc.id}
                   onMouseEnter={e=>{e.currentTarget.querySelector('.doc-actions').style.opacity='1'}}
                   onMouseLeave={e=>{e.currentTarget.querySelector('.doc-actions').style.opacity='0'}}
                   style={{border:'1px solid var(--br)',borderRadius:12,padding:'14px 12px 12px',
                     background:'var(--s2)',transition:'all .15s',position:'relative',
                     boxShadow:'0 1px 4px rgba(0,0,0,.06)'}}>
-
-                  {/* File type badge */}
                   <div style={{position:'absolute',top:10,right:10,fontSize:10,fontWeight:700,
                     background:'var(--s3)',color:'var(--t3)',borderRadius:4,padding:'2px 5px'}}>
                     {(doc.file_name||doc.name||'').split('.').pop()?.toUpperCase()||'—'}
                   </div>
-
-                  {/* Icon */}
                   <div style={{fontSize:42,textAlign:'center',marginBottom:10,lineHeight:1}}>{fileIcon(doc.file_name||doc.name)}</div>
-
-                  {/* Name */}
                   <div style={{fontSize:12.5,fontWeight:700,lineHeight:1.35,marginBottom:6,
                     overflow:'hidden',textOverflow:'ellipsis',display:'-webkit-box',
-                    WebkitLineClamp:2,WebkitBoxOrient:'vertical',minHeight:34}}>
-                    {doc.name}
-                  </div>
-
-                  {/* Meta */}
+                    WebkitLineClamp:2,WebkitBoxOrient:'vertical',minHeight:34}}>{doc.name}</div>
                   <div style={{fontSize:11,color:'var(--t3)',lineHeight:1.7,marginBottom:8}}>
                     {doc.client && (
                       <div style={{display:'flex',alignItems:'center',gap:4,color:'var(--t2)',fontWeight:600}}>
@@ -289,24 +309,101 @@ export default function Documents() {
                       <span>{fmtDate(doc.created_at)}</span>
                     </div>
                   </div>
-
-                  {/* Actions — fade in on hover */}
                   <div className="doc-actions" style={{display:'flex',gap:6,opacity:0,transition:'opacity .15s'}}>
                     {doc.file_url ? (
                       <a href={doc.file_url} target="_blank" rel="noreferrer"
                         style={{flex:1,padding:'6px 0',background:'var(--blue)',color:'#fff',borderRadius:7,
-                          fontSize:11,fontWeight:700,textAlign:'center',textDecoration:'none'}}>
-                        Open
-                      </a>
+                          fontSize:11,fontWeight:700,textAlign:'center',textDecoration:'none'}}>Open</a>
                     ) : <div style={{flex:1}}/>}
                     <button onClick={e=>{e.stopPropagation();setConfirmDel(doc)}}
                       style={{padding:'6px 10px',background:'rgba(239,68,68,.12)',color:'var(--bad)',
-                        border:'1px solid rgba(239,68,68,.3)',borderRadius:7,cursor:'pointer',fontSize:11,fontWeight:700}}>
-                      Del
-                    </button>
+                        border:'1px solid rgba(239,68,68,.3)',borderRadius:7,cursor:'pointer',fontSize:11,fontWeight:700}}>Del</button>
                   </div>
                 </div>
               ))}
+            </div>
+          ) : viewMode === 'list' ? (
+            // ── LIST VIEW ──────────────────────────────────────────────────
+            <div style={{display:'flex',flexDirection:'column',gap:4}}>
+              {sortedDocs(filtered).map(doc => (
+                <div key={doc.id} style={{display:'flex',alignItems:'center',gap:12,padding:'9px 12px',
+                  background:'var(--s2)',border:'1px solid var(--br)',borderRadius:9,
+                  transition:'background .1s'}}
+                  onMouseEnter={e=>e.currentTarget.style.background='var(--s3)'}
+                  onMouseLeave={e=>e.currentTarget.style.background='var(--s2)'}>
+                  <span style={{fontSize:24,flexShrink:0}}>{fileIcon(doc.file_name||doc.name)}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:700,color:'var(--tx)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{doc.name}</div>
+                    <div style={{fontSize:11,color:'var(--t3)',display:'flex',gap:10,marginTop:2,flexWrap:'wrap'}}>
+                      {doc.client && <span>👤 {doc.client}</span>}
+                      <span>📂 {doc.docType||'Other'}</span>
+                      {doc.file_size && <span>{fmtSize(doc.file_size)}</span>}
+                    </div>
+                  </div>
+                  <span style={{fontSize:11,color:'var(--t3)',flexShrink:0,whiteSpace:'nowrap'}}>{fmtDate(doc.created_at)}</span>
+                  <div style={{display:'flex',gap:6,flexShrink:0}}>
+                    {doc.file_url && (
+                      <a href={doc.file_url} target="_blank" rel="noreferrer"
+                        style={{padding:'5px 12px',background:'var(--blue)',color:'#fff',borderRadius:6,
+                          fontSize:11,fontWeight:700,textDecoration:'none'}}>Open</a>
+                    )}
+                    <button onClick={e=>{e.stopPropagation();setConfirmDel(doc)}}
+                      style={{padding:'5px 10px',background:'rgba(239,68,68,.12)',color:'var(--bad)',
+                        border:'1px solid rgba(239,68,68,.3)',borderRadius:6,cursor:'pointer',fontSize:11,fontWeight:700}}>Del</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            // ── TABLE VIEW ─────────────────────────────────────────────────
+            <div style={{overflowX:'auto'}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                <thead>
+                  <tr style={{background:'var(--s2)'}}>
+                    {[['name','Name'],['client','Client'],['docType','Folder'],['file_size','Size'],['created_at','Uploaded']].map(([col,label])=>(
+                      <th key={col} onClick={()=>toggleSort(col)}
+                        style={{padding:'9px 12px',textAlign:'left',fontWeight:700,fontSize:11,
+                          color:sortCol===col?'var(--blue)':'var(--t3)',textTransform:'uppercase',
+                          letterSpacing:'.05em',borderBottom:'2px solid var(--br)',
+                          cursor:'pointer',whiteSpace:'nowrap',userSelect:'none'}}>
+                        {label} {sortCol===col?(sortDir==='asc'?'↑':'↓'):''}
+                      </th>
+                    ))}
+                    <th style={{padding:'9px 12px',borderBottom:'2px solid var(--br)',width:100}}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedDocs(filtered).map((doc,idx) => (
+                    <tr key={doc.id}
+                      style={{background:idx%2===0?'transparent':'rgba(0,0,0,.02)',transition:'background .1s'}}
+                      onMouseEnter={e=>e.currentTarget.style.background='var(--s2)'}
+                      onMouseLeave={e=>e.currentTarget.style.background=idx%2===0?'transparent':'rgba(0,0,0,.02)'}>
+                      <td style={{padding:'8px 12px',borderBottom:'1px solid var(--br)'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:8}}>
+                          <span style={{fontSize:18}}>{fileIcon(doc.file_name||doc.name)}</span>
+                          <span style={{fontWeight:600,color:'var(--tx)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:220}}>{doc.name}</span>
+                        </div>
+                      </td>
+                      <td style={{padding:'8px 12px',borderBottom:'1px solid var(--br)',color:'var(--t2)',whiteSpace:'nowrap'}}>{doc.client||'—'}</td>
+                      <td style={{padding:'8px 12px',borderBottom:'1px solid var(--br)',color:'var(--t3)',whiteSpace:'nowrap'}}>{doc.docType||'Other'}</td>
+                      <td style={{padding:'8px 12px',borderBottom:'1px solid var(--br)',color:'var(--t3)',whiteSpace:'nowrap'}}>{doc.file_size?fmtSize(doc.file_size):'—'}</td>
+                      <td style={{padding:'8px 12px',borderBottom:'1px solid var(--br)',color:'var(--t3)',whiteSpace:'nowrap'}}>{fmtDate(doc.created_at)}</td>
+                      <td style={{padding:'8px 12px',borderBottom:'1px solid var(--br)'}}>
+                        <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>
+                          {doc.file_url && (
+                            <a href={doc.file_url} target="_blank" rel="noreferrer"
+                              style={{padding:'4px 10px',background:'var(--blue)',color:'#fff',borderRadius:5,
+                                fontSize:11,fontWeight:700,textDecoration:'none'}}>Open</a>
+                          )}
+                          <button onClick={e=>{e.stopPropagation();setConfirmDel(doc)}}
+                            style={{padding:'4px 8px',background:'rgba(239,68,68,.12)',color:'var(--bad)',
+                              border:'1px solid rgba(239,68,68,.3)',borderRadius:5,cursor:'pointer',fontSize:11,fontWeight:700}}>Del</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
