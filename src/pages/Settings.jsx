@@ -1265,10 +1265,12 @@ function StorageTab() {
   const [usageLoading, setUsageLoading] = useState(true)
 
   useEffect(() => {
+    const tid = FIRM.tenantId
+    if (!tid) return  // Wait for branding to resolve
     async function load() {
       const [{ data: d, error: docsErr }, { data: e }] = await Promise.all([
-        supabase.from('documents').select('file_size, "docType", client, created_at').eq('tenant_id', FIRM.tenantId).order('file_size', { ascending: false }),
-        supabase.from('esigns').select('created_at').eq('tenant_id', FIRM.tenantId).limit(200),
+        supabase.from('documents').select('file_size, "docType", client, created_at').eq('tenant_id', tid).order('file_size', { ascending: false }),
+        supabase.from('esigns').select('created_at').eq('tenant_id', tid).limit(200),
       ])
       if (docsErr) console.error('Storage Usage: failed to load documents —', docsErr.message)
       setDocs(d || [])
@@ -1305,7 +1307,7 @@ function StorageTab() {
       setUsageLoading(false)
     }
     loadUsage()
-  }, [])
+  }, [FIRM.tenantId])
 
   const FREE_LIMIT = 1024 * 1024 * 1024  // 1 GB Supabase free tier
   const totalBytes  = docs.reduce((s, d) => s + (d.file_size || 0), 0)
