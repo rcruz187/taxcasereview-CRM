@@ -1,0 +1,102 @@
+const RAW_BASE = "https://raw.githubusercontent.com/taxresolutioncrm/taxcasereview-CRM/gh-pages";
+
+const INDEX_HTML = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#0a0f1a" />
+    <script>
+      (function(){
+        var redirect = sessionStorage.redirect;
+        delete sessionStorage.redirect;
+        if (redirect && redirect !== location.href) {
+          history.replaceState(null, null, redirect);
+        }
+      })();
+    </script>
+    <title>TaxRes CRM</title>
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="icon" type="image/x-icon" href="/favicon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/favicon.png" />
+    <meta name="theme-color" content="#0f2150" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+      <script type="text/javascript">
+      (function(c,l,a,r,i,t,y){
+        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+      })(window, document, "clarity", "script", "xyck7g2mfl");
+    </script>
+      <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-M6J80B65LG"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-M6J80B65LG');
+    </script>
+    <script type="module" crossorigin src="/functions/v1/serve-app/assets/index-bGt3y8Cu.js"></script>
+    <link rel="stylesheet" crossorigin href="/functions/v1/serve-app/assets/index-DVq7vtti.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>`;
+
+const MIME: Record<string, string> = {
+  js: 'application/javascript; charset=utf-8',
+  css: 'text/css; charset=utf-8',
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+  gif: 'image/gif', svg: 'image/svg+xml', ico: 'image/x-icon',
+  woff: 'font/woff', woff2: 'font/woff2', ttf: 'font/ttf',
+  pdf: 'application/pdf', webp: 'image/webp', map: 'application/json',
+};
+
+Deno.serve(async (req: Request) => {
+  const url = new URL(req.url);
+  const full = url.pathname;
+  const PREFIX = '/serve-app';
+  let asset = full.startsWith(PREFIX) ? full.slice(PREFIX.length) : full;
+  if (!asset || asset === '') asset = '/';
+  const ext = (asset.split('.').pop() ?? '').toLowerCase();
+
+  if (ext && MIME[ext]) {
+    try {
+      const upstream = await fetch(`${RAW_BASE}${asset}`);
+      if (!upstream.ok) return new Response(`Not found: ${asset}`, { status: 404 });
+      const body = await upstream.arrayBuffer();
+      return new Response(body, {
+        status: 200,
+        headers: {
+          'Content-Type': MIME[ext],
+          'Cache-Control': 'public, max-age=31536000, immutable',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    } catch (e) {
+      return new Response(`Error: ${e}`, { status: 502 });
+    }
+  }
+
+  return new Response(INDEX_HTML, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
+});
