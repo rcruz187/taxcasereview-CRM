@@ -88,43 +88,9 @@ function RequireAuth({ children }) {
   return children
 }
 
-// Blocks a route if the user doesn't have view permission for that section,
-// or if the feature requires a higher plan tier than the tenant's current plan.
-const TIER_LABELS = { starter: 'Starter', growth: 'Growth', pro: 'Pro' }
-const TIER_REQUIRED_DISPLAY = {
-  dialer:'Growth', workflows:'Growth', irsforms:'Growth', irsreference:'Growth',
-  taxreturns:'Growth', transcripts:'Growth', payments:'Growth', invoices:'Growth',
-  estimates:'Growth', books:'Growth', stateforms:'Growth',
-  payroll:'Pro', timeoff:'Pro', employees:'Pro', reports:'Pro', deadlines:'Pro',
-}
+// Blocks a route if the user doesn't have view permission for that section
 function Guard({ section, children }) {
-  const { can, planTier } = useApp()
-  const requiredTier = TIER_REQUIRED_DISPLAY[section]
-  const tierBlocked = requiredTier && !can('view', section) && planTier !== 'pro'
-  if (tierBlocked) {
-    return (
-      <div style={{
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        height: '60vh', gap: 16, color: 'var(--t3)', textAlign: 'center', padding: 32
-      }}>
-        <div style={{ fontSize: 48 }}>⭐</div>
-        <div style={{ fontWeight: 800, fontSize: 20, color: 'var(--tx)' }}>
-          {requiredTier} Plan Required
-        </div>
-        <div style={{ fontSize: 14, color: 'var(--t2)', maxWidth: 340, lineHeight: 1.6 }}>
-          This feature is available on the <strong>{requiredTier}</strong> plan and above.
-          Your firm is currently on the <strong>{TIER_LABELS[planTier] || planTier}</strong> plan.
-        </div>
-        <div style={{
-          background: 'var(--s1)', border: '1px solid var(--br)', borderRadius: 12,
-          padding: '16px 24px', fontSize: 13, color: 'var(--t3)', maxWidth: 320
-        }}>
-          Contact <strong style={{ color: 'var(--tx)' }}>romy@taxrescrm.net</strong> to upgrade your plan.
-        </div>
-      </div>
-    )
-  }
+  const { can } = useApp()
   if (!can('view', section)) {
     return (
       <div style={{
