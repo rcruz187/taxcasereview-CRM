@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
+
+// Tier gate — module-level constant, matches App.jsx
+const TIER_ORDER = { starter: 0, growth: 1, pro: 2 }
+const TIER_REQUIRED_SIDEBAR = {
+  dialer: 'growth', workflows: 'growth', irsforms: 'growth',
+  irsreference: 'growth', taxreturns: 'growth', transcripts: 'growth',
+  payments: 'growth', invoices: 'growth', estimates: 'growth',
+  books: 'growth', stateforms: 'growth',
+  payroll: 'pro', timeoff: 'pro', employees: 'pro', reports: 'pro', deadlines: 'pro',
+}
 import { supabase } from '../../lib/supabase'
 import { FIRM } from '../../lib/firmBranding'
 import { OPEN_STATUSES } from '../../lib/caseStatuses'
@@ -106,7 +116,7 @@ const SECTIONS = [
 ]
 
 export default function Sidebar() {
-  const { user, logout, can, role, mobileNavOpen, setMobileNavOpen, employeeName } = useApp()
+  const { user, logout, can, role, mobileNavOpen, setMobileNavOpen, employeeName, planTier } = useApp()
   const location = useLocation()
   const navigate = useNavigate()
   const [logoUrl, setLogoUrl] = useState(() => FIRM.logoUrl || null)
@@ -482,14 +492,17 @@ export default function Sidebar() {
 
             {/* Items — only show when open */}
             {isOpen && section.items.map(item => {
-              if (item.section && !can('view', item.section)) return null
+              const tierLocked = item.section && TIER_REQUIRED_SIDEBAR[item.section] &&
+                (TIER_ORDER[planTier] || 0) < (TIER_ORDER[TIER_REQUIRED_SIDEBAR[item.section]] || 0)
+              if (item.section && !can('view', item.section) && !tierLocked) return null
               const Icon = item.icon
               return (
                 <NavLink
                   key={item.path}
                   to={item.path}
                   end={item.path === '/'}
-                  className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+                  className={({ isActive }) => `nav-item${isActive ? ' active' : ''}${tierLocked ? ' tier-locked' : ''}`}
+                  onClick={tierLocked ? e => e.preventDefault() : undefined}
                   onClick={() => {
                     if (item.path === '/email') setUnreadInbox(0)
                     if (item.path === '/tasks') setOpenTasks(0)
@@ -502,6 +515,7 @@ export default function Sidebar() {
                 >
                   <Icon />
                   {item.label}
+                  {tierLocked && <span style={{marginLeft:'auto',fontSize:10,opacity:.5}}>🔒</span>}
                   {item.badge === 'email' ? (
                     unreadInbox > 0 && <span className="nav-badge">{unreadInbox}</span>
                   ) : item.badge && (
