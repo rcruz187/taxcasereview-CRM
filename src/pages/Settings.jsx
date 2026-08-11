@@ -788,6 +788,9 @@ export default function Settings() {
             </div>
           </div>
 
+          {/* ── OFFICE BILLING ── */}
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.08em', margin: '8px 0 8px 2px' }}>🏦 Office Billing</div>
+
           {/* Mercury — Office Billing */}
           <div className="card">
             <div className="card-header"><span className="card-title">💳 Mercury — Office Billing</span></div>
@@ -845,6 +848,9 @@ export default function Settings() {
               </div>
             </div>
           </div>
+
+          {/* ── PAYMENTS & BILLING ── */}
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.08em', margin: '8px 0 8px 2px' }}>💳 Payments &amp; Billing</div>
 
           {/* Payment Provider */}
           <div className="card">
