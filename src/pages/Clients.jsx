@@ -3298,10 +3298,10 @@ export default function Clients() {
   }
 
   // ── List View ────────────────────────────────────────────────────────────────
-  const totalClients   = clients.filter(c=>!c.archived).length
-  const activeClients  = clients.filter(c=>!c.archived&&c.status==='Active').length
-  const indivClients   = clients.filter(c=>!c.archived&&(c.clientType||'Individual')==='Individual').length
-  const bizClients     = clients.filter(c=>!c.archived&&c.clientType==='Business').length
+  const totalClients   = filtered.filter(c=>!c.archived).length
+  const activeClients  = filtered.filter(c=>!c.archived&&c.status==='Active').length
+  const indivClients   = filtered.filter(c=>!c.archived&&(c.clientType||'Individual')==='Individual').length
+  const bizClients     = filtered.filter(c=>!c.archived&&c.clientType==='Business').length
 
   return (
     <div>
