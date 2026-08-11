@@ -181,6 +181,8 @@ async function syncAccount(account: Record<string, unknown>): Promise<{ synced: 
           body:             text,
           body_html:        html,
           direction:        'inbound',
+          triage:           'Inbox',
+          status:           'Received',
           is_read:          false,
           received_at:      new Date(date).toISOString(),
           client_id:        clientId,
