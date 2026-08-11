@@ -3462,7 +3462,7 @@ export default function AdminPortal() {
     <ScreenShareProvider>
     <div style={{display:'flex',minHeight:'100vh',background:'#0d0c1a',fontFamily:'system-ui,Arial,sans-serif'}}>
       <Sidebar onSignOut={handleSignOut} />
-      <div style={{flex:1,position:'relative',height:'100vh',overflow:'hidden'}}>
+      <div style={{flex:1,position:'relative',height:'100vh',overflowY:'auto'}}>
         {/* Persistent SnappyMail iframe — always mounted so compose drafts survive tab switches.
             Hidden via CSS when not on /email; shown only when on /email route. */}
         <div style={{
