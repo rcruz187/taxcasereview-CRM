@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { PRESETS } from '../lib/videoBackground'
+import { FIRM } from '../lib/firmBranding'
 
-const TCR_BG = '/tcr-bg.png'
 
 export default function VirtualBackground({ bgMode, bgPreset, segStatus, onSelect }) {
   const fileRef = useRef()
@@ -17,6 +17,7 @@ export default function VirtualBackground({ bgMode, bgPreset, segStatus, onSelec
   const isActive = (id) => {
     if (id === 'none')   return bgMode === 'none'
     if (id === 'blur')   return bgMode === 'blur'
+    if (id === 'firm')   return bgMode === 'custom'
     if (id === 'custom') return bgMode === 'custom'
     return bgMode === 'preset' && bgPreset === id
   }
@@ -53,10 +54,14 @@ export default function VirtualBackground({ bgMode, bgPreset, segStatus, onSelec
           </div>
         </BgBtn>
 
-        {/* TCR Brand */}
-        <BgBtn active={isActive('tcr')} onClick={() => onSelect('preset', 'tcr', null)} label="TCR Brand">
-          <img src={TCR_BG} alt="TCR" style={{ width: 56, height: 34, objectFit: 'cover', borderRadius: 4 }}/>
-        </BgBtn>
+        {/* Firm Brand — per-tenant logo as background */}
+        {FIRM.logoUrl && (
+          <BgBtn active={isActive('firm')} onClick={() => onSelect('custom', null, FIRM.logoUrl)} label={`${FIRM.name || 'Brand'}`}>
+            <img src={FIRM.logoUrl} alt={FIRM.name || 'Brand'}
+              style={{ width: 56, height: 34, objectFit: 'contain', borderRadius: 4, background: '#0a1628', padding: 2 }}
+              onError={e => e.currentTarget.style.display='none'}/>
+          </BgBtn>
+        )}
 
         {/* Other presets */}
         {PRESETS.filter(p => p.id !== 'blur' && p.id !== 'tcr').map(p => (
