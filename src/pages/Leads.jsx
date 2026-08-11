@@ -412,6 +412,7 @@ export default function Leads() {
   const [leads, setLeads]   = useState([])
   const [filter, setFilter] = useState('All')
   const [repFilter, setRepFilter] = useState('All')
+  const [filterPipeline, setFilterPipeline] = useState('All')
   const [leadSearch, setLeadSearch] = useState('')
   const [sortCol, setSortCol] = useState('name')
   const [sortDir, setSortDir] = useState('asc')
@@ -1014,6 +1015,7 @@ export default function Leads() {
   function fldBizName(v){ setForm(f=>{ const n={...f, business_name:v}; return {...n, name: resolveLeadName(n)} }) }
   function toggleYear(y) { setForm(f=>({...f, taxYears: f.taxYears.includes(y)?f.taxYears.filter(x=>x!==y):[...f.taxYears,y]})) }
 
+  const pipelineOptions = ['All', ...Array.from(new Set(leads.map(l => l.pipelineStage).filter(Boolean))).sort()]
   const filtered = leads
     .filter(l => showArchived ? !!l.archived : !l.archived)
     // A converted lead now lives in Clients — it stays out of the working pool
@@ -1021,6 +1023,7 @@ export default function Leads() {
     .filter(l => filter === 'Converted to Client' || l.status !== 'Converted to Client')
     .filter(l => filter === 'All' || l.status === filter)
     .filter(l => repFilter === 'All' || (repFilter === 'Unassigned' ? !l.assignedTo : l.assignedTo === repFilter))
+    .filter(l => filterPipeline === 'All' || (l.pipelineStage||'') === filterPipeline)
     .filter(l => {
       if (!leadSearch.trim()) return true
       const q = leadSearch.toLowerCase()
@@ -3017,6 +3020,10 @@ export default function Leads() {
             {employees.map(e=><option key={e.id} value={e.name}>{e.name}</option>)}
           </select>
         )}
+        <select value={filterPipeline} onChange={e=>setFilterPipeline(e.target.value)}
+          style={{padding:'6px 10px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:6,color:'var(--tx)',fontSize:12,maxWidth:160}}>
+          {pipelineOptions.map(p=><option key={p} value={p}>{p==='All'?'All Stages':p}</option>)}
+        </select>
       </div>
 
       <div className="card">
