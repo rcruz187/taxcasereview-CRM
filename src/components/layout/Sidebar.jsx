@@ -502,8 +502,8 @@ export default function Sidebar() {
                   to={item.path}
                   end={item.path === '/'}
                   className={({ isActive }) => `nav-item${isActive ? ' active' : ''}${tierLocked ? ' tier-locked' : ''}`}
-                  onClick={tierLocked ? e => e.preventDefault() : undefined}
-                  onClick={() => {
+                  onClick={e => {
+                    if (tierLocked) { e.preventDefault(); return }
                     if (item.path === '/email') setUnreadInbox(0)
                     if (item.path === '/tasks') setOpenTasks(0)
                     if (item.path === '/esign') setPendingEsign(0)
