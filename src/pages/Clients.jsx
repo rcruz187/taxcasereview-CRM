@@ -3338,7 +3338,7 @@ export default function Clients() {
             {['All','Individual','Business'].map(f=>(
               <span key={f} className={`chip${filter===f?' on':''}`} onClick={()=>setFilter(f)}>{f}</span>
             ))}
-            <span className={`chip${showArchived?' on':''}`} onClick={()=>setShowArchived(a=>!a)}>🗄 Archived</span>
+            <span className={`chip${showArchived?' on':''}`} onClick={()=>{ setShowArchived(a=>!a); setFilterStatus('All'); setFilterRep('All'); setFilterPipeline('All') }}>🗄 Archived</span>
             <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}
               style={{fontSize:12,padding:'4px 8px',borderRadius:6,border:'1px solid var(--br)',background:'var(--s2)',color:'var(--tx)',cursor:'pointer'}}>
               <option value="All">All Statuses</option>
