@@ -898,47 +898,6 @@ export function ClientDocs({ clientName, supabase, showToast, onLogged }) {
   )
 }
 
-function FilterDrop({ value, onChange, options, width = 130 }) {
-  const [open, setOpen] = React.useState(false)
-  const ref = React.useRef(null)
-  React.useEffect(() => {
-    function handler(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-  const label = (options.find(([v]) => v === value) || options[0])?.[1] || value
-  return (
-    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
-      <div onClick={() => setOpen(o => !o)} style={{
-        fontSize: 12, padding: '4px 24px 4px 8px', borderRadius: 6,
-        border: '1px solid var(--br)', background: 'var(--bg2)', color: 'var(--tx)',
-        cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap',
-        minWidth: width, position: 'relative'
-      }}>
-        {label}
-        <span style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', fontSize: 10, opacity: .6 }}>▼</span>
-      </div>
-      {open && (
-        <div style={{
-          position: 'absolute', top: '110%', left: 0, zIndex: 9999,
-          background: 'var(--bg2)', border: '1px solid var(--br)', borderRadius: 8,
-          minWidth: width, maxHeight: 260, overflowY: 'auto', padding: '4px 0'
-        }}>
-          {options.map(([v, lbl]) => (
-            <div key={v} onClick={() => { onChange(v); setOpen(false) }} style={{
-              padding: '7px 12px', fontSize: 12, cursor: 'pointer', color: 'var(--tx)',
-              background: v === value ? 'rgba(26,127,212,.3)' : 'transparent',
-              whiteSpace: 'nowrap'
-            }}>
-              {lbl}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 export default function Clients() {
   const navigate = useNavigate()
   const { id: urlId } = useParams()
@@ -965,9 +924,6 @@ export default function Clients() {
   const [employees, setEmployees] = useState([])
   const [statusCategories, setStatusCategories] = useState([])
   const [filter,    setFilter]    = useState('All')
-  const [filterStatus,   setFilterStatus]   = useState('All') // Active | Inactive | Archived
-  const [filterRep,      setFilterRep]      = useState('All')
-  const [filterPipeline, setFilterPipeline] = useState('All')
   const [clientSearch, setClientSearch] = useState('')
   const [sortCol, setSortCol] = useState('name')
   const [sortDir, setSortDir] = useState('asc')
@@ -1276,16 +1232,9 @@ export default function Clients() {
     }
   }
   const _clientSearchLower = clientSearch.toLowerCase()
-  // Build unique rep and pipeline lists from loaded clients
-  const repOptions = ['All', ...Array.from(new Set(clients.map(c => c.assignedTo).filter(Boolean))).sort()]
-  const pipelineOptions = ['All', ...Array.from(new Set(clients.map(c => c.pipelineStage).filter(Boolean))).sort()]
-
   const filtered = clients
     .filter(c => showArchived ? !!c.archived : !c.archived)
     .filter(c => filter==='All' || c.clientType===filter)
-    .filter(c => filterStatus==='All' || (c.status||'Active')===filterStatus)
-    .filter(c => filterRep==='All' || (c.assignedTo||'')=== filterRep)
-    .filter(c => filterPipeline==='All' || (c.pipelineStage||'')=== filterPipeline)
     .filter(c => !_clientSearchLower || (
       (c.name||'').toLowerCase().includes(_clientSearchLower) ||
       (c.email||'').toLowerCase().includes(_clientSearchLower) ||
@@ -3382,12 +3331,6 @@ export default function Clients() {
               <span key={f} className={`chip${filter===f?' on':''}`} onClick={()=>setFilter(f)}>{f}</span>
             ))}
             <span className={`chip${showArchived?' on':''}`} onClick={()=>setShowArchived(a=>!a)}>🗄 Archived</span>
-            <FilterDrop value={filterStatus} onChange={setFilterStatus} width={130}
-              options={[['All','All Statuses'],['Active','Active'],['Inactive','Inactive'],['Archived','Archived']]} />
-            <FilterDrop value={filterRep} onChange={setFilterRep} width={150}
-              options={repOptions.map(r => [r, r === 'All' ? 'All Reps' : r])} />
-            <FilterDrop value={filterPipeline} onChange={setFilterPipeline} width={160}
-              options={pipelineOptions.map(p => [p, p === 'All' ? 'All Stages' : p])} />
             <button className="btn pri" onClick={()=>{setForm(BLANK);setModal(true)}}>+ Add Client</button>
           </div>
         </div>
