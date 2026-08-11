@@ -260,7 +260,7 @@ serve(async (req) => {
 
   try {
     const { data: settings } = await supabase.from('settings')
-      .select('tenant_id, gmail_client_id, gmail_client_secret').limit(1).maybeSingle()
+      .select('tenant_id, gmail_client_id, gmail_client_secret').not('gmail_client_id', 'is', null).limit(1).maybeSingle()
 
     if (!settings?.gmail_client_id || !settings?.gmail_client_secret) {
       return new Response(JSON.stringify({ ok: true, skipped: 'Gmail app credentials not configured' }), { status: 200, headers: corsHeaders })
