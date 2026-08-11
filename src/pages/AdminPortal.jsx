@@ -364,7 +364,7 @@ function OfficePage() {
 
   const t = data.tenant
   const employees = data.employees || []
-  const TABS = ['overview','employees','billing','documents','actions']
+  const TABS = ['overview','employees','billing','actions','documents']
 
   return (
     <div style={{ padding:'28px 36px', maxWidth:1050 }}>
