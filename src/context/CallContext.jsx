@@ -250,8 +250,13 @@ export function CallProvider({ children }) {
       if (disposed) return
       if (error || !data?.jwt_token) {
         setRelayStatus('error')
-        showCallToast('Could not connect calling: ' + (data?.error || error?.message || 'unknown error'))
-        scheduleReconnect()
+        // Only show toast + retry if SW is configured — skip silently when not set up
+        const reason = data?.error || error?.message || ''
+        const notConfigured = !data || reason.toLowerCase().includes('not configured') || reason.toLowerCase().includes('not fully set up') || reason.toLowerCase().includes('no signalwire') || reason.toLowerCase().includes('missing')
+        if (!notConfigured) {
+          showCallToast('Could not connect calling: ' + reason)
+          scheduleReconnect()
+        }
         return
       }
       callerNumberRef.current = data.caller_number
