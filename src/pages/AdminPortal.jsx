@@ -543,8 +543,8 @@ function OfficePage() {
             </div>
             <div style={{ fontSize:13, color:'#475569', marginBottom:16, padding:'10px 14px', background:'rgba(99,102,241,.06)', borderRadius:8 }}>
               Estimated MRR: <strong style={{ color:'#10b981' }}>
-                ${billing.monthly_rate ? Number(billing.monthly_rate).toFixed(0)
-                  : billing.per_seat_rate ? (Number(billing.per_seat_rate)*employees.length).toFixed(0)
+                ${Number(billing.monthly_rate) > 0 ? Number(billing.monthly_rate).toFixed(0)
+                  : Number(billing.per_seat_rate) > 0 ? (Number(billing.per_seat_rate)*employees.length).toFixed(0)
                   : '0'}/mo
               </strong> · {employees.length} seat{employees.length!==1?'s':''}
             </div>
