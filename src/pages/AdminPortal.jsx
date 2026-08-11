@@ -730,7 +730,10 @@ function Billing() {
             <thead><tr>{['Firm','Status','Plan','Seats','Per Seat','Flat Rate','MRR','Actions'].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
             <tbody>
               {rows.map(r=>(
-                <tr key={r.id}>
+                <tr key={r.id} onClick={()=>navigate(`/crm-admin/offices/${r.id}`)}
+                  style={{ cursor:'pointer' }}
+                  onMouseEnter={e=>e.currentTarget.style.background='rgba(99,102,241,.06)'}
+                  onMouseLeave={e=>e.currentTarget.style.background=''}>
                   <td style={{ ...S.td,color:'#e2e8f0',fontWeight:600 }}>{r.firm_name}</td>
                   <td style={S.td}><span style={S.badge(STATUS_COLOR[r.status]||'#64748b')}>{r.status}</span></td>
                   <td style={S.td}><span style={S.badge(TIER_COLOR[r.plan_tier]||'#64748b',undefined)}>{r.plan_tier||'—'}</span></td>
@@ -740,7 +743,7 @@ function Billing() {
                   <td style={{ ...S.td,color:'#10b981',fontWeight:700 }}>
                     {r.effective_monthly!=null ? `$${Number(r.effective_monthly).toFixed(0)}/mo` : '—'}
                   </td>
-                  <td style={S.td}>
+                  <td style={S.td} onClick={e=>e.stopPropagation()}>
                     <button onClick={()=>navigate(`/crm-admin/offices/${r.id}?tab=billing`)}
                       style={{ ...S.btn('ghost'),padding:'4px 12px',fontSize:11 }}>Edit</button>
                   </td>
