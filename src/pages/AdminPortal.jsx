@@ -510,7 +510,7 @@ function OfficePage() {
 
       {/* Billing tab */}
       {tab==='billing' && (
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, alignItems:'start' }}>
+        <div style={{ maxWidth:520 }}>
           <div style={{ ...S.card, padding:20 }}>
             <div style={{ fontSize:12,fontWeight:700,color:'#475569',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:16 }}>Billing Settings</div>
             {[
@@ -580,8 +580,71 @@ function OfficePage() {
             </button>
           </div>
 
-          {/* Mercury Payment — right column */}
+        </div>
+      )}
+
+      {/* Actions tab — support tickets */}
+      {tab==='documents' && (
+        <div>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.05em' }}>Firm Documents</div>
+            <label style={{ ...S.btn('primary'), fontSize:12, padding:'7px 14px', cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
+              📎 Upload Document
+              <input type="file" style={{ display:'none' }} onChange={async e => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                setDocUploading(true)
+                toast_('Uploading…')
+                const path = `office-docs/${id}/${Date.now()}-${file.name}`
+                const { error: upErr } = await supabase.storage.from('firm-assets').upload(path, file, { upsert: false })
+                if (upErr) { toast_(upErr.message, 'error'); setDocUploading(false); return }
+                const { data: urlData } = supabase.storage.from('firm-assets').getPublicUrl(path)
+                const { error: dbErr } = await supabase.from('office_documents').insert([{
+                  tenant_id: id,
+                  name: file.name,
+                  file_url: urlData.publicUrl,
+                  file_size: file.size,
+                  uploaded_by: 'romy@taxrescrm.net',
+                  created_at: new Date().toISOString(),
+                }])
+                if (dbErr) { toast_(dbErr.message, 'error') }
+                else {
+                  toast_('✅ Document uploaded')
+                  setOffDocs(prev => [...prev, { name: file.name, file_url: urlData.publicUrl, file_size: file.size, created_at: new Date().toISOString() }])
+                }
+                setDocUploading(false)
+                e.target.value = ''
+              }} />
+            </label>
+          </div>
+          <div style={S.card}>
+            {offDocs.length === 0 ? (
+              <div style={{ padding:'24px 20px', color:'#475569', fontSize:13, textAlign:'center' }}>
+                <div style={{ fontSize:28, marginBottom:8 }}>📄</div>
+                No documents uploaded yet. Upload the signed agreement, contract, or any firm-level document.
+              </div>
+            ) : offDocs.map((doc, i) => (
+              <div key={i} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 18px', borderBottom: i < offDocs.length-1 ? '1px solid rgba(99,102,241,.08)' : 'none' }}>
+                <span style={{ fontSize:20 }}>📄</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:600, color:'#e2e8f0', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.name}</div>
+                  <div style={{ fontSize:11, color:'#475569', marginTop:2 }}>{fmtDate(doc.created_at)} · {doc.file_size ? (doc.file_size/1024).toFixed(0)+' KB' : ''}</div>
+                </div>
+                <a href={doc.file_url} target="_blank" rel="noreferrer"
+                  style={{ ...S.btn('ghost'), fontSize:11, padding:'5px 12px', textDecoration:'none' }}>
+                  Download ↗
+                </a>
+              </div>
+            ))}
+          </div>
+          {docUploading && <div style={{ fontSize:12, color:'#6366f1', marginTop:8, textAlign:'center' }}>Uploading…</div>}
+        </div>
+      )}
+
+      {tab==='actions' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <div style={{ ...S.card, padding:20 }}>
+
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
               <div style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.05em' }}>
                 💳 Charge Office
@@ -653,69 +716,7 @@ function OfficePage() {
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Actions tab — support tickets */}
-      {tab==='documents' && (
-        <div>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.05em' }}>Firm Documents</div>
-            <label style={{ ...S.btn('primary'), fontSize:12, padding:'7px 14px', cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
-              📎 Upload Document
-              <input type="file" style={{ display:'none' }} onChange={async e => {
-                const file = e.target.files?.[0]
-                if (!file) return
-                setDocUploading(true)
-                toast_('Uploading…')
-                const path = `office-docs/${id}/${Date.now()}-${file.name}`
-                const { error: upErr } = await supabase.storage.from('firm-assets').upload(path, file, { upsert: false })
-                if (upErr) { toast_(upErr.message, 'error'); setDocUploading(false); return }
-                const { data: urlData } = supabase.storage.from('firm-assets').getPublicUrl(path)
-                const { error: dbErr } = await supabase.from('office_documents').insert([{
-                  tenant_id: id,
-                  name: file.name,
-                  file_url: urlData.publicUrl,
-                  file_size: file.size,
-                  uploaded_by: 'romy@taxrescrm.net',
-                  created_at: new Date().toISOString(),
-                }])
-                if (dbErr) { toast_(dbErr.message, 'error') }
-                else {
-                  toast_('✅ Document uploaded')
-                  setOffDocs(prev => [...prev, { name: file.name, file_url: urlData.publicUrl, file_size: file.size, created_at: new Date().toISOString() }])
-                }
-                setDocUploading(false)
-                e.target.value = ''
-              }} />
-            </label>
-          </div>
           <div style={S.card}>
-            {offDocs.length === 0 ? (
-              <div style={{ padding:'24px 20px', color:'#475569', fontSize:13, textAlign:'center' }}>
-                <div style={{ fontSize:28, marginBottom:8 }}>📄</div>
-                No documents uploaded yet. Upload the signed agreement, contract, or any firm-level document.
-              </div>
-            ) : offDocs.map((doc, i) => (
-              <div key={i} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 18px', borderBottom: i < offDocs.length-1 ? '1px solid rgba(99,102,241,.08)' : 'none' }}>
-                <span style={{ fontSize:20 }}>📄</span>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:600, color:'#e2e8f0', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.name}</div>
-                  <div style={{ fontSize:11, color:'#475569', marginTop:2 }}>{fmtDate(doc.created_at)} · {doc.file_size ? (doc.file_size/1024).toFixed(0)+' KB' : ''}</div>
-                </div>
-                <a href={doc.file_url} target="_blank" rel="noreferrer"
-                  style={{ ...S.btn('ghost'), fontSize:11, padding:'5px 12px', textDecoration:'none' }}>
-                  Download ↗
-                </a>
-              </div>
-            ))}
-          </div>
-          {docUploading && <div style={{ fontSize:12, color:'#6366f1', marginTop:8, textAlign:'center' }}>Uploading…</div>}
-        </div>
-      )}
-
-      {tab==='actions' && (
-        <div style={S.card}>
           <div style={{ padding:16, fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.05em' }}>Support Tickets</div>
           {(data.support_tickets||[]).length===0 ? (
             <div style={{ padding:'16px 20px', color:'#475569', fontSize:13 }}>No support tickets for this office.</div>
