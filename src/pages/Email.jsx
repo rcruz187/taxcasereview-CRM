@@ -104,7 +104,7 @@ export default function Email() {
         event: 'INSERT',
         schema: 'public',
         table: 'emails',
-        filter: `triage=eq.Inbox`,
+        filter: `direction=eq.inbound`,
       }, (payload) => {
         const e = payload.new
         // Reload inbox
