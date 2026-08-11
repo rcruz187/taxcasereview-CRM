@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
+import { supabase } from '../../lib/supabase'
+import { FIRM } from '../../lib/firmBranding'
+import { OPEN_STATUSES } from '../../lib/caseStatuses'
 
 // Tier gate — module-level constant, matches App.jsx
 const TIER_ORDER = { starter: 0, growth: 1, pro: 2 }
@@ -11,9 +14,6 @@ const TIER_REQUIRED_SIDEBAR = {
   books: 'growth', stateforms: 'growth',
   payroll: 'pro', timeoff: 'pro', employees: 'pro', reports: 'pro', deadlines: 'pro',
 }
-import { supabase } from '../../lib/supabase'
-import { FIRM } from '../../lib/firmBranding'
-import { OPEN_STATUSES } from '../../lib/caseStatuses'
 
 const LOGO = '/logo.png'
 
