@@ -101,6 +101,7 @@ export function AppProvider({ children }) {
   const [modal, setModal]       = useState({ open: false, title: '', body: null })
   const [searchQ, setSearchQ]   = useState('')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [planTier, setPlanTier] = useState('pro') // default pro — loads from tenants on login
   const toastTimer = useRef(null)
 
   function applyBrandColor(hex) {
@@ -448,10 +449,11 @@ export function AppProvider({ children }) {
     try {
       const { data } = await supabase
         .from('tenants')
-        .select('status, firm_name')
+        .select('status, firm_name, plan_tier')
         .limit(1)
         .maybeSingle()
       if (!data) return
+      if (data.plan_tier) setPlanTier(data.plan_tier)
       const blocked = ['suspended', 'cancelled']
       if (blocked.includes(data.status)) {
         await supabase.auth.signOut()
@@ -551,6 +553,7 @@ export function AppProvider({ children }) {
   return (
     <AppContext.Provider value={{
       user, login, logout, checking, realtimeOk,
+      planTier,
       role, perms, can, employeeName,
       toast, showToast,
       modal, openModal, closeModal,
