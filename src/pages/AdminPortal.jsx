@@ -510,7 +510,7 @@ function OfficePage() {
 
       {/* Billing tab */}
       {tab==='billing' && (
-        <div style={{ maxWidth:480, overflowY:'auto', maxHeight:'calc(100vh - 220px)', paddingRight:8 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, alignItems:'start' }}>
           <div style={{ ...S.card, padding:20 }}>
             <div style={{ fontSize:12,fontWeight:700,color:'#475569',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:16 }}>Billing Settings</div>
             {[
@@ -580,8 +580,8 @@ function OfficePage() {
             </button>
           </div>
 
-          {/* Mercury Payment */}
-          <div style={{ ...S.card, padding:20, marginTop:14 }}>
+          {/* Mercury Payment — right column */}
+          <div style={{ ...S.card, padding:20 }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
               <div style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.05em' }}>
                 💳 Charge Office
