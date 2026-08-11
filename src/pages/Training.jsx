@@ -7,6 +7,8 @@ import { useScreenShare } from '../context/ScreenShareContext'
 import { useApp }         from '../context/AppContext'
 import { supabase }       from '../lib/supabase'
 import { FIRM, firmFooterLine } from '../lib/firmBranding'
+import { useVideoBackground } from '../lib/videoBackground'
+import VirtualBackground from '../components/VirtualBackground'
 
 const BASE = '/'
 
@@ -243,7 +245,7 @@ ${safeLogo ? `<img src="${safeLogo}" alt="${firm}" style="max-height:56px;max-wi
       </div>
 
       {/* Controls */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
         {!ss.sharingScreen
           ? <button onClick={() => ss.startScreenShare(myName)}
               style={{ background: '#2563eb', border: 'none', borderRadius: 8,
@@ -256,7 +258,21 @@ ${safeLogo ? `<img src="${safeLogo}" alt="${firm}" style="max-height:56px;max-wi
               ⏹ Stop sharing
             </button>
         }
+        <button onClick={() => setShowBgPanel(p => !p)}
+          style={{ background: showBgPanel ? 'rgba(59,130,246,.2)' : 'var(--s2)',
+                   border: `1px solid ${showBgPanel ? '#3b82f6' : 'var(--br)'}`,
+                   borderRadius: 8, padding: '10px 18px', color: showBgPanel ? '#93c5fd' : 'var(--t2)',
+                   fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+          🖼️ Background{vbg.bgMode !== 'none' ? ' ●' : ''}
+        </button>
       </div>
+
+      {/* Virtual background panel */}
+      {showBgPanel && (
+        <div style={{ marginBottom: 16, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--br)' }}>
+          <VirtualBackground bgMode={vbg.bgMode} bgPreset={vbg.bgPreset} segStatus={vbg.segStatus} onSelect={handleBgSelect}/>
+        </div>
+      )}
 
       {/* Invite link */}
       <div style={{ background: 'var(--s1)', border: '1px solid var(--br)', borderRadius: 10,
