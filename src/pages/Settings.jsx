@@ -19,6 +19,8 @@ export default function Settings() {
   const [myTenantId, setMyTenantId] = useState(null)
   const [acctStatus, setAcctStatus] = useState({}) // { quickbooks: {...}, xero: {...} }
   const [syncing, setSyncing] = useState({ quickbooks: false, xero: false })
+  const [expandedInt, setExpandedInt] = useState({}) // which integration cards are expanded
+  function toggleInt(key) { setExpandedInt(p => ({ ...p, [key]: !p[key] })) }
 
   useEffect(() => {
     if (!user?.email) return
@@ -449,132 +451,159 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* POP / SMTP Email */}
-          <div className="card">
-            <div className="card-header"><span className="card-title">📬 POP / SMTP Email</span></div>
-            <div style={{ padding: '0 20px 20px' }}>
-              <div style={{fontSize:12,color:'var(--t3)',marginBottom:14,lineHeight:1.6}}>Use any provider — Outlook, Yahoo, Zoho, custom domain. No Google required.</div>
-              <div className="fg2">
-                <div className="field"><label>SMTP Host</label><input value={firm.smtp_host||''} onChange={set('smtp_host')} placeholder="smtp.yourprovider.com"/></div>
-                <div className="field"><label>SMTP Port</label><input value={firm.smtp_port||''} onChange={set('smtp_port')} placeholder="587"/></div>
-              </div>
-              <div className="fg2">
-                <div className="field"><label>Email Address</label><input type="email" value={firm.smtp_email||''} onChange={set('smtp_email')} placeholder="you@yourdomain.com"/></div>
-                <div className="field"><label>Password / App Password</label><input type="password" value={firm.smtp_password||''} onChange={set('smtp_password')} placeholder="••••••••"/></div>
-              </div>
-              <div className="fg2">
-                <div className="field"><label>From Name</label><input value={firm.smtp_name||''} onChange={set('smtp_name')} placeholder="ClearCase.Tax"/></div>
-                <div className="field"><label>Encryption</label>
-                  <select value={firm.smtp_encryption||'TLS'} onChange={set('smtp_encryption')}><option>TLS</option><option>SSL</option><option>None</option></select>
-                </div>
-              </div>
-              <div style={{background:'var(--s2)',borderRadius:6,padding:'8px 14px',fontSize:11,color:'var(--t3)',lineHeight:1.7,marginBottom:14}}>
-                💡 Outlook: smtp.office365.com:587 · Yahoo: smtp.mail.yahoo.com:587 · Zoho: smtp.zoho.com:587
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Email Settings'}</button>
-              </div>
+          {/* ── EMAIL & CALENDAR ───────────────────────────────── */}
+          <div style={{ marginBottom: 4 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 12, paddingLeft: 2 }}>
+              📧 Email &amp; Calendar
             </div>
-          </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
 
-          {/* Gmail OAuth */}
-          <div className="card">
-            <div className="card-header"><span className="card-title">📧 Gmail OAuth Integration</span></div>
-            <div style={{ padding: '0 20px 20px' }}>
-              {connectedGmailCount > 0 ? (
-                <div style={{background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.25)",borderRadius:8,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10,fontSize:12,color:"var(--ok)"}}>
-                  <span>✅</span><span>{connectedGmailCount} employee{connectedGmailCount === 1 ? ' has' : 's have'} connected their own Gmail account.</span>
-                </div>
-              ) : (
-                <div style={{background:"rgba(250,204,21,.08)",border:"1px solid rgba(250,204,21,.25)",borderRadius:8,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10,fontSize:12,color:"var(--warn)"}}>
-                  <span>⚠️</span><span>No employees have connected Gmail yet.</span>
-                </div>
-              )}
-              <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.7 }}>
-                Each employee connects their OWN Gmail account individually, from the "Connect Gmail" button on the Email page — this section is only for the app-level setup below (done once, by an admin), not for connecting any specific person's account.
-              </div>
-
-              {/* Step by step */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-                {[
-                  ['1', 'Go to console.cloud.google.com and create a new project (or select existing)'],
-                  ['2', 'Enable the Gmail API under APIs & Services → Library'],
-                  ['3', 'Go to APIs & Services → Credentials → Create OAuth 2.0 Client ID'],
-                  ['4', 'Set Application Type to "Web application"'],
-                  ['5', `Add Authorized Redirect URI: ${window.location.origin}/auth/callback`],
-                  ['6', 'Copy your Client ID and Client Secret below, then save. After that, each employee connects their own account from the Email page.'],
-                ].map(([step, text]) => (
-                  <div key={step} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--blue)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, flexShrink: 0 }}>{step}</div>
-                    <div style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, paddingTop: 2 }}>{text}</div>
+              {/* POP / SMTP */}
+              <div style={{ border: '1px solid var(--br)', borderRadius: 12, overflow: 'hidden', background: 'var(--s1)' }}>
+                <div onClick={() => toggleInt('smtp')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer', userSelect: 'none' }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f0f4ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>📬</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)' }}>POP / SMTP</div>
+                    <div style={{ fontSize: 11, color: firm.smtp_email ? 'var(--ok)' : 'var(--t3)' }}>{firm.smtp_email ? '✅ ' + firm.smtp_email : 'Not configured'}</div>
                   </div>
-                ))}
-              </div>
-
-              <div className="fg2">
-                <div className="field"><label>Gmail OAuth Client ID</label>
-                  <input value={firm.gmail_client_id} onChange={set('gmail_client_id')} placeholder="xxxxx.apps.googleusercontent.com" />
+                  <span style={{ fontSize: 12, color: 'var(--t3)' }}>{expandedInt.smtp ? '▲' : '▼'}</span>
                 </div>
-                <div className="field"><label>Gmail OAuth Client Secret</label>
-                  <input type="password" value={firm.gmail_client_secret} onChange={set('gmail_client_secret')} placeholder="GOCSPX-xxxxxxxxxx" />
-                </div>
-              </div>
-              <div className="field"><label>Redirect URI (copy this exactly into Google Console)</label>
-                <input readOnly value={window.location.origin + '/auth/callback'} style={{ color: 'var(--t3)', cursor: 'text' }} onClick={e => { e.target.select(); document.execCommand('copy'); }} />
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 14 }}>Click the Redirect URI field to copy it.</div>
-
-              <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Gmail Config'}</button>
-            </div>
-          </div>
-
-
-          {/* Microsoft 365 / Azure AD */}
-          <div className="card">
-            <div className="card-header"><span className="card-title">📧 Microsoft 365 Integration (Email + Calendar)</span></div>
-            <div style={{ padding: '0 20px 20px' }}>
-              {connectedM365Count > 0 ? (
-                <div style={{background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.25)",borderRadius:8,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10,fontSize:12,color:"var(--ok)"}}>
-                  <span>✅</span><span>{connectedM365Count} employee{connectedM365Count === 1 ? ' has' : 's have'} connected their Microsoft 365 account.</span>
-                </div>
-              ) : (
-                <div style={{background:"rgba(250,204,21,.08)",border:"1px solid rgba(250,204,21,.25)",borderRadius:8,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10,fontSize:12,color:"var(--warn)"}}>
-                  <span>⚠️</span><span>No employees have connected Microsoft 365 yet. Complete the setup below, then each employee connects from the Email page.</span>
-                </div>
-              )}
-              <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.7 }}>
-                Connects each employee's Outlook inbox and Outlook Calendar to the CRM — emails auto-log to client files, meetings sync to the CRM calendar. Done once by an admin, then each employee connects their own account from the Email page.
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-                {[
-                  ['1', 'Go to portal.azure.com → Azure Active Directory → App registrations → New registration'],
-                  ['2', 'Name it "Nashville Tax Solutions CRM" (or your firm name). Supported account types: "Accounts in any organizational directory and personal Microsoft accounts"'],
-                  ['3', `Under Redirect URIs, add: ${typeof window !== 'undefined' ? window.location.origin.replace('taxresolutioncrm.github.io/taxcasereview-CRM','taxresolutioncrm.github.io/taxcasereview-CRM') : ''}/auth/m365/callback — set type to "Web"`],
-                  ['4', 'Go to API permissions → Add permission → Microsoft Graph → Delegated → add: Mail.Read, Mail.Send, Calendars.ReadWrite, User.Read'],
-                  ['5', 'Go to Certificates & secrets → New client secret → copy the Value (shown once)'],
-                  ['6', 'Copy your Application (client) ID from the Overview page. Paste both below and save.'],
-                ].map(([step, text]) => (
-                  <div key={step} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#0078d4', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, flexShrink: 0 }}>{step}</div>
-                    <div style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, paddingTop: 2 }}>{text}</div>
+                {expandedInt.smtp && (
+                  <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--br)' }}>
+                    <div style={{fontSize:12,color:'var(--t3)',margin:'12px 0 10px',lineHeight:1.6}}>Use any provider — Outlook, Yahoo, Zoho, custom domain. No Google required.</div>
+                    <div className="fg2">
+                      <div className="field"><label>SMTP Host</label><input value={firm.smtp_host||''} onChange={set('smtp_host')} placeholder="smtp.yourprovider.com"/></div>
+                      <div className="field"><label>SMTP Port</label><input value={firm.smtp_port||''} onChange={set('smtp_port')} placeholder="587"/></div>
+                    </div>
+                    <div className="fg2">
+                      <div className="field"><label>Email Address</label><input type="email" value={firm.smtp_email||''} onChange={set('smtp_email')} placeholder="you@yourdomain.com"/></div>
+                      <div className="field"><label>Password / App Password</label><input type="password" value={firm.smtp_password||''} onChange={set('smtp_password')} placeholder="••••••••"/></div>
+                    </div>
+                    <div className="fg2">
+                      <div className="field"><label>From Name</label><input value={firm.smtp_name||''} onChange={set('smtp_name')} placeholder="Your Firm Name"/></div>
+                      <div className="field"><label>Encryption</label>
+                        <select value={firm.smtp_encryption||'TLS'} onChange={set('smtp_encryption')}><option>TLS</option><option>SSL</option><option>None</option></select>
+                      </div>
+                    </div>
+                    <div style={{background:'var(--s2)',borderRadius:6,padding:'8px 12px',fontSize:11,color:'var(--t3)',lineHeight:1.7,marginBottom:12}}>
+                      💡 Outlook: smtp.office365.com:587 · Yahoo: smtp.mail.yahoo.com:587 · Zoho: smtp.zoho.com:587
+                    </div>
+                    <button className="btn pri" onClick={saveFirm} disabled={saving} style={{width:'100%',justifyContent:'center'}}>{saving ? 'Saving…' : 'Save Email Settings'}</button>
                   </div>
-                ))}
+                )}
               </div>
-              <div className="fg2">
-                <div className="field"><label>Azure Application (Client) ID</label>
-                  <input value={firm.m365_client_id || ''} onChange={set('m365_client_id')} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+
+
+              {/* Gmail */}
+              <div style={{ border: '1px solid var(--br)', borderRadius: 12, overflow: 'hidden', background: 'var(--s1)' }}>
+                <div onClick={() => toggleInt('gmail')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer', userSelect: 'none' }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fff3f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <svg viewBox="0 0 48 48" width="24" height="24"><path fill="#EA4335" d="M6 40h6V23L4 17v20a3 3 0 003 3z"/><path fill="#34A853" d="M36 40h6a3 3 0 003-3V17l-9 6z"/><path fill="#FBBC04" d="M36 8l-12 9L12 8H6l18 13L42 8z"/><path fill="#4285F4" d="M4 17l8 6V8H6a3 3 0 00-2 6z"/><path fill="#C5221F" d="M42 8h-6v15l8-6a3 3 0 00-2-9z"/></svg>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)' }}>Gmail</div>
+                    <div style={{ fontSize: 11, color: connectedGmailCount > 0 ? 'var(--ok)' : 'var(--t3)' }}>{connectedGmailCount > 0 ? `✅ ${connectedGmailCount} connected` : 'Not connected'}</div>
+                  </div>
+                  <span style={{ fontSize: 12, color: 'var(--t3)' }}>{expandedInt.gmail ? '▲' : '▼'}</span>
                 </div>
-                <div className="field"><label>Azure Client Secret</label>
-                  <input type="password" value={firm.m365_client_secret || ''} onChange={set('m365_client_secret')} placeholder="Paste the secret Value from Azure" />
+                {expandedInt.gmail && (
+                  <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--br)' }}>
+                    {connectedGmailCount > 0 ? (
+                      <div style={{background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.25)",borderRadius:8,padding:"10px 14px",margin:"12px 0 10px",fontSize:12,color:"var(--ok)"}}>
+                        ✅ {connectedGmailCount} employee{connectedGmailCount === 1 ? ' has' : 's have'} connected their Gmail.
+                      </div>
+                    ) : (
+                      <div style={{background:"rgba(250,204,21,.08)",border:"1px solid rgba(250,204,21,.25)",borderRadius:8,padding:"10px 14px",margin:"12px 0 10px",fontSize:12,color:"var(--warn)"}}>
+                        ⚠️ No employees have connected Gmail yet.
+                      </div>
+                    )}
+                    <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 12, lineHeight: 1.6 }}>
+                      Each employee connects their own Gmail from the Email page. This section configures the app-level OAuth credentials (done once by an admin).
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                      {[
+                        ['1', 'Go to console.cloud.google.com → create or select a project'],
+                        ['2', 'Enable the Gmail API under APIs & Services → Library'],
+                        ['3', 'Create OAuth 2.0 Client ID → Web application'],
+                        ['4', `Add Redirect URI: ${window.location.origin}/auth/callback`],
+                        ['5', 'Paste Client ID and Secret below, then save.'],
+                      ].map(([s, t]) => (
+                        <div key={s} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                          <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#4285F4', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>{s}</div>
+                          <div style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.5, paddingTop: 1 }}>{t}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="fg2">
+                      <div className="field"><label>Client ID</label><input value={firm.gmail_client_id} onChange={set('gmail_client_id')} placeholder="xxxxx.apps.googleusercontent.com"/></div>
+                      <div className="field"><label>Client Secret</label><input type="password" value={firm.gmail_client_secret} onChange={set('gmail_client_secret')} placeholder="GOCSPX-…"/></div>
+                    </div>
+                    <div className="field"><label>Redirect URI <span style={{fontWeight:400,color:'var(--t3)'}}>(click to copy)</span></label>
+                      <input readOnly value={window.location.origin + '/auth/callback'} style={{color:'var(--t3)',cursor:'text'}} onClick={e=>{e.target.select();document.execCommand('copy')}}/>
+                    </div>
+                    <button className="btn pri" onClick={saveFirm} disabled={saving} style={{width:'100%',justifyContent:'center',marginTop:4}}>{saving ? 'Saving…' : 'Save Gmail Config'}</button>
+                  </div>
+                )}
+              </div>
+
+
+
+              {/* Microsoft 365 */}
+              <div style={{ border: '1px solid var(--br)', borderRadius: 12, overflow: 'hidden', background: 'var(--s1)' }}>
+                <div onClick={() => toggleInt('m365')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer', userSelect: 'none' }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f0f4ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <svg viewBox="0 0 48 48" width="24" height="24"><path fill="#0078D4" d="M6 6h17v17H6z"/><path fill="#50D9FF" d="M25 6h17v17H25z"/><path fill="#FFB900" d="M6 25h17v17H6z"/><path fill="#EB3C00" d="M25 25h17v17H25z"/></svg>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)' }}>Microsoft 365</div>
+                    <div style={{ fontSize: 11, color: connectedM365Count > 0 ? 'var(--ok)' : 'var(--t3)' }}>{connectedM365Count > 0 ? `✅ ${connectedM365Count} connected` : 'Not connected'}</div>
+                  </div>
+                  <span style={{ fontSize: 12, color: 'var(--t3)' }}>{expandedInt.m365 ? '▲' : '▼'}</span>
                 </div>
+                {expandedInt.m365 && (
+                  <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--br)' }}>
+                    {connectedM365Count > 0 ? (
+                      <div style={{background:"rgba(34,197,94,.08)",border:"1px solid rgba(34,197,94,.25)",borderRadius:8,padding:"10px 14px",margin:"12px 0 10px",fontSize:12,color:"var(--ok)"}}>
+                        ✅ {connectedM365Count} employee{connectedM365Count === 1 ? ' has' : 's have'} connected Microsoft 365.
+                      </div>
+                    ) : (
+                      <div style={{background:"rgba(250,204,21,.08)",border:"1px solid rgba(250,204,21,.25)",borderRadius:8,padding:"10px 14px",margin:"12px 0 10px",fontSize:12,color:"var(--warn)"}}>
+                        ⚠️ No employees connected yet. Complete setup below, then each employee connects from the Email page.
+                      </div>
+                    )}
+                    <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 12, lineHeight: 1.6 }}>
+                      Connects each employee's Outlook inbox and calendar. Done once by an admin, then each employee connects their own account from the Email page.
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                      {[
+                        ['1', 'Go to portal.azure.com → Azure Active Directory → App registrations → New registration'],
+                        ['2', 'Supported account types: "Accounts in any organizational directory and personal Microsoft accounts"'],
+                        ['3', `Add Redirect URI: ${typeof window !== 'undefined' ? window.location.origin : ''}/auth/m365/callback — type: Web`],
+                        ['4', 'API permissions → Microsoft Graph → Delegated → Mail.Read, Mail.Send, Calendars.ReadWrite, User.Read'],
+                        ['5', 'Certificates & secrets → New client secret → copy the Value'],
+                        ['6', 'Copy the Application (client) ID from Overview and paste both below.'],
+                      ].map(([s, t]) => (
+                        <div key={s} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                          <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#0078D4', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>{s}</div>
+                          <div style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.5, paddingTop: 1 }}>{t}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="fg2">
+                      <div className="field"><label>Azure Application (Client) ID</label><input value={firm.m365_client_id||''} onChange={set('m365_client_id')} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/></div>
+                      <div className="field"><label>Azure Client Secret</label><input type="password" value={firm.m365_client_secret||''} onChange={set('m365_client_secret')} placeholder="Paste the secret Value from Azure"/></div>
+                    </div>
+                    <div className="field"><label>Azure Tenant ID</label>
+                      <input value={firm.m365_tenant_id||'common'} onChange={set('m365_tenant_id')} placeholder="common"/>
+                      <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Use "common" to allow any Microsoft account. For single-tenant, paste your Azure Directory ID.</div>
+                    </div>
+                    <button className="btn pri" onClick={saveFirm} disabled={saving} style={{width:'100%',justifyContent:'center',marginTop:4}}>{saving ? 'Saving…' : 'Save M365 Config'}</button>
+                  </div>
+                )}
               </div>
-              <div className="field"><label>Azure Tenant ID (leave as "common" unless single-tenant)</label>
-                <input value={firm.m365_tenant_id || 'common'} onChange={set('m365_tenant_id')} placeholder="common" />
-                <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Use "common" to allow any Microsoft account. For single-tenant (company accounts only), paste your Azure Directory (tenant) ID from the Azure AD Overview page.</div>
-              </div>
-              <button className="btn pri" onClick={saveFirm} disabled={saving} style={{marginTop:8}}>{saving ? 'Saving…' : 'Save M365 Config'}</button>
-            </div>
-          </div>
+
+            </div>{/* end email grid */}
+          </div>{/* end email section */}
 
           {/* SignalWire Dialer */}
           <div className="card">
