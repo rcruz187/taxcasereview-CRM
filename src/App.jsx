@@ -88,9 +88,39 @@ function RequireAuth({ children }) {
   return children
 }
 
-// Blocks a route if the user doesn't have view permission for that section
+// Tier gate maps — module-level, never change at runtime
+const TIER_ORDER = { starter: 0, growth: 1, pro: 2 }
+const TIER_REQUIRED = {
+  dialer: 'growth', workflows: 'growth', irsforms: 'growth',
+  irsreference: 'growth', taxreturns: 'growth', transcripts: 'growth',
+  payments: 'growth', invoices: 'growth', estimates: 'growth',
+  books: 'growth', stateforms: 'growth',
+  payroll: 'pro', timeoff: 'pro', employees: 'pro', reports: 'pro', deadlines: 'pro',
+}
+
+// Blocks a route by role permission OR plan tier
 function Guard({ section, children }) {
-  const { can } = useApp()
+  const { can, planTier } = useApp()
+  const requiredTier = TIER_REQUIRED[section]
+  const tierBlocked = requiredTier && (TIER_ORDER[planTier] || 0) < (TIER_ORDER[requiredTier] || 0)
+  if (tierBlocked) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        height: '60vh', gap: 16, color: 'var(--t3)', textAlign: 'center', padding: 32
+      }}>
+        <div style={{ fontSize: 48 }}>⭐</div>
+        <div style={{ fontWeight: 800, fontSize: 20, color: 'var(--tx)' }}>
+          {requiredTier.charAt(0).toUpperCase() + requiredTier.slice(1)} Plan Required
+        </div>
+        <div style={{ fontSize: 14, color: 'var(--t2)', maxWidth: 340, lineHeight: 1.6 }}>
+          This feature requires the <strong>{requiredTier.charAt(0).toUpperCase() + requiredTier.slice(1)}</strong> plan.
+          Contact <strong>romy@taxrescrm.net</strong> to upgrade.
+        </div>
+      </div>
+    )
+  }
   if (!can('view', section)) {
     return (
       <div style={{
