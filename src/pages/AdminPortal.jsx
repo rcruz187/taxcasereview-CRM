@@ -1646,6 +1646,79 @@ function DemoSetup() {
 }
 
 // ── Main Shell ───────────────────────────────────────────────────────────────
+// ── Command Center shared primitives (module scope — NOT inside CommandCenter) ─
+const CC_STYLES = {
+  card: (extra={}) => ({
+    background:'rgba(255,255,255,.04)',
+    border:'1px solid rgba(99,102,241,.18)',
+    borderRadius:14,
+    overflow:'hidden',
+    ...extra,
+  }),
+  sectionLabel: { fontSize:10, fontWeight:800, color:'#475569', textTransform:'uppercase', letterSpacing:'.1em', marginBottom:12 },
+  kpiCard: (color) => ({
+    background:`linear-gradient(135deg, ${color}18, ${color}08)`,
+    border:`1px solid ${color}30`,
+    borderRadius:12,
+    padding:'18px 20px',
+    cursor:'pointer',
+    transition:'transform .15s, box-shadow .15s',
+  }),
+}
+
+function KPICard({ label, value, sub, color, icon, to, onNav }) {
+  const [hover, setHover] = useState(false)
+  return (
+    <div
+      onClick={() => to && onNav && onNav(to)}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        ...CC_STYLES.kpiCard(color),
+        transform: hover ? 'translateY(-3px)' : 'none',
+        boxShadow: hover ? `0 8px 32px ${color}30` : 'none',
+      }}
+    >
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+        <div style={{ fontSize:10, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'.07em' }}>{label}</div>
+        <div style={{ fontSize:18, opacity:.5 }}>{icon}</div>
+      </div>
+      <div style={{ fontSize:30, fontWeight:900, color, lineHeight:1, marginTop:10 }}>{value ?? '—'}</div>
+      {sub && <div style={{ fontSize:11, color:'#475569', marginTop:5 }}>{sub}</div>}
+    </div>
+  )
+}
+
+function MiniBar({ pct, color }) {
+  return (
+    <div style={{ height:6, background:'rgba(255,255,255,.06)', borderRadius:3, overflow:'hidden', flex:1 }}>
+      <div style={{ height:'100%', width:`${Math.min(100,pct)}%`, background:color, borderRadius:3,
+        transition:'width .6s ease', boxShadow:`0 0 8px ${color}60` }} />
+    </div>
+  )
+}
+
+function GoalBar({ label, current, target, unit, color }) {
+  const pct = Math.min(100, Math.round((current/target)*100))
+  const fmt = (v) => unit==='$' ? `$${Number(v).toLocaleString('en-US',{maximumFractionDigits:0})}` : `${Number(v).toLocaleString()}${unit!=='$'&&unit!=='demos'&&unit!=='firms'&&unit!=='visitors'?' '+unit:''}`
+  return (
+    <div style={{ marginBottom:18 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
+        <div style={{ fontSize:12, fontWeight:600, color:'#e2e8f0' }}>{label}</div>
+        <div style={{ fontSize:11, color:'#64748b' }}>{fmt(current)} / {fmt(target)} · <span style={{ color }}>{pct}%</span></div>
+      </div>
+      <MiniBar pct={pct} color={color} />
+    </div>
+  )
+}
+
+function StatusDot({ ok }) {
+  if (ok === null) return <span style={{ fontSize:10, color:'#475569', fontWeight:600 }}>—</span>
+  return <span style={{ display:'inline-block', width:8, height:8, borderRadius:'50%',
+    background: ok ? '#10b981' : '#ef4444',
+    boxShadow: ok ? '0 0 6px #10b98160' : '0 0 6px #ef444460' }} />
+}
+
 // ── Command Center ────────────────────────────────────────────────────────────
 function CommandCenter() {
   const navigate = useNavigate()
@@ -1963,81 +2036,8 @@ function CommandCenter() {
     </div>
   )
 
-  // ── Sub-components ─────────────────────────────────────────────────────────
-  const CC = {
-    // Glassmorphism card
-    card: (extra={}) => ({
-      background:'rgba(255,255,255,.04)',
-      border:'1px solid rgba(99,102,241,.18)',
-      borderRadius:14,
-      overflow:'hidden',
-      ...extra,
-    }),
-    // Section label
-    sectionLabel: { fontSize:10, fontWeight:800, color:'#475569', textTransform:'uppercase', letterSpacing:'.1em', marginBottom:12 },
-    // Metric card
-    kpiCard: (color) => ({
-      background:`linear-gradient(135deg, ${color}18, ${color}08)`,
-      border:`1px solid ${color}30`,
-      borderRadius:12,
-      padding:'18px 20px',
-      cursor:'pointer',
-      transition:'transform .15s, box-shadow .15s',
-    }),
-  }
-
-  function KPICard({ label, value, sub, color, icon, to }) {
-    const [hover, setHover] = useState(false)
-    return (
-      <div
-        onClick={() => to && navigate(to)}
-        onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}
-        style={{
-          ...CC.kpiCard(color),
-          transform: hover ? 'translateY(-3px)' : 'none',
-          boxShadow: hover ? `0 8px 32px ${color}30` : 'none',
-        }}
-      >
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-          <div style={{ fontSize:10, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'.07em' }}>{label}</div>
-          <div style={{ fontSize:18, opacity:.5 }}>{icon}</div>
-        </div>
-        <div style={{ fontSize:30, fontWeight:900, color, lineHeight:1, marginTop:10 }}>{value ?? '—'}</div>
-        {sub && <div style={{ fontSize:11, color:'#475569', marginTop:5 }}>{sub}</div>}
-      </div>
-    )
-  }
-
-  function MiniBar({ pct, color }) {
-    return (
-      <div style={{ height:6, background:'rgba(255,255,255,.06)', borderRadius:3, overflow:'hidden', flex:1 }}>
-        <div style={{ height:'100%', width:`${Math.min(100,pct)}%`, background:color, borderRadius:3,
-          transition:'width .6s ease', boxShadow:`0 0 8px ${color}60` }} />
-      </div>
-    )
-  }
-
-  function GoalBar({ label, current, target, unit, color }) {
-    const pct = Math.min(100, Math.round((current/target)*100))
-    const fmt = (v) => unit==='$' ? `$${Number(v).toLocaleString('en-US',{maximumFractionDigits:0})}` : `${Number(v).toLocaleString()}${unit!=='$'&&unit!=='demos'&&unit!=='firms'&&unit!=='visitors'?' '+unit:''}`
-    return (
-      <div style={{ marginBottom:18 }}>
-        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
-          <div style={{ fontSize:12, fontWeight:600, color:'#e2e8f0' }}>{label}</div>
-          <div style={{ fontSize:11, color:'#64748b' }}>{fmt(current)} / {fmt(target)} · <span style={{ color }}>{pct}%</span></div>
-        </div>
-        <MiniBar pct={pct} color={color} />
-      </div>
-    )
-  }
-
-  function StatusDot({ ok }) {
-    if (ok === null) return <span style={{ fontSize:10, color:'#475569', fontWeight:600 }}>—</span>
-    return <span style={{ display:'inline-block', width:8, height:8, borderRadius:'50%',
-      background: ok ? '#10b981' : '#ef4444',
-      boxShadow: ok ? '0 0 6px #10b98160' : '0 0 6px #ef444460' }} />
-  }
+  // CC alias for module-scope CC_STYLES so existing JSX below doesn't need editing
+  const CC = CC_STYLES
 
   const TABS = [
     { key:'overview',  label:'Overview'  },
@@ -2090,7 +2090,7 @@ function CommandCenter() {
               { label:'Total Seats',     value:data.kpis.totalSeats,     icon:'👥',  color:'#f59e0b', to:'/crm-admin/offices' },
               { label:'Total Clients',   value:data.kpis.totalClients.toLocaleString(), icon:'📋', color:'#0ea5e9', to:'/crm-admin/crm' },
               { label:'Total Leads',     value:data.kpis.totalLeads.toLocaleString(),   icon:'🎯', color:'#8b5cf6', to:'/crm-admin/crm' },
-            ].map(k => <KPICard key={k.label} {...k} />)}
+            ].map(k => <KPICard key={k.label} {...k} onNav={navigate} />)}
           </div>
 
           {/* Platform KPIs Row 2 */}
@@ -2102,7 +2102,7 @@ function CommandCenter() {
               { label:'Visitors Today',  value:ga4Data?.users ?? 0,      icon:'🌐', color:'#0ea5e9', sub: ga4Data ? null : 'connect GA4', to:'/crm-admin/marketing' },
               { label:'Clicks (GSC)',    value:gscConnected && gscData ? gscData.clicks : 0, icon:'🔍', color:'#6366f1', sub: gscConnected ? null : 'connect GSC', to:'/crm-admin/search' },
               { label:'Impressions',     value:gscConnected && gscData ? gscData.impressions : 0, icon:'👁', color:'#0ea5e9', sub: gscConnected ? null : 'connect GSC', to:'/crm-admin/search' },
-            ].map(k => <KPICard key={k.label} {...k} />)}
+            ].map(k => <KPICard key={k.label} {...k} onNav={navigate} />)}
           </div>
 
           {/* What changed + Activity side-by-side */}
@@ -2236,7 +2236,7 @@ function CommandCenter() {
                 { label:'Users Today',       value: ga4Data.users.toLocaleString(),    sub:`${ga4Data.newUsers.toLocaleString()} new`,   icon:'👥', color:'#0ea5e9' },
                 { label:'Bounce Rate',       value:`${ga4Data.bounceRate}%`,            sub:'avg today',     icon:'↩️', color:'#10b981' },
                 { label:'Pages / Session',   value: ga4Data.pagesPerSession,            sub:'avg today',     icon:'📄', color:'#f59e0b' },
-              ].map(k => <KPICard key={k.label} {...k} />)}
+              ].map(k => <KPICard key={k.label} {...k} onNav={navigate} />)}
             </div>
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18, marginBottom:24 }}>
@@ -2384,7 +2384,7 @@ function CommandCenter() {
               { label:'Active Prospects', value: data.sales.prospects.filter(p=>!['Won','Lost'].includes(p.stage)).length, icon:'🎯', color:'#6366f1' },
               { label:'Pipeline Value',value:`$${(data.sales.pipeline).toLocaleString('en-US',{maximumFractionDigits:0})}`, icon:'💼', color:'#f59e0b' },
               { label:'Platform MRR',  value:`$${data.kpis.totalMRR.toLocaleString('en-US',{maximumFractionDigits:0})}`,  icon:'📈', color:'#0ea5e9' },
-            ].map(k => <KPICard key={k.label} {...k} />)}
+            ].map(k => <KPICard key={k.label} {...k} onNav={navigate} />)}
           </div>
 
           {/* Funnel */}
@@ -2460,7 +2460,7 @@ function CommandCenter() {
               { label:'Pending E-Signs',              value:data.kpis.pendingEsigns,                 icon:'✍️', color:'#8b5cf6' },
               { label:'Demos Today',                  value:data.kpis.todayDemos,                    icon:'📅', color:'#0ea5e9' },
               { label:'Storage Used',                 value:fmtBytes(data.kpis.totalStorage),        icon:'💾', color:'#f59e0b' },
-            ].map(k => <KPICard key={k.label} {...k} />)}
+            ].map(k => <KPICard key={k.label} {...k} onNav={navigate} />)}
           </div>
 
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18 }}>
@@ -3494,6 +3494,7 @@ export default function AdminPortal() {
             <Route path="/provision"      element={<div style={{padding:8}}><NewOffice/></div>}/>
             <Route path="/billing"        element={<Billing/>}/>
             <Route path="/search"         element={<Search/>}/>
+            <Route path="/crm"            element={<AdminRouteErrorBoundary><Overview key="crm"/></AdminRouteErrorBoundary>}/>
             <Route path="/demo"           element={<AdminRouteErrorBoundary><DemoMgmt/></AdminRouteErrorBoundary>}/>
             <Route path="/demo-setup"     element={<AdminRouteErrorBoundary><DemoSetup/></AdminRouteErrorBoundary>}/>
             <Route path="/live-demo"      element={<AdminRouteErrorBoundary><LiveDemo/></AdminRouteErrorBoundary>}/>
