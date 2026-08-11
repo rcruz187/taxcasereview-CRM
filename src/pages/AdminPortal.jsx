@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, Suspense, lazy, useCallback } from 'react'
 import { ScreenShareProvider, useScreenShare } from '../context/ScreenShareContext'
-import { Routes, Route, NavLink, useNavigate, useLocation, useParams } from 'react-router-dom'
+import { Routes, Route, NavLink, useNavigate, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { FIRM, loadFirmBranding, loadFirmBrandingPublic } from '../lib/firmBranding'
 import { useApp } from '../context/AppContext'
@@ -1726,7 +1726,9 @@ function StatusDot({ ok }) {
 // ── Command Center ────────────────────────────────────────────────────────────
 function CommandCenter() {
   const navigate = useNavigate()
-  const [tab, setTab] = useState('overview')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tab = searchParams.get('tab') || 'overview'
+  const setTab = (key) => setSearchParams({ tab: key }, { replace: false })
   const [data, setData] = useState(null)
   const [activity, setActivity] = useState([])
   const [activityPoll, setActivityPoll] = useState(0)
