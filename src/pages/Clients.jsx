@@ -921,16 +921,14 @@ function FilterDrop({ value, onChange, options, width = 130 }) {
       {open && (
         <div style={{
           position: 'absolute', top: '110%', left: 0, zIndex: 9999,
-          background: 'var(--s1)', border: '1px solid var(--br)', borderRadius: 8,
+          background: 'var(--bg2)', border: '1px solid var(--br)', borderRadius: 8,
           minWidth: width, maxHeight: 260, overflowY: 'auto', padding: '4px 0'
         }}>
           {options.map(([v, lbl]) => (
             <div key={v} onClick={() => { onChange(v); setOpen(false) }} style={{
               padding: '7px 12px', fontSize: 12, cursor: 'pointer', color: 'var(--tx)',
-              background: v === value ? 'var(--blue)' : 'transparent',
-              whiteSpace: 'nowrap',
-              color: 'var(--tx)',
-              fontWeight: v === value ? 600 : 400
+              background: v === value ? 'rgba(26,127,212,.3)' : 'transparent',
+              whiteSpace: 'nowrap'
             }}>
               {lbl}
             </div>
