@@ -261,9 +261,9 @@ function OfficePage() {
   const [toast, setToast] = useState(null)
   const [billing, setBilling] = useState({ per_seat_rate:'', monthly_rate:'', plan_tier:'', status:'', primary_contact_name:'', primary_contact_email:'', contract_start_date:'', contract_end_date:'', notes:'' })
   const [officePayments, setOfficePayments] = useState([])
-  const [chargeAmount,   setChargeAmount]   = useState('')
-  const [chargeNote,     setChargeNote]     = useState('')
-  const [charging,       setCharging]       = useState(false)
+  const [chargeAmount, setChargeAmount] = useState('')
+  const [chargeNote, setChargeNote] = useState('')
+  const [charging, setCharging] = useState(false)
   const [mercuryConfigured, setMercuryConfigured] = useState(false)
   const [impersonating, setImpersonating] = useState(false)
   const [offDocs, setOffDocs]     = useState([])
@@ -331,38 +331,21 @@ function OfficePage() {
   }
 
   async function loadOfficePayments(tenantId) {
-    const { data } = await supabase
-      .from('office_billing_payments')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .order('charged_at', { ascending: false })
-      .limit(20)
+    const { data } = await supabase.from('office_billing_payments').select('*').eq('tenant_id', tenantId).order('charged_at', { ascending: false }).limit(20)
     setOfficePayments(data || [])
-    // Check mercury configured
-    const { data: s } = await supabase
-      .from('settings')
-      .select('mercury_api_key')
-      .eq('tenant_id', '61a89aef-0e7e-4ea2-b222-44ab2024655a')
-      .maybeSingle()
+    const { data: s } = await supabase.from('settings').select('mercury_api_key').eq('tenant_id', '61a89aef-0e7e-4ea2-b222-44ab2024655a').maybeSingle()
     setMercuryConfigured(!!s?.mercury_api_key)
   }
 
   async function chargeOffice() {
     if (!chargeAmount || Number(chargeAmount) <= 0) { toast_('Enter a valid amount'); return }
     setCharging(true)
-    const { data, error } = await supabase.functions.invoke('mercury-charge', {
-      body: { tenant_id: id, amount: Number(chargeAmount), description: chargeNote || null }
-    })
+    const { data, error } = await supabase.functions.invoke('mercury-charge', { body: { tenant_id: id, amount: Number(chargeAmount), description: chargeNote || null } })
     setCharging(false)
     if (error) { toast_('❌ ' + error.message, 'error'); return }
-    if (data?.pending) {
-      toast_('⏳ Saved as pending — configure Mercury API key in Settings to process')
-    } else if (data?.ok) {
-      toast_('✅ Payment processed via Mercury')
-      setChargeAmount(''); setChargeNote('')
-    } else {
-      toast_('❌ ' + (data?.error || 'Unknown error'), 'error')
-    }
+    if (data?.pending) { toast_('⏳ Saved as pending — configure Mercury API key in Settings to process') }
+    else if (data?.ok) { toast_('✅ Payment processed via Mercury'); setChargeAmount(''); setChargeNote('') }
+    else { toast_('❌ ' + (data?.error || 'Unknown error'), 'error') }
     loadOfficePayments(id)
   }
 
@@ -510,7 +493,7 @@ function OfficePage() {
 
       {/* Billing tab */}
       {tab==='billing' && (
-        <div style={{ maxWidth:520 }}>
+        <div style={{ maxWidth:480 }}>
           <div style={{ ...S.card, padding:20 }}>
             <div style={{ fontSize:12,fontWeight:700,color:'#475569',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:16 }}>Billing Settings</div>
             {[
@@ -579,7 +562,6 @@ function OfficePage() {
               💾 Save Billing & Contact
             </button>
           </div>
-
         </div>
       )}
 
@@ -644,77 +626,27 @@ function OfficePage() {
       {tab==='actions' && (
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <div style={{ ...S.card, padding:20 }}>
-
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-              <div style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.05em' }}>
-                💳 Charge Office
-              </div>
-              <div style={{ fontSize:11, padding:'3px 10px', borderRadius:20, fontWeight:700,
-                background: mercuryConfigured ? 'rgba(16,185,129,.15)' : 'rgba(245,158,11,.15)',
-                color: mercuryConfigured ? '#10b981' : '#f59e0b' }}>
+              <div style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.05em' }}>💳 Charge Office</div>
+              <div style={{ fontSize:11, padding:'3px 10px', borderRadius:20, fontWeight:700, background: mercuryConfigured ? 'rgba(16,185,129,.15)' : 'rgba(245,158,11,.15)', color: mercuryConfigured ? '#10b981' : '#f59e0b' }}>
                 {mercuryConfigured ? '● Mercury Connected' : '⚠ Mercury Not Configured'}
               </div>
             </div>
-            {!mercuryConfigured && (
-              <div style={{ fontSize:12, color:'#64748b', marginBottom:14, padding:'10px 14px',
-                background:'rgba(245,158,11,.08)', borderRadius:8, border:'1px solid rgba(245,158,11,.2)' }}>
-                Add your Mercury API key in Settings → Integrations to enable live payments.
-                Charges will be saved as pending until then.
-              </div>
-            )}
+            {!mercuryConfigured && <div style={{ fontSize:12, color:'#64748b', marginBottom:14, padding:'10px 14px', background:'rgba(245,158,11,.08)', borderRadius:8, border:'1px solid rgba(245,158,11,.2)' }}>Add your Mercury API key in Settings to enable live payments. Charges saved as pending until then.</div>}
             <div style={{ display:'grid', gridTemplateColumns:'1fr 2fr', gap:10, marginBottom:12 }}>
               <div>
                 <label style={{ fontSize:11, fontWeight:700, color:'#6366f1', textTransform:'uppercase', letterSpacing:'.05em', display:'block', marginBottom:6 }}>Amount ($)</label>
-                <input type="number" value={chargeAmount} onChange={e=>setChargeAmount(e.target.value)}
-                  placeholder={billing.monthly_rate || billing.per_seat_rate ? `${billing.monthly_rate || (Number(billing.per_seat_rate)*employees.length).toFixed(0)}` : '0.00'}
-                  style={{ width:'100%', padding:'10px 14px', borderRadius:8, border:'1px solid rgba(99,102,241,.3)',
-                    background:'rgba(255,255,255,.04)', color:'#e2e8f0', fontSize:14, boxSizing:'border-box' }}/>
+                <input type="number" value={chargeAmount} onChange={e=>setChargeAmount(e.target.value)} placeholder={Number(billing.per_seat_rate)>0 ? String((Number(billing.per_seat_rate)*employees.length).toFixed(0)) : '0.00'} style={{ width:'100%', padding:'10px 14px', borderRadius:8, border:'1px solid rgba(99,102,241,.3)', background:'rgba(255,255,255,.04)', color:'#e2e8f0', fontSize:14, boxSizing:'border-box' }}/>
               </div>
               <div>
                 <label style={{ fontSize:11, fontWeight:700, color:'#6366f1', textTransform:'uppercase', letterSpacing:'.05em', display:'block', marginBottom:6 }}>Note (optional)</label>
-                <input value={chargeNote} onChange={e=>setChargeNote(e.target.value)}
-                  placeholder={`e.g. August 2026 subscription`}
-                  style={{ width:'100%', padding:'10px 14px', borderRadius:8, border:'1px solid rgba(99,102,241,.3)',
-                    background:'rgba(255,255,255,.04)', color:'#e2e8f0', fontSize:14, boxSizing:'border-box' }}/>
+                <input value={chargeNote} onChange={e=>setChargeNote(e.target.value)} placeholder="e.g. August 2026 subscription" style={{ width:'100%', padding:'10px 14px', borderRadius:8, border:'1px solid rgba(99,102,241,.3)', background:'rgba(255,255,255,.04)', color:'#e2e8f0', fontSize:14, boxSizing:'border-box' }}/>
               </div>
             </div>
-            <button onClick={chargeOffice} disabled={charging || !chargeAmount}
-              style={{ ...S.btn('primary'), width:'100%', justifyContent:'center',
-                opacity: charging || !chargeAmount ? .5 : 1 }}>
+            <button onClick={chargeOffice} disabled={charging||!chargeAmount} style={{ ...S.btn('primary'), width:'100%', justifyContent:'center', opacity: charging||!chargeAmount?.5:1 }}>
               {charging ? '⏳ Processing…' : mercuryConfigured ? '💳 Charge via Mercury' : '💾 Save as Pending'}
             </button>
-
-            {/* Payment history */}
-            {officePayments.length > 0 && (
-              <div style={{ marginTop:18 }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:10 }}>
-                  Payment History
-                </div>
-                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                  {officePayments.map(p => (
-                    <div key={p.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px',
-                      background:'rgba(255,255,255,.03)', border:'1px solid rgba(255,255,255,.06)', borderRadius:8 }}>
-                      <div style={{ flex:1 }}>
-                        <div style={{ fontSize:13, fontWeight:700, color:'#e2e8f0' }}>
-                          ${Number(p.amount).toFixed(2)}
-                          {p.description && <span style={{ fontWeight:400, color:'#94a3b8', marginLeft:8 }}>{p.description}</span>}
-                        </div>
-                        <div style={{ fontSize:11, color:'#64748b', marginTop:2 }}>
-                          {new Date(p.charged_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}
-                          {' · '}{p.charged_by}
-                          {p.notes && ` · ${p.notes}`}
-                        </div>
-                      </div>
-                      <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20,
-                        background: p.status==='completed' ? 'rgba(16,185,129,.15)' : p.status==='failed' ? 'rgba(239,68,68,.15)' : 'rgba(245,158,11,.15)',
-                        color: p.status==='completed' ? '#10b981' : p.status==='failed' ? '#ef4444' : '#f59e0b' }}>
-                        {p.status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {officePayments.length > 0 && <div style={{ marginTop:18 }}><div style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:10 }}>Payment History</div><div style={{ display:'flex', flexDirection:'column', gap:6 }}>{officePayments.map(p => <div key={p.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', background:'rgba(255,255,255,.03)', border:'1px solid rgba(255,255,255,.06)', borderRadius:8 }}><div style={{ flex:1 }}><div style={{ fontSize:13, fontWeight:700, color:'#e2e8f0' }}>${Number(p.amount).toFixed(2)}{p.description && <span style={{ fontWeight:400, color:'#94a3b8', marginLeft:8 }}>{p.description}</span>}</div><div style={{ fontSize:11, color:'#64748b', marginTop:2 }}>{new Date(p.charged_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} · {p.charged_by}</div></div><span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20, background: p.status==='completed'?'rgba(16,185,129,.15)':p.status==='failed'?'rgba(239,68,68,.15)':'rgba(245,158,11,.15)', color: p.status==='completed'?'#10b981':p.status==='failed'?'#ef4444':'#f59e0b' }}>{p.status}</span></div>)}</div></div>}
           </div>
           <div style={S.card}>
           <div style={{ padding:16, fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.05em' }}>Support Tickets</div>
@@ -726,6 +658,7 @@ function OfficePage() {
               <div style={{ fontSize:11, color:'#475569', marginTop:3 }}>{fmtAgo(t.created_at)} · {t.status}</div>
             </div>
           ))}
+          </div>
         </div>
       )}
     </div>
