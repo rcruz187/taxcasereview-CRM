@@ -28,6 +28,7 @@ const ClientPortal = lazy(() => import('./pages/ClientPortal'))
 const OrganizerPage = lazy(() => import('./pages/OrganizerPage'))
 const FinancialIntakePage = lazy(() => import('./pages/FinancialIntakePage'))
 const AuthCallback = lazy(() => import('./pages/AuthCallback'))
+const QuickBooksCallback  = lazy(() => import('./pages/QuickBooksCallback'))
 const NewOffice = lazy(() => import('./pages/NewOffice'))
 const AdminConsole = lazy(() => import('./pages/AdminConsole'))
 const ImpersonateGate = lazy(() => import('./pages/ImpersonateGate'))
@@ -294,6 +295,7 @@ function AuthRouter() {
       <Route path="/impersonate" element={<ImpersonateGate />} />
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/auth/quickbooks-callback" element={<QuickBooksCallback />} />
       <Route path="/kiosk" element={<Kiosk />} />
       <Route path="/book" element={<BookAppointment />} />
       <Route path="/book/manage/:token" element={<ManageBooking />} />

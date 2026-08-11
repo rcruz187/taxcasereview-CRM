@@ -1,16 +1,8 @@
 // quickbooks-oauth-callback
-// Handles the Intuit OAuth 2.0 redirect after a user authorizes TCR's
-// QuickBooks app. Exchanges the authorization code for access/refresh
-// tokens, stores them per-tenant in accounting_connections, and redirects
-// back into the app. This is the piece Settings.jsx has been waiting on —
-// "Connect to QuickBooks" now actually works.
-//
-// Flow: Settings.jsx "Connect to QuickBooks" button opens Intuit's OAuth
-// authorize URL with state=<tenant_id> (base64, so we know which tenant to
-// attach the connection to when Intuit redirects back here — the whole
-// point of per-tenant credentials is that each office uses its OWN Intuit
-// app's client id/secret, stored on their own settings row).
-// verify_jwt OFF — Intuit calls this directly with no Supabase session.
+// Called directly from the QuickBooksCallback React page (not by Intuit directly).
+// Receives code/state/realmId as query params, exchanges for tokens, stores them.
+// Returns JSON { ok, message } — the React page handles the redirect.
+// verify_jwt OFF — called from the browser before session is confirmed.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -19,39 +11,39 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
-const APP_ORIGIN = 'https://taxrescrm.app'
-const REDIRECT_URI = `${APP_ORIGIN}/auth/quickbooks-callback`
+
+const REDIRECT_URI = 'https://taxrescrm.app/auth/quickbooks-callback'
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
+  const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), {
+    status: s, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  })
+
   const url = new URL(req.url)
-  const code = url.searchParams.get('code')
-  const state = url.searchParams.get('state') // base64(tenant_id)
-  const realmId = url.searchParams.get('realmId')
+  const code     = url.searchParams.get('code')
+  const state    = url.searchParams.get('state') // base64(tenant_id)
+  const realmId  = url.searchParams.get('realmId')
   const errParam = url.searchParams.get('error')
 
-  const redirectWithMsg = (ok: boolean, msg: string) => {
-    const dest = `${APP_ORIGIN}/settings?qb_connect=${ok ? 'ok' : 'error'}&msg=${encodeURIComponent(msg)}`
-    return new Response(null, { status: 302, headers: { ...corsHeaders, Location: dest } })
-  }
-
-  if (errParam) return redirectWithMsg(false, 'Intuit denied the connection: ' + errParam)
-  if (!code || !state || !realmId) return redirectWithMsg(false, 'Missing code/state/realmId from Intuit redirect')
+  if (errParam) return json({ ok: false, message: 'Intuit denied the connection: ' + errParam }, 400)
+  if (!code || !state || !realmId) return json({ ok: false, message: 'Missing code/state/realmId' }, 400)
 
   let tenantId: string
-  try { tenantId = atob(state) } catch { return redirectWithMsg(false, 'Invalid state') }
+  try { tenantId = atob(state) } catch { return json({ ok: false, message: 'Invalid state' }, 400) }
 
-  const supaUrl = Deno.env.get('SUPABASE_URL')!
+  const supaUrl    = Deno.env.get('SUPABASE_URL')!
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  const admin = createClient(supaUrl, serviceKey)
+  const admin      = createClient(supaUrl, serviceKey)
 
-  // Each tenant uses their OWN Intuit app credentials (stored on their
-  // settings row, same field names the existing Settings.jsx UI already
-  // writes: qb_client_id / qb_client_secret).
-  const { data: settingsRow } = await admin.from('settings').select('qb_client_id, qb_client_secret').eq('tenant_id', tenantId).maybeSingle()
+  const { data: settingsRow } = await admin.from('settings')
+    .select('qb_client_id, qb_client_secret')
+    .eq('tenant_id', tenantId)
+    .maybeSingle()
+
   if (!settingsRow?.qb_client_id || !settingsRow?.qb_client_secret) {
-    return redirectWithMsg(false, 'QuickBooks Client ID/Secret not saved for this office yet')
+    return json({ ok: false, message: 'QuickBooks Client ID/Secret not saved for this office' }, 400)
   }
 
   const basicAuth = btoa(`${settingsRow.qb_client_id}:${settingsRow.qb_client_secret}`)
@@ -66,15 +58,16 @@ serve(async (req) => {
   })
   const tokenData = await tokenRes.json()
   if (!tokenRes.ok || !tokenData.access_token) {
-    return redirectWithMsg(false, 'Token exchange failed: ' + (tokenData.error_description || tokenData.error || tokenRes.status))
+    return json({ ok: false, message: 'Token exchange failed: ' + (tokenData.error_description || tokenData.error || tokenRes.status) }, 400)
   }
 
-  // Pull the company name for a friendly display (best-effort — don't fail the connect if this errors)
+  // Pull company name (best-effort)
   let companyName = null
   try {
-    const infoRes = await fetch(`https://quickbooks.api.intuit.com/v3/company/${realmId}/companyinfo/${realmId}`, {
-      headers: { 'Authorization': `Bearer ${tokenData.access_token}`, 'Accept': 'application/json' },
-    })
+    const infoRes = await fetch(
+      `https://quickbooks.api.intuit.com/v3/company/${realmId}/companyinfo/${realmId}`,
+      { headers: { 'Authorization': `Bearer ${tokenData.access_token}`, 'Accept': 'application/json' } }
+    )
     const infoData = await infoRes.json()
     companyName = infoData?.CompanyInfo?.CompanyName || null
   } catch (_) { /* non-fatal */ }
@@ -93,7 +86,7 @@ serve(async (req) => {
     connected_at: new Date().toISOString(),
   }, { onConflict: 'tenant_id,provider' })
 
-  if (upsertErr) return redirectWithMsg(false, 'Saved token exchange but failed to store connection: ' + upsertErr.message)
+  if (upsertErr) return json({ ok: false, message: 'Token exchanged but failed to store: ' + upsertErr.message }, 500)
 
-  return redirectWithMsg(true, 'QuickBooks connected' + (companyName ? ` to ${companyName}` : ''))
+  return json({ ok: true, message: 'QuickBooks connected' + (companyName ? ` to ${companyName}` : '') })
 })
