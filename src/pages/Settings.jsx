@@ -126,6 +126,7 @@ export default function Settings() {
     gmail_client_id: '', gmail_client_secret: '', gmail_redirect_uri: '',
     email_signature: '', email_signature_logo_url: '',
     verizon_api_key: '', verizon_account_id: '', verizon_phone_number: '',
+    mercury_api_key: '',
     verizon_api_url: 'https://api.verizon.com/v1', calling_provider: 'signalwire',
     m365_client_id: '', m365_client_secret: '', m365_tenant_id: 'common',
     payment_provider: 'stripe',
@@ -256,6 +257,7 @@ export default function Settings() {
         email_signature: firm.email_signature,
         metered_app_name: firm.metered_app_name,
         metered_api_key: firm.metered_api_key,
+        mercury_api_key: firm.mercury_api_key,
         otter_api_key: firm.otter_api_key,
       }
       // Empty-string values blow up non-text columns (date, numeric) with
@@ -753,6 +755,26 @@ export default function Settings() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
                 <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Video Calling'}</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Mercury — Office Billing */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">💳 Mercury — Office Billing</span></div>
+            <div className="card-body">
+              <div style={{fontSize:13,color:'var(--t3)',marginBottom:16,lineHeight:1.6}}>
+                Mercury is used to charge offices their monthly subscription. Once connected, the Charge Office panel in the Admin Portal will process payments directly against your Mercury checking account.
+                <br/><br/>
+                Get your API key from <strong>app.mercury.com → Settings → API → Generate Key</strong>.
+              </div>
+              <div className="field">
+                <label>Mercury API Key</label>
+                <input type="password" value={firm.mercury_api_key || ''} onChange={set('mercury_api_key')} placeholder="Your Mercury API key" />
+                <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Stored securely — never exposed to clients or staff.</div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Mercury'}</button>
               </div>
             </div>
           </div>
