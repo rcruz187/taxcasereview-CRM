@@ -9,19 +9,15 @@ serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
   try {
-    // Get service account JSON from vault using schema-qualified query
+    // Read secret via RPC (vault schema is not exposed to PostgREST directly)
     const { data: secretData, error: secretErr } = await supabase
-      .schema('vault')
-      .from('decrypted_secrets')
-      .select('decrypted_secret')
-      .eq('name', 'GA4_SERVICE_ACCOUNT_JSON')
-      .single()
+      .rpc('get_secret', { secret_name: 'GA4_SERVICE_ACCOUNT_JSON' })
 
     if (secretErr || !secretData) {
       throw new Error('Could not read GA4_SERVICE_ACCOUNT_JSON from vault: ' + JSON.stringify(secretErr))
     }
 
-    const serviceAccount = JSON.parse(secretData.decrypted_secret)
+    const serviceAccount = JSON.parse(secretData)
 
     // Get Google OAuth2 access token using JWT
     const token = await getGoogleAccessToken(serviceAccount)
