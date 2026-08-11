@@ -54,6 +54,16 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ── Native select option colours (browser ignores CSS vars on <option>) ── */
+select option {
+  background: #0F2235;
+  color: #E8EEF4;
+}
+html.light select option {
+  background: #FFFFFF;
+  color: #1A202C;
+}
+
 /* ── Light Mode ── */
 html.light {
   --bg:   #F0F4F8;
