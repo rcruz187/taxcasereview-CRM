@@ -924,6 +924,9 @@ export default function Clients() {
   const [employees, setEmployees] = useState([])
   const [statusCategories, setStatusCategories] = useState([])
   const [filter,    setFilter]    = useState('All')
+  const [filterStatus,   setFilterStatus]   = useState('All')
+  const [filterRep,      setFilterRep]      = useState('All')
+  const [filterPipeline, setFilterPipeline] = useState('All')
   const [clientSearch, setClientSearch] = useState('')
   const [sortCol, setSortCol] = useState('name')
   const [sortDir, setSortDir] = useState('asc')
@@ -1232,9 +1235,14 @@ export default function Clients() {
     }
   }
   const _clientSearchLower = clientSearch.toLowerCase()
+  const repOptions = ['All', ...Array.from(new Set(clients.map(c => c.assignedTo).filter(Boolean))).sort()]
+  const pipelineOptions = ['All', ...Array.from(new Set(clients.map(c => c.pipelineStage).filter(Boolean))).sort()]
   const filtered = clients
     .filter(c => showArchived ? !!c.archived : !c.archived)
     .filter(c => filter==='All' || c.clientType===filter)
+    .filter(c => filterStatus==='All' || (c.status||'Active')===filterStatus)
+    .filter(c => filterRep==='All' || (c.assignedTo||'')===filterRep)
+    .filter(c => filterPipeline==='All' || (c.pipelineStage||'')===filterPipeline)
     .filter(c => !_clientSearchLower || (
       (c.name||'').toLowerCase().includes(_clientSearchLower) ||
       (c.email||'').toLowerCase().includes(_clientSearchLower) ||
@@ -3331,6 +3339,21 @@ export default function Clients() {
               <span key={f} className={`chip${filter===f?' on':''}`} onClick={()=>setFilter(f)}>{f}</span>
             ))}
             <span className={`chip${showArchived?' on':''}`} onClick={()=>setShowArchived(a=>!a)}>🗄 Archived</span>
+            <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}
+              style={{fontSize:12,padding:'4px 8px',borderRadius:6,border:'1px solid var(--br)',background:'var(--s2)',color:'var(--tx)',cursor:'pointer'}}>
+              <option value="All">All Statuses</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+              <option value="Archived">Archived</option>
+            </select>
+            <select value={filterRep} onChange={e=>setFilterRep(e.target.value)}
+              style={{fontSize:12,padding:'4px 8px',borderRadius:6,border:'1px solid var(--br)',background:'var(--s2)',color:'var(--tx)',cursor:'pointer',maxWidth:150}}>
+              {repOptions.map(r=><option key={r} value={r}>{r==='All'?'All Reps':r}</option>)}
+            </select>
+            <select value={filterPipeline} onChange={e=>setFilterPipeline(e.target.value)}
+              style={{fontSize:12,padding:'4px 8px',borderRadius:6,border:'1px solid var(--br)',background:'var(--s2)',color:'var(--tx)',cursor:'pointer',maxWidth:160}}>
+              {pipelineOptions.map(p=><option key={p} value={p}>{p==='All'?'All Stages':p}</option>)}
+            </select>
             <button className="btn pri" onClick={()=>{setForm(BLANK);setModal(true)}}>+ Add Client</button>
           </div>
         </div>
