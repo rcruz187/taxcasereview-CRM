@@ -372,16 +372,16 @@ function OfficePage() {
     toast_('Demo reset queued — check back in 30 seconds', 'ok')
   }
 
+  useEffect(() => {
+    if (tab === 'billing' && id) loadOfficePayments(id)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, id])
+
   if (!data) return <Spinner />
 
   const t = data.tenant
   const employees = data.employees || []
   const TABS = ['overview','employees','billing','documents','actions']
-
-  useEffect(() => {
-    if (tab === 'billing' && id) loadOfficePayments(id)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, id])
 
   return (
     <div style={{ padding:'28px 36px', maxWidth:1050 }}>
