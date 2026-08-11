@@ -605,439 +605,434 @@ export default function Settings() {
             </div>{/* end email grid */}
           </div>{/* end email section */}
 
-          {/* ── CALLING & COMMUNICATIONS ── */}
-          <div style={{ marginBottom: 4 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 12, paddingLeft: 2 }}>
-              📞 Calling &amp; Communications
+          {/* SignalWire Dialer */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">📞 SignalWire Dialer</span></div>
+            <div style={{ padding: '0 20px 20px' }}>
+              <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.6 }}>
+                Powers SMS and fax directly (no separate backend needed for those), plus the built-in dialer if you deploy one later. Get credentials at <strong>signalwire.com</strong>.
+              </div>
+              <div className="fg2">
+                <div className="field"><label>Space URL</label>
+                  <input value={firm.sw_space_url || ''} onChange={set('sw_space_url')} placeholder="yourspace.signalwire.com" />
+                </div>
+                <div className="field"><label>Project ID</label>
+                  <input value={firm.sw_project_id || ''} onChange={set('sw_project_id')} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+                </div>
+              </div>
+              <div className="fg2">
+                <div className="field"><label>API Token</label>
+                  <input type="password" value={firm.sw_api_token || ''} onChange={set('sw_api_token')} placeholder="PT..." />
+                </div>
+                <div className="field"><label>Inbound DID (Fax / Inbound-only Number)</label>
+                  <input value={firm.sw_inbound_did || ''} onChange={set('sw_inbound_did')} placeholder="+15614206999" />
+                  <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Used for fax reception and inbound-only numbers. Do not use for outbound SMS.</div>
+                </div>
+                <div className="field"><label>Outbound SMS Number</label>
+                  <input value={firm.sw_outbound_did || ''} onChange={set('sw_outbound_did')} placeholder="+15614206665" />
+                  <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>All outbound text messages send from this number. Local numbers work immediately — toll-free numbers require SignalWire verification first.</div>
+                </div>
+              </div>
+              <div className="fg2">
+                <div className="field"><label>Fax From Number (optional)</label>
+                  <input value={firm.firm_fax_number || ''} onChange={set('firm_fax_number')} placeholder="Leave blank to use Inbound DID above" />
+                  <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Only needed if you want fax to send from a different number than voice/SMS — e.g. if the area code you wanted wasn't available for fax.</div>
+                </div>
+              </div>
+              <div className="fg2">
+                <div className="field"><label>SIP Username</label>
+                  <input value={firm.sw_sip_username || ''} onChange={set('sw_sip_username')} placeholder="SIP endpoint username" />
+                </div>
+                <div className="field"><label>SIP Password</label>
+                  <input type="password" value={firm.sw_sip_password || ''} onChange={set('sw_sip_password')} placeholder="SIP endpoint password" />
+                </div>
+              </div>
+              <div className="fg2">
+                <div className="field"><label>Call Forwarding Number</label>
+                  <input value={firm.call_forward_number || ''} onChange={set('call_forward_number')} placeholder="+15615551234" />
+                  <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Where incoming calls to your SignalWire number actually ring — your cell, front desk, etc.</div>
+                </div>
+              </div>
+              <div className="field"><label>Backend Server URL (optional)</label>
+                <input value={firm.signalwire_backend || ''} onChange={set('signalwire_backend')} placeholder="https://your-backend.onrender.com" />
+                <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Not needed for SMS or fax — those run through Supabase Edge Functions now. Only fill this in if you deploy a separate backend for real-time browser calling later.</div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save SignalWire'}</button>
+              </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          </div>
 
-              {/* SignalWire */}
-              <div style={{ border: '1px solid var(--br)', borderRadius: 12, overflow: 'hidden', background: 'var(--s1)' }}>
-                <div onClick={() => toggleInt('signalwire')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer', userSelect: 'none' }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--s2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>📞</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)' }}>SignalWire</div>
-                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>{firm.sw_api_token ? '✅ Configured' : 'Not configured'}</div>
-                  </div>
-                  <span style={{ fontSize: 12, color: 'var(--t3)' }}>{expandedInt.signalwire ? '▲' : '▼'}</span>
-                </div>
-                {expandedInt.signalwire && (
-                  <div style={{ borderTop: '1px solid var(--br)', padding: '0 20px 20px' }}>
-                    <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.6, marginTop: 14 }}>
-                      Powers SMS, fax, and the built-in dialer. Get credentials at <strong>signalwire.com</strong>.
-                    </div>
-                    <div className="fg2">
-                      <div className="field"><label>Space URL</label><input value={firm.sw_space_url || ''} onChange={set('sw_space_url')} placeholder="yourspace.signalwire.com" /></div>
-                      <div className="field"><label>Project ID</label><input value={firm.sw_project_id || ''} onChange={set('sw_project_id')} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" /></div>
-                    </div>
-                    <div className="fg2">
-                      <div className="field"><label>API Token</label><input type="password" value={firm.sw_api_token || ''} onChange={set('sw_api_token')} placeholder="PT..." /></div>
-                      <div className="field"><label>Inbound DID</label><input value={firm.sw_inbound_did || ''} onChange={set('sw_inbound_did')} placeholder="+15614206999" /></div>
-                    </div>
-                    <div className="fg2">
-                      <div className="field"><label>Outbound SMS Number</label><input value={firm.sw_outbound_did || ''} onChange={set('sw_outbound_did')} placeholder="+15614206665" /></div>
-                      <div className="field"><label>Fax From Number (optional)</label><input value={firm.firm_fax_number || ''} onChange={set('firm_fax_number')} placeholder="Leave blank to use Inbound DID" /></div>
-                    </div>
-                    <div className="fg2">
-                      <div className="field"><label>SIP Username</label><input value={firm.sw_sip_username || ''} onChange={set('sw_sip_username')} placeholder="SIP endpoint username" /></div>
-                      <div className="field"><label>SIP Password</label><input type="password" value={firm.sw_sip_password || ''} onChange={set('sw_sip_password')} placeholder="SIP endpoint password" /></div>
-                    </div>
-                    <div className="fg2">
-                      <div className="field"><label>Call Forwarding Number</label><input value={firm.call_forward_number || ''} onChange={set('call_forward_number')} placeholder="+15615551234" /></div>
-                      <div className="field"><label>Backend Server URL (optional)</label><input value={firm.signalwire_backend || ''} onChange={set('signalwire_backend')} placeholder="https://your-backend.onrender.com" /></div>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-                      <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save SignalWire'}</button>
-                    </div>
-                  </div>
-                )}
+
+
+          {/* Slack Integration */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">💬 Slack Integration</span></div>
+            <div style={{ padding: '0 20px 20px' }}>
+              <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.7 }}>
+                Two-way bridge between Slack and CRM Team Chat. Messages sent in mapped Slack channels appear in the CRM instantly, and CRM messages forward to Slack. Also supports importing Slack message history from a workspace export.
               </div>
-
-              {/* Verizon */}
-              <div style={{ border: '1px solid var(--br)', borderRadius: 12, overflow: 'hidden', background: 'var(--s1)' }}>
-                <div onClick={() => toggleInt('verizon')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer', userSelect: 'none' }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--s2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <svg viewBox="0 0 48 48" width="22" height="22"><path fill="#CD040B" d="M24 4L8 36h8l8-16 8 16h8L24 4z"/></svg>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                {[
+                  ['1', 'Go to api.slack.com/apps → Create New App → From scratch. Name it "TaxRes CRM".'],
+                  ['2', 'Under OAuth & Permissions → Scopes → Bot Token Scopes, add: channels:history, channels:read, chat:write, users:read'],
+                  ['3', 'Click "Install to Workspace" — copy the Bot User OAuth Token (starts with xoxb-)'],
+                  ['4', 'Under Basic Information → App Credentials, copy the Signing Secret'],
+                  ['5', 'Under Event Subscriptions → Enable Events. Request URL: paste your Supabase edge function URL (shown below). Subscribe to bot events: message.channels'],
+                  ['6', 'Map each Slack channel ID to a CRM channel name below (get channel IDs from Slack: right-click channel → View channel details → Channel ID at bottom)'],
+                ].map(([step, text]) => (
+                  <div key={step} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#4a154b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, flexShrink: 0 }}>{step}</div>
+                    <div style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, paddingTop: 2 }}>{text}</div>
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)' }}>Verizon Business</div>
-                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>{firm.verizon_api_key ? '✅ Configured' : 'Not configured'}</div>
-                  </div>
-                  <span style={{ fontSize: 12, color: 'var(--t3)' }}>{expandedInt.verizon ? '▲' : '▼'}</span>
-                </div>
-                {expandedInt.verizon && (
-                  <div style={{ borderTop: '1px solid var(--br)', padding: '0 20px 20px' }}>
-                    <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.6, marginTop: 14 }}>
-                      Connect your Verizon Business account for click-to-call, inbound routing, and call logging.
-                      Contact your Verizon Business rep or email <strong>businesssupport@verizon.com</strong>.
-                    </div>
-                    <div className="fg2">
-                      <div className="field"><label>Verizon Account ID</label><input value={firm.verizon_account_id || ''} onChange={set('verizon_account_id')} placeholder="Your Verizon Business account ID" /></div>
-                      <div className="field"><label>Verizon API Key</label><input type="password" value={firm.verizon_api_key || ''} onChange={set('verizon_api_key')} placeholder="API key from Verizon Business portal" /></div>
-                    </div>
-                    <div className="fg2">
-                      <div className="field"><label>Verizon Business Phone Number</label><input value={firm.verizon_phone_number || ''} onChange={set('verizon_phone_number')} placeholder="+16155022250" /></div>
-                      <div className="field"><label>Calling Provider</label>
-                        <select value={firm.calling_provider || 'signalwire'} onChange={set('calling_provider')}>
-                          <option value="signalwire">SignalWire (default)</option>
-                          <option value="verizon">Verizon Business</option>
-                          <option value="none">None / Manual</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-                      <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Verizon'}</button>
-                    </div>
-                  </div>
-                )}
+                ))}
               </div>
-
-              {/* Fax */}
-              <div style={{ border: '1px solid var(--br)', borderRadius: 12, overflow: 'hidden', background: 'var(--s1)' }}>
-                <div onClick={() => toggleInt('fax')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer', userSelect: 'none' }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--s2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>📠</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)' }}>Fax</div>
-                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>{firm.sw_api_token ? '✅ Via SignalWire' : 'Requires SignalWire'}</div>
-                  </div>
-                  <span style={{ fontSize: 12, color: 'var(--t3)' }}>{expandedInt.fax ? '▲' : '▼'}</span>
-                </div>
-                {expandedInt.fax && (
-                  <div style={{ borderTop: '1px solid var(--br)', padding: '0 20px 20px' }}>
-                    <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.7, marginTop: 14 }}>
-                      Fax is sent via the <code>send-fax</code> Edge Function using your SignalWire credentials. No separate backend needed.
-                    </div>
-                    <div style={{ background: 'var(--s2)', borderRadius: 8, padding: '12px 16px', marginBottom: 14, fontSize: 12, lineHeight: 1.8 }}>
-                      <div style={{ fontWeight: 700, color: 'var(--tx)', marginBottom: 6 }}>Setup:</div>
-                      {[['1','Configure SignalWire credentials in the SignalWire card above'],['2','Fax sends from Fax From Number if set, otherwise the Inbound DID']].map(([step, text]) => (
-                        <div key={step} style={{ display: 'flex', gap: 10, marginBottom: 4, alignItems: 'flex-start' }}>
-                          <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--blue)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, flexShrink: 0, marginTop: 1 }}>{step}</div>
-                          <div style={{ color: 'var(--t2)' }}>{text}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div style={{ background: 'rgba(26,127,212,.08)', border: '1px solid rgba(26,127,212,.2)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--t2)', lineHeight: 1.6 }}>
-                      SignalWire Space: <strong>{firm.sw_space_url || 'Not configured'}</strong><br/>
-                      Fax From Number: <strong>{firm.firm_fax_number || firm.sw_inbound_did || 'Not configured'}</strong>
-                    </div>
-                  </div>
-                )}
+              <div className="field"><label>Slack Webhook URL (paste into Slack Event Subscriptions)</label>
+                <input readOnly value="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/slack-events"
+                  style={{ color: 'var(--t3)', cursor: 'text', fontSize: 11 }}
+                  onClick={e => { e.target.select(); document.execCommand('copy'); }} />
+                <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Click to copy. Paste this exactly into Slack's Event Subscriptions → Request URL field.</div>
               </div>
-
-              {/* Slack */}
-              <div style={{ border: '1px solid var(--br)', borderRadius: 12, overflow: 'hidden', background: 'var(--s1)' }}>
-                <div onClick={() => toggleInt('slack')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer', userSelect: 'none' }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--s2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <svg viewBox="0 0 48 48" width="22" height="22"><path fill="#E01E5A" d="M12 30a4 4 0 110 8 4 4 0 010-8zm8-8a4 4 0 100 8h4v-4a4 4 0 00-4-4z"/><path fill="#36C5F0" d="M36 18a4 4 0 110-8 4 4 0 010 8zm-8 8a4 4 0 100-8h-4v4a4 4 0 004 4z"/><path fill="#2EB67D" d="M18 36a4 4 0 110 8 4 4 0 010-8zm-8-8h-4a4 4 0 100 8v-4a4 4 0 004-4z"/><path fill="#ECB22E" d="M30 12a4 4 0 110-8 4 4 0 010 8zm8 8h4a4 4 0 100-8v4a4 4 0 00-4 4z"/></svg>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)' }}>Slack</div>
-                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>{firm.slack_bot_token ? '✅ Connected' : 'Not connected'}</div>
-                  </div>
-                  <span style={{ fontSize: 12, color: 'var(--t3)' }}>{expandedInt.slack ? '▲' : '▼'}</span>
+              <div className="fg2">
+                <div className="field"><label>Slack Bot Token (xoxb-...)</label>
+                  <input type="password" value={firm.slack_bot_token || ''} onChange={set('slack_bot_token')} placeholder="xoxb-xxxxxxxxxxxx" />
                 </div>
-                {expandedInt.slack && (
-                  <div style={{ borderTop: '1px solid var(--br)', padding: '0 20px 20px' }}>
-                    <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.7, marginTop: 14 }}>
-                      Two-way bridge between Slack and CRM Team Chat. Messages bridge both ways and you can import Slack history.
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-                      {[
-                        ['1', 'Go to api.slack.com/apps → Create New App → From scratch. Name it "TaxRes CRM".'],
-                        ['2', 'OAuth & Permissions → Bot Token Scopes: channels:history, channels:read, chat:write, users:read'],
-                        ['3', 'Install to Workspace — copy the Bot User OAuth Token (xoxb-)'],
-                        ['4', 'Basic Information → App Credentials → copy the Signing Secret'],
-                        ['5', 'Event Subscriptions → Enable → Request URL: paste edge function URL below. Subscribe to: message.channels'],
-                        ['6', 'Map Slack channel IDs to CRM channel names below'],
-                      ].map(([step, text]) => (
-                        <div key={step} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                          <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#4a154b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, flexShrink: 0 }}>{step}</div>
-                          <div style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, paddingTop: 2 }}>{text}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="field"><label>Webhook URL (paste into Slack Event Subscriptions)</label>
-                      <input readOnly value="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/slack-events"
-                        style={{ color: 'var(--t3)', cursor: 'text', fontSize: 11 }}
-                        onClick={e => { e.target.select(); document.execCommand('copy'); }} />
-                    </div>
-                    <div className="fg2">
-                      <div className="field"><label>Slack Bot Token (xoxb-...)</label><input type="password" value={firm.slack_bot_token || ''} onChange={set('slack_bot_token')} placeholder="xoxb-xxxxxxxxxxxx" /></div>
-                      <div className="field"><label>Slack Signing Secret</label><input type="password" value={firm.slack_signing_secret || ''} onChange={set('slack_signing_secret')} placeholder="From Basic Information → App Credentials" /></div>
-                    </div>
-                    <div className="field"><label>Channel Mapping (Slack Channel ID = CRM channel, one per line)</label>
-                      <textarea rows={3}
-                        value={firm.slack_channel_map ? Object.entries(firm.slack_channel_map).map(([k,v]) => `${k} = ${v}`).join('\n') : ''}
-                        onChange={e => {
-                          const map = {}
-                          e.target.value.split('\n').forEach(line => {
-                            const [k, v] = line.split('=').map(s => s.trim())
-                            if (k && v) map[k] = v
-                          })
-                          setFirm(f => ({ ...f, slack_channel_map: Object.keys(map).length ? map : null }))
-                        }}
-                        placeholder={'C0123ABCDEF = general\nC0456GHIJKL = tax-team'}
-                        style={{ fontFamily: 'monospace', fontSize: 12 }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                      <input type="checkbox" id="slack_sync" checked={!!firm.slack_sync_enabled}
-                        onChange={e => setFirm(f => ({ ...f, slack_sync_enabled: e.target.checked }))} />
-                      <label htmlFor="slack_sync" style={{ fontSize: 13, color: 'var(--tx)', cursor: 'pointer' }}>Enable two-way Slack sync</label>
-                    </div>
-                    <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Slack Config'}</button>
-                  </div>
-                )}
-              </div>
-
-              {/* Video Calling */}
-              <div style={{ border: '1px solid var(--br)', borderRadius: 12, overflow: 'hidden', background: 'var(--s1)' }}>
-                <div onClick={() => toggleInt('video')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer', userSelect: 'none' }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--s2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🎥</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)' }}>Video Calling</div>
-                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>{firm.metered_api_key ? '✅ Configured' : 'Not configured'}</div>
-                  </div>
-                  <span style={{ fontSize: 12, color: 'var(--t3)' }}>{expandedInt.video ? '▲' : '▼'}</span>
+                <div className="field"><label>Slack Signing Secret</label>
+                  <input type="password" value={firm.slack_signing_secret || ''} onChange={set('slack_signing_secret')} placeholder="From Basic Information → App Credentials" />
                 </div>
-                {expandedInt.video && (
-                  <div style={{ borderTop: '1px solid var(--br)', padding: '0 20px 20px' }}>
-                    <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.6, marginTop: 14 }}>
-                      Powers the team Huddle and client meeting links — free browser-to-browser video. Sign up free (no card needed, 20GB/month) at <strong>dashboard.metered.ca/signup?tool=turnserver</strong>.
-                    </div>
-                    <div className="fg2">
-                      <div className="field"><label>Metered App Name</label><input value={firm.metered_app_name || ''} onChange={set('metered_app_name')} placeholder="yourappname" /></div>
-                      <div className="field"><label>API Key</label><input type="password" value={firm.metered_api_key || ''} onChange={set('metered_api_key')} placeholder="API key from your dashboard" /></div>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-                      <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Video Calling'}</button>
-                    </div>
-                  </div>
-                )}
               </div>
-
-            </div>{/* end calling grid */}
-          </div>{/* end calling section */}
-
-          {/* ── PAYMENTS & BILLING ── */}
-          <div style={{ marginBottom: 4 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 12, paddingLeft: 2 }}>
-              💳 Payments &amp; Billing
+              <div className="field"><label>Channel Mapping (Slack Channel ID → CRM channel name, one per line)</label>
+                <textarea rows={4}
+                  value={firm.slack_channel_map ? Object.entries(firm.slack_channel_map).map(([k,v]) => `${k} = ${v}`).join('\n') : ''}
+                  onChange={e => {
+                    const map = {}
+                    e.target.value.split('\n').forEach(line => {
+                      const [k, v] = line.split('=').map(s => s.trim())
+                      if (k && v) map[k] = v
+                    })
+                    setFirm(f => ({ ...f, slack_channel_map: Object.keys(map).length ? map : null }))
+                  }}
+                  placeholder={"C0123ABCDEF = general\nC0456GHIJKL = tax-team"}
+                  style={{ fontFamily: 'monospace', fontSize: 12 }}
+                />
+                <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Format: SlackChannelID = crm-channel-name. Right-click any Slack channel → View channel details to find the ID.</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, marginBottom: 16 }}>
+                <input type="checkbox" id="slack_sync" checked={!!firm.slack_sync_enabled}
+                  onChange={e => setFirm(f => ({ ...f, slack_sync_enabled: e.target.checked }))} />
+                <label htmlFor="slack_sync" style={{ fontSize: 13, color: 'var(--tx)', cursor: 'pointer' }}>
+                  Enable two-way Slack sync (messages bridge between Slack and CRM chat)
+                </label>
+              </div>
+              <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Slack Config'}</button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          </div>
 
-              {/* Mercury */}
-              <div style={{ border: '1px solid var(--br)', borderRadius: 12, overflow: 'hidden', background: 'var(--s1)' }}>
-                <div onClick={() => toggleInt('mercury')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer', userSelect: 'none' }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--s2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🏦</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)' }}>Mercury</div>
-                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>{firm.mercury_api_key ? '✅ Connected' : 'Not connected'}</div>
-                  </div>
-                  <span style={{ fontSize: 12, color: 'var(--t3)' }}>{expandedInt.mercury ? '▲' : '▼'}</span>
-                </div>
-                {expandedInt.mercury && (
-                  <div style={{ borderTop: '1px solid var(--br)', padding: '0 20px 20px' }}>
-                    <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 16, lineHeight: 1.6, marginTop: 14 }}>
-                      Used to charge offices their monthly subscription. Get your API key from <strong>app.mercury.com → Settings → API → Generate Key</strong>.
-                    </div>
-                    <div className="field">
-                      <label>Mercury API Key</label>
-                      <input type="password" value={firm.mercury_api_key || ''} onChange={set('mercury_api_key')} placeholder="Your Mercury API key" />
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-                      <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Mercury'}</button>
-                    </div>
-                  </div>
-                )}
+          {/* Verizon Business Calling */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">📞 Verizon Business Calling</span></div>
+            <div style={{ padding: '0 20px 20px' }}>
+              <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.6 }}>
+                Connect your Verizon Business account for click-to-call, inbound routing, and call logging.
+                Contact your Verizon Business rep to get your API credentials, or email <strong>businesssupport@verizon.com</strong>.
+                Once connected, set Calling Provider to "Verizon" below to activate.
               </div>
-
-              {/* Stripe */}
-              <div style={{ border: '1px solid var(--br)', borderRadius: 12, overflow: 'hidden', background: 'var(--s1)' }}>
-                <div onClick={() => toggleInt('stripe')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer', userSelect: 'none' }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--s2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <svg viewBox="0 0 48 48" width="22" height="22"><path fill="#6772E5" d="M24 4C13 4 4 13 4 24s9 20 20 20 20-9 20-20S35 4 24 4zm-1 30c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8z"/></svg>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)' }}>Stripe</div>
-                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>{firm.stripe_publishable_key ? '✅ Configured' : 'Not configured'}</div>
-                  </div>
-                  <span style={{ fontSize: 12, color: 'var(--t3)' }}>{expandedInt.stripe ? '▲' : '▼'}</span>
+              <div className="fg2">
+                <div className="field"><label>Verizon Account ID</label>
+                  <input value={firm.verizon_account_id || ''} onChange={set('verizon_account_id')} placeholder="Your Verizon Business account ID" />
                 </div>
-                {expandedInt.stripe && (
-                  <div style={{ borderTop: '1px solid var(--br)', padding: '0 20px 20px' }}>
-                    <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.6, marginTop: 14 }}>
-                      Enables card-on-file, autopay, and payment links. Get keys from <strong>dashboard.stripe.com → Developers → API Keys</strong>.
-                    </div>
-                    <div className="field"><label>Payment Provider</label>
-                      <select value={firm.payment_provider || 'stripe'} onChange={set('payment_provider')}>
-                        <option value="stripe">Stripe</option>
-                        <option value="intuit">Intuit / QuickBooks Payments</option>
-                      </select>
-                    </div>
-                    <div className="fg2">
-                      <div className="field"><label>Publishable Key</label><input value={firm.stripe_publishable_key || ''} onChange={set('stripe_publishable_key')} placeholder="pk_live_..." /></div>
-                      <div className="field"><label>Secret Key</label><input type="password" value={firm.stripe_secret_key || ''} onChange={set('stripe_secret_key')} placeholder="sk_live_..." /></div>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-                      <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Stripe'}</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* QuickBooks */}
-              <div style={{ border: '1px solid var(--br)', borderRadius: 12, overflow: 'hidden', background: 'var(--s1)' }}>
-                <div onClick={() => toggleInt('quickbooks')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer', userSelect: 'none' }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--s2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <svg viewBox="0 0 48 48" width="22" height="22"><circle cx="24" cy="24" r="20" fill="#2CA01C"/><path fill="#fff" d="M18 14h8a6 6 0 010 12h-2v4h-6V14zm6 8a2 2 0 000-4h-2v4h2z"/></svg>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)' }}>QuickBooks</div>
-                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>{acctStatus.quickbooks?.status === 'connected' ? '✅ Connected' : 'Not connected'}</div>
-                  </div>
-                  <span style={{ fontSize: 12, color: 'var(--t3)' }}>{expandedInt.quickbooks ? '▲' : '▼'}</span>
+                <div className="field"><label>Verizon API Key</label>
+                  <input type="password" value={firm.verizon_api_key || ''} onChange={set('verizon_api_key')} placeholder="API key from Verizon Business portal" />
                 </div>
-                {expandedInt.quickbooks && (
-                  <div style={{ borderTop: '1px solid var(--br)', padding: '0 20px 20px' }}>
-                    <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.7, marginTop: 14 }}>
-                      Connect QuickBooks Online to sync invoices and payments. Go to <strong>developer.intuit.com</strong> → create an app → grab Client ID &amp; Secret.
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-                      {[
-                        ['1', 'Sign in to developer.intuit.com with your QuickBooks account'],
-                        ['2', 'Create a new app → QuickBooks Online and Payments'],
-                        ['3', 'Keys & credentials → copy Client ID and Client Secret'],
-                        ['4', `Add Redirect URI: ${window.location.origin}/auth/quickbooks-callback`],
-                        ['5', 'Paste below, Save, then click Connect'],
-                      ].map(([step, text]) => (
-                        <div key={step} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                          <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#2CA01C', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>{step}</div>
-                          <div style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.5, paddingTop: 1 }}>{text}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="fg2">
-                      <div className="field"><label>Client ID</label><input value={firm.qb_client_id || ''} onChange={set('qb_client_id')} placeholder="ABxxxxxxxxxxxxxxxx" /></div>
-                      <div className="field"><label>Client Secret</label><input type="password" value={firm.qb_client_secret || ''} onChange={set('qb_client_secret')} placeholder="xxxxxxxxxxxxxxxx" /></div>
-                    </div>
-                    <div className="field"><label>Redirect URI (click to copy)</label>
-                      <input readOnly value={window.location.origin + '/auth/quickbooks-callback'} style={{ color: 'var(--t3)', cursor: 'text' }} onClick={e => { e.target.select(); document.execCommand('copy'); }} />
-                    </div>
-                    {acctStatus.quickbooks?.status === 'connected' ? (
-                      <div style={{ background: 'rgba(44,160,28,.1)', border: '1px solid rgba(44,160,28,.3)', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
-                        <div style={{ fontWeight: 700, color: '#2CA01C', marginBottom: 4 }}>✅ Connected{acctStatus.quickbooks.company_name ? ` — ${acctStatus.quickbooks.company_name}` : ''}</div>
-                        <div style={{ fontSize: 12, color: 'var(--t2)' }}>Last synced: {acctStatus.quickbooks.last_synced_at ? new Date(acctStatus.quickbooks.last_synced_at).toLocaleString() : 'Never'}</div>
-                        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                          <button className="btn sec" disabled={syncing.quickbooks} onClick={() => syncAccounting('quickbooks')}>{syncing.quickbooks ? 'Syncing…' : '🔄 Sync Now'}</button>
-                          <button className="btn sec" onClick={() => disconnectAccounting('quickbooks')} style={{ color: '#ef4444' }}>Disconnect</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button className="btn pri" style={{ marginTop: 8 }} onClick={connectQuickBooks}>🔗 Connect to QuickBooks</button>
-                    )}
-                  </div>
-                )}
               </div>
-
-              {/* Xero */}
-              <div style={{ border: '1px solid var(--br)', borderRadius: 12, overflow: 'hidden', background: 'var(--s1)' }}>
-                <div onClick={() => toggleInt('xero')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer', userSelect: 'none' }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--s2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <svg viewBox="0 0 48 48" width="22" height="22"><circle cx="24" cy="24" r="20" fill="#13B5EA"/><path stroke="#fff" strokeWidth="3" fill="none" d="M16 18l16 12M32 18L16 30"/></svg>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)' }}>Xero</div>
-                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>{acctStatus.xero?.status === 'connected' ? '✅ Connected' : 'Not connected'}</div>
-                  </div>
-                  <span style={{ fontSize: 12, color: 'var(--t3)' }}>{expandedInt.xero ? '▲' : '▼'}</span>
+              <div className="fg2">
+                <div className="field"><label>Verizon Business Phone Number</label>
+                  <input value={firm.verizon_phone_number || ''} onChange={set('verizon_phone_number')} placeholder="+16155022250" />
                 </div>
-                {expandedInt.xero && (
-                  <div style={{ borderTop: '1px solid var(--br)', padding: '0 20px 20px' }}>
-                    <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.7, marginTop: 14 }}>
-                      Connect Xero to sync invoices and payments. Go to <strong>developer.xero.com</strong> → My Apps → New App.
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-                      {[
-                        ['1', 'Go to developer.xero.com → My Apps → New App'],
-                        ['2', 'Integration type: Web app. Add redirect URI below.'],
-                        ['3', 'Scopes: accounting.transactions, accounting.contacts, offline_access'],
-                        ['4', 'Copy Client ID and Client Secret, paste below and save'],
-                      ].map(([step, text]) => (
-                        <div key={step} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                          <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#13B5EA', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>{step}</div>
-                          <div style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.5, paddingTop: 1 }}>{text}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="fg2">
-                      <div className="field"><label>Xero Client ID</label><input value={firm.xero_client_id || ''} onChange={set('xero_client_id')} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" /></div>
-                      <div className="field"><label>Xero Client Secret</label><input type="password" value={firm.xero_client_secret || ''} onChange={set('xero_client_secret')} placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" /></div>
-                    </div>
-                    <div className="field"><label>Redirect URI (click to copy)</label>
-                      <input readOnly value={window.location.origin + '/auth/xero-callback'} style={{ color: 'var(--t3)', cursor: 'text' }} onClick={e => { e.target.select(); document.execCommand('copy'); }} />
-                    </div>
-                    {acctStatus.xero?.status === 'connected' ? (
-                      <div style={{ background: 'rgba(19,181,234,.1)', border: '1px solid rgba(19,181,234,.3)', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
-                        <div style={{ fontWeight: 700, color: '#13B5EA', marginBottom: 4 }}>✅ Connected{acctStatus.xero.company_name ? ` — ${acctStatus.xero.company_name}` : ''}</div>
-                        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                          <button className="btn sec" disabled={syncing.xero} onClick={() => syncAccounting('xero')}>{syncing.xero ? 'Syncing…' : '🔄 Sync Now'}</button>
-                          <button className="btn sec" onClick={() => disconnectAccounting('xero')} style={{ color: '#ef4444' }}>Disconnect</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button className="btn pri" style={{ marginTop: 8 }} onClick={connectXero}>🔗 Connect to Xero</button>
-                    )}
-                  </div>
-                )}
+                <div className="field"><label>Calling Provider</label>
+                  <select value={firm.calling_provider || 'signalwire'} onChange={set('calling_provider')}>
+                    <option value="signalwire">SignalWire (default)</option>
+                    <option value="verizon">Verizon Business</option>
+                    <option value="none">None / Manual</option>
+                  </select>
+                  <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Switch to Verizon after entering credentials above. SignalWire remains active for TCR and any office without Verizon configured.</div>
+                </div>
               </div>
-
-            </div>{/* end payments grid */}
-          </div>{/* end payments section */}
-
-          {/* ── AI & PRODUCTIVITY ── */}
-          <div style={{ marginBottom: 4 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 12, paddingLeft: 2 }}>
-              🤖 AI &amp; Productivity
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Verizon'}</button>
+              </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          </div>
 
-              {/* AI Transcription */}
-              <div style={{ border: '1px solid var(--br)', borderRadius: 12, overflow: 'hidden', background: 'var(--s1)' }}>
-                <div onClick={() => toggleInt('ai')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer', userSelect: 'none' }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--s2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🎙️</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)' }}>AI Transcription</div>
-                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>{firm.otter_api_key ? '✅ Connected' : 'Not connected'}</div>
-                  </div>
-                  <span style={{ fontSize: 12, color: 'var(--t3)' }}>{expandedInt.ai ? '▲' : '▼'}</span>
+          {/* Video Calling (TURN server) */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">🎥 Video Calling (Huddle + Client Meetings)</span></div>
+            <div style={{ padding: '0 20px 20px' }}>
+              <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.6 }}>
+                Powers the team Huddle and client meeting links — free, browser-to-browser video. Without this, calls only connect when both people's networks happen to allow a direct connection; this fills in the gap for everyone else (different ISPs, office firewalls, etc).
+                <br/><br/>
+                Sign up free (no card needed, 20GB/month relay) at <strong>dashboard.metered.ca/signup?tool=turnserver</strong>, then copy your app name and API key from the dashboard.
+              </div>
+              <div className="fg2">
+                <div className="field"><label>Metered App Name</label>
+                  <input value={firm.metered_app_name || ''} onChange={set('metered_app_name')} placeholder="yourappname" />
+                  <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>The subdomain shown in your dashboard — just the name, not the full URL.</div>
                 </div>
-                {expandedInt.ai && (
-                  <div style={{ borderTop: '1px solid var(--br)', padding: '0 20px 20px' }}>
-                    <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.6, marginTop: 14 }}>
-                      Connect Otter.ai or Fathom to auto-transcribe calls and meetings. Transcripts log directly to client files.
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)' }}>Otter.ai</div>
-                      <div style={{ fontSize: 12, color: 'var(--t3)' }}>Free at <strong>otter.ai</strong> (300 min/month). Get your API key under Settings → Account → Integrations → API. Requires Otter Pro or Business for the import API.</div>
-                      <div className="fg2">
-                        <div className="field"><label>Otter API Key</label><input type="password" value={firm.otter_api_key || ''} onChange={set('otter_api_key')} placeholder="Your Otter API key" /></div>
-                      </div>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--tx)', marginTop: 8 }}>Fathom</div>
-                      <div style={{ fontSize: 12, color: 'var(--t3)' }}>Connect Fathom for automatic meeting notes. Get your API key from <strong>fathom.video → Settings → Integrations</strong>.</div>
-                      <div className="fg2">
-                        <div className="field"><label>Fathom API Key</label><input type="password" value={firm.fathom_api_key || ''} onChange={set('fathom_api_key')} placeholder="Your Fathom API key" /></div>
-                      </div>
-                    </div>
-                    <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save AI Transcription'}</button>
-                  </div>
-                )}
+                <div className="field"><label>API Key</label>
+                  <input type="password" value={firm.metered_api_key || ''} onChange={set('metered_api_key')} placeholder="API key from your dashboard" />
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Video Calling'}</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Mercury — Office Billing */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">💳 Mercury — Office Billing</span></div>
+            <div className="card-body">
+              <div style={{fontSize:13,color:'var(--t3)',marginBottom:16,lineHeight:1.6}}>
+                Mercury is used to charge offices their monthly subscription. Once connected, the Charge Office panel in the Admin Portal will process payments directly against your Mercury checking account.
+                <br/><br/>
+                Get your API key from <strong>app.mercury.com → Settings → API → Generate Key</strong>.
+              </div>
+              <div className="field">
+                <label>Mercury API Key</label>
+                <input type="password" value={firm.mercury_api_key || ''} onChange={set('mercury_api_key')} placeholder="Your Mercury API key" />
+                <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Stored securely — never exposed to clients or staff.</div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Mercury'}</button>
+              </div>
+            </div>
+          </div>
+
+          {/* AI Transcription — Otter + Fathom */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">🎙️ AI Transcription (Otter & Fathom)</span></div>
+            <div className="card-body">
+              <div style={{fontSize:13,color:'var(--t3)',marginBottom:16,lineHeight:1.6}}>
+                <strong>Otter.ai</strong> automatically transcribes your phone call recordings. Once your API key is entered below, a "Transcribe with Otter" button will appear on every recorded call.
+                <br/><br/>
+                <strong>Fathom</strong> auto-records and summarizes your Zoom and video meetings. It works as a Chrome extension — no key needed here, just install it and connect your Zoom account.
               </div>
 
-            </div>{/* end ai grid */}
-          </div>{/* end ai section */}
+              <div style={{background:'var(--s2)',border:'1px solid var(--br)',borderRadius:8,padding:'12px 14px',marginBottom:16}}>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>🦦 Otter.ai — Phone Call Transcription</div>
+                <div className="field" style={{marginBottom:8}}>
+                  <label>Otter API Key</label>
+                  <input type="password" value={firm.otter_api_key||''} onChange={set('otter_api_key')} placeholder="Get from otter.ai → Settings → API"/>
+                </div>
+                <div style={{fontSize:11,color:'var(--t3)',lineHeight:1.6}}>
+                  Free at <strong>otter.ai</strong> (300 min/month). Get your API key under <strong>Settings → Account → Integrations → API</strong>. Requires Otter Pro or Business for the import API — free plan can be used manually by uploading recordings directly at otter.ai/import.
+                </div>
+              </div>
 
+              <div style={{background:'var(--s2)',border:'1px solid var(--br)',borderRadius:8,padding:'12px 14px',marginBottom:16}}>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:6}}>🌟 Fathom — Video Meeting Recording</div>
+                <div style={{fontSize:12,color:'var(--t3)',lineHeight:1.7}}>
+                  Fathom requires no API key — it runs as a Chrome extension.<br/>
+                  <strong>Step 1:</strong> Go to <strong>fathom.video</strong> and sign up free (no credit card).<br/>
+                  <strong>Step 2:</strong> Install the Fathom Chrome extension when prompted.<br/>
+                  <strong>Step 3:</strong> Connect your Zoom account inside Fathom.<br/>
+                  Every Zoom meeting you host will now be automatically recorded and summarized by AI after it ends.
+                </div>
+              </div>
+
+              <div style={{display:'flex',justifyContent:'flex-end'}}>
+                <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving?'Saving…':'Save Transcription Settings'}</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Payment Provider */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">💳 Payment Provider</span></div>
+            <div style={{ padding: '0 20px 20px' }}>
+              <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.6 }}>
+                Select how this office collects client payments. This controls which payment flow appears on charges throughout the CRM.
+              </div>
+              <div className="field">
+                <label>Payment Provider</label>
+                <select value={firm.payment_provider || 'stripe'} onChange={set('payment_provider')}>
+                  <option value="stripe">Stripe</option>
+                  <option value="intuit">Intuit / QuickBooks Payments</option>
+                  <option value="manual">Manual / External</option>
+                </select>
+                <div style={{fontSize:10,color:'var(--t3)',marginTop:4}}>
+                  {(firm.payment_provider || 'stripe') === 'intuit' && 'Connect QuickBooks below to activate Intuit Payments. Once connected, all charge buttons will route through your QuickBooks Payments account.'}
+                  {(firm.payment_provider || 'stripe') === 'stripe' && 'Enter your Stripe keys below to activate Stripe payments.'}
+                  {firm.payment_provider === 'manual' && 'No online payment processing. Staff will collect payments manually and record them in the CRM.'}
+                </div>
+              </div>
+              <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+            </div>
+          </div>
+
+          {/* Stripe Autopay */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">💳 Stripe (Autopay)</span></div>
+            <div style={{ padding: '0 20px 20px' }}>
+              <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.6 }}>
+                Powers saved cards/bank accounts and recurring autopay on the Clients page. Get your keys at <strong>dashboard.stripe.com/apikeys</strong>.
+              </div>
+              <div className="field"><label>Publishable Key</label>
+                <input value={firm.stripe_publishable_key || ''} onChange={set('stripe_publishable_key')} placeholder="pk_live_..." />
+                <div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>Safe to store here — Stripe designs this key to be public-facing.</div>
+              </div>
+              <div style={{ background:'var(--s2)', border:'1px solid var(--br)', borderRadius:8, padding:'10px 14px', fontSize:12, color:'var(--t3)', lineHeight:1.6, marginTop:10 }}>
+                <strong style={{color:'var(--t2)'}}>⚠️ Secret Key does NOT go here.</strong> Unlike the credentials above, the Stripe Secret Key can move money on its own, so it must never sit in this database. Set it as an Edge Function secret instead: Supabase Dashboard → Edge Functions → Secrets → add <code>STRIPE_SECRET_KEY</code>. Then deploy the <code>stripe-setup-intent</code> and <code>stripe-charge</code> functions from <code>supabase/functions/</code>.
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Stripe'}</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Fax (uses SignalWire credentials above) */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">📠 Fax Integration</span></div>
+            <div style={{ padding: '0 20px 20px' }}>
+              <div style={{fontSize:12,color:'var(--t3)',marginBottom:16,lineHeight:1.7}}>
+                Fax is sent via a Supabase Edge Function (<code>send-fax</code>), using the same SignalWire project as SMS above. No separate backend or hosting needed.
+              </div>
+              <div style={{background:'var(--s2)',borderRadius:8,padding:'12px 16px',marginBottom:16,fontSize:12,lineHeight:1.8}}>
+                <div style={{fontWeight:700,color:'var(--tx)',marginBottom:6}}>Setup:</div>
+                {[['1','Set up SignalWire credentials in the SignalWire Dialer card above'],['2','Deploy the send-fax Edge Function from your Supabase dashboard (Edge Functions → send-fax)'],['3','Fax sends from the Fax From Number above if set, otherwise the Inbound DID']].map(([step,text])=>(
+                  <div key={step} style={{display:'flex',gap:10,marginBottom:4,alignItems:'flex-start'}}>
+                    <div style={{width:20,height:20,borderRadius:'50%',background:'var(--blue)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,flexShrink:0,marginTop:1}}>{step}</div>
+                    <div style={{color:'var(--t2)'}}>{text}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{background:'rgba(26,127,212,.08)',border:'1px solid rgba(26,127,212,.2)',borderRadius:8,padding:'10px 14px',fontSize:12,color:'var(--t2)',lineHeight:1.6}}>
+                SignalWire Space: <strong>{firm.sw_space_url || 'Not configured'}</strong><br/>
+                Fax From Number: <strong>{firm.firm_fax_number || firm.sw_inbound_did || 'Not configured'}</strong>
+              </div>
+            </div>
+          </div>
+
+          {/* QuickBooks Online */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">📊 QuickBooks Online</span></div>
+            <div style={{ padding: '0 20px 20px' }}>
+              <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.7 }}>
+                Connect QuickBooks Online to sync invoices and payments automatically. Until this is connected, use the
+                <strong> "Export to QuickBooks" </strong> button on the Books & Ledger page to download a CSV you can
+                import manually under QuickBooks → Banking → Upload from file.
+              </div>
+
+              {/* Step by step */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                {[
+                  ['1', 'Go to developer.intuit.com and sign in with your QuickBooks account'],
+                  ['2', 'Create a new app → choose "QuickBooks Online and Payments"'],
+                  ['3', 'In the app\'s Keys & OAuth section, grab your Client ID and Client Secret (use the Production keys, not Sandbox)'],
+                  ['4', `Add Redirect URI: ${window.location.origin}/auth/quickbooks-callback`],
+                  ['5', 'Copy your Client ID and Client Secret below, then save'],
+                ].map(([step, text]) => (
+                  <div key={step} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#2CA01C', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, flexShrink: 0 }}>{step}</div>
+                    <div style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, paddingTop: 2 }}>{text}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="fg2">
+                <div className="field"><label>QuickBooks Client ID</label>
+                  <input value={firm.qb_client_id || ''} onChange={set('qb_client_id')} placeholder="ABxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+                </div>
+                <div className="field"><label>QuickBooks Client Secret</label>
+                  <input type="password" value={firm.qb_client_secret || ''} onChange={set('qb_client_secret')} placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+                </div>
+              </div>
+              <div className="field"><label>Redirect URI (copy this exactly into the Intuit Developer app)</label>
+                <input readOnly value={window.location.origin + '/auth/quickbooks-callback'} style={{ color: 'var(--t3)', cursor: 'text' }} onClick={e => { e.target.select(); document.execCommand('copy'); }} />
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 14 }}>Click the Redirect URI field to copy it.</div>
+
+              <div style={{ background: 'rgba(212,147,10,.1)', border: '1px solid rgba(212,147,10,.3)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--t2)', marginBottom: 14, lineHeight: 1.7 }}>
+                <strong style={{ color: 'var(--warn)' }}>⚠️ Note:</strong> Save your Client ID/Secret above first, then click Connect.
+              </div>
+
+              {acctStatus.quickbooks?.status === 'connected' ? (
+                <div style={{ background: 'rgba(44,160,28,.1)', border: '1px solid rgba(44,160,28,.3)', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#2CA01C', marginBottom: 4 }}>✅ Connected{acctStatus.quickbooks.external_company_name ? ` — ${acctStatus.quickbooks.external_company_name}` : ''}</div>
+                  {acctStatus.quickbooks.last_synced_at && <div style={{ fontSize: 11.5, color: 'var(--t3)' }}>Last synced {new Date(acctStatus.quickbooks.last_synced_at).toLocaleString()}{acctStatus.quickbooks.last_sync_result ? ` — ${acctStatus.quickbooks.last_sync_result.synced_invoices||0} invoices, ${acctStatus.quickbooks.last_sync_result.synced_payments||0} payments` : ''}</div>}
+                </div>
+              ) : null}
+
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save QuickBooks Config'}</button>
+                {acctStatus.quickbooks?.status === 'connected' ? (
+                  <>
+                    <button className="btn sec" disabled={syncing.quickbooks} onClick={()=>syncAccounting('quickbooks')}>{syncing.quickbooks ? 'Syncing…' : '🔄 Sync Now'}</button>
+                    <button className="btn sec" onClick={()=>disconnectAccounting('quickbooks')} style={{color:'#ef4444'}}>Disconnect</button>
+                  </>
+                ) : (
+                  <button className="btn sec" onClick={connectQuickBooks}>🔗 Connect to QuickBooks</button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Xero */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">📗 Xero</span></div>
+            <div style={{ padding: '0 20px 20px' }}>
+              <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14, lineHeight: 1.7 }}>
+                Connect Xero to sync invoices and payments automatically — same idea as QuickBooks above, for firms that run their books on Xero instead.
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                {[
+                  ['1', 'Go to developer.xero.com/app/manage and sign in with your Xero account'],
+                  ['2', 'Create a new app → choose "Web app"'],
+                  ['3', `Add Redirect URI: ${window.location.origin}/auth/xero-callback`],
+                  ['4', 'In the app\'s Configuration, grab your Client ID and generate a Client Secret'],
+                  ['5', 'Copy your Client ID and Client Secret below, then save'],
+                ].map(([step, text]) => (
+                  <div key={step} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#13B5EA', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, flexShrink: 0 }}>{step}</div>
+                    <div style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, paddingTop: 2 }}>{text}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="fg2">
+                <div className="field"><label>Xero Client ID</label>
+                  <input value={firm.xero_client_id || ''} onChange={set('xero_client_id')} placeholder="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" />
+                </div>
+                <div className="field"><label>Xero Client Secret</label>
+                  <input type="password" value={firm.xero_client_secret || ''} onChange={set('xero_client_secret')} placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+                </div>
+              </div>
+              <div className="field"><label>Redirect URI (copy this exactly into the Xero app)</label>
+                <input readOnly value={window.location.origin + '/auth/xero-callback'} style={{ color: 'var(--t3)', cursor: 'text' }} onClick={e => { e.target.select(); document.execCommand('copy'); }} />
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 14 }}>Click the Redirect URI field to copy it.</div>
+
+              {acctStatus.xero?.status === 'connected' ? (
+                <div style={{ background: 'rgba(19,181,234,.1)', border: '1px solid rgba(19,181,234,.3)', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#13B5EA', marginBottom: 4 }}>✅ Connected{acctStatus.xero.external_company_name ? ` — ${acctStatus.xero.external_company_name}` : ''}</div>
+                  {acctStatus.xero.last_synced_at && <div style={{ fontSize: 11.5, color: 'var(--t3)' }}>Last synced {new Date(acctStatus.xero.last_synced_at).toLocaleString()}{acctStatus.xero.last_sync_result ? ` — ${acctStatus.xero.last_sync_result.synced_invoices||0} invoices, ${acctStatus.xero.last_sync_result.synced_payments||0} payments` : ''}</div>}
+                </div>
+              ) : null}
+
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <button className="btn pri" onClick={saveFirm} disabled={saving}>{saving ? 'Saving…' : 'Save Xero Config'}</button>
+                {acctStatus.xero?.status === 'connected' ? (
+                  <>
+                    <button className="btn sec" disabled={syncing.xero} onClick={()=>syncAccounting('xero')}>{syncing.xero ? 'Syncing…' : '🔄 Sync Now'}</button>
+                    <button className="btn sec" onClick={()=>disconnectAccounting('xero')} style={{color:'#ef4444'}}>Disconnect</button>
+                  </>
+                ) : (
+                  <button className="btn sec" onClick={connectXero}>🔗 Connect to Xero</button>
+                )}
+              </div>
+            </div>
+          </div>
 
 
           <div className="card">
