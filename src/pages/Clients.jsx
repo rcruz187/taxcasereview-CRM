@@ -898,51 +898,6 @@ export function ClientDocs({ clientName, supabase, showToast, onLogged }) {
   )
 }
 
-// Custom dropdown that respects dark/light CSS vars
-function FilterDrop({ value, onChange, options, width = 130 }) {
-  const [open, setOpen] = React.useState(false)
-  const ref = React.useRef(null)
-  React.useEffect(() => {
-    function handler(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-  const label = (options.find(([v]) => v === value) || options[0])?.[1] || value
-  return (
-    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
-      <div onClick={() => setOpen(o => !o)} style={{
-        fontSize: 12, padding: '4px 24px 4px 8px', borderRadius: 6,
-        border: '1px solid var(--br)', background: 'var(--bg2)', color: 'var(--tx)',
-        cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap',
-        minWidth: width, position: 'relative'
-      }}>
-        {label}
-        <span style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', fontSize: 10, opacity: .6 }}>▼</span>
-      </div>
-      {open && (
-        <div style={{
-          position: 'absolute', top: '110%', left: 0, zIndex: 9999,
-          background: 'var(--bg2)', border: '1px solid var(--br)', borderRadius: 8,
-          boxShadow: '0 4px 16px rgba(0,0,0,.25)', minWidth: width, maxHeight: 260,
-          overflowY: 'auto', padding: '4px 0'
-        }}>
-          {options.map(([v, label]) => (
-            <div key={v} onClick={() => { onChange(v); setOpen(false) }} style={{
-              padding: '7px 12px', fontSize: 12, cursor: 'pointer', color: 'var(--tx)',
-              background: v === value ? 'var(--blue)' : 'transparent',
-              whiteSpace: 'nowrap'
-            }}
-            onMouseEnter={e => { if (v !== value) e.currentTarget.style.background = 'var(--s2)' }}
-            onMouseLeave={e => { if (v !== value) e.currentTarget.style.background = 'transparent' }}>
-              {label}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 export default function Clients() {
   const navigate = useNavigate()
   const { id: urlId } = useParams()
@@ -3386,12 +3341,21 @@ export default function Clients() {
               <span key={f} className={`chip${filter===f?' on':''}`} onClick={()=>setFilter(f)}>{f}</span>
             ))}
             <span className={`chip${showArchived?' on':''}`} onClick={()=>setShowArchived(a=>!a)}>🗄 Archived</span>
-            <FilterDrop value={filterStatus} onChange={setFilterStatus}
-              options={[['All','All Statuses'],['Active','Active'],['Inactive','Inactive'],['Archived','Archived']]} />
-            <FilterDrop value={filterRep} onChange={setFilterRep}
-              options={repOptions.map(r=>[r, r==='All'?'All Reps':r])} width={150} />
-            <FilterDrop value={filterPipeline} onChange={setFilterPipeline}
-              options={pipelineOptions.map(p=>[p, p==='All'?'All Stages':p])} width={160} />
+            <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}
+              style={{fontSize:12,padding:'4px 8px',borderRadius:6,border:'1px solid var(--br)',background:'var(--bg2)',color:'var(--tx)',cursor:'pointer'}}>
+              <option value="All">All Statuses</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+              <option value="Archived">Archived</option>
+            </select>
+            <select value={filterRep} onChange={e=>setFilterRep(e.target.value)}
+              style={{fontSize:12,padding:'4px 8px',borderRadius:6,border:'1px solid var(--br)',background:'var(--bg2)',color:'var(--tx)',cursor:'pointer',maxWidth:150}}>
+              {repOptions.map(r=><option key={r} value={r}>{r==='All'?'All Reps':r}</option>)}
+            </select>
+            <select value={filterPipeline} onChange={e=>setFilterPipeline(e.target.value)}
+              style={{fontSize:12,padding:'4px 8px',borderRadius:6,border:'1px solid var(--br)',background:'var(--bg2)',color:'var(--tx)',cursor:'pointer',maxWidth:160}}>
+              {pipelineOptions.map(p=><option key={p} value={p}>{p==='All'?'All Stages':p}</option>)}
+            </select>
             <button className="btn pri" onClick={()=>{setForm(BLANK);setModal(true)}}>+ Add Client</button>
           </div>
         </div>
