@@ -2084,24 +2084,24 @@ function CommandCenter() {
           {/* Platform KPIs */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:10, marginBottom:24 }}>
             {[
-              { label:'Active Offices',  value:data.kpis.activeTenants,  icon:'🏢',  color:'#10b981' },
-              { label:'Total Offices',   value:data.kpis.totalTenants,   icon:'🏗️',  color:'#6366f1' },
-              { label:'Platform MRR',    value:`$${data.kpis.totalMRR.toLocaleString('en-US',{maximumFractionDigits:0})}`, icon:'📈', color:'#10b981' },
-              { label:'Total Seats',     value:data.kpis.totalSeats,     icon:'👥',  color:'#f59e0b' },
-              { label:'Total Clients',   value:data.kpis.totalClients.toLocaleString(), icon:'📋', color:'#0ea5e9' },
-              { label:'Total Leads',     value:data.kpis.totalLeads.toLocaleString(),   icon:'🎯', color:'#8b5cf6' },
+              { label:'Active Offices',  value:data.kpis.activeTenants,  icon:'🏢',  color:'#10b981', to:'/crm-admin/offices' },
+              { label:'Total Offices',   value:data.kpis.totalTenants,   icon:'🏗️',  color:'#6366f1', to:'/crm-admin/offices' },
+              { label:'Platform MRR',    value:`$${data.kpis.totalMRR.toLocaleString('en-US',{maximumFractionDigits:0})}`, icon:'📈', color:'#10b981', to:'/crm-admin/billing' },
+              { label:'Total Seats',     value:data.kpis.totalSeats,     icon:'👥',  color:'#f59e0b', to:'/crm-admin/offices' },
+              { label:'Total Clients',   value:data.kpis.totalClients.toLocaleString(), icon:'📋', color:'#0ea5e9', to:'/crm-admin/crm' },
+              { label:'Total Leads',     value:data.kpis.totalLeads.toLocaleString(),   icon:'🎯', color:'#8b5cf6', to:'/crm-admin/crm' },
             ].map(k => <KPICard key={k.label} {...k} />)}
           </div>
 
           {/* Platform KPIs Row 2 */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:10, marginBottom:28 }}>
             {[
-              { label:'Storage Used',    value:fmtBytes(data.kpis.totalStorage), icon:'💾', color:'#8b5cf6' },
-              { label:'Pending E-Signs', value:data.kpis.pendingEsigns,  icon:'✍️', color:'#f59e0b' },
-              { label:'Demos Today',     value:data.kpis.todayDemos,     icon:'📅', color:'#ec4899' },
-              { label:'Visitors Today',  value:ga4Data?.users ?? 0,      icon:'🌐', color:'#0ea5e9', sub: ga4Data ? null : 'connect GA4' },
-              { label:'Clicks (GSC)',    value:gscConnected && gscData ? gscData.clicks : 0, icon:'🔍', color:'#6366f1', sub: gscConnected ? null : 'connect GSC' },
-              { label:'Impressions',     value:gscConnected && gscData ? gscData.impressions : 0, icon:'👁', color:'#0ea5e9', sub: gscConnected ? null : 'connect GSC' },
+              { label:'Storage Used',    value:fmtBytes(data.kpis.totalStorage), icon:'💾', color:'#8b5cf6', to:'/crm-admin/system' },
+              { label:'Pending E-Signs', value:data.kpis.pendingEsigns,  icon:'✍️', color:'#f59e0b', to:'/crm-admin/crm' },
+              { label:'Demos Today',     value:data.kpis.todayDemos,     icon:'📅', color:'#ec4899', to:'/crm-admin/demo' },
+              { label:'Visitors Today',  value:ga4Data?.users ?? 0,      icon:'🌐', color:'#0ea5e9', sub: ga4Data ? null : 'connect GA4', to:'/crm-admin/marketing' },
+              { label:'Clicks (GSC)',    value:gscConnected && gscData ? gscData.clicks : 0, icon:'🔍', color:'#6366f1', sub: gscConnected ? null : 'connect GSC', to:'/crm-admin/search' },
+              { label:'Impressions',     value:gscConnected && gscData ? gscData.impressions : 0, icon:'👁', color:'#0ea5e9', sub: gscConnected ? null : 'connect GSC', to:'/crm-admin/search' },
             ].map(k => <KPICard key={k.label} {...k} />)}
           </div>
 
