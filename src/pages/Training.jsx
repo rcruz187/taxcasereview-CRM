@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useScreenShare } from '../context/ScreenShareContext'
 import { useApp }         from '../context/AppContext'
 
-const BASE = '/taxcasereview-CRM'
+const BASE = '/'
 
 function ScreenPreview({ stream }) {
   const ref = useRef(null)
