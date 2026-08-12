@@ -10,6 +10,7 @@ import AIAssistant from './components/AIAssistant'
 import TopBar   from './components/layout/TopBar'
 import { Modal, Toast } from './components/ui'
 import ActiveCallBar from './components/calling/ActiveCallBar'
+import ImpersonationBanner from './components/ImpersonationBanner'
 
 // Public, unauthenticated entry points stay eager — loaded immediately on
 // first paint with no extra network round-trip, since these are the very
@@ -32,7 +33,6 @@ const QuickBooksCallback  = lazy(() => import('./pages/QuickBooksCallback'))
 const NewOffice = lazy(() => import('./pages/NewOffice'))
 const AdminConsole = lazy(() => import('./pages/AdminConsole'))
 const ImpersonateGate = lazy(() => import('./pages/ImpersonateGate'))
-import ImpersonationBanner from './components/ImpersonationBanner'
 const AdminPortal = lazy(() => import('./pages/AdminPortal'))
 const Training = lazy(() => import('./pages/Training'))
 const Manual   = lazy(() => import('./pages/Manual'))
