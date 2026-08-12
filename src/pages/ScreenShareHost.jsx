@@ -245,7 +245,7 @@ export default function ScreenShareHost() {
             <div style={{ flex: 1, minHeight: 0, borderRadius: 12, overflow: 'hidden',
                           background: '#000', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column' }}>
               {surfaceType !== 'monitor' ? (
-                <div style={{ flex: 1, minHeight: 0, background: '#000' }}><StreamVideo stream={screenStream} muted contain={false} /></div>
+                <div style={{ flex: 1, minHeight: 0, background: '#000' }}><StreamVideo stream={screenStream} muted contain={true} /></div>
               ) : (
                 <div style={{ width: '100%', height: '100%', minHeight: 300, display: 'flex',
                               alignItems: 'center', justifyContent: 'center', flexDirection: 'column',
@@ -293,7 +293,7 @@ export default function ScreenShareHost() {
               <div style={{ display: 'grid', gridTemplateColumns: gridCols, gridAutoRows: '1fr', gap: 10, flex: 1 }}>
                 {allParticipants.map(({ key, name, stream, muted, mirror }) => (
                   <div key={key} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden',
-                                          background: '#1e293b', minHeight: 0 }}>
+                                          background: '#1e293b', minHeight: 240 }}>
                     {stream ? <StreamVideo stream={stream} muted={muted} mirror={mirror} contain={false} />
                       : <div style={{ position:'absolute',inset:0,display:'flex',alignItems:'center',
                                       justifyContent:'center',flexDirection:'column',gap:8 }}>
