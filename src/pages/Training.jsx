@@ -2,7 +2,7 @@
 // All session state lives in ScreenShareContext (mounted in Shell/App.jsx)
 // so navigating away and back does NOT kill the session.
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useScreenShare } from '../context/ScreenShareContext'
 import { useApp }         from '../context/AppContext'
 import { supabase }       from '../lib/supabase'
@@ -40,6 +40,10 @@ export default function Training() {
 
   const [starting, setStarting] = useState(false)
   const [copied,   setCopied]   = useState(false)
+  const [activeTab, setActiveTab] = useState('session') // 'session' | 'recordings'
+  const [recordings, setRecordings] = useState([])
+  const [recLoading, setRecLoading] = useState(false)
+  const [playingUrl, setPlayingUrl] = useState(null)
 
   // Capture FIRM into React state on mount — FIRM is a mutable module object that
   // may not be set yet as a plain const. Reading it in useEffect guarantees we get
@@ -83,6 +87,54 @@ export default function Training() {
       track?.label?.slice(0, 40) || 'Screen'
     )
   }, [ss.sharingScreen, ss.screenStream])
+
+  async function loadRecordings() {
+    setRecLoading(true)
+    try {
+      const { data, error } = await supabase.storage
+        .from('training-recordings')
+        .list('', { limit: 100, sortBy: { column: 'created_at', order: 'desc' } })
+      if (!error && data) setRecordings(data.filter(f => f.name.endsWith('.webm')))
+    } catch {}
+    setRecLoading(false)
+  }
+
+  useEffect(() => { if (activeTab === 'recordings') loadRecordings() }, [activeTab])
+
+  async function getPlayUrl(name) {
+    const { data } = await supabase.storage.from('training-recordings').createSignedUrl(name, 3600)
+    if (data?.signedUrl) setPlayingUrl({ url: data.signedUrl, name })
+  }
+
+  async function downloadRec(name) {
+    const { data } = await supabase.storage.from('training-recordings').createSignedUrl(name, 60)
+    if (data?.signedUrl) {
+      const a = Object.assign(document.createElement('a'), { href: data.signedUrl, download: name })
+      a.click()
+    }
+  }
+
+  async function deleteRec(name) {
+    if (!window.confirm(`Delete ${name}?`)) return
+    await supabase.storage.from('training-recordings').remove([name])
+    setRecordings(r => r.filter(f => f.name !== name))
+    if (playingUrl?.name === name) setPlayingUrl(null)
+  }
+
+  function fmtBytes(b) {
+    if (!b) return '—'
+    if (b < 1024 * 1024) return `${(b/1024).toFixed(0)} KB`
+    return `${(b/1024/1024).toFixed(1)} MB`
+  }
+
+  function fmtRecName(name) {
+    // training-ROOMID-2026-08-12T10-30-00.webm → Room ROOMID · Aug 12 2026 10:30
+    const m = name.match(/training-([A-Z0-9]+)-(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})/)
+    if (!m) return name
+    const [,room,yr,mo,dy,hr,mn] = m
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    return `Room ${room} · ${months[+mo-1]} ${+dy} ${yr} ${hr}:${mn}`
+  }
 
   async function startSession() {
     setStarting(true)
@@ -185,6 +237,93 @@ ${safeLogo ? `<img src="${safeLogo}" alt="${dispName}" style="max-height:56px;ma
   const joinUrl      = buildJoinUrl()
   const participants = ss.webrtc.members.filter(n => !n.endsWith('(view)') && n !== myName).length
 
+  // ── Recordings tab (shown regardless of session state) ───────────────────
+  const tabBar = (
+    <div style={{ display:'flex', gap:4, marginBottom:24 }}>
+      {[['session','🖥️ Session'],['recordings','🎬 Recordings']].map(([id,label]) => (
+        <button key={id} onClick={() => setActiveTab(id)}
+          style={{ padding:'8px 18px', borderRadius:8, fontWeight:700, fontSize:13, cursor:'pointer', border:'none',
+                   background: activeTab===id ? '#2563eb' : 'var(--s1)',
+                   color: activeTab===id ? '#fff' : 'var(--t2)' }}>
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+
+  if (activeTab === 'recordings') {
+    return (
+      <div style={{ padding:'28px 32px', maxWidth:780 }}>
+        <div style={{ fontSize:22, fontWeight:800, color:'var(--tx)', marginBottom:20 }}>🎬 Training Recordings</div>
+        {tabBar}
+        {playingUrl && (
+          <div style={{ marginBottom:20, background:'#000', borderRadius:12, overflow:'hidden',
+                        border:'1px solid var(--br)', position:'relative' }}>
+            <video src={playingUrl.url} controls autoPlay
+              style={{ width:'100%', maxHeight:420, display:'block', background:'#000' }} />
+            <div style={{ padding:'10px 14px', background:'var(--s1)', display:'flex',
+                          alignItems:'center', justifyContent:'space-between' }}>
+              <span style={{ fontSize:13, color:'var(--t2)' }}>{fmtRecName(playingUrl.name)}</span>
+              <button onClick={() => setPlayingUrl(null)}
+                style={{ background:'none', border:'none', color:'var(--t3)', cursor:'pointer', fontSize:13 }}>
+                ✕ Close
+              </button>
+            </div>
+          </div>
+        )}
+        <div style={{ background:'var(--s1)', border:'1px solid var(--br)', borderRadius:12, overflow:'hidden' }}>
+          <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--br)',
+                        display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <span style={{ fontSize:12, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em' }}>
+              Saved Recordings
+            </span>
+            <button onClick={loadRecordings} disabled={recLoading}
+              style={{ background:'none', border:'none', color:'var(--t3)', cursor:'pointer', fontSize:12 }}>
+              {recLoading ? 'Loading…' : '↻ Refresh'}
+            </button>
+          </div>
+          {recLoading
+            ? <div style={{ padding:32, textAlign:'center', color:'var(--t3)', fontSize:13 }}>Loading recordings…</div>
+            : recordings.length === 0
+            ? <div style={{ padding:32, textAlign:'center', color:'var(--t3)', fontSize:13 }}>
+                No recordings yet. Start a session and hit ⏺ Record in the pop-out window.
+              </div>
+            : recordings.map(rec => (
+              <div key={rec.name} style={{ display:'flex', alignItems:'center', gap:12,
+                                           padding:'12px 16px', borderBottom:'1px solid var(--br)' }}>
+                <div style={{ fontSize:20 }}>🎬</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:14, fontWeight:600, color:'var(--tx)', marginBottom:2,
+                                overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                    {fmtRecName(rec.name)}
+                  </div>
+                  <div style={{ fontSize:12, color:'var(--t3)' }}>{fmtBytes(rec.metadata?.size)}</div>
+                </div>
+                <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+                  <button onClick={() => getPlayUrl(rec.name)}
+                    style={{ background:'#2563eb', border:'none', borderRadius:6, padding:'6px 14px',
+                             color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer' }}>
+                    ▶ Play
+                  </button>
+                  <button onClick={() => downloadRec(rec.name)}
+                    style={{ background:'var(--s2)', border:'1px solid var(--br)', borderRadius:6,
+                             padding:'6px 14px', color:'var(--tx)', fontWeight:700, fontSize:12, cursor:'pointer' }}>
+                    ↓ Download
+                  </button>
+                  <button onClick={() => deleteRec(rec.name)}
+                    style={{ background:'none', border:'1px solid var(--br)', borderRadius:6,
+                             padding:'6px 10px', color:'var(--t3)', fontWeight:700, fontSize:12, cursor:'pointer' }}>
+                    🗑
+                  </button>
+                </div>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    )
+  }
+
   // ── Not started ──────────────────────────────────────────────────────────
   if (!ss.active) {
     return (
@@ -195,6 +334,7 @@ ${safeLogo ? `<img src="${safeLogo}" alt="${dispName}" style="max-height:56px;ma
             Start a live screen-share session with client firms. Participants join via a link — no install required.
           </div>
         </div>
+        {tabBar}
         <div style={{ background: 'var(--s1)', border: '1px solid var(--br)', borderRadius: 12, padding: 32,
                       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, textAlign: 'center' }}>
           <div style={{ fontSize: 48, lineHeight: 1 }}>📺</div>
@@ -220,6 +360,7 @@ ${safeLogo ? `<img src="${safeLogo}" alt="${dispName}" style="max-height:56px;ma
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--tx)', marginBottom: 4 }}>🖥️ Training Sessions</div>
       </div>
+      {tabBar}
 
       {/* Session header bar */}
       <div style={{ background: '#1e3a8a', borderRadius: 12, padding: '14px 20px',
