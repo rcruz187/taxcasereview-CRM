@@ -81,6 +81,7 @@ export default function Chat() {
   const [input, setInput]         = useState('')
   const [sending, setSending]     = useState(false)
   const [loading, setLoading]     = useState(false)
+  const [onlineUsers, setOnlineUsers] = useState(new Set()) // names of currently online employees
   const [huddleId, setHuddleId]         = useState(null)  // unique room ID
   const [showHuddleInvite, setShowHuddleInvite] = useState(false)
   const [incomingHuddle, setIncomingHuddle] = useState(null) // { from, huddleId }
@@ -206,6 +207,29 @@ export default function Chat() {
     el.style.padding = '0'; el.style.overflow = 'hidden'; el.style.height = '100%'; el.style.position = 'relative'
     return () => { el.style.padding = op; el.style.overflow = oo; el.style.height = oh; el.style.position = opos }
   }, [])
+
+  // ── Presence: track who is online ──
+  useEffect(() => {
+    if (!myName || myName === 'You') return
+    const presenceCh = supabase.channel('chat-presence', { config: { presence: { key: myName } } })
+    presenceCh
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceCh.presenceState()
+        setOnlineUsers(new Set(Object.keys(state)))
+      })
+      .on('presence', { event: 'join' }, ({ key }) => {
+        setOnlineUsers(prev => new Set([...prev, key]))
+      })
+      .on('presence', { event: 'leave' }, ({ key }) => {
+        setOnlineUsers(prev => { const n = new Set(prev); n.delete(key); return n })
+      })
+      .subscribe(async status => {
+        if (status === 'SUBSCRIBED') {
+          await presenceCh.track({ name: myName, online_at: new Date().toISOString() })
+        }
+      })
+    return () => { supabase.removeChannel(presenceCh) }
+  }, [myName])
 
   // A deep-linked DM starts as a placeholder (we only have the channel id
   // before the roster loads); swap in the real entry once TEAM arrives so the
@@ -811,7 +835,7 @@ export default function Chat() {
                 onMouseLeave={e => { if (!isAct) e.currentTarget.style.background = 'transparent' }}>
                 <div style={{ position: 'relative', flexShrink: 0 }}>
                   <Avatar name={dm.name} size={26} color={dm.color} avatarUrl={dm.avatarUrl}/>
-                  <span style={{ position: 'absolute', bottom: -1, right: -1, width: 8, height: 8, borderRadius: '50%', background: '#22c55e', border: '2px solid #0d1526' }}/>
+                  <span style={{ position: 'absolute', bottom: -1, right: -1, width: 8, height: 8, borderRadius: '50%', background: onlineUsers.has(dm.name) ? '#22c55e' : '#475569', border: '2px solid #0d1526' }}/>
                 </div>
                 <span style={{ fontSize: 14, flex: 1 }}>{dm.name}</span>
                 {isVip && <span style={{ fontSize: 11, color: '#f59e0b' }} title="VIP">★</span>}
