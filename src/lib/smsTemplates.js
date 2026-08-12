@@ -1,6 +1,8 @@
 // ── Shared SMS templates ──
 // Standalone module (not on a page) to avoid circular imports. {name} is
 // replaced with the recipient's first name when applied.
+import { FIRM } from './firmBranding'
+
 export const SMS_TEMPLATES = [
   { label: 'Intro / follow-up', body: "Hi {name}, this is {firm} following up on your tax matter. Do you have a few minutes to connect?" },
   { label: 'Docs needed', body: "Hi {name}, we still need a few documents to move your case forward. Please reply or call us at your earliest convenience." },
@@ -10,8 +12,6 @@ export const SMS_TEMPLATES = [
   { label: 'Case update', body: "Hi {name}, we have an update on your case. Please give us a call when you get a chance." },
   { label: 'Left a voicemail', body: "Hi {name}, we just left you a voicemail regarding your tax case. Call us back when you can — we're here to help." },
 ]
-
-import { FIRM } from './firmBranding'
 
 export function applySmsTemplate(tpl, fullName) {
   const first = (fullName || '').trim().split(' ')[0] || 'there'
