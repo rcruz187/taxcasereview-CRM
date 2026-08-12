@@ -111,9 +111,10 @@ export default function ScreenShareOverlay() {
   const total   = peers.length + 1
 
   function openPopout() {
-    const w = 960, h = 680
-    const left = Math.max(0, window.screen.width  - w - 20)
-    const top  = Math.max(0, window.screen.height - h - 60)
+    const w = Math.min(1400, window.screen.availWidth  - 40)
+    const h = Math.min(900,  window.screen.availHeight - 60)
+    const left = Math.round((window.screen.availWidth  - w) / 2)
+    const top  = Math.round((window.screen.availHeight - h) / 2)
     const hostUrl = `${window.location.origin}${BASE}/screenshare-host?room=${ss.roomId}&name=${encodeURIComponent(myName)}`
     const win = window.open(
       hostUrl,

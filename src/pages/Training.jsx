@@ -175,9 +175,10 @@ ${safeLogo ? `<img src="${safeLogo}" alt="${dispName}" style="max-height:56px;ma
 
   function openPopout() {
     const url  = buildHostUrl()
-    const w = 960, h = 680
-    const left = Math.max(0, window.screen.width - w - 20)
-    const top  = Math.max(0, window.screen.height - h - 60)
+    const w = Math.min(1400, window.screen.availWidth  - 40)
+    const h = Math.min(900,  window.screen.availHeight - 60)
+    const left = Math.round((window.screen.availWidth  - w) / 2)
+    const top  = Math.round((window.screen.availHeight - h) / 2)
     window.open(url, `tcr-training-${ss.roomId}`, `width=${w},height=${h},left=${left},top=${top},resizable=yes`)
   }
 
