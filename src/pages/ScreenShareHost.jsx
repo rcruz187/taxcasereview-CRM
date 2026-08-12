@@ -200,8 +200,10 @@ export default function ScreenShareHost() {
   )
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: '#0f172a', display: 'flex',
-                  flexDirection: 'column', fontFamily: 'Arial, sans-serif', overflow: 'hidden' }}>
+    <>
+      <style>{`html,body,#root{height:100%;margin:0;padding:0;overflow:hidden}`}</style>
+      <div style={{ height: '100vh', background: '#0f172a', display: 'flex',
+                    flexDirection: 'column', fontFamily: 'Arial, sans-serif', overflow: 'hidden' }}>
 
       {/* Header */}
       <div style={{ background: '#1e293b', borderBottom: '1px solid #334155',
@@ -403,5 +405,6 @@ export default function ScreenShareHost() {
         )}
       </div>
     </div>
+    </>
   )
 }

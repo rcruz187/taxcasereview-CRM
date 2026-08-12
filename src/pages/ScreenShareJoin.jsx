@@ -151,7 +151,7 @@ export default function ScreenShareJoin() {
 
   // ── In-session ────────────────────────────────────────────────────────────
   return (
-    <div style={{ position: 'fixed', inset: 0, background: '#0f172a', display: 'flex',
+    <div style={{ height: '100vh', background: '#0f172a', display: 'flex',
                   flexDirection: 'column', fontFamily: 'Arial, sans-serif', overflow: 'hidden' }}>
 
       {/* Header */}
