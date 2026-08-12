@@ -268,16 +268,16 @@ export default function ScreenShareHost() {
 
             if (isStrip) {
               return (
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', flexShrink: 0 }}>
+                <div style={{ display: 'flex', gap: 8, flexShrink: 0, height: 120 }}>
                   {allParticipants.map(({ key, name, stream, muted, mirror }) => (
-                    <div key={key} style={{ width: 220, aspectRatio: '4/3', borderRadius: 10,
+                    <div key={key} style={{ width: 160, height: 120, borderRadius: 8,
                                             overflow: 'hidden', background: '#1e293b', position: 'relative', flexShrink: 0 }}>
                       {stream ? <StreamVideo stream={stream} muted={muted} mirror={mirror} contain={false} />
                         : <div style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center' }}>
-                            <span style={{ fontSize: 28, opacity: .3 }}>📷</span>
+                            <span style={{ fontSize: 24, opacity: .3 }}>📷</span>
                           </div>}
-                      <div style={{ position:'absolute',bottom:5,left:8,fontSize:11,color:'#e2e8f0',
-                                    background:'rgba(0,0,0,.6)',borderRadius:4,padding:'2px 6px',fontWeight:600 }}>{name}</div>
+                      <div style={{ position:'absolute',bottom:4,left:6,fontSize:10,color:'#e2e8f0',
+                                    background:'rgba(0,0,0,.6)',borderRadius:3,padding:'1px 5px',fontWeight:600 }}>{name}</div>
                     </div>
                   ))}
                 </div>
