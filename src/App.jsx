@@ -281,7 +281,7 @@ function AuthRouter() {
   const publicPaths = ['/book', '/sign', '/portal', '/clockin', '/kiosk',
     '/employee', '/meet', '/screenshare', '/financial-intake', '/organizer']
   const isPublicPath = publicPaths.some(p =>
-    window.location.pathname.replace('/', '').startsWith(p)
+    window.location.pathname.startsWith(p)
   )
 
   if (checking && !isPublicPath) return (
