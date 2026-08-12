@@ -207,7 +207,7 @@ export default function ScreenShareHost() {
 
       {/* Header */}
       <div style={{ background: '#1e293b', borderBottom: '1px solid #334155',
-                    padding: '11px 20px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+                    padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
         {(urlLogo || (ready && FIRM.logoUrl)) && (
           <img src={urlLogo || FIRM.logoUrl} alt="" style={{ height: 30, objectFit: 'contain' }}
             onError={e => { e.target.style.display = 'none' }} />
@@ -234,7 +234,7 @@ export default function ScreenShareHost() {
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
         {/* Main video column */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 16, gap: 12, overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '8px 12px', gap: 8, overflow: 'hidden' }}>
 
           {/* Screen share tile */}
           {sharing && screenStream && (
@@ -306,21 +306,21 @@ export default function ScreenShareHost() {
           })()}
 
           {/* Controls */}
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0, padding: '0 0 4px' }}>
             <button onClick={toggleMic}
-              style={{ flex: 1, padding: '10px 0', background: micOn ? '#1e293b' : '#dc2626',
+              style={{ flex: 1, padding: '8px 0', background: micOn ? '#1e293b' : '#dc2626',
                        border: '1px solid #334155', borderRadius: 8, color: '#fff',
                        cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
               {micOn ? '🎙️ Mute' : '🔇 Unmute'}
             </button>
             <button onClick={toggleCam}
-              style={{ flex: 1, padding: '10px 0', background: camOn ? '#1e293b' : '#dc2626',
+              style={{ flex: 1, padding: '8px 0', background: camOn ? '#1e293b' : '#dc2626',
                        border: '1px solid #334155', borderRadius: 8, color: '#fff',
                        cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
               {camOn ? '📷 Stop cam' : '📷 Start cam'}
             </button>
             <button onClick={() => setShowBgPanel(v => !v)}
-              style={{ flex: 1, padding: '10px 0',
+              style={{ flex: 1, padding: '8px 0',
                        background: showBgPanel ? 'rgba(99,102,241,.3)' : '#1e293b',
                        border: `1px solid ${showBgPanel ? '#6366f1' : '#334155'}`,
                        borderRadius: 8, color: showBgPanel ? '#a5b4fc' : '#fff',
@@ -328,7 +328,7 @@ export default function ScreenShareHost() {
               🎨 Background{vbg.bgMode !== 'none' ? ' ●' : ''}
             </button>
             <button onClick={() => setShowChat(v => !v)}
-              style={{ flex: 1, padding: '10px 0', position: 'relative',
+              style={{ flex: 1, padding: '8px 0', position: 'relative',
                        background: showChat ? 'rgba(34,197,94,.2)' : '#1e293b',
                        border: `1px solid ${showChat ? '#22c55e' : '#334155'}`,
                        borderRadius: 8, color: showChat ? '#86efac' : '#fff',
