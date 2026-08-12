@@ -180,19 +180,21 @@ export default function ScreenShareJoin() {
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
         {/* Video column */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 16, gap: 12, overflow: 'auto' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 16, gap: 12, overflow: 'hidden' }}>
 
           {hostStream ? (
-            <div style={{ flex: 1, minHeight: 260, borderRadius: 12, overflow: 'hidden', background: '#0d1526' }}>
-              <StreamVideo stream={hostStream} contain />
+            <div style={{ flex: 1, minHeight: 0, borderRadius: 12, overflow: 'hidden', background: '#0d1526', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ flex: 1, minHeight: 0 }}>
+                <StreamVideo stream={hostStream} contain />
+              </div>
               <div style={{ padding: '6px 12px', background: '#1e293b', fontSize: 12, color: '#94a3b8',
-                            display: 'flex', gap: 6, alignItems: 'center' }}>
+                            display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
                 <span style={{ color: '#22c55e', fontSize: 10 }}>●</span>
                 {screenState.host}'s screen
               </div>
             </div>
           ) : (
-            <div style={{ flex: 1, minHeight: 200, display: 'flex', alignItems: 'center',
+            <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center',
                           justifyContent: 'center', color: '#475569', fontSize: 15,
                           background: '#1e293b', borderRadius: 12 }}>
               {peers.length === 0 ? 'Waiting for the host to join…' : 'Waiting for host to share their screen…'}

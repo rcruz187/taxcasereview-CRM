@@ -232,14 +232,14 @@ export default function ScreenShareHost() {
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
         {/* Main video column */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 16, gap: 12, overflow: 'auto' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 16, gap: 12, overflow: 'hidden' }}>
 
           {/* Screen share tile */}
           {sharing && screenStream && (
-            <div style={{ flex: 1, minHeight: 300, borderRadius: 12, overflow: 'hidden',
-                          background: '#0d1526', border: '1px solid #1e293b' }}>
+            <div style={{ flex: 1, minHeight: 0, borderRadius: 12, overflow: 'hidden',
+                          background: '#0d1526', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column' }}>
               {surfaceType !== 'monitor' ? (
-                <StreamVideo stream={screenStream} muted contain />
+                <div style={{ flex: 1, minHeight: 0 }}><StreamVideo stream={screenStream} muted contain /></div>
               ) : (
                 <div style={{ width: '100%', height: '100%', minHeight: 300, display: 'flex',
                               alignItems: 'center', justifyContent: 'center', flexDirection: 'column',
