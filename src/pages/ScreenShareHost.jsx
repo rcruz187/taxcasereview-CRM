@@ -238,7 +238,7 @@ export default function ScreenShareHost() {
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
         {/* Main video column */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '8px 12px', gap: 8, overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 16, gap: 12, overflow: 'hidden' }}>
 
           {/* Screen share tile */}
           {sharing && screenStream && (
@@ -293,7 +293,7 @@ export default function ScreenShareHost() {
               <div style={{ display: 'grid', gridTemplateColumns: gridCols, gridAutoRows: '1fr', gap: 10, flex: 1 }}>
                 {allParticipants.map(({ key, name, stream, muted, mirror }) => (
                   <div key={key} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden',
-                                          background: '#1e293b', minHeight: 120 }}>
+                                          background: '#1e293b', minHeight: 0 }}>
                     {stream ? <StreamVideo stream={stream} muted={muted} mirror={mirror} contain={false} />
                       : <div style={{ position:'absolute',inset:0,display:'flex',alignItems:'center',
                                       justifyContent:'center',flexDirection:'column',gap:8 }}>
