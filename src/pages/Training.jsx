@@ -8,7 +8,7 @@ import { useApp }         from '../context/AppContext'
 import { supabase }       from '../lib/supabase'
 import { FIRM, firmFooterLine } from '../lib/firmBranding'
 
-const BASE = '/taxcasereview-CRM'
+const BASE = '/'
 
 function ScreenPreview({ stream }) {
   const ref = useRef(null)
@@ -27,6 +27,30 @@ export default function Training() {
 
   const [starting, setStarting] = useState(false)
   const [copied,   setCopied]   = useState(false)
+
+  // Capture FIRM into React state on mount — FIRM is a mutable module object that
+  // may not be set yet as a plain const. Reading it in useEffect guarantees we get
+  // the branding that AdminTraining loaded before rendering this component.
+  const [firmName,     setFirmName]     = useState(() => FIRM.name || '')
+  const [firmLogo,     setFirmLogo]     = useState(() => FIRM.logoUrl || '')
+  const [firmTenantId, setFirmTenantId] = useState(() => FIRM.tenantId || '')
+  const [firmEmail,    setFirmEmail]    = useState(() => FIRM.email || '')
+  useEffect(() => {
+    // AdminTraining awaits set_admin_tenant_override + loadFirmBranding before
+    // rendering us, but FIRM may still be mid-load. Poll briefly to capture it.
+    const apply = () => {
+      if (FIRM.name) {
+        setFirmName(FIRM.name)
+        setFirmLogo(FIRM.logoUrl || '')
+        setFirmTenantId(FIRM.tenantId || '')
+        setFirmEmail(FIRM.email || '')
+      }
+    }
+    apply()
+    const t = setTimeout(apply, 300)
+    const t2 = setTimeout(apply, 800)
+    return () => { clearTimeout(t); clearTimeout(t2) }
+  }, [])
 
   // Email the invite link straight from this page
   const [emailOpen,   setEmailOpen]   = useState(false)
@@ -57,9 +81,9 @@ export default function Training() {
   }
 
   function copyLink() {
-    const firmParam = FIRM.name ? `&firm=${encodeURIComponent(FIRM.name)}` : ''
-    const logoParam = FIRM.logoUrl ? `&logo=${encodeURIComponent(FIRM.logoUrl)}` : ''
-    const tParam = FIRM.tenantId ? `&t=${encodeURIComponent(FIRM.tenantId)}` : ''
+    const firmParam = (FIRM.name || firmName) ? `&firm=${encodeURIComponent(FIRM.name || firmName)}` : ''
+    const _logo = FIRM.logoUrl?.startsWith('https://') ? FIRM.logoUrl : FIRM.logoUrl ? `${window.location.origin}${FIRM.logoUrl}` : safeLogo; const logoParam = _logo ? `&logo=${encodeURIComponent(_logo)}` : ''
+    const tParam = (FIRM.tenantId || firmTenantId) ? `&t=${encodeURIComponent(FIRM.tenantId || firmTenantId)}` : ''
     const url = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${firmParam}${logoParam}${tParam}`
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true); setTimeout(() => setCopied(false), 2000)
@@ -68,29 +92,39 @@ export default function Training() {
 
   // Email the join link to one or more people, using the same send-email
   // edge function every other transactional email in the CRM goes through.
+  // Only pass logo to join URL if it's an absolute https URL (Supabase storage).
+  // Relative paths like /nashville-logo.png are now deleted
+  // except for the TaxRes CRM logo which lives in gh-pages assets — build absolute URL.
+  const safeLogo = firmLogo?.startsWith('https://')
+    ? firmLogo
+    : firmLogo
+      ? `${window.location.origin}${firmLogo}`
+      : `${window.location.origin}/assets/taxrescrm-logo.png`
+
   async function sendInviteEmail() {
     const raw = emailTo.split(',').map(v => v.trim()).filter(Boolean)
     if (!raw.length) return
     const bad = raw.filter(v => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))
     if (bad.length) { showToast?.(`Not a valid email: ${bad[0]}`, 'error'); return }
 
-    const firmParam2 = FIRM.name ? `&firm=${encodeURIComponent(FIRM.name)}` : ''
-    const logoParam2 = FIRM.logoUrl ? `&logo=${encodeURIComponent(FIRM.logoUrl)}` : ''
-    const tParam2 = FIRM.tenantId ? `&t=${encodeURIComponent(FIRM.tenantId)}` : ''
+    const firmParam2 = (FIRM.name || firmName) ? `&firm=${encodeURIComponent(FIRM.name || firmName)}` : ''
+    const _logo2 = FIRM.logoUrl?.startsWith('https://') ? FIRM.logoUrl : FIRM.logoUrl ? `${window.location.origin}${FIRM.logoUrl}` : safeLogo; const logoParam2 = _logo2 ? `&logo=${encodeURIComponent(_logo2)}` : ''
+    const tParam2 = (FIRM.tenantId || firmTenantId) ? `&t=${encodeURIComponent(FIRM.tenantId || firmTenantId)}` : ''
     const url  = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${firmParam2}${logoParam2}${tParam2}`
-    const firm = FIRM.name || 'Tax Case Review'
+    const firm = firmName || 'TaxRes CRM'
     setEmailSending(true)
     try {
       for (const to of raw) {
         const { error } = await supabase.functions.invoke('send-email', {
           body: {
-            tenant_id: FIRM.tenantId || undefined,
+            tenant_id: firmTenantId || undefined,
+            from_name: firm,
+            from_email: firmEmail || undefined,
             to,
-            // Use the tenant's own email settings so the invite comes from the right firm
             subject: `Join the training session — ${firm}`,
             html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px">
 <div style="text-align:center;margin-bottom:20px">
-<img src="${FIRM.logoUrl}" alt="${firm}" style="max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px" onerror="this.style.display='none'"/>
+${safeLogo ? `<img src="${safeLogo}" alt="${firm}" style="max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px" onerror="this.style.display='none'"/>` : ''}
 <div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${firm}</div>
 </div>
 <p>You've been invited to a live training session with <strong>${myName}</strong>.</p>
@@ -117,9 +151,9 @@ export default function Training() {
   }
 
   function openPopout() {
-    const hostFirmParam = FIRM.name ? `&firm=${encodeURIComponent(FIRM.name)}` : ''
-    const hostLogoParam = FIRM.logoUrl ? `&logo=${encodeURIComponent(FIRM.logoUrl)}` : ''
-    const hostTParam    = FIRM.tenantId ? `&t=${encodeURIComponent(FIRM.tenantId)}` : ''
+    const hostFirmParam = (FIRM.name || firmName) ? `&firm=${encodeURIComponent(FIRM.name || firmName)}` : ''
+    const _hostLogo = FIRM.logoUrl?.startsWith('https://') ? FIRM.logoUrl : FIRM.logoUrl ? `${window.location.origin}${FIRM.logoUrl}` : safeLogo; const hostLogoParam = _hostLogo ? `&logo=${encodeURIComponent(_hostLogo)}` : ''
+    const hostTParam = (FIRM.tenantId || firmTenantId) ? `&t=${encodeURIComponent(FIRM.tenantId || firmTenantId)}` : ''
     const url  = `${window.location.origin}${BASE}/screenshare-host?room=${ss.roomId}&name=${encodeURIComponent(myName)}${hostFirmParam}${hostLogoParam}${hostTParam}`
     const w = 960, h = 680
     const left = Math.max(0, window.screen.width - w - 20)
@@ -127,9 +161,9 @@ export default function Training() {
     window.open(url, `tcr-training-${ss.roomId}`, `width=${w},height=${h},left=${left},top=${top},resizable=yes`)
   }
 
-  const joinFirmParam = FIRM.name ? `&firm=${encodeURIComponent(FIRM.name)}` : ''
-  const joinLogoParam = FIRM.logoUrl ? `&logo=${encodeURIComponent(FIRM.logoUrl)}` : ''
-  const joinTParam    = FIRM.tenantId ? `&t=${encodeURIComponent(FIRM.tenantId)}` : ''
+  const joinFirmParam = (FIRM.name || firmName) ? `&firm=${encodeURIComponent(FIRM.name || firmName)}` : ''
+  const _joinLogo = FIRM.logoUrl?.startsWith('https://') ? FIRM.logoUrl : FIRM.logoUrl ? `${window.location.origin}${FIRM.logoUrl}` : safeLogo; const joinLogoParam = _joinLogo ? `&logo=${encodeURIComponent(_joinLogo)}` : ''
+  const joinTParam = (FIRM.tenantId || firmTenantId) ? `&t=${encodeURIComponent(FIRM.tenantId || firmTenantId)}` : ''
   const joinUrl      = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${joinFirmParam}${joinLogoParam}${joinTParam}`
   const participants = ss.webrtc.members.filter(n => !n.endsWith('(view)') && n !== myName).length
 
