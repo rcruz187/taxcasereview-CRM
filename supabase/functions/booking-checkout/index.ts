@@ -91,8 +91,8 @@ serve(async (req) => {
       'metadata[b_date]': date.toString().slice(0, 10),
       'metadata[b_time]': time.toString().slice(0, 8),
       'metadata[b_notes]': (notes || '').toString().slice(0, 480),
-      success_url: (success_url || 'https://taxresolutioncrm.github.io/taxcasereview-CRM/') ,
-      cancel_url: (cancel_url || 'https://taxresolutioncrm.github.io/taxcasereview-CRM/'),
+      success_url: (success_url || 'https://taxrescrm.app/') ,
+      cancel_url: (cancel_url || 'https://taxrescrm.app/'),
     })
 
     return new Response(JSON.stringify({ url: session.url }), {
