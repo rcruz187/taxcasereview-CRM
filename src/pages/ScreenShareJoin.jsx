@@ -5,13 +5,13 @@ import { useSearchParams }              from 'react-router-dom'
 import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 import { useWebRTCRoom }                from '../lib/webrtcRoom'
 
-function StreamVideo({ stream, muted = false, mirror = false, contain = true }) {
+function StreamVideo({ stream, muted = false, mirror = false, contain = false }) {
   const ref = useRef(null)
   useEffect(() => { if (ref.current) ref.current.srcObject = stream || null }, [stream])
   return (
     <video ref={ref} autoPlay playsInline muted={muted}
       style={{ width: '100%', height: '100%', objectFit: contain ? 'contain' : 'cover',
-               display: 'block', transform: mirror ? 'scaleX(-1)' : 'none', background: '#0d1526' }} />
+               display: 'block', transform: mirror ? 'scaleX(-1)' : 'none', background: '#000' }} />
   )
 }
 

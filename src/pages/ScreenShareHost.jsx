@@ -11,7 +11,7 @@ import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 import { useVideoBackground }           from '../lib/videoBackground'
 import VirtualBackground                from '../components/VirtualBackground'
 
-function StreamVideo({ stream, muted = false, contain = true, mirror = false }) {
+function StreamVideo({ stream, muted = false, contain = false, mirror = false }) {
   const ref = useRef(null)
   useEffect(() => { if (ref.current) ref.current.srcObject = stream || null }, [stream])
   return (
@@ -239,9 +239,9 @@ export default function ScreenShareHost() {
           {/* Screen share tile */}
           {sharing && screenStream && (
             <div style={{ flex: 1, minHeight: 0, borderRadius: 12, overflow: 'hidden',
-                          background: '#0d1526', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column' }}>
+                          background: '#000', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column' }}>
               {surfaceType !== 'monitor' ? (
-                <div style={{ flex: 1, minHeight: 0 }}><StreamVideo stream={screenStream} muted /></div>
+                <div style={{ flex: 1, minHeight: 0, background: '#000' }}><StreamVideo stream={screenStream} muted contain={false} /></div>
               ) : (
                 <div style={{ width: '100%', height: '100%', minHeight: 300, display: 'flex',
                               alignItems: 'center', justifyContent: 'center', flexDirection: 'column',
