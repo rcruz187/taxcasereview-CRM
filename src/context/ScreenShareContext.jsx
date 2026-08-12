@@ -31,6 +31,7 @@ export function ScreenShareProvider({ children }) {
   const [sharingScreen, setSharingScreen] = useState(false)
   const [myName,        setMyName       ] = useState('')
   const [screenStream,  setScreenStream]  = useState(null)
+  const [localStream,   setLocalStream]   = useState(null)
   const [remoteScreenState, setRemoteScreenState] = useState(null)
 
   const webrtc         = useWebRTCRoom('screenshare')
@@ -46,14 +47,14 @@ export function ScreenShareProvider({ children }) {
       // The pop-out must drive the REAL session mic/camera, not a second
       // getUserMedia of its own — otherwise its mute button silences a
       // stream nobody is listening to and participants still hear the host.
-      localStream:   webrtc.localStreamRef.current,
+      localStream:   localStream,
       remoteStreams:  webrtc.remoteStreams,
       micOn:         webrtc.micOn,
       cameraOn:      webrtc.cameraOn,
       toggleMic:     webrtc.toggleMic,
       toggleCamera:  webrtc.toggleCamera,
     }
-  }, [sharingScreen, screenStream, webrtc.members, webrtc.remoteStreams, webrtc.micOn, webrtc.cameraOn, webrtc.joined])
+  }, [sharingScreen, screenStream, localStream, webrtc.members, webrtc.remoteStreams, webrtc.micOn, webrtc.cameraOn, webrtc.joined])
 
   // Broadcast member list to pop-out whenever it changes
   useEffect(() => {
@@ -137,7 +138,7 @@ export function ScreenShareProvider({ children }) {
 
   function _resetState() {
     setActive(false); setMinimized(false); setRoomId('')
-    setSharingScreen(false); setScreenStream(null); setRemoteScreenState(null)
+    setSharingScreen(false); setScreenStream(null); setLocalStream(null); setRemoteScreenState(null)
   }
 
   function doStopScreenShare(myName) {
@@ -161,7 +162,7 @@ export function ScreenShareProvider({ children }) {
     setMyName(myName)
     const result = await webrtc.join(id, myName, true)
     if (!result.ok) { setActive(false); return { ok: false, reason: result.reason } }
-    // Listen for screen-state from other participants
+    setLocalStream(webrtc.localStreamRef.current)
     webrtc.channelRef?.current?.on('broadcast', { event: 'screen-state' }, ({ payload }) => {
       setRemoteScreenState(payload)
     })
