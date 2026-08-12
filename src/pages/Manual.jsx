@@ -944,6 +944,8 @@ const MANUAL_SECTIONS = [
       { type: 'info', text: 'TCR\'s training sessions use taxcasereview.metered.live for cross-network WebRTC video relay. If participants on different networks cannot see the screen share, verify the Metered credentials are still active in the Supabase settings row for the TCR tenant.' },
     ]
   },
+  {
+    id: 'manual-about', icon: '📖', label: 'About This Manual', category: 'Training',
     title: 'About This Manual',
     content: [
       { type: 'lead', text: 'This manual covers the complete TaxRes CRM platform as configured for Tax Case Review and Nashville Tax Solutions. All sections apply to both offices unless specifically noted.' },
