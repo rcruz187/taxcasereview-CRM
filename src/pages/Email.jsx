@@ -441,7 +441,18 @@ export default function Email() {
               </span>
               <span onClick={syncNow} style={{ cursor: 'pointer', textDecoration: 'underline' }}>Sync now</span>
             </div>
-            {lastError && <div style={{ marginTop: 4, fontSize: 10, color: 'var(--bad)' }}>⚠️ {lastError}</div>}
+            {lastError && (
+              <div style={{ marginTop: 4, fontSize: 10, color: 'var(--bad)' }}>⚠️ {lastError}</div>
+            )}
+            {lastError && gmailClientId && (
+              <button onClick={() => {
+                const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${gmailClientId}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback')}&response_type=code&scope=https://mail.google.com/&access_type=offline&prompt=consent`
+                window.open(url, '_blank')
+                showToast('Complete authorization in the popup window')
+              }} style={{ marginTop: 6, width: '100%', padding: '4px 0', borderRadius: 6, border: 'none', background: 'var(--blue)', color: '#fff', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>
+                🔗 Reconnect Gmail
+              </button>
+            )}
           </div>
         ) : !gmailConnected && (
           <div style={{ margin: '0 10px 10px', padding: '10px 12px', background: 'rgba(26,127,212,.12)', borderRadius: 8, border: '1px solid rgba(26,127,212,.3)' }}>
