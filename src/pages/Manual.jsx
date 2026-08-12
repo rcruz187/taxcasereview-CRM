@@ -909,7 +909,41 @@ const MANUAL_SECTIONS = [
     ]
   },
   {
-    id: 'manual-about', icon: '📖', label: 'About This Manual', category: 'Training',
+    id: 'tcr-reference', icon: '🏛️', label: 'TCR Quick Reference', category: 'Training',
+    title: 'Tax Case Review — Quick Reference',
+    content: [
+      { type: 'lead', text: 'Office-specific details for Tax Case Review (TCR). These apply only to the TCR tenant — not Nashville.' },
+      { type: 'h3', text: 'TCR office details' },
+      { type: 'table', headers: ['Item', 'Value'], rows: [
+        ['CRM URL', 'taxrescrm.app'],
+        ['Booking URL', 'taxrescrm.app/book?t=61a89aef-0e7e-4ea2-b222-44ab2024655a'],
+        ['Kiosk URL', 'taxrescrm.app/kiosk?t=61a89aef-0e7e-4ea2-b222-44ab2024655a'],
+        ['Employee portal', 'taxrescrm.app/emp'],
+        ['Client portal', 'taxrescrm.app/portal'],
+        ['Admin webmail', 'webmail.taxrescrm.net:7443 (SnappyMail)'],
+        ['Email system', 'Gmail — connected per employee via Google OAuth'],
+        ['Phone system', 'SignalWire'],
+        ['Payment processor', 'TCR Stripe account'],
+        ['Video relay', 'taxcasereview.metered.live (Metered TURN)'],
+        ['Work email', 'romy@taxcasereview.org'],
+        ['Domains', 'taxrescrm.app · taxrescrm.net (Porkbun)'],
+      ]},
+      { type: 'h3', text: 'TCR team' },
+      { type: 'table', headers: ['Name', 'Role', 'Email'], rows: [
+        ['Romy Cruz', 'Super Admin / Owner / Lead EA', 'romy@taxcasereview.org'],
+        ['Dana Richard', 'Tax Associate', 'TCR email'],
+        ['Yesenia Gonzalez', 'Tax Associate', 'TCR email'],
+      ]},
+      { type: 'h3', text: 'Gmail reconnect — TCR' },
+      { type: 'info', text: 'Gmail OAuth tokens expire periodically. When the Email tab shows "Reconnect," click it and re-authorize with your Google account. This is a Google security requirement — the token must be refreshed every few months. Takes about 30 seconds.' },
+      { type: 'h3', text: 'TCR Stripe' },
+      { type: 'info', text: 'TCR uses its own Stripe account separate from Nashville\'s. All payments from TCR clients go to TCR\'s Stripe. The Stripe account is connected in Settings → Payments. If Stripe shows disconnected, reconnect via Stripe OAuth in Settings.' },
+      { type: 'h3', text: 'QuickBooks — TCR' },
+      { type: 'info', text: 'TCR\'s QuickBooks integration is pending Intuit Production approval. Once approved, invoices and payments will sync bi-directionally. No action needed until Intuit completes their review.' },
+      { type: 'h3', text: 'TCR Metered TURN (video relay)' },
+      { type: 'info', text: 'TCR\'s training sessions use taxcasereview.metered.live for cross-network WebRTC video relay. If participants on different networks cannot see the screen share, verify the Metered credentials are still active in the Supabase settings row for the TCR tenant.' },
+    ]
+  },
     title: 'About This Manual',
     content: [
       { type: 'lead', text: 'This manual covers the complete TaxRes CRM platform as configured for Tax Case Review and Nashville Tax Solutions. All sections apply to both offices unless specifically noted.' },
