@@ -6,11 +6,29 @@ import { useWebRTCRoom }                from '../lib/webrtcRoom'
 
 function StreamVideo({ stream, muted = false, mirror = false, contain = false }) {
   const ref = useRef(null)
-  useEffect(() => { if (ref.current) ref.current.srcObject = stream || null }, [stream])
+  useEffect(() => {
+    if (ref.current && ref.current.srcObject !== stream) {
+      ref.current.srcObject = stream || null
+    }
+  }, [stream])
   return (
     <video ref={ref} autoPlay playsInline muted={muted}
       style={{ width: '100%', height: '100%', objectFit: contain ? 'contain' : 'cover',
                display: 'block', transform: mirror ? 'scaleX(-1)' : 'none', background: '#000' }} />
+  )
+}
+
+function HostVideo({ stream }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    if (ref.current && ref.current.srcObject !== stream) {
+      ref.current.srcObject = stream || null
+    }
+  }, [stream])
+  return (
+    <video ref={ref} autoPlay playsInline
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
+               objectFit: 'contain', display: 'block', background: '#000' }} />
   )
 }
 
@@ -187,9 +205,7 @@ export default function ScreenShareJoin() {
           {hostStream ? (
             <div style={{ flex: 1, minHeight: 0, borderRadius: 12, overflow: 'hidden',
                           background: '#000', position: 'relative' }}>
-              <video ref={el => { if (el) el.srcObject = hostStream }} autoPlay playsInline
-                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
-                         objectFit: 'contain', display: 'block', background: '#000' }} />
+              <HostVideo stream={hostStream} />
               <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0,
                             padding: '4px 12px', background: 'rgba(0,0,0,.6)',
                             fontSize: 12, color: '#94a3b8', display: 'flex', gap: 6, alignItems: 'center' }}>

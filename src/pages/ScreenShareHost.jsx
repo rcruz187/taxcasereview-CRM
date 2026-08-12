@@ -5,7 +5,11 @@ import VirtualBackground                from '../components/VirtualBackground'
 
 function StreamVideo({ stream, muted = false, mirror = false, fit = 'contain' }) {
   const ref = useRef(null)
-  useEffect(() => { if (ref.current) ref.current.srcObject = stream || null }, [stream])
+  useEffect(() => {
+    if (ref.current && ref.current.srcObject !== stream) {
+      ref.current.srcObject = stream || null
+    }
+  }, [stream])
   return (
     <video ref={ref} autoPlay playsInline muted={muted}
       style={{ width: '100%', height: '100%', objectFit: fit,
