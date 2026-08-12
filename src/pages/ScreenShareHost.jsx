@@ -165,67 +165,96 @@ export default function ScreenShareHost() {
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 16, gap: 12, overflow: 'auto' }}>
 
-        {/* Screen share — main tile */}
-        <div style={{ flex: 1, minHeight: 300, borderRadius: 12, overflow: 'hidden',
-                      background: '#0d1526', border: '1px solid #1e293b' }}>
-          {sharing && screenStream && surfaceType !== 'monitor' ? (
-            <StreamVideo stream={screenStream} muted contain />
-          ) : sharing && screenStream ? (
-            <div style={{ width: '100%', height: '100%', minHeight: 300, display: 'flex',
-                          alignItems: 'center', justifyContent: 'center', flexDirection: 'column',
-                          gap: 12, padding: 24, textAlign: 'center' }}>
-              <span style={{ fontSize: 40 }}>🟢</span>
-              <span style={{ color: '#f8fafc', fontSize: 17, fontWeight: 700 }}>
-                You're sharing your entire screen
-              </span>
-              <span style={{ color: '#94a3b8', fontSize: 13, maxWidth: 420, lineHeight: 1.6 }}>
-                Participants can see everything on your monitor. The live preview is hidden
-                here on purpose — showing it would capture this window inside itself.
-              </span>
-              <span style={{ color: '#64748b', fontSize: 12, maxWidth: 420, lineHeight: 1.6 }}>
-                To see exactly what participants see, share a single window or browser tab
-                instead of the entire screen.
-              </span>
-            </div>
-          ) : (
-            <div style={{ width: '100%', height: '100%', minHeight: 300, display: 'flex',
-                          alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 10 }}>
-              <span style={{ fontSize: 36, opacity: .3 }}>🖥️</span>
-              <span style={{ color: '#475569', fontSize: 14 }}>
-                Waiting for screen share — click Share screen in the Training tab
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Camera strip — self + remote participants */}
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {/* Self */}
-          <div style={{ width: 260, borderRadius: 10, overflow: 'hidden',
-                        background: '#1e293b', position: 'relative', aspectRatio: '4/3', flexShrink: 0 }}>
-            {camOn && selfStream
-              ? <StreamVideo stream={selfStream} muted mirror />
-              : <div style={{ width: '100%', height: '100%', display: 'flex',
-                              alignItems: 'center', justifyContent: 'center', background: '#1e293b' }}>
-                  <span style={{ fontSize: 28, opacity: .3 }}>📷</span>
-                </div>}
-            <div style={{ position: 'absolute', bottom: 5, left: 8, fontSize: 11, color: '#e2e8f0',
-                          background: 'rgba(0,0,0,.6)', borderRadius: 4, padding: '2px 6px', fontWeight: 600 }}>
-              {hostName} (you)
-            </div>
-          </div>
-          {/* Remote participants */}
-          {Object.entries(remoteStreams).map(([name, stream]) => (
-            <div key={name} style={{ width: 260, borderRadius: 10, overflow: 'hidden',
-                          background: '#1e293b', position: 'relative', aspectRatio: '4/3', flexShrink: 0 }}>
-              <StreamVideo stream={stream} />
-              <div style={{ position: 'absolute', bottom: 5, left: 8, fontSize: 11, color: '#e2e8f0',
-                            background: 'rgba(0,0,0,.6)', borderRadius: 4, padding: '2px 6px', fontWeight: 600 }}>
-                {name}
+        {/* Screen share — main tile (only shown when actively sharing) */}
+        {sharing && screenStream && (
+          <div style={{ flex: 1, minHeight: 300, borderRadius: 12, overflow: 'hidden',
+                        background: '#0d1526', border: '1px solid #1e293b' }}>
+            {surfaceType !== 'monitor' ? (
+              <StreamVideo stream={screenStream} muted contain />
+            ) : (
+              <div style={{ width: '100%', height: '100%', minHeight: 300, display: 'flex',
+                            alignItems: 'center', justifyContent: 'center', flexDirection: 'column',
+                            gap: 12, padding: 24, textAlign: 'center' }}>
+                <span style={{ fontSize: 40 }}>🟢</span>
+                <span style={{ color: '#f8fafc', fontSize: 17, fontWeight: 700 }}>
+                  You're sharing your entire screen
+                </span>
+                <span style={{ color: '#94a3b8', fontSize: 13, maxWidth: 420, lineHeight: 1.6 }}>
+                  Participants can see everything on your monitor. The live preview is hidden
+                  here on purpose — showing it would capture this window inside itself.
+                </span>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* Camera grid — fills the whole window when not screen sharing, strip below when sharing */}
+        {(() => {
+          const remoteEntries = Object.entries(remoteStreams)
+          const allParticipants = [
+            { key: '__self__', name: hostName + ' (you)', stream: selfStream, muted: true, mirror: true },
+            ...remoteEntries.map(([name, stream]) => ({ key: name, name, stream, muted: false, mirror: false }))
+          ]
+          const count = allParticipants.length
+          const isStrip = sharing && screenStream
+
+          // Strip mode (screen sharing active): fixed-width tiles in a row
+          if (isStrip) {
+            return (
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', flexShrink: 0 }}>
+                {allParticipants.map(({ key, name, stream, muted, mirror }) => (
+                  <div key={key} style={{ width: 220, aspectRatio: '4/3', borderRadius: 10,
+                                          overflow: 'hidden', background: '#1e293b', position: 'relative', flexShrink: 0 }}>
+                    {stream
+                      ? <StreamVideo stream={stream} muted={muted} mirror={mirror} />
+                      : <div style={{ width: '100%', height: '100%', display: 'flex',
+                                      alignItems: 'center', justifyContent: 'center' }}>
+                          <span style={{ fontSize: 28, opacity: .3 }}>📷</span>
+                        </div>}
+                    <div style={{ position: 'absolute', bottom: 5, left: 8, fontSize: 11, color: '#e2e8f0',
+                                  background: 'rgba(0,0,0,.6)', borderRadius: 4, padding: '2px 6px', fontWeight: 600 }}>
+                      {name}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          }
+
+          // Full-window mode (no screen share): grid fills all available space
+          const gridCols = count === 1 ? '1fr'
+            : count === 2 ? '1fr 1fr'
+            : count <= 4 ? '1fr 1fr'
+            : '1fr 1fr 1fr'
+
+          return (
+            <div style={{ display: 'grid', gridTemplateColumns: gridCols,
+                          gridAutoRows: '1fr', gap: 10, flex: 1 }}>
+              {allParticipants.map(({ key, name, stream, muted, mirror }) => (
+                <div key={key} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden',
+                                        background: '#1e293b', minHeight: 200 }}>
+                  {stream
+                    ? <StreamVideo stream={stream} muted={muted} mirror={mirror} />
+                    : <div style={{ position: 'absolute', inset: 0, display: 'flex',
+                                    alignItems: 'center', justifyContent: 'center',
+                                    flexDirection: 'column', gap: 8 }}>
+                        <span style={{ fontSize: 40, opacity: .25 }}>📷</span>
+                        {key === '__self__' && !camOn && (
+                          <span style={{ fontSize: 12, color: '#475569' }}>Camera off</span>
+                        )}
+                        {key !== '__self__' && (
+                          <span style={{ fontSize: 12, color: '#475569' }}>Connecting…</span>
+                        )}
+                      </div>}
+                  <div style={{ position: 'absolute', bottom: 8, left: 10, fontSize: 12, color: '#e2e8f0',
+                                background: 'rgba(0,0,0,.65)', borderRadius: 5, padding: '3px 8px', fontWeight: 600 }}>
+                    {name}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )
+        })()}
 
         {/* Controls */}
         <div style={{ display: 'flex', gap: 8 }}>
