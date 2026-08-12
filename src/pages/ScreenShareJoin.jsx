@@ -20,7 +20,7 @@ function CamTile({ stream, name, muted = false, mirror = false }) {
   const initials = (name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
   return (
     <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden',
-                  background: '#1e293b', aspectRatio: '4/3' }}>
+                  background: '#1e293b', width: '100%', height: '100%' }}>
       {hasVideo
         ? <StreamVideo stream={stream} muted={muted} mirror={mirror} contain={false} />
         : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -188,12 +188,14 @@ export default function ScreenShareJoin() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 16, gap: 12, overflow: 'hidden' }}>
 
           {hostStream ? (
-            <div style={{ flex: 1, minHeight: 0, borderRadius: 12, overflow: 'hidden', background: '#0d1526', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ flex: 1, minHeight: 0 }}>
-                <StreamVideo stream={hostStream} />
-              </div>
-              <div style={{ padding: '6px 12px', background: '#1e293b', fontSize: 12, color: '#94a3b8',
-                            display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+            <div style={{ flex: 1, minHeight: 0, borderRadius: 12, overflow: 'hidden',
+                          background: '#000', position: 'relative' }}>
+              <video ref={el => { if (el) el.srcObject = hostStream }} autoPlay playsInline
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
+                         objectFit: 'contain', display: 'block', background: '#000' }} />
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0,
+                            padding: '4px 12px', background: 'rgba(0,0,0,.6)',
+                            fontSize: 12, color: '#94a3b8', display: 'flex', gap: 6, alignItems: 'center' }}>
                 <span style={{ color: '#22c55e', fontSize: 10 }}>●</span>
                 {screenState.host}'s screen
               </div>
@@ -207,16 +209,23 @@ export default function ScreenShareJoin() {
           )}
 
           {/* Camera strip */}
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', flexShrink: 0, maxHeight: 180, overflow: 'hidden' }}>
-            <div style={{ width: 160, flexShrink: 0 }}>
-              <CamTile stream={webrtc.localStreamRef.current} name={`${myName} (you)`} muted mirror />
-            </div>
-            {peers.map(pName => (
-              <div key={pName} style={{ width: 160, flexShrink: 0 }}>
-                <CamTile stream={webrtc.remoteStreams[pName]} name={pName} />
+          {(() => {
+            const count = peers.length + 1
+            const tileW = count <= 2 ? 240 : count <= 4 ? 180 : 140
+            const tileH = count <= 2 ? 180 : count <= 4 ? 135 : 105
+            return (
+              <div style={{ display: 'flex', gap: 8, flexShrink: 0, height: tileH, overflowX: 'auto' }}>
+                <div style={{ width: tileW, height: tileH, flexShrink: 0 }}>
+                  <CamTile stream={webrtc.localStreamRef.current} name={`${myName} (you)`} muted mirror />
+                </div>
+                {peers.map(pName => (
+                  <div key={pName} style={{ width: tileW, height: tileH, flexShrink: 0 }}>
+                    <CamTile stream={webrtc.remoteStreams[pName]} name={pName} />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            )
+          })()}
 
           {/* Controls */}
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
