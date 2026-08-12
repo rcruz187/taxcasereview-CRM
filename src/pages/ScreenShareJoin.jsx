@@ -5,7 +5,7 @@ import { useSearchParams }              from 'react-router-dom'
 import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 import { useWebRTCRoom }                from '../lib/webrtcRoom'
 
-function StreamVideo({ stream, muted = false, mirror = false, contain = false }) {
+function StreamVideo({ stream, muted = false, mirror = false, contain = true }) {
   const ref = useRef(null)
   useEffect(() => { if (ref.current) ref.current.srcObject = stream || null }, [stream])
   return (
@@ -22,7 +22,7 @@ function CamTile({ stream, name, muted = false, mirror = false }) {
     <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden',
                   background: '#1e293b', aspectRatio: '4/3' }}>
       {hasVideo
-        ? <StreamVideo stream={stream} muted={muted} mirror={mirror} />
+        ? <StreamVideo stream={stream} muted={muted} mirror={mirror} contain={false} />
         : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#2563eb',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',

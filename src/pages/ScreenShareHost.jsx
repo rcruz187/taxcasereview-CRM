@@ -11,7 +11,7 @@ import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 import { useVideoBackground }           from '../lib/videoBackground'
 import VirtualBackground                from '../components/VirtualBackground'
 
-function StreamVideo({ stream, muted = false, contain = false, mirror = false }) {
+function StreamVideo({ stream, muted = false, contain = true, mirror = false }) {
   const ref = useRef(null)
   useEffect(() => { if (ref.current) ref.current.srcObject = stream || null }, [stream])
   return (
@@ -272,7 +272,7 @@ export default function ScreenShareHost() {
                   {allParticipants.map(({ key, name, stream, muted, mirror }) => (
                     <div key={key} style={{ width: 220, aspectRatio: '4/3', borderRadius: 10,
                                             overflow: 'hidden', background: '#1e293b', position: 'relative', flexShrink: 0 }}>
-                      {stream ? <StreamVideo stream={stream} muted={muted} mirror={mirror} />
+                      {stream ? <StreamVideo stream={stream} muted={muted} mirror={mirror} contain={false} />
                         : <div style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center' }}>
                             <span style={{ fontSize: 28, opacity: .3 }}>📷</span>
                           </div>}
@@ -290,7 +290,7 @@ export default function ScreenShareHost() {
                 {allParticipants.map(({ key, name, stream, muted, mirror }) => (
                   <div key={key} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden',
                                           background: '#1e293b', minHeight: 120 }}>
-                    {stream ? <StreamVideo stream={stream} muted={muted} mirror={mirror} />
+                    {stream ? <StreamVideo stream={stream} muted={muted} mirror={mirror} contain={false} />
                       : <div style={{ position:'absolute',inset:0,display:'flex',alignItems:'center',
                                       justifyContent:'center',flexDirection:'column',gap:8 }}>
                           <span style={{ fontSize: 40, opacity: .25 }}>📷</span>
