@@ -65,7 +65,7 @@ serve(async (req) => {
       }
     }
 
-    // Try this tenant's Metered credentials first
+    // Try this tenant's Metered credentials first (authenticated users only)
     if (tenantId) {
       const { data: tenantSettings } = await supabase
         .from('settings')
@@ -84,6 +84,7 @@ serve(async (req) => {
     }
 
     // Fall back to TCR's Metered credentials (platform-level key)
+    // Used for: unauthenticated participants (screenshare guests), tenants with no Metered key
     const { data: tcrSettings } = await supabase
       .from('settings')
       .select('metered_app_name, metered_api_key')
