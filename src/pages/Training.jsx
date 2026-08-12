@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useScreenShare } from '../context/ScreenShareContext'
 import { useApp }         from '../context/AppContext'
+import { supabase }       from '../lib/supabase'
 
 const BASE = '/'
 
@@ -25,6 +26,11 @@ export default function Training() {
 
   const [starting, setStarting] = useState(false)
   const [copied,   setCopied]   = useState(false)
+
+  // Email the invite link straight from this page
+  const [emailOpen,   setEmailOpen]   = useState(false)
+  const [emailTo,     setEmailTo]     = useState('')
+  const [emailSending,setEmailSending]= useState(false)
 
   // Screen label (Entire screen / Window / Browser tab)
   const [screenLabel, setScreenLabel] = useState('')
@@ -54,6 +60,42 @@ export default function Training() {
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true); setTimeout(() => setCopied(false), 2000)
     })
+  }
+
+  async function sendInviteEmail() {
+    const raw = emailTo.split(',').map(v => v.trim()).filter(Boolean)
+    if (!raw.length) return
+    const bad = raw.filter(v => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))
+    if (bad.length) { showToast?.(`Not a valid email: ${bad[0]}`, 'error'); return }
+    const url = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}`
+    const firm = 'TaxRes CRM'
+    setEmailSending(true)
+    try {
+      for (const to of raw) {
+        const { error } = await supabase.functions.invoke('send-email', {
+          body: {
+            to,
+            subject: `Join the training session — ${firm}`,
+            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px">
+<p>You've been invited to a live training session with <strong>${myName}</strong>.</p>
+<p style="text-align:center;margin:24px 0">
+<a href="${url}" style="background:#7c3aed;color:#fff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Join session &rarr;</a>
+</p>
+<p style="font-size:13px;color:#475569">No account or download needed. Room code <strong>${ss.roomId}</strong>.</p>
+<p style="font-size:12px;color:#64748b">${url}</p>
+</div>`
+          }
+        })
+        if (error) throw error
+      }
+      showToast?.(`Invite sent to ${raw.length} recipient${raw.length > 1 ? 's' : ''}`, 'success')
+      setEmailTo(''); setEmailOpen(false)
+    } catch {
+      navigator.clipboard.writeText(url).catch(() => {})
+      showToast?.('Could not send email — link copied to clipboard instead', 'error')
+    } finally {
+      setEmailSending(false)
+    }
   }
 
   function openPopout() {
@@ -175,7 +217,34 @@ export default function Training() {
                      cursor: 'pointer', flexShrink: 0, transition: 'background .2s' }}>
             {copied ? '✓ Copied!' : '📋 Copy'}
           </button>
+          <button onClick={() => setEmailOpen(o => !o)}
+            style={{ background: emailOpen ? 'var(--s3)' : '#7c3aed', border: 'none', borderRadius: 8,
+                     padding: '8px 16px', color: '#fff', fontWeight: 700, fontSize: 13,
+                     cursor: 'pointer', flexShrink: 0 }}>
+            ✉️ Email
+          </button>
         </div>
+
+        {emailOpen && (
+          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="email"
+              value={emailTo}
+              onChange={e => setEmailTo(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') sendInviteEmail() }}
+              placeholder="name@firm.com — separate multiple with commas"
+              style={{ flex: 1, fontSize: 13, padding: '9px 11px', borderRadius: 6,
+                       border: '1px solid var(--br)', background: 'var(--bg)', color: 'var(--tx)' }} />
+            <button onClick={sendInviteEmail} disabled={emailSending || !emailTo.trim()}
+              style={{ background: '#16a34a', border: 'none', borderRadius: 8, padding: '9px 18px',
+                       color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0,
+                       cursor: emailSending || !emailTo.trim() ? 'not-allowed' : 'pointer',
+                       opacity: emailSending || !emailTo.trim() ? .55 : 1 }}>
+              {emailSending ? 'Sending…' : 'Send invite'}
+            </button>
+          </div>
+        )}
+
         <div style={{ marginTop: 8, fontSize: 12, color: 'var(--t3)' }}>
           Share in Chat, email, or SMS. Anyone who clicks joins instantly — no account needed.
         </div>
