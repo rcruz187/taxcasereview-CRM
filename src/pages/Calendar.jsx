@@ -14,6 +14,7 @@ const STATUS_COLORS = {
   cancelled:   { bg: '#3b1a1a', border: '#ef4444', text: '#fca5a5' },
   reminder:    { bg: '#2a1f3d', border: '#7c3aed', text: '#c4b5fd' },
   draft:       { bg: 'var(--s2)', border: 'var(--t3)', text: 'var(--t2)' },
+  Pending:     { bg: '#2a1f10', border: '#f59e0b', text: '#fcd34d' },
 }
 
 // Map calevents color keys to status colors
@@ -346,6 +347,30 @@ export default function Calendar() {
           )}
         </div>
 
+        {/* ── Pending ICS invite banner ── */}
+        {selectedEvent.source === 'ics_auto' && selectedEvent.eventType === 'Pending' && (
+          <div style={{ background: '#2a1f10', border: '1px solid #f59e0b', borderRadius: 12, padding: '16px 20px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, color: '#fcd34d' }}>📩 Calendar Invite — Pending Your Response</p>
+              {selectedEvent.contact_email && <p style={{ margin: 0, fontSize: 12, color: '#92400e' }}>From: {selectedEvent.contact_email}</p>}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={async () => {
+                await supabase.from('calevents').update({ eventType: 'Meeting', status: 'scheduled' }).eq('id', selectedEvent.id)
+                setSelectedEvent(ev => ({ ...ev, eventType: 'Meeting', status: 'scheduled' }))
+                setEvents(evs => evs.map(e => e.id === selectedEvent.id ? { ...e, eventType: 'Meeting', status: 'scheduled' } : e))
+                showToast('✅ Invite accepted')
+              }} style={{ padding: '8px 18px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>✅ Accept</button>
+              <button onClick={async () => {
+                await supabase.from('calevents').delete().eq('id', selectedEvent.id)
+                setEvents(evs => evs.filter(e => e.id !== selectedEvent.id))
+                setSelectedEvent(null)
+                showToast('❌ Invite declined and removed')
+              }} style={{ padding: '8px 18px', background: '#3b1a1a', color: '#fca5a5', border: '1px solid #ef4444', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>❌ Decline</button>
+            </div>
+          </div>
+        )}
+
         {!selectedEvent._isDl && (
           <div style={{ background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: 12, padding: '14px 16px', marginBottom: 14 }}>
             <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.05em' }}>Video Meeting</p>
@@ -627,9 +652,9 @@ export default function Calendar() {
                     <div key={i} onClick={() => { setSelectedEvent(ev); setDayMenuPos(null) }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 6, marginBottom: 2, cursor: 'pointer' }}
                       onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.04)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'none'}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: sc.border, flexShrink: 0 }} />
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: ev.eventType === 'Pending' ? '#f59e0b' : sc.border, flexShrink: 0, boxShadow: ev.eventType === 'Pending' ? '0 0 6px #f59e0b' : 'none' }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: sc.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.clientName || ev.title}</p>
+                        <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: ev.eventType === 'Pending' ? '#fcd34d' : sc.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.eventType === 'Pending' ? '⏳ ' : ''}{ev.clientName || ev.title}</p>
                         {ev.time && <p style={{ margin: 0, fontSize: 10, color: 'var(--t3)' }}>{fmtTime(ev.time)}</p>}
                       </div>
                     </div>
