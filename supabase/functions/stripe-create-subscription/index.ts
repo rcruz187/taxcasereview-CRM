@@ -112,8 +112,8 @@ serve(async (req) => {
         'subscription_data[metadata][months]': String(months),
         'subscription_data[metadata][total_amount]': String(totalAmount),
         'subscription_data[metadata][trade_type]': '2nd Trade',
-        success_url: 'https://taxresolutioncrm.github.io/taxcasereview-CRM/',
-        cancel_url: 'https://taxresolutioncrm.github.io/taxcasereview-CRM/',
+        success_url: 'https://taxrescrm.app/',
+        cancel_url: 'https://taxrescrm.app/',
       })
 
       return new Response(JSON.stringify({
