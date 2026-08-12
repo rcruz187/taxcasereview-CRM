@@ -2,10 +2,14 @@
 // Reads the screen stream DIRECTLY from window.opener (same-origin) so
 // there is no WebRTC join, no double-participant, no relay needed.
 // Camera preview + mic controls mirror the main window's real session stream.
+// Virtual backgrounds apply here and transmit to participants via replaceTrack
+// on the opener's peer connections.
 
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams }              from 'react-router-dom'
 import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
+import { useVideoBackground }           from '../lib/videoBackground'
+import VirtualBackground                from '../components/VirtualBackground'
 
 function StreamVideo({ stream, muted = false, contain = false, mirror = false }) {
   const ref = useRef(null)
@@ -31,25 +35,30 @@ export default function ScreenShareHost() {
   const [surfaceType,  setSurfaceType]  = useState(null)
   const [participants, setParticipants] = useState(0)
 
-  // Local camera preview — NEVER sent to anyone
   const [selfStream,    setSelfStream]    = useState(null)
   const [remoteStreams, setRemoteStreams] = useState({})
   const [micOn,      setMicOn]       = useState(true)
   const [camOn,      setCamOn]       = useState(true)
+  const [showBgPanel, setShowBgPanel] = useState(false)
+
+  // Virtual background — processes the self stream locally and replaces
+  // the track on the opener's peer connections so participants see it too.
+  const vbg         = useVideoBackground()
+  const rawStreamRef = useRef(null)   // unprocessed stream from opener
+  const processedRef = useRef(null)   // background-processed stream (shown in self tile)
+  const [displayStream, setDisplayStream] = useState(null) // what the self tile renders
+
   const selfStreamRef = useRef(null)
   const bcRef         = useRef(null)
 
   useEffect(() => { loadFirmBrandingPublic(params.get('t')).finally(() => setReady(true)) }, [])
 
-  // Pull screen stream from window.opener (same-origin, set by ScreenShareContext)
   function syncScreenStream() {
     try {
       const ctx = window.opener?._tcrScreenShare
       if (ctx?.sharingScreen && ctx?.screenStream) {
         setScreenStream(ctx.screenStream)
         setSharing(true)
-        // 'monitor' = entire screen. Showing the live feed here would capture
-        // this very window, producing an infinite hall-of-mirrors.
         const track = ctx.screenStream.getVideoTracks?.()[0]
         setSurfaceType(track?.getSettings?.().displaySurface || null)
       } else {
@@ -58,56 +67,55 @@ export default function ScreenShareHost() {
         setSurfaceType(null)
       }
       if (ctx?.memberCount !== undefined) setParticipants(ctx.memberCount)
-      // Mirror the REAL session camera + mic state from the main window.
-      if (ctx?.localStream !== undefined) setSelfStream(ctx.localStream || null)
+      if (ctx?.localStream !== undefined) {
+        const incoming = ctx.localStream || null
+        // Only update rawStreamRef when stream identity changes
+        if (incoming && incoming !== rawStreamRef.current) {
+          rawStreamRef.current = incoming
+          // If a background is active, re-apply it to the new stream
+          if (vbg.bgMode !== 'none') {
+            vbg.changeBackground(incoming, vbg.bgMode, vbg.bgPreset, null).then(out => {
+              if (out) { processedRef.current = out; setDisplayStream(out) }
+            })
+          } else {
+            setDisplayStream(incoming)
+          }
+        } else if (!incoming) {
+          rawStreamRef.current = null
+          setDisplayStream(null)
+        }
+        setSelfStream(incoming)
+      }
       if (ctx?.remoteStreams !== undefined) setRemoteStreams(ctx.remoteStreams || {})
       if (ctx?.micOn    !== undefined) setMicOn(ctx.micOn)
       if (ctx?.cameraOn !== undefined) setCamOn(ctx.cameraOn)
-    } catch { /* cross-origin guard, should never happen */ }
+    } catch { /* cross-origin guard */ }
   }
 
-  // BroadcastChannel for end signal and screen-state changes
   useEffect(() => {
     const ch = new BroadcastChannel('tcr-screenshare')
     bcRef.current = ch
 
     ch.addEventListener('message', e => {
-      if (e.data?.type === 'end') {
-        cleanup()
-        setTimeout(() => window.close(), 800)
-      }
-      if (e.data?.type === 'screen-state') {
-        // Re-read from opener whenever screen state changes
-        setTimeout(syncScreenStream, 50)
-      }
+      if (e.data?.type === 'end') { cleanup(); setTimeout(() => window.close(), 800) }
+      if (e.data?.type === 'screen-state') setTimeout(syncScreenStream, 50)
       if (e.data?.type === 'state-snapshot') {
         const count = (e.data.members || []).filter(n => !n.endsWith('(view)')).length - 1
         setParticipants(Math.max(0, count))
       }
     })
 
-    // Initial sync + request snapshot from parent
     syncScreenStream()
     ch.postMessage({ type: 'request-snapshot' })
-
-    // Poll for screen stream every 500ms while not sharing (handles timing edge cases)
     const poll = setInterval(syncScreenStream, 500)
-
     return () => { ch.close(); bcRef.current = null; clearInterval(poll) }
   }, [])
 
-  // No getUserMedia here — the pop-out shows the SAME stream the session is
-  // already sending. Opening a second camera/mic would give the host two
-  // captures and a mute button that controls the wrong one.
-  function stopSelf() {
-    selfStreamRef.current = null
-    setSelfStream(null)
-  }
+  // When component unmounts, stop the background loop
+  useEffect(() => () => vbg.stopLoop(), [])
 
-  function cleanup() {
-    stopSelf()
-    setEnded(true)
-  }
+  function stopSelf() { selfStreamRef.current = null; setSelfStream(null) }
+  function cleanup()  { stopSelf(); setEnded(true) }
 
   function endSession() {
     bcRef.current?.postMessage({ type: 'end' })
@@ -115,7 +123,6 @@ export default function ScreenShareHost() {
     setTimeout(() => window.close(), 600)
   }
 
-  // Drive the real session tracks in the opener window, then re-read state.
   function toggleMic() {
     try { window.opener?._tcrScreenShare?.toggleMic?.() } catch {}
     setTimeout(syncScreenStream, 60)
@@ -124,6 +131,43 @@ export default function ScreenShareHost() {
   function toggleCam() {
     try { window.opener?._tcrScreenShare?.toggleCamera?.() } catch {}
     setTimeout(syncScreenStream, 60)
+  }
+
+  async function handleBgSelect(mode, presetId, customUrl) {
+    const raw = rawStreamRef.current
+    if (!raw) return
+    if (mode === 'none') {
+      vbg.stopLoop()
+      processedRef.current = null
+      setDisplayStream(raw)
+      // Restore original track to all peer connections in opener
+      try {
+        const origTrack = raw.getVideoTracks()[0]
+        if (origTrack) {
+          const pcs = Object.values(window.opener?._tcrScreenShare?.peerConnsRef?.current || {})
+          for (const pc of pcs) {
+            const sender = pc.getSenders().find(s => s.track?.kind === 'video')
+            if (sender) sender.replaceTrack(origTrack).catch(() => {})
+          }
+        }
+      } catch {}
+      return
+    }
+    const out = await vbg.changeBackground(raw, mode, presetId, customUrl)
+    if (!out) return
+    processedRef.current = out
+    setDisplayStream(out)
+    // Push processed track to all peer connections in opener
+    try {
+      const newTrack = out.getVideoTracks()[0]
+      if (newTrack) {
+        const pcs = Object.values(window.opener?._tcrScreenShare?.peerConnsRef?.current || {})
+        for (const pc of pcs) {
+          const sender = pc.getSenders().find(s => s.track?.kind === 'video')
+          if (sender) sender.replaceTrack(newTrack).catch(() => {})
+        }
+      }
+    } catch {}
   }
 
   if (ended) return (
@@ -188,17 +232,16 @@ export default function ScreenShareHost() {
           </div>
         )}
 
-        {/* Camera grid — fills the whole window when not screen sharing, strip below when sharing */}
+        {/* Camera grid */}
         {(() => {
           const remoteEntries = Object.entries(remoteStreams)
           const allParticipants = [
-            { key: '__self__', name: hostName + ' (you)', stream: selfStream, muted: true, mirror: true },
+            { key: '__self__', name: hostName + ' (you)', stream: displayStream || selfStream, muted: true, mirror: true },
             ...remoteEntries.map(([name, stream]) => ({ key: name, name, stream, muted: false, mirror: false }))
           ]
           const count = allParticipants.length
           const isStrip = sharing && screenStream
 
-          // Strip mode (screen sharing active): fixed-width tiles in a row
           if (isStrip) {
             return (
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', flexShrink: 0 }}>
@@ -221,7 +264,6 @@ export default function ScreenShareHost() {
             )
           }
 
-          // Full-window mode (no screen share): grid fills all available space
           const gridCols = count === 1 ? '1fr'
             : count === 2 ? '1fr 1fr'
             : count <= 4 ? '1fr 1fr'
@@ -270,7 +312,25 @@ export default function ScreenShareHost() {
                      cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
             {camOn ? '📷 Stop cam' : '📷 Start cam'}
           </button>
+          <button onClick={() => setShowBgPanel(v => !v)}
+            style={{ flex: 1, padding: '10px 0',
+                     background: showBgPanel ? 'rgba(99,102,241,.3)' : '#1e293b',
+                     border: `1px solid ${showBgPanel ? '#6366f1' : '#334155'}`,
+                     borderRadius: 8, color: showBgPanel ? '#a5b4fc' : '#fff',
+                     cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+            🎨 Background{vbg.bgMode !== 'none' ? ' ●' : ''}
+          </button>
         </div>
+
+        {/* Virtual background picker — shown when toggled */}
+        {showBgPanel && (
+          <VirtualBackground
+            bgMode={vbg.bgMode}
+            bgPreset={vbg.bgPreset}
+            segStatus={vbg.segStatus}
+            onSelect={handleBgSelect}
+          />
+        )}
 
         {participants === 0 && (
           <div style={{ color: '#475569', fontSize: 13, textAlign: 'center' }}>
