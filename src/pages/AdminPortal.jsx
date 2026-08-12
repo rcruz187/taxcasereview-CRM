@@ -1176,28 +1176,30 @@ function Email(){return(
 )}
 
 // ── Training (screen-share training, admin context) ──────────────────────────
-// Clears the TCR tenant override so FIRM loads TaxRes CRM branding (the admin's
-// own settings row), not Tax Case Review the practice. Restores on unmount.
-// Uses useScreenShare to detect an active session — if one is already running,
-// render immediately without waiting for the branding load so navigation away
-// and back never kills a live session.
+// Stamps FIRM with TaxRes CRM product branding — never loads TCR practice tenant.
+// Restores Admin Portal favicon on unmount so navigating away leaves no trace.
 function AdminTraining(){
-  const [ready, setReady] = useState(false)
   const ss = useScreenShare()
 
   useEffect(()=>{
-    // If a session is already active, render immediately — don't gate on branding.
-    // The branding was already loaded when the session started.
-    if (ss.active) { setReady(true); return }
-    supabase.rpc('set_admin_tenant_override',{ p_tenant_id: TCR_TENANT })
-      .then(()=> loadFirmBrandingPublic(TCR_TENANT))
-      .then(()=> setReady(true))
-      .catch(()=> setReady(true))
+    // Set FIRM to TaxRes CRM product identity — no DB call needed
+    FIRM.name     = 'TaxRes CRM'
+    FIRM.logoUrl  = 'https://taxrescrm.app/taxrescrm-logo.png'
+    FIRM.email    = 'romy@taxrescrm.net'
+    FIRM.tenantId = 'a0000000-0000-0000-0000-000000000001'
+    FIRM.loaded   = true
+    document.title = 'TaxRes CRM — IRS Resolution CRM'
     return ()=>{
-      supabase.rpc('set_admin_tenant_override',{ p_tenant_id: TCR_TENANT }).then(()=>{}).catch(()=>{})
+      // Restore Admin Portal favicon on unmount
+      try {
+        document.querySelectorAll("link[rel*='icon']").forEach(el => {
+          el.href = '/taxrescrm-favicon.png'
+        })
+        document.title = 'TaxRes CRM — IRS Resolution CRM'
+      } catch(_) {}
     }
   },[])
-  if (!ready) return null
+
   return <TrainingPage/>
 }
 
