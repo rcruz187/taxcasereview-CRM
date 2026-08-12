@@ -41,7 +41,7 @@ serve(async (req) => {
 
     const html = `<!DOCTYPE html><html><body style="background:#0d0c1a;font-family:system-ui,Arial,sans-serif;margin:0;padding:32px;">
 <div style="max-width:600px;margin:0 auto;">
-  <img src="https://taxresolutioncrm.github.io/taxcasereview-CRM/assets/taxrescrm-logo.png" style="height:36px;margin-bottom:24px;" />
+  <img src="https://taxrescrm.app/assets/taxrescrm-logo.png" style="height:36px;margin-bottom:24px;" />
   <h1 style="color:#fff;font-size:22px;font-weight:800;margin-bottom:4px;">Good morning, Romy 👋</h1>
   <p style="color:#475569;font-size:13px;margin-bottom:28px;">${today}</p>
   
