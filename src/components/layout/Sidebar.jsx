@@ -29,6 +29,7 @@ const SECTIONS = [
       { path: '/chat',      icon: ChatIcon,    label: 'Team Chat',     badge: 'chat',     section: 'chat' },
       { path: '/calendar',  icon: CalIcon,     label: 'Calendar',      badge: 'calendar', section: 'calendar' },
       { path: '/tasks',     icon: TaskIcon,    label: 'Tasks',         badge: 'tasks',    section: 'tasks' },
+      { path: '/dialer',    icon: DialIcon,    label: 'Dialer',        badge: 'voicemails', section: 'dialer' },
     ]
   },
   {
@@ -45,7 +46,6 @@ const SECTIONS = [
     key: 'comms',
     label: 'Communications',
     items: [
-      { path: '/dialer',    icon: DialIcon,    label: 'Dialer',        badge: 'voicemails', section: 'dialer' },
       { path: '/sms',       icon: SmsIcon,     label: 'SMS',           badge: 'sms',    section: 'sms' },
       { path: '/fax',       icon: FaxIcon,     label: 'Fax',           badge: 'fax',    section: 'fax' },
       { path: '/documents', icon: FolderIcon,  label: 'Documents',     section: 'documents' },
