@@ -45,7 +45,12 @@ export default function ScreenShareHost() {
   const chatEndRef    = useRef(null)
   const controlsTimer = useRef(null)
 
-  const vbg          = useVideoBackground()
+  const [recording,    setRecording]    = useState(false)
+  const [recDuration,  setRecDuration]  = useState(0)
+  const mediaRecRef    = useRef(null)
+  const recChunksRef   = useRef([])
+  const recTimerRef    = useRef(null)
+  const recStartRef    = useRef(null)
   const rawStreamRef  = useRef(null)
   const [displayStream, setDisplayStream] = useState(null)
   const bcRef         = useRef(null)
@@ -105,7 +110,60 @@ export default function ScreenShareHost() {
     return () => { ch.close(); clearInterval(poll) }
   }, [])
 
+  function startRecording() {
+    if (!screenStream) return
+    recChunksRef.current = []
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+      ? 'video/webm;codecs=vp9' : 'video/webm'
+    try {
+      const mr = new MediaRecorder(screenStream, { mimeType })
+      mr.ondataavailable = e => { if (e.data?.size > 0) recChunksRef.current.push(e.data) }
+      mr.onstop = () => saveRecording()
+      mr.start(1000)
+      mediaRecRef.current = mr
+      recStartRef.current = Date.now()
+      setRecording(true)
+      setRecDuration(0)
+      recTimerRef.current = setInterval(() => {
+        setRecDuration(Math.floor((Date.now() - recStartRef.current) / 1000))
+      }, 1000)
+    } catch (e) { console.error('Recording failed:', e) }
+  }
+
+  function stopRecording() {
+    mediaRecRef.current?.stop()
+    clearInterval(recTimerRef.current)
+    setRecording(false)
+  }
+
+  async function saveRecording() {
+    const chunks = recChunksRef.current
+    if (!chunks.length) return
+    const blob = new Blob(chunks, { type: 'video/webm' })
+    const ts   = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+    const filename = `training-${roomId}-${ts}.webm`
+
+    // Auto-download
+    const url = URL.createObjectURL(blob)
+    const a   = document.createElement('a')
+    a.href = url; a.download = filename; a.click()
+    URL.revokeObjectURL(url)
+
+    // Upload to Supabase storage
+    try {
+      const { supabase } = await import('../lib/supabase')
+      const file = new File([blob], filename, { type: 'video/webm' })
+      await supabase.storage.from('training-recordings').upload(filename, file, { upsert: true })
+    } catch (e) { console.error('Upload failed:', e) }
+  }
+
+  // Stop recording if screen share ends
+  useEffect(() => {
+    if (!sharing && recording) stopRecording()
+  }, [sharing])
+
   function endSession() {
+    if (recording) stopRecording()
     bcRef.current?.postMessage({ type: 'end' })
     setEnded(true); setTimeout(() => window.close(), 600)
   }
@@ -249,6 +307,17 @@ export default function ScreenShareHost() {
               {label}
             </button>
           ))}
+          <button onClick={() => recording ? stopRecording() : startRecording()}
+            disabled={!sharing}
+            style={{ flex:1, height:40, position:'relative',
+                     background: recording ? 'rgba(220,38,38,.3)' : 'rgba(255,255,255,.08)',
+                     border:`1px solid ${recording ? '#dc2626' : 'rgba(255,255,255,.15)'}`,
+                     borderRadius:8, color: recording ? '#fca5a5' : (!sharing ? '#334155' : '#fff'),
+                     cursor: sharing ? 'pointer' : 'not-allowed', fontSize:13, fontWeight:700 }}>
+            {recording
+              ? <>⏹ Stop · {Math.floor(recDuration/60)}:{String(recDuration%60).padStart(2,'0')}</>
+              : '⏺ Record'}
+          </button>
           <button onClick={() => setShowChat(v => !v)}
             style={{ flex:1, height:40, position:'relative',
                      background: showChat ? 'rgba(34,197,94,.2)' : 'rgba(255,255,255,.08)',
