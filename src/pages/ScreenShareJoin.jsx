@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams }              from 'react-router-dom'
-import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 import { useWebRTCRoom }                from '../lib/webrtcRoom'
 
 function StreamVideo({ stream, muted = false, mirror = false, contain = false }) {
@@ -42,9 +41,8 @@ export default function ScreenShareJoin() {
   const urlFirm  = params.get('firm') || ''
   const urlLogo  = params.get('logo') || ''
 
-  const [ready,       setReady]       = useState(false)
-  const displayName = ready ? (FIRM.name || urlFirm || 'TaxRes CRM') : (urlFirm || '')
-  const displayLogo = ready ? (FIRM.logoUrl || urlLogo || `${window.location.origin}/assets/taxrescrm-logo.png`) : (urlLogo || '')
+  const displayName = urlFirm || 'TaxRes CRM'
+  const displayLogo = urlLogo || ''
   const [name,        setName]        = useState('')
   const [entered,     setEntered]     = useState(false)
   const [joining,     setJoining]     = useState(false)
@@ -59,7 +57,6 @@ export default function ScreenShareJoin() {
 
   const webrtc = useWebRTCRoom('screenshare')
 
-  useEffect(() => { loadFirmBrandingPublic(params.get('t')).finally(() => setReady(true)) }, [])
   useEffect(() => () => { webrtc.leave() }, []) // eslint-disable-line
   useEffect(() => { if (showChat) chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chatMsgs, showChat])
   useEffect(() => { if (showChat) setUnread(0) }, [showChat])

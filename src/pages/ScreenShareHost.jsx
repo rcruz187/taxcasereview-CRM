@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams }              from 'react-router-dom'
-import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 import { useVideoBackground }           from '../lib/videoBackground'
 import VirtualBackground                from '../components/VirtualBackground'
 
@@ -21,7 +20,6 @@ export default function ScreenShareHost() {
   const urlFirm    = params.get('firm') || ''
   const urlLogo    = params.get('logo') || ''
 
-  const [ready,         setReady]         = useState(false)
   const [ended,         setEnded]         = useState(false)
   const [screenStream,  setScreenStream]  = useState(null)
   const [sharing,       setSharing]       = useState(false)
@@ -51,7 +49,6 @@ export default function ScreenShareHost() {
   const recStartRef  = useRef(null)
   const recordingRef = useRef(false)   // mirrors recording state for callbacks
 
-  useEffect(() => { loadFirmBrandingPublic(params.get('t')).finally(() => setReady(true)) }, [])
   useEffect(() => { if (showChat) { setUnread(0); chatEndRef.current?.scrollIntoView({ behavior:'smooth' }) } }, [chatMsgs, showChat])
   useEffect(() => () => { vbg.stopLoop(); clearInterval(recTimerRef.current) }, [])
 
@@ -223,12 +220,12 @@ export default function ScreenShareHost() {
           {/* Room info — top left */}
           <div style={{ position:'absolute', top:12, left:12, display:'flex', alignItems:'center', gap:8,
                         background:'rgba(0,0,0,.65)', borderRadius:8, padding:'6px 12px', backdropFilter:'blur(8px)' }}>
-            {(urlLogo || (ready && FIRM.logoUrl)) && (
-              <img src={urlLogo || FIRM.logoUrl} alt="" style={{ height:22, objectFit:'contain' }}
+            {urlLogo && (
+              <img src={urlLogo} alt="" style={{ height:22, objectFit:'contain' }}
                 onError={e => e.target.style.display='none'} />
             )}
             <span style={{ color:'#f8fafc', fontWeight:700, fontSize:13 }}>
-              {urlFirm || (ready ? FIRM.name : 'TaxRes CRM')}
+              {urlFirm || 'TaxRes CRM'}
             </span>
             <span style={{ color:'#64748b', fontSize:11 }}>· Room</span>
             <span style={{ color:'#93c5fd', fontFamily:'monospace', fontSize:11, letterSpacing:2 }}>{roomId}</span>
