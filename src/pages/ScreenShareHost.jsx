@@ -1,9 +1,4 @@
-// ScreenShareHost — host pop-out monitor window.
-// Full-window layout: screen share fills 100% of the window.
-// Controls float as an overlay at the bottom. Camera tiles float bottom-left.
-// Chat slides in from the right as an overlay panel.
-
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams }              from 'react-router-dom'
 import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 import { useVideoBackground }           from '../lib/videoBackground'
@@ -15,61 +10,50 @@ function StreamVideo({ stream, muted = false, mirror = false, fit = 'contain' })
   return (
     <video ref={ref} autoPlay playsInline muted={muted}
       style={{ width: '100%', height: '100%', objectFit: fit,
-               display: 'block', transform: mirror ? 'scaleX(-1)' : 'none',
-               background: '#000' }} />
+               display: 'block', transform: mirror ? 'scaleX(-1)' : 'none', background: '#000' }} />
   )
 }
 
 export default function ScreenShareHost() {
-  const [params]  = useSearchParams()
-  const roomId    = (params.get('room') || '').trim().toUpperCase()
-  const hostName  = (params.get('name') || 'Host').trim()
-  const urlFirm   = params.get('firm') || ''
-  const urlLogo   = params.get('logo') || ''
+  const [params]   = useSearchParams()
+  const roomId     = (params.get('room') || '').trim().toUpperCase()
+  const hostName   = (params.get('name') || 'Host').trim()
+  const urlFirm    = params.get('firm') || ''
+  const urlLogo    = params.get('logo') || ''
 
-  const [ready,        setReady]        = useState(false)
-  const [ended,        setEnded]        = useState(false)
-  const [screenStream, setScreenStream] = useState(null)
-  const [sharing,      setSharing]      = useState(false)
-  const [participants, setParticipants] = useState(0)
-  const [selfStream,   setSelfStream]   = useState(null)
-  const [remoteStreams, setRemoteStreams] = useState({})
-  const [micOn,        setMicOn]        = useState(true)
-  const [camOn,        setCamOn]        = useState(true)
-  const [showBgPanel,  setShowBgPanel]  = useState(false)
-  const [showChat,     setShowChat]     = useState(false)
-  const [showControls, setShowControls] = useState(true)
-  const [chatMsgs,     setChatMsgs]     = useState([])
-  const [chatInput,    setChatInput]    = useState('')
-  const [unread,       setUnread]       = useState(0)
-  const chatEndRef    = useRef(null)
-  const controlsTimer = useRef(null)
+  const [ready,         setReady]         = useState(false)
+  const [ended,         setEnded]         = useState(false)
+  const [screenStream,  setScreenStream]  = useState(null)
+  const [sharing,       setSharing]       = useState(false)
+  const [participants,  setParticipants]  = useState(0)
+  const [selfStream,    setSelfStream]    = useState(null)
+  const [remoteStreams,  setRemoteStreams] = useState({})
+  const [micOn,         setMicOn]         = useState(true)
+  const [camOn,         setCamOn]         = useState(true)
+  const [showBgPanel,   setShowBgPanel]   = useState(false)
+  const [showChat,      setShowChat]      = useState(false)
+  const [chatMsgs,      setChatMsgs]      = useState([])
+  const [chatInput,     setChatInput]     = useState('')
+  const [unread,        setUnread]        = useState(0)
+  const [recording,     setRecording]     = useState(false)
+  const [recDuration,   setRecDuration]   = useState(0)
 
-  const [recording,    setRecording]    = useState(false)
-  const [recDuration,  setRecDuration]  = useState(0)
-  const mediaRecRef    = useRef(null)
-  const recChunksRef   = useRef([])
-  const recTimerRef    = useRef(null)
-  const recStartRef    = useRef(null)
-  const rawStreamRef  = useRef(null)
+  const chatEndRef   = useRef(null)
+  const bcRef        = useRef(null)
+  const vbg          = useVideoBackground()
+  const rawStreamRef = useRef(null)
   const [displayStream, setDisplayStream] = useState(null)
-  const bcRef         = useRef(null)
+
+  // Recording refs — plain refs, no stale closures
+  const mediaRecRef  = useRef(null)
+  const recChunksRef = useRef([])
+  const recTimerRef  = useRef(null)
+  const recStartRef  = useRef(null)
+  const recordingRef = useRef(false)   // mirrors recording state for callbacks
 
   useEffect(() => { loadFirmBrandingPublic(params.get('t')).finally(() => setReady(true)) }, [])
-  useEffect(() => { if (showChat) chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chatMsgs, showChat])
-  useEffect(() => { if (showChat) setUnread(0) }, [showChat])
-  useEffect(() => () => vbg.stopLoop(), [])
-
-  // Auto-hide controls after 3s of no mouse movement
-  function resetControlsTimer() {
-    setShowControls(true)
-    clearTimeout(controlsTimer.current)
-    controlsTimer.current = setTimeout(() => setShowControls(false), 3000)
-  }
-  useEffect(() => {
-    resetControlsTimer()
-    return () => clearTimeout(controlsTimer.current)
-  }, [])
+  useEffect(() => { if (showChat) { setUnread(0); chatEndRef.current?.scrollIntoView({ behavior:'smooth' }) } }, [chatMsgs, showChat])
+  useEffect(() => () => { vbg.stopLoop(); clearInterval(recTimerRef.current) }, [])
 
   function syncFromOpener() {
     try {
@@ -79,6 +63,8 @@ export default function ScreenShareHost() {
         setScreenStream(ctx.screenStream); setSharing(true)
       } else {
         setScreenStream(null); setSharing(false)
+        // Stop recording if screen share ended
+        if (recordingRef.current) stopRecording()
       }
       setParticipants(Math.max(0, ctx.memberCount || 0))
       const incoming = ctx.localStream || null
@@ -100,7 +86,7 @@ export default function ScreenShareHost() {
     const ch = new BroadcastChannel('tcr-screenshare')
     bcRef.current = ch
     ch.addEventListener('message', e => {
-      if (e.data?.type === 'end') { setEnded(true); setTimeout(() => window.close(), 800) }
+      if (e.data?.type === 'end')      { stopRecording(); setEnded(true); setTimeout(() => window.close(), 800) }
       if (e.data?.type === 'screen-state') setTimeout(syncFromOpener, 50)
       if (e.data?.type === 'chat-msg') { setChatMsgs(m => [...m, e.data.msg]); setUnread(u => u + 1) }
     })
@@ -110,65 +96,63 @@ export default function ScreenShareHost() {
     return () => { ch.close(); clearInterval(poll) }
   }, [])
 
+  // ── Recording ──────────────────────────────────────────────────────────────
   function startRecording() {
-    if (!screenStream) return
+    const stream = window.opener?._tcrScreenShare?.screenStream
+    if (!stream) return
     recChunksRef.current = []
     const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
       ? 'video/webm;codecs=vp9' : 'video/webm'
     try {
-      const mr = new MediaRecorder(screenStream, { mimeType })
+      const mr = new MediaRecorder(stream, { mimeType })
       mr.ondataavailable = e => { if (e.data?.size > 0) recChunksRef.current.push(e.data) }
-      mr.onstop = () => saveRecording()
+      mr.onstop = saveRecording
       mr.start(1000)
       mediaRecRef.current = mr
       recStartRef.current = Date.now()
+      recordingRef.current = true
       setRecording(true)
       setRecDuration(0)
       recTimerRef.current = setInterval(() => {
         setRecDuration(Math.floor((Date.now() - recStartRef.current) / 1000))
       }, 1000)
-    } catch (e) { console.error('Recording failed:', e) }
+    } catch (err) { console.error('Recording start failed:', err) }
   }
 
   function stopRecording() {
-    mediaRecRef.current?.stop()
+    if (!recordingRef.current) return
+    recordingRef.current = false
     clearInterval(recTimerRef.current)
     setRecording(false)
+    try { mediaRecRef.current?.stop() } catch {}
   }
 
   async function saveRecording() {
     const chunks = recChunksRef.current
     if (!chunks.length) return
-    const blob = new Blob(chunks, { type: 'video/webm' })
-    const ts   = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+    const blob     = new Blob(chunks, { type: 'video/webm' })
+    const ts       = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
     const filename = `training-${roomId}-${ts}.webm`
-
     // Auto-download
     const url = URL.createObjectURL(blob)
-    const a   = document.createElement('a')
-    a.href = url; a.download = filename; a.click()
-    URL.revokeObjectURL(url)
-
+    const a   = Object.assign(document.createElement('a'), { href: url, download: filename })
+    a.click(); URL.revokeObjectURL(url)
     // Upload to Supabase storage
     try {
       const { supabase } = await import('../lib/supabase')
-      const file = new File([blob], filename, { type: 'video/webm' })
-      await supabase.storage.from('training-recordings').upload(filename, file, { upsert: true })
-    } catch (e) { console.error('Upload failed:', e) }
+      await supabase.storage.from('training-recordings')
+        .upload(filename, new File([blob], filename, { type: 'video/webm' }), { upsert: true })
+    } catch (err) { console.error('Upload failed:', err) }
   }
 
-  // Stop recording if screen share ends
-  useEffect(() => {
-    if (!sharing && recording) stopRecording()
-  }, [sharing])
-
+  // ── Session controls ───────────────────────────────────────────────────────
   function endSession() {
-    if (recording) stopRecording()
+    stopRecording()
     bcRef.current?.postMessage({ type: 'end' })
     setEnded(true); setTimeout(() => window.close(), 600)
   }
-  function toggleMic()    { try { window.opener?._tcrScreenShare?.toggleMic?.()    } catch {} }
-  function toggleCam()    { try { window.opener?._tcrScreenShare?.toggleCamera?.() } catch {} }
+  function toggleMic() { try { window.opener?._tcrScreenShare?.toggleMic?.()    } catch {} }
+  function toggleCam() { try { window.opener?._tcrScreenShare?.toggleCamera?.() } catch {} }
 
   async function handleBgSelect(mode, presetId, customUrl) {
     const raw = rawStreamRef.current; if (!raw) return
@@ -177,7 +161,7 @@ export default function ScreenShareHost() {
       try {
         const t = raw.getVideoTracks()[0]
         if (t) Object.values(window.opener?._tcrScreenShare?.peerConnsRef?.current || {})
-          .forEach(pc => pc.getSenders().find(s => s.track?.kind === 'video')?.replaceTrack(t).catch(()=>{}))
+          .forEach(pc => pc.getSenders().find(s => s.track?.kind==='video')?.replaceTrack(t).catch(()=>{}))
       } catch {}; return
     }
     const out = await vbg.changeBackground(raw, mode, presetId, customUrl)
@@ -185,7 +169,7 @@ export default function ScreenShareHost() {
     try {
       const t = out.getVideoTracks()[0]
       if (t) Object.values(window.opener?._tcrScreenShare?.peerConnsRef?.current || {})
-        .forEach(pc => pc.getSenders().find(s => s.track?.kind === 'video')?.replaceTrack(t).catch(()=>{}))
+        .forEach(pc => pc.getSenders().find(s => s.track?.kind==='video')?.replaceTrack(t).catch(()=>{}))
     } catch {}
   }
 
@@ -195,11 +179,12 @@ export default function ScreenShareHost() {
     setChatMsgs(m => [...m, msg]); setChatInput('')
     try {
       window.opener?._tcrScreenShare?.channelRef?.current
-        ?.send({ type: 'broadcast', event: 'chat', payload: { name: hostName, text, ts: msg.ts } }).catch(()=>{})
+        ?.send({ type:'broadcast', event:'chat', payload:{ name:hostName, text, ts:msg.ts } }).catch(()=>{})
     } catch {}
-    bcRef.current?.postMessage({ type: 'chat-msg', msg })
+    bcRef.current?.postMessage({ type:'chat-msg', msg })
   }
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   if (ended) return (
     <div style={{ minHeight:'100vh', background:'#000', display:'flex', alignItems:'center',
                   justifyContent:'center', color:'#94a3b8', fontSize:16, fontFamily:'Arial,sans-serif' }}>
@@ -208,9 +193,11 @@ export default function ScreenShareHost() {
   )
 
   const allCams = [
-    { key: '__self__', name: `${hostName} (you)`, stream: displayStream || selfStream, muted: true, mirror: true },
-    ...Object.entries(remoteStreams).map(([name, stream]) => ({ key: name, name, stream, muted: false, mirror: false }))
+    { key:'__self__', name:`${hostName} (you)`, stream: displayStream || selfStream, muted:true,  mirror:true  },
+    ...Object.entries(remoteStreams).map(([name, stream]) => ({ key:name, name, stream, muted:false, mirror:false }))
   ]
+
+  const fmtTime = s => `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`
 
   return (
     <>
@@ -219,13 +206,11 @@ export default function ScreenShareHost() {
         html, body, #root { width: 100%; height: 100%; overflow: hidden; background: #000; }
       `}</style>
 
-      {/* Full-window container */}
-      <div onMouseMove={resetControlsTimer}
-        style={{ width: '100%', height: '100%', background: '#000', position: 'relative',
-                 display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: 'Arial, sans-serif' }}>
+      <div style={{ width:'100%', height:'100%', background:'#000', position:'relative',
+                    display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:'Arial,sans-serif' }}>
 
-        {/* Screen share — fills everything */}
-        <div style={{ flex: 1, minHeight: 0, position: 'relative', background: '#000' }}>
+        {/* Screen share area */}
+        <div style={{ flex:1, minHeight:0, position:'relative', background:'#000' }}>
           {sharing && screenStream
             ? <StreamVideo stream={screenStream} muted fit="contain" />
             : <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center',
@@ -235,10 +220,9 @@ export default function ScreenShareHost() {
               </div>
           }
 
-          {/* Floating room info — top left */}
+          {/* Room info — top left */}
           <div style={{ position:'absolute', top:12, left:12, display:'flex', alignItems:'center', gap:8,
-                        background:'rgba(0,0,0,.6)', borderRadius:8, padding:'6px 12px',
-                        opacity: 1 }}>
+                        background:'rgba(0,0,0,.65)', borderRadius:8, padding:'6px 12px', backdropFilter:'blur(8px)' }}>
             {(urlLogo || (ready && FIRM.logoUrl)) && (
               <img src={urlLogo || FIRM.logoUrl} alt="" style={{ height:22, objectFit:'contain' }}
                 onError={e => e.target.style.display='none'} />
@@ -250,21 +234,25 @@ export default function ScreenShareHost() {
             <span style={{ color:'#93c5fd', fontFamily:'monospace', fontSize:11, letterSpacing:2 }}>{roomId}</span>
             <span style={{ width:7, height:7, borderRadius:'50%', background:'#22c55e', display:'inline-block' }}/>
             <span style={{ color:'#86efac', fontSize:11 }}>{participants} participant{participants!==1?'s':''}</span>
+            {recording && (
+              <span style={{ display:'flex', alignItems:'center', gap:5, marginLeft:8 }}>
+                <span style={{ width:8, height:8, borderRadius:'50%', background:'#ef4444',
+                               animation:'pulse 1s infinite', display:'inline-block' }}/>
+                <span style={{ color:'#fca5a5', fontSize:11, fontWeight:700 }}>REC {fmtTime(recDuration)}</span>
+              </span>
+            )}
           </div>
 
           {/* End session — top right */}
           <button onClick={endSession}
             style={{ position:'absolute', top:12, right:12, background:'#dc2626', border:'none',
-                     borderRadius:7, padding:'7px 16px', color:'#fff', cursor:'pointer',
-                     fontWeight:700, fontSize:13, opacity: showControls ? 1 : 0, transition:'opacity .3s' }}>
+                     borderRadius:7, padding:'7px 16px', color:'#fff', cursor:'pointer', fontWeight:700, fontSize:13 }}>
             End session
           </button>
 
-
-
-          {/* Background picker — floating above controls */}
+          {/* Background picker */}
           {showBgPanel && (
-            <div style={{ position:'absolute', bottom:80, right: showChat ? 316 : 12,
+            <div style={{ position:'absolute', bottom:10, right: showChat ? 316 : 12,
                           width:340, zIndex:100, boxShadow:'0 8px 32px rgba(0,0,0,.8)' }}>
               <VirtualBackground bgMode={vbg.bgMode} bgPreset={vbg.bgPreset}
                 segStatus={vbg.segStatus} onSelect={handleBgSelect} />
@@ -272,7 +260,7 @@ export default function ScreenShareHost() {
           )}
         </div>
 
-        {/* Camera strip — below screen share, above controls */}
+        {/* Camera strip */}
         <div style={{ display:'flex', gap:8, padding:'8px 12px', background:'rgba(0,0,0,.85)',
                       flexShrink:0, overflowX:'auto', borderTop:'1px solid rgba(255,255,255,.06)' }}>
           {allCams.map(({ key, name, stream, muted, mirror }) => (
@@ -291,13 +279,13 @@ export default function ScreenShareHost() {
           ))}
         </div>
 
-        {/* Controls bar — fixed height at bottom */}
-        <div style={{ height:60, background:'rgba(15,23,42,.92)', borderTop:'1px solid rgba(255,255,255,.08)',
-                      display:'flex', alignItems:'center', gap:8, padding:'0 16px', flexShrink:0,
-                      opacity: 1, backdropFilter:'blur(12px)' }}>
+        {/* Controls bar */}
+        <div style={{ height:60, background:'rgba(15,23,42,.95)', borderTop:'1px solid rgba(255,255,255,.08)',
+                      display:'flex', alignItems:'center', gap:8, padding:'0 16px',
+                      flexShrink:0, backdropFilter:'blur(12px)' }}>
           {[
-            { label: micOn  ? '🎙️ Mute'      : '🔇 Unmute',    active: !micOn,  onClick: toggleMic },
-            { label: camOn  ? '📷 Stop cam'  : '📷 Start cam', active: !camOn,  onClick: toggleCam },
+            { label: micOn ? '🎙️ Mute'     : '🔇 Unmute',    active: !micOn,     onClick: toggleMic },
+            { label: camOn ? '📷 Stop cam' : '📷 Start cam', active: !camOn,     onClick: toggleCam },
             { label: `🎨 Background${vbg.bgMode!=='none'?' ●':''}`, active: showBgPanel, onClick: ()=>setShowBgPanel(v=>!v) },
           ].map(({ label, active, onClick }) => (
             <button key={label} onClick={onClick}
@@ -309,14 +297,12 @@ export default function ScreenShareHost() {
           ))}
           <button onClick={() => recording ? stopRecording() : startRecording()}
             disabled={!sharing}
-            style={{ flex:1, height:40, position:'relative',
-                     background: recording ? 'rgba(220,38,38,.3)' : 'rgba(255,255,255,.08)',
-                     border:`1px solid ${recording ? '#dc2626' : 'rgba(255,255,255,.15)'}`,
-                     borderRadius:8, color: recording ? '#fca5a5' : (!sharing ? '#334155' : '#fff'),
+            style={{ flex:1, height:40,
+                     background: recording ? 'rgba(239,68,68,.25)' : 'rgba(255,255,255,.08)',
+                     border:`1px solid ${recording ? '#ef4444' : 'rgba(255,255,255,.15)'}`,
+                     borderRadius:8, color: recording ? '#fca5a5' : (!sharing ? '#475569' : '#fff'),
                      cursor: sharing ? 'pointer' : 'not-allowed', fontSize:13, fontWeight:700 }}>
-            {recording
-              ? <>⏹ Stop · {Math.floor(recDuration/60)}:{String(recDuration%60).padStart(2,'0')}</>
-              : '⏺ Record'}
+            {recording ? `⏹ Stop · ${fmtTime(recDuration)}` : '⏺ Record'}
           </button>
           <button onClick={() => setShowChat(v => !v)}
             style={{ flex:1, height:40, position:'relative',
@@ -333,7 +319,7 @@ export default function ScreenShareHost() {
           </button>
         </div>
 
-        {/* Chat panel — slides in from right as overlay */}
+        {/* Chat panel */}
         {showChat && (
           <div style={{ position:'absolute', top:0, right:0, bottom:0, width:300,
                         background:'rgba(15,23,42,.96)', borderLeft:'1px solid rgba(255,255,255,.1)',
@@ -348,9 +334,7 @@ export default function ScreenShareHost() {
             </div>
             <div style={{ flex:1, overflowY:'auto', padding:'12px 16px', display:'flex', flexDirection:'column', gap:10 }}>
               {chatMsgs.length === 0 && (
-                <div style={{ color:'#334155', fontSize:13, textAlign:'center', marginTop:24 }}>
-                  No messages yet.
-                </div>
+                <div style={{ color:'#334155', fontSize:13, textAlign:'center', marginTop:24 }}>No messages yet.</div>
               )}
               {chatMsgs.map((m, i) => (
                 <div key={i} style={{ display:'flex', flexDirection:'column', alignItems: m.self ? 'flex-end' : 'flex-start' }}>
@@ -366,7 +350,7 @@ export default function ScreenShareHost() {
             </div>
             <div style={{ padding:'10px 12px', borderTop:'1px solid rgba(255,255,255,.08)', display:'flex', gap:8 }}>
               <input value={chatInput} onChange={e => setChatInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') sendChat() }}
+                onKeyDown={e => { if (e.key==='Enter') sendChat() }}
                 placeholder="Message participants…"
                 style={{ flex:1, background:'rgba(255,255,255,.08)', border:'1px solid rgba(255,255,255,.15)',
                          borderRadius:8, padding:'8px 10px', color:'#f1f5f9', fontSize:13, outline:'none' }} />
@@ -374,9 +358,7 @@ export default function ScreenShareHost() {
                 style={{ background:'#2563eb', border:'none', borderRadius:8, padding:'8px 14px',
                          color:'#fff', fontWeight:700, fontSize:13,
                          cursor: chatInput.trim() ? 'pointer' : 'not-allowed',
-                         opacity: chatInput.trim() ? 1 : .4 }}>
-                Send
-              </button>
+                         opacity: chatInput.trim() ? 1 : .4 }}>Send</button>
             </div>
           </div>
         )}
