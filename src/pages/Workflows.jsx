@@ -399,7 +399,7 @@ export default function Workflows() {
             </div>
 
             {/* Body */}
-            <div style={{ padding:'28px 32px', display:'flex', flexDirection:'column', gap:24, flex:1 }}>
+            <div style={{ padding:'28px 32px', display:'flex', flexDirection:'column', gap:24, flex:1, overflowY:'auto', minHeight:0 }}>
 
               {/* Workflow Name */}
               <div>
@@ -514,7 +514,7 @@ export default function Workflows() {
             </div>
 
             {/* Footer */}
-            <div style={{ display:'flex', gap:12, padding:'20px 32px 24px', borderTop:'1px solid var(--br)', justifyContent:'flex-end' }}>
+            <div style={{ display:'flex', gap:12, padding:'20px 32px 24px', borderTop:'1px solid var(--br)', justifyContent:'flex-end', flexShrink:0 }}>
               <button onClick={()=>setShowForm(false)} className="btn" style={{ padding:'10px 24px', fontSize:14 }}>Cancel</button>
               <button onClick={save} className="btn pri" disabled={saving} style={{ padding:'10px 28px', fontSize:14, fontWeight:700 }}>{saving ? 'Saving…' : editId ? 'Update Workflow' : 'Create Workflow'}</button>
             </div>
