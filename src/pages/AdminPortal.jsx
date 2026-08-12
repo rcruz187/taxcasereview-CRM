@@ -3436,7 +3436,6 @@ export default function AdminPortal() {
   useEffect(() => {
     const prev = document.title
     document.title = 'TaxRes CRM — Admin'
-    const prevFavicon = document.querySelector("link[rel*='icon']")?.href || '/favicon.png'
     const setFavicon = (href) => {
       document.querySelectorAll("link[rel*='icon']").forEach(el => el.remove())
       const link = document.createElement('link')
@@ -3448,7 +3447,8 @@ export default function AdminPortal() {
     setFavicon('/taxrescrm-favicon.png')
     return () => {
       document.title = prev
-      setFavicon(prevFavicon)
+      // Always restore TaxRes CRM favicon — never restore a tenant favicon
+      setFavicon('/taxrescrm-favicon.png')
     }
   }, [])
 
