@@ -1,10 +1,4 @@
 // ScreenShareJoin — public join page at /screenshare?room=XXXXX
-//
-// KEY FIX: Instead of guessing which stream is the screen by resolution,
-// we listen for 'screen-state' broadcasts from the host on the same
-// Supabase Realtime channel. The host sends { host, sharing } when they
-// start/stop sharing — we use that to route the right remote stream to
-// the main tile and cameras to the strip below.
 
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams }              from 'react-router-dom'
@@ -28,9 +22,8 @@ function CamTile({ stream, name, muted = false, mirror = false }) {
     <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden',
                   background: '#1e293b', aspectRatio: '4/3' }}>
       {hasVideo
-        ? <StreamVideo stream={stream} muted={muted} mirror={mirror} cover />
-        : <div style={{ width: '100%', height: '100%', display: 'flex',
-                        alignItems: 'center', justifyContent: 'center' }}>
+        ? <StreamVideo stream={stream} muted={muted} mirror={mirror} />
+        : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#2563eb',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: 16, fontWeight: 700, color: '#fff' }}>{initials}</div>
@@ -46,27 +39,30 @@ function CamTile({ stream, name, muted = false, mirror = false }) {
 export default function ScreenShareJoin() {
   const [params] = useSearchParams()
   const roomId   = (params.get('room') || '').trim().toUpperCase()
-  // Branding from URL params (passed by Training.jsx) — falls back to loaded FIRM
   const urlFirm  = params.get('firm') || ''
   const urlLogo  = params.get('logo') || ''
 
-  const [ready,         setReady]         = useState(false)
-  // Prefer URL-passed branding; fall back to loaded FIRM once ready
-  // Wait for loadFirmBrandingPublic to finish before showing branding.
-  // ?firm= and ?logo= are fallbacks if the tenant param isn't set.
+  const [ready,       setReady]       = useState(false)
   const displayName = ready ? (FIRM.name || urlFirm || 'TaxRes CRM') : (urlFirm || '')
   const displayLogo = ready ? (FIRM.logoUrl || urlLogo || `${window.location.origin}/assets/taxrescrm-logo.png`) : (urlLogo || '')
-  const [name,          setName]          = useState('')
-  const [entered,       setEntered]       = useState(false)
-  const [joining,       setJoining]       = useState(false)
-  // { host: string, sharing: bool } — from broadcast, reliable source of truth
-  const [screenState,   setScreenState]   = useState(null)
+  const [name,        setName]        = useState('')
+  const [entered,     setEntered]     = useState(false)
+  const [joining,     setJoining]     = useState(false)
+  const [screenState, setScreenState] = useState(null)
+
+  // Chat
+  const [showChat,  setShowChat]  = useState(false)
+  const [chatMsgs,  setChatMsgs]  = useState([])
+  const [chatInput, setChatInput] = useState('')
+  const [unread,    setUnread]    = useState(0)
+  const chatEndRef  = useRef(null)
 
   const webrtc = useWebRTCRoom('screenshare')
-  // remoteScreenStreams is available on webrtc object from webrtcRoom.js
 
   useEffect(() => { loadFirmBrandingPublic(params.get('t')).finally(() => setReady(true)) }, [])
   useEffect(() => () => { webrtc.leave() }, []) // eslint-disable-line
+  useEffect(() => { if (showChat) chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chatMsgs, showChat])
+  useEffect(() => { if (showChat) setUnread(0) }, [showChat])
 
   async function handleJoin() {
     if (!name.trim() || !roomId) return
@@ -75,24 +71,34 @@ export default function ScreenShareJoin() {
     setJoining(false)
     if (!result.ok) return
 
-    // Subscribe to screen-state broadcasts from the host
     webrtc.channelRef.current?.on('broadcast', { event: 'screen-state' }, ({ payload }) => {
-      setScreenState(payload)  // { host, sharing }
+      setScreenState(payload)
     })
-    // Request the current screen state immediately in case we joined after sharing started
     webrtc.channelRef.current?.send({
       type: 'broadcast', event: 'request-screen-state', payload: { from: name.trim() }
     })
-
+    // Subscribe to chat messages from host
+    webrtc.channelRef.current?.on('broadcast', { event: 'chat' }, ({ payload }) => {
+      setChatMsgs(m => [...m, { ...payload, self: false }])
+      setUnread(u => u + 1)
+    })
     setEntered(true)
   }
 
-  const myName = name.trim()
-  const peers  = webrtc.members.filter(n => n !== myName)
+  function sendChat() {
+    const text = chatInput.trim()
+    if (!text || !webrtc.channelRef.current) return
+    const msg = { name: name.trim(), text, ts: Date.now(), self: true }
+    setChatMsgs(m => [...m, msg])
+    setChatInput('')
+    webrtc.channelRef.current.send({
+      type: 'broadcast', event: 'chat', payload: { name: name.trim(), text, ts: msg.ts }
+    }).catch(() => {})
+  }
 
-  // The screen stream — from the dedicated screen track (separated from camera in ontrack)
-  // Falls back to broadcast-flagged stream if label-detection didn't catch it
-  const hostName   = screenState?.host || ''
+  const myName   = name.trim()
+  const peers    = webrtc.members.filter(n => n !== myName)
+  const hostName = screenState?.host || ''
   const hostStream = screenState?.sharing && hostName
     ? (webrtc.remoteScreenStreams[hostName] || webrtc.remoteStreams[hostName] || null)
     : null
@@ -117,14 +123,12 @@ export default function ScreenShareJoin() {
               ? <>Room <span style={{ color: '#93c5fd', fontFamily: 'monospace', letterSpacing: 3, fontWeight: 800 }}>{roomId}</span></>
               : 'No room code in this link.'}
           </div>
-
           {webrtc.error && (
             <div style={{ background: '#450a0a', border: '1px solid #991b1b', borderRadius: 8,
                           padding: '10px 14px', color: '#fca5a5', fontSize: 13, marginBottom: 16 }}>
               {webrtc.error}
             </div>
           )}
-
           <input value={name} onChange={e => setName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleJoin() }}
             placeholder="Your name" disabled={!roomId} autoFocus
@@ -147,8 +151,8 @@ export default function ScreenShareJoin() {
 
   // ── In-session ────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: '100vh', background: '#0f172a', display: 'flex',
-                  flexDirection: 'column', fontFamily: 'Arial, sans-serif' }}>
+    <div style={{ height: '100vh', background: '#0f172a', display: 'flex',
+                  flexDirection: 'column', fontFamily: 'Arial, sans-serif', overflow: 'hidden' }}>
 
       {/* Header */}
       <div style={{ background: '#1e293b', borderBottom: '1px solid #334155',
@@ -157,9 +161,7 @@ export default function ScreenShareJoin() {
           <img src={displayLogo} alt="" style={{ height: 30, objectFit: 'contain' }}
             onError={e => { e.target.style.display = 'none' }} />
         )}
-        <span style={{ color: '#f8fafc', fontWeight: 700, fontSize: 15 }}>
-          {displayName}
-        </span>
+        <span style={{ color: '#f8fafc', fontWeight: 700, fontSize: 15 }}>{displayName}</span>
         <span style={{ color: '#64748b', fontSize: 12 }}>
           · Room <span style={{ fontFamily: 'monospace', color: '#93c5fd', letterSpacing: 2 }}>{roomId}</span>
         </span>
@@ -174,57 +176,119 @@ export default function ScreenShareJoin() {
         </button>
       </div>
 
-      {/* Main — screen share fills this area when host is sharing */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 16, gap: 12, overflow: 'auto' }}>
+      {/* Body */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
-        {hostStream ? (
-          <div style={{ flex: 1, minHeight: 260, borderRadius: 12, overflow: 'hidden', background: '#0d1526' }}>
-            <StreamVideo stream={hostStream} contain />
-            <div style={{ padding: '6px 12px', background: '#1e293b', fontSize: 12, color: '#94a3b8',
-                          display: 'flex', gap: 6, alignItems: 'center' }}>
-              <span style={{ color: '#22c55e', fontSize: 10 }}>●</span>
-              {screenState.host}'s screen
+        {/* Video column */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 16, gap: 12, overflow: 'auto' }}>
+
+          {hostStream ? (
+            <div style={{ flex: 1, minHeight: 260, borderRadius: 12, overflow: 'hidden', background: '#0d1526' }}>
+              <StreamVideo stream={hostStream} contain />
+              <div style={{ padding: '6px 12px', background: '#1e293b', fontSize: 12, color: '#94a3b8',
+                            display: 'flex', gap: 6, alignItems: 'center' }}>
+                <span style={{ color: '#22c55e', fontSize: 10 }}>●</span>
+                {screenState.host}'s screen
+              </div>
             </div>
+          ) : (
+            <div style={{ flex: 1, minHeight: 200, display: 'flex', alignItems: 'center',
+                          justifyContent: 'center', color: '#475569', fontSize: 15,
+                          background: '#1e293b', borderRadius: 12 }}>
+              {peers.length === 0 ? 'Waiting for the host to join…' : 'Waiting for host to share their screen…'}
+            </div>
+          )}
+
+          {/* Camera strip */}
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ width: 220 }}>
+              <CamTile stream={webrtc.localStreamRef.current} name={`${myName} (you)`} muted mirror />
+            </div>
+            {peers.map(pName => (
+              <div key={pName} style={{ width: 220 }}>
+                <CamTile stream={webrtc.remoteStreams[pName]} name={pName} />
+              </div>
+            ))}
           </div>
-        ) : (
-          <div style={{ flex: 1, minHeight: 200, display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', color: '#475569', fontSize: 15,
-                        background: '#1e293b', borderRadius: 12 }}>
-            {peers.length === 0
-              ? 'Waiting for the host to join…'
-              : 'Waiting for host to share their screen…'}
+
+          {/* Controls */}
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button onClick={webrtc.toggleMic}
+              style={{ flex: 1, padding: '10px 0', background: webrtc.micOn ? '#1e293b' : '#dc2626',
+                       border: '1px solid #334155', borderRadius: 8, color: '#fff',
+                       cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+              {webrtc.micOn ? '🎙️ Mute' : '🔇 Unmute'}
+            </button>
+            <button onClick={webrtc.toggleCamera}
+              style={{ flex: 1, padding: '10px 0', background: webrtc.cameraOn ? '#1e293b' : '#dc2626',
+                       border: '1px solid #334155', borderRadius: 8, color: '#fff',
+                       cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+              {webrtc.cameraOn ? '📷 Stop cam' : '📷 Start cam'}
+            </button>
+            <button onClick={() => setShowChat(v => !v)}
+              style={{ flex: 1, padding: '10px 0', position: 'relative',
+                       background: showChat ? 'rgba(34,197,94,.2)' : '#1e293b',
+                       border: `1px solid ${showChat ? '#22c55e' : '#334155'}`,
+                       borderRadius: 8, color: showChat ? '#86efac' : '#fff',
+                       cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+              💬 Chat
+              {unread > 0 && !showChat && (
+                <span style={{ position:'absolute',top:6,right:8,background:'#ef4444',color:'#fff',
+                               borderRadius:'50%',fontSize:10,fontWeight:800,width:16,height:16,
+                               display:'flex',alignItems:'center',justifyContent:'center' }}>{unread}</span>
+              )}
+            </button>
+          </div>
+          {webrtc.error && <div style={{ fontSize: 12, color: '#fca5a5' }}>{webrtc.error}</div>}
+        </div>
+
+        {/* Chat sidebar */}
+        {showChat && (
+          <div style={{ width: 300, borderLeft: '1px solid #1e293b', display: 'flex',
+                        flexDirection: 'column', background: '#0f172a', flexShrink: 0 }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid #1e293b',
+                          fontSize: 13, fontWeight: 700, color: '#94a3b8',
+                          textTransform: 'uppercase', letterSpacing: '.05em' }}>
+              Session Chat
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px',
+                          display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {chatMsgs.length === 0 && (
+                <div style={{ color: '#334155', fontSize: 13, textAlign: 'center', marginTop: 24 }}>
+                  No messages yet — type a question below.
+                </div>
+              )}
+              {chatMsgs.map((m, i) => (
+                <div key={i} style={{ display: 'flex', flexDirection: 'column',
+                                      alignItems: m.self ? 'flex-end' : 'flex-start' }}>
+                  <div style={{ fontSize: 10, color: '#475569', marginBottom: 3, fontWeight: 600 }}>{m.name}</div>
+                  <div style={{ maxWidth: 220, padding: '8px 12px', borderRadius: 10,
+                                background: m.self ? '#1d4ed8' : '#1e293b',
+                                color: '#f1f5f9', fontSize: 13, lineHeight: 1.5,
+                                borderBottomRightRadius: m.self ? 2 : 10,
+                                borderBottomLeftRadius: m.self ? 10 : 2 }}>
+                    {m.text}
+                  </div>
+                </div>
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+            <div style={{ padding: '10px 12px', borderTop: '1px solid #1e293b', display: 'flex', gap: 8 }}>
+              <input value={chatInput} onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') sendChat() }}
+                placeholder="Ask a question…"
+                style={{ flex: 1, background: '#1e293b', border: '1px solid #334155', borderRadius: 8,
+                         padding: '8px 10px', color: '#f1f5f9', fontSize: 13, outline: 'none' }} />
+              <button onClick={sendChat} disabled={!chatInput.trim()}
+                style={{ background: '#2563eb', border: 'none', borderRadius: 8, padding: '8px 14px',
+                         color: '#fff', fontWeight: 700, fontSize: 13,
+                         cursor: chatInput.trim() ? 'pointer' : 'not-allowed',
+                         opacity: chatInput.trim() ? 1 : .4 }}>
+                Send
+              </button>
+            </div>
           </div>
         )}
-
-        {/* Camera strip — all participants except host when they're sharing screen
-             (host's stream = screen content after replaceTrack, not their camera) */}
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <div style={{ width: 220 }}>
-            <CamTile stream={webrtc.localStreamRef.current} name={`${myName} (you)`} muted mirror />
-          </div>
-          {peers.map(pName => (
-            <div key={pName} style={{ width: 220 }}>
-              <CamTile stream={webrtc.remoteStreams[pName]} name={pName} />
-            </div>
-          ))}
-        </div>
-
-        {/* Controls */}
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={webrtc.toggleMic}
-            style={{ flex: 1, padding: '10px 0', background: webrtc.micOn ? '#1e293b' : '#dc2626',
-                     border: '1px solid #334155', borderRadius: 8, color: '#fff',
-                     cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
-            {webrtc.micOn ? '🎙️ Mute' : '🔇 Unmute'}
-          </button>
-          <button onClick={webrtc.toggleCamera}
-            style={{ flex: 1, padding: '10px 0', background: webrtc.cameraOn ? '#1e293b' : '#dc2626',
-                     border: '1px solid #334155', borderRadius: 8, color: '#fff',
-                     cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
-            {webrtc.cameraOn ? '📷 Stop cam' : '📷 Start cam'}
-          </button>
-        </div>
-        {webrtc.error && <div style={{ fontSize: 12, color: '#fca5a5' }}>{webrtc.error}</div>}
       </div>
     </div>
   )

@@ -52,6 +52,9 @@ export function ScreenShareProvider({ children }) {
       cameraOn:      webrtc.cameraOn,
       toggleMic:     webrtc.toggleMic,
       toggleCamera:  webrtc.toggleCamera,
+      // Exposed so the host pop-out can send chat messages directly on the channel
+      channelRef:    webrtc.channelRef,
+      peerConnsRef:  webrtc.peerConnsRef,
     }
   }, [sharingScreen, screenStream, webrtc.members, webrtc.remoteStreams, webrtc.micOn, webrtc.cameraOn, webrtc.joined])
 
@@ -170,6 +173,10 @@ export function ScreenShareProvider({ children }) {
       if (stateRef.current?.sharingScreen && stateRef.current?.myName) {
         broadcastScreenState(true, stateRef.current.myName)
       }
+    })
+    // Relay incoming chat messages to the host pop-out via BroadcastChannel
+    webrtc.channelRef?.current?.on('broadcast', { event: 'chat' }, ({ payload }) => {
+      getBC().postMessage({ type: 'chat-msg', msg: { ...payload, self: false } })
     })
     return { ok: true, roomId: id }
   }
