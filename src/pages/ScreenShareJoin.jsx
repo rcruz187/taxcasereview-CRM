@@ -151,7 +151,7 @@ export default function ScreenShareJoin() {
 
   // ── In-session ────────────────────────────────────────────────────────────
   return (
-    <div style={{ height: '100vh', background: '#0f172a', display: 'flex',
+    <div style={{ height: '100dvh', minHeight: '-webkit-fill-available', background: '#0f172a', display: 'flex',
                   flexDirection: 'column', fontFamily: 'Arial, sans-serif', overflow: 'hidden' }}>
 
       {/* Header */}
@@ -202,12 +202,12 @@ export default function ScreenShareJoin() {
           )}
 
           {/* Camera strip */}
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <div style={{ width: 220 }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', flexShrink: 0, maxHeight: 180, overflow: 'hidden' }}>
+            <div style={{ width: 160, flexShrink: 0 }}>
               <CamTile stream={webrtc.localStreamRef.current} name={`${myName} (you)`} muted mirror />
             </div>
             {peers.map(pName => (
-              <div key={pName} style={{ width: 220 }}>
+              <div key={pName} style={{ width: 160, flexShrink: 0 }}>
                 <CamTile stream={webrtc.remoteStreams[pName]} name={pName} />
               </div>
             ))}
