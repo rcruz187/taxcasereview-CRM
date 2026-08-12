@@ -15,6 +15,7 @@ serve(async (req) => {
     )
 
     const GROQ_KEY = Deno.env.get('GROQ_API_KEY')!
+    const ANTHROPIC_KEY = Deno.env.get('ANTHROPIC_API_KEY')!
 
     // Download the audio file
     const audioRes = await fetch(recording_url)
@@ -23,12 +24,9 @@ serve(async (req) => {
       return new Response('audio download failed', { status: 200 })
     }
 
-    // Convert audio to base64 for transcription
-    // Since Groq doesn't support audio directly, use the Whisper API for transcription
+    // Transcribe with Groq Whisper (audio-to-text — Claude does not do audio)
     const audioBytes = await audioRes.arrayBuffer()
     const blob = new Blob([audioBytes], { type: 'audio/mp3' })
-    
-    // Transcribe with Groq Whisper
     const formData = new FormData()
     formData.append('file', blob, 'recording.mp3')
     formData.append('model', 'whisper-large-v3')
@@ -47,36 +45,31 @@ serve(async (req) => {
       console.error('call-ai-summary: Whisper error', await transcribeRes.text())
     }
 
-    // Now analyze the transcript with Groq LLM
+    // Analyze transcript with Claude
     let summary = '', key_points: string[] = [], action_items: string[] = [], sentiment = 'Unknown', next_steps = ''
 
     if (transcript) {
-      const analysisRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      const analysisRes = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${GROQ_KEY}`,
+          'x-api-key': ANTHROPIC_KEY,
+          'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are an AI assistant for a tax resolution firm. Analyze call transcripts and return JSON only.'
-            },
-            {
-              role: 'user',
-              content: `Analyze this call transcript and return ONLY a JSON object with these keys: summary (2-3 sentences), key_points (array of strings), action_items (array of strings - specific tasks), sentiment (one of: Positive/Neutral/Concerned/Frustrated), next_steps (string).\n\nTranscript:\n${transcript}`
-            }
-          ],
+          model: 'claude-sonnet-4-6',
           max_tokens: 1024,
-          temperature: 0.1,
+          system: 'You are an AI assistant for a tax resolution firm. Analyze call transcripts and return JSON only. No preamble, no markdown, just the raw JSON object.',
+          messages: [{
+            role: 'user',
+            content: `Analyze this tax resolution call transcript and return ONLY a JSON object with these keys: summary (2-3 sentences describing what was discussed), key_points (array of strings — important facts, IRS notices mentioned, balances, deadlines), action_items (array of strings — specific tasks that need to be done after this call), sentiment (one of: Positive/Neutral/Concerned/Frustrated), next_steps (string — what happens next).\n\nTranscript:\n${transcript}`
+          }]
         })
       })
 
       if (analysisRes.ok) {
         const analysisData = await analysisRes.json()
-        const rawText = analysisData.choices?.[0]?.message?.content || ''
+        const rawText = analysisData.content?.[0]?.text || ''
         try {
           const jsonMatch = rawText.match(/\{[\s\S]*\}/)
           if (jsonMatch) {
@@ -93,65 +86,36 @@ serve(async (req) => {
       }
     }
 
-    // Find matching client/case by phone number
-    let case_id = null
-    let client_id = null
-    let client_name = ""
+    // Find matching client by phone number
+    let case_id = null, client_id = null, client_name = ''
     const searchPhone = (from_number || to_number || '').replace(/\D/g, '').slice(-10)
     if (searchPhone) {
       const { data: client } = await supabase
-        .from('clients')
-        .select('id, name')
-        .eq('tenant_id', tenant_id)
+        .from('clients').select('id, name').eq('tenant_id', tenant_id)
         .or(`phone.ilike.%${searchPhone}%,mobile.ilike.%${searchPhone}%`)
-        .limit(1)
-        .maybeSingle()
-
+        .limit(1).maybeSingle()
       if (client) {
-        client_id = client.id
-        client_name = client.name || ""
+        client_id = client.id; client_name = client.name || ''
         const { data: caseRow } = await supabase
-          .from('cases')
-          .select('id')
-          .eq('tenant_id', tenant_id)
-          .eq('client_id', client_id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
+          .from('cases').select('id').eq('tenant_id', tenant_id).eq('client_id', client_id)
+          .order('created_at', { ascending: false }).limit(1).maybeSingle()
         if (caseRow) case_id = caseRow.id
       }
     }
 
     // Save to DB
     await supabase.from('call_ai_summaries').insert({
-      tenant_id,
-      call_sid,
-      from_number,
-      to_number,
-      duration_seconds,
-      recording_url,
-      transcript,
-      summary,
-      key_points,
-      action_items,
-      sentiment,
-      next_steps,
-      client_id,
-      case_id,
-      created_at: new Date().toISOString()
+      tenant_id, call_sid, from_number, to_number, duration_seconds, recording_url,
+      transcript, summary, key_points, action_items, sentiment, next_steps,
+      client_id, case_id, created_at: new Date().toISOString()
     })
 
     // Auto-create tasks from action items
     if (action_items.length > 0 && client_id) {
       await supabase.from('tasks').insert(
         action_items.map((item: string) => ({
-          tenant_id,
-          client_id,
-          clientName: client_name,
-          linkedcase: case_id || null,
-          title: item,
-          status_label: 'Open',
-          created_at: new Date().toISOString(),
+          tenant_id, client_id, clientName: client_name, linkedcase: case_id || null,
+          title: item, status_label: 'Open', created_at: new Date().toISOString(),
         }))
       )
     }
