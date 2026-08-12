@@ -29,13 +29,14 @@ export function ScreenShareProvider({ children }) {
   const [roomId,        setRoomId]        = useState('')
   const [minimized,     setMinimized]     = useState(false)
   const [sharingScreen, setSharingScreen] = useState(false)
+  const [myName,        setMyName       ] = useState('')
   const [screenStream,  setScreenStream]  = useState(null)
   const [remoteScreenState, setRemoteScreenState] = useState(null)
 
   const webrtc         = useWebRTCRoom('screenshare')
   const screenTrackRef = useRef(null)
   const stateRef       = useRef({})
-  stateRef.current     = { webrtc, screenStream, sharingScreen }
+  stateRef.current     = { webrtc, screenStream, sharingScreen, myName }
 
   // Expose screen state on window so the pop-out can read it directly (same-origin)
   useEffect(() => {
@@ -45,13 +46,14 @@ export function ScreenShareProvider({ children }) {
       // The pop-out must drive the REAL session mic/camera, not a second
       // getUserMedia of its own — otherwise its mute button silences a
       // stream nobody is listening to and participants still hear the host.
-      localStream:  webrtc.localStreamRef.current,
-      micOn:        webrtc.micOn,
-      cameraOn:     webrtc.cameraOn,
-      toggleMic:    webrtc.toggleMic,
-      toggleCamera: webrtc.toggleCamera,
+      localStream:   webrtc.localStreamRef.current,
+      remoteStreams:  webrtc.remoteStreams,
+      micOn:         webrtc.micOn,
+      cameraOn:      webrtc.cameraOn,
+      toggleMic:     webrtc.toggleMic,
+      toggleCamera:  webrtc.toggleCamera,
     }
-  }, [sharingScreen, screenStream, webrtc.members, webrtc.micOn, webrtc.cameraOn, webrtc.joined])
+  }, [sharingScreen, screenStream, webrtc.members, webrtc.remoteStreams, webrtc.micOn, webrtc.cameraOn, webrtc.joined])
 
   // Broadcast member list to pop-out whenever it changes
   useEffect(() => {
@@ -98,18 +100,39 @@ export function ScreenShareProvider({ children }) {
     getBC().postMessage({ type: 'screen-state', host: myName, sharing })
   }
 
-  function replacePeerTracks(newTrack) {
+  // screenSendersRef tracks the extra sender added for the screen track
+  // so we can remove it cleanly when screen sharing stops.
+  const screenSendersRef = { current: [] }
+
+  function addScreenTrackToPeers(track) {
     const pcs = stateRef.current.webrtc.peerConnsRef.current
+    const stream = stateRef.current.webrtc.localStreamRef.current
+    screenSendersRef.current = []
     Object.values(pcs).forEach(pc => {
-      const sender = pc.getSenders().find(s => s.track?.kind === 'video')
-      if (!sender) return
-      if (newTrack) {
-        sender.replaceTrack(newTrack).catch(() => {})
-      } else {
-        const cam = stateRef.current.webrtc.localStreamRef.current?.getVideoTracks()[0]
-        if (cam) sender.replaceTrack(cam).catch(() => {})
-      }
+      try {
+        const sender = pc.addTrack(track, stream || new MediaStream([track]))
+        screenSendersRef.current.push(sender)
+      } catch (_) {}
     })
+  }
+
+  function removeScreenTrackFromPeers() {
+    const pcs = stateRef.current.webrtc.peerConnsRef.current
+    screenSendersRef.current.forEach(sender => {
+      Object.values(pcs).forEach(pc => {
+        try { pc.removeTrack(sender) } catch (_) {}
+      })
+    })
+    screenSendersRef.current = []
+  }
+
+  // Keep replacePeerTracks for stop-share camera restore
+  function replacePeerTracks(newTrack) {
+    if (newTrack) {
+      addScreenTrackToPeers(newTrack)
+    } else {
+      removeScreenTrackFromPeers()
+    }
   }
 
   function _resetState() {
@@ -135,6 +158,7 @@ export function ScreenShareProvider({ children }) {
   async function startSession(myName) {
     const id = makeRoomId()
     setRoomId(id); setActive(true); setMinimized(false)
+    setMyName(myName)
     const result = await webrtc.join(id, myName, true)
     if (!result.ok) { setActive(false); return { ok: false, reason: result.reason } }
     // Listen for screen-state from other participants
@@ -152,6 +176,7 @@ export function ScreenShareProvider({ children }) {
 
   async function joinSession(id, myName) {
     setRoomId(id); setActive(true); setMinimized(false)
+    setMyName(myName)
     const result = await webrtc.join(id, myName, true)
     if (!result.ok) { setActive(false); return { ok: false, reason: result.reason } }
     return { ok: true }
@@ -166,6 +191,10 @@ export function ScreenShareProvider({ children }) {
       const track    = stream.getVideoTracks()[0]
       const settings = track.getSettings?.() || {}
       track._surface = settings.displaySurface
+      // contentHint='detail' propagates through WebRTC to the receiver's ontrack handler.
+      // This is the only reliable cross-browser signal — getSettings().displaySurface
+      // is sender-only and not available on the received track.
+      track.contentHint = 'detail'
 
       screenTrackRef.current = track
       // Late joiners get this track at peer-connection creation time
