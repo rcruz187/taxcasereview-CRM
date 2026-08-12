@@ -51,8 +51,8 @@ serve(async (req) => {
       })
     }
     // Fall back to the CRM app URL if success/cancel URLs not explicitly set
-    const successUrl = STRIPE_SUCCESS_URL || 'https://taxresolutioncrm.github.io/taxcasereview-CRM/'
-    const cancelUrl  = STRIPE_CANCEL_URL  || 'https://taxresolutioncrm.github.io/taxcasereview-CRM/'
+    const successUrl = STRIPE_SUCCESS_URL || 'https://taxrescrm.app/'
+    const cancelUrl  = STRIPE_CANCEL_URL  || 'https://taxrescrm.app/'
 
 
     const { recordType, recordId, name, email, amount, description, purpose } = await req.json()
