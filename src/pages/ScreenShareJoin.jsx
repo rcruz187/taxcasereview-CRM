@@ -52,8 +52,10 @@ export default function ScreenShareJoin() {
 
   const [ready,         setReady]         = useState(false)
   // Prefer URL-passed branding; fall back to loaded FIRM once ready
-  const displayName = urlFirm || (ready ? (FIRM.name || 'Training session') : 'Training session')
-  const displayLogo = urlLogo || (ready ? FIRM.logoUrl : '')
+  // Wait for loadFirmBrandingPublic to finish before showing branding.
+  // ?firm= and ?logo= are fallbacks if the tenant param isn't set.
+  const displayName = ready ? (FIRM.name || urlFirm || 'TaxRes CRM') : (urlFirm || '')
+  const displayLogo = ready ? (FIRM.logoUrl || urlLogo || `${window.location.origin}/assets/taxrescrm-logo.png`) : (urlLogo || '')
   const [name,          setName]          = useState('')
   const [entered,       setEntered]       = useState(false)
   const [joining,       setJoining]       = useState(false)
@@ -194,7 +196,8 @@ export default function ScreenShareJoin() {
           </div>
         )}
 
-        {/* Camera strip — all participants */}
+        {/* Camera strip — all participants except host when they're sharing screen
+             (host's stream = screen content after replaceTrack, not their camera) */}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <div style={{ width: 160 }}>
             <CamTile stream={webrtc.localStreamRef.current} name={`${myName} (you)`} muted mirror />
