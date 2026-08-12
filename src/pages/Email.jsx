@@ -98,31 +98,31 @@ export default function Email() {
   // Realtime subscription — fires immediately when a new inbound email arrives
   useEffect(() => {
     if (!user?.email) return
+    const owner = user.email
     const channel = supabase
-      .channel('email-inbox-notify')
+      .channel(`email-inbox-notify-${owner}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'emails',
-        filter: `direction=eq.inbound`,
+        filter: `mailbox_owner=eq.${owner}`,
       }, (payload) => {
         const e = payload.new
-        // Reload inbox
-        load()
+        // Only notify for inbound (triage=Inbox means it came in, Sent means we sent it)
+        if (e.triage === 'Sent') return
+        // Add directly to state — no stale-closure load() call
+        setEmails(prev => {
+          if (prev.some(x => x.id === e.id)) return prev
+          return [e, ...prev]
+        })
         // Browser notification
+        const title = 'New Email'
+        const body = `From: ${e.clientName || e.recipient || 'Unknown'} — ${e.subject || '(no subject)'}`
         if (Notification.permission === 'granted') {
-          new Notification('New Email', {
-            body: `From: ${e.clientName || e.recipient || 'Unknown'} — ${e.subject || '(no subject)'}`,
-            icon: '/favicon.png',
-          })
+          new Notification(title, { body, icon: '/favicon.png' })
         } else if (Notification.permission !== 'denied') {
           Notification.requestPermission().then(perm => {
-            if (perm === 'granted') {
-              new Notification('New Email', {
-                body: `From: ${e.clientName || e.recipient || 'Unknown'} — ${e.subject || '(no subject)'}`,
-                icon: '/favicon.png',
-              })
-            }
+            if (perm === 'granted') new Notification(title, { body, icon: '/favicon.png' })
           })
         }
       })
@@ -182,7 +182,16 @@ export default function Email() {
       supabase.from('clients').select('id,name,email'),
       supabase.from('leads').select('id,name,email'),
     ])
-    if (e) setEmails(e)
+    if (e) {
+      // Preserve is_read=true for any email the user already opened this session.
+      // Without this, a background lastSyncAt reload resets the unread dot on
+      // emails the user just clicked — the DB write from markRead() can race
+      // with the reload and the fetch wins with the old value.
+      setEmails(prev => {
+        const localRead = new Set(prev.filter(x => x.is_read).map(x => x.id))
+        return e.map(row => localRead.has(row.id) ? { ...row, is_read: true } : row)
+      })
+    }
     if (c) setClients(c)
     if (l) setLeads(l)
   }
