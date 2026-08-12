@@ -5,10 +5,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useScreenShare } from '../context/ScreenShareContext'
 import { useApp }         from '../context/AppContext'
-import { supabase }       from '../lib/supabase'
-import { FIRM, firmFooterLine } from '../lib/firmBranding'
 
-const BASE = '/'
+const BASE = '/taxcasereview-CRM'
 
 function ScreenPreview({ stream }) {
   const ref = useRef(null)
@@ -27,35 +25,6 @@ export default function Training() {
 
   const [starting, setStarting] = useState(false)
   const [copied,   setCopied]   = useState(false)
-
-  // Capture FIRM into React state on mount — FIRM is a mutable module object that
-  // may not be set yet as a plain const. Reading it in useEffect guarantees we get
-  // the branding that AdminTraining loaded before rendering this component.
-  const [firmName,     setFirmName]     = useState(() => FIRM.name || '')
-  const [firmLogo,     setFirmLogo]     = useState(() => FIRM.logoUrl || '')
-  const [firmTenantId, setFirmTenantId] = useState(() => FIRM.tenantId || '')
-  const [firmEmail,    setFirmEmail]    = useState(() => FIRM.email || '')
-  useEffect(() => {
-    // AdminTraining awaits set_admin_tenant_override + loadFirmBranding before
-    // rendering us, but FIRM may still be mid-load. Poll briefly to capture it.
-    const apply = () => {
-      if (FIRM.name) {
-        setFirmName(FIRM.name)
-        setFirmLogo(FIRM.logoUrl || '')
-        setFirmTenantId(FIRM.tenantId || '')
-        setFirmEmail(FIRM.email || '')
-      }
-    }
-    apply()
-    const t = setTimeout(apply, 300)
-    const t2 = setTimeout(apply, 800)
-    return () => { clearTimeout(t); clearTimeout(t2) }
-  }, [])
-
-  // Email the invite link straight from this page
-  const [emailOpen,   setEmailOpen]   = useState(false)
-  const [emailTo,     setEmailTo]     = useState('')
-  const [emailSending,setEmailSending]= useState(false)
 
   // Screen label (Entire screen / Window / Browser tab)
   const [screenLabel, setScreenLabel] = useState('')
@@ -81,90 +50,21 @@ export default function Training() {
   }
 
   function copyLink() {
-    const firmParam = (FIRM.name || firmName) ? `&firm=${encodeURIComponent(FIRM.name || firmName)}` : ''
-    const _logo = FIRM.logoUrl?.startsWith('https://') ? FIRM.logoUrl : FIRM.logoUrl ? `${window.location.origin}${FIRM.logoUrl}` : safeLogo; const logoParam = _logo ? `&logo=${encodeURIComponent(_logo)}` : ''
-    const tParam = (FIRM.tenantId || firmTenantId) ? `&t=${encodeURIComponent(FIRM.tenantId || firmTenantId)}` : ''
-    const url = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${firmParam}${logoParam}${tParam}`
+    const url = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}`
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true); setTimeout(() => setCopied(false), 2000)
     })
   }
 
-  // Email the join link to one or more people, using the same send-email
-  // edge function every other transactional email in the CRM goes through.
-  // Only pass logo to join URL if it's an absolute https URL (Supabase storage).
-  // Relative paths like /nashville-logo.png are now deleted
-  // except for the TaxRes CRM logo which lives in gh-pages assets — build absolute URL.
-  const safeLogo = firmLogo?.startsWith('https://')
-    ? firmLogo
-    : firmLogo
-      ? `${window.location.origin}${firmLogo}`
-      : `${window.location.origin}/assets/taxrescrm-logo.png`
-
-  async function sendInviteEmail() {
-    const raw = emailTo.split(',').map(v => v.trim()).filter(Boolean)
-    if (!raw.length) return
-    const bad = raw.filter(v => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))
-    if (bad.length) { showToast?.(`Not a valid email: ${bad[0]}`, 'error'); return }
-
-    const firmParam2 = (FIRM.name || firmName) ? `&firm=${encodeURIComponent(FIRM.name || firmName)}` : ''
-    const _logo2 = FIRM.logoUrl?.startsWith('https://') ? FIRM.logoUrl : FIRM.logoUrl ? `${window.location.origin}${FIRM.logoUrl}` : safeLogo; const logoParam2 = _logo2 ? `&logo=${encodeURIComponent(_logo2)}` : ''
-    const tParam2 = (FIRM.tenantId || firmTenantId) ? `&t=${encodeURIComponent(FIRM.tenantId || firmTenantId)}` : ''
-    const url  = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${firmParam2}${logoParam2}${tParam2}`
-    const firm = firmName || 'TaxRes CRM'
-    setEmailSending(true)
-    try {
-      for (const to of raw) {
-        const { error } = await supabase.functions.invoke('send-email', {
-          body: {
-            tenant_id: firmTenantId || undefined,
-            from_name: firm,
-            from_email: firmEmail || undefined,
-            to,
-            subject: `Join the training session — ${firm}`,
-            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px">
-<div style="text-align:center;margin-bottom:20px">
-${safeLogo ? `<img src="${safeLogo}" alt="${firm}" style="max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px" onerror="this.style.display='none'"/>` : ''}
-<div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${firm}</div>
-</div>
-<p>You've been invited to a live training session with <strong>${myName}</strong>.</p>
-<p style="text-align:center;margin:24px 0">
-<a href="${url}" style="background:#7c3aed;color:#fff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block">Join session &rarr;</a>
-</p>
-<p style="font-size:13px;color:#475569">No account or download needed — the link opens straight in your browser. Room code <strong>${ss.roomId}</strong>.</p>
-<p style="font-size:12px;color:#64748b">${url}</p>
-<p style="font-size:11px;color:#94a3b8;margin-top:24px">${firmFooterLine()}</p>
-</div>`
-          }
-        })
-        if (error) throw error
-      }
-      showToast?.(`Invite sent to ${raw.length} recipient${raw.length > 1 ? 's' : ''}`, 'success')
-      setEmailTo(''); setEmailOpen(false)
-    } catch (e) {
-      // Offices with no email connected fall back to the copy button.
-      navigator.clipboard.writeText(url).catch(() => {})
-      showToast?.('Could not send email — link copied to clipboard instead', 'error')
-    } finally {
-      setEmailSending(false)
-    }
-  }
-
   function openPopout() {
-    const hostFirmParam = (FIRM.name || firmName) ? `&firm=${encodeURIComponent(FIRM.name || firmName)}` : ''
-    const _hostLogo = FIRM.logoUrl?.startsWith('https://') ? FIRM.logoUrl : FIRM.logoUrl ? `${window.location.origin}${FIRM.logoUrl}` : safeLogo; const hostLogoParam = _hostLogo ? `&logo=${encodeURIComponent(_hostLogo)}` : ''
-    const hostTParam = (FIRM.tenantId || firmTenantId) ? `&t=${encodeURIComponent(FIRM.tenantId || firmTenantId)}` : ''
-    const url  = `${window.location.origin}${BASE}/screenshare-host?room=${ss.roomId}&name=${encodeURIComponent(myName)}${hostFirmParam}${hostLogoParam}${hostTParam}`
+    const url  = `${window.location.origin}${BASE}/screenshare-host?room=${ss.roomId}&name=${encodeURIComponent(myName)}`
     const w = 960, h = 680
     const left = Math.max(0, window.screen.width - w - 20)
     const top  = Math.max(0, window.screen.height - h - 60)
     window.open(url, `tcr-training-${ss.roomId}`, `width=${w},height=${h},left=${left},top=${top},resizable=yes`)
   }
 
-  const joinFirmParam = (FIRM.name || firmName) ? `&firm=${encodeURIComponent(FIRM.name || firmName)}` : ''
-  const _joinLogo = FIRM.logoUrl?.startsWith('https://') ? FIRM.logoUrl : FIRM.logoUrl ? `${window.location.origin}${FIRM.logoUrl}` : safeLogo; const joinLogoParam = _joinLogo ? `&logo=${encodeURIComponent(_joinLogo)}` : ''
-  const joinTParam = (FIRM.tenantId || firmTenantId) ? `&t=${encodeURIComponent(FIRM.tenantId || firmTenantId)}` : ''
-  const joinUrl      = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${joinFirmParam}${joinLogoParam}${joinTParam}`
+  const joinUrl      = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}`
   const participants = ss.webrtc.members.filter(n => !n.endsWith('(view)') && n !== myName).length
 
   // ── Not started ──────────────────────────────────────────────────────────
@@ -275,34 +175,7 @@ ${safeLogo ? `<img src="${safeLogo}" alt="${firm}" style="max-height:56px;max-wi
                      cursor: 'pointer', flexShrink: 0, transition: 'background .2s' }}>
             {copied ? '✓ Copied!' : '📋 Copy'}
           </button>
-          <button onClick={() => setEmailOpen(o => !o)}
-            style={{ background: emailOpen ? 'var(--s3)' : '#7c3aed', border: 'none', borderRadius: 8,
-                     padding: '8px 16px', color: '#fff', fontWeight: 700, fontSize: 13,
-                     cursor: 'pointer', flexShrink: 0 }}>
-            ✉️ Email
-          </button>
         </div>
-
-        {emailOpen && (
-          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input
-              type="email"
-              value={emailTo}
-              onChange={e => setEmailTo(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') sendInviteEmail() }}
-              placeholder="name@firm.com — separate multiple with commas"
-              style={{ flex: 1, fontSize: 13, padding: '9px 11px', borderRadius: 6,
-                       border: '1px solid var(--br)', background: 'var(--bg)', color: 'var(--tx)' }} />
-            <button onClick={sendInviteEmail} disabled={emailSending || !emailTo.trim()}
-              style={{ background: '#16a34a', border: 'none', borderRadius: 8, padding: '9px 18px',
-                       color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0,
-                       cursor: emailSending || !emailTo.trim() ? 'not-allowed' : 'pointer',
-                       opacity: emailSending || !emailTo.trim() ? .55 : 1 }}>
-              {emailSending ? 'Sending…' : 'Send invite'}
-            </button>
-          </div>
-        )}
-
         <div style={{ marginTop: 8, fontSize: 12, color: 'var(--t3)' }}>
           Share in Chat, email, or SMS. Anyone who clicks joins instantly — no account needed.
         </div>
