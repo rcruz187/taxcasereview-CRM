@@ -185,7 +185,7 @@ export default function ScreenShareJoin() {
           {hostStream ? (
             <div style={{ flex: 1, minHeight: 0, borderRadius: 12, overflow: 'hidden', background: '#0d1526', display: 'flex', flexDirection: 'column' }}>
               <div style={{ flex: 1, minHeight: 0 }}>
-                <StreamVideo stream={hostStream} contain />
+                <StreamVideo stream={hostStream} />
               </div>
               <div style={{ padding: '6px 12px', background: '#1e293b', fontSize: 12, color: '#94a3b8',
                             display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
