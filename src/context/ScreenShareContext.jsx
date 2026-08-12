@@ -29,32 +29,13 @@ export function ScreenShareProvider({ children }) {
   const [roomId,        setRoomId]        = useState('')
   const [minimized,     setMinimized]     = useState(false)
   const [sharingScreen, setSharingScreen] = useState(false)
-  const [myName,        setMyName       ] = useState('')
   const [screenStream,  setScreenStream]  = useState(null)
-  const [localStream,   setLocalStream]   = useState(null)
   const [remoteScreenState, setRemoteScreenState] = useState(null)
 
   const webrtc         = useWebRTCRoom('screenshare')
   const screenTrackRef = useRef(null)
   const stateRef       = useRef({})
-  stateRef.current     = { webrtc, screenStream, sharingScreen, myName }
-
-  // Expose screen state on window so the pop-out can read it directly (same-origin)
-  useEffect(() => {
-    window._tcrScreenShare = {
-      sharingScreen, screenStream,
-      memberCount: webrtc.members.filter(n => !n.endsWith('(view)')).length - 1,
-      // The pop-out must drive the REAL session mic/camera, not a second
-      // getUserMedia of its own — otherwise its mute button silences a
-      // stream nobody is listening to and participants still hear the host.
-      localStream:   localStream,
-      remoteStreams:  webrtc.remoteStreams,
-      micOn:         webrtc.micOn,
-      cameraOn:      webrtc.cameraOn,
-      toggleMic:     webrtc.toggleMic,
-      toggleCamera:  webrtc.toggleCamera,
-    }
-  }, [sharingScreen, screenStream, localStream, webrtc.members, webrtc.remoteStreams, webrtc.micOn, webrtc.cameraOn, webrtc.joined])
+  stateRef.current     = { webrtc, screenStream, sharingScreen }
 
   // Broadcast member list to pop-out whenever it changes
   useEffect(() => {
@@ -101,44 +82,23 @@ export function ScreenShareProvider({ children }) {
     getBC().postMessage({ type: 'screen-state', host: myName, sharing })
   }
 
-  // screenSendersRef tracks the extra sender added for the screen track
-  // so we can remove it cleanly when screen sharing stops.
-  const screenSendersRef = { current: [] }
-
-  function addScreenTrackToPeers(track) {
-    const pcs = stateRef.current.webrtc.peerConnsRef.current
-    const stream = stateRef.current.webrtc.localStreamRef.current
-    screenSendersRef.current = []
-    Object.values(pcs).forEach(pc => {
-      try {
-        const sender = pc.addTrack(track, stream || new MediaStream([track]))
-        screenSendersRef.current.push(sender)
-      } catch (_) {}
-    })
-  }
-
-  function removeScreenTrackFromPeers() {
-    const pcs = stateRef.current.webrtc.peerConnsRef.current
-    screenSendersRef.current.forEach(sender => {
-      Object.values(pcs).forEach(pc => {
-        try { pc.removeTrack(sender) } catch (_) {}
-      })
-    })
-    screenSendersRef.current = []
-  }
-
-  // Keep replacePeerTracks for stop-share camera restore
   function replacePeerTracks(newTrack) {
-    if (newTrack) {
-      addScreenTrackToPeers(newTrack)
-    } else {
-      removeScreenTrackFromPeers()
-    }
+    const pcs = stateRef.current.webrtc.peerConnsRef.current
+    Object.values(pcs).forEach(pc => {
+      const sender = pc.getSenders().find(s => s.track?.kind === 'video')
+      if (!sender) return
+      if (newTrack) {
+        sender.replaceTrack(newTrack).catch(() => {})
+      } else {
+        const cam = stateRef.current.webrtc.localStreamRef.current?.getVideoTracks()[0]
+        if (cam) sender.replaceTrack(cam).catch(() => {})
+      }
+    })
   }
 
   function _resetState() {
     setActive(false); setMinimized(false); setRoomId('')
-    setSharingScreen(false); setScreenStream(null); setLocalStream(null); setRemoteScreenState(null)
+    setSharingScreen(false); setScreenStream(null); setRemoteScreenState(null)
   }
 
   function doStopScreenShare(myName) {
@@ -148,7 +108,6 @@ export function ScreenShareProvider({ children }) {
       screenTrackRef.current.stop()
       screenTrackRef.current = null
     }
-    if (stateRef.current.webrtc?.screenTrackRef) stateRef.current.webrtc.screenTrackRef.current = null
     const ss = stateRef.current.screenStream
     if (ss) { ss.getTracks().forEach(t => t.stop()); setScreenStream(null) }
     setSharingScreen(false)
@@ -159,25 +118,17 @@ export function ScreenShareProvider({ children }) {
   async function startSession(myName) {
     const id = makeRoomId()
     setRoomId(id); setActive(true); setMinimized(false)
-    setMyName(myName)
     const result = await webrtc.join(id, myName, true)
     if (!result.ok) { setActive(false); return { ok: false, reason: result.reason } }
-    setLocalStream(webrtc.localStreamRef.current)
+    // Listen for screen-state from other participants
     webrtc.channelRef?.current?.on('broadcast', { event: 'screen-state' }, ({ payload }) => {
       setRemoteScreenState(payload)
-    })
-    // Respond to late joiners requesting current screen state
-    webrtc.channelRef?.current?.on('broadcast', { event: 'request-screen-state' }, () => {
-      if (stateRef.current?.sharingScreen && stateRef.current?.myName) {
-        broadcastScreenState(true, stateRef.current.myName)
-      }
     })
     return { ok: true, roomId: id }
   }
 
   async function joinSession(id, myName) {
     setRoomId(id); setActive(true); setMinimized(false)
-    setMyName(myName)
     const result = await webrtc.join(id, myName, true)
     if (!result.ok) { setActive(false); return { ok: false, reason: result.reason } }
     return { ok: true }
@@ -192,14 +143,8 @@ export function ScreenShareProvider({ children }) {
       const track    = stream.getVideoTracks()[0]
       const settings = track.getSettings?.() || {}
       track._surface = settings.displaySurface
-      // contentHint='detail' propagates through WebRTC to the receiver's ontrack handler.
-      // This is the only reliable cross-browser signal — getSettings().displaySurface
-      // is sender-only and not available on the received track.
-      track.contentHint = 'detail'
 
       screenTrackRef.current = track
-      // Late joiners get this track at peer-connection creation time
-      stateRef.current.webrtc.screenTrackRef.current = track
       setScreenStream(stream)
       setSharingScreen(true)
       // User hits browser's "Stop sharing" button
