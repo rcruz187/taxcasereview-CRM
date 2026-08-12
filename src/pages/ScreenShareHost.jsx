@@ -32,8 +32,7 @@ export default function ScreenShareHost() {
   const [participants, setParticipants] = useState(0)
 
   // Local camera preview — NEVER sent to anyone
-  const [selfStream,    setSelfStream]    = useState(null)
-  const [remoteStreams, setRemoteStreams] = useState({})
+  const [selfStream, setSelfStream]  = useState(null)
   const [micOn,      setMicOn]       = useState(true)
   const [camOn,      setCamOn]       = useState(true)
   const selfStreamRef = useRef(null)
@@ -60,7 +59,6 @@ export default function ScreenShareHost() {
       if (ctx?.memberCount !== undefined) setParticipants(ctx.memberCount)
       // Mirror the REAL session camera + mic state from the main window.
       if (ctx?.localStream !== undefined) setSelfStream(ctx.localStream || null)
-      if (ctx?.remoteStreams !== undefined) setRemoteStreams(ctx.remoteStreams || {})
       if (ctx?.micOn    !== undefined) setMicOn(ctx.micOn)
       if (ctx?.cameraOn !== undefined) setCamOn(ctx.cameraOn)
     } catch { /* cross-origin guard, should never happen */ }
@@ -198,9 +196,8 @@ export default function ScreenShareHost() {
           )}
         </div>
 
-        {/* Camera strip — self + remote participants */}
+        {/* Camera strip — self preview only (no remote streams) */}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {/* Self */}
           <div style={{ width: 180, borderRadius: 10, overflow: 'hidden',
                         background: '#1e293b', position: 'relative', aspectRatio: '4/3', flexShrink: 0 }}>
             {camOn && selfStream
@@ -214,17 +211,6 @@ export default function ScreenShareHost() {
               {hostName} (you)
             </div>
           </div>
-          {/* Remote participants */}
-          {Object.entries(remoteStreams).map(([name, stream]) => (
-            <div key={name} style={{ width: 180, borderRadius: 10, overflow: 'hidden',
-                          background: '#1e293b', position: 'relative', aspectRatio: '4/3', flexShrink: 0 }}>
-              <StreamVideo stream={stream} />
-              <div style={{ position: 'absolute', bottom: 5, left: 8, fontSize: 11, color: '#e2e8f0',
-                            background: 'rgba(0,0,0,.6)', borderRadius: 4, padding: '2px 6px', fontWeight: 600 }}>
-                {name}
-              </div>
-            </div>
-          ))}
         </div>
 
         {/* Controls */}
