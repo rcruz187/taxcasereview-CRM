@@ -1189,8 +1189,8 @@ function AdminTraining(){
     // If a session is already active, render immediately — don't gate on branding.
     // The branding was already loaded when the session started.
     if (ss.active) { setReady(true); return }
-    supabase.rpc('set_admin_tenant_override',{ p_tenant_id: TAXRESCRM_TENANT })
-      .then(()=> loadFirmBrandingPublic(TAXRESCRM_TENANT))
+    supabase.rpc('set_admin_tenant_override',{ p_tenant_id: TCR_TENANT })
+      .then(()=> loadFirmBrandingPublic(TCR_TENANT))
       .then(()=> setReady(true))
       .catch(()=> setReady(true))
     return ()=>{
