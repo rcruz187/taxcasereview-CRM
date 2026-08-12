@@ -206,11 +206,11 @@ export default function ScreenShareHost() {
           <div style={{ position:'absolute', bottom:80, left:12, display:'flex', gap:8,
                         opacity: showControls ? 1 : 0.7, transition:'opacity .3s' }}>
             {allCams.map(({ key, name, stream, muted, mirror }) => (
-              <div key={key} style={{ width:200, height:150, borderRadius:10, overflow:'hidden',
+              <div key={key} style={{ width:240, height:180, borderRadius:10, overflow:'hidden',
                                       background:'#1e293b', position:'relative', flexShrink:0,
                                       boxShadow:'0 4px 20px rgba(0,0,0,.6)', border:'1px solid rgba(255,255,255,.1)' }}>
                 {stream
-                  ? <StreamVideo stream={stream} muted={muted} mirror={mirror} fit="cover" />
+                  ? <StreamVideo stream={stream} muted={muted} mirror={mirror} fit="contain" />
                   : <div style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center' }}>
                       <span style={{ fontSize:28, opacity:.3 }}>📷</span>
                     </div>}
