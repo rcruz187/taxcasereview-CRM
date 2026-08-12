@@ -260,24 +260,31 @@ export default function ScreenShareHost() {
           )}
         </div>
 
-        {/* Camera strip */}
-        <div style={{ display:'flex', gap:8, padding:'8px 12px', background:'rgba(0,0,0,.85)',
-                      flexShrink:0, overflowX:'auto', borderTop:'1px solid rgba(255,255,255,.06)' }}>
-          {allCams.map(({ key, name, stream, muted, mirror }) => (
-            <div key={key} style={{ width:160, height:120, borderRadius:8, overflow:'hidden',
-                                    background:'#1e293b', position:'relative', flexShrink:0 }}>
-              {stream
-                ? <StreamVideo stream={stream} muted={muted} mirror={mirror} fit="cover" />
-                : <div style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center' }}>
-                    <span style={{ fontSize:22, opacity:.3 }}>📷</span>
-                  </div>}
-              <div style={{ position:'absolute',bottom:4,left:6,fontSize:10,color:'#e2e8f0',
-                            background:'rgba(0,0,0,.65)',borderRadius:3,padding:'1px 5px',fontWeight:600 }}>
-                {name}
-              </div>
+        {/* Camera strip — dynamic tile size based on count */}
+        {(() => {
+          const count = allCams.length
+          const tileW = count <= 2 ? 280 : count <= 4 ? 200 : 160
+          const tileH = count <= 2 ? 210 : count <= 4 ? 150 : 120
+          return (
+            <div style={{ display:'flex', gap:8, padding:'8px 12px', background:'rgba(0,0,0,.85)',
+                          flexShrink:0, overflowX:'auto', borderTop:'1px solid rgba(255,255,255,.06)' }}>
+              {allCams.map(({ key, name, stream, muted, mirror }) => (
+                <div key={key} style={{ width:tileW, height:tileH, borderRadius:8, overflow:'hidden',
+                                        background:'#1e293b', position:'relative', flexShrink:0 }}>
+                  {stream
+                    ? <StreamVideo stream={stream} muted={muted} mirror={mirror} fit="cover" />
+                    : <div style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center' }}>
+                        <span style={{ fontSize:22, opacity:.3 }}>📷</span>
+                      </div>}
+                  <div style={{ position:'absolute',bottom:4,left:6,fontSize:10,color:'#e2e8f0',
+                                background:'rgba(0,0,0,.65)',borderRadius:3,padding:'1px 5px',fontWeight:600 }}>
+                    {name}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )
+        })()}
 
         {/* Controls bar */}
         <div style={{ height:60, background:'rgba(15,23,42,.95)', borderTop:'1px solid rgba(255,255,255,.08)',
