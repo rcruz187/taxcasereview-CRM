@@ -202,25 +202,7 @@ export default function ScreenShareHost() {
             End session
           </button>
 
-          {/* Camera tiles — bottom left, floating */}
-          <div style={{ position:'absolute', bottom:68, left:12, display:'flex', gap:8,
-                        opacity: 1 }}>
-            {allCams.map(({ key, name, stream, muted, mirror }) => (
-              <div key={key} style={{ width:240, height:180, borderRadius:10, overflow:'hidden',
-                                      background:'#1e293b', position:'relative', flexShrink:0,
-                                      boxShadow:'0 4px 20px rgba(0,0,0,.6)', border:'1px solid rgba(255,255,255,.1)' }}>
-                {stream
-                  ? <StreamVideo stream={stream} muted={muted} mirror={mirror} fit="contain" />
-                  : <div style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center' }}>
-                      <span style={{ fontSize:28, opacity:.3 }}>📷</span>
-                    </div>}
-                <div style={{ position:'absolute',bottom:5,left:7,fontSize:10,color:'#e2e8f0',
-                              background:'rgba(0,0,0,.65)',borderRadius:4,padding:'2px 6px',fontWeight:600 }}>
-                  {name}
-                </div>
-              </div>
-            ))}
-          </div>
+
 
           {/* Background picker — floating above controls */}
           {showBgPanel && (
@@ -230,6 +212,25 @@ export default function ScreenShareHost() {
                 segStatus={vbg.segStatus} onSelect={handleBgSelect} />
             </div>
           )}
+        </div>
+
+        {/* Camera strip — below screen share, above controls */}
+        <div style={{ display:'flex', gap:8, padding:'8px 12px', background:'rgba(0,0,0,.85)',
+                      flexShrink:0, overflowX:'auto', borderTop:'1px solid rgba(255,255,255,.06)' }}>
+          {allCams.map(({ key, name, stream, muted, mirror }) => (
+            <div key={key} style={{ width:160, height:120, borderRadius:8, overflow:'hidden',
+                                    background:'#1e293b', position:'relative', flexShrink:0 }}>
+              {stream
+                ? <StreamVideo stream={stream} muted={muted} mirror={mirror} fit="cover" />
+                : <div style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center' }}>
+                    <span style={{ fontSize:22, opacity:.3 }}>📷</span>
+                  </div>}
+              <div style={{ position:'absolute',bottom:4,left:6,fontSize:10,color:'#e2e8f0',
+                            background:'rgba(0,0,0,.65)',borderRadius:3,padding:'1px 5px',fontWeight:600 }}>
+                {name}
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* Controls bar — fixed height at bottom */}
