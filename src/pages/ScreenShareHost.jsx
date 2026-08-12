@@ -101,7 +101,7 @@ export default function ScreenShareHost() {
     })
     syncFromOpener()
     ch.postMessage({ type: 'request-snapshot' })
-    const poll = setInterval(syncFromOpener, 500)
+    const poll = setInterval(syncFromOpener, 200)
     return () => { ch.close(); clearInterval(poll) }
   }, [])
 
@@ -163,7 +163,7 @@ export default function ScreenShareHost() {
 
       {/* Full-window container */}
       <div onMouseMove={resetControlsTimer}
-        style={{ width: '100vw', height: '100vh', background: '#000', position: 'relative',
+        style={{ width: '100%', height: '100%', background: '#000', position: 'relative',
                  display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: 'Arial, sans-serif' }}>
 
         {/* Screen share — fills everything */}
@@ -180,7 +180,7 @@ export default function ScreenShareHost() {
           {/* Floating room info — top left */}
           <div style={{ position:'absolute', top:12, left:12, display:'flex', alignItems:'center', gap:8,
                         background:'rgba(0,0,0,.6)', borderRadius:8, padding:'6px 12px',
-                        opacity: showControls ? 1 : 0, transition:'opacity .3s' }}>
+                        opacity: 1 }}>
             {(urlLogo || (ready && FIRM.logoUrl)) && (
               <img src={urlLogo || FIRM.logoUrl} alt="" style={{ height:22, objectFit:'contain' }}
                 onError={e => e.target.style.display='none'} />
@@ -203,8 +203,8 @@ export default function ScreenShareHost() {
           </button>
 
           {/* Camera tiles — bottom left, floating */}
-          <div style={{ position:'absolute', bottom:80, left:12, display:'flex', gap:8,
-                        opacity: showControls ? 1 : 0.7, transition:'opacity .3s' }}>
+          <div style={{ position:'absolute', bottom:68, left:12, display:'flex', gap:8,
+                        opacity: 1 }}>
             {allCams.map(({ key, name, stream, muted, mirror }) => (
               <div key={key} style={{ width:240, height:180, borderRadius:10, overflow:'hidden',
                                       background:'#1e293b', position:'relative', flexShrink:0,
@@ -235,7 +235,7 @@ export default function ScreenShareHost() {
         {/* Controls bar — fixed height at bottom */}
         <div style={{ height:60, background:'rgba(15,23,42,.92)', borderTop:'1px solid rgba(255,255,255,.08)',
                       display:'flex', alignItems:'center', gap:8, padding:'0 16px', flexShrink:0,
-                      opacity: showControls ? 1 : 0, transition:'opacity .3s', backdropFilter:'blur(12px)' }}>
+                      opacity: 1, backdropFilter:'blur(12px)' }}>
           {[
             { label: micOn  ? '🎙️ Mute'      : '🔇 Unmute',    active: !micOn,  onClick: toggleMic },
             { label: camOn  ? '📷 Stop cam'  : '📷 Start cam', active: !camOn,  onClick: toggleCam },
