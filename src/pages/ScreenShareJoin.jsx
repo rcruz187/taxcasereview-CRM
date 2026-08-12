@@ -151,7 +151,12 @@ export default function ScreenShareJoin() {
 
   // ── In-session ────────────────────────────────────────────────────────────
   return (
-    <div style={{ height: '100vh', background: '#0f172a', display: 'flex',
+    <>
+      <style>{`
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body, #root { width: 100%; height: 100%; overflow: hidden; background: #0f172a; }
+      `}</style>
+    <div style={{ width: '100%', height: '100%', background: '#0f172a', display: 'flex',
                   flexDirection: 'column', fontFamily: 'Arial, sans-serif', overflow: 'hidden' }}>
 
       {/* Header */}
@@ -293,5 +298,6 @@ export default function ScreenShareJoin() {
         )}
       </div>
     </div>
+    </>
   )
 }
