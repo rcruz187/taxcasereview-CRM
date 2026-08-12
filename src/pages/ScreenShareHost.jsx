@@ -201,7 +201,7 @@ export default function ScreenShareHost() {
         {/* Camera strip — self + remote participants */}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           {/* Self */}
-          <div style={{ width: 180, borderRadius: 10, overflow: 'hidden',
+          <div style={{ width: 260, borderRadius: 10, overflow: 'hidden',
                         background: '#1e293b', position: 'relative', aspectRatio: '4/3', flexShrink: 0 }}>
             {camOn && selfStream
               ? <StreamVideo stream={selfStream} muted mirror />
@@ -216,7 +216,7 @@ export default function ScreenShareHost() {
           </div>
           {/* Remote participants */}
           {Object.entries(remoteStreams).map(([name, stream]) => (
-            <div key={name} style={{ width: 180, borderRadius: 10, overflow: 'hidden',
+            <div key={name} style={{ width: 260, borderRadius: 10, overflow: 'hidden',
                           background: '#1e293b', position: 'relative', aspectRatio: '4/3', flexShrink: 0 }}>
               <StreamVideo stream={stream} />
               <div style={{ position: 'absolute', bottom: 5, left: 8, fontSize: 11, color: '#e2e8f0',

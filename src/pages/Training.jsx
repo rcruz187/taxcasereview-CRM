@@ -10,6 +10,19 @@ import { FIRM, firmFooterLine } from '../lib/firmBranding'
 
 const BASE = ''
 
+// Admin portal uses this tenant prefix — when training is sent from the
+// Admin Portal, we always brand as "TaxRes CRM" (the product), not as
+// whatever tenant happens to be loaded into FIRM.
+const ADMIN_TENANT_PREFIX = 'a0000000'
+const PRODUCT_NAME  = 'TaxRes CRM'
+const PRODUCT_LOGO  = 'https://taxrescrm.app/taxrescrm-logo.png'
+const PRODUCT_EMAIL = 'romy@taxrescrm.net'
+
+function isAdminContext(tenantId) {
+  if (!tenantId) return false
+  return tenantId.startsWith(ADMIN_TENANT_PREFIX) || tenantId === '00000000-0000-0000-0000-000000000000'
+}
+
 function ScreenPreview({ stream }) {
   const ref = useRef(null)
   useEffect(() => { if (ref.current) ref.current.srcObject = stream || null }, [stream])
@@ -80,26 +93,40 @@ export default function Training() {
     if (!sResult.ok) showToast(sResult.reason || 'Use the Share screen button below')
   }
 
+  // Resolved branding — Admin Portal always uses TaxRes CRM product identity.
+  // Per-tenant training uses that tenant's own branding.
+  const resolvedTenantId = FIRM.tenantId || firmTenantId
+  const isAdmin  = isAdminContext(resolvedTenantId)
+  const dispName = isAdmin ? PRODUCT_NAME  : (FIRM.name  || firmName  || PRODUCT_NAME)
+  const dispEmail= isAdmin ? PRODUCT_EMAIL : (FIRM.email || firmEmail || PRODUCT_EMAIL)
+
+  // Logo: Admin → product logo. Tenant → their logo if https, else build absolute URL.
+  const rawLogo  = isAdmin ? PRODUCT_LOGO : (FIRM.logoUrl || firmLogo || '')
+  const safeLogo = rawLogo.startsWith('https://')
+    ? rawLogo
+    : rawLogo
+      ? `${window.location.origin}${rawLogo}`
+      : PRODUCT_LOGO
+
+  function buildJoinUrl(extraParams = '') {
+    const firmParam = `&firm=${encodeURIComponent(dispName)}`
+    const logoParam = safeLogo ? `&logo=${encodeURIComponent(safeLogo)}` : ''
+    const tParam    = resolvedTenantId ? `&t=${encodeURIComponent(resolvedTenantId)}` : ''
+    return `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${firmParam}${logoParam}${tParam}${extraParams}`
+  }
+
+  function buildHostUrl() {
+    const firmParam = `&firm=${encodeURIComponent(dispName)}`
+    const logoParam = safeLogo ? `&logo=${encodeURIComponent(safeLogo)}` : ''
+    const tParam    = resolvedTenantId ? `&t=${encodeURIComponent(resolvedTenantId)}` : ''
+    return `${window.location.origin}${BASE}/screenshare-host?room=${ss.roomId}&name=${encodeURIComponent(myName)}${firmParam}${logoParam}${tParam}`
+  }
+
   function copyLink() {
-    const firmParam = (FIRM.name || firmName) ? `&firm=${encodeURIComponent(FIRM.name || firmName)}` : ''
-    const _logo = FIRM.logoUrl?.startsWith('https://') ? FIRM.logoUrl : FIRM.logoUrl ? `${window.location.origin}${FIRM.logoUrl}` : safeLogo; const logoParam = _logo ? `&logo=${encodeURIComponent(_logo)}` : ''
-    const tParam = (FIRM.tenantId || firmTenantId) ? `&t=${encodeURIComponent(FIRM.tenantId || firmTenantId)}` : ''
-    const url = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${firmParam}${logoParam}${tParam}`
-    navigator.clipboard.writeText(url).then(() => {
+    navigator.clipboard.writeText(buildJoinUrl()).then(() => {
       setCopied(true); setTimeout(() => setCopied(false), 2000)
     })
   }
-
-  // Email the join link to one or more people, using the same send-email
-  // edge function every other transactional email in the CRM goes through.
-  // Only pass logo to join URL if it's an absolute https URL (Supabase storage).
-  // Relative paths like /nashville-logo.png are now deleted
-  // except for the TaxRes CRM logo which lives in gh-pages assets — build absolute URL.
-  const safeLogo = firmLogo?.startsWith('https://')
-    ? firmLogo
-    : firmLogo
-      ? `${window.location.origin}${firmLogo}`
-      : `${window.location.origin}/assets/taxrescrm-logo.png`
 
   async function sendInviteEmail() {
     const raw = emailTo.split(',').map(v => v.trim()).filter(Boolean)
@@ -107,25 +134,21 @@ export default function Training() {
     const bad = raw.filter(v => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))
     if (bad.length) { showToast?.(`Not a valid email: ${bad[0]}`, 'error'); return }
 
-    const firmParam2 = (FIRM.name || firmName) ? `&firm=${encodeURIComponent(FIRM.name || firmName)}` : ''
-    const _logo2 = FIRM.logoUrl?.startsWith('https://') ? FIRM.logoUrl : FIRM.logoUrl ? `${window.location.origin}${FIRM.logoUrl}` : safeLogo; const logoParam2 = _logo2 ? `&logo=${encodeURIComponent(_logo2)}` : ''
-    const tParam2 = (FIRM.tenantId || firmTenantId) ? `&t=${encodeURIComponent(FIRM.tenantId || firmTenantId)}` : ''
-    const url  = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${firmParam2}${logoParam2}${tParam2}`
-    const firm = firmName || 'TaxRes CRM'
+    const url = buildJoinUrl()
     setEmailSending(true)
     try {
       for (const to of raw) {
         const { error } = await supabase.functions.invoke('send-email', {
           body: {
-            tenant_id: firmTenantId || undefined,
-            from_name: firm,
-            from_email: firmEmail || undefined,
+            tenant_id:  isAdmin ? undefined : (resolvedTenantId || undefined),
+            from_name:  dispName,
+            from_email: dispEmail,
             to,
-            subject: `Join the training session — ${firm}`,
+            subject: `Join the training session — ${dispName}`,
             html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px">
 <div style="text-align:center;margin-bottom:20px">
-${safeLogo ? `<img src="${safeLogo}" alt="${firm}" style="max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px" onerror="this.style.display='none'"/>` : ''}
-<div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${firm}</div>
+${safeLogo ? `<img src="${safeLogo}" alt="${dispName}" style="max-height:56px;max-width:190px;object-fit:contain;display:block;margin:0 auto 8px" onerror="this.style.display='none'"/>` : ''}
+<div style="font-size:12px;font-weight:800;color:#1d4ed8;letter-spacing:.1em;text-transform:uppercase;margin-top:6px">${dispName}</div>
 </div>
 <p>You've been invited to a live training session with <strong>${myName}</strong>.</p>
 <p style="text-align:center;margin:24px 0">
@@ -151,20 +174,14 @@ ${safeLogo ? `<img src="${safeLogo}" alt="${firm}" style="max-height:56px;max-wi
   }
 
   function openPopout() {
-    const hostFirmParam = (FIRM.name || firmName) ? `&firm=${encodeURIComponent(FIRM.name || firmName)}` : ''
-    const _hostLogo = FIRM.logoUrl?.startsWith('https://') ? FIRM.logoUrl : FIRM.logoUrl ? `${window.location.origin}${FIRM.logoUrl}` : safeLogo; const hostLogoParam = _hostLogo ? `&logo=${encodeURIComponent(_hostLogo)}` : ''
-    const hostTParam = (FIRM.tenantId || firmTenantId) ? `&t=${encodeURIComponent(FIRM.tenantId || firmTenantId)}` : ''
-    const url  = `${window.location.origin}${BASE}/screenshare-host?room=${ss.roomId}&name=${encodeURIComponent(myName)}${hostFirmParam}${hostLogoParam}${hostTParam}`
+    const url  = buildHostUrl()
     const w = 960, h = 680
     const left = Math.max(0, window.screen.width - w - 20)
     const top  = Math.max(0, window.screen.height - h - 60)
     window.open(url, `tcr-training-${ss.roomId}`, `width=${w},height=${h},left=${left},top=${top},resizable=yes`)
   }
 
-  const joinFirmParam = (FIRM.name || firmName) ? `&firm=${encodeURIComponent(FIRM.name || firmName)}` : ''
-  const _joinLogo = FIRM.logoUrl?.startsWith('https://') ? FIRM.logoUrl : FIRM.logoUrl ? `${window.location.origin}${FIRM.logoUrl}` : safeLogo; const joinLogoParam = _joinLogo ? `&logo=${encodeURIComponent(_joinLogo)}` : ''
-  const joinTParam = (FIRM.tenantId || firmTenantId) ? `&t=${encodeURIComponent(FIRM.tenantId || firmTenantId)}` : ''
-  const joinUrl      = `${window.location.origin}${BASE}/screenshare?room=${ss.roomId}${joinFirmParam}${joinLogoParam}${joinTParam}`
+  const joinUrl      = buildJoinUrl()
   const participants = ss.webrtc.members.filter(n => !n.endsWith('(view)') && n !== myName).length
 
   // ── Not started ──────────────────────────────────────────────────────────
