@@ -8,7 +8,7 @@ import { useApp }         from '../context/AppContext'
 import { supabase }       from '../lib/supabase'
 import { FIRM, firmFooterLine } from '../lib/firmBranding'
 
-const BASE = '/'
+const BASE = ''
 
 function ScreenPreview({ stream }) {
   const ref = useRef(null)
