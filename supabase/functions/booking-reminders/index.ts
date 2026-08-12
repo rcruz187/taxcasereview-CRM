@@ -4,7 +4,7 @@
 // Deploy with JWT verification OFF; the cron job calls it every 10 minutes.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const BOOK_MANAGE = "https://taxresolutioncrm.github.io/taxcasereview-CRM/book/manage/";
+const BOOK_MANAGE = "https://taxrescrm.app/book/manage/";
 
 Deno.serve(async () => {
   const supabase = createClient(
