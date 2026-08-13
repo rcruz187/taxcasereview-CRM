@@ -164,8 +164,8 @@ serve(async (req) => {
         subject,
         body:    finalBody,
         isHtml,
-        // Always route replies to the Stalwart inbox regardless of sending account
-        replyTo: 'romy@taxrescrm.net',
+        // Reply-To routes replies to the tenant's own inbox — each CRM gets its own
+        replyTo: fromAddress || tenantSettings?.email || 'romy@taxrescrm.net',
         atts,
       })
 
