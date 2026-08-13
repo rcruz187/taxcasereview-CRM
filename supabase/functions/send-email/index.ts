@@ -164,8 +164,8 @@ serve(async (req) => {
         subject,
         body:    finalBody,
         isHtml,
-        // Reply-To routes replies to the tenant's actual address
-        replyTo: fromAddress !== (gmailSettings.email || '') ? fromAddress : undefined,
+        // Always route replies to the Stalwart inbox regardless of sending account
+        replyTo: 'romy@taxrescrm.net',
         atts,
       })
 
