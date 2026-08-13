@@ -52,20 +52,31 @@ const FIELD_LABELS = {
   recipient_name: 'Recipient Name',
 }
 
+async function extractPdfText(file) {
+  try {
+    const arrayBuffer = await file.arrayBuffer()
+    const pdfjsLib = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js')
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+    let fullText = ''
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i)
+      const content = await page.getTextContent()
+      fullText += content.items.map((item) => item.str).join(' ') + '\n'
+    }
+    return fullText.trim()
+  } catch { return '' }
+}
+
 async function parseDocWithAI(file, docType) {
-  // Convert PDF to base64 in browser — no storage bucket needed, works for all users
-  const base64 = await new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result.split(',')[1])
-    reader.onerror = () => reject(new Error('Failed to read file'))
-    reader.readAsDataURL(file)
-  })
+  // Extract text from PDF first — Groq is text-only and cannot read binary PDF
+  const pdfText = await extractPdfText(file)
 
   const fields = DOC_TYPES[docType] || DOC_TYPES['Other']
   const fieldList = fields.map(f => `"${f}": "${FIELD_LABELS[f] || f}"`).join(', ')
 
   const { data: fnData, error: fnErr } = await supabase.functions.invoke('parse-tax-doc', {
-    body: { base64, docType, fieldList }
+    body: { pdfText, docType, fieldList }
   })
 
   if (fnErr) throw new Error(fnErr.message)
