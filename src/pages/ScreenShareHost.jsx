@@ -99,15 +99,20 @@ export default function ScreenShareHost() {
 
   // ── Recording ──────────────────────────────────────────────────────────────
   function startRecording() {
-    const stream = window.opener?._tcrScreenShare?.screenStream
-    if (!stream) return
-    recChunksRef.current = []
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-      ? 'video/webm;codecs=vp9' : 'video/webm'
-    try {
-      const mr = new MediaRecorder(stream, { mimeType })
+    // We want to record the pop-out window itself (the composed view —
+    // screen share + camera strip + controls), NOT the raw screenStream track.
+    // preferCurrentTab: true tells Chrome to capture this tab without a picker.
+    navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: 30 },
+      audio: { suppressLocalAudioPlayback: false },
+      preferCurrentTab: true,
+    }).then(captureStream => {
+      recChunksRef.current = []
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9' : 'video/webm'
+      const mr = new MediaRecorder(captureStream, { mimeType })
       mr.ondataavailable = e => { if (e.data?.size > 0) recChunksRef.current.push(e.data) }
-      mr.onstop = saveRecording
+      mr.onstop = () => { captureStream.getTracks().forEach(t => t.stop()); saveRecording() }
       mr.start(1000)
       mediaRecRef.current = mr
       recStartRef.current = Date.now()
@@ -117,7 +122,9 @@ export default function ScreenShareHost() {
       recTimerRef.current = setInterval(() => {
         setRecDuration(Math.floor((Date.now() - recStartRef.current) / 1000))
       }, 1000)
-    } catch (err) { console.error('Recording start failed:', err) }
+      // Stop recording automatically if the capture track ends (user clicks Stop Sharing)
+      captureStream.getVideoTracks()[0].onended = () => stopRecording()
+    }).catch(err => { console.error('Recording start failed:', err) })
   }
 
   function stopRecording() {
