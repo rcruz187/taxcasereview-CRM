@@ -98,105 +98,106 @@ export default function ScreenShareHost() {
   }, [])
 
   // ── Recording (cross-browser canvas compositor) ────────────────────────────
-  // We composite the screen share + camera tiles onto an offscreen canvas and
-  // record that. Works in Chrome, Firefox, and Safari — no browser-specific APIs.
-  const canvasRef    = useRef(null)
-  const rafRef       = useRef(null)
-  const camVidsRef   = useRef({})   // key → HTMLVideoElement for each camera stream
+  // Attaches hidden <video> elements to the DOM (required for frame decode),
+  // composites screen share + cameras onto an offscreen canvas each rAF tick,
+  // and records the canvas stream. Works in Chrome, Firefox, and Safari.
+  const canvasRef       = useRef(null)
+  const rafRef          = useRef(null)
+  const vidContainerRef = useRef(null)
 
-  function getOrMakeVid(key, stream) {
+  function getOrMakeVid(key, stream, container) {
     if (!stream) return null
-    if (camVidsRef.current[key]?.srcObject === stream) return camVidsRef.current[key]
-    const v = Object.assign(document.createElement('video'), {
-      autoplay: true, playsInline: true, muted: true,
-    })
-    v.srcObject = stream
-    camVidsRef.current[key] = v
+    let v = container.querySelector(`[data-key="${key}"]`)
+    if (v && v.srcObject === stream) return v
+    if (!v) {
+      v = document.createElement('video')
+      v.setAttribute('data-key', key)
+      v.autoplay = true; v.playsInline = true; v.muted = true
+      // Must be in the DOM (even invisible) for the browser to decode frames.
+      // Fully offscreen elements get readyState stuck at 0 in most browsers.
+      Object.assign(v.style, {
+        position: 'fixed', width: '1px', height: '1px',
+        opacity: '0', pointerEvents: 'none', top: '-9999px', left: '-9999px',
+      })
+      container.appendChild(v)
+    }
+    if (v.srcObject !== stream) v.srcObject = stream
     return v
   }
 
   function startRecording() {
-    // Build offscreen canvas
     const W = window.innerWidth  || 1280
     const H = window.innerHeight || 720
+
+    // Hidden DOM container — video elements must be in the DOM for frame decode
+    const container = document.createElement('div')
+    container.setAttribute('data-tcr-rec', '1')
+    document.body.appendChild(container)
+    vidContainerRef.current = container
+
     const cvs = document.createElement('canvas')
     cvs.width = W; cvs.height = H
     canvasRef.current = cvs
     const ctx2d = cvs.getContext('2d')
-
-    // Collect all camera streams at record-start (updated each frame via closure)
-    const screenVid = document.createElement('video')
-    screenVid.autoplay = true; screenVid.playsInline = true; screenVid.muted = true
 
     function drawFrame() {
       if (!recordingRef.current) return
       ctx2d.fillStyle = '#000'
       ctx2d.fillRect(0, 0, W, H)
 
-      // Get current streams from state via refs (avoid stale closures)
-      const ss   = window.opener?._tcrScreenShare?.screenStream
-      const self = window.opener?._tcrScreenShare?.localStream
+      const ss      = window.opener?._tcrScreenShare?.screenStream
+      const self    = window.opener?._tcrScreenShare?.localStream
       const remotes = window.opener?._tcrScreenShare?.remoteStreams || {}
 
-      // ── Screen share (top area) ──
-      if (ss && ss !== screenVid.srcObject) screenVid.srcObject = ss
       const camCount = 1 + Object.keys(remotes).length
       const stripH   = camCount <= 2 ? 210 : camCount <= 4 ? 150 : 120
       const mainH    = H - stripH - 8
-      if (ss && screenVid.readyState >= 2) {
-        const vw = screenVid.videoWidth || W
-        const vh = screenVid.videoHeight || mainH
+
+      // ── Screen share (top) ──
+      const screenVid = getOrMakeVid('__screen__', ss, container)
+      if (screenVid && screenVid.readyState >= 2 && screenVid.videoWidth > 0) {
+        const vw = screenVid.videoWidth, vh = screenVid.videoHeight
         const scale = Math.min(W / vw, mainH / vh)
         const dw = vw * scale, dh = vh * scale
-        const dx = (W - dw) / 2, dy = (mainH - dh) / 2
-        ctx2d.drawImage(screenVid, dx, dy, dw, dh)
+        ctx2d.drawImage(screenVid, (W - dw) / 2, (mainH - dh) / 2, dw, dh)
       } else {
-        ctx2d.fillStyle = '#1e293b'
-        ctx2d.fillRect(0, 0, W, mainH)
-        ctx2d.fillStyle = '#475569'; ctx2d.font = '20px Arial'
+        ctx2d.fillStyle = '#1e293b'; ctx2d.fillRect(0, 0, W, mainH)
+        ctx2d.fillStyle = '#64748b'; ctx2d.font = '18px Arial'
         ctx2d.textAlign = 'center'
-        ctx2d.fillText('No screen share active', W / 2, mainH / 2)
+        ctx2d.fillText('Screen share loading…', W / 2, mainH / 2)
       }
 
       // ── Camera strip (bottom) ──
-      ctx2d.fillStyle = 'rgba(0,0,0,0.85)'
+      ctx2d.fillStyle = '#0f172a'
       ctx2d.fillRect(0, mainH + 8, W, stripH)
-      const allCamEntries = [
-        ['__self__', self],
-        ...Object.entries(remotes),
-      ].filter(([, s]) => s)
-      const tileW = Math.min(280, (W - 12) / Math.max(allCamEntries.length, 1))
-      allCamEntries.forEach(([key, stream], i) => {
-        const vid = getOrMakeVid(key, stream)
-        if (!vid || vid.readyState < 2) return
-        const x = 8 + i * (tileW + 8)
-        const y = mainH + 8
+      const allCams = [['__self__', self], ...Object.entries(remotes)].filter(([, s]) => s)
+      const tileW   = Math.min(280, (W - 16) / Math.max(allCams.length, 1))
+      allCams.forEach(([key, stream], i) => {
+        const vid = getOrMakeVid(key, stream, container)
+        if (!vid || vid.readyState < 2 || !vid.videoWidth) return
+        const x = 8 + i * (tileW + 8), y = mainH + 8
         ctx2d.save()
         ctx2d.beginPath()
-        ctx2d.roundRect(x, y, tileW, stripH, 8)
+        if (ctx2d.roundRect) ctx2d.roundRect(x, y, tileW, stripH, 8)
+        else ctx2d.rect(x, y, tileW, stripH)
         ctx2d.clip()
-        // Cover fit
-        const vw2 = vid.videoWidth || tileW, vh2 = vid.videoHeight || stripH
-        const scale2 = Math.max(tileW / vw2, stripH / vh2)
-        const dw2 = vw2 * scale2, dh2 = vh2 * scale2
-        ctx2d.drawImage(vid, x + (tileW - dw2) / 2, y + (stripH - dh2) / 2, dw2, dh2)
+        const vw = vid.videoWidth, vh = vid.videoHeight
+        const scale = Math.max(tileW / vw, stripH / vh)
+        const dw = vw * scale, dh = vh * scale
+        ctx2d.drawImage(vid, x + (tileW - dw) / 2, y + (stripH - dh) / 2, dw, dh)
         ctx2d.restore()
       })
 
       rafRef.current = requestAnimationFrame(drawFrame)
     }
 
-    // Start the draw loop
     recordingRef.current = true
     rafRef.current = requestAnimationFrame(drawFrame)
 
-    // Canvas video stream at 30fps
     const canvasStream = cvs.captureStream(30)
-
-    // Add mic audio from the host's local stream
-    const localStream = window.opener?._tcrScreenShare?.localStream
+    const localStream  = window.opener?._tcrScreenShare?.localStream
     if (localStream) {
-      localStream.getAudioTracks().forEach(t => canvasStream.addTrack(t))
+      localStream.getAudioTracks().forEach(t => { try { canvasStream.addTrack(t) } catch {} })
     }
 
     recChunksRef.current = []
@@ -204,7 +205,7 @@ export default function ScreenShareHost() {
       ? 'video/webm;codecs=vp9'
       : MediaRecorder.isTypeSupported('video/webm')
         ? 'video/webm'
-        : 'video/mp4'   // Safari
+        : 'video/mp4'
 
     try {
       const mr = new MediaRecorder(canvasStream, { mimeType })
@@ -221,6 +222,7 @@ export default function ScreenShareHost() {
     } catch (err) {
       recordingRef.current = false
       cancelAnimationFrame(rafRef.current)
+      vidContainerRef.current?.remove()
       console.error('Recording start failed:', err)
     }
   }
@@ -231,6 +233,8 @@ export default function ScreenShareHost() {
     cancelAnimationFrame(rafRef.current)
     clearInterval(recTimerRef.current)
     setRecording(false)
+    vidContainerRef.current?.remove()
+    vidContainerRef.current = null
     try { mediaRecRef.current?.stop() } catch {}
   }
 
