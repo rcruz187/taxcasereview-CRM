@@ -28,16 +28,29 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
-        max_tokens: 1500,
+        max_tokens: 2000,
         temperature: 0,
         messages: [
           {
             role: 'system',
-            content: 'You are a professional tax document parser. Extract values from tax documents and return ONLY valid JSON. No explanation, no markdown, no backticks — just the raw JSON object.'
+            content: 'You are a professional tax document parser specializing in IRS forms. Extract values precisely and return ONLY valid JSON. No explanation, no markdown, no backticks — just the raw JSON object.'
           },
           {
             role: 'user',
-            content: `Extract ALL values from this ${docType} tax document text.\n\nReturn ONLY a valid JSON object with these exact keys: {${fieldList}}\n\nRules:\n- Use null for any field not found\n- For dollar amounts, return numbers only (no $ or commas) e.g. 52341.00\n- For EINs use format XX-XXXXXXX, for SSNs use XXX-XX-XXXX\n- Return ONLY the JSON object\n\nDocument text:\n${pdfText.substring(0, 6000)}`
+            content: `You are parsing a ${docType} tax document. This PDF may contain multiple copies of the same form (e.g. multiple W-2s from different employers, or multiple copies for state/federal/employee).
+
+IMPORTANT RULES:
+- If there are multiple W-2s from DIFFERENT employers, aggregate the numeric values (add wages together, add withholding together)
+- For employer name/EIN: use the FIRST employer listed
+- For employee name/SSN: use the employee information (not the employer)
+- For dollar amounts, return numbers only — no $ signs, no commas. Example: 53637.09
+- For EINs use format XX-XXXXXXX
+- For SSNs use format XXX-XX-XXXX
+- Use null for any field not present in the document
+- Return ONLY a valid JSON object with these exact keys: {${fieldList}}
+
+Document text:
+${pdfText.substring(0, 10000)}`
           }
         ]
       })
