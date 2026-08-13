@@ -57,7 +57,7 @@ IMPORTANT RULES:
       ]
     }
 
-    const model = hasImages ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile'
+    const model = hasImages ? 'llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile'
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',

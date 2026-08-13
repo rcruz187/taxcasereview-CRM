@@ -138,7 +138,7 @@ export default function TaxDocParser({ clientName = '', taxYear = '2024', onPars
     if (n.includes('K1') || n.includes('K-1') || n.includes('1065')) return 'K-1 (1065)'
     if (n.includes('1120')) return 'K-1 (1120-S)'
     if (n.includes('SCHC') || n.includes('SCH-C') || n.includes('SCHEDULE-C')) return 'Schedule C (prior)'
-    return 'Other'
+    return 'W-2' // default to W-2 for unknown filenames
   }
 
   function setDocType(id, docType) {
