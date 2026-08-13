@@ -251,7 +251,12 @@ export default function TaxReturns() {
         updates.clientName = data.employee_name || data.recipient_name
       }
     })
-    setForm(f => ({ ...f, ...updates }))
+    console.log('handleDocsParsed updates to apply:', JSON.stringify(updates))
+    setForm(f => {
+      const merged = { ...f, ...updates }
+      console.log('form after merge wages:', merged.wages, 'withholding:', merged.withholding)
+      return merged
+    })
     setTab('income')
     setView('edit')
     showToast(`✅ ${parsedDocs.length} document${parsedDocs.length > 1 ? 's' : ''} parsed — fields pre-filled!`)
