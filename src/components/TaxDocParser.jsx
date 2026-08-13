@@ -52,35 +52,55 @@ const FIELD_LABELS = {
   recipient_name: 'Recipient Name',
 }
 
-async function extractPdfText(file) {
+async function extractPdfContent(file) {
   try {
     const arrayBuffer = await file.arrayBuffer()
     const pdfjs = await import('pdfjs-dist')
     const workerUrl = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
     pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
     const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise
+
+    // Extract text first
     let fullText = ''
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i)
       const content = await page.getTextContent()
       fullText += content.items.map((item) => item.str).join(' ') + '\n'
     }
-    return fullText.trim()
+    const hasText = fullText.trim().length > 30
+
+    // If scanned/image PDF (no text), render pages to images for vision model
+    let base64Pages = []
+    if (!hasText) {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      for (let i = 1; i <= Math.min(pdf.numPages, 4); i++) {
+        const page = await pdf.getPage(i)
+        const viewport = page.getViewport({ scale: 1.5 })
+        canvas.width  = viewport.width
+        canvas.height = viewport.height
+        await page.render({ canvasContext: ctx, viewport }).promise
+        const b64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1]
+        base64Pages.push(b64)
+      }
+    }
+
+    return { pdfText: fullText.trim(), base64Pages, isScanned: !hasText }
   } catch (e) {
-    console.error('extractPdfText error:', e)
-    return ''
+    console.error('extractPdfContent error:', e)
+    return { pdfText: '', base64Pages: [], isScanned: false }
   }
 }
 
 async function parseDocWithAI(file, docType) {
-  // Extract text from PDF first — Groq is text-only and cannot read binary PDF
-  const pdfText = await extractPdfText(file)
+  const { pdfText, base64Pages, isScanned } = await extractPdfContent(file)
+  console.log('PDF type:', isScanned ? 'scanned/image' : 'text-based', '| text length:', pdfText.length, '| image pages:', base64Pages.length)
 
   const fields = DOC_TYPES[docType] || DOC_TYPES['Other']
   const fieldList = fields.map(f => `"${f}": "${FIELD_LABELS[f] || f}"`).join(', ')
 
   const { data: fnData, error: fnErr } = await supabase.functions.invoke('parse-tax-doc', {
-    body: { pdfText, docType, fieldList }
+    body: { pdfText, base64Pages, docType, fieldList }
   })
 
   if (fnErr) throw new Error(fnErr.message)
