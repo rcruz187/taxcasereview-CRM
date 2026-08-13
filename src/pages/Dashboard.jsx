@@ -107,7 +107,7 @@ export default function Dashboard() {
       { data: deadlines }, { data: arScheduled },
     ] = await Promise.all([
       tf(supabase.from('leads').select('*')).order('created_at', { ascending: false }),
-      tf(supabase.from('clients').select('*')).order('created_at', { ascending: false }),
+      tf(supabase.from('clients').select('*').is('deleted_at', null)).order('created_at', { ascending: false }),
       tf(supabase.from('cases').select('*')).order('created_at', { ascending: false }),
       tf(supabase.from('tasks').select('*').not('deleted','is',true)).order('created_at', { ascending: false }),
       tf(supabase.from('invoices').select('id,total,status,clientName')),
