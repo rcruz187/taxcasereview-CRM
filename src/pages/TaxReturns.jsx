@@ -267,6 +267,28 @@ export default function TaxReturns() {
     showToast(`✅ ${parsedDocs.length} document${parsedDocs.length > 1 ? 's' : ''} parsed — fields pre-filled!`)
   }
 
+  // Log a note on the client's file for tax return events
+  async function logReturnNote(noteText) {
+    if (!form.clientName) return
+    const tid = user?.app_metadata?.tenant_id || user?.user_metadata?.tenant_id
+    const author = user?.user_metadata?.name || user?.email || 'Staff'
+    // Look up client by name within this tenant
+    const { data: clientRow } = await supabase.from('clients')
+      .select('id').eq('tenant_id', tid).ilike('name', form.clientName.trim()).maybeSingle()
+    const client_id = clientRow?.id || null
+    await supabase.from('client_notes').insert({
+      clientname: form.clientName,
+      client_id,
+      tenant_id: tid,
+      text: noteText,
+      author,
+      type: 'Tax Return',
+      note_type: 'Tax Return',
+      visible_to_client: false,
+      created_at: new Date().toISOString()
+    })
+  }
+
   function openEdit(ret) {
     setForm({ ...BLANK_RETURN, ...ret })
     setCurrent(ret)
@@ -1638,6 +1660,7 @@ export default function TaxReturns() {
                         showToast(`✅ Accepted! Acknowledgement: ${data.ackNumber}`)
                         fld('status', 'Filed')
                         await supabase.from('tax_returns').update({ status: 'Filed', updated_at: new Date().toISOString() }).eq('id', current?.id)
+                        await logReturnNote(`📄 ${form.taxYear} ${form.returnType} filed electronically via IRS MeF. IRS acknowledged and accepted. Acknowledgement #: ${data.ackNumber}. Preparer: ${preparer.name || 'Staff'} (EFIN: ${preparer.efin}).`)
                         load()
                       }
                     }}>
@@ -1673,6 +1696,7 @@ export default function TaxReturns() {
                     fld('status', 'Filed')
                     await supabase.from('tax_returns').update({ status: 'Filed', updated_at: new Date().toISOString() }).eq('id', current?.id)
                     showToast('✅ Return marked as Filed!')
+                    await logReturnNote(`📄 ${form.taxYear} ${form.returnType} marked as filed. Preparer: ${preparer.name || 'Staff'}.`)
                     await triggerWorkflow('tax_return_filed', 'client', ret?.clientName || '', user?.user_metadata?.name || 'Staff').catch(()=>{})
                     load()
                   }} disabled={!current?.id}>Mark as Filed</button>
