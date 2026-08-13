@@ -211,12 +211,17 @@ export default function TaxReturns() {
       if (!data) return
       console.log('Processing docType:', docType, 'data keys:', Object.keys(data))
       if (docType === 'W-2') {
-        updates.wages = (n(updates.wages) + n(data.box1_wages)).toFixed(2)
-        updates.withholding = (n(updates.withholding) + n(data.box2_federal_withheld)).toFixed(2)
+        // Support both field naming conventions from different parsers
+        const w2Wages = data.wages ?? data.box1_wages ?? data.box1Wages ?? 0
+        const w2Fed = data.federalWithheld ?? data.box2_federal_withheld ?? data.box2FederalWithheld ?? 0
+        updates.wages = (n(updates.wages) + n(w2Wages)).toFixed(2)
+        updates.withholding = (n(updates.withholding) + n(w2Fed)).toFixed(2)
       }
       if (docType === '1099-NEC') {
-        updates.businessIncome = (n(updates.businessIncome) + n(data.box1_nonemployee_comp)).toFixed(2)
-        updates.withholding = (n(updates.withholding) + n(data.box4_federal_withheld)).toFixed(2)
+        const necComp = data.nonEmployeeCompensation ?? data.box1_nonemployee_comp ?? data.box1NonemployeeComp ?? 0
+        const necFed = data.federalWithheld ?? data.box4_federal_withheld ?? 0
+        updates.businessIncome = (n(updates.businessIncome) + n(necComp)).toFixed(2)
+        updates.withholding = (n(updates.withholding) + n(necFed)).toFixed(2)
       }
       if (docType === '1099-INT') {
         updates.interest = (n(updates.interest) + n(data.box1_interest_income)).toFixed(2)
@@ -247,6 +252,7 @@ export default function TaxReturns() {
       }
     })
     setForm(f => ({ ...f, ...updates }))
+    setTab('income')
     setView('edit')
     showToast(`✅ ${parsedDocs.length} document${parsedDocs.length > 1 ? 's' : ''} parsed — fields pre-filled!`)
   }
@@ -406,10 +412,16 @@ export default function TaxReturns() {
         />
       </div>
 
-      <button className="btn sec" style={{ width: '100%', justifyContent: 'center', padding: 11, fontSize: 14 }}
-        onClick={() => { setTab('income'); setView('edit') }}>
-        Skip Upload — Fill Return Manually →
-      </button>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button className="btn pri" style={{ flex: 1, justifyContent: 'center', padding: 11, fontSize: 14, fontWeight: 700 }}
+          onClick={() => { setTab('income'); setView('edit') }}>
+          Continue → Fill Return
+        </button>
+        <button className="btn sec" style={{ justifyContent: 'center', padding: '11px 18px', fontSize: 13 }}
+          onClick={() => { setForm(BLANK_RETURN); setTab('income'); setView('edit') }}>
+          Start Blank
+        </button>
+      </div>
     </div>
   )
 
