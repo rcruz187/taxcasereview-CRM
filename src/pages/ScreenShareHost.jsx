@@ -195,9 +195,39 @@ export default function ScreenShareHost() {
     rafRef.current = requestAnimationFrame(drawFrame)
 
     const canvasStream = cvs.captureStream(30)
-    const localStream  = window.opener?._tcrScreenShare?.localStream
-    if (localStream) {
-      localStream.getAudioTracks().forEach(t => { try { canvasStream.addTrack(t) } catch {} })
+
+    // ── Audio: mix host mic + all participant audio into one track via AudioContext ──
+    // MediaRecorder only uses the first audio track — AudioContext.createMediaStreamDestination
+    // lets us properly combine multiple sources before handing off to the recorder.
+    try {
+      const audioCtx = new AudioContext()
+      const dest     = audioCtx.createMediaStreamDestination()
+
+      const addAudioSource = (stream) => {
+        if (!stream) return
+        const tracks = stream.getAudioTracks()
+        if (!tracks.length) return
+        try {
+          const src = audioCtx.createMediaStreamSource(new MediaStream(tracks))
+          src.connect(dest)
+        } catch {}
+      }
+
+      // Host mic
+      const localStream = window.opener?._tcrScreenShare?.localStream
+      addAudioSource(localStream)
+
+      // All remote participant streams
+      const remoteStreams = window.opener?._tcrScreenShare?.remoteStreams || {}
+      Object.values(remoteStreams).forEach(addAudioSource)
+
+      // Add the mixed audio track to the canvas stream
+      dest.stream.getAudioTracks().forEach(t => {
+        try { canvasStream.addTrack(t) } catch {}
+      })
+    } catch (audioErr) {
+      // AudioContext failed (e.g. no audio devices) — record video-only, no crash
+      console.warn('Audio mix failed, recording video only:', audioErr?.message)
     }
 
     recChunksRef.current = []
