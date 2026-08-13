@@ -74,13 +74,13 @@ async function extractPdfContent(file) {
     if (!hasText) {
       const canvas = document.createElement('canvas')
       const ctx = canvas.getContext('2d')
-      for (let i = 1; i <= Math.min(pdf.numPages, 4); i++) {
+      for (let i = 1; i <= Math.min(pdf.numPages, 2); i++) {
         const page = await pdf.getPage(i)
-        const viewport = page.getViewport({ scale: 1.5 })
+        const viewport = page.getViewport({ scale: 1.0 })
         canvas.width  = viewport.width
         canvas.height = viewport.height
         await page.render({ canvasContext: ctx, viewport }).promise
-        const b64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1]
+        const b64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1]
         base64Pages.push(b64)
       }
     }
