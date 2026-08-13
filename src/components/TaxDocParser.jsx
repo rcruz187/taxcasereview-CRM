@@ -104,6 +104,8 @@ async function parseDocWithAI(file, docType) {
   })
 
   if (fnErr) throw new Error(fnErr.message)
+  console.log('Edge fn _debug:', fnData?._debug)
+  console.log('Edge fn error:', fnData?.error)
   return fnData?.parsed || {}
 }
 

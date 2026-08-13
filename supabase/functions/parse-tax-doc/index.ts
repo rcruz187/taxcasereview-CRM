@@ -84,6 +84,7 @@ IMPORTANT RULES:
 
     const data = await response.json()
     const text = data.choices?.[0]?.message?.content || '{}'
+    console.log('Groq raw response:', text.substring(0, 500))
     let parsed = {}
     try {
       parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
@@ -91,8 +92,9 @@ IMPORTANT RULES:
       const match = text.match(/\{[\s\S]*\}/)
       if (match) { try { parsed = JSON.parse(match[0]) } catch { parsed = {} } }
     }
+    console.log('Parsed result:', JSON.stringify(parsed).substring(0, 300))
 
-    return new Response(JSON.stringify({ parsed }), {
+    return new Response(JSON.stringify({ parsed, _debug: text.substring(0, 200) }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   } catch (e) {
