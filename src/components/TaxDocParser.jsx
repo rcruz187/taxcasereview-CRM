@@ -55,9 +55,10 @@ const FIELD_LABELS = {
 async function extractPdfText(file) {
   try {
     const arrayBuffer = await file.arrayBuffer()
-    const pdfjsLib = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js')
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+    const pdfjs = await import('pdfjs-dist')
+    const workerUrl = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
+    pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
+    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise
     let fullText = ''
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i)
@@ -65,7 +66,10 @@ async function extractPdfText(file) {
       fullText += content.items.map((item) => item.str).join(' ') + '\n'
     }
     return fullText.trim()
-  } catch { return '' }
+  } catch (e) {
+    console.error('extractPdfText error:', e)
+    return ''
+  }
 }
 
 async function parseDocWithAI(file, docType) {
