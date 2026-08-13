@@ -94,7 +94,7 @@ export default function Training() {
       const { data, error } = await supabase.storage
         .from('training-recordings')
         .list('', { limit: 100, sortBy: { column: 'created_at', order: 'desc' } })
-      if (!error && data) setRecordings(data.filter(f => f.name.endsWith('.webm')))
+      if (!error && data) setRecordings(data.filter(f => f.name.endsWith('.webm') || f.name.endsWith('.mp4')))
     } catch {}
     setRecLoading(false)
   }

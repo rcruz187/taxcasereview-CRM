@@ -97,39 +97,138 @@ export default function ScreenShareHost() {
     return () => { ch.close(); clearInterval(poll) }
   }, [])
 
-  // ── Recording ──────────────────────────────────────────────────────────────
+  // ── Recording (cross-browser canvas compositor) ────────────────────────────
+  // We composite the screen share + camera tiles onto an offscreen canvas and
+  // record that. Works in Chrome, Firefox, and Safari — no browser-specific APIs.
+  const canvasRef    = useRef(null)
+  const rafRef       = useRef(null)
+  const camVidsRef   = useRef({})   // key → HTMLVideoElement for each camera stream
+
+  function getOrMakeVid(key, stream) {
+    if (!stream) return null
+    if (camVidsRef.current[key]?.srcObject === stream) return camVidsRef.current[key]
+    const v = Object.assign(document.createElement('video'), {
+      autoplay: true, playsInline: true, muted: true,
+    })
+    v.srcObject = stream
+    camVidsRef.current[key] = v
+    return v
+  }
+
   function startRecording() {
-    // We want to record the pop-out window itself (the composed view —
-    // screen share + camera strip + controls), NOT the raw screenStream track.
-    // preferCurrentTab: true tells Chrome to capture this tab without a picker.
-    navigator.mediaDevices.getDisplayMedia({
-      video: { frameRate: 30 },
-      audio: { suppressLocalAudioPlayback: false },
-      preferCurrentTab: true,
-    }).then(captureStream => {
-      recChunksRef.current = []
-      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-        ? 'video/webm;codecs=vp9' : 'video/webm'
-      const mr = new MediaRecorder(captureStream, { mimeType })
+    // Build offscreen canvas
+    const W = window.innerWidth  || 1280
+    const H = window.innerHeight || 720
+    const cvs = document.createElement('canvas')
+    cvs.width = W; cvs.height = H
+    canvasRef.current = cvs
+    const ctx2d = cvs.getContext('2d')
+
+    // Collect all camera streams at record-start (updated each frame via closure)
+    const screenVid = document.createElement('video')
+    screenVid.autoplay = true; screenVid.playsInline = true; screenVid.muted = true
+
+    function drawFrame() {
+      if (!recordingRef.current) return
+      ctx2d.fillStyle = '#000'
+      ctx2d.fillRect(0, 0, W, H)
+
+      // Get current streams from state via refs (avoid stale closures)
+      const ss   = window.opener?._tcrScreenShare?.screenStream
+      const self = window.opener?._tcrScreenShare?.localStream
+      const remotes = window.opener?._tcrScreenShare?.remoteStreams || {}
+
+      // ── Screen share (top area) ──
+      if (ss && ss !== screenVid.srcObject) screenVid.srcObject = ss
+      const camCount = 1 + Object.keys(remotes).length
+      const stripH   = camCount <= 2 ? 210 : camCount <= 4 ? 150 : 120
+      const mainH    = H - stripH - 8
+      if (ss && screenVid.readyState >= 2) {
+        const vw = screenVid.videoWidth || W
+        const vh = screenVid.videoHeight || mainH
+        const scale = Math.min(W / vw, mainH / vh)
+        const dw = vw * scale, dh = vh * scale
+        const dx = (W - dw) / 2, dy = (mainH - dh) / 2
+        ctx2d.drawImage(screenVid, dx, dy, dw, dh)
+      } else {
+        ctx2d.fillStyle = '#1e293b'
+        ctx2d.fillRect(0, 0, W, mainH)
+        ctx2d.fillStyle = '#475569'; ctx2d.font = '20px Arial'
+        ctx2d.textAlign = 'center'
+        ctx2d.fillText('No screen share active', W / 2, mainH / 2)
+      }
+
+      // ── Camera strip (bottom) ──
+      ctx2d.fillStyle = 'rgba(0,0,0,0.85)'
+      ctx2d.fillRect(0, mainH + 8, W, stripH)
+      const allCamEntries = [
+        ['__self__', self],
+        ...Object.entries(remotes),
+      ].filter(([, s]) => s)
+      const tileW = Math.min(280, (W - 12) / Math.max(allCamEntries.length, 1))
+      allCamEntries.forEach(([key, stream], i) => {
+        const vid = getOrMakeVid(key, stream)
+        if (!vid || vid.readyState < 2) return
+        const x = 8 + i * (tileW + 8)
+        const y = mainH + 8
+        ctx2d.save()
+        ctx2d.beginPath()
+        ctx2d.roundRect(x, y, tileW, stripH, 8)
+        ctx2d.clip()
+        // Cover fit
+        const vw2 = vid.videoWidth || tileW, vh2 = vid.videoHeight || stripH
+        const scale2 = Math.max(tileW / vw2, stripH / vh2)
+        const dw2 = vw2 * scale2, dh2 = vh2 * scale2
+        ctx2d.drawImage(vid, x + (tileW - dw2) / 2, y + (stripH - dh2) / 2, dw2, dh2)
+        ctx2d.restore()
+      })
+
+      rafRef.current = requestAnimationFrame(drawFrame)
+    }
+
+    // Start the draw loop
+    recordingRef.current = true
+    rafRef.current = requestAnimationFrame(drawFrame)
+
+    // Canvas video stream at 30fps
+    const canvasStream = cvs.captureStream(30)
+
+    // Add mic audio from the host's local stream
+    const localStream = window.opener?._tcrScreenShare?.localStream
+    if (localStream) {
+      localStream.getAudioTracks().forEach(t => canvasStream.addTrack(t))
+    }
+
+    recChunksRef.current = []
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+      ? 'video/webm;codecs=vp9'
+      : MediaRecorder.isTypeSupported('video/webm')
+        ? 'video/webm'
+        : 'video/mp4'   // Safari
+
+    try {
+      const mr = new MediaRecorder(canvasStream, { mimeType })
       mr.ondataavailable = e => { if (e.data?.size > 0) recChunksRef.current.push(e.data) }
-      mr.onstop = () => { captureStream.getTracks().forEach(t => t.stop()); saveRecording() }
+      mr.onstop = saveRecording
       mr.start(1000)
       mediaRecRef.current = mr
       recStartRef.current = Date.now()
-      recordingRef.current = true
       setRecording(true)
       setRecDuration(0)
       recTimerRef.current = setInterval(() => {
         setRecDuration(Math.floor((Date.now() - recStartRef.current) / 1000))
       }, 1000)
-      // Stop recording automatically if the capture track ends (user clicks Stop Sharing)
-      captureStream.getVideoTracks()[0].onended = () => stopRecording()
-    }).catch(err => { console.error('Recording start failed:', err) })
+    } catch (err) {
+      recordingRef.current = false
+      cancelAnimationFrame(rafRef.current)
+      console.error('Recording start failed:', err)
+    }
   }
 
   function stopRecording() {
     if (!recordingRef.current) return
     recordingRef.current = false
+    cancelAnimationFrame(rafRef.current)
     clearInterval(recTimerRef.current)
     setRecording(false)
     try { mediaRecRef.current?.stop() } catch {}
@@ -138,9 +237,12 @@ export default function ScreenShareHost() {
   async function saveRecording() {
     const chunks = recChunksRef.current
     if (!chunks.length) return
-    const blob     = new Blob(chunks, { type: 'video/webm' })
+    const isMp4   = chunks[0]?.type?.includes('mp4')
+    const mime    = isMp4 ? 'video/mp4' : 'video/webm'
+    const ext     = isMp4 ? 'mp4' : 'webm'
+    const blob    = new Blob(chunks, { type: mime })
     const ts       = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-    const filename = `training-${roomId}-${ts}.webm`
+    const filename = `training-${roomId}-${ts}.${ext}`
     // Auto-download
     const url = URL.createObjectURL(blob)
     const a   = Object.assign(document.createElement('a'), { href: url, download: filename })
