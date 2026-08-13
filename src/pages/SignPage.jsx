@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { stampSignature, buildCertificatePage, addTearDropStamp, appendPdfPages } from '../lib/irsFormUtils'
 import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 
@@ -327,8 +326,21 @@ export default function SignPage() {
         }).catch(() => {})
       }
       // Fire workflow trigger — esign_signed with doc_type as value
-      // triggerWorkflow handles 'both' entity_type so this hits client + lead templates
-      await triggerWorkflow('esign_signed', 'client', doc.client_name || '', '', doc.doc_type || '').catch(() => {})
+      // Fire workflow trigger via edge function (service role) — triggerWorkflow()
+      // uses the anon Supabase client which is blocked by RLS on workflow_templates
+      // and tasks. The edge function bypasses that with SUPABASE_SERVICE_ROLE_KEY.
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://mpxgxfqdbquzkrvvejkh.supabase.co'
+      fetch(`${supabaseUrl}/functions/v1/trigger-workflow`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: 'esign_signed',
+          entity_type: 'client',
+          entity_name: doc.client_name || '',
+          tenant_id: doc.tenant_id || FIRM.tenantId || '',
+          doc_type: doc.doc_type || '',
+        }),
+      }).catch(() => {})
     } catch (e) {
       console.error('Post-sign steps failed (signature already saved):', e)
     } finally {
