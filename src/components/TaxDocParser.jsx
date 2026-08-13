@@ -142,7 +142,7 @@ export default function TaxDocParser({ clientName = '', taxYear = '2024', onPars
     if (n.includes('1099-R')) return '1099-R'
     if (n.includes('1099-G')) return '1099-G'
     if (n.includes('K1') || n.includes('K-1') || n.includes('1065')) return 'K-1 (1065)'
-    if (n.includes('1120')) return 'K-1 (1120-S)'
+    if (n.includes('1120-S') || n.includes('1120S')) return 'K-1 (1120-S)'
     if (n.includes('SCHC') || n.includes('SCH-C') || n.includes('SCHEDULE-C')) return 'Schedule C (prior)'
     return 'W-2' // default to W-2 for unknown filenames
   }
