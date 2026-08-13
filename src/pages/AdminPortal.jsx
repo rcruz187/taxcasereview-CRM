@@ -1725,6 +1725,129 @@ function StatusDot({ ok }) {
     boxShadow: ok ? '0 0 6px #10b98160' : '0 0 6px #ef444460' }} />
 }
 
+// ── Products Tab ──────────────────────────────────────────────────────────────
+// Shows cross-product metrics from platform_metrics table.
+// Additive only — no existing code modified.
+const PRODUCT_META = {
+  taxres:   { label:'Tax Res CRM',  icon:'📊', color:'#6366f1', url:'https://taxrescrm.app',    status:'live' },
+  camvella: { label:'Camvella',     icon:'🏘️', color:'#10b981', url:'https://camvella.com',      status:'live' },
+  phl:      { label:'PHL Land Care',icon:'🌿', color:'#f59e0b', url:'#',                         status:'live' },
+  arcvena:  { label:'Arcvena',      icon:'⚡', color:'#0ea5e9', url:'#',                         status:'building' },
+  dental:   { label:'DentOS',       icon:'🦷', color:'#8b5cf6', url:'#',                         status:'building' },
+  bocaflow: { label:'BocaFlow',     icon:'🏢', color:'#ec4899', url:'#',                         status:'building' },
+}
+
+function ProductsTab({ supabase }) {
+  const [metrics, setMetrics] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    supabase
+      .from('platform_metrics')
+      .select('*')
+      .order('metric_date', { ascending: false })
+      .then(({ data }) => {
+        // Keep only the latest row per product
+        const latest = {}
+        ;(data || []).forEach(row => {
+          if (!latest[row.product]) latest[row.product] = row
+        })
+        setMetrics(Object.values(latest))
+        setLoading(false)
+      })
+  }, [])
+
+  const fmt$ = (n) => n ? `$${Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—'
+  const fmtN = (n) => n != null ? Number(n).toLocaleString() : '—'
+  const fmtBytes = (b) => {
+    if (!b) return '—'
+    if (b > 1e9) return (b/1e9).toFixed(1)+' GB'
+    if (b > 1e6) return (b/1e6).toFixed(1)+' MB'
+    return (b/1e3).toFixed(0)+' KB'
+  }
+
+  // Platform totals across live products with metrics
+  const totalMRR     = metrics.reduce((s, r) => s + (r.mrr || 0), 0)
+  const totalClients = metrics.reduce((s, r) => s + (r.active_clients || 0), 0)
+  const totalLeads   = metrics.reduce((s, r) => s + (r.leads || 0), 0)
+  const totalOffices = metrics.reduce((s, r) => s + (r.offices || 0), 0)
+
+  return (
+    <>
+      {/* Platform totals */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:24 }}>
+        {[
+          { label:'Combined MRR',    value: fmt$(totalMRR),     color:'#10b981', icon:'📈' },
+          { label:'Total Clients',   value: fmtN(totalClients), color:'#0ea5e9', icon:'👥' },
+          { label:'Total Leads',     value: fmtN(totalLeads),   color:'#8b5cf6', icon:'🎯' },
+          { label:'Total Offices',   value: fmtN(totalOffices), color:'#f59e0b', icon:'🏢' },
+        ].map(k => (
+          <div key={k.label} style={{ background:`linear-gradient(135deg, ${k.color}18, ${k.color}08)`,
+            border:`1px solid ${k.color}30`, borderRadius:12, padding:'18px 20px' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'.07em' }}>{k.label}</div>
+              <div style={{ fontSize:18, opacity:.5 }}>{k.icon}</div>
+            </div>
+            <div style={{ fontSize:28, fontWeight:900, color:k.color, lineHeight:1, marginTop:10 }}>{k.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Per-product cards */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
+        {Object.entries(PRODUCT_META).map(([key, meta]) => {
+          const m = metrics.find(r => r.product === key)
+          const isBuilding = meta.status === 'building'
+          return (
+            <div key={key} style={{ background:'rgba(255,255,255,.04)', border:`1px solid ${meta.color}30`,
+              borderRadius:14, padding:'20px 22px', opacity: isBuilding ? .6 : 1 }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <span style={{ fontSize:22 }}>{meta.icon}</span>
+                  <div>
+                    <div style={{ fontSize:14, fontWeight:800, color:'#e2e8f0' }}>{meta.label}</div>
+                    <div style={{ fontSize:10, fontWeight:700, color: isBuilding ? '#f59e0b' : '#10b981',
+                      textTransform:'uppercase', letterSpacing:'.06em', marginTop:2 }}>
+                      {isBuilding ? '🔨 Building' : '✅ Live'}
+                    </div>
+                  </div>
+                </div>
+                {meta.url !== '#' && (
+                  <a href={meta.url} target="_blank" rel="noreferrer"
+                    style={{ fontSize:11, color:meta.color, fontWeight:600, textDecoration:'none' }}>
+                    Visit →
+                  </a>
+                )}
+              </div>
+              {m ? (
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  {[
+                    ['MRR',     fmt$(m.mrr)],
+                    ['Clients', fmtN(m.active_clients)],
+                    ['Leads',   fmtN(m.leads)],
+                    ['Offices', fmtN(m.offices)],
+                    ['Storage', fmtBytes(m.storage_bytes)],
+                    ['Updated', m.metric_date],
+                  ].map(([label, val]) => (
+                    <div key={label} style={{ background:'rgba(255,255,255,.03)', borderRadius:8, padding:'8px 10px' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.06em' }}>{label}</div>
+                      <div style={{ fontSize:13, fontWeight:700, color:'#e2e8f0', marginTop:2 }}>{val}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign:'center', padding:'20px 0', color:'#475569', fontSize:12 }}>
+                  {isBuilding ? 'Not yet pushing metrics' : loading ? 'Loading…' : 'No metrics yet — deploy push-platform-metrics edge fn'}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
 // ── Command Center ────────────────────────────────────────────────────────────
 function CommandCenter() {
   const navigate = useNavigate()
@@ -2052,6 +2175,7 @@ function CommandCenter() {
     { key:'crm',       label:'CRM'       },
     { key:'goals',     label:'Goals'     },
     { key:'system',    label:'System'    },
+    { key:'products',  label:'Products'  },
   ]
 
   // ── RENDER ─────────────────────────────────────────────────────────────────
@@ -2615,12 +2739,12 @@ function CommandCenter() {
           </div>
         </>)}
 
+        {tab==='products' && <ProductsTab supabase={supabase} />}
+
       </div>
     </div>
   )
 }
-
-// ── Content Center ────────────────────────────────────────────────────────────
 const CONTENT_LABELS = {
   linkedin:     { label:'LinkedIn Post',      icon:'💼', color:'#0ea5e9' },
   article_idea: { label:'Article Idea',       icon:'📝', color:'#6366f1' },

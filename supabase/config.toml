@@ -130,3 +130,7 @@ verify_jwt = false
 # Public — called by unauthenticated screenshare participants to get TURN creds
 [functions.turn-credentials]
 verify_jwt = false
+
+# Platform metrics push — runs nightly, service-role only
+[functions.push-platform-metrics]
+verify_jwt = false
