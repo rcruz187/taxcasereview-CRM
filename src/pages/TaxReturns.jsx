@@ -211,11 +211,16 @@ export default function TaxReturns() {
       if (!data) return
       console.log('Processing docType:', docType, 'data keys:', Object.keys(data))
       if (docType === 'W-2') {
-        // Support both field naming conventions from different parsers
-        const w2Wages = data.wages ?? data.box1_wages ?? data.box1Wages ?? 0
-        const w2Fed = data.federalWithheld ?? data.box2_federal_withheld ?? data.box2FederalWithheld ?? 0
-        updates.wages = (n(updates.wages) + n(w2Wages)).toFixed(2)
+        const w2Wages = data.wages ?? data.box1_wages ?? 0
+        const w2Fed   = data.federalWithheld ?? data.box2_federal_withheld ?? 0
+        updates.wages       = (n(updates.wages) + n(w2Wages)).toFixed(2)
         updates.withholding = (n(updates.withholding) + n(w2Fed)).toFixed(2)
+        // Grab employer/employee info from first W-2
+        if (!updates.w2_employer_name) updates.w2_employer_name = data.employer_name || ''
+        if (!updates.w2_employer_ein)  updates.w2_employer_ein  = data.employer_ein  || ''
+        if (!updates.w2_employee_ssn)  updates.w2_employee_ssn  = data.employee_ssn  || ''
+        // Client name from W-2 employee name
+        if (!updates.clientName && data.employee_name) updates.clientName = data.employee_name
       }
       if (docType === '1099-NEC') {
         const necComp = data.nonEmployeeCompensation ?? data.box1_nonemployee_comp ?? data.box1NonemployeeComp ?? 0
@@ -1609,11 +1614,42 @@ export default function TaxReturns() {
                   <button className="btn pri" style={{ width: '100%', justifyContent: 'center' }} onClick={printReturn}>Print / Preview</button>
                 </div>
 
+                <div style={{ padding: 16, borderRadius: 10, border: `1px solid ${preparer.efin ? 'rgba(34,197,94,.4)' : 'var(--br)'}`, background: preparer.efin ? 'rgba(34,197,94,.07)' : 'var(--s2)' }}>
+                  <div style={{ fontSize: 22, marginBottom: 8 }}>🏛️</div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--tx)', marginBottom: 4 }}>Submit to IRS</div>
+                  <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 12, lineHeight: 1.5 }}>
+                    {preparer.efin ? `Direct MeF e-file to IRS using EFIN ${preparer.efin}. No third-party software needed.` : 'Add your EFIN above to enable direct IRS e-file submission.'}
+                  </div>
+                  <button className="btn ok" style={{ width: '100%', justifyContent: 'center', opacity: preparer.efin ? 1 : 0.4 }}
+                    disabled={!preparer.efin}
+                    onClick={async () => {
+                      if (!preparer.efin) { showToast('⚠️ Enter your EFIN above first'); return }
+                      showToast('📡 Submitting to IRS…')
+                      const { data, error } = await supabase.functions.invoke('submit-to-irs', {
+                        body: {
+                          returnData: { ...form, grossIncome: t.grossIncome, agi: t.agi, taxableIncome: t.taxableIncome, estimatedTax: t.estimatedTax, refund: t.refund > 0 ? t.refund : 0, amountOwed: t.refund < 0 ? Math.abs(t.refund) : 0 },
+                          preparerData: preparer,
+                          testMode: false
+                        }
+                      })
+                      if (error || !data?.success) {
+                        showToast(`❌ ${data?.error || error?.message || 'Submission failed'}`)
+                      } else {
+                        showToast(`✅ Accepted! Acknowledgement: ${data.ackNumber}`)
+                        fld('status', 'Filed')
+                        await supabase.from('tax_returns').update({ status: 'Filed', updated_at: new Date().toISOString() }).eq('id', current?.id)
+                        load()
+                      }
+                    }}>
+                    🏛️ Submit to IRS
+                  </button>
+                </div>
+
                 <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--br)', background: 'var(--s2)' }}>
                   <div style={{ fontSize: 22, marginBottom: 8 }}>📄</div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--tx)', marginBottom: 4 }}>IRS MeF XML Export</div>
-                  <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 12, lineHeight: 1.5 }}>Generate MeF-compatible XML. Import into Drake, ProSeries, or Lacerte for final e-file submission.</div>
-                  <button className="btn pri" style={{ width: '100%', justifyContent: 'center' }} onClick={() => {
+                  <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--tx)', marginBottom: 4 }}>Download XML</div>
+                  <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 12, lineHeight: 1.5 }}>Download MeF-compatible XML for your records.</div>
+                  <button className="btn sec" style={{ width: '100%', justifyContent: 'center' }} onClick={() => {
                     const xml = generateMeFXML(form, t, preparer)
                     downloadFile(xml, `${form.clientName?.replace(/\s+/g,'_')}_${form.taxYear}_MeF.xml`, 'text/xml')
                   }}>⬇ Download XML</button>
@@ -1622,8 +1658,8 @@ export default function TaxReturns() {
                 <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--br)', background: 'var(--s2)' }}>
                   <div style={{ fontSize: 22, marginBottom: 8 }}>📋</div>
                   <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--tx)', marginBottom: 4 }}>State Filing Export</div>
-                  <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 12, lineHeight: 1.5 }}>Export a formatted state return worksheet with federal AGI carryover and preparer credentials.</div>
-                  <button className="btn pri" style={{ width: '100%', justifyContent: 'center' }} onClick={() => {
+                  <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 12, lineHeight: 1.5 }}>Export a formatted state return worksheet with federal AGI carryover.</div>
+                  <button className="btn sec" style={{ width: '100%', justifyContent: 'center' }} onClick={() => {
                     const txt = generateStateExport(form, t, preparer)
                     downloadFile(txt, `${form.clientName?.replace(/\s+/g,'_')}_${form.taxYear}_State.txt`)
                   }}>⬇ Download State Export</button>
@@ -1632,7 +1668,7 @@ export default function TaxReturns() {
                 <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--br)', background: 'var(--s2)' }}>
                   <div style={{ fontSize: 22, marginBottom: 8 }}>✅</div>
                   <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--tx)', marginBottom: 4 }}>Mark as Filed</div>
-                  <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 12, lineHeight: 1.5 }}>After submitting through your e-file software, mark this return as filed and save.</div>
+                  <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 12, lineHeight: 1.5 }}>Manually mark this return as filed after submission.</div>
                   <button className="btn ok" style={{ width: '100%', justifyContent: 'center' }} onClick={async () => {
                     fld('status', 'Filed')
                     await supabase.from('tax_returns').update({ status: 'Filed', updated_at: new Date().toISOString() }).eq('id', current?.id)
@@ -1644,10 +1680,8 @@ export default function TaxReturns() {
 
               </div>
 
-              <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(26,127,212,.1)', borderRadius: 8, border: '1px solid rgba(26,127,212,.3)', fontSize: 12, color: 'var(--t2)', lineHeight: 1.7 }}>
-                <strong style={{ color: 'var(--blue)' }}>📌 IRS E-File Requirement:</strong> Direct IRS MeF submission requires an approved EFIN (Electronic Filing Identification Number).
-                Your PTIN ({preparer.ptin || 'not set'}) and CAF# ({preparer.caf || 'not set'}) are used for return preparation and IRS representation.
-                Export the XML above and import it into your approved e-file software (Drake Tax, ProSeries, Lacerte, TaxSlayer Pro) for final submission.
+              <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(34,197,94,.08)', borderRadius: 8, border: '1px solid rgba(34,197,94,.25)', fontSize: 12, color: 'var(--t2)', lineHeight: 1.7 }}>
+                <strong style={{ color: '#22c55e' }}>🏛️ Direct IRS e-file:</strong> Enter your EFIN above to enable direct MeF submission — no Drake, ProSeries, or any other software needed. Each agent uses their own EFIN. Your PTIN ({preparer.ptin || 'not set'}) and CAF# ({preparer.caf || 'not set'}) are used for return preparation and IRS representation.
               </div>
             </div>
           </div>
