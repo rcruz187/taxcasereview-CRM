@@ -272,7 +272,7 @@ export default function Sidebar() {
       const now = new Date().toISOString()
       const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
       const { count } = await supabase.from('calevents').select('id', { count: 'exact', head: true })
-        .gte('start', now).lte('start', tomorrow)
+        .gte('date', now).lte('date', tomorrow)
       setUpcomingEvents(count || 0)
     }
     if (!user) return
