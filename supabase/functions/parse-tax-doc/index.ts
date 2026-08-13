@@ -57,7 +57,7 @@ IMPORTANT RULES:
       ]
     }
 
-    const model = hasImages ? 'meta-llama/llama-4-maverick-17b-128e-instruct' : 'llama-3.3-70b-versatile'
+    const model = hasImages ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile'
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -76,7 +76,7 @@ IMPORTANT RULES:
     if (!response.ok) {
       const errText = await response.text()
       console.error('Groq error:', response.status, errText)
-      return new Response(JSON.stringify({ error: `Groq error ${response.status}: ${errText}`, parsed: {} }), {
+      return new Response(JSON.stringify({ error: `Groq ${response.status}: ${errText.substring(0, 300)}`, parsed: {}, _groqError: errText.substring(0, 500) }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
