@@ -1729,12 +1729,11 @@ function StatusDot({ ok }) {
 // Shows cross-product metrics from platform_metrics table.
 // Additive only — no existing code modified.
 const PRODUCT_META = {
-  taxres:   { label:'Tax Res CRM',  icon:'📊', color:'#6366f1', url:'https://taxrescrm.app',    status:'live' },
-  camvella: { label:'Camvella',     icon:'🏘️', color:'#10b981', url:'https://camvella.com',      status:'live' },
-  phl:      { label:'PHL Land Care',icon:'🌿', color:'#f59e0b', url:'#',                         status:'live' },
-  arcvena:  { label:'Arcvena',      icon:'⚡', color:'#0ea5e9', url:'#',                         status:'building' },
-  dental:   { label:'DentOS',       icon:'🦷', color:'#8b5cf6', url:'#',                         status:'building' },
-  bocaflow: { label:'BocaFlow',     icon:'🏢', color:'#ec4899', url:'#',                         status:'building' },
+  taxres:   { label:'Tax Res CRM',  icon:'📊', color:'#6366f1', url:'https://taxrescrm.app',  status:'live' },
+  camvella: { label:'Camvella',     icon:'🏘️', color:'#10b981', url:'https://camvella.com',    status:'live' },
+  phl:      { label:'PHL Land Care',icon:'🌿', color:'#f59e0b', url:'#',                       status:'live' },
+  arcvena:  { label:'Arcvena',      icon:'⚡', color:'#0ea5e9', url:'#',                       status:'building' },
+  bocasync: { label:'BocaSync',     icon:'🦷', color:'#8b5cf6', url:'https://bocasync.com',    status:'building' },
 }
 
 function ProductsTab({ supabase }) {
