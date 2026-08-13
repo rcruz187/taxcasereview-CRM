@@ -156,6 +156,41 @@ serve(async (req) => {
       )
     }
 
+    // Save call summary as a note on the client's file
+    if (client_id && (summary || transcript)) {
+      const mins = Math.floor((duration_seconds || 0) / 60)
+      const secs = (duration_seconds || 0) % 60
+      const duration_str = duration_seconds ? `${mins}m ${secs}s` : 'unknown duration'
+      const caller = from_number || 'Unknown'
+      const noteLines = [
+        `📞 Call Summary — ${duration_str} · ${caller}`,
+        '',
+        summary || 'No summary available.',
+      ]
+      if (key_points?.length > 0) {
+        noteLines.push('', 'Key Points:')
+        key_points.forEach((p: string) => noteLines.push(`• ${p}`))
+      }
+      if (action_items?.length > 0) {
+        noteLines.push('', 'Action Items:')
+        action_items.forEach((a: string) => noteLines.push(`• ${a}`))
+      }
+      if (next_steps) noteLines.push('', `Next Steps: ${next_steps}`)
+      if (sentiment && sentiment !== 'Unknown') noteLines.push('', `Client Sentiment: ${sentiment}`)
+
+      await supabase.from('client_notes').insert({
+        tenant_id,
+        client_id,
+        clientname: client_name,
+        text: noteLines.join('\n'),
+        author: 'AI Call Summary',
+        type: 'Call',
+        note_type: 'Call',
+        visible_to_client: false,
+        created_at: new Date().toISOString()
+      })
+    }
+
     return new Response(JSON.stringify({ ok: true, case_id, client_id }), { status: 200 })
 
   } catch (err) {
