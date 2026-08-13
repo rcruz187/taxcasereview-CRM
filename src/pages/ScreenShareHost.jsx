@@ -138,11 +138,15 @@ export default function ScreenShareHost() {
     const url = URL.createObjectURL(blob)
     const a   = Object.assign(document.createElement('a'), { href: url, download: filename })
     a.click(); URL.revokeObjectURL(url)
-    // Upload to Supabase storage
+    // Upload via the authenticated parent window — the pop-out has no auth
+    // session of its own, so it delegates to the parent's supabase client.
     try {
-      const { supabase } = await import('../lib/supabase')
-      await supabase.storage.from('training-recordings')
-        .upload(filename, new File([blob], filename, { type: 'video/webm' }), { upsert: true })
+      const upload = window.opener?._tcrScreenShare?.uploadRecording
+      if (upload) {
+        await upload(blob, filename)
+      } else {
+        console.warn('Upload skipped — no authenticated parent window available')
+      }
     } catch (err) { console.error('Upload failed:', err) }
   }
 

@@ -55,6 +55,14 @@ export function ScreenShareProvider({ children }) {
       // Exposed so the host pop-out can send chat messages directly on the channel
       channelRef:    webrtc.channelRef,
       peerConnsRef:  webrtc.peerConnsRef,
+      // Upload recording from the pop-out — the pop-out has no auth session,
+      // so it delegates the storage upload to the authenticated parent window.
+      uploadRecording: async (blob, filename) => {
+        const { supabase } = await import('../lib/supabase')
+        return supabase.storage
+          .from('training-recordings')
+          .upload(filename, new File([blob], filename, { type: 'video/webm' }), { upsert: true })
+      },
     }
   }, [sharingScreen, screenStream, webrtc.members, webrtc.remoteStreams, webrtc.micOn, webrtc.cameraOn, webrtc.joined])
 
