@@ -160,7 +160,7 @@ export default function TaxDocParser({ clientName = '', taxYear = '2024', onPars
         parsed_data: parsed,
         created_at: new Date().toISOString(),
       }))
-      supabase.from('tax_doc_uploads').insert(inserts).catch(() => {})
+      try { await supabase.from('tax_doc_uploads').insert(inserts) } catch (_) {}
 
       onParsed(results.map(({ item, parsed }) => ({ docType: item.docType, data: parsed })))
     }
