@@ -1,4 +1,6 @@
-// linkedin-publish v4 — 2026-08-14
+// linkedin-publish v5 — 2026-08-14
+// All operations go through this edge function (service role).
+// No RPCs used — current_tenant_id() is unreliable for admin tenant users.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const cors = {
@@ -29,7 +31,7 @@ Deno.serve(async (req) => {
   )
   if (authError || !user) return json({ ok: false, error: 'Unauthorized' }, 401)
 
-  // Get tenant_id
+  // Get tenant_id via service role — bypasses current_tenant_id() entirely
   const { data: emp, error: empError } = await supabase
     .from('employees')
     .select('tenant_id')
@@ -39,12 +41,14 @@ Deno.serve(async (req) => {
   if (empError || !emp?.tenant_id) return json({ ok: false, error: 'No tenant found' }, 403)
   const tenantId = emp.tenant_id
 
-  let body: Record<string, string> = {}
+  let body: Record<string, unknown> = {}
   try { body = await req.json() } catch (_) {}
-  const { action, code, redirect_uri, post_id } = body
+  const action = body.action as string
 
   // ── OAuth callback ─────────────────────────────────────────────────────────
   if (action === 'oauth_callback') {
+    const code         = body.code as string
+    const redirect_uri = body.redirect_uri as string
     const clientId     = Deno.env.get('LINKEDIN_CLIENT_ID')!
     const clientSecret = Deno.env.get('LINKEDIN_CLIENT_SECRET')!
 
@@ -105,8 +109,73 @@ Deno.serve(async (req) => {
     })
   }
 
+  // ── Save / update post ─────────────────────────────────────────────────────
+  if (action === 'save_draft') {
+    const p_body         = (body.body as string || '').trim()
+    const p_status       = (body.status as string) || 'draft'
+    const p_scheduled_at = body.scheduled_at as string | null || null
+    const p_id           = body.id as string | null || null
+
+    if (!p_body) return json({ ok: false, error: 'Post body is required' }, 400)
+
+    if (p_id) {
+      // Update existing post
+      const { data: updated, error } = await supabase
+        .from('linkedin_posts')
+        .update({
+          body:         p_body,
+          status:       p_status,
+          scheduled_at: p_scheduled_at,
+          updated_at:   new Date().toISOString(),
+        })
+        .eq('id', p_id)
+        .eq('tenant_id', tenantId)
+        .select()
+        .single()
+      if (error) return json({ ok: false, error: error.message }, 500)
+      return json({ ok: true, post: updated })
+    } else {
+      // Insert new post
+      const { data: inserted, error } = await supabase
+        .from('linkedin_posts')
+        .insert({
+          tenant_id:    tenantId,
+          body:         p_body,
+          status:       p_status,
+          scheduled_at: p_scheduled_at,
+        })
+        .select()
+        .single()
+      if (error) return json({ ok: false, error: error.message }, 500)
+      return json({ ok: true, post: inserted })
+    }
+  }
+
+  // ── List posts ─────────────────────────────────────────────────────────────
+  if (action === 'list_posts') {
+    const limit = Number(body.limit) || 100
+    const { data: posts, error } = await supabase
+      .from('linkedin_posts')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    if (error) return json({ ok: false, error: error.message }, 500)
+    return json({ ok: true, posts: posts || [] })
+  }
+
+  // ── Delete post ────────────────────────────────────────────────────────────
+  if (action === 'delete_post') {
+    const post_id = body.post_id as string
+    if (!post_id) return json({ ok: false, error: 'post_id required' }, 400)
+    await supabase.from('linkedin_posts').delete()
+      .eq('id', post_id).eq('tenant_id', tenantId)
+    return json({ ok: true })
+  }
+
   // ── Publish ────────────────────────────────────────────────────────────────
   if (action === 'publish') {
+    const post_id = body.post_id as string
     if (!post_id) return json({ ok: false, error: 'post_id required' }, 400)
 
     const { data: conn, error: connError } = await supabase

@@ -3234,12 +3234,12 @@ function LinkedInPublisher() {
   async function load() {
     setLoading(true)
     try {
-      const { data: connData } = await supabase.functions.invoke('linkedin-publish', {
-        body: { action: 'status' }
-      })
+      const [{ data: connData }, { data: postsData }] = await Promise.all([
+        supabase.functions.invoke('linkedin-publish', { body: { action: 'status' } }),
+        supabase.functions.invoke('linkedin-publish', { body: { action: 'list_posts', limit: 100 } }),
+      ])
       setConnection(connData?.connected ? connData : false)
-      const { data: postsData } = await supabase.rpc('get_linkedin_posts', { p_limit: 100 })
-      setPosts(postsData || [])
+      setPosts(postsData?.posts || [])
     } catch (_) {
       setConnection(false)
       setPosts([])
@@ -3272,18 +3272,24 @@ function LinkedInPublisher() {
   async function savePost(status='draft') {
     if (!composeBody.trim()) { showToast('Post body is required', false); return }
     setSaving(true)
-    const { data } = await supabase.rpc('upsert_linkedin_post', {
-      p_body: composeBody,
-      p_status: status,
-      p_scheduled_at: status==='scheduled' && scheduleDate ? new Date(scheduleDate).toISOString() : null,
+    const { data, error } = await supabase.functions.invoke('linkedin-publish', {
+      body: {
+        action:       'save_draft',
+        body:         composeBody,
+        status,
+        scheduled_at: status==='scheduled' && scheduleDate ? new Date(scheduleDate).toISOString() : null,
+      }
     })
-    if (data) {
-      setPosts(prev => [data, ...prev])
-      setSelected(data)
+    if (data?.ok && data?.post) {
+      setPosts(prev => [data.post, ...prev])
+      setSelected(data.post)
       setComposing(false)
       setComposeBody('')
       setScheduleDate('')
       showToast(status==='scheduled' ? 'Scheduled ✓' : 'Saved as draft ✓')
+    } else {
+      showToast('Failed to save post — try again', false)
+      console.error('savePost error:', error || data)
     }
     setSaving(false)
   }
@@ -3306,7 +3312,7 @@ function LinkedInPublisher() {
   }
 
   async function deletePost(id) {
-    await supabase.from('linkedin_posts').delete().eq('id', id)
+    await supabase.functions.invoke('linkedin-publish', { body: { action: 'delete_post', post_id: id } })
     setPosts(prev => prev.filter(p => p.id!==id))
     if (selected?.id===id) setSelected(null)
     showToast('Deleted')
