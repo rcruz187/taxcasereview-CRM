@@ -60,6 +60,7 @@ Deno.serve(async (req) => {
       }),
     })
     const tokenData = await tokenRes.json()
+    console.log('LinkedIn token response:', JSON.stringify(tokenData))
     if (!tokenData.access_token) {
       return json({ ok: false, error: 'Token exchange failed', detail: tokenData }, 400)
     }
