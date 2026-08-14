@@ -3234,12 +3234,12 @@ function LinkedInPublisher() {
   async function load() {
     setLoading(true)
     try {
-      const [connRes, postsRes] = await Promise.all([
-        supabase.rpc('get_linkedin_connection').then(r=>r).catch(() => ({ data: null })),
-        supabase.rpc('get_linkedin_posts', { p_limit: 100 }).then(r=>r).catch(() => ({ data: [] })),
-      ])
-      setConnection(connRes.data || false)
-      setPosts(postsRes.data || [])
+      const { data: connData } = await supabase.functions.invoke('linkedin-publish', {
+        body: { action: 'status' }
+      })
+      setConnection(connData?.connected ? connData : false)
+      const { data: postsData } = await supabase.rpc('get_linkedin_posts', { p_limit: 100 })
+      setPosts(postsData || [])
     } catch (_) {
       setConnection(false)
       setPosts([])
