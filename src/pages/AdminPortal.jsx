@@ -3241,15 +3241,17 @@ function LinkedInPublisher() {
   useEffect(() => { load() }, [])
 
   function connectLinkedIn() {
+    const state = Math.random().toString(36).slice(2)
+    sessionStorage.setItem('linkedin_oauth_state', state)
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: LINKEDIN_CLIENT_ID,
       redirect_uri: REDIRECT_URI,
       scope: 'openid profile w_member_social',
-      state: Math.random().toString(36).slice(2),
+      state,
     })
-    window.open(`https://www.linkedin.com/oauth/v2/authorization?${params}`, '_blank', 'width=600,height=700')
-    showToast('LinkedIn OAuth window opened. Complete sign-in there.', true)
+    // Redirect main window — popup approach fails because callback lands in popup, not main window
+    window.location.href = `https://www.linkedin.com/oauth/v2/authorization?${params}`
   }
 
   async function disconnect() {
