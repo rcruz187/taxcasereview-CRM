@@ -3193,13 +3193,34 @@ function LinkedInPublisher() {
   const [saving, setSaving]           = useState(false)
   const [toast, setToast]             = useState(null)
 
-  const LINKEDIN_CLIENT_ID = 'YOUR_CLIENT_ID' // replaced after OAuth app approved
+  const LINKEDIN_CLIENT_ID = '788n5oz5zrmb1o'
   const REDIRECT_URI = `${window.location.origin}/crm-admin/linkedin/callback`
 
   function showToast(msg, ok=true) {
     setToast({ msg, ok })
     setTimeout(() => setToast(null), 3500)
   }
+
+  // Handle OAuth callback — LinkedIn redirects back with ?code=...
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const code = params.get('code')
+    if (!code) return
+    // Clear code from URL immediately
+    window.history.replaceState({}, '', window.location.pathname)
+    // Exchange code for token server-side
+    supabase.functions.invoke('linkedin-publish', {
+      body: { action: 'oauth_callback', code, redirect_uri: REDIRECT_URI, state: params.get('state') }
+    }).then(({ data, error }) => {
+      if (data?.ok) {
+        showToast(`Connected as ${data.name} ✓`)
+        load()
+      } else {
+        showToast('LinkedIn connection failed — try again', false)
+        console.error('LinkedIn OAuth error:', error || data)
+      }
+    })
+  }, [])
 
   async function load() {
     setLoading(true)
@@ -3208,7 +3229,7 @@ function LinkedInPublisher() {
         supabase.rpc('get_linkedin_connection').then(r=>r).catch(() => ({ data: null })),
         supabase.rpc('get_linkedin_posts', { p_limit: 100 }).then(r=>r).catch(() => ({ data: [] })),
       ])
-      setConnection(connRes.data?.[0] || false)
+      setConnection(connRes.data || false)
       setPosts(postsRes.data || [])
     } catch (_) {
       setConnection(false)
@@ -3615,7 +3636,8 @@ export default function AdminPortal() {
           <Routes>
             <Route path="/command-center" element={<AdminRouteErrorBoundary><CommandCenter/></AdminRouteErrorBoundary>}/>
             <Route path="/content"         element={<AdminRouteErrorBoundary><ContentCenter/></AdminRouteErrorBoundary>}/>
-            <Route path="/linkedin"        element={<AdminRouteErrorBoundary><LinkedInPublisher/></AdminRouteErrorBoundary>}/>
+            <Route path="/linkedin"          element={<AdminRouteErrorBoundary><LinkedInPublisher/></AdminRouteErrorBoundary>}/>
+            <Route path="/linkedin/callback" element={<AdminRouteErrorBoundary><LinkedInPublisher/></AdminRouteErrorBoundary>}/>
             <Route index                   element={<Overview key={window.location.pathname + window.location.search}/>}/>
             <Route path="/offices"        element={<OfficesList/>}/>
             <Route path="/offices/:id"    element={<OfficePage/>}/>
