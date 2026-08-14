@@ -3206,12 +3206,20 @@ function LinkedInPublisher() {
     const params = new URLSearchParams(window.location.search)
     const code = params.get('code')
     if (!code) return
-    // Clear code from URL immediately
     window.history.replaceState({}, '', window.location.pathname)
-    // Exchange code for token server-side
-    supabase.functions.invoke('linkedin-publish', {
-      body: { action: 'oauth_callback', code, redirect_uri: REDIRECT_URI, state: params.get('state') }
-    }).then(({ data, error }) => {
+    // Give Supabase time to restore session from storage, then invoke
+    const attempt = async () => {
+      // Retry up to 5 times waiting for session to restore
+      let session = null
+      for (let i = 0; i < 5; i++) {
+        const { data } = await supabase.auth.getSession()
+        if (data?.session) { session = data.session; break }
+        await new Promise(r => setTimeout(r, 500))
+      }
+      if (!session) { showToast('Session expired — please log in again', false); return }
+      const { data, error } = await supabase.functions.invoke('linkedin-publish', {
+        body: { action: 'oauth_callback', code, redirect_uri: REDIRECT_URI, state: params.get('state') }
+      })
       if (data?.ok) {
         showToast(`Connected as ${data.name} ✓`)
         load()
@@ -3219,7 +3227,8 @@ function LinkedInPublisher() {
         showToast('LinkedIn connection failed — try again', false)
         console.error('LinkedIn OAuth error:', error || data)
       }
-    })
+    }
+    attempt()
   }, [])
 
   async function load() {
