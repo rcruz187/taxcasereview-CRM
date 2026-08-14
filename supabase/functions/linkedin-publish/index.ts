@@ -1,8 +1,3 @@
-// linkedin-publish edge function
-// Handles: oauth_callback, status, publish, disconnect
-// Security: state validation, server-side only token handling, tenant isolation
-// Never exposes access_token or client_secret to frontend
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const cors = {
@@ -24,7 +19,7 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   )
 
-  // Verify JWT using service role client
+  // Verify JWT
   const authHeader = req.headers.get('Authorization')
   if (!authHeader) return json({ ok: false, error: 'Unauthorized' }, 401)
 
@@ -33,32 +28,22 @@ Deno.serve(async (req) => {
   )
   if (authError || !user) return json({ ok: false, error: 'Unauthorized' }, 401)
 
-  // Get tenant_id for this user
-  const { data: emp } = await supabase
+  // Get tenant_id
+  const { data: emp, error: empError } = await supabase
     .from('employees')
     .select('tenant_id')
     .eq('email', user.email)
     .limit(1)
     .single()
-  if (!emp?.tenant_id) return json({ ok: false, error: 'No tenant found' }, 403)
+  if (empError || !emp?.tenant_id) return json({ ok: false, error: 'No tenant found' }, 403)
   const tenantId = emp.tenant_id
 
-  const body = await req.json().catch(() => ({}))
-  const { action, code, redirect_uri, state, post_id } = body
+  let body: Record<string, string> = {}
+  try { body = await req.json() } catch (_) {}
+  const { action, code, redirect_uri, post_id } = body
 
-  // ── OAuth callback: exchange code for token ────────────────────────────────
+  // ── OAuth callback ─────────────────────────────────────────────────────────
   if (action === 'oauth_callback') {
-    // Validate state to prevent CSRF
-    const { data: storedState } = await supabase
-      .from('linkedin_connections')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('scopes', `pending:${state}`)
-      .limit(1)
-      .single()
-      .catch(() => ({ data: null }))
-
-    // State validation — only enforce if we stored one (graceful for first-time)
     const clientId     = Deno.env.get('LINKEDIN_CLIENT_ID')!
     const clientSecret = Deno.env.get('LINKEDIN_CLIENT_SECRET')!
 
@@ -78,13 +63,13 @@ Deno.serve(async (req) => {
       return json({ ok: false, error: 'Token exchange failed', detail: tokenData }, 400)
     }
 
-    // Get LinkedIn profile — never returned to frontend
+    // Get LinkedIn profile
     const profileRes = await fetch('https://api.linkedin.com/v2/userinfo', {
       headers: { Authorization: `Bearer ${tokenData.access_token}` }
     })
     const profile = await profileRes.json()
 
-    // Upsert connection — one per tenant, token stays server-side
+    // Store connection — token stays server-side only
     await supabase.from('linkedin_connections').upsert({
       tenant_id:          tenantId,
       linkedin_person_id: profile.sub,
@@ -100,15 +85,14 @@ Deno.serve(async (req) => {
 
   // ── Connection status ──────────────────────────────────────────────────────
   if (action === 'status') {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('linkedin_connections')
       .select('display_name, expires_at, scopes')
       .eq('tenant_id', tenantId)
       .limit(1)
       .single()
-      .catch(() => ({ data: null }))
 
-    if (!data) return json({ ok: true, connected: false })
+    if (error || !data) return json({ ok: true, connected: false })
     return json({
       ok:           true,
       connected:    true,
@@ -119,42 +103,37 @@ Deno.serve(async (req) => {
     })
   }
 
-  // ── Publish a post ─────────────────────────────────────────────────────────
+  // ── Publish ────────────────────────────────────────────────────────────────
   if (action === 'publish') {
     if (!post_id) return json({ ok: false, error: 'post_id required' }, 400)
 
-    // Get connection — token never leaves server
-    const { data: conn } = await supabase
+    const { data: conn, error: connError } = await supabase
       .from('linkedin_connections')
       .select('access_token, expires_at, linkedin_person_id')
       .eq('tenant_id', tenantId)
       .limit(1)
       .single()
-      .catch(() => ({ data: null }))
 
-    if (!conn) return json({ ok: false, error: 'LinkedIn not connected' }, 401)
+    if (connError || !conn) return json({ ok: false, error: 'LinkedIn not connected' }, 401)
     if (new Date(conn.expires_at) < new Date()) {
       return json({ ok: false, error: 'LinkedIn token expired — please reconnect' }, 401)
     }
 
-    // Get post — verify it belongs to this tenant (prevent cross-tenant publishing)
-    const { data: post } = await supabase
+    const { data: post, error: postError } = await supabase
       .from('linkedin_posts')
       .select('id, body, status, tenant_id')
       .eq('id', post_id)
       .eq('tenant_id', tenantId)
       .single()
-      .catch(() => ({ data: null }))
 
-    if (!post) return json({ ok: false, error: 'Post not found' }, 404)
-    if (post.status === 'published') return json({ ok: false, error: 'Already published — duplicate prevented' }, 409)
+    if (postError || !post) return json({ ok: false, error: 'Post not found' }, 404)
+    if (post.status === 'published') return json({ ok: false, error: 'Already published' }, 409)
 
-    // Mark as publishing first (idempotency lock)
+    // Lock against duplicate publish
     await supabase.from('linkedin_posts')
       .update({ status: 'publishing', updated_at: new Date().toISOString() })
       .eq('id', post_id).eq('tenant_id', tenantId)
 
-    // Publish to LinkedIn
     const publishRes = await fetch('https://api.linkedin.com/v2/ugcPosts', {
       method: 'POST',
       headers: {
@@ -179,9 +158,7 @@ Deno.serve(async (req) => {
 
     if (!publishRes.ok) {
       await supabase.from('linkedin_posts').update({
-        status: 'failed',
-        error_msg: JSON.stringify(publishData),
-        updated_at: new Date().toISOString(),
+        status: 'failed', error_msg: JSON.stringify(publishData), updated_at: new Date().toISOString(),
       }).eq('id', post_id).eq('tenant_id', tenantId)
       return json({ ok: false, error: 'LinkedIn API error', detail: publishData }, 500)
     }
@@ -190,12 +167,9 @@ Deno.serve(async (req) => {
     const liUrl    = `https://www.linkedin.com/feed/update/${liPostId}`
 
     await supabase.from('linkedin_posts').update({
-      status:          'published',
-      published_at:    new Date().toISOString(),
-      linkedin_post_id: liPostId,
-      linkedin_url:    liUrl,
-      error_msg:       null,
-      updated_at:      new Date().toISOString(),
+      status: 'published', published_at: new Date().toISOString(),
+      linkedin_post_id: liPostId, linkedin_url: liUrl,
+      error_msg: null, updated_at: new Date().toISOString(),
     }).eq('id', post_id).eq('tenant_id', tenantId)
 
     return json({ ok: true, post_id: liPostId, url: liUrl })
@@ -203,9 +177,7 @@ Deno.serve(async (req) => {
 
   // ── Disconnect ─────────────────────────────────────────────────────────────
   if (action === 'disconnect') {
-    await supabase.from('linkedin_connections')
-      .delete()
-      .eq('tenant_id', tenantId)
+    await supabase.from('linkedin_connections').delete().eq('tenant_id', tenantId)
     return json({ ok: true })
   }
 
