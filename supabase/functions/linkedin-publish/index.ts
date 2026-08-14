@@ -24,17 +24,14 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   )
 
-  // Get authenticated user's tenant_id
+  // Verify JWT using service role client
   const authHeader = req.headers.get('Authorization')
   if (!authHeader) return json({ ok: false, error: 'Unauthorized' }, 401)
 
-  const userClient = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_ANON_KEY')!,
-    { global: { headers: { Authorization: authHeader } } }
+  const { data: { user }, error: authError } = await supabase.auth.getUser(
+    authHeader.replace('Bearer ', '')
   )
-  const { data: { user } } = await userClient.auth.getUser()
-  if (!user) return json({ ok: false, error: 'Unauthorized' }, 401)
+  if (authError || !user) return json({ ok: false, error: 'Unauthorized' }, 401)
 
   // Get tenant_id for this user
   const { data: emp } = await supabase
