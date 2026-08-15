@@ -13,7 +13,8 @@ jobs:
     steps:
       - name: Setup Supabase CLI
         run: |
-          npm install -g supabase --legacy-peer-deps 2>/dev/null
+          # Use the official install script
+          curl -fsSL https://raw.githubusercontent.com/supabase/cli/main/scripts/install.sh | sh -s -- -b /usr/local/bin
           supabase --version
 
       - name: Dump schema
@@ -25,18 +26,23 @@ jobs:
           else
             PROJECT_REF="mpxgxfqdbquzkrvvejkh"
           fi
+          echo "Dumping project: $PROJECT_REF"
           supabase db dump \
             --project-ref "$PROJECT_REF" \
             --schema-only \
-            -f schema.sql 2>&1
-          echo "=== LINES ==="
-          wc -l schema.sql || echo "schema.sql not created"
+            -f schema.sql
+          echo "Done. Lines: $(wc -l < schema.sql)"
 
       - name: Upload schema artifact
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: schema-${{ inputs.target }}-${{ github.run_id }}
           path: schema.sql
           retention-days: 1
           if-no-files-found: warn
+
+      - name: Post error summary if failed
+        if: failure()
+        run: |
+          echo "Dump failed — check step logs above"
+          cat schema.sql 2>/dev/null | head -20 || echo "schema.sql not created"
