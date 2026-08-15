@@ -1749,7 +1749,7 @@ const PRODUCT_REGISTRY = [
     label:     'Camvella',
     icon:      '🏘️',
     color:     '#0ea5e9',
-    url:       'https://camvella.com',
+    url:       'https://www.camvella.com',
     status:    'live',
     desc:      'HOA & property management CRM',
     metricsUrl: 'https://fjqywulzsyfyzitneazb.supabase.co/functions/v1/platform-metrics',
