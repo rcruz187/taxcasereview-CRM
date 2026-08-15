@@ -1732,7 +1732,7 @@ const PRODUCT_REGISTRY = [
     url:       'https://taxrescrm.app',
     status:    'live',
     desc:      'Multi-tenant SaaS CRM for tax resolution firms',
-    metricsUrl: `https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/platform-metrics`,
+    metricsUrl: 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/platform-metrics?view=saas',
   },
   {
     key:       'tax_case_review',
@@ -1742,7 +1742,7 @@ const PRODUCT_REGISTRY = [
     url:       'https://taxrescrm.app',
     status:    'live',
     desc:      "Origin CRM — Romy's own tax resolution practice (TRC-001)",
-    metricsUrl: `https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/platform-metrics`,
+    metricsUrl: 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/platform-metrics?view=tcr',
   },
   {
     key:       'camvella',
