@@ -3,18 +3,17 @@ on:
   workflow_dispatch:
     inputs:
       phase:
-        description: 'Phase: employees, clients, cases, transactions, meta, all'
+        description: 'Phase: employees, clients, cases, transactions, meta'
         required: true
-        default: 'all'
+        default: 'clients'
 
 jobs:
   migrate:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-
-      - name: Migrate Nashville data
+      - name: Migrate
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           TCR: mpxgxfqdbquzkrvvejkh
@@ -22,36 +21,11 @@ jobs:
           NASH: 489ace07-1a6b-4864-833a-4f8420568b40
           PHASE: ${{ github.event.inputs.phase }}
         run: |
-          run_table() {
-            TABLE=$1 python3 scripts/migrate_nashville.py
-          }
-
-          if [ "$PHASE" = "employees" ] || [ "$PHASE" = "all" ]; then
-            run_table employees
-          fi
-          if [ "$PHASE" = "clients" ] || [ "$PHASE" = "all" ]; then
-            run_table clients
-          fi
-          if [ "$PHASE" = "cases" ] || [ "$PHASE" = "all" ]; then
-            run_table cases
-          fi
-          if [ "$PHASE" = "transactions" ] || [ "$PHASE" = "all" ]; then
-            run_table payment_transactions
-            run_table payments
-          fi
-          if [ "$PHASE" = "meta" ] || [ "$PHASE" = "all" ]; then
-            run_table client_notes
-            run_table lead_notes
-            run_table leads
-            run_table tasks
-            run_table calevents
-            run_table invoices
-            run_table documents
-            run_table esigns
-            run_table workflow_templates
-            run_table workflow_statuses
-            run_table workflow_status_categories
-            run_table deadlines
-            run_table poa_records
-            run_table transcript_analyses
-          fi
+          run_table() { TABLE=$1 python3 scripts/migrate_nashville.py; }
+          case "$PHASE" in
+            employees) run_table employees ;;
+            clients) run_table clients ;;
+            cases) run_table cases ;;
+            transactions) run_table payment_transactions; run_table payments ;;
+            meta) run_table client_notes; run_table lead_notes; run_table leads; run_table tasks; run_table calevents; run_table invoices; run_table documents; run_table esigns; run_table workflow_templates; run_table workflow_statuses; run_table workflow_status_categories; run_table deadlines; run_table poa_records ;;
+          esac
