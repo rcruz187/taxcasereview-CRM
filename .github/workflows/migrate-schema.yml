@@ -9,9 +9,11 @@ jobs:
       - name: Install postgres client
         run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
 
-      - name: Dump TCR schema via session pooler port 5432
+      - name: Dump and report
+        env:
+          GH_PAT: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          # Session pooler supports pg_dump, port 5432, IPv4
+          # Try pg_dump and capture everything
           PGPASSWORD="5b4zhcuTttEfL3YZ" pg_dump \
             --host=aws-0-us-east-1.pooler.supabase.com \
             --port=5432 \
@@ -21,18 +23,15 @@ jobs:
             --no-owner \
             --no-acl \
             --schema=public \
-            -f tcr-schema.sql 2>&1
-          echo "Exit: $?"
-          echo "Lines: $(wc -l < tcr-schema.sql 2>/dev/null || echo 0)"
-          head -5 tcr-schema.sql 2>/dev/null || echo "empty"
-
-      - name: Restore to Nashville
-        if: success()
-        run: |
-          PGPASSWORD="rsqY3zU6QUiiAISB" psql \
-            --host=aws-0-us-west-2.pooler.supabase.com \
-            --port=5432 \
-            --username=postgres.alozyneyvvtjekiyqdyb \
-            --dbname=postgres \
-            -f tcr-schema.sql 2>&1 | tail -30
-          echo "Restore exit: $?"
+            -f tcr-schema.sql > stdout.txt 2> stderr.txt
+          EXIT=$?
+          
+          BODY="Exit: $EXIT\n\nSTDOUT:\n$(cat stdout.txt | head -20)\n\nSTDERR:\n$(cat stderr.txt | head -30)\n\nLines: $(wc -l < tcr-schema.sql 2>/dev/null || echo 0)"
+          
+          curl -s -X POST \
+            "https://api.github.com/repos/taxresolutioncrm/taxcasereview-CRM/issues" \
+            -H "Authorization: token $GH_PAT" \
+            -H "Content-Type: application/json" \
+            -d "{\"title\": \"dump-diag-$GITHUB_RUN_ID\", \"body\": \"$BODY\"}"
+          
+          exit $EXIT
