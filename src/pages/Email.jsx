@@ -77,7 +77,7 @@ export default function Email() {
     return () => window.removeEventListener('focus', onFocus)
   }, [user?.email])
 
-  // Global Delete/Backspace key — archive selected email from anywhere on the page
+  // Global Delete/Backspace — archive; Shift+Delete — permanently delete (Archive folder only)
   useEffect(() => {
     function onKey(e) {
       if (e.key !== 'Delete' && e.key !== 'Backspace') return
@@ -85,11 +85,15 @@ export default function Email() {
       if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return
       if (!selected) return
       e.preventDefault()
-      archiveEmail(selected.id)
+      if (e.shiftKey && triageFilter === 'Archive') {
+        permanentlyDeleteEmail(selected.id)
+      } else {
+        archiveEmail(selected.id)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selected])
+  }, [selected, triageFilter])
 
   // Refresh the visible list whenever the background sync (running
   // globally, not just on this page) picks up anything new.
@@ -342,20 +346,41 @@ export default function Email() {
   // in. Archiving keeps the row (with its gmail_message_id) so sync never
   // re-imports it.
   async function archiveEmail(id) {
-    await supabase.from('emails').update({ triage: 'Archive' }).eq('id', id)
+    // Optimistic: update local state immediately, DB write in background
+    setEmails(es => es.map(e => e.id === id ? { ...e, triage: 'Archive' } : e))
     if (selected?.id === id) setSelected(null)
     setCheckedIds(s => { const n = new Set(s); n.delete(id); return n })
-    load()
+    supabase.from('emails').update({ triage: 'Archive' }).eq('id', id)
   }
 
   async function archiveSelected() {
     if (checkedIds.size === 0) return
     const ids = [...checkedIds]
-    await supabase.from('emails').update({ triage: 'Archive' }).in('id', ids)
+    // Optimistic: update local state immediately, DB write in background
+    setEmails(es => es.map(e => ids.includes(e.id) ? { ...e, triage: 'Archive' } : e))
     if (selected && ids.includes(selected.id)) setSelected(null)
     setCheckedIds(new Set())
     showToast(`Archived ${ids.length} email${ids.length === 1 ? '' : 's'}`)
-    load()
+    supabase.from('emails').update({ triage: 'Archive' }).in('id', ids)
+  }
+
+  async function permanentlyDeleteEmail(id) {
+    // Hard delete — only shown for Archive folder emails
+    // Mark deleted_at so sync never re-imports, then remove from local state
+    setEmails(es => es.filter(e => e.id !== id))
+    if (selected?.id === id) setSelected(null)
+    setCheckedIds(s => { const n = new Set(s); n.delete(id); return n })
+    supabase.from('emails').delete().eq('id', id)
+  }
+
+  async function permanentlyDeleteSelected() {
+    if (checkedIds.size === 0) return
+    const ids = [...checkedIds]
+    setEmails(es => es.filter(e => !ids.includes(e.id)))
+    if (selected && ids.includes(selected.id)) setSelected(null)
+    setCheckedIds(new Set())
+    showToast(`Deleted ${ids.length} email${ids.length === 1 ? '' : 's'}`)
+    supabase.from('emails').delete().in('id', ids)
   }
 
   async function markRead(email) {
@@ -392,11 +417,16 @@ export default function Email() {
   // as a file explorer. Plain Up/Down without Shift just moves which
   // single email is open for reading, clearing any multi-select.
   function onListKeyDown(e) {
-    // Delete or Backspace: if emails are checked, delete all checked; else delete the open one
+    // Delete/Backspace: archive; Shift+Delete in Archive folder: permanently delete
     if ((e.key === 'Delete' || e.key === 'Backspace') && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
       e.preventDefault()
-      if (checkedIds.size > 0) { archiveSelected(); return }
-      if (selected) { archiveEmail(selected.id); return }
+      if (e.shiftKey && triageFilter === 'Archive') {
+        if (checkedIds.size > 0) { permanentlyDeleteSelected(); return }
+        if (selected) { permanentlyDeleteEmail(selected.id); return }
+      } else {
+        if (checkedIds.size > 0) { archiveSelected(); return }
+        if (selected) { archiveEmail(selected.id); return }
+      }
     }
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
     if (filtered.length === 0) return
@@ -613,7 +643,10 @@ export default function Email() {
                       {TRIAGE.filter(t => t !== triageFilter).map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                     <button className="btn sec" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => { setCheckedIds(new Set()); anchorIndexRef.current = -1 }}>Clear</button>
-                    <button className="btn del" style={{ fontSize: 11, padding: '4px 12px', fontWeight: 700 }} onClick={archiveSelected}>🗑 Delete Selected</button>
+                    {triageFilter === 'Archive'
+                      ? <button className="btn del" style={{ fontSize: 11, padding: '4px 12px', fontWeight: 700 }} onClick={permanentlyDeleteSelected}>🗑 Delete Permanently</button>
+                      : <button className="btn del" style={{ fontSize: 11, padding: '4px 12px', fontWeight: 700 }} onClick={archiveSelected}>🗑 Archive Selected</button>
+                    }
                   </div>
                 </div>
               )}
@@ -698,7 +731,10 @@ export default function Email() {
                       ))}
                       <button className="btn" style={{ fontSize: 12, padding: '6px 14px', fontWeight: 600 }} onClick={() => { setForm({ ...BLANK, clientName: selected.clientName, recipient: selected.recipient, subject: 'Re: ' + selected.subject }); setView('compose') }}>↩ Reply</button>
                       <button className="btn" style={{ fontSize: 12, padding: '6px 14px', fontWeight: 600, background: 'var(--blue)', color: '#fff', border: 'none' }} onClick={() => markUnread(selected)}>● Mark as New</button>
-                      <button className="btn del" style={{ fontSize: 12, padding: '6px 14px', fontWeight: 600 }} onClick={() => archiveEmail(selected.id)}>🗑 Archive</button>
+                      {triageFilter === 'Archive'
+                        ? <button className="btn del" style={{ fontSize: 12, padding: '6px 14px', fontWeight: 600 }} onClick={() => permanentlyDeleteEmail(selected.id)}>🗑 Delete Permanently</button>
+                        : <button className="btn del" style={{ fontSize: 12, padding: '6px 14px', fontWeight: 600 }} onClick={() => archiveEmail(selected.id)}>🗑 Archive</button>
+                      }
                     </div>
                   </div>
                   {selected.body_html ? (
