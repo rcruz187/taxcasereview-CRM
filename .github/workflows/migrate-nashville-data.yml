@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       phase:
-        description: 'Phase: test, employees, clients, cases, transactions, all'
+        description: 'Phase'
         required: true
         default: 'test'
 
@@ -16,79 +16,27 @@ jobs:
         run: sudo apt-get install -y postgresql-client -qq
 
       - name: Migrate
+        env:
+          GH_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           NASH="489ace07-1a6b-4864-833a-4f8420568b40"
-          PHASE="${{ github.event.inputs.phase }}"
 
-          tcr() { PGPASSWORD="5b4zhcuTttEfL3YZ" psql "host=aws-0-us-east-1.pooler.supabase.com port=5432 dbname=postgres user=postgres.mpxgxfqdbquzkrvvejkh sslmode=require" "$@"; }
-          nas() { PGPASSWORD="rsqY3zU6QUiiAISB" psql "host=aws-0-us-west-2.pooler.supabase.com port=5432 dbname=postgres user=postgres.ydrvncdedgjtcprczwpu sslmode=require" "$@"; }
+          echo "Testing TCR..."
+          TCR_RESULT=$(PGPASSWORD="5b4zhcuTttEfL3YZ" psql \
+            "host=aws-0-us-east-1.pooler.supabase.com port=5432 dbname=postgres user=postgres.mpxgxfqdbquzkrvvejkh sslmode=require" \
+            -c "SELECT COUNT(*) FROM clients WHERE tenant_id='$NASH';" 2>&1)
+          echo "TCR: $TCR_RESULT"
 
-          echo "=== Connection test ==="
-          tcr -c "SELECT COUNT(*) FROM clients WHERE tenant_id='$NASH';"
-          nas -c "SELECT COUNT(*) FROM clients WHERE tenant_id='$NASH';"
+          echo "Testing Nashville..."
+          NAS_RESULT=$(PGPASSWORD="rsqY3zU6QUiiAISB" psql \
+            "host=aws-0-us-west-2.pooler.supabase.com port=5432 dbname=postgres user=postgres.ydrvncdedgjtcprczwpu sslmode=require" \
+            -c "SELECT COUNT(*) FROM clients WHERE tenant_id='$NASH';" 2>&1)
+          echo "NAS: $NAS_RESULT"
 
-          if [ "$PHASE" = "test" ]; then exit 0; fi
-
-          migrate_via_copy() {
-            TABLE=$1
-            echo "=== $TABLE ==="
-            # Export from TCR as CSV, import to Nashville
-            tcr -c "\COPY (SELECT * FROM $TABLE WHERE tenant_id='$NASH') TO STDOUT CSV HEADER" > /tmp/data.csv 2>&1
-            ROWS=$(wc -l < /tmp/data.csv)
-            echo "Exported $ROWS rows"
-            if [ "$ROWS" -gt 1 ]; then
-              nas -c "\COPY $TABLE FROM STDIN CSV HEADER" < /tmp/data.csv 2>&1
-              echo "Imported to Nashville"
-            fi
-          }
-
-          if [ "$PHASE" = "employees" ] || [ "$PHASE" = "all" ]; then
-            migrate_via_copy "employees"
-          fi
-
-          if [ "$PHASE" = "clients" ] || [ "$PHASE" = "all" ]; then
-            migrate_via_copy "clients"
-          fi
-
-          if [ "$PHASE" = "cases" ] || [ "$PHASE" = "all" ]; then
-            migrate_via_copy "cases"
-          fi
-
-          if [ "$PHASE" = "transactions" ] || [ "$PHASE" = "all" ]; then
-            migrate_via_copy "payment_transactions"
-            migrate_via_copy "payments"
-          fi
-
-          if [ "$PHASE" = "all" ]; then
-            migrate_via_copy "client_notes"
-            migrate_via_copy "lead_notes"
-            migrate_via_copy "leads"
-            migrate_via_copy "tasks"
-            migrate_via_copy "calevents"
-            migrate_via_copy "esigns"
-            migrate_via_copy "documents"
-            migrate_via_copy "invoices"
-            migrate_via_copy "sms_messages"
-            migrate_via_copy "fax_logs"
-            migrate_via_copy "timeentries"
-            migrate_via_copy "chat_messages"
-            migrate_via_copy "workflow_templates"
-            migrate_via_copy "workflow_statuses"
-            migrate_via_copy "workflow_status_categories"
-            migrate_via_copy "poa_records"
-            migrate_via_copy "transcript_analyses"
-            migrate_via_copy "billing_time_entries"
-            migrate_via_copy "billing_activity_types"
-            migrate_via_copy "call_logs"
-            migrate_via_copy "calllog"
-            migrate_via_copy "deadlines"
-            migrate_via_copy "irsforms"
-            migrate_via_copy "tax_doc_uploads"
-            migrate_via_copy "financial_intake_responses"
-            migrate_via_copy "client_financial_profiles"
-            migrate_via_copy "client_compliance_records"
-          fi
-
-          echo "=== DONE ==="
-          nas -c "SELECT COUNT(*) as clients FROM clients WHERE tenant_id='$NASH';"
-          nas -c "SELECT COUNT(*) as cases FROM cases WHERE tenant_id='$NASH';"
+          # Post results as issue
+          BODY="TCR: $TCR_RESULT\n\nNAS: $NAS_RESULT"
+          curl -s -X POST \
+            "https://api.github.com/repos/taxresolutioncrm/taxcasereview-CRM/issues" \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"title\":\"migrate-test-$GITHUB_RUN_ID\",\"body\":\"$BODY\"}" > /dev/null
