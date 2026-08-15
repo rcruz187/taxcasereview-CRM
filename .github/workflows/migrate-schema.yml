@@ -1,0 +1,36 @@
+name: Migrate Schema TCR to Nashville
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install postgres client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client
+
+      - name: Dump TCR schema and restore to Nashville
+        run: |
+          echo "Dumping TCR schema..."
+          PGPASSWORD="5b4zhcuTttEfL3YZ" pg_dump \
+            -h db.mpxgxfqdbquzkrvvejkh.supabase.co \
+            -U postgres \
+            -d postgres \
+            --schema-only \
+            --no-owner \
+            --no-acl \
+            -f tcr-schema.sql
+          
+          echo "Lines dumped: $(wc -l < tcr-schema.sql)"
+          
+          echo "Restoring to Nashville..."
+          PGPASSWORD="rsqY3zU6QUiiAISB" psql \
+            -h db.alozyneyvvtjekiyqdyb.supabase.co \
+            -U postgres \
+            -d postgres \
+            -f tcr-schema.sql \
+            2>&1 | tail -20
+          
+          echo "Done."
