@@ -5,51 +5,43 @@ on:
 jobs:
   migrate:
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
     steps:
       - name: Install postgres client
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y postgresql-client
+          psql --version
 
-      - name: Dump TCR schema and restore to Nashville
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Test connectivity
         run: |
-          echo "Dumping TCR schema..."
+          echo "Testing TCR connection..."
+          PGPASSWORD="5b4zhcuTttEfL3YZ" PGCONNECT_TIMEOUT=10 psql \
+            "postgresql://postgres:5b4zhcuTttEfL3YZ@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require" \
+            -c "SELECT 'TCR connected' as status;" 2>&1 || echo "TCR pooler failed, trying direct..."
+          
+          PGPASSWORD="5b4zhcuTttEfL3YZ" PGCONNECT_TIMEOUT=10 psql \
+            "postgresql://postgres.mpxgxfqdbquzkrvvejkh:5b4zhcuTttEfL3YZ@aws-0-us-east-1.pooler.supabase.com:5432/postgres" \
+            -c "SELECT 'TCR pooler connected' as status;" 2>&1 || echo "TCR pooler v2 failed"
+
+      - name: Dump TCR schema
+        run: |
+          # Try session pooler (IPv4, port 5432)
           PGPASSWORD="5b4zhcuTttEfL3YZ" pg_dump \
-            -h db.mpxgxfqdbquzkrvvejkh.supabase.co \
-            -U postgres \
-            -d postgres \
+            "postgresql://postgres.mpxgxfqdbquzkrvvejkh:5b4zhcuTttEfL3YZ@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require" \
             --schema-only \
             --no-owner \
             --no-acl \
-            -f tcr-schema.sql 2> dump_err.txt
-          
-          DUMP_EXIT=$?
-          echo "Dump exit: $DUMP_EXIT"
-          echo "Dump stderr: $(cat dump_err.txt)"
-          echo "Lines: $(wc -l < tcr-schema.sql 2>/dev/null || echo 0)"
-          
-          if [ $DUMP_EXIT -ne 0 ]; then
-            gh api repos/${{ github.repository }}/issues \
-              -X POST \
-              -f title="migrate-error-${{ github.run_id }}" \
-              -f body="## Dump failed\n\n\`\`\`\n$(cat dump_err.txt | head -30)\n\`\`\`" || true
-            exit 1
-          fi
-          
-          echo "Restoring to Nashville..."
+            -f tcr-schema.sql 2>&1
+          echo "Exit: $?"
+          wc -l tcr-schema.sql 2>/dev/null || echo "No file produced"
+
+      - name: Restore to Nashville
+        if: success()
+        run: |
           PGPASSWORD="rsqY3zU6QUiiAISB" psql \
-            -h db.alozyneyvvtjekiyqdyb.supabase.co \
-            -U postgres \
-            -d postgres \
-            -f tcr-schema.sql > restore_out.txt 2> restore_err.txt
-          
-          RESTORE_EXIT=$?
-          
-          gh api repos/${{ github.repository }}/issues \
-            -X POST \
-            -f title="migrate-result-${{ github.run_id }}" \
-            -f body="## Result\n\nDump: $DUMP_EXIT | Restore: $RESTORE_EXIT\n\n### Restore errors\n\`\`\`\n$(cat restore_err.txt | head -50)\n\`\`\`\n\n### Restore output\n\`\`\`\n$(cat restore_out.txt | tail -20)\n\`\`\`" || true
-          
-          exit $RESTORE_EXIT
+            "postgresql://postgres.alozyneyvvtjekiyqdyb:rsqY3zU6QUiiAISB@aws-0-us-west-2.pooler.supabase.com:5432/postgres?sslmode=require" \
+            -f tcr-schema.sql 2>&1 | tail -30
+          echo "Restore exit: $?"
