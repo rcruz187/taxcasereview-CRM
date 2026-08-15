@@ -1846,6 +1846,527 @@ function ProductsTab({ supabase }) {
   )
 }
 
+
+// ── Sales Pipeline ────────────────────────────────────────────────────────────
+const PIPELINE_STAGES = ['Prospect','Contacted','Interested','Demo Scheduled','Demo Completed','Proposal Sent','Negotiation','Won','Lost']
+const STAGE_COLORS    = ['#64748b','#6366f1','#8b5cf6','#0ea5e9','#a855f7','#f59e0b','#f97316','#10b981','#ef4444']
+const PRODUCTS = [
+  { value:'all',         label:'All Products' },
+  { value:'taxres_crm',  label:'Tax Res CRM'  },
+  { value:'camvella',    label:'Camvella'      },
+  { value:'phl',         label:'PHL Land Care' },
+  { value:'arcvena',     label:'Arcvena'       },
+  { value:'bocasync',    label:'BocaSync'      },
+]
+const PRICING_LABELS = { monthly:'Monthly', perpetual:'Perpetual License', undecided:'Undecided' }
+const ACTIVITY_ICONS = { note:'📝', call:'📞', email:'📧', demo:'🖥️', proposal:'📄', stage_change:'🔄', won:'🏆', lost:'❌' }
+
+function SalesPipeline({ data, supabase }) {
+  const [prospects, setProspects]     = useState(data?.sales?.prospects || [])
+  const [selected, setSelected]       = useState(null)
+  const [activities, setActivities]   = useState([])
+  const [actLoading, setActLoading]   = useState(false)
+  const [productFilter, setProductFilter] = useState('all')
+  const [stageFilter, setStageFilter] = useState('all')
+  const [showForm, setShowForm]       = useState(false)
+  const [editMode, setEditMode]       = useState(false)
+  const [form, setForm]               = useState({})
+  const [saving, setSaving]           = useState(false)
+  const [newNote, setNewNote]         = useState('')
+  const [addingNote, setAddingNote]   = useState(false)
+  const [toast, setToast]             = useState(null)
+
+  function showToast(msg, ok=true) { setToast({msg,ok}); setTimeout(()=>setToast(null),3000) }
+
+  // Reload prospects from DB
+  async function reload() {
+    const { data: rows } = await supabase.from('prospects').select('*').order('created_at', { ascending: false })
+    setProspects(rows || [])
+  }
+
+  // Load activities for selected prospect
+  async function loadActivities(prospectId) {
+    setActLoading(true)
+    const { data: rows } = await supabase
+      .from('prospect_activities')
+      .select('*')
+      .eq('prospect_id', prospectId)
+      .order('created_at', { ascending: false })
+    setActivities(rows || [])
+    setActLoading(false)
+  }
+
+  useEffect(() => { if (selected) loadActivities(selected.id) }, [selected?.id])
+
+  // Filtered list
+  const filtered = prospects.filter(p => {
+    if (productFilter !== 'all' && p.product !== productFilter) return false
+    if (stageFilter !== 'all' && p.stage !== stageFilter) return false
+    return true
+  })
+
+  // Derived metrics from filtered or all prospects
+  const all = productFilter === 'all' ? prospects : prospects.filter(p => p.product === productFilter)
+  const active = all.filter(p => !['Won','Lost'].includes(p.stage))
+  const won = all.filter(p => p.stage === 'Won')
+  const lost = all.filter(p => p.stage === 'Lost')
+  const winRate = (won.length + lost.length) > 0 ? Math.round((won.length / (won.length + lost.length)) * 100) : 0
+  const pipeline = active.reduce((s,p) => s + Number(p.mrr_potential || 0), 0)
+  const wonRevenue = won.reduce((s,p) => s + (p.pricing_model==='perpetual' ? Number(p.perpetual_price||0) : Number(p.mrr_potential||0)*12), 0)
+
+  const fmt$ = n => n ? `$${Number(n).toLocaleString('en-US',{maximumFractionDigits:0})}` : '—'
+  const fmtDate = d => d ? new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'
+  const fmtAgo2 = d => { if (!d) return '—'; const diff = Math.floor((Date.now()-new Date(d))/86400000); return diff===0?'Today':diff===1?'Yesterday':`${diff}d ago` }
+
+  function stageColor(stage) {
+    const i = PIPELINE_STAGES.indexOf(stage)
+    return i >= 0 ? STAGE_COLORS[i] : '#475569'
+  }
+
+  // Save prospect (add or edit)
+  async function saveProspect() {
+    if (!form.firm_name?.trim()) { showToast('Firm name required', false); return }
+    setSaving(true)
+    const payload = {
+      firm_name:          form.firm_name,
+      contact_name:       form.contact_name || null,
+      contact_email:      form.contact_email || null,
+      contact_phone:      form.contact_phone || null,
+      contact_linkedin:   form.contact_linkedin || null,
+      company_url:        form.company_url || null,
+      product:            form.product || 'taxres_crm',
+      stage:              form.stage || 'Prospect',
+      pricing_model:      form.pricing_model || 'undecided',
+      seats:              form.seats ? Number(form.seats) : null,
+      mrr_potential:      form.mrr_potential ? Number(form.mrr_potential) : null,
+      perpetual_price:    form.perpetual_price ? Number(form.perpetual_price) : null,
+      source:             form.source || null,
+      source_campaign:    form.source_campaign || null,
+      next_action:        form.next_action || null,
+      next_followup:      form.next_followup || null,
+      expected_close_date:form.expected_close_date || null,
+      demo_date:          form.demo_date || null,
+      notes:              form.notes || null,
+      owner:              form.owner || 'romy@taxrescrm.net',
+      updated_at:         new Date().toISOString(),
+    }
+    if (editMode && form.id) {
+      const { error } = await supabase.from('prospects').update(payload).eq('id', form.id)
+      if (error) { showToast('Save failed: ' + error.message, false); setSaving(false); return }
+      showToast('Saved ✓')
+    } else {
+      const { error } = await supabase.from('prospects').insert(payload)
+      if (error) { showToast('Save failed: ' + error.message, false); setSaving(false); return }
+      showToast('Prospect added ✓')
+    }
+    await reload()
+    setShowForm(false)
+    setEditMode(false)
+    setForm({})
+    setSaving(false)
+  }
+
+  async function addNote() {
+    if (!newNote.trim() || !selected) return
+    setAddingNote(true)
+    await supabase.from('prospect_activities').insert({
+      prospect_id: selected.id,
+      activity_type: 'note',
+      body: newNote.trim(),
+      actor: 'romy@taxrescrm.net',
+    })
+    setNewNote('')
+    await loadActivities(selected.id)
+    // Update last_contact
+    await supabase.from('prospects').update({ last_contact: new Date().toISOString().slice(0,10), updated_at: new Date().toISOString() }).eq('id', selected.id)
+    await reload()
+    setAddingNote(false)
+  }
+
+  async function updateStage(prospect, newStage) {
+    const extra = {}
+    if (newStage === 'Won')  { extra.won_lost_date = new Date().toISOString().slice(0,10) }
+    if (newStage === 'Lost') { extra.won_lost_date = new Date().toISOString().slice(0,10) }
+    if (newStage === 'Demo Scheduled') { extra.demo_date = extra.demo_date || prospect.demo_date }
+    if (newStage === 'Proposal Sent')  { extra.proposal_sent_date = new Date().toISOString().slice(0,10) }
+    await supabase.from('prospects').update({ stage: newStage, ...extra, updated_at: new Date().toISOString() }).eq('id', prospect.id)
+    await supabase.from('prospect_activities').insert({
+      prospect_id: prospect.id,
+      activity_type: 'stage_change',
+      body: `Stage changed: ${prospect.stage} → ${newStage}`,
+      actor: 'romy@taxrescrm.net',
+    })
+    await reload()
+    setSelected(prev => prev?.id === prospect.id ? { ...prev, stage: newStage, ...extra } : prev)
+    if (selected?.id === prospect.id) await loadActivities(prospect.id)
+    showToast(`Moved to ${newStage} ✓`)
+  }
+
+  async function deleteProspect(id) {
+    if (!window.confirm('Delete this prospect? This cannot be undone.')) return
+    await supabase.from('prospects').delete().eq('id', id)
+    setSelected(null)
+    await reload()
+    showToast('Deleted')
+  }
+
+  const CC2 = { card: s => ({ background:'rgba(255,255,255,.04)', border:'1px solid rgba(99,102,241,.15)', borderRadius:12, ...s }) }
+  const inp = { background:'rgba(255,255,255,.06)', border:'1px solid rgba(99,102,241,.2)', borderRadius:8, color:'#e2e8f0', fontSize:13, padding:'8px 12px', width:'100%', boxSizing:'border-box' }
+  const lbl = { fontSize:10, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:5, display:'block' }
+
+  return (
+    <div style={{ position:'relative' }}>
+      {toast && (
+        <div style={{ position:'fixed', top:20, right:20, zIndex:9999, padding:'10px 18px', borderRadius:8,
+          background: toast.ok ? 'rgba(16,185,129,.9)' : 'rgba(239,68,68,.9)',
+          color:'#fff', fontSize:13, fontWeight:600, boxShadow:'0 4px 20px rgba(0,0,0,.4)' }}>
+          {toast.msg}
+        </div>
+      )}
+
+      {/* ── KPI Row ── */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:20 }}>
+        {[
+          { label:'Total Prospects',    value:all.length,                icon:'🎯', color:'#6366f1' },
+          { label:'Active Opps',         value:active.length,             icon:'📊', color:'#8b5cf6' },
+          { label:'Demos Scheduled',    value:all.filter(p=>p.stage==='Demo Scheduled').length, icon:'📅', color:'#0ea5e9' },
+          { label:'Proposals Out',      value:all.filter(p=>['Proposal Sent','Negotiation'].includes(p.stage)).length, icon:'📄', color:'#f59e0b' },
+          { label:'Pipeline Value',     value:`$${(pipeline*12).toLocaleString('en-US',{maximumFractionDigits:0})}/yr`, icon:'💼', color:'#f97316' },
+          { label:'Won Revenue',        value:fmt$(wonRevenue),           icon:'🏆', color:'#10b981' },
+          { label:'Lost',               value:lost.length,                icon:'❌', color:'#ef4444' },
+          { label:'Win Rate',           value:`${winRate}%`,              icon:'📈', color:'#10b981' },
+        ].map(k => (
+          <div key={k.label} style={{ background:`${k.color}10`, border:`1px solid ${k.color}25`, borderRadius:10, padding:'14px 16px' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+              <div style={{ fontSize:9, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'.07em' }}>{k.label}</div>
+              <span style={{ fontSize:16, opacity:.5 }}>{k.icon}</span>
+            </div>
+            <div style={{ fontSize:22, fontWeight:900, color:k.color, marginTop:6 }}>{k.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Funnel ── */}
+      <div style={{ ...CC2.card({ padding:'20px 24px', marginBottom:18 }) }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em' }}>Pipeline Funnel</div>
+          <div style={{ display:'flex', gap:6 }}>
+            {PRODUCTS.map(p => (
+              <button key={p.value} onClick={() => setProductFilter(p.value)} style={{
+                padding:'3px 10px', borderRadius:20, border:'none', cursor:'pointer', fontSize:10, fontWeight:700,
+                background: productFilter===p.value ? 'rgba(99,102,241,.4)' : 'rgba(255,255,255,.05)',
+                color: productFilter===p.value ? '#a5b4fc' : '#64748b',
+              }}>{p.label}</button>
+            ))}
+          </div>
+        </div>
+        <div style={{ display:'flex', gap:3, alignItems:'flex-end', height:100, marginBottom:12 }}>
+          {PIPELINE_STAGES.map((stage, i) => {
+            const count = (productFilter==='all' ? all : all).filter(p=>p.stage===stage).length
+            const maxCount = Math.max(...PIPELINE_STAGES.map(s => all.filter(p=>p.stage===s).length), 1)
+            const h = Math.max(12, Math.round((count/maxCount)*88))
+            return (
+              <div key={stage} onClick={() => setStageFilter(stageFilter===stage?'all':stage)}
+                style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:3, cursor:'pointer' }}>
+                <div style={{ fontSize:12, fontWeight:900, color:STAGE_COLORS[i] }}>{count}</div>
+                <div style={{ width:'100%', height:h,
+                  background: stageFilter===stage ? STAGE_COLORS[i] : `linear-gradient(to top, ${STAGE_COLORS[i]}70, ${STAGE_COLORS[i]}20)`,
+                  border:`1px solid ${STAGE_COLORS[i]}50`, borderRadius:'4px 4px 0 0', transition:'all .2s' }} />
+              </div>
+            )
+          })}
+        </div>
+        <div style={{ display:'flex', gap:3 }}>
+          {PIPELINE_STAGES.map((s,i) => (
+            <div key={s} style={{ flex:1, textAlign:'center', fontSize:8, color: stageFilter===s?STAGE_COLORS[i]:'#334155',
+              fontWeight:700, textTransform:'uppercase', letterSpacing:'.03em', lineHeight:1.3 }}>{s}</div>
+          ))}
+        </div>
+        {stageFilter !== 'all' && (
+          <div style={{ marginTop:10, textAlign:'center' }}>
+            <button onClick={() => setStageFilter('all')} style={{ ...S.btn('ghost'), fontSize:11, padding:'4px 12px' }}>
+              Clear filter ×
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Prospect Table + Detail ── */}
+      <div style={{ display:'grid', gridTemplateColumns: selected ? '1fr 400px' : '1fr', gap:16, alignItems:'start' }}>
+
+        {/* Table */}
+        <div style={CC2.card({ padding:'0' })}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px', borderBottom:'1px solid rgba(99,102,241,.1)' }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em' }}>
+              {filtered.length} Prospect{filtered.length!==1?'s':''}{stageFilter!=='all'?` · ${stageFilter}`:''}
+            </div>
+            <button onClick={() => { setShowForm(true); setEditMode(false); setForm({ product:'taxres_crm', stage:'Prospect', pricing_model:'undecided', owner:'romy@taxrescrm.net' }) }}
+              style={{ ...S.btn('primary'), fontSize:11, padding:'6px 14px' }}>
+              + Add Prospect
+            </button>
+          </div>
+          {filtered.length === 0 ? (
+            <div style={{ padding:32, textAlign:'center', color:'#475569', fontSize:13 }}>No prospects match the current filter.</div>
+          ) : (
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+              <thead>
+                <tr>{['Firm / Contact','Product','Stage','Value','Next Follow-up','Last Contact'].map(h=>(
+                  <th key={h} style={{ textAlign:'left', padding:'8px 14px', fontSize:9, fontWeight:700, color:'#475569',
+                    textTransform:'uppercase', letterSpacing:'.05em', borderBottom:'1px solid rgba(99,102,241,.12)', whiteSpace:'nowrap' }}>{h}</th>
+                ))}</tr>
+              </thead>
+              <tbody>
+                {filtered.map((p,i) => (
+                  <tr key={p.id} onClick={() => setSelected(selected?.id===p.id ? null : p)}
+                    style={{ cursor:'pointer', borderBottom:'1px solid rgba(99,102,241,.06)',
+                      background: selected?.id===p.id ? 'rgba(99,102,241,.08)' : i%2===0 ? 'transparent' : 'rgba(255,255,255,.01)' }}>
+                    <td style={{ padding:'10px 14px' }}>
+                      <div style={{ fontWeight:700, color:'#e2e8f0' }}>{p.firm_name}</div>
+                      <div style={{ fontSize:11, color:'#64748b', marginTop:1 }}>{p.contact_name||'—'}</div>
+                    </td>
+                    <td style={{ padding:'10px 14px' }}>
+                      <span style={{ fontSize:10, fontWeight:700, color:'#6366f1' }}>
+                        {PRODUCTS.find(x=>x.value===p.product)?.label || p.product}
+                      </span>
+                    </td>
+                    <td style={{ padding:'10px 14px' }}>
+                      <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20,
+                        background:`${stageColor(p.stage)}18`, color:stageColor(p.stage) }}>{p.stage}</span>
+                    </td>
+                    <td style={{ padding:'10px 14px', color:'#10b981', fontWeight:700, fontSize:11 }}>
+                      {p.pricing_model==='perpetual'
+                        ? fmt$(p.perpetual_price)
+                        : p.mrr_potential ? `${fmt$(p.mrr_potential)}/mo` : '—'}
+                    </td>
+                    <td style={{ padding:'10px 14px', fontSize:11, color: p.next_followup && new Date(p.next_followup+'T12:00:00') < new Date() ? '#ef4444' : '#94a3b8' }}>
+                      {fmtDate(p.next_followup)}
+                    </td>
+                    <td style={{ padding:'10px 14px', fontSize:11, color:'#64748b' }}>{fmtAgo2(p.last_contact)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Detail Drawer */}
+        {selected && (
+          <div style={{ ...CC2.card({ padding:'0' }), position:'sticky', top:0 }}>
+            {/* Header */}
+            <div style={{ padding:'16px 18px', borderBottom:'1px solid rgba(99,102,241,.1)' }}>
+              <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:8 }}>
+                <div>
+                  <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{selected.firm_name}</div>
+                  <div style={{ fontSize:11, color:'#64748b', marginTop:2 }}>{selected.contact_name}{selected.contact_email ? ` · ${selected.contact_email}` : ''}</div>
+                </div>
+                <button onClick={() => setSelected(null)} style={{ ...S.btn('ghost'), fontSize:11, padding:'3px 8px' }}>×</button>
+              </div>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                <span style={{ fontSize:10, fontWeight:700, padding:'2px 9px', borderRadius:20,
+                  background:`${stageColor(selected.stage)}18`, color:stageColor(selected.stage) }}>{selected.stage}</span>
+                <span style={{ fontSize:10, fontWeight:700, color:'#6366f1' }}>
+                  {PRODUCTS.find(x=>x.value===selected.product)?.label}
+                </span>
+                {selected.pricing_model && selected.pricing_model !== 'undecided' && (
+                  <span style={{ fontSize:10, color:'#475569', fontWeight:600 }}>{PRICING_LABELS[selected.pricing_model]}</span>
+                )}
+              </div>
+            </div>
+
+            {/* Key fields */}
+            <div style={{ padding:'14px 18px', borderBottom:'1px solid rgba(99,102,241,.08)' }}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+                {[
+                  ['Monthly Value', selected.mrr_potential ? `${fmt$(selected.mrr_potential)}/mo` : '—'],
+                  ['Perpetual',     fmt$(selected.perpetual_price)],
+                  ['Seats',         selected.seats || '—'],
+                  ['Source',        selected.source || '—'],
+                  ['Demo Date',     fmtDate(selected.demo_date)],
+                  ['Proposal Sent', fmtDate(selected.proposal_sent_date)],
+                  ['Expected Close',fmtDate(selected.expected_close_date)],
+                  ['Next Follow-up',fmtDate(selected.next_followup)],
+                ].map(([label,val]) => (
+                  <div key={label} style={{ background:'rgba(255,255,255,.03)', borderRadius:6, padding:'8px 10px' }}>
+                    <div style={{ fontSize:9, color:'#334155', fontWeight:700, textTransform:'uppercase', letterSpacing:'.06em' }}>{label}</div>
+                    <div style={{ fontSize:11, color:'#e2e8f0', fontWeight:600, marginTop:2 }}>{val}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pricing model callout for Chris */}
+              {selected.pricing_model === 'undecided' && selected.mrr_potential && selected.perpetual_price && (
+                <div style={{ padding:'8px 12px', borderRadius:8, background:'rgba(245,158,11,.06)', border:'1px solid rgba(245,158,11,.2)', fontSize:11, color:'#f59e0b', marginBottom:8 }}>
+                  Two pricing paths presented — awaiting selection
+                </div>
+              )}
+
+              {selected.next_action && (
+                <div style={{ padding:'8px 12px', borderRadius:8, background:'rgba(99,102,241,.06)', border:'1px solid rgba(99,102,241,.2)', fontSize:11, color:'#a5b4fc' }}>
+                  Next: {selected.next_action}
+                </div>
+              )}
+            </div>
+
+            {/* Stage mover */}
+            <div style={{ padding:'12px 18px', borderBottom:'1px solid rgba(99,102,241,.08)' }}>
+              <div style={{ fontSize:9, fontWeight:700, color:'#334155', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:8 }}>Move Stage</div>
+              <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                {PIPELINE_STAGES.filter(s => s !== selected.stage).map((s,i) => (
+                  <button key={s} onClick={() => updateStage(selected, s)} style={{
+                    padding:'3px 8px', borderRadius:20, border:`1px solid ${stageColor(s)}30`,
+                    background:`${stageColor(s)}10`, color:stageColor(s),
+                    fontSize:9, fontWeight:700, cursor:'pointer' }}>{s}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ padding:'10px 18px', borderBottom:'1px solid rgba(99,102,241,.08)', display:'flex', gap:6 }}>
+              {selected.contact_email && (
+                <a href={`mailto:${selected.contact_email}`}
+                  style={{ ...S.btn('ghost'), fontSize:10, padding:'5px 10px', textDecoration:'none' }}>📧 Email</a>
+              )}
+              {selected.contact_linkedin && (
+                <a href={selected.contact_linkedin} target="_blank" rel="noreferrer"
+                  style={{ ...S.btn('ghost'), fontSize:10, padding:'5px 10px', textDecoration:'none', color:'#0ea5e9' }}>💼 LinkedIn</a>
+              )}
+              <button onClick={() => { setEditMode(true); setShowForm(true); setForm({ ...selected, seats: selected.seats||'', mrr_potential: selected.mrr_potential||'', perpetual_price: selected.perpetual_price||'' }) }}
+                style={{ ...S.btn('ghost'), fontSize:10, padding:'5px 10px' }}>✏️ Edit</button>
+              <button onClick={() => deleteProspect(selected.id)}
+                style={{ ...S.btn('ghost'), fontSize:10, padding:'5px 10px', color:'#ef4444', border:'1px solid rgba(239,68,68,.2)' }}>Delete</button>
+            </div>
+
+            {/* Activity log */}
+            <div style={{ padding:'12px 18px', maxHeight:280, overflowY:'auto' }}>
+              <div style={{ fontSize:9, fontWeight:700, color:'#334155', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:10 }}>Activity</div>
+
+              {/* Add note */}
+              <div style={{ display:'flex', gap:6, marginBottom:12 }}>
+                <input value={newNote} onChange={e=>setNewNote(e.target.value)}
+                  onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&addNote()}
+                  placeholder="Add a note or activity…"
+                  style={{ ...inp, padding:'6px 10px', fontSize:11 }} />
+                <button onClick={addNote} disabled={addingNote||!newNote.trim()}
+                  style={{ ...S.btn('primary'), fontSize:11, padding:'6px 12px', flexShrink:0 }}>
+                  {addingNote ? '…' : 'Add'}
+                </button>
+              </div>
+
+              {actLoading ? (
+                <div style={{ fontSize:11, color:'#475569' }}>Loading…</div>
+              ) : activities.length === 0 ? (
+                <div style={{ fontSize:11, color:'#334155' }}>No activity yet.</div>
+              ) : activities.map((a,i) => (
+                <div key={a.id} style={{ display:'flex', gap:8, padding:'8px 0',
+                  borderBottom: i<activities.length-1 ? '1px solid rgba(99,102,241,.06)' : 'none' }}>
+                  <div style={{ fontSize:14, width:20, flexShrink:0, marginTop:1 }}>
+                    {ACTIVITY_ICONS[a.activity_type] || '📝'}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:11, color:'#e2e8f0', lineHeight:1.5 }}>{a.body}</div>
+                    <div style={{ fontSize:9, color:'#334155', marginTop:2 }}>
+                      {new Date(a.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Add/Edit Modal ── */}
+      {showForm && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.7)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+          <div style={{ background:'#0f0e1a', border:'1px solid rgba(99,102,241,.25)', borderRadius:16, padding:'28px 32px', width:'100%', maxWidth:680, maxHeight:'90vh', overflowY:'auto' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:22 }}>
+              <div style={{ fontSize:16, fontWeight:800, color:'#fff' }}>{editMode ? 'Edit Prospect' : 'Add Prospect'}</div>
+              <button onClick={() => { setShowForm(false); setEditMode(false); setForm({}) }}
+                style={{ ...S.btn('ghost'), fontSize:12 }}>Cancel</button>
+            </div>
+
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+              {/* Firm + Product */}
+              <div style={{ gridColumn:'1/-1' }}>
+                <label style={lbl}>Firm Name *</label>
+                <input value={form.firm_name||''} onChange={e=>setForm(f=>({...f,firm_name:e.target.value}))} style={inp} placeholder="Nashville Tax Solutions" />
+              </div>
+              <div>
+                <label style={lbl}>Product</label>
+                <select value={form.product||'taxres_crm'} onChange={e=>setForm(f=>({...f,product:e.target.value}))} style={inp}>
+                  {PRODUCTS.filter(p=>p.value!=='all').map(p=><option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={lbl}>Stage</label>
+                <select value={form.stage||'Prospect'} onChange={e=>setForm(f=>({...f,stage:e.target.value}))} style={inp}>
+                  {PIPELINE_STAGES.map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+
+              {/* Contact */}
+              <div><label style={lbl}>Contact Name</label><input value={form.contact_name||''} onChange={e=>setForm(f=>({...f,contact_name:e.target.value}))} style={inp} /></div>
+              <div><label style={lbl}>Contact Email</label><input value={form.contact_email||''} onChange={e=>setForm(f=>({...f,contact_email:e.target.value}))} style={inp} /></div>
+              <div><label style={lbl}>Contact Phone</label><input value={form.contact_phone||''} onChange={e=>setForm(f=>({...f,contact_phone:e.target.value}))} style={inp} /></div>
+              <div><label style={lbl}>LinkedIn Profile URL</label><input value={form.contact_linkedin||''} onChange={e=>setForm(f=>({...f,contact_linkedin:e.target.value}))} style={inp} /></div>
+              <div><label style={lbl}>Company URL</label><input value={form.company_url||''} onChange={e=>setForm(f=>({...f,company_url:e.target.value}))} style={inp} /></div>
+
+              {/* Pricing */}
+              <div>
+                <label style={lbl}>Pricing Model</label>
+                <select value={form.pricing_model||'undecided'} onChange={e=>setForm(f=>({...f,pricing_model:e.target.value}))} style={inp}>
+                  <option value="undecided">Undecided</option>
+                  <option value="monthly">Monthly / Per Seat</option>
+                  <option value="perpetual">Perpetual License</option>
+                </select>
+              </div>
+              <div><label style={lbl}>Estimated Seats</label><input type="number" value={form.seats||''} onChange={e=>setForm(f=>({...f,seats:e.target.value}))} style={inp} /></div>
+              <div><label style={lbl}>Monthly Value (MRR)</label><input type="number" value={form.mrr_potential||''} onChange={e=>setForm(f=>({...f,mrr_potential:e.target.value}))} style={inp} placeholder="1625" /></div>
+              <div><label style={lbl}>Perpetual License Price</label><input type="number" value={form.perpetual_price||''} onChange={e=>setForm(f=>({...f,perpetual_price:e.target.value}))} style={inp} placeholder="60000" /></div>
+
+              {/* Source */}
+              <div>
+                <label style={lbl}>Lead Source</label>
+                <select value={form.source||''} onChange={e=>setForm(f=>({...f,source:e.target.value}))} style={inp}>
+                  <option value="">— Select —</option>
+                  {['Referral','LinkedIn','Cold Outreach','Conference','Inbound','Google','Direct'].map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div><label style={lbl}>Source Campaign / Post</label><input value={form.source_campaign||''} onChange={e=>setForm(f=>({...f,source_campaign:e.target.value}))} style={inp} /></div>
+
+              {/* Dates */}
+              <div><label style={lbl}>Next Follow-up</label><input type="date" value={form.next_followup||''} onChange={e=>setForm(f=>({...f,next_followup:e.target.value}))} style={inp} /></div>
+              <div><label style={lbl}>Expected Close</label><input type="date" value={form.expected_close_date||''} onChange={e=>setForm(f=>({...f,expected_close_date:e.target.value}))} style={inp} /></div>
+              <div><label style={lbl}>Demo Date</label><input type="date" value={form.demo_date||''} onChange={e=>setForm(f=>({...f,demo_date:e.target.value}))} style={inp} /></div>
+              <div><label style={lbl}>Owner</label><input value={form.owner||''} onChange={e=>setForm(f=>({...f,owner:e.target.value}))} style={inp} /></div>
+
+              {/* Next action + notes */}
+              <div style={{ gridColumn:'1/-1' }}>
+                <label style={lbl}>Next Action</label>
+                <input value={form.next_action||''} onChange={e=>setForm(f=>({...f,next_action:e.target.value}))} style={inp} placeholder="e.g. Follow up on proposal" />
+              </div>
+              <div style={{ gridColumn:'1/-1' }}>
+                <label style={lbl}>Notes</label>
+                <textarea value={form.notes||''} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} rows={3}
+                  style={{ ...inp, resize:'vertical', lineHeight:1.6 }} />
+              </div>
+            </div>
+
+            <div style={{ display:'flex', gap:8, marginTop:20, justifyContent:'flex-end' }}>
+              <button onClick={() => { setShowForm(false); setEditMode(false); setForm({}) }}
+                style={{ ...S.btn('ghost'), fontSize:13, padding:'9px 18px' }}>Cancel</button>
+              <button onClick={saveProspect} disabled={saving}
+                style={{ ...S.btn('primary'), fontSize:13, padding:'9px 20px' }}>
+                {saving ? 'Saving…' : editMode ? 'Save Changes' : 'Add Prospect'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Command Center ────────────────────────────────────────────────────────────
 function CommandCenter() {
   const navigate = useNavigate()
@@ -2506,78 +3027,7 @@ function CommandCenter() {
         </>)}
 
         {/* ═══ SALES TAB ═══ */}
-        {tab==='sales' && (<>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24 }}>
-            {[
-              { label:'Win Rate',      value:`${data.sales.winRate}%`,                                              icon:'🏆', color:'#10b981' },
-              { label:'Active Prospects', value: data.sales.prospects.filter(p=>!['Won','Lost'].includes(p.stage)).length, icon:'🎯', color:'#6366f1' },
-              { label:'Pipeline Value',value:`$${(data.sales.pipeline).toLocaleString('en-US',{maximumFractionDigits:0})}`, icon:'💼', color:'#f59e0b' },
-              { label:'Platform MRR',  value:`$${data.kpis.totalMRR.toLocaleString('en-US',{maximumFractionDigits:0})}`,  icon:'📈', color:'#0ea5e9' },
-            ].map(k => <KPICard key={k.label} {...k} />)}
-          </div>
-
-          {/* Funnel */}
-          <div style={CC.card({padding:'26px 28px', marginBottom:18})}>
-            <div style={CC.sectionLabel}>Sales pipeline funnel</div>
-            <div style={{ display:'flex', gap:3, alignItems:'flex-end', height:120, marginBottom:16 }}>
-              {data.sales.stages.map((s,i) => {
-                const maxCount = Math.max(...data.sales.stages.map(x=>x.count), 1)
-                const h = Math.max(20, Math.round((s.count/maxCount)*100))
-                return (
-                  <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
-                    <div style={{ fontSize:14, fontWeight:900, color:s.color }}>{s.count}</div>
-                    <div style={{ width:'100%', height:h, background:`linear-gradient(to top, ${s.color}60, ${s.color}20)`,
-                      border:`1px solid ${s.color}40`, borderRadius:'4px 4px 0 0', transition:'height .4s ease' }} />
-                  </div>
-                )
-              })}
-            </div>
-            <div style={{ display:'flex', gap:3 }}>
-              {data.sales.stages.map((s,i) => (
-                <div key={i} style={{ flex:1, textAlign:'center', fontSize:9, color:'#475569', fontWeight:600, textTransform:'uppercase', letterSpacing:'.04em', lineHeight:1.2 }}>{s.label}</div>
-              ))}
-            </div>
-          </div>
-
-          {/* Prospect Pipeline Table */}
-          <div style={CC.card({padding:'22px 24px', marginBottom:18})}>
-            <div style={CC.sectionLabel}>Prospect Pipeline</div>
-            {data.sales.prospects.length === 0
-              ? <div style={{ fontSize:13, color:'#475569' }}>No prospects yet — add your first one.</div>
-              : <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
-                  <thead>
-                    <tr>{['Firm','Contact','Stage','Seats','MRR Potential','Notes'].map(h=>(
-                      <th key={h} style={{ textAlign:'left', padding:'6px 10px', fontSize:10, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.05em', borderBottom:'1px solid rgba(99,102,241,.15)' }}>{h}</th>
-                    ))}</tr>
-                  </thead>
-                  <tbody>
-                    {data.sales.prospects.map((p,i)=>(
-                      <tr key={p.id} style={{ borderBottom:'1px solid rgba(99,102,241,.08)' }}>
-                        <td style={{ padding:'8px 10px', color:'#e2e8f0', fontWeight:600 }}>{p.firm_name}</td>
-                        <td style={{ padding:'8px 10px', color:'#94a3b8' }}>{p.contact_name||'—'}</td>
-                        <td style={{ padding:'8px 10px' }}>
-                          <span style={{ background: p.stage==='Won'?'rgba(16,185,129,.15)':p.stage==='Lost'?'rgba(239,68,68,.15)':'rgba(99,102,241,.15)',
-                            color: p.stage==='Won'?'#10b981':p.stage==='Lost'?'#ef4444':'#818cf8',
-                            padding:'2px 8px', borderRadius:4, fontSize:11, fontWeight:700 }}>{p.stage}</span>
-                        </td>
-                        <td style={{ padding:'8px 10px', color:'#94a3b8' }}>{p.seats||'—'}</td>
-                        <td style={{ padding:'8px 10px', color:'#10b981', fontWeight:700 }}>{p.mrr_potential ? `$${Number(p.mrr_potential).toLocaleString()}/mo` : '—'}</td>
-                        <td style={{ padding:'8px 10px', color:'#475569', fontSize:11 }}>{p.notes ? p.notes.slice(0,60)+(p.notes.length>60?'…':'') : '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-            }
-          </div>
-
-          <div style={{ ...CC.card(), padding:'20px 24px', background:'rgba(16,185,129,.04)', border:'1px solid rgba(16,185,129,.15)' }}>
-            <div style={{ fontSize:13, color:'#10b981', fontWeight:700, marginBottom:4 }}>ARR Projection</div>
-            <div style={{ fontSize:28, fontWeight:900, color:'#fff', marginBottom:4 }}>
-              ${(data.kpis.totalMRR*12).toLocaleString('en-US',{maximumFractionDigits:0})}
-            </div>
-            <div style={{ fontSize:12, color:'#475569' }}>Based on current MRR × 12. Grows automatically as offices activate.</div>
-          </div>
-        </>)}
+        {tab==='sales' && <SalesPipeline data={data} supabase={supabase} />}
 
         {/* ═══ CRM TAB ═══ */}
         {tab==='crm' && (<>
