@@ -3,40 +3,132 @@ on:
   workflow_dispatch:
     inputs:
       phase:
-        description: 'Phase: employees, clients_1, clients_2, cases, transactions, all_meta'
+        description: 'Phase'
         required: true
-        default: 'employees'
+        default: 'all'
 
 jobs:
   migrate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Migrate via Supabase Management API
+      - name: Migrate all Nashville data
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           NASH="489ace07-1a6b-4864-833a-4f8420568b40"
-          TCR_REF="mpxgxfqdbquzkrvvejkh"
-          NAS_REF="ydrvncdedgjtcprczwpu"
-          PHASE="${{ github.event.inputs.phase }}"
+          TCR="mpxgxfqdbquzkrvvejkh"
+          NAS="ydrvncdedgjtcprczwpu"
 
-          query_tcr() {
-            curl -s -X POST "https://api.supabase.com/v1/projects/$TCR_REF/database/query" \
+          tcr_query() {
+            curl -s -X POST "https://api.supabase.com/v1/projects/$TCR/database/query" \
               -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
               -H "Content-Type: application/json" \
               -d "{\"query\": \"$1\"}"
           }
 
-          run_nas() {
-            curl -s -X POST "https://api.supabase.com/v1/projects/$NAS_REF/database/query" \
+          nas_query() {
+            curl -s -X POST "https://api.supabase.com/v1/projects/$NAS/database/query" \
               -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
               -H "Content-Type: application/json" \
               -d "{\"query\": \"$1\"}"
           }
 
-          echo "=== Testing API access ==="
-          query_tcr "SELECT COUNT(*) as cnt FROM employees WHERE tenant_id='$NASH'"
-          run_nas "SELECT COUNT(*) as cnt FROM employees WHERE tenant_id='$NASH'"
+          migrate_table() {
+            local TABLE=$1
+            local LIMIT=${2:-500}
+            local OFFSET=0
+            echo "=== Migrating $TABLE ==="
+            
+            while true; do
+              # Get rows from TCR
+              ROWS=$(tcr_query "SELECT row_to_json(t) FROM (SELECT * FROM $TABLE WHERE tenant_id='$NASH' ORDER BY created_at LIMIT $LIMIT OFFSET $OFFSET) t")
+              COUNT=$(echo "$ROWS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d))" 2>/dev/null || echo "0")
+              echo "  Batch offset=$OFFSET count=$COUNT"
+              
+              if [ "$COUNT" = "0" ] || [ "$COUNT" = "" ]; then
+                break
+              fi
+              
+              # Generate and run INSERT for each row
+              echo "$ROWS" | python3 - << 'PYEOF'
+import json, sys, subprocess, os
 
-          echo "Done"
+NAS = os.environ['NAS']
+TOKEN = os.environ['SUPABASE_ACCESS_TOKEN']
+TABLE = os.environ['TABLE']
+
+data = json.load(sys.stdin)
+
+for item in data:
+    row = item.get('row_to_json', {})
+    if not row:
+        continue
+    
+    cols = []
+    vals = []
+    for k, v in row.items():
+        cols.append(f'"{k}"')
+        if v is None:
+            vals.append('NULL')
+        elif isinstance(v, bool):
+            vals.append('true' if v else 'false')
+        elif isinstance(v, (int, float)):
+            vals.append(str(v))
+        elif isinstance(v, (dict, list)):
+            vals.append("'" + json.dumps(v).replace("'", "''") + "'")
+        else:
+            vals.append("'" + str(v).replace("'", "''") + "'")
+    
+    sql = f"INSERT INTO {TABLE} ({','.join(cols)}) VALUES ({','.join(vals)}) ON CONFLICT DO NOTHING;"
+    
+    import subprocess
+    result = subprocess.run([
+        'curl', '-s', '-X', 'POST',
+        f'https://api.supabase.com/v1/projects/{NAS}/database/query',
+        '-H', f'Authorization: Bearer {TOKEN}',
+        '-H', 'Content-Type: application/json',
+        '-d', json.dumps({'query': sql})
+    ], capture_output=True, text=True)
+
+print(f"Processed {len(data)} rows")
+PYEOF
+              OFFSET=$((OFFSET + LIMIT))
+              if [ "$COUNT" -lt "$LIMIT" ]; then
+                break
+              fi
+            done
+            
+            # Verify count in Nashville
+            NAS_COUNT=$(nas_query "SELECT COUNT(*) as cnt FROM $TABLE WHERE tenant_id='$NASH'" | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['cnt'])" 2>/dev/null || echo "?")
+            echo "  Nashville $TABLE count: $NAS_COUNT"
+          }
+
+          export NAS TCR NASH SUPABASE_ACCESS_TOKEN
+
+          # Migrate employees first
+          export TABLE=employees
+          migrate_table employees 100
+
+          # Migrate clients (2109 rows - do in batches of 200)
+          export TABLE=clients
+          migrate_table clients 200
+
+          # Migrate cases
+          export TABLE=cases
+          migrate_table cases 200
+
+          # Migrate payment_transactions (4031 rows)
+          export TABLE=payment_transactions
+          migrate_table payment_transactions 200
+
+          # Migrate supporting tables
+          for T in payments client_notes lead_notes leads tasks calevents invoices documents esigns sms_messages workflow_templates workflow_statuses workflow_status_categories poa_records transcript_analyses deadlines irsforms; do
+            export TABLE=$T
+            migrate_table $T 200
+          done
+
+          echo "=== MIGRATION COMPLETE ==="
+          nas_query "SELECT COUNT(*) as clients FROM clients WHERE tenant_id='$NASH'"
+          nas_query "SELECT COUNT(*) as cases FROM cases WHERE tenant_id='$NASH'"
+          nas_query "SELECT COUNT(*) as transactions FROM payment_transactions WHERE tenant_id='$NASH'"
