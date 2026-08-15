@@ -1788,6 +1788,8 @@ const PRODUCT_REGISTRY = [
 
 const HUB_SECRET = 'hub-metrics-2026'
 
+function fmt$(n) { return n ? `$${Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—' }
+function fmtN(n) { return n != null ? Number(n).toLocaleString() : '—' }
 function ProductsTab({ supabase }) {
   const [selected, setSelected]     = useState(null) // the product registry entry
   const [liveData, setLiveData]     = useState({})   // key → fetched metrics
