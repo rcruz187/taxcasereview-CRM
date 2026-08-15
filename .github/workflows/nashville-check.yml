@@ -1,0 +1,32 @@
+name: Nashville Check
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/nashville-check.yml']
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Nashville deployment
+        run: |
+          CF_TOKEN="cfut_ycmXEArcGSBXDwOiQgzwIA8PHD2947E36DHoZdPHd668e199"
+
+          ACCOUNT_ID=$(curl -s "https://api.cloudflare.com/client/v4/accounts" \
+            -H "Authorization: Bearer $CF_TOKEN" \
+            | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+
+          echo "=== Nashville Project ==="
+          curl -s \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects/nashville-tax-crm" \
+            -H "Authorization: Bearer $CF_TOKEN" \
+            | grep -o '"subdomain":"[^"]*"\|"latest_deployment":{[^}]*}\|"url":"[^"]*"\|"success":[^,}]*'
+
+          echo "=== Latest Deployment ==="
+          curl -s \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects/nashville-tax-crm/deployments?per_page=1" \
+            -H "Authorization: Bearer $CF_TOKEN" \
+            | grep -o '"url":"[^"]*"\|"stage":{[^}]*}\|"status":"[^"]*"\|"env_vars":{[^}]*}'
+
+          echo "=== Test URL ==="
+          curl -s -o /dev/null -w "%{http_code}" "https://nashville-tax-crm.pages.dev"
