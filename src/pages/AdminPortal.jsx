@@ -1743,6 +1743,7 @@ const PRODUCT_REGISTRY = [
     status:    'live',
     desc:      "Origin CRM — Romy's own tax resolution practice (TRC-001)",
     metricsUrl: 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/platform-metrics?view=tcr',
+    tenantId:  '61a89aef-0e7e-4ea2-b222-44ab2024655a',
   },
   {
     key:       'camvella',
@@ -1908,7 +1909,15 @@ function ProductsTab({ supabase }) {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                {selected.url !== '#' && (
+                {selected.tenantId ? (
+                  <button onClick={async () => {
+                    const { data: token } = await supabase.rpc('create_impersonation_token', { p_tenant_id: selected.tenantId })
+                    if (token) window.open(`${window.location.origin}/impersonate?admin_token=${token}`, '_blank')
+                  }} style={{ fontSize: 12, color: '#fff', fontWeight: 700,
+                    background: selected.color, padding: '7px 16px', borderRadius: 8, border: 'none', cursor: 'pointer' }}>
+                    Open CRM →
+                  </button>
+                ) : selected.url !== '#' && (
                   <a href={selected.url} target="_blank" rel="noreferrer"
                     style={{ fontSize: 12, color: '#fff', fontWeight: 700, textDecoration: 'none',
                       background: selected.color, padding: '7px 16px', borderRadius: 8 }}>
