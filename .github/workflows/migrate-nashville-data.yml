@@ -1,0 +1,33 @@
+name: Migrate Nashville Data
+on:
+  workflow_dispatch:
+    inputs:
+      table:
+        description: 'Table to migrate'
+        required: true
+        default: 'clients'
+      offset:
+        description: 'Offset'
+        required: true
+        default: '0'
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install postgres client
+        run: sudo apt-get install -y postgresql-client -qq
+
+      - name: Migrate data
+        run: |
+          TCR="postgresql://postgres.mpxgxfqdbquzkrvvejkh:5b4zhcuTttEfL3YZ@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require"
+          NAS="postgresql://postgres.ydrvncdedgjtcprczwpu:rsqY3zU6QUiiAISB@aws-0-us-west-2.pooler.supabase.com:5432/postgres?sslmode=require"
+          TABLE="${{ github.event.inputs.table }}"
+          OFFSET="${{ github.event.inputs.offset }}"
+          NASH_TENANT="489ace07-1a6b-4864-833a-4f8420568b40"
+
+          echo "Testing TCR connection..."
+          PGPASSWORD="5b4zhcuTttEfL3YZ" psql "$TCR" -c "SELECT 1 as test;" 2>&1 || echo "TCR FAILED"
+
+          echo "Testing Nashville connection..."
+          PGPASSWORD="rsqY3zU6QUiiAISB" psql "$NAS" -c "SELECT 1 as test;" 2>&1 || echo "NAS FAILED"
