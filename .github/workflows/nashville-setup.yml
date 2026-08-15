@@ -8,7 +8,7 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     steps:
-      - name: Check project and trigger deployment
+      - name: Trigger Nashville first deployment
         run: |
           CF_TOKEN="cfut_ycmXEArcGSBXDwOiQgzwIA8PHD2947E36DHoZdPHd668e199"
 
@@ -16,21 +16,16 @@ jobs:
             -H "Authorization: Bearer $CF_TOKEN" \
             | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
 
-          echo "Account: $ACCOUNT_ID"
-
-          # Get project details
-          PROJECT=$(curl -s \
-            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects/nashville-tax-crm" \
-            -H "Authorization: Bearer $CF_TOKEN")
-
-          echo "Project response:"
-          echo "$PROJECT" | grep -o '"name":"[^"]*"\|"subdomain":"[^"]*"\|"success":[^,}]*\|"message":"[^"]*"'
-
-          # Try adding domain anyway
-          echo "Adding domain..."
+          # Trigger a deployment on the nashville project
           curl -s -X POST \
-            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects/nashville-tax-crm/domains" \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects/nashville-tax-crm/deployments" \
             -H "Authorization: Bearer $CF_TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"name": "nashville.taxrescrm.app"}' \
-            | grep -o '"success":[^,}]*\|"message":"[^"]*"\|"name":"[^"]*"'
+            | grep -o '"id":"[^"]*"\|"url":"[^"]*"\|"success":[^,}]*\|"message":"[^"]*"' | head -10
+
+          # List all custom domains on the project
+          echo "Custom domains:"
+          curl -s \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects/nashville-tax-crm/domains" \
+            -H "Authorization: Bearer $CF_TOKEN" \
+            | grep -o '"name":"[^"]*"\|"status":"[^"]*"'
