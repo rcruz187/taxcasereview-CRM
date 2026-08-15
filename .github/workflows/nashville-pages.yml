@@ -8,7 +8,7 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     steps:
-      - name: Delete Worker and create Pages project
+      - name: Add domain and trigger deployment
         run: |
           CF_TOKEN="cfut_HydJSm4KRyzDnCcp58KXFRI30TZY6z3bXKSeSio7a5058b4b"
           ACCOUNT_ID=$(curl -s "https://api.cloudflare.com/client/v4/accounts" \
@@ -16,15 +16,23 @@ jobs:
             | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
           echo "Account: $ACCOUNT_ID"
 
-          echo "Deleting Worker..."
-          curl -s -X DELETE \
-            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/nashville-tax-crm" \
-            -H "Authorization: Bearer $CF_TOKEN" | grep -o '"success":[^,}]*'
-
-          echo "Creating Pages project..."
+          echo "Adding custom domain..."
           curl -s -X POST \
-            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects" \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects/nashville-tax-crm/domains" \
             -H "Authorization: Bearer $CF_TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{\"name\":\"nashville-tax-crm\",\"production_branch\":\"main\",\"source\":{\"type\":\"github\",\"config\":{\"owner\":\"taxresolutioncrm\",\"repo_name\":\"taxcasereview-CRM\",\"production_branch\":\"main\",\"deployments_enabled\":true}},\"build_config\":{\"build_command\":\"npm run build\",\"destination_dir\":\"dist\"},\"deployment_configs\":{\"production\":{\"env_vars\":{\"VITE_SUPABASE_URL\":{\"value\":\"https://ydrvncdedgjtcprczwpu.supabase.co\"},\"VITE_SUPABASE_ANON_KEY\":{\"value\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkcnZuY2RlZGdqdGNwcmN6d3B1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY4MDkzNTQsImV4cCI6MjEwMjM4NTM1NH0.k6_dSA6HREDufH_dxGH9KFrdmwx4EnfV1v3pA1VsGag\"}}}}}" \
-            | grep -o '"success":[^,}]*\|"subdomain":"[^"]*"\|"name":"[^"]*"\|"message":"[^"]*"'
+            -d '{"name":"nashville.taxrescrm.app"}' \
+            | grep -o '"success":[^,}]*\|"name":"[^"]*"\|"message":"[^"]*"'
+
+          echo "Triggering deployment..."
+          curl -s -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects/nashville-tax-crm/deployments" \
+            -H "Authorization: Bearer $CF_TOKEN" \
+            -H "Content-Type: application/json" \
+            | grep -o '"success":[^,}]*\|"url":"[^"]*"\|"message":"[^"]*"'
+
+          echo "Getting project URL..."
+          curl -s \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects/nashville-tax-crm" \
+            -H "Authorization: Bearer $CF_TOKEN" \
+            | grep -o '"subdomain":"[^"]*"'
