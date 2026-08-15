@@ -1722,142 +1722,321 @@ function StatusDot({ ok }) {
 
 // ── Products Tab ──────────────────────────────────────────────────────────────
 // Shows cross-product metrics from platform_metrics table.
-// Products tab — CRM hub. Each card links to its live CRM.
-const PRODUCT_META = {
-  tcr:      { label:'Tax Case Review', icon:'⚖️', color:'#10b981', url:'https://taxrescrm.app',  status:'live',     desc:"Origin CRM — Romy's own tax resolution practice (TRC-001)" },
-  taxres:   { label:'Tax Res CRM',     icon:'📊', color:'#6366f1', url:'https://taxrescrm.app',  status:'live',     desc:'Multi-tenant SaaS CRM for tax resolution firms' },
-  camvella: { label:'Camvella',        icon:'🏘️', color:'#0ea5e9', url:'https://camvella.com',   status:'live',     desc:'HOA & property management CRM' },
-  phl:      { label:'PHL Land Care',   icon:'🌿', color:'#f59e0b', url:'#',                      status:'live',     desc:'Field service CRM for lawn care & landscaping' },
-  arcvena:  { label:'Arcvena',         icon:'⚡', color:'#8b5cf6', url:'#',                      status:'building', desc:'Field service CRM for HVAC & electrical contractors' },
-  bocasync: { label:'BocaSync',        icon:'🦷', color:'#ec4899', url:'https://bocasync.com',   status:'building', desc:'Practice management for dental offices' },
-}
+// Products tab — hub for all CRMs. Each card opens a live dashboard panel.
+const PRODUCT_REGISTRY = [
+  {
+    key:       'taxres_crm',
+    label:     'Tax Res CRM',
+    icon:      '📊',
+    color:     '#6366f1',
+    url:       'https://taxrescrm.app',
+    status:    'live',
+    desc:      'Multi-tenant SaaS CRM for tax resolution firms',
+    metricsUrl: `https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/platform-metrics`,
+  },
+  {
+    key:       'tax_case_review',
+    label:     'Tax Case Review',
+    icon:      '⚖️',
+    color:     '#10b981',
+    url:       'https://taxrescrm.app',
+    status:    'live',
+    desc:      "Origin CRM — Romy's own tax resolution practice (TRC-001)",
+    metricsUrl: `https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/platform-metrics`,
+  },
+  {
+    key:       'camvella',
+    label:     'Camvella',
+    icon:      '🏘️',
+    color:     '#0ea5e9',
+    url:       'https://camvella.com',
+    status:    'live',
+    desc:      'HOA & property management CRM',
+    metricsUrl: null, // deploy platform-metrics to Camvella Supabase to enable
+  },
+  {
+    key:       'phl',
+    label:     'PHL Land Care',
+    icon:      '🌿',
+    color:     '#f59e0b',
+    url:       '#',
+    status:    'live',
+    desc:      'Field service CRM for lawn care & landscaping',
+    metricsUrl: null, // deploy platform-metrics to PHL Supabase to enable
+  },
+  {
+    key:       'arcvena',
+    label:     'Arcvena',
+    icon:      '⚡',
+    color:     '#8b5cf6',
+    url:       '#',
+    status:    'building',
+    desc:      'Field service CRM for HVAC & electrical contractors',
+    metricsUrl: null,
+  },
+  {
+    key:       'bocasync',
+    label:     'BocaSync',
+    icon:      '🦷',
+    color:     '#ec4899',
+    url:       'https://bocasync.com',
+    status:    'building',
+    desc:      'Practice management for dental offices',
+    metricsUrl: null,
+  },
+]
+
+const HUB_SECRET = 'hub-metrics-2026'
 
 function ProductsTab({ supabase }) {
-  const [metrics, setMetrics] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [selected, setSelected]     = useState(null) // the product registry entry
+  const [liveData, setLiveData]     = useState({})   // key → fetched metrics
+  const [loading, setLoading]       = useState({})   // key → bool
 
-  useEffect(() => {
-    supabase
-      .from('platform_metrics')
-      .select('*')
-      .order('metric_date', { ascending: false })
-      .then(({ data }) => {
-        // Keep only the latest row per product
-        const latest = {}
-        ;(data || []).forEach(row => {
-          if (!latest[row.product]) latest[row.product] = row
-        })
-        setMetrics(Object.values(latest))
-        setLoading(false)
+  async function fetchMetrics(product) {
+    if (!product.metricsUrl) return
+    if (loading[product.key]) return
+    setLoading(l => ({ ...l, [product.key]: true }))
+    try {
+      const res = await fetch(product.metricsUrl, {
+        headers: { 'x-hub-secret': HUB_SECRET, 'Content-Type': 'application/json' }
       })
-  }, [])
-
-  const fmt$ = (n) => n ? `$${Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—'
-  const fmtN = (n) => n != null ? Number(n).toLocaleString() : '—'
-  const fmtBytes = (b) => {
-    if (!b) return '—'
-    if (b > 1e9) return (b/1e9).toFixed(1)+' GB'
-    if (b > 1e6) return (b/1e6).toFixed(1)+' MB'
-    return (b/1e3).toFixed(0)+' KB'
+      const data = await res.json()
+      setLiveData(d => ({ ...d, [product.key]: data }))
+    } catch (e) {
+      setLiveData(d => ({ ...d, [product.key]: { ok: false, error: String(e) } }))
+    }
+    setLoading(l => ({ ...l, [product.key]: false }))
   }
 
-  // Platform totals across live products with metrics
-  const totalMRR     = metrics.reduce((s, r) => s + (r.mrr || 0), 0)
-  const totalClients = metrics.reduce((s, r) => s + (r.active_clients || 0), 0)
-  const totalLeads   = metrics.reduce((s, r) => s + (r.leads || 0), 0)
-  const totalOffices = metrics.reduce((s, r) => s + (r.offices || 0), 0)
+  function selectProduct(p) {
+    setSelected(p)
+    if (p.metricsUrl && !liveData[p.key]) fetchMetrics(p)
+  }
+
+  const CC = { card: (s={}) => ({ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 12, ...s }) }
 
   return (
-    <>
-      {/* Platform totals */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:24 }}>
-        {[
-          { label:'Combined MRR',    value: fmt$(totalMRR),     color:'#10b981', icon:'📈' },
-          { label:'Total Clients',   value: fmtN(totalClients), color:'#0ea5e9', icon:'👥' },
-          { label:'Total Leads',     value: fmtN(totalLeads),   color:'#8b5cf6', icon:'🎯' },
-          { label:'Total Offices',   value: fmtN(totalOffices), color:'#f59e0b', icon:'🏢' },
-        ].map(k => (
-          <div key={k.label} style={{ background:`linear-gradient(135deg, ${k.color}18, ${k.color}08)`,
-            border:`1px solid ${k.color}30`, borderRadius:12, padding:'18px 20px' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-              <div style={{ fontSize:10, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'.07em' }}>{k.label}</div>
-              <div style={{ fontSize:18, opacity:.5 }}>{k.icon}</div>
-            </div>
-            <div style={{ fontSize:28, fontWeight:900, color:k.color, lineHeight:1, marginTop:10 }}>{k.value}</div>
-          </div>
-        ))}
-      </div>
+    <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
 
-      {/* Per-product cards — entire card is clickable */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
-        {Object.entries(PRODUCT_META).map(([key, meta]) => {
-          const m = metrics.find(r => r.product === key)
-          const isBuilding = meta.status === 'building'
-          const clickable = meta.url !== '#'
-          function handleCardClick() {
-            if (clickable) window.open(meta.url, '_blank')
-          }
-          return (
-            <div key={key}
-              onClick={handleCardClick}
-              style={{
-                background:'rgba(255,255,255,.04)',
-                border:`1px solid ${meta.color}30`,
-                borderRadius:14, padding:'20px 22px',
-                opacity: isBuilding ? .7 : 1,
-                cursor: clickable ? 'pointer' : 'default',
-                transition:'all .15s',
-              }}
-              onMouseEnter={e => { if (clickable) { e.currentTarget.style.border=`1px solid ${meta.color}70`; e.currentTarget.style.background=`${meta.color}08` } }}
-              onMouseLeave={e => { e.currentTarget.style.border=`1px solid ${meta.color}30`; e.currentTarget.style.background='rgba(255,255,255,.04)' }}
-            >
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                  <span style={{ fontSize:22 }}>{meta.icon}</span>
-                  <div>
-                    <div style={{ fontSize:14, fontWeight:800, color:'#e2e8f0' }}>{meta.label}</div>
-                    <div style={{ fontSize:10, fontWeight:700, color: isBuilding ? '#f59e0b' : '#10b981',
-                      textTransform:'uppercase', letterSpacing:'.06em', marginTop:2 }}>
-                      {isBuilding ? '🔨 Building' : '✅ Live'}
+      {/* ── Card Grid ── */}
+      <div style={{ flex: selected ? '0 0 340px' : '1', minWidth: 0 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr' : 'repeat(3,1fr)', gap: 12 }}>
+          {PRODUCT_REGISTRY.map(p => {
+            const isBuilding = p.status === 'building'
+            const isSelected = selected?.key === p.key
+            const clickable  = p.url !== '#' || p.metricsUrl
+            return (
+              <div key={p.key}
+                onClick={() => isSelected ? setSelected(null) : selectProduct(p)}
+                style={{
+                  ...CC.card(),
+                  padding: '18px 20px',
+                  opacity:    isBuilding ? .7 : 1,
+                  cursor:     'pointer',
+                  border:     isSelected ? `1px solid ${p.color}` : `1px solid ${p.color}30`,
+                  background: isSelected ? `${p.color}12` : 'rgba(255,255,255,.04)',
+                  transition: 'all .15s',
+                }}
+                onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.border = `1px solid ${p.color}60`; e.currentTarget.style.background = `${p.color}08` } }}
+                onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.border = `1px solid ${p.color}30`; e.currentTarget.style.background = 'rgba(255,255,255,.04)' } }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 22 }}>{p.icon}</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0' }}>{p.label}</div>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: isBuilding ? '#f59e0b' : '#10b981',
+                        textTransform: 'uppercase', letterSpacing: '.06em', marginTop: 2 }}>
+                        {isBuilding ? '🔨 Building' : '✅ Live'}
+                      </div>
                     </div>
-                    {meta.desc && <div style={{ fontSize:11, color:'#475569', marginTop:4, lineHeight:1.4 }}>{meta.desc}</div>}
                   </div>
+                  {p.url !== '#' && !isSelected && (
+                    <a href={p.url} target="_blank" rel="noreferrer"
+                      onClick={e => e.stopPropagation()}
+                      style={{ fontSize: 10, color: '#fff', fontWeight: 700, textDecoration: 'none',
+                        background: p.color, padding: '4px 10px', borderRadius: 6, flexShrink: 0 }}>
+                      Open →
+                    </a>
+                  )}
                 </div>
-                {clickable ? (
-                  <div style={{ fontSize:11, color:'#fff', fontWeight:700,
-                    background:meta.color, padding:'5px 12px', borderRadius:6 }}>
-                    Open →
+                <div style={{ fontSize: 11, color: '#475569', marginBottom: 10, lineHeight: 1.4 }}>{p.desc}</div>
+
+                {/* Mini metrics preview */}
+                {liveData[p.key]?.ok && !isSelected && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                    {[
+                      ['MRR',     fmt$(liveData[p.key].metrics?.mrr)],
+                      ['Clients', fmtN(liveData[p.key].metrics?.active_clients)],
+                    ].map(([l, v]) => (
+                      <div key={l} style={{ background: 'rgba(255,255,255,.03)', borderRadius: 6, padding: '6px 8px' }}>
+                        <div style={{ fontSize: 9, color: '#334155', fontWeight: 700, textTransform: 'uppercase' }}>{l}</div>
+                        <div style={{ fontSize: 12, color: '#e2e8f0', fontWeight: 700, marginTop: 2 }}>{v}</div>
+                      </div>
+                    ))}
                   </div>
-                ) : (
-                  <span style={{ fontSize:10, color:'#475569', fontWeight:600 }}>Coming soon</span>
+                )}
+                {loading[p.key] && <div style={{ fontSize: 11, color: '#475569' }}>Loading…</div>}
+                {!p.metricsUrl && !isBuilding && (
+                  <div style={{ fontSize: 10, color: '#334155' }}>Deploy platform-metrics to connect</div>
+                )}
+                {isBuilding && !p.metricsUrl && (
+                  <div style={{ fontSize: 10, color: '#334155' }}>Not yet pushing metrics</div>
                 )}
               </div>
-              {m ? (
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                  {[
-                    ['MRR',     fmt$(m.mrr)],
-                    ['Clients', fmtN(m.active_clients)],
-                    ['Leads',   fmtN(m.leads)],
-                    ['Offices', fmtN(m.offices)],
-                    ['Storage', fmtBytes(m.storage_bytes)],
-                    ['Updated', m.metric_date],
-                  ].map(([label, val]) => (
-                    <div key={label} style={{ background:'rgba(255,255,255,.03)', borderRadius:8, padding:'8px 10px' }}>
-                      <div style={{ fontSize:9, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.06em' }}>{label}</div>
-                      <div style={{ fontSize:13, fontWeight:700, color:'#e2e8f0', marginTop:2 }}>{val}</div>
-                    </div>
-                  ))}
+            )
+          })}
+        </div>
+      </div>
+
+      {/* ── Dashboard Panel ── */}
+      {selected && (
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ ...CC.card({ padding: '0' }) }}>
+
+            {/* Header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(99,102,241,.1)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 28 }}>{selected.icon}</span>
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: '#fff' }}>{selected.label}</div>
+                  <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>{selected.desc}</div>
                 </div>
-              ) : (
-                <div style={{ textAlign:'center', padding:'20px 0', color:'#475569', fontSize:12 }}>
-                  {isBuilding ? 'Not yet pushing metrics' : loading ? 'Loading…' : 'No metrics yet — deploy push-platform-metrics edge fn'}
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {selected.url !== '#' && (
+                  <a href={selected.url} target="_blank" rel="noreferrer"
+                    style={{ fontSize: 12, color: '#fff', fontWeight: 700, textDecoration: 'none',
+                      background: selected.color, padding: '7px 16px', borderRadius: 8 }}>
+                    Open CRM →
+                  </a>
+                )}
+                {selected.metricsUrl && (
+                  <button onClick={() => fetchMetrics(selected)}
+                    style={{ fontSize: 11, color: '#6366f1', background: 'rgba(99,102,241,.1)',
+                      border: '1px solid rgba(99,102,241,.2)', borderRadius: 8, padding: '7px 14px', cursor: 'pointer' }}>
+                    ↻ Refresh
+                  </button>
+                )}
+                <button onClick={() => setSelected(null)}
+                  style={{ fontSize: 18, color: '#475569', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}>×</button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '20px 24px' }}>
+              {!selected.metricsUrl ? (
+                <div style={{ textAlign: 'center', padding: '48px 0', color: '#334155' }}>
+                  <div style={{ fontSize: 36, marginBottom: 12 }}>🔌</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#475569', marginBottom: 8 }}>
+                    {selected.status === 'building' ? 'Not yet built' : 'Metrics not connected'}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#334155', maxWidth: 320, margin: '0 auto', lineHeight: 1.6 }}>
+                    {selected.status === 'building'
+                      ? 'This product is still being built. Check back soon.'
+                      : 'Deploy the platform-metrics edge function to this product\'s Supabase project to see live data here.'}
+                  </div>
+                </div>
+              ) : loading[selected.key] ? (
+                <div style={{ textAlign: 'center', padding: '48px 0', color: '#475569', fontSize: 13 }}>
+                  Loading live data…
+                </div>
+              ) : liveData[selected.key]?.ok === false ? (
+                <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                  <div style={{ fontSize: 13, color: '#ef4444', marginBottom: 8 }}>Failed to load metrics</div>
+                  <div style={{ fontSize: 11, color: '#334155' }}>{liveData[selected.key]?.error}</div>
+                </div>
+              ) : liveData[selected.key] ? (() => {
+                const d = liveData[selected.key]
+                const m = d.metrics || {}
+                return (
+                  <div>
+                    {/* KPI tiles */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
+                      {[
+                        { label: 'MRR',           value: fmt$(m.mrr),            color: '#10b981' },
+                        { label: 'ARR',           value: fmt$(m.arr),            color: '#6366f1' },
+                        { label: 'Active Clients',value: fmtN(m.active_clients), color: '#0ea5e9' },
+                        { label: 'Active Leads',  value: fmtN(m.active_leads),   color: '#8b5cf6' },
+                        { label: 'Active Offices',value: fmtN(m.active_offices), color: '#f59e0b' },
+                        { label: 'Total Offices', value: fmtN(m.total_offices),  color: '#f59e0b' },
+                        { label: 'Pending Tasks', value: fmtN(m.pending_tasks),  color: '#ef4444' },
+                        { label: 'Storage',       value: fmtBytes(m.storage_bytes), color: '#475569' },
+                      ].map(k => (
+                        <div key={k.label} style={{ background: `${k.color}10`, border: `1px solid ${k.color}25`,
+                          borderRadius: 10, padding: '12px 14px' }}>
+                          <div style={{ fontSize: 9, fontWeight: 700, color: '#64748b',
+                            textTransform: 'uppercase', letterSpacing: '.07em' }}>{k.label}</div>
+                          <div style={{ fontSize: 20, fontWeight: 900, color: k.color, marginTop: 6 }}>{k.value}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                      {/* Offices table */}
+                      {d.offices?.length > 0 && (
+                        <div style={CC.card({ padding: '16px 18px' })}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: '#475569',
+                            textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 12 }}>
+                            Offices / Tenants
+                          </div>
+                          {d.offices.map((o, i) => (
+                            <div key={o.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                              padding: '8px 0', borderBottom: i < d.offices.length-1 ? '1px solid rgba(99,102,241,.06)' : 'none' }}>
+                              <div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0' }}>{o.name}</div>
+                                <div style={{ fontSize: 10, color: '#475569' }}>Since {o.since || '—'}</div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: '#10b981' }}>{fmt$(o.mrr)}/mo</span>
+                                <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
+                                  background: o.is_active ? 'rgba(16,185,129,.12)' : 'rgba(71,85,105,.12)',
+                                  color: o.is_active ? '#10b981' : '#475569' }}>
+                                  {o.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Recent activity */}
+                      {d.recent_activity?.length > 0 && (
+                        <div style={CC.card({ padding: '16px 18px' })}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: '#475569',
+                            textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 12 }}>
+                            Recent Activity
+                          </div>
+                          {d.recent_activity.map((a, i) => (
+                            <div key={i} style={{ padding: '8px 0',
+                              borderBottom: i < d.recent_activity.length-1 ? '1px solid rgba(99,102,241,.06)' : 'none' }}>
+                              <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.5 }}>{a.text}</div>
+                              <div style={{ fontSize: 10, color: '#334155', marginTop: 3 }}>
+                                {fmtAgo(a.at)} · {a.by || '—'}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ fontSize: 10, color: '#334155', marginTop: 14, textAlign: 'right' }}>
+                      Live data · fetched {fmtAgo(d.fetched_at)}
+                    </div>
+                  </div>
+                )
+              })() : (
+                <div style={{ textAlign: 'center', padding: '48px 0', color: '#475569', fontSize: 13 }}>
+                  Click Refresh to load live data
                 </div>
               )}
             </div>
-          )
-        })}
-      </div>
-    </>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 

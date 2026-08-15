@@ -134,3 +134,6 @@ verify_jwt = false
 # Platform metrics push — runs nightly, service-role only
 [functions.push-platform-metrics]
 verify_jwt = false
+
+[functions.platform-metrics]
+verify_jwt = false
