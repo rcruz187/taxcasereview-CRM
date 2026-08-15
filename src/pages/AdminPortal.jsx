@@ -94,25 +94,20 @@ function Spinner() {
 }
 
 // ── Sidebar ──────────────────────────────────────────────────────────────────
+// Operational items only — Marketing/Content/LinkedIn/Search/System live in Command Center tabs
 const NAV = [
   { path:'/crm-admin/command-center', label:'Command Center', icon:'⚡' },
-  { path:'/crm-admin/content',        label:'Content Center', icon:'✍️' },
-  { path:'/crm-admin/linkedin',       label:'LinkedIn',       icon:'💼' },
-  { path:'/crm-admin/email',     label:'Email',        icon:'📧' },
-  { path:'/crm-admin/calendar',  label:'Calendar',     icon:'📅' },
-  { path:'/crm-admin/training',  label:'Training',     icon:'🖥️' },
-  { path:'/crm-admin/chat',      label:'Chat (All)',   icon:'💬' },
-  { path:'/crm-admin',           label:'Overview',     icon:'📊' },
-  { path:'/crm-admin/provision', label:'+ New Office', icon:'➕' },
-  { path:'/crm-admin/offices',   label:'Offices',      icon:'🏢' },
-  { path:'/crm-admin/demo',      label:'Demo Mgmt',    icon:'🎭' },
-  { path:'/crm-admin/demo-setup', label:'Demo Setup',   icon:'🎨' },
-  { path:'/crm-admin/search',    label:'Search',       icon:'🔍' },
-  { path:'/crm-admin/employees', label:'Employees',    icon:'👥' },
-  { path:'/crm-admin/support',   label:'Support',      icon:'🎫' },
-  { path:'/crm-admin/audit',     label:'Audit Log',    icon:'📋' },
-  { path:'/crm-admin/billing',   label:'Billing',      icon:'💳' },
-  { path:'/crm-admin/health',    label:'System Health',icon:'💚' },
+  { path:'/crm-admin/email',          label:'Email',          icon:'📧' },
+  { path:'/crm-admin/calendar',       label:'Calendar',       icon:'📅' },
+  { path:'/crm-admin/chat',           label:'Chat (All)',      icon:'💬' },
+  { path:'/crm-admin',                label:'Overview',        icon:'📊' },
+  { path:'/crm-admin/provision',      label:'+ New Office',   icon:'➕' },
+  { path:'/crm-admin/offices',        label:'Offices',         icon:'🏢' },
+  { path:'/crm-admin/demo',           label:'Demo Mgmt',       icon:'🎭' },
+  { path:'/crm-admin/employees',      label:'Employees',       icon:'👥' },
+  { path:'/crm-admin/support',        label:'Support',         icon:'🎫' },
+  { path:'/crm-admin/audit',          label:'Audit Log',       icon:'📋' },
+  { path:'/crm-admin/billing',        label:'Billing',         icon:'💳' },
 ]
 
 function Sidebar({ onSignOut }) {
@@ -1727,13 +1722,12 @@ function StatusDot({ ok }) {
 
 // ── Products Tab ──────────────────────────────────────────────────────────────
 // Shows cross-product metrics from platform_metrics table.
-// Additive only — no existing code modified.
+// Products tab — CRM hub. Each card links to its live CRM.
 const PRODUCT_META = {
-  taxres:   { label:'Tax Res CRM',  icon:'📊', color:'#6366f1', url:'https://taxrescrm.app',  status:'live' },
-  camvella: { label:'Camvella',     icon:'🏘️', color:'#10b981', url:'https://camvella.com',    status:'live' },
-  phl:      { label:'PHL Land Care',icon:'🌿', color:'#f59e0b', url:'#',                       status:'live' },
-  arcvena:  { label:'Arcvena',      icon:'⚡', color:'#0ea5e9', url:'#',                       status:'building' },
-  bocasync: { label:'BocaSync',     icon:'🦷', color:'#8b5cf6', url:'https://bocasync.com',    status:'building' },
+  taxres:   { label:'Tax Res CRM',   icon:'📊', color:'#6366f1', url:'https://taxrescrm.app',    status:'live',     desc:'Multi-tenant SaaS CRM for tax resolution firms' },
+  phl:      { label:'PHL Land Care', icon:'🌿', color:'#f59e0b', url:'#',                        status:'live',     desc:'Field service CRM for lawn care & landscaping' },
+  arcvena:  { label:'Arcvena',       icon:'⚡', color:'#0ea5e9', url:'#',                        status:'building', desc:'Field service CRM for HVAC & electrical contractors' },
+  bocasync: { label:'BocaSync',      icon:'🦷', color:'#8b5cf6', url:'https://bocasync.com',     status:'building', desc:'Practice management for dental offices' },
 }
 
 function ProductsTab({ supabase }) {
@@ -1809,13 +1803,17 @@ function ProductsTab({ supabase }) {
                       textTransform:'uppercase', letterSpacing:'.06em', marginTop:2 }}>
                       {isBuilding ? '🔨 Building' : '✅ Live'}
                     </div>
+                    {meta.desc && <div style={{ fontSize:11, color:'#475569', marginTop:4, lineHeight:1.4 }}>{meta.desc}</div>}
                   </div>
                 </div>
-                {meta.url !== '#' && (
+                {meta.url !== '#' ? (
                   <a href={meta.url} target="_blank" rel="noreferrer"
-                    style={{ fontSize:11, color:meta.color, fontWeight:600, textDecoration:'none' }}>
-                    Visit →
+                    style={{ fontSize:11, color:'#fff', fontWeight:700, textDecoration:'none',
+                      background:meta.color, padding:'5px 12px', borderRadius:6 }}>
+                    Open →
                   </a>
+                ) : (
+                  <span style={{ fontSize:10, color:'#475569', fontWeight:600 }}>Coming soon</span>
                 )}
               </div>
               {m ? (
@@ -2168,13 +2166,15 @@ function CommandCenter() {
 
   const TABS = [
     { key:'overview',  label:'Overview'  },
+    { key:'products',  label:'Products'  },
     { key:'marketing', label:'Marketing' },
+    { key:'linkedin',  label:'LinkedIn'  },
+    { key:'content',   label:'Content'   },
     { key:'search',    label:'Search'    },
     { key:'sales',     label:'Sales'     },
     { key:'crm',       label:'CRM'       },
     { key:'goals',     label:'Goals'     },
     { key:'system',    label:'System'    },
-    { key:'products',  label:'Products'  },
   ]
 
   // ── RENDER ─────────────────────────────────────────────────────────────────
@@ -2740,6 +2740,18 @@ function CommandCenter() {
 
         {tab==='products' && <ProductsTab supabase={supabase} />}
 
+        {tab==='linkedin' && (
+          <div style={{ marginTop:0 }}>
+            <LinkedInPublisher embeddedMode />
+          </div>
+        )}
+
+        {tab==='content' && (
+          <div style={{ marginTop:0 }}>
+            <ContentCenter embeddedMode />
+          </div>
+        )}
+
       </div>
     </div>
   )
@@ -2768,7 +2780,7 @@ const GENERATION_STEPS = [
   { key:'outreach_3',   label:'Outreach Message 3',  icon:'📨' },
 ]
 
-function ContentCenter() {
+function ContentCenter({ embeddedMode = false }) {
   const [drafts, setDrafts]           = useState([])
   const [loading, setLoading]         = useState(true)
   const [genSteps, setGenSteps]       = useState(null)  // null=idle, array=generating
@@ -3180,7 +3192,7 @@ function ContentCenter() {
 // ── LinkedIn Publisher ─────────────────────────────────────────────────────
 const LI_STATUS_COLORS = { draft:'#475569', scheduled:'#6366f1', published:'#10b981', failed:'#ef4444' }
 
-function LinkedInPublisher() {
+function LinkedInPublisher({ embeddedMode = false }) {
   const [connection, setConnection]   = useState(null)  // null=loading, false=disconnected, obj=connected
   const [posts, setPosts]             = useState([])
   const [loading, setLoading]         = useState(true)
