@@ -2223,8 +2223,8 @@ function SalesPipeline({ data, supabase }) {
             {/* Actions */}
             <div style={{ padding:'10px 18px', borderBottom:'1px solid rgba(99,102,241,.08)', display:'flex', gap:6 }}>
               {selected.contact_email && (
-                <a href={`mailto:${selected.contact_email}`}
-                  style={{ ...S.btn('ghost'), fontSize:10, padding:'5px 10px', textDecoration:'none' }}>📧 Email</a>
+                <button onClick={() => window.open(`https://webmail.taxrescrm.net:7443/?_to=${encodeURIComponent(selected.contact_email)}`, '_blank')}
+                  style={{ ...S.btn('ghost'), fontSize:10, padding:'5px 10px' }}>📧 Email</button>
               )}
               {selected.contact_linkedin && (
                 <a href={selected.contact_linkedin} target="_blank" rel="noreferrer"
