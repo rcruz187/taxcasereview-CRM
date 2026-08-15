@@ -13,8 +13,13 @@ jobs:
     steps:
       - name: Setup Supabase CLI
         run: |
-          # Use the official install script
-          curl -fsSL https://raw.githubusercontent.com/supabase/cli/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+          # Download latest release binary directly
+          LATEST=$(curl -sf https://api.github.com/repos/supabase/cli/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+          echo "Latest CLI: $LATEST"
+          curl -fsSL "https://github.com/supabase/cli/releases/download/${LATEST}/supabase_linux_amd64.tar.gz" \
+            -o supabase.tar.gz
+          tar xzf supabase.tar.gz
+          sudo mv supabase /usr/local/bin/supabase
           supabase --version
 
       - name: Dump schema
@@ -30,19 +35,15 @@ jobs:
           supabase db dump \
             --project-ref "$PROJECT_REF" \
             --schema-only \
-            -f schema.sql
-          echo "Done. Lines: $(wc -l < schema.sql)"
+            -f schema.sql 2>&1
+          ls -la schema.sql 2>/dev/null || echo "schema.sql not produced"
+          wc -l schema.sql 2>/dev/null || true
 
       - name: Upload schema artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: schema-${{ inputs.target }}-${{ github.run_id }}
           path: schema.sql
           retention-days: 1
           if-no-files-found: warn
-
-      - name: Post error summary if failed
-        if: failure()
-        run: |
-          echo "Dump failed — check step logs above"
-          cat schema.sql 2>/dev/null | head -20 || echo "schema.sql not created"
