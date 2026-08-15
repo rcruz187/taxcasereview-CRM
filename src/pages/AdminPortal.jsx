@@ -3191,20 +3191,43 @@ function ContentCenter({ embeddedMode = false }) {
 }
 
 // ── LinkedIn Publisher ─────────────────────────────────────────────────────
-const LI_STATUS_COLORS = { draft:'#475569', scheduled:'#6366f1', published:'#10b981', failed:'#ef4444' }
+const LI_STATUS_COLORS = {
+  draft:'#475569', approved:'#f59e0b', scheduled:'#6366f1',
+  publishing:'#8b5cf6', published:'#10b981', failed:'#ef4444', canceled:'#334155'
+}
+const LI_CATEGORIES = [
+  { value:'educational',    label:'Educational' },
+  { value:'pain_point',     label:'Pain Point' },
+  { value:'feature_demo',   label:'Feature Demo' },
+  { value:'before_after',   label:'Before / After' },
+  { value:'founder_story',  label:'Founder Story' },
+  { value:'workflow_tip',   label:'Workflow Tip' },
+  { value:'product_update', label:'Product Update' },
+  { value:'demo_invite',    label:'Demo Invite' },
+  { value:'comparison',     label:'Comparison' },
+  { value:'case_study',     label:'Case Study' },
+]
 
 function LinkedInPublisher({ embeddedMode = false }) {
-  const [connection, setConnection]   = useState(null)  // null=loading, false=disconnected, obj=connected
+  const [liTab, setLiTab]             = useState('queue')
+  const [connection, setConnection]   = useState(null)
   const [posts, setPosts]             = useState([])
   const [loading, setLoading]         = useState(true)
   const [selected, setSelected]       = useState(null)
   const [filter, setFilter]           = useState('all')
   const [composing, setComposing]     = useState(false)
   const [composeBody, setComposeBody] = useState('')
+  const [composeTitle, setComposeTitle] = useState('')
+  const [composeCategory, setComposeCategory] = useState('educational')
   const [scheduleDate, setScheduleDate] = useState('')
   const [publishing, setPublishing]   = useState(null)
   const [saving, setSaving]           = useState(false)
   const [toast, setToast]             = useState(null)
+  const [settings, setSettings]       = useState(null)
+  const [savingSettings, setSavingSettings] = useState(false)
+  const [reports, setReports]         = useState([])
+  const [selectedReport, setSelectedReport] = useState(null)
+  const [nextSlots, setNextSlots]     = useState([])
 
   const LINKEDIN_CLIENT_ID = '788n5oz5zrmb1o'
   const REDIRECT_URI = `${window.location.origin}/crm-admin/linkedin/callback`
@@ -3214,15 +3237,13 @@ function LinkedInPublisher({ embeddedMode = false }) {
     setTimeout(() => setToast(null), 3500)
   }
 
-  // Handle OAuth callback — LinkedIn redirects back with ?code=...
+  // Handle OAuth callback
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const code = params.get('code')
     if (!code) return
     window.history.replaceState({}, '', window.location.pathname)
-    // Give Supabase time to restore session from storage, then invoke
     const attempt = async () => {
-      // Retry up to 5 times waiting for session to restore
       let session = null
       for (let i = 0; i < 5; i++) {
         const { data } = await supabase.auth.getSession()
@@ -3233,13 +3254,8 @@ function LinkedInPublisher({ embeddedMode = false }) {
       const { data, error } = await supabase.functions.invoke('linkedin-publish', {
         body: { action: 'oauth_callback', code, redirect_uri: REDIRECT_URI, state: params.get('state') }
       })
-      if (data?.ok) {
-        showToast(`Connected as ${data.name} ✓`)
-        load()
-      } else {
-        showToast('LinkedIn connection failed — try again', false)
-        console.error('LinkedIn OAuth error:', error || data)
-      }
+      if (data?.ok) { showToast(`Connected as ${data.name} ✓`); load() }
+      else { showToast('LinkedIn connection failed — try again', false); console.error(error || data) }
     }
     attempt()
   }, [])
@@ -3249,30 +3265,54 @@ function LinkedInPublisher({ embeddedMode = false }) {
     try {
       const [{ data: connData }, { data: postsData }] = await Promise.all([
         supabase.functions.invoke('linkedin-publish', { body: { action: 'status' } }),
-        supabase.functions.invoke('linkedin-publish', { body: { action: 'list_posts', limit: 100 } }),
+        supabase.functions.invoke('linkedin-publish', { body: { action: 'list_posts', limit: 200 } }),
       ])
       setConnection(connData?.connected ? connData : false)
       setPosts(postsData?.posts || [])
-    } catch (_) {
-      setConnection(false)
-      setPosts([])
-    }
+    } catch (_) { setConnection(false); setPosts([]) }
     setLoading(false)
   }
 
+  async function loadSettings(tenantId) {
+    const { data } = await supabase.functions.invoke('linkedin-scheduler', {
+      body: { action: 'get_settings', tenant_id: tenantId }
+    })
+    setSettings(data?.settings || { autopilot: false, timezone: 'America/New_York' })
+    const { data: sd } = await supabase.functions.invoke('linkedin-scheduler', {
+      body: { action: 'next_slots', tenant_id: tenantId }
+    })
+    setNextSlots(sd?.slots || [])
+  }
+
+  async function loadReports(tenantId) {
+    const { data } = await supabase.functions.invoke('linkedin-scheduler', {
+      body: { action: 'list_reports', tenant_id: tenantId }
+    })
+    setReports(data?.reports || [])
+  }
+
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    if (liTab === 'settings' || liTab === 'calendar') {
+      supabase.from('tenants').select('id').limit(1).single().then(({ data }) => {
+        if (data?.id) { loadSettings(data.id); loadReports(data.id) }
+      })
+    }
+    if (liTab === 'reports') {
+      supabase.from('tenants').select('id').limit(1).single().then(({ data }) => {
+        if (data?.id) loadReports(data.id)
+      })
+    }
+  }, [liTab])
 
   function connectLinkedIn() {
     const state = Math.random().toString(36).slice(2)
     sessionStorage.setItem('linkedin_oauth_state', state)
     const params = new URLSearchParams({
-      response_type: 'code',
-      client_id: LINKEDIN_CLIENT_ID,
-      redirect_uri: REDIRECT_URI,
-      scope: 'openid profile w_member_social',
-      state,
+      response_type: 'code', client_id: LINKEDIN_CLIENT_ID,
+      redirect_uri: REDIRECT_URI, scope: 'openid profile w_member_social', state,
     })
-    // Redirect main window — popup approach fails because callback lands in popup, not main window
     window.location.href = `https://www.linkedin.com/oauth/v2/authorization?${params}`
   }
 
@@ -3287,24 +3327,34 @@ function LinkedInPublisher({ embeddedMode = false }) {
     setSaving(true)
     const { data, error } = await supabase.functions.invoke('linkedin-publish', {
       body: {
-        action:       'save_draft',
-        body:         composeBody,
-        status,
+        action: 'save_draft', body: composeBody, status,
+        title: composeTitle || composeBody.slice(0, 60),
+        category: composeCategory,
         scheduled_at: status==='scheduled' && scheduleDate ? new Date(scheduleDate).toISOString() : null,
       }
     })
     if (data?.ok && data?.post) {
       setPosts(prev => [data.post, ...prev])
-      setSelected(data.post)
-      setComposing(false)
-      setComposeBody('')
-      setScheduleDate('')
-      showToast(status==='scheduled' ? 'Scheduled ✓' : 'Saved as draft ✓')
+      setSelected(data.post); setComposing(false)
+      setComposeBody(''); setComposeTitle(''); setScheduleDate('')
+      showToast(status==='scheduled' ? 'Scheduled ✓' : status==='approved' ? 'Approved ✓' : 'Saved as draft ✓')
     } else {
-      showToast('Failed to save post — try again', false)
-      console.error('savePost error:', error || data)
+      showToast('Failed to save — try again', false)
+      console.error(error || data)
     }
     setSaving(false)
+  }
+
+  async function approvePost(post) {
+    const { data } = await supabase.functions.invoke('linkedin-publish', {
+      body: { action: 'save_draft', id: post.id, body: post.body, status: 'approved',
+        title: post.title, category: post.category }
+    })
+    if (data?.ok) {
+      setPosts(prev => prev.map(p => p.id===post.id ? {...p, status:'approved'} : p))
+      if (selected?.id===post.id) setSelected(s => ({...s, status:'approved'}))
+      showToast('Approved — will publish on next scheduled slot ✓')
+    }
   }
 
   async function publishNow(post) {
@@ -3315,7 +3365,7 @@ function LinkedInPublisher({ embeddedMode = false }) {
     })
     if (data?.ok) {
       setPosts(prev => prev.map(p => p.id===post.id ? {...p, status:'published', linkedin_url:data.url, published_at:new Date().toISOString()} : p))
-      if (selected?.id === post.id) setSelected(s => ({...s, status:'published', linkedin_url:data.url}))
+      if (selected?.id===post.id) setSelected(s => ({...s, status:'published', linkedin_url:data.url}))
       showToast('Published to LinkedIn ✓')
     } else {
       setPosts(prev => prev.map(p => p.id===post.id ? {...p, status:'failed'} : p))
@@ -3331,18 +3381,46 @@ function LinkedInPublisher({ embeddedMode = false }) {
     showToast('Deleted')
   }
 
+  async function saveSettings() {
+    if (!settings) return
+    setSavingSettings(true)
+    const { data: td } = await supabase.from('tenants').select('id').limit(1).single()
+    if (td?.id) {
+      await supabase.functions.invoke('linkedin-scheduler', {
+        body: { action: 'save_settings', tenant_id: td.id, settings }
+      })
+      showToast('Settings saved ✓')
+    }
+    setSavingSettings(false)
+  }
+
+  async function generateReport() {
+    const { data: td } = await supabase.from('tenants').select('id').limit(1).single()
+    if (!td?.id) return
+    showToast('Generating report…')
+    const { data } = await supabase.functions.invoke('linkedin-scheduler', {
+      body: { action: 'generate_report', tenant_id: td.id }
+    })
+    if (data?.ok) { loadReports(td.id); showToast('Report generated ✓') }
+    else showToast('Report generation failed', false)
+  }
+
   const filtered = filter==='all' ? posts : posts.filter(p => p.status===filter)
-
-  const CC = { card: { background:'rgba(255,255,255,.04)', border:'1px solid rgba(99,102,241,.18)', borderRadius:12 } }
-
+  const CC2 = { card: { background:'rgba(255,255,255,.04)', border:'1px solid rgba(99,102,241,.18)', borderRadius:12 } }
   const charCount = composeBody.length
-  const charLimit = 3000
-  const charOk = charCount <= charLimit
+  const charOk = charCount <= 3000
+
+  const LI_TABS = [
+    { key:'queue',     label:'Content Queue' },
+    { key:'published', label:'Published' },
+    { key:'calendar',  label:'Calendar' },
+    { key:'reports',   label:'Reports' },
+    { key:'settings',  label:'Settings' },
+  ]
 
   return (
-    <div style={{ display:'flex', height:'100vh', overflow:'hidden', background:'#0a0918' }}>
+    <div style={{ display:'flex', height: embeddedMode ? 'calc(100vh - 120px)' : '100vh', overflow:'hidden', background:'#0a0918' }}>
 
-      {/* Toast */}
       {toast && (
         <div style={{ position:'fixed', top:20, right:20, zIndex:9999, padding:'10px 18px', borderRadius:8,
           background: toast.ok ? 'rgba(16,185,129,.9)' : 'rgba(239,68,68,.9)',
@@ -3352,248 +3430,507 @@ function LinkedInPublisher({ embeddedMode = false }) {
       )}
 
       {/* Left panel */}
-      <div style={{ width:300, borderRight:'1px solid rgba(99,102,241,.15)', overflowY:'auto', padding:'24px 0', flexShrink:0 }}>
+      <div style={{ width:280, borderRight:'1px solid rgba(99,102,241,.15)', overflowY:'auto', padding:'20px 0', flexShrink:0, display:'flex', flexDirection:'column' }}>
 
-        {/* Header */}
-        <div style={{ padding:'0 20px 16px' }}>
-          <div style={{ fontSize:18, fontWeight:900, color:'#fff', marginBottom:2 }}>💼 LinkedIn</div>
-          <div style={{ fontSize:11, color:'#475569' }}>Manual approval required before publishing</div>
-        </div>
+        {/* Header + connection */}
+        <div style={{ padding:'0 18px 14px' }}>
+          <div style={{ fontSize:16, fontWeight:900, color:'#fff', marginBottom:10 }}>💼 LinkedIn</div>
 
-        {/* Connection status */}
-        <div style={{ padding:'0 20px 16px' }}>
-          {loading ? (
-            <div style={{ fontSize:12, color:'#475569' }}>Checking connection…</div>
-          ) : connection?.connected ? (
-            <div style={{ ...CC.card, padding:'12px 14px' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
-                <span style={{ width:8, height:8, borderRadius:'50%', background:'#10b981', display:'inline-block', boxShadow:'0 0 6px #10b98160' }} />
-                <span style={{ fontSize:12, fontWeight:700, color:'#10b981' }}>Connected</span>
+          {loading ? <div style={{ fontSize:12, color:'#475569' }}>Checking…</div>
+          : connection?.connected ? (
+            <div style={{ ...CC2.card, padding:'10px 14px', marginBottom:10 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+                <span style={{ width:7, height:7, borderRadius:'50%', background:'#10b981', display:'inline-block' }} />
+                <span style={{ fontSize:11, fontWeight:700, color:'#10b981' }}>{connection.display_name}</span>
               </div>
-              <div style={{ fontSize:11, color:'#e2e8f0', marginBottom:2 }}>{connection.display_name}</div>
-              <div style={{ fontSize:10, color:'#475569', marginBottom:10 }}>
+              <div style={{ fontSize:10, color:'#475569', marginBottom:8 }}>
                 Expires {new Date(connection.expires_at).toLocaleDateString()}
               </div>
-              <button onClick={disconnect} style={{ ...S.btn('ghost'), fontSize:11, padding:'5px 12px', color:'#ef4444', border:'1px solid rgba(239,68,68,.2)' }}>
-                Disconnect
-              </button>
+              <div style={{ display:'flex', gap:6 }}>
+                <button onClick={disconnect} style={{ ...S.btn('ghost'), fontSize:10, padding:'4px 10px', color:'#ef4444', border:'1px solid rgba(239,68,68,.2)' }}>Disconnect</button>
+              </div>
             </div>
           ) : (
-            <div style={{ ...CC.card, padding:'14px' }}>
-              <div style={{ fontSize:12, color:'#94a3b8', marginBottom:10, lineHeight:1.5 }}>
-                Connect your LinkedIn account to publish posts directly from TaxRes CRM.
-              </div>
-              <button onClick={connectLinkedIn} style={{ ...S.btn('primary'), fontSize:12, padding:'8px 16px', width:'100%' }}>
+            <div style={{ ...CC2.card, padding:'12px', marginBottom:10 }}>
+              <div style={{ fontSize:11, color:'#94a3b8', marginBottom:8 }}>Connect LinkedIn to publish posts</div>
+              <button onClick={connectLinkedIn} style={{ ...S.btn('primary'), fontSize:11, padding:'7px 14px', width:'100%' }}>
                 Connect LinkedIn
               </button>
-              <div style={{ fontSize:10, color:'#334155', marginTop:8, lineHeight:1.5 }}>
-                Requires LinkedIn Developer App approval. See setup guide →
-              </div>
             </div>
           )}
-        </div>
 
-        {/* New post */}
-        <div style={{ padding:'0 20px 16px' }}>
-          <button onClick={() => { setComposing(true); setSelected(null) }}
-            style={{ ...S.btn('primary'), width:'100%', padding:'9px 0', fontSize:12 }}>
+          <button onClick={() => { setComposing(true); setSelected(null); setLiTab('queue') }}
+            style={{ ...S.btn('primary'), width:'100%', padding:'8px 0', fontSize:12 }}>
             + New Post
           </button>
         </div>
 
-        {/* Filter */}
-        <div style={{ padding:'0 20px 12px', display:'flex', gap:4, flexWrap:'wrap' }}>
-          {['all','draft','scheduled','published','failed'].map(s => (
-            <button key={s} onClick={() => setFilter(s)} style={{
-              padding:'3px 9px', borderRadius:20, border:'none', cursor:'pointer', fontSize:11, fontWeight:600,
-              background: filter===s ? 'rgba(99,102,241,.4)' : 'rgba(255,255,255,.05)',
-              color: filter===s ? '#a5b4fc' : '#64748b',
-            }}>{s.charAt(0).toUpperCase()+s.slice(1)}</button>
+        {/* Sub-tabs */}
+        <div style={{ padding:'0 18px 10px', display:'flex', gap:4, flexWrap:'wrap' }}>
+          {LI_TABS.map(t => (
+            <button key={t.key} onClick={() => { setLiTab(t.key); setComposing(false) }} style={{
+              padding:'4px 10px', borderRadius:20, border:'none', cursor:'pointer', fontSize:10, fontWeight:700,
+              background: liTab===t.key ? 'rgba(99,102,241,.4)' : 'rgba(255,255,255,.05)',
+              color: liTab===t.key ? '#a5b4fc' : '#64748b',
+            }}>{t.label}</button>
           ))}
         </div>
 
+        {/* Filter (queue/published tabs) */}
+        {(liTab==='queue' || liTab==='published') && (
+          <div style={{ padding:'0 18px 10px', display:'flex', gap:3, flexWrap:'wrap' }}>
+            {(liTab==='queue'
+              ? ['all','draft','approved','scheduled','failed']
+              : ['all','published']
+            ).map(s => (
+              <button key={s} onClick={() => setFilter(s)} style={{
+                padding:'3px 8px', borderRadius:20, border:'none', cursor:'pointer', fontSize:10, fontWeight:600,
+                background: filter===s ? 'rgba(99,102,241,.4)' : 'rgba(255,255,255,.04)',
+                color: filter===s ? '#a5b4fc' : '#64748b',
+              }}>{s.charAt(0).toUpperCase()+s.slice(1)}</button>
+            ))}
+          </div>
+        )}
+
         {/* Post list */}
-        {loading ? (
-          <div style={{ padding:'20px', color:'#475569', fontSize:13 }}>Loading…</div>
-        ) : filtered.length===0 ? (
-          <div style={{ padding:'20px', color:'#475569', fontSize:13 }}>
-            No posts yet. Click "+ New Post" to draft your first LinkedIn post.
-          </div>
-        ) : filtered.map(p => (
-          <div key={p.id} onClick={() => { setSelected(p); setComposing(false) }}
-            style={{ padding:'12px 20px', cursor:'pointer',
-              borderLeft: selected?.id===p.id ? '2px solid #6366f1' : '2px solid transparent',
-              background: selected?.id===p.id ? 'rgba(99,102,241,.1)' : 'transparent',
-              borderBottom:'1px solid rgba(99,102,241,.06)' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-              <span style={{ fontSize:9, fontWeight:700, padding:'2px 8px', borderRadius:20,
-                background:`${LI_STATUS_COLORS[p.status]}18`, color:LI_STATUS_COLORS[p.status] }}>
-                {p.status}
-              </span>
-              {p.scheduled_at && (
-                <span style={{ fontSize:10, color:'#475569' }}>
-                  {new Date(p.scheduled_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})}
-                </span>
-              )}
-            </div>
-            <div style={{ fontSize:12, color:'#94a3b8', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', lineHeight:1.4 }}>
-              {p.body.slice(0,80)}{p.body.length>80?'…':''}
-            </div>
-            <div style={{ fontSize:10, color:'#334155', marginTop:3 }}>
-              {new Date(p.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}
-            </div>
-          </div>
-        ))}
+        <div style={{ flex:1, overflowY:'auto' }}>
+          {loading ? <div style={{ padding:20, color:'#475569', fontSize:12 }}>Loading…</div>
+          : (liTab==='queue' || liTab==='published') ? (
+            filtered.filter(p => liTab==='published' ? p.status==='published' : p.status!=='published').length===0
+            ? <div style={{ padding:20, color:'#475569', fontSize:12 }}>No posts yet.</div>
+            : filtered.filter(p => liTab==='published' ? p.status==='published' : p.status!=='published').map(p => (
+              <div key={p.id} onClick={() => { setSelected(p); setComposing(false) }}
+                style={{ padding:'10px 18px', cursor:'pointer',
+                  borderLeft: selected?.id===p.id ? '2px solid #6366f1' : '2px solid transparent',
+                  background: selected?.id===p.id ? 'rgba(99,102,241,.08)' : 'transparent',
+                  borderBottom:'1px solid rgba(99,102,241,.06)' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:3 }}>
+                  <span style={{ fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:20,
+                    background:`${LI_STATUS_COLORS[p.status]}18`, color:LI_STATUS_COLORS[p.status] }}>
+                    {p.status}
+                  </span>
+                  {p.category && <span style={{ fontSize:9, color:'#475569' }}>{p.category.replace('_',' ')}</span>}
+                </div>
+                <div style={{ fontSize:11, color:'#94a3b8', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  {p.title || p.body.slice(0,70)}
+                </div>
+                {p.scheduled_at && p.status!=='published' && (
+                  <div style={{ fontSize:10, color:'#6366f1', marginTop:2 }}>
+                    📅 {new Date(p.scheduled_at).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}
+                  </div>
+                )}
+                {p.published_at && (
+                  <div style={{ fontSize:10, color:'#475569', marginTop:2 }}>
+                    {new Date(p.published_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}
+                  </div>
+                )}
+              </div>
+            ))
+          ) : null}
+        </div>
       </div>
 
       {/* Right panel */}
-      <div style={{ flex:1, overflowY:'auto', padding:'28px 32px' }}>
+      <div style={{ flex:1, overflowY:'auto', padding:'24px 28px' }}>
 
-        {/* Compose */}
+        {/* ── COMPOSE ── */}
         {composing && (
-          <div style={{ maxWidth:700 }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
-              <div style={{ fontSize:18, fontWeight:800, color:'#fff' }}>New LinkedIn Post</div>
+          <div style={{ maxWidth:680 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
+              <div style={{ fontSize:16, fontWeight:800, color:'#fff' }}>New LinkedIn Post</div>
               <button onClick={() => setComposing(false)} style={{ ...S.btn('ghost'), fontSize:12 }}>Cancel</button>
             </div>
 
-            <div style={{ ...CC.card, padding:'20px 22px', marginBottom:14 }}>
-              <textarea
-                value={composeBody}
-                onChange={e => setComposeBody(e.target.value)}
-                placeholder="Write your LinkedIn post here…&#10;&#10;120–160 words works best for engagement. Open with a specific insight, end with a question or CTA."
-                style={{ width:'100%', minHeight:280, background:'transparent', border:'none', outline:'none',
-                  color:'#e2e8f0', fontSize:14, lineHeight:1.75, resize:'vertical', fontFamily:'inherit' }}
-              />
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:10, paddingTop:10, borderTop:'1px solid rgba(99,102,241,.1)' }}>
-                <span style={{ fontSize:11, color: charOk ? '#475569' : '#ef4444' }}>
-                  {charCount} / {charLimit} characters
-                </span>
-                <span style={{ fontSize:11, color:'#475569' }}>LinkedIn max: 3,000 characters</span>
+            {/* Title + Category */}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
+              <div>
+                <div style={{ fontSize:10, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 }}>Internal Title</div>
+                <input value={composeTitle} onChange={e => setComposeTitle(e.target.value)}
+                  placeholder="e.g. IRS CP2000 educational post"
+                  style={{ width:'100%', background:'rgba(255,255,255,.06)', border:'1px solid rgba(99,102,241,.2)', borderRadius:8,
+                    color:'#e2e8f0', fontSize:13, padding:'8px 12px', boxSizing:'border-box' }} />
+              </div>
+              <div>
+                <div style={{ fontSize:10, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 }}>Category</div>
+                <select value={composeCategory} onChange={e => setComposeCategory(e.target.value)}
+                  style={{ width:'100%', background:'rgba(255,255,255,.06)', border:'1px solid rgba(99,102,241,.2)', borderRadius:8,
+                    color:'#e2e8f0', fontSize:13, padding:'8px 12px', boxSizing:'border-box' }}>
+                  {LI_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div style={{ ...CC2.card, padding:'18px 20px', marginBottom:12 }}>
+              <textarea value={composeBody} onChange={e => setComposeBody(e.target.value)}
+                placeholder={"Write your LinkedIn post here…\n\n120–160 words works best. Open with a specific insight, end with a question or CTA."}
+                style={{ width:'100%', minHeight:260, background:'transparent', border:'none', outline:'none',
+                  color:'#e2e8f0', fontSize:14, lineHeight:1.75, resize:'vertical', fontFamily:'inherit' }} />
+              <div style={{ display:'flex', justifyContent:'space-between', marginTop:8, paddingTop:8, borderTop:'1px solid rgba(99,102,241,.1)' }}>
+                <span style={{ fontSize:11, color: charOk ? '#475569' : '#ef4444' }}>{charCount} / 3,000</span>
+                <span style={{ fontSize:11, color:'#334155' }}>URLs will get UTM params on publish</span>
               </div>
             </div>
 
             {/* Schedule */}
-            <div style={{ ...CC.card, padding:'16px 20px', marginBottom:18 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:10 }}>
-                Schedule (optional)
+            <div style={{ ...CC2.card, padding:'14px 18px', marginBottom:16 }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:8 }}>
+                Schedule Date/Time (ET) — optional
               </div>
               <input type="datetime-local" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)}
                 style={{ background:'rgba(255,255,255,.06)', border:'1px solid rgba(99,102,241,.2)', borderRadius:8,
                   color:'#e2e8f0', fontSize:13, padding:'8px 12px', width:'100%', boxSizing:'border-box' }} />
               <div style={{ fontSize:11, color:'#475569', marginTop:6 }}>
-                Leave blank to save as a draft without a scheduled time.
+                Leave blank to save as draft. Set a date to schedule. Autopilot publishes on the schedule automatically.
               </div>
             </div>
 
             <div style={{ display:'flex', gap:8 }}>
               <button onClick={() => savePost('draft')} disabled={saving || !charOk}
-                style={{ ...S.btn('ghost'), fontSize:12, padding:'9px 18px' }}>
-                Save as Draft
+                style={{ ...S.btn('ghost'), fontSize:12, padding:'9px 16px' }}>
+                Save Draft
+              </button>
+              <button onClick={() => savePost('approved')} disabled={saving || !charOk}
+                style={{ ...S.btn('primary'), fontSize:12, padding:'9px 16px', background:'rgba(245,158,11,.8)' }}>
+                {saving ? 'Saving…' : 'Approve'}
               </button>
               {scheduleDate && (
                 <button onClick={() => savePost('scheduled')} disabled={saving || !charOk}
-                  style={{ ...S.btn('primary'), fontSize:12, padding:'9px 18px', background:'rgba(99,102,241,.8)' }}>
-                  {saving ? 'Scheduling…' : 'Schedule Post'}
+                  style={{ ...S.btn('primary'), fontSize:12, padding:'9px 16px' }}>
+                  {saving ? 'Scheduling…' : 'Schedule'}
                 </button>
               )}
             </div>
           </div>
         )}
 
-        {/* Post detail */}
-        {!composing && selected && (
-          <div style={{ maxWidth:700 }}>
-            <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:20, gap:16 }}>
+        {/* ── POST DETAIL ── */}
+        {!composing && selected && (liTab==='queue' || liTab==='published') && (
+          <div style={{ maxWidth:680 }}>
+            <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:18, gap:14 }}>
               <div>
-                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
-                  <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20,
+                {selected.title && <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:4 }}>{selected.title}</div>}
+                <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                  <span style={{ fontSize:10, fontWeight:700, padding:'2px 9px', borderRadius:20,
                     background:`${LI_STATUS_COLORS[selected.status]}18`, color:LI_STATUS_COLORS[selected.status] }}>
                     {selected.status}
                   </span>
+                  {selected.category && (
+                    <span style={{ fontSize:10, color:'#6366f1', fontWeight:600 }}>
+                      {LI_CATEGORIES.find(c=>c.value===selected.category)?.label || selected.category}
+                    </span>
+                  )}
                   {selected.published_at && (
-                    <span style={{ fontSize:11, color:'#475569' }}>
+                    <span style={{ fontSize:10, color:'#475569' }}>
                       Published {new Date(selected.published_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}
                     </span>
                   )}
                   {selected.scheduled_at && selected.status==='scheduled' && (
-                    <span style={{ fontSize:11, color:'#6366f1' }}>
-                      Scheduled {new Date(selected.scheduled_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}
+                    <span style={{ fontSize:10, color:'#6366f1' }}>
+                      Scheduled {new Date(selected.scheduled_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})} ET
                     </span>
                   )}
-                </div>
-                <div style={{ fontSize:11, color:'#334155' }}>
-                  Created {new Date(selected.created_at).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}
                 </div>
               </div>
 
               <div style={{ display:'flex', gap:6, flexShrink:0, flexWrap:'wrap', justifyContent:'flex-end' }}>
                 <button onClick={() => navigator.clipboard.writeText(selected.body).then(()=>showToast('Copied'))}
-                  style={{ ...S.btn('ghost'), fontSize:11, padding:'6px 12px' }}>Copy</button>
-                {selected.status !== 'published' && (
+                  style={{ ...S.btn('ghost'), fontSize:11, padding:'5px 11px' }}>Copy</button>
+                {selected.status==='draft' && (
+                  <button onClick={() => approvePost(selected)}
+                    style={{ ...S.btn('primary'), fontSize:11, padding:'5px 11px', background:'rgba(245,158,11,.8)' }}>
+                    ✓ Approve
+                  </button>
+                )}
+                {['draft','approved','scheduled','failed'].includes(selected.status) && (
                   <button onClick={() => publishNow(selected)} disabled={publishing===selected.id || !connection?.connected}
-                    style={{ ...S.btn('primary'), fontSize:11, padding:'6px 14px',
+                    style={{ ...S.btn('primary'), fontSize:11, padding:'5px 11px',
                       background: connection?.connected ? 'rgba(16,185,129,.8)' : 'rgba(99,102,241,.3)' }}>
                     {publishing===selected.id ? '⟳ Publishing…' : '▶ Publish Now'}
                   </button>
                 )}
                 {selected.linkedin_url && (
                   <a href={selected.linkedin_url} target="_blank" rel="noreferrer"
-                    style={{ ...S.btn('ghost'), fontSize:11, padding:'6px 12px', textDecoration:'none', color:'#0ea5e9' }}>
-                    View on LinkedIn ↗
+                    style={{ ...S.btn('ghost'), fontSize:11, padding:'5px 11px', textDecoration:'none', color:'#0ea5e9' }}>
+                    View ↗
                   </a>
                 )}
                 {selected.status !== 'published' && (
                   <button onClick={() => deletePost(selected.id)}
-                    style={{ ...S.btn('ghost'), fontSize:11, padding:'6px 12px', color:'#ef4444', border:'1px solid rgba(239,68,68,.2)' }}>
+                    style={{ ...S.btn('ghost'), fontSize:11, padding:'5px 11px', color:'#ef4444', border:'1px solid rgba(239,68,68,.2)' }}>
                     Delete
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Error */}
             {selected.status==='failed' && selected.error_msg && (
-              <div style={{ padding:'12px 16px', borderRadius:8, background:'rgba(239,68,68,.08)', border:'1px solid rgba(239,68,68,.2)', marginBottom:14, fontSize:12, color:'#ef4444' }}>
-                Publish failed. Check your LinkedIn connection and try again.
+              <div style={{ padding:'10px 14px', borderRadius:8, background:'rgba(239,68,68,.08)', border:'1px solid rgba(239,68,68,.2)', marginBottom:12, fontSize:12, color:'#ef4444' }}>
+                Publish failed — check your LinkedIn connection and retry.
               </div>
             )}
 
-            {/* Body */}
-            <div style={{ ...CC.card, padding:'24px 26px', marginBottom:14 }}>
+            <div style={{ ...CC2.card, padding:'20px 24px', marginBottom:12 }}>
               <pre style={{ whiteSpace:'pre-wrap', wordBreak:'break-word', color:'#e2e8f0', fontSize:14, lineHeight:1.75, fontFamily:'inherit', margin:0 }}>
                 {selected.body}
               </pre>
             </div>
 
-            {/* Stats placeholder */}
             {selected.status==='published' && (
-              <div style={{ ...CC.card, padding:'16px 20px', opacity:.7 }}>
-                <div style={{ fontSize:10, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:8 }}>
-                  Post Analytics
-                </div>
+              <div style={{ ...CC2.card, padding:'14px 18px', opacity:.65 }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 }}>Analytics</div>
                 <div style={{ fontSize:12, color:'#475569' }}>
-                  Impressions, reactions, and click data available in Phase 2 once LinkedIn analytics API access is approved.
+                  Impression and reaction data requires LinkedIn Marketing Developer Platform access. Track visits via Google Analytics using the UTM params automatically added to links in this post.
                 </div>
               </div>
             )}
 
-            {/* Not connected warning */}
             {!connection?.connected && selected.status!=='published' && (
-              <div style={{ padding:'12px 16px', borderRadius:8, background:'rgba(245,158,11,.06)', border:'1px solid rgba(245,158,11,.2)', fontSize:12, color:'#f59e0b' }}>
-                Connect your LinkedIn account to publish this post.
+              <div style={{ padding:'10px 14px', borderRadius:8, background:'rgba(245,158,11,.06)', border:'1px solid rgba(245,158,11,.2)', fontSize:12, color:'#f59e0b' }}>
+                Connect LinkedIn to publish this post.
               </div>
             )}
           </div>
         )}
 
-        {/* Empty */}
-        {!composing && !selected && (
+        {/* ── CALENDAR TAB ── */}
+        {!composing && liTab==='calendar' && (
+          <div style={{ maxWidth:800 }}>
+            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:18 }}>Publishing Calendar</div>
+
+            {/* Schedule slots */}
+            <div style={{ ...CC2.card, padding:'20px 24px', marginBottom:16 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:12 }}>
+                Default Schedule — America/New_York
+              </div>
+              <div style={{ display:'flex', gap:10 }}>
+                {[{day:'Monday',time:'9:00 AM'},{day:'Wednesday',time:'12:00 PM'},{day:'Friday',time:'9:00 AM'}].map(s => (
+                  <div key={s.day} style={{ flex:1, background:'rgba(99,102,241,.08)', border:'1px solid rgba(99,102,241,.2)', borderRadius:10, padding:'14px 16px', textAlign:'center' }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:'#a5b4fc' }}>{s.day}</div>
+                    <div style={{ fontSize:12, color:'#6366f1', marginTop:4 }}>{s.time} ET</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize:11, color:'#475569', marginTop:10 }}>3 posts/week · 8-week rolling calendar · Handles DST automatically</div>
+            </div>
+
+            {/* Upcoming posts */}
+            <div style={{ ...CC2.card, padding:'20px 24px', marginBottom:16 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:12 }}>Upcoming Queue</div>
+              {posts.filter(p => ['approved','scheduled'].includes(p.status)).length === 0 ? (
+                <div style={{ fontSize:13, color:'#475569' }}>No approved or scheduled posts. Approve posts from the Content Queue to fill the calendar.</div>
+              ) : posts.filter(p => ['approved','scheduled'].includes(p.status))
+                  .sort((a,b) => new Date(a.scheduled_at||'9999').getTime() - new Date(b.scheduled_at||'9999').getTime())
+                  .map((p, i) => (
+                <div key={p.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0',
+                  borderBottom: i < posts.filter(x=>['approved','scheduled'].includes(x.status)).length-1 ? '1px solid rgba(99,102,241,.08)' : 'none' }}>
+                  <div style={{ width:48, height:48, borderRadius:10, background:'rgba(99,102,241,.12)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                    <span style={{ fontSize:10, fontWeight:700, color:'#6366f1', textAlign:'center' }}>
+                      {p.scheduled_at ? new Date(p.scheduled_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : 'TBD'}
+                    </span>
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:12, color:'#e2e8f0', fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      {p.title || p.body.slice(0,80)}
+                    </div>
+                    <div style={{ fontSize:10, color:'#475569', marginTop:2 }}>
+                      {p.category?.replace('_',' ')} · {p.status}
+                      {p.scheduled_at && ` · ${new Date(p.scheduled_at).toLocaleString('en-US',{hour:'numeric',minute:'2-digit'})} ET`}
+                    </div>
+                  </div>
+                  <button onClick={() => publishNow(p)} disabled={publishing===p.id || !connection?.connected}
+                    style={{ ...S.btn('ghost'), fontSize:10, padding:'4px 10px' }}>
+                    {publishing===p.id ? '…' : 'Publish Now'}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Status summary */}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10 }}>
+              {['draft','approved','scheduled','published'].map(s => (
+                <div key={s} style={{ ...CC2.card, padding:'14px 16px', textAlign:'center' }}>
+                  <div style={{ fontSize:22, fontWeight:900, color:LI_STATUS_COLORS[s] }}>
+                    {posts.filter(p=>p.status===s).length}
+                  </div>
+                  <div style={{ fontSize:10, color:'#475569', fontWeight:600, textTransform:'uppercase', marginTop:4 }}>{s}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── REPORTS TAB ── */}
+        {!composing && liTab==='reports' && (
+          <div style={{ maxWidth:800 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
+              <div style={{ fontSize:15, fontWeight:800, color:'#fff' }}>Weekly Reports</div>
+              <button onClick={generateReport} style={{ ...S.btn('primary'), fontSize:12, padding:'8px 16px' }}>
+                Generate This Week
+              </button>
+            </div>
+
+            {reports.length===0 ? (
+              <div style={{ ...CC2.card, padding:'40px', textAlign:'center', color:'#475569' }}>
+                No reports yet. Reports generate automatically every Monday at 7am ET, or click Generate above.
+              </div>
+            ) : (
+              <div style={{ display:'grid', gridTemplateColumns:'240px 1fr', gap:16, alignItems:'start' }}>
+                <div style={{ ...CC2.card, padding:'8px 0' }}>
+                  {reports.map((r, i) => (
+                    <div key={r.id} onClick={() => setSelectedReport(r)}
+                      style={{ padding:'10px 16px', cursor:'pointer',
+                        borderLeft: selectedReport?.id===r.id ? '2px solid #6366f1' : '2px solid transparent',
+                        background: selectedReport?.id===r.id ? 'rgba(99,102,241,.08)' : 'transparent',
+                        borderBottom: i<reports.length-1 ? '1px solid rgba(99,102,241,.06)' : 'none' }}>
+                      <div style={{ fontSize:12, fontWeight:700, color:'#e2e8f0' }}>
+                        Week of {new Date(r.week_start+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+                      </div>
+                      <div style={{ fontSize:10, color:'#475569', marginTop:2 }}>
+                        {r.report_data?.posts_published || 0} published · {r.report_data?.posts_failed || 0} failed
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {selectedReport ? (
+                  <div style={{ ...CC2.card, padding:'20px 24px' }}>
+                    <div style={{ fontSize:13, fontWeight:800, color:'#fff', marginBottom:16 }}>
+                      Week of {new Date(selectedReport.week_start+'T12:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}
+                      {' '}— {new Date(selectedReport.week_end+'T12:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric'})}
+                    </div>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:18 }}>
+                      {[
+                        ['Published', selectedReport.report_data?.posts_published, '#10b981'],
+                        ['Failed',    selectedReport.report_data?.posts_failed,    '#ef4444'],
+                        ['Upcoming',  selectedReport.report_data?.posts_upcoming,  '#6366f1'],
+                      ].map(([label, val, color]) => (
+                        <div key={label} style={{ background:`${color}10`, border:`1px solid ${color}25`, borderRadius:8, padding:'12px 14px', textAlign:'center' }}>
+                          <div style={{ fontSize:24, fontWeight:900, color }}>{val ?? '—'}</div>
+                          <div style={{ fontSize:10, color:'#475569', fontWeight:600, marginTop:4 }}>{label}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {selectedReport.report_data?.published_posts?.length > 0 && (<>
+                      <div style={{ fontSize:10, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:8 }}>Published This Week</div>
+                      {selectedReport.report_data.published_posts.map((p, i) => (
+                        <div key={p.id} style={{ padding:'8px 0', borderBottom: i<selectedReport.report_data.published_posts.length-1 ? '1px solid rgba(99,102,241,.08)' : 'none' }}>
+                          <div style={{ fontSize:12, color:'#e2e8f0' }}>{p.title}</div>
+                          <div style={{ display:'flex', gap:10, marginTop:3 }}>
+                            <span style={{ fontSize:10, color:'#475569' }}>{new Date(p.published_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
+                            {p.linkedin_url && <a href={p.linkedin_url} target="_blank" rel="noreferrer" style={{ fontSize:10, color:'#0ea5e9' }}>View ↗</a>}
+                          </div>
+                        </div>
+                      ))}
+                    </>)}
+
+                    {selectedReport.report_data?.upcoming_posts?.length > 0 && (<>
+                      <div style={{ fontSize:10, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginTop:16, marginBottom:8 }}>Next Week</div>
+                      {selectedReport.report_data.upcoming_posts.map((p, i) => (
+                        <div key={p.id} style={{ padding:'8px 0', borderBottom: i<selectedReport.report_data.upcoming_posts.length-1 ? '1px solid rgba(99,102,241,.08)' : 'none' }}>
+                          <div style={{ fontSize:12, color:'#e2e8f0' }}>{p.title}</div>
+                          <div style={{ fontSize:10, color:'#6366f1', marginTop:3 }}>
+                            {p.scheduled_at ? new Date(p.scheduled_at).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : 'Unscheduled'}
+                          </div>
+                        </div>
+                      ))}
+                    </>)}
+
+                    <div style={{ fontSize:11, color:'#334155', marginTop:16, padding:'10px 12px', borderRadius:8, background:'rgba(255,255,255,.03)' }}>
+                      {selectedReport.report_data?.note}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ ...CC2.card, padding:'40px', textAlign:'center', color:'#475569', fontSize:13 }}>
+                    Select a week to view the report
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── SETTINGS TAB ── */}
+        {!composing && liTab==='settings' && (
+          <div style={{ maxWidth:600 }}>
+            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:18 }}>LinkedIn Settings</div>
+
+            <div style={{ ...CC2.card, padding:'20px 24px', marginBottom:16 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:16 }}>
+                Publishing Mode
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:10 }}>
+                {[
+                  { value:false, label:'Approval Mode', desc:'Posts require manual approval before publishing. Safe default.', color:'#f59e0b' },
+                  { value:true,  label:'Autopilot',     desc:'Approved posts publish automatically on schedule.',           color:'#10b981' },
+                ].map(opt => (
+                  <div key={String(opt.value)} onClick={() => settings && setSettings(s => ({...s, autopilot: opt.value}))}
+                    style={{ cursor:'pointer', borderRadius:10, padding:'16px',
+                      border: settings?.autopilot===opt.value ? `2px solid ${opt.color}` : '2px solid rgba(99,102,241,.15)',
+                      background: settings?.autopilot===opt.value ? `${opt.color}10` : 'rgba(255,255,255,.03)' }}>
+                    <div style={{ fontSize:13, fontWeight:700, color: settings?.autopilot===opt.value ? opt.color : '#94a3b8', marginBottom:6 }}>
+                      {settings?.autopilot===opt.value ? '● ' : '○ '}{opt.label}
+                    </div>
+                    <div style={{ fontSize:11, color:'#475569', lineHeight:1.5 }}>{opt.desc}</div>
+                  </div>
+                ))}
+              </div>
+              {settings?.autopilot && (
+                <div style={{ padding:'10px 12px', borderRadius:8, background:'rgba(16,185,129,.08)', border:'1px solid rgba(16,185,129,.2)', fontSize:12, color:'#10b981' }}>
+                  ✓ Autopilot active — approved posts will publish Mon 9am · Wed 12pm · Fri 9am ET
+                </div>
+              )}
+            </div>
+
+            <div style={{ ...CC2.card, padding:'20px 24px', marginBottom:16 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:12 }}>
+                Weekly Report
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                <div style={{ flex:1, fontSize:12, color:'#94a3b8' }}>
+                  Report generated every Monday 7am ET covering the previous week. Stored in Reports tab.
+                </div>
+                <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer' }}>
+                  <input type="checkbox" checked={settings?.weekly_report_enabled ?? true}
+                    onChange={e => settings && setSettings(s => ({...s, weekly_report_enabled: e.target.checked}))} />
+                  <span style={{ fontSize:12, color:'#e2e8f0' }}>Enabled</span>
+                </label>
+              </div>
+            </div>
+
+            <div style={{ ...CC2.card, padding:'20px 24px', marginBottom:16 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:12 }}>
+                LinkedIn Connection
+              </div>
+              {connection?.connected ? (
+                <div>
+                  <div style={{ fontSize:13, color:'#e2e8f0', marginBottom:4 }}>Connected as <strong>{connection.display_name}</strong></div>
+                  <div style={{ fontSize:11, color:'#475569', marginBottom:4 }}>Scopes: {connection.scopes}</div>
+                  <div style={{ fontSize:11, color:'#475569', marginBottom:10 }}>Expires: {new Date(connection.expires_at).toLocaleDateString()}</div>
+                  <div style={{ fontSize:11, color:'#f59e0b', padding:'8px 12px', borderRadius:6, background:'rgba(245,158,11,.06)', border:'1px solid rgba(245,158,11,.2)' }}>
+                    Publishing to personal profile only. Company page and analytics require LinkedIn Marketing Developer Platform approval.
+                  </div>
+                </div>
+              ) : (
+                <button onClick={connectLinkedIn} style={{ ...S.btn('primary'), fontSize:12 }}>Connect LinkedIn</button>
+              )}
+            </div>
+
+            <button onClick={saveSettings} disabled={savingSettings || !settings}
+              style={{ ...S.btn('primary'), fontSize:13, padding:'10px 24px' }}>
+              {savingSettings ? 'Saving…' : 'Save Settings'}
+            </button>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!composing && !selected && ['queue','published'].includes(liTab) && (
           <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', flexDirection:'column', gap:12 }}>
-            <div style={{ fontSize:40 }}>💼</div>
-            <div style={{ fontSize:15, color:'#475569' }}>LinkedIn Publisher</div>
-            <div style={{ fontSize:12, color:'#334155', textAlign:'center', maxWidth:320 }}>
-              Draft, schedule, and publish LinkedIn posts directly from TaxRes CRM. Every post requires manual approval before publishing.
+            <div style={{ fontSize:36 }}>💼</div>
+            <div style={{ fontSize:14, color:'#475569' }}>LinkedIn Publisher</div>
+            <div style={{ fontSize:12, color:'#334155', textAlign:'center', maxWidth:300 }}>
+              Select a post from the left or create a new one.
             </div>
           </div>
         )}
