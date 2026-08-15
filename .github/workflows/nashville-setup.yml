@@ -8,7 +8,7 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     steps:
-      - name: Add custom domain + deploy edge functions
+      - name: Check project and trigger deployment
         run: |
           CF_TOKEN="cfut_ycmXEArcGSBXDwOiQgzwIA8PHD2947E36DHoZdPHd668e199"
 
@@ -18,18 +18,19 @@ jobs:
 
           echo "Account: $ACCOUNT_ID"
 
-          # Add nashville.taxrescrm.app custom domain to the Nashville Pages project
-          DOMAIN_RESULT=$(curl -s -X POST \
-            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects/nashville-tax-crm/domains" \
-            -H "Authorization: Bearer $CF_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"name": "nashville.taxrescrm.app"}')
-
-          echo "Domain result: $DOMAIN_RESULT"
-
-          # Also get the pages.dev subdomain
+          # Get project details
           PROJECT=$(curl -s \
             "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects/nashville-tax-crm" \
             -H "Authorization: Bearer $CF_TOKEN")
 
-          echo "Project: $PROJECT" | grep -o '"subdomain":"[^"]*"'
+          echo "Project response:"
+          echo "$PROJECT" | grep -o '"name":"[^"]*"\|"subdomain":"[^"]*"\|"success":[^,}]*\|"message":"[^"]*"'
+
+          # Try adding domain anyway
+          echo "Adding domain..."
+          curl -s -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects/nashville-tax-crm/domains" \
+            -H "Authorization: Bearer $CF_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"name": "nashville.taxrescrm.app"}' \
+            | grep -o '"success":[^,}]*\|"message":"[^"]*"\|"name":"[^"]*"'
