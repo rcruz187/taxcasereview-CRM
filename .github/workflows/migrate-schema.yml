@@ -9,29 +9,38 @@ jobs:
       - name: Install postgres client
         run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
 
-      - name: Dump and report
-        env:
-          GH_PAT: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      - name: Test all connection methods
         run: |
-          # Try pg_dump and capture everything
-          PGPASSWORD="5b4zhcuTttEfL3YZ" pg_dump \
-            --host=aws-0-us-east-1.pooler.supabase.com \
-            --port=5432 \
-            --username=postgres.mpxgxfqdbquzkrvvejkh \
-            --dbname=postgres \
-            --schema-only \
-            --no-owner \
-            --no-acl \
-            --schema=public \
-            -f tcr-schema.sql > stdout.txt 2> stderr.txt
-          EXIT=$?
+          echo "=== Testing TCR connections ==="
           
-          BODY="Exit: $EXIT\n\nSTDOUT:\n$(cat stdout.txt | head -20)\n\nSTDERR:\n$(cat stderr.txt | head -30)\n\nLines: $(wc -l < tcr-schema.sql 2>/dev/null || echo 0)"
+          # Method 1: Direct IPv6
+          echo "Method 1: Direct port 5432"
+          timeout 10 PGPASSWORD="5b4zhcuTttEfL3YZ" psql \
+            "postgresql://postgres:5b4zhcuTttEfL3YZ@db.mpxgxfqdbquzkrvvejkh.supabase.co:5432/postgres?sslmode=require" \
+            -c "SELECT 1 as test;" 2>&1 || echo "FAILED"
           
-          curl -s -X POST \
-            "https://api.github.com/repos/taxresolutioncrm/taxcasereview-CRM/issues" \
-            -H "Authorization: token $GH_PAT" \
-            -H "Content-Type: application/json" \
-            -d "{\"title\": \"dump-diag-$GITHUB_RUN_ID\", \"body\": \"$BODY\"}"
+          # Method 2: Session pooler port 5432
+          echo "Method 2: Session pooler port 5432"
+          timeout 10 PGPASSWORD="5b4zhcuTttEfL3YZ" psql \
+            "postgresql://postgres.mpxgxfqdbquzkrvvejkh:5b4zhcuTttEfL3YZ@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require" \
+            -c "SELECT 1 as test;" 2>&1 || echo "FAILED"
           
-          exit $EXIT
+          # Method 3: Session pooler port 6543
+          echo "Method 3: Session pooler port 6543"
+          timeout 10 PGPASSWORD="5b4zhcuTttEfL3YZ" psql \
+            "postgresql://postgres.mpxgxfqdbquzkrvvejkh:5b4zhcuTttEfL3YZ@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require" \
+            -c "SELECT 1 as test;" 2>&1 || echo "FAILED"
+
+          echo "=== Testing Nashville connections ==="
+          
+          # Nashville Method 2
+          echo "Nashville session pooler port 5432"
+          timeout 10 PGPASSWORD="rsqY3zU6QUiiAISB" psql \
+            "postgresql://postgres.alozyneyvvtjekiyqdyb:rsqY3zU6QUiiAISB@aws-0-us-west-2.pooler.supabase.com:5432/postgres?sslmode=require" \
+            -c "SELECT 1 as test;" 2>&1 || echo "FAILED"
+            
+          # Nashville Method 3
+          echo "Nashville session pooler port 6543"
+          timeout 10 PGPASSWORD="rsqY3zU6QUiiAISB" psql \
+            "postgresql://postgres.alozyneyvvtjekiyqdyb:rsqY3zU6QUiiAISB@aws-0-us-west-2.pooler.supabase.com:6543/postgres?sslmode=require" \
+            -c "SELECT 1 as test;" 2>&1 || echo "FAILED"
