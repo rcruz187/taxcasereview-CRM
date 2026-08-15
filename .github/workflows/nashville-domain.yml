@@ -1,0 +1,24 @@
+name: Nashville Domain
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/nashville-domain.yml']
+
+jobs:
+  domain:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add nashville.taxrescrm.app
+        run: |
+          CF_TOKEN="cfut_HydJSm4KRyzDnCcp58KXFRI30TZY6z3bXKSeSio7a5058b4b"
+          ACCOUNT_ID=$(curl -s "https://api.cloudflare.com/client/v4/accounts" \
+            -H "Authorization: Bearer $CF_TOKEN" \
+            | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+          echo "Account: $ACCOUNT_ID"
+
+          curl -s -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects/nashville-tax-crm/domains" \
+            -H "Authorization: Bearer $CF_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"nashville.taxrescrm.app"}' \
+            | grep -o '"success":[^,}]*\|"name":"[^"]*"\|"status":"[^"]*"\|"message":"[^"]*"'
