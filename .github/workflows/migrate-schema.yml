@@ -5,43 +5,34 @@ on:
 jobs:
   migrate:
     runs-on: ubuntu-latest
-    permissions:
-      issues: write
-      contents: read
     steps:
       - name: Install postgres client
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y postgresql-client
-          psql --version
+        run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
 
-      - name: Test connectivity
+      - name: Dump TCR schema via session pooler port 5432
         run: |
-          echo "Testing TCR connection..."
-          PGPASSWORD="5b4zhcuTttEfL3YZ" PGCONNECT_TIMEOUT=10 psql \
-            "postgresql://postgres:5b4zhcuTttEfL3YZ@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require" \
-            -c "SELECT 'TCR connected' as status;" 2>&1 || echo "TCR pooler failed, trying direct..."
-          
-          PGPASSWORD="5b4zhcuTttEfL3YZ" PGCONNECT_TIMEOUT=10 psql \
-            "postgresql://postgres.mpxgxfqdbquzkrvvejkh:5b4zhcuTttEfL3YZ@aws-0-us-east-1.pooler.supabase.com:5432/postgres" \
-            -c "SELECT 'TCR pooler connected' as status;" 2>&1 || echo "TCR pooler v2 failed"
-
-      - name: Dump TCR schema
-        run: |
-          # Try session pooler (IPv4, port 5432)
+          # Session pooler supports pg_dump, port 5432, IPv4
           PGPASSWORD="5b4zhcuTttEfL3YZ" pg_dump \
-            "postgresql://postgres.mpxgxfqdbquzkrvvejkh:5b4zhcuTttEfL3YZ@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require" \
+            --host=aws-0-us-east-1.pooler.supabase.com \
+            --port=5432 \
+            --username=postgres.mpxgxfqdbquzkrvvejkh \
+            --dbname=postgres \
             --schema-only \
             --no-owner \
             --no-acl \
+            --schema=public \
             -f tcr-schema.sql 2>&1
           echo "Exit: $?"
-          wc -l tcr-schema.sql 2>/dev/null || echo "No file produced"
+          echo "Lines: $(wc -l < tcr-schema.sql 2>/dev/null || echo 0)"
+          head -5 tcr-schema.sql 2>/dev/null || echo "empty"
 
       - name: Restore to Nashville
         if: success()
         run: |
           PGPASSWORD="rsqY3zU6QUiiAISB" psql \
-            "postgresql://postgres.alozyneyvvtjekiyqdyb:rsqY3zU6QUiiAISB@aws-0-us-west-2.pooler.supabase.com:5432/postgres?sslmode=require" \
+            --host=aws-0-us-west-2.pooler.supabase.com \
+            --port=5432 \
+            --username=postgres.alozyneyvvtjekiyqdyb \
+            --dbname=postgres \
             -f tcr-schema.sql 2>&1 | tail -30
           echo "Restore exit: $?"
