@@ -201,7 +201,7 @@ serve(async (req) => {
     // entirely since that's a manual override Romy can flip on/off.
     const forwardTo = settings?.call_forward_number
     if (forwardTo) {
-      const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial timeout="25"><Number>${forwardTo}</Number></Dial><Say voice="Polly.Joanna-Neural">Thank you for calling Tax Case Review. No one is available right now. Please leave a message after the tone.</Say><Record action="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/voicemail-recorded" maxLength="120" playBeep="true"/></Response>`
+      const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial timeout="25"><Number>${forwardTo}</Number></Dial><Say voice="Polly.Ruth-Neural" language="en-US"><speak>Thank you for calling Tax Case Review. <break time="400ms"/> We're sorry we missed you. <break time="300ms"/> Please leave your name, number, and a brief message <break time="200ms"/> and we'll get back to you shortly.</speak></Say><Record action="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/voicemail-recorded" maxLength="120" playBeep="true"/></Response>`
       return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
     }
 
@@ -209,7 +209,7 @@ serve(async (req) => {
     // voicemail with a message that sets the right expectation instead of
     // the generic "no one is available" line.
     if (!isWithinBusinessHours(new Date())) {
-      const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">Thank you for calling Tax Case Review. Our office hours are Monday through Friday, 9 AM to 6 PM Eastern. Please leave a message after the tone and we will return your call as soon as possible.</Say><Record action="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/voicemail-recorded" maxLength="120" playBeep="true"/></Response>`
+      const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Ruth-Neural" language="en-US"><speak>Thank you for calling Tax Case Review. <break time="400ms"/> Our office is currently closed. <break time="300ms"/> We're available Monday through Friday, <break time="200ms"/> nine AM to six PM Eastern. <break time="500ms"/> Please leave us a message after the tone <break time="200ms"/> and we'll return your call the next business day.</speak></Say><Record action="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/voicemail-recorded" maxLength="120" playBeep="true"/></Response>`
       return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
     }
 
@@ -217,16 +217,16 @@ serve(async (req) => {
     // digit (or no digit) comes back, including holding the caller in a
     // conference for Option 1/2/0 -- this function's job stops at
     // presenting the menu.
-    const greeting = 'Thank you for calling Tax Case Review. To check your tax status instantly, please check your email or text messages for your personal client portal link. Otherwise, please choose from the following options. Press 1 to dial by extension. Press 2 to speak with a tax advisor. Press 3 to speak with a tax associate. Press 0 to speak with the operator.'
     const ivrRouteUrl = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/ivr-route'
-    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Gather numDigits="1" timeout="8" action="${ivrRouteUrl}" method="POST"><Say voice="Polly.Joanna-Neural">${greeting}</Say></Gather><Redirect method="POST">${ivrRouteUrl}</Redirect></Response>`
+    const greeting = `<speak>Thank you for calling Tax Case Review. <break time="400ms"/> If you're an existing client, check your email or text messages for your secure client portal link. <break time="600ms"/> To continue, please listen carefully as our menu has recently changed. <break time="400ms"/> Press <say-as interpret-as="digits">1</say-as> to dial by extension. <break time="300ms"/> Press <say-as interpret-as="digits">2</say-as> to speak with a tax advisor. <break time="300ms"/> Press <say-as interpret-as="digits">3</say-as> to speak with a tax associate. <break time="300ms"/> Or press <say-as interpret-as="digits">0</say-as> for the operator.</speak>`
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Gather numDigits="1" timeout="8" action="${ivrRouteUrl}" method="POST"><Say voice="Polly.Ruth-Neural" language="en-US">${greeting}</Say></Gather><Redirect method="POST">${ivrRouteUrl}</Redirect></Response>`
 
     console.log('returning IVR cXML:', xml)
     return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
 
   } catch (err) {
     console.error('receive-call error:', err)
-    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">We are sorry, an error occurred. Please try again.</Say></Response>`
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Ruth-Neural" language="en-US"><speak>We're sorry, we're experiencing a brief technical issue. <break time="300ms"/> Please try your call again in just a moment.</speak></Say></Response>`
     return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
   }
 })

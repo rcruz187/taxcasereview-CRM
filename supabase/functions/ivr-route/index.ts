@@ -46,7 +46,7 @@ serve(async (req) => {
   try {
     // Press 1 -> dial by extension submenu
     if (digits === '1') {
-      const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Gather numDigits="3" timeout="8" action="${IVR_EXTENSION_URL}" method="POST"><Say voice="Polly.Joanna-Neural">Please enter the 3 digit extension you would like to reach.</Say></Gather><Redirect method="POST">${VOICEMAIL_PROMPT_URL}</Redirect></Response>`
+      const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Gather numDigits="3" timeout="8" action="${IVR_EXTENSION_URL}" method="POST"><Say voice="Polly.Ruth-Neural" language="en-US"><speak>Please enter the three-digit extension <break time="300ms"/> for the person you'd like to reach.</speak></Say></Gather><Redirect method="POST">${VOICEMAIL_PROMPT_URL}</Redirect></Response>`
       console.log('routing to extension submenu')
       return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
     }
@@ -100,7 +100,7 @@ serve(async (req) => {
 
   } catch (err) {
     console.error('ivr-route error:', err)
-    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">We are sorry, an error occurred. Please try again.</Say></Response>`
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Ruth-Neural" language="en-US"><speak>We're sorry, we're experiencing a brief technical issue. <break time="300ms"/> Please try your call again in just a moment.</speak></Say></Response>`
     return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
   }
 })
