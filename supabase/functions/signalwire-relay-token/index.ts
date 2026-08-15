@@ -85,7 +85,7 @@ serve(async (req) => {
     if (!settings || !settings.sw_space_url || !settings.sw_project_id || !settings.sw_api_token) {
       const r = await supabase.from('settings')
         .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did,tenant_id')
-        .not('sw_api_token', 'is', null).limit(1).maybeSingle()
+        .not('sw_api_token', 'is', null).not('sw_space_url', 'is', null).not('sw_inbound_did', 'is', null).order('updated_at', { ascending: true }).limit(1).maybeSingle()
       if (r.data) settings = r.data
       if (!sErr) sErr = r.error
     }

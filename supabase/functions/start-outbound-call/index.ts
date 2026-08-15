@@ -45,6 +45,9 @@ serve(async (req) => {
       .from('settings')
       .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did,tenant_id')
       .not('sw_api_token', 'is', null)
+      .not('sw_space_url', 'is', null)
+      .not('sw_inbound_did', 'is', null)
+      .order('updated_at', { ascending: true })
       .limit(1)
       .maybeSingle()
 
