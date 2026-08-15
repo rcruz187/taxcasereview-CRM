@@ -1724,10 +1724,11 @@ function StatusDot({ ok }) {
 // Shows cross-product metrics from platform_metrics table.
 // Products tab — CRM hub. Each card links to its live CRM.
 const PRODUCT_META = {
-  taxres:   { label:'Tax Res CRM',   icon:'📊', color:'#6366f1', url:'https://taxrescrm.app',    status:'live',     desc:'Multi-tenant SaaS CRM for tax resolution firms' },
-  phl:      { label:'PHL Land Care', icon:'🌿', color:'#f59e0b', url:'#',                        status:'live',     desc:'Field service CRM for lawn care & landscaping' },
-  arcvena:  { label:'Arcvena',       icon:'⚡', color:'#0ea5e9', url:'#',                        status:'building', desc:'Field service CRM for HVAC & electrical contractors' },
-  bocasync: { label:'BocaSync',      icon:'🦷', color:'#8b5cf6', url:'https://bocasync.com',     status:'building', desc:'Practice management for dental offices' },
+  taxres:   { label:'Tax Res CRM',   icon:'📊', color:'#6366f1', url:'https://taxrescrm.app',  status:'live',     desc:'Multi-tenant SaaS CRM for tax resolution firms' },
+  camvella: { label:'Camvella',      icon:'🏘️', color:'#10b981', url:'https://camvella.com',   status:'live',     desc:'HOA & property management CRM' },
+  phl:      { label:'PHL Land Care', icon:'🌿', color:'#f59e0b', url:'#',                      status:'live',     desc:'Field service CRM for lawn care & landscaping' },
+  arcvena:  { label:'Arcvena',       icon:'⚡', color:'#0ea5e9', url:'#',                      status:'building', desc:'Field service CRM for HVAC & electrical contractors' },
+  bocasync: { label:'BocaSync',      icon:'🦷', color:'#8b5cf6', url:'https://bocasync.com',   status:'building', desc:'Practice management for dental offices' },
 }
 
 function ProductsTab({ supabase }) {
