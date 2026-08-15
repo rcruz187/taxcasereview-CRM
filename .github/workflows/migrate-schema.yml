@@ -12,6 +12,8 @@ jobs:
           sudo apt-get install -y postgresql-client
 
       - name: Dump TCR schema and restore to Nashville
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Dumping TCR schema..."
           PGPASSWORD="5b4zhcuTttEfL3YZ" pg_dump \
@@ -21,16 +23,33 @@ jobs:
             --schema-only \
             --no-owner \
             --no-acl \
-            -f tcr-schema.sql
+            -f tcr-schema.sql 2> dump_err.txt
           
-          echo "Lines dumped: $(wc -l < tcr-schema.sql)"
+          DUMP_EXIT=$?
+          echo "Dump exit: $DUMP_EXIT"
+          echo "Dump stderr: $(cat dump_err.txt)"
+          echo "Lines: $(wc -l < tcr-schema.sql 2>/dev/null || echo 0)"
+          
+          if [ $DUMP_EXIT -ne 0 ]; then
+            gh api repos/${{ github.repository }}/issues \
+              -X POST \
+              -f title="migrate-error-${{ github.run_id }}" \
+              -f body="## Dump failed\n\n\`\`\`\n$(cat dump_err.txt | head -30)\n\`\`\`" || true
+            exit 1
+          fi
           
           echo "Restoring to Nashville..."
           PGPASSWORD="rsqY3zU6QUiiAISB" psql \
             -h db.alozyneyvvtjekiyqdyb.supabase.co \
             -U postgres \
             -d postgres \
-            -f tcr-schema.sql \
-            2>&1 | tail -20
+            -f tcr-schema.sql > restore_out.txt 2> restore_err.txt
           
-          echo "Done."
+          RESTORE_EXIT=$?
+          
+          gh api repos/${{ github.repository }}/issues \
+            -X POST \
+            -f title="migrate-result-${{ github.run_id }}" \
+            -f body="## Result\n\nDump: $DUMP_EXIT | Restore: $RESTORE_EXIT\n\n### Restore errors\n\`\`\`\n$(cat restore_err.txt | head -50)\n\`\`\`\n\n### Restore output\n\`\`\`\n$(cat restore_out.txt | tail -20)\n\`\`\`" || true
+          
+          exit $RESTORE_EXIT
