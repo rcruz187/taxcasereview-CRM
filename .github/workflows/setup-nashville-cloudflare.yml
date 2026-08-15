@@ -1,6 +1,9 @@
 name: Setup Nashville Cloudflare Pages
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [".github/workflows/setup-nashville-cloudflare.yml"]
 
 jobs:
   setup:
