@@ -1994,10 +1994,18 @@ function ProductsTab({ supabase }) {
                             Offices / Tenants
                           </div>
                           {d.offices.map((o, i) => (
-                            <div key={o.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                              padding: '8px 0', borderBottom: i < d.offices.length-1 ? '1px solid rgba(99,102,241,.06)' : 'none' }}>
+                            <div key={o.id}
+                              onClick={async () => {
+                                const { data: token } = await supabase.rpc('create_impersonation_token', { p_tenant_id: o.id })
+                                if (token) window.open(`${window.location.origin}/impersonate?admin_token=${token}`, '_blank')
+                              }}
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                padding: '8px 0', borderBottom: i < d.offices.length-1 ? '1px solid rgba(99,102,241,.06)' : 'none',
+                                cursor: 'pointer', borderRadius: 6, transition: 'background .1s' }}
+                              onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,.06)'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                               <div>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0' }}>{o.name}</div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0' }}>{o.name} <span style={{ fontSize: 10, color: '#334155' }}>↗</span></div>
                                 <div style={{ fontSize: 10, color: '#475569' }}>Since {o.since || '—'}</div>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
