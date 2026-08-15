@@ -9,38 +9,30 @@ jobs:
       - name: Install postgres client
         run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
 
-      - name: Test all connection methods
+      - name: Dump TCR schema and restore to Nashville
         run: |
-          echo "=== Testing TCR connections ==="
+          set -e
           
-          # Method 1: Direct IPv6
-          echo "Method 1: Direct port 5432"
-          timeout 10 PGPASSWORD="5b4zhcuTttEfL3YZ" psql \
-            "postgresql://postgres:5b4zhcuTttEfL3YZ@db.mpxgxfqdbquzkrvvejkh.supabase.co:5432/postgres?sslmode=require" \
-            -c "SELECT 1 as test;" 2>&1 || echo "FAILED"
+          # Session pooler port 6543 worked in connectivity test
+          TCR="postgresql://postgres.mpxgxfqdbquzkrvvejkh:5b4zhcuTttEfL3YZ@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require"
+          NAS="postgresql://postgres.alozyneyvvtjekiyqdyb:rsqY3zU6QUiiAISB@aws-0-us-west-2.pooler.supabase.com:6543/postgres?sslmode=require"
           
-          # Method 2: Session pooler port 5432
-          echo "Method 2: Session pooler port 5432"
-          timeout 10 PGPASSWORD="5b4zhcuTttEfL3YZ" psql \
-            "postgresql://postgres.mpxgxfqdbquzkrvvejkh:5b4zhcuTttEfL3YZ@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require" \
-            -c "SELECT 1 as test;" 2>&1 || echo "FAILED"
+          echo "Dumping TCR schema..."
+          PGPASSWORD="5b4zhcuTttEfL3YZ" pg_dump \
+            "$TCR" \
+            --schema-only \
+            --no-owner \
+            --no-acl \
+            --schema=public \
+            -f tcr-schema.sql
           
-          # Method 3: Session pooler port 6543
-          echo "Method 3: Session pooler port 6543"
-          timeout 10 PGPASSWORD="5b4zhcuTttEfL3YZ" psql \
-            "postgresql://postgres.mpxgxfqdbquzkrvvejkh:5b4zhcuTttEfL3YZ@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require" \
-            -c "SELECT 1 as test;" 2>&1 || echo "FAILED"
-
-          echo "=== Testing Nashville connections ==="
+          echo "Lines dumped: $(wc -l < tcr-schema.sql)"
+          echo "First 5 lines:"
+          head -5 tcr-schema.sql
           
-          # Nashville Method 2
-          echo "Nashville session pooler port 5432"
-          timeout 10 PGPASSWORD="rsqY3zU6QUiiAISB" psql \
-            "postgresql://postgres.alozyneyvvtjekiyqdyb:rsqY3zU6QUiiAISB@aws-0-us-west-2.pooler.supabase.com:5432/postgres?sslmode=require" \
-            -c "SELECT 1 as test;" 2>&1 || echo "FAILED"
-            
-          # Nashville Method 3
-          echo "Nashville session pooler port 6543"
-          timeout 10 PGPASSWORD="rsqY3zU6QUiiAISB" psql \
-            "postgresql://postgres.alozyneyvvtjekiyqdyb:rsqY3zU6QUiiAISB@aws-0-us-west-2.pooler.supabase.com:6543/postgres?sslmode=require" \
-            -c "SELECT 1 as test;" 2>&1 || echo "FAILED"
+          echo "Restoring to Nashville..."
+          PGPASSWORD="rsqY3zU6QUiiAISB" psql "$NAS" -f tcr-schema.sql
+          
+          echo "DONE - verifying Nashville tables..."
+          PGPASSWORD="rsqY3zU6QUiiAISB" psql "$NAS" \
+            -c "SELECT count(*) as table_count FROM pg_tables WHERE schemaname='public';"
