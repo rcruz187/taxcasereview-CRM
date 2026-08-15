@@ -1,0 +1,44 @@
+name: Run SQL (Nashville)
+on:
+  workflow_dispatch:
+    inputs:
+      sql:
+        description: 'SQL to run against Nashville project'
+        required: true
+      mode:
+        description: 'readonly or APPLY_INTENTIONAL'
+        required: false
+        default: 'readonly'
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: ydrvncdedgjtcprczwpu
+      SQL_INPUT: ${{ github.event.inputs.sql }}
+      MODE: ${{ github.event.inputs.mode }}
+    steps:
+      - name: Execute
+        run: |
+          printf '%s' "$SQL_INPUT" > /tmp/stmt.sql
+          jq -Rs '{query: .}' < /tmp/stmt.sql > /tmp/body.json
+          HTTP=$(curl -sS -o /tmp/out.json -w '%{http_code}' \
+            -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/body.json)
+          echo "HTTP $HTTP"
+          jq '.' /tmp/out.json 2>/dev/null || cat /tmp/out.json
+
+      - name: Post result
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          RESULT=$(cat /tmp/out.json 2>/dev/null || echo "no output")
+          curl -s -X POST \
+            "https://api.github.com/repos/${{ github.repository }}/issues" \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"title\":\"nas-sql-result-${{ github.run_id }}\",\"body\":\"\`\`\`json\n$RESULT\n\`\`\`\"}" > /dev/null || true
