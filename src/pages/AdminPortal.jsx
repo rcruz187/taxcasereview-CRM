@@ -1787,14 +1787,29 @@ function ProductsTab({ supabase }) {
         ))}
       </div>
 
-      {/* Per-product cards */}
+      {/* Per-product cards — entire card is clickable */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
         {Object.entries(PRODUCT_META).map(([key, meta]) => {
           const m = metrics.find(r => r.product === key)
           const isBuilding = meta.status === 'building'
+          const clickable = meta.url !== '#'
+          function handleCardClick() {
+            if (clickable) window.open(meta.url, '_blank')
+          }
           return (
-            <div key={key} style={{ background:'rgba(255,255,255,.04)', border:`1px solid ${meta.color}30`,
-              borderRadius:14, padding:'20px 22px', opacity: isBuilding ? .6 : 1 }}>
+            <div key={key}
+              onClick={handleCardClick}
+              style={{
+                background:'rgba(255,255,255,.04)',
+                border:`1px solid ${meta.color}30`,
+                borderRadius:14, padding:'20px 22px',
+                opacity: isBuilding ? .7 : 1,
+                cursor: clickable ? 'pointer' : 'default',
+                transition:'all .15s',
+              }}
+              onMouseEnter={e => { if (clickable) { e.currentTarget.style.border=`1px solid ${meta.color}70`; e.currentTarget.style.background=`${meta.color}08` } }}
+              onMouseLeave={e => { e.currentTarget.style.border=`1px solid ${meta.color}30`; e.currentTarget.style.background='rgba(255,255,255,.04)' }}
+            >
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
                 <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                   <span style={{ fontSize:22 }}>{meta.icon}</span>
@@ -1807,12 +1822,11 @@ function ProductsTab({ supabase }) {
                     {meta.desc && <div style={{ fontSize:11, color:'#475569', marginTop:4, lineHeight:1.4 }}>{meta.desc}</div>}
                   </div>
                 </div>
-                {meta.url !== '#' ? (
-                  <a href={meta.url} target="_blank" rel="noreferrer"
-                    style={{ fontSize:11, color:'#fff', fontWeight:700, textDecoration:'none',
-                      background:meta.color, padding:'5px 12px', borderRadius:6 }}>
+                {clickable ? (
+                  <div style={{ fontSize:11, color:'#fff', fontWeight:700,
+                    background:meta.color, padding:'5px 12px', borderRadius:6 }}>
                     Open →
-                  </a>
+                  </div>
                 ) : (
                   <span style={{ fontSize:10, color:'#475569', fontWeight:600 }}>Coming soon</span>
                 )}
