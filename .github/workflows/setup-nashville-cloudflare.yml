@@ -1,9 +1,8 @@
 name: Setup Nashville Cloudflare Pages
 on:
-  workflow_dispatch:
   push:
     branches: [main]
-    paths: [".github/workflows/setup-nashville-cloudflare.yml"]
+    paths: ['.github/workflows/setup-nashville-cloudflare.yml']
 
 jobs:
   setup:
@@ -12,21 +11,15 @@ jobs:
       - name: Create Nashville Cloudflare Pages project
         run: |
           CF_TOKEN="cfut_ycmXEArcGSBXDwOiQgzwIA8PHD2947E36DHoZdPHd668e199"
-          ACCOUNT_ID="529673f7c801a2470b431c46bbab"
-          
-          # Get full account ID first
-          FULL_ACCOUNT=$(curl -s "https://api.cloudflare.com/client/v4/accounts" \
+
+          ACCOUNT_ID=$(curl -s "https://api.cloudflare.com/client/v4/accounts" \
             -H "Authorization: Bearer $CF_TOKEN" \
-            -H "Content-Type: application/json")
-          
-          echo "Accounts response:"
-          echo $FULL_ACCOUNT
-          
-          ACCOUNT_ID=$(echo $FULL_ACCOUNT | python3 -c "import json,sys; r=json.load(sys.stdin); print(r['result'][0]['id'])" 2>/dev/null || echo "failed")
-          echo "Account ID: $ACCOUNT_ID"
-          
-          # Create project
-          RESULT=$(curl -s -X POST \
+            -H "Content-Type: application/json" \
+            | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+
+          echo "Account: $ACCOUNT_ID"
+
+          curl -s -X POST \
             "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects" \
             -H "Authorization: Bearer $CF_TOKEN" \
             -H "Content-Type: application/json" \
@@ -50,19 +43,13 @@ jobs:
               "deployment_configs": {
                 "production": {
                   "env_vars": {
-                    "VITE_SUPABASE_URL": {"value": "https://ydrvncdedgjtcprczwpu.supabase.co"},
-                    "VITE_SUPABASE_ANON_KEY": {"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkcnZuY2RlZGdqdGNwcmN6d3B1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY4MDkzNTQsImV4cCI6MjEwMjM4NTM1NH0.k6_dSA6HREDufH_dxGH9KFrdmwx4EnfV1v3pA1VsGag"}
+                    "VITE_SUPABASE_URL": {
+                      "value": "https://ydrvncdedgjtcprczwpu.supabase.co"
+                    },
+                    "VITE_SUPABASE_ANON_KEY": {
+                      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkcnZuY2RlZGdqdGNwcmN6d3B1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY4MDkzNTQsImV4cCI6MjEwMjM4NTM1NH0.k6_dSA6HREDufH_dxGH9KFrdmwx4EnfV1v3pA1VsGag"
+                    }
                   }
                 }
               }
-            }')
-          
-          echo "Create result:"
-          echo $RESULT | python3 -c "
-import json,sys
-r=json.load(sys.stdin)
-print('Success:', r.get('success'))
-print('Name:', r.get('result',{}).get('name','—'))
-print('Subdomain:', r.get('result',{}).get('subdomain','—'))
-for e in r.get('errors',[]): print('ERROR:', e)
-"
+            }'
