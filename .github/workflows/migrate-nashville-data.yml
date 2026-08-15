@@ -2,32 +2,58 @@ name: Migrate Nashville Data
 on:
   workflow_dispatch:
     inputs:
-      table:
-        description: 'Table to migrate'
+      phase:
+        description: 'Phase: employees, clients, cases, transactions, notes, workflows, all'
         required: true
-        default: 'clients'
-      offset:
-        description: 'Offset'
-        required: true
-        default: '0'
+        default: 'all'
 
 jobs:
   migrate:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Install postgres client
         run: sudo apt-get install -y postgresql-client -qq
 
-      - name: Migrate data
+      - name: Migrate Nashville data from TCR
         run: |
-          TCR="postgresql://postgres.mpxgxfqdbquzkrvvejkh:5b4zhcuTttEfL3YZ@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require"
-          NAS="postgresql://postgres.ydrvncdedgjtcprczwpu:rsqY3zU6QUiiAISB@aws-0-us-west-2.pooler.supabase.com:5432/postgres?sslmode=require"
-          TABLE="${{ github.event.inputs.table }}"
-          OFFSET="${{ github.event.inputs.offset }}"
-          NASH_TENANT="489ace07-1a6b-4864-833a-4f8420568b40"
+          TCR="host=aws-0-us-east-1.pooler.supabase.com port=5432 dbname=postgres user=postgres.mpxgxfqdbquzkrvvejkh password=5b4zhcuTttEfL3YZ sslmode=require"
+          NAS="host=aws-0-us-west-2.pooler.supabase.com port=5432 dbname=postgres user=postgres.ydrvncdedgjtcprczwpu password=rsqY3zU6QUiiAISB sslmode=require"
+          NASH="489ace07-1a6b-4864-833a-4f8420568b40"
+          PHASE="${{ github.event.inputs.phase }}"
 
-          echo "Testing TCR connection..."
-          PGPASSWORD="5b4zhcuTttEfL3YZ" psql "$TCR" -c "SELECT 1 as test;" 2>&1 || echo "TCR FAILED"
+          run_tcr() { PGPASSWORD="5b4zhcuTttEfL3YZ" psql "$TCR" "$@"; }
+          run_nas() { PGPASSWORD="rsqY3zU6QUiiAISB" psql "$NAS" "$@"; }
 
-          echo "Testing Nashville connection..."
-          PGPASSWORD="rsqY3zU6QUiiAISB" psql "$NAS" -c "SELECT 1 as test;" 2>&1 || echo "NAS FAILED"
+          migrate_table() {
+            local TABLE=$1
+            local COLS=$2
+            local EXTRA=${3:-""}
+            echo "=== Migrating $TABLE ==="
+            PGPASSWORD="5b4zhcuTttEfL3YZ" pg_dump \
+              "host=aws-0-us-east-1.pooler.supabase.com port=5432 dbname=postgres user=postgres.mpxgxfqdbquzkrvvejkh password=5b4zhcuTttEfL3YZ sslmode=require" \
+              --data-only --no-owner --no-acl \
+              --table="$TABLE" \
+              -f /tmp/${TABLE}.sql 2>&1 || echo "pg_dump failed for $TABLE"
+            
+            if [ -f /tmp/${TABLE}.sql ] && [ -s /tmp/${TABLE}.sql ]; then
+              # Filter to Nashville tenant only
+              grep "$NASH" /tmp/${TABLE}.sql > /tmp/${TABLE}_nash.sql || true
+              LINES=$(wc -l < /tmp/${TABLE}_nash.sql)
+              echo "Filtered lines: $LINES"
+              if [ "$LINES" -gt 0 ]; then
+                PGPASSWORD="rsqY3zU6QUiiAISB" psql "$NAS" -f /tmp/${TABLE}_nash.sql 2>&1 | tail -5
+              fi
+            fi
+          }
+
+          echo "Testing connections..."
+          run_tcr -c "SELECT COUNT(*) as clients FROM clients WHERE tenant_id='$NASH';"
+          run_nas -c "SELECT COUNT(*) as clients FROM clients WHERE tenant_id='$NASH';"
+
+          if [ "$PHASE" = "employees" ] || [ "$PHASE" = "all" ]; then
+            echo "=== EMPLOYEES ==="
+            PGPASSWORD="5b4zhcuTttEfL3YZ" pg_dump \
+              "postgresql://postgres.mpxgxfqdbquzkrvvejkh:5b4zhcuTttEfL3YZ@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require" \
+              --data-only --no-owner --no-acl --table=employees 2>&1 | head -20 || echo "pg_dump test failed"
+          fi
