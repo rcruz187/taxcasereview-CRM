@@ -1,0 +1,59 @@
+name: Setup Nashville Cloudflare Pages
+on:
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Nashville Cloudflare Pages project
+        env:
+          CF_TOKEN: cfut_ycmXEArcGSBXDwOiQgzwIA8PHD2947E36DHoZdPHd668e199
+          GH_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          # Get account ID
+          ACCOUNT_ID=$(curl -s "https://api.cloudflare.com/client/v4/accounts" \
+            -H "Authorization: Bearer $CF_TOKEN" \
+            | python3 -c "import json,sys; r=json.load(sys.stdin); print(r['result'][0]['id'])")
+          
+          echo "Account ID: $ACCOUNT_ID"
+          
+          # Create the Pages project
+          RESULT=$(curl -s -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects" \
+            -H "Authorization: Bearer $CF_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "name": "nashville-tax-crm",
+              "production_branch": "main",
+              "source": {
+                "type": "github",
+                "config": {
+                  "owner": "taxresolutioncrm",
+                  "repo_name": "taxcasereview-CRM",
+                  "production_branch": "main",
+                  "pr_comments_enabled": false,
+                  "deployments_enabled": true
+                }
+              },
+              "build_config": {
+                "build_command": "npm run build",
+                "destination_dir": "dist",
+                "root_dir": ""
+              },
+              "deployment_configs": {
+                "production": {
+                  "env_vars": {
+                    "VITE_SUPABASE_URL": {
+                      "value": "https://ydrvncdedgjtcprczwpu.supabase.co"
+                    },
+                    "VITE_SUPABASE_ANON_KEY": {
+                      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkcnZuY2RlZGdqdGNwcmN6d3B1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY4MDkzNTQsImV4cCI6MjEwMjM4NTM1NH0.k6_dSA6HREDufH_dxGH9KFrdmwx4EnfV1v3pA1VsGag"
+                    }
+                  }
+                }
+              }
+            }')
+          
+          echo "Result:"
+          echo $RESULT | python3 -c "import json,sys; r=json.load(sys.stdin); print('Success:', r.get('success')); print('Name:', r.get('result',{}).get('name')); print('Subdomain:', r.get('result',{}).get('subdomain')); [print('Error:', e) for e in r.get('errors',[])]"
