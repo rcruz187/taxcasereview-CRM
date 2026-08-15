@@ -1724,7 +1724,7 @@ function StatusDot({ ok }) {
 // Shows cross-product metrics from platform_metrics table.
 // Products tab — CRM hub. Each card links to its live CRM.
 const PRODUCT_META = {
-  tcr:      { label:'Tax Case Review', icon:'⚖️', color:'#10b981', url:'https://taxcasereview.org', status:'live',     desc:"Origin CRM — Romy's own tax resolution practice (TRC-001)" },
+  tcr:      { label:'Tax Case Review', icon:'⚖️', color:'#10b981', url:'https://taxrescrm.app',  status:'live',     desc:"Origin CRM — Romy's own tax resolution practice (TRC-001)" },
   taxres:   { label:'Tax Res CRM',     icon:'📊', color:'#6366f1', url:'https://taxrescrm.app',  status:'live',     desc:'Multi-tenant SaaS CRM for tax resolution firms' },
   camvella: { label:'Camvella',        icon:'🏘️', color:'#0ea5e9', url:'https://camvella.com',   status:'live',     desc:'HOA & property management CRM' },
   phl:      { label:'PHL Land Care',   icon:'🌿', color:'#f59e0b', url:'#',                      status:'live',     desc:'Field service CRM for lawn care & landscaping' },
