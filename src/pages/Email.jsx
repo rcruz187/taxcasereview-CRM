@@ -122,12 +122,14 @@ export default function Email() {
         // Browser notification
         const title = 'New Email'
         const body = `From: ${e.clientName || e.recipient || 'Unknown'} — ${e.subject || '(no subject)'}`
+        function fireEmailNotif() {
+          const n = new Notification(title, { body, icon: '/favicon.png', requireInteraction: false })
+          n.onclick = () => { window.focus(); window.location.hash = ''; n.close() }
+        }
         if (Notification.permission === 'granted') {
-          new Notification(title, { body, icon: '/favicon.png' })
+          fireEmailNotif()
         } else if (Notification.permission !== 'denied') {
-          Notification.requestPermission().then(perm => {
-            if (perm === 'granted') new Notification(title, { body, icon: '/favicon.png' })
-          })
+          Notification.requestPermission().then(perm => { if (perm === 'granted') fireEmailNotif() })
         }
       })
       .subscribe()

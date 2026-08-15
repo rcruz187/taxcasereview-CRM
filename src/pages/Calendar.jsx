@@ -91,10 +91,12 @@ export default function Calendar() {
         const who = row.clientName || row.title || 'New appointment'
         showToast(`📅 New appointment booked: ${who} — ${row.date} ${row.time || ''}`)
         if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification('📅 New Appointment Booked', {
+          const cn = new Notification('📅 New Appointment Booked', {
             body: `${who} — ${row.date} ${fmtTime(row.time||'')}`,
-            icon: FIRM.logoUrl || '/icon-192.png'
+            icon: FIRM.logoUrl || '/icon-192.png',
+            requireInteraction: false
           })
+          cn.onclick = () => { window.focus(); cn.close() }
         }
         supabase.from('chat_messages').insert([{
           channel: 'general', sender: '🔔 System',
