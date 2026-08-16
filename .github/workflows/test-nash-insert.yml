@@ -8,36 +8,29 @@ jobs:
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
     steps:
-      - name: Test single insert
+      - name: Test insert and read
         run: |
           NAS="ydrvncdedgjtcprczwpu"
-          TCR="mpxgxfqdbquzkrvvejkh"
           NASH="489ace07-1a6b-4864-833a-4f8420568b40"
 
-          echo "=== Get one client from TCR ==="
-          CLIENT=$(curl -s -X POST "https://api.supabase.com/v1/projects/$TCR/database/query" \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{\"query\": \"SELECT id, name, status, tenant_id FROM clients WHERE tenant_id='$NASH' LIMIT 1\"}")
-          echo "Client: $CLIENT"
+          q() {
+            curl -s -X POST "https://api.supabase.com/v1/projects/$NAS/database/query" \
+              -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{\"query\": \"$1\"}"
+          }
 
-          echo "=== Try simple insert ==="
-          RESULT=$(curl -s -X POST "https://api.supabase.com/v1/projects/$NAS/database/query" \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{\"query\": \"INSERT INTO clients (id, name, status, tenant_id) VALUES ('test-001', 'Test Client', 'Active', '$NASH') ON CONFLICT DO NOTHING\"}")
-          echo "Insert result: $RESULT"
+          echo "=== RLS status ==="
+          q "SELECT tablename, rowsecurity FROM pg_tables WHERE tablename='clients' AND schemaname='public'"
 
-          echo "=== Verify ==="
-          COUNT=$(curl -s -X POST "https://api.supabase.com/v1/projects/$NAS/database/query" \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{\"query\": \"SELECT COUNT(*) as cnt FROM clients\"}")
-          echo "Count: $COUNT"
+          echo "=== Policies ==="
+          q "SELECT policyname, cmd, qual FROM pg_policies WHERE tablename='clients'"
 
-          echo "=== Check RLS ==="
-          RLS=$(curl -s -X POST "https://api.supabase.com/v1/projects/$NAS/database/query" \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{\"query\": \"SELECT tablename, rowsecurity FROM pg_tables WHERE tablename='clients'\"}")
-          echo "RLS: $RLS"
+          echo "=== Try insert bypassing RLS ==="
+          q "SET LOCAL row_security = off; INSERT INTO clients (id, name, status, tenant_id) VALUES ('test-nash-001', 'Test Client', 'Active', '$NASH') ON CONFLICT DO NOTHING"
+
+          echo "=== Count ==="
+          q "SELECT COUNT(*) as cnt FROM clients"
+
+          echo "=== Count without RLS ==="
+          q "SET row_security = off; SELECT COUNT(*) as cnt FROM clients"
