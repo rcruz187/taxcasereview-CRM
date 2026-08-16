@@ -1,0 +1,91 @@
+name: Nash Slack Import (one-shot)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    env:
+      NASH_URL: ${{ secrets.NASH_SUPABASE_URL }}
+      NASH_KEY: ${{ secrets.NASH_SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Slack import SQL against Nash
+        run: |
+          set -euo pipefail
+          echo "Running Nash Slack import — $(wc -l < scripts/nash_slack_import.sql) lines"
+          
+          # Split into individual statements and run each via REST API
+          # Use psql-style approach via Supabase Management API
+          # The SQL file is too large for one payload — split by batch marker
+          
+          python3 << 'PYEOF'
+          import urllib.request, json, re, sys, os
+
+          url = os.environ["NASH_URL"]
+          key = os.environ["NASH_KEY"]
+
+          with open("scripts/nash_slack_import.sql") as f:
+              sql = f.read()
+
+          # Split into individual statements on semicolon+newline
+          # Run CREATE TABLE first, then each INSERT batch, then marker
+          statements = [s.strip() for s in sql.split(";\n") if s.strip() and not s.strip().startswith("--")]
+          
+          print(f"Total statements to run: {len(statements)}")
+          
+          for i, stmt in enumerate(statements):
+              if not stmt:
+                  continue
+              payload = json.dumps({"query": stmt + ";"}).encode()
+              req = urllib.request.Request(
+                  f"{url}/rest/v1/rpc/execute_sql" ,
+                  data=payload,
+                  method="POST",
+                  headers={
+                      "apikey": key,
+                      "Authorization": f"Bearer {key}",
+                      "Content-Type": "application/json"
+                  }
+              )
+              # Actually use the pg endpoint
+              import http.client
+              import urllib.parse
+              parsed = urllib.parse.urlparse(url)
+              conn = http.client.HTTPSConnection(parsed.netloc)
+              conn.request("POST", "/rest/v1/",
+                  body=json.dumps({"query": stmt + ";"}).encode(),
+                  headers={
+                      "apikey": key,
+                      "Authorization": f"Bearer {key}",
+                      "Content-Type": "application/json",
+                      "Prefer": "return=minimal"
+                  }
+              )
+              resp = conn.getresponse()
+              body = resp.read().decode()
+              if resp.status not in (200, 201, 204):
+                  print(f"Statement {i+1} FAILED ({resp.status}): {body[:200]}")
+              else:
+                  if i % 10 == 0:
+                      print(f"Statement {i+1}/{len(statements)} OK")
+          
+          print("Import complete")
+          PYEOF
+
+      - name: Post result
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -sS -X POST \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues" \
+            -d '{"title":"nash-import-result ${{ github.run_id }}","body":"Nash Slack import workflow completed. Check run logs for details.","labels":["sql-result"]}'
