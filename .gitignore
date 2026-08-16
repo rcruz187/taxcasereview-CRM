@@ -9,3 +9,5 @@ dist/
 .env.*.local
 *.pem
 *.key
+
+.env.production
