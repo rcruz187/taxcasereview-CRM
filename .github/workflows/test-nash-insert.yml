@@ -1,0 +1,43 @@
+name: Test Nashville Insert
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - name: Test single insert
+        run: |
+          NAS="ydrvncdedgjtcprczwpu"
+          TCR="mpxgxfqdbquzkrvvejkh"
+          NASH="489ace07-1a6b-4864-833a-4f8420568b40"
+
+          echo "=== Get one client from TCR ==="
+          CLIENT=$(curl -s -X POST "https://api.supabase.com/v1/projects/$TCR/database/query" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\": \"SELECT id, name, status, tenant_id FROM clients WHERE tenant_id='$NASH' LIMIT 1\"}")
+          echo "Client: $CLIENT"
+
+          echo "=== Try simple insert ==="
+          RESULT=$(curl -s -X POST "https://api.supabase.com/v1/projects/$NAS/database/query" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\": \"INSERT INTO clients (id, name, status, tenant_id) VALUES ('test-001', 'Test Client', 'Active', '$NASH') ON CONFLICT DO NOTHING\"}")
+          echo "Insert result: $RESULT"
+
+          echo "=== Verify ==="
+          COUNT=$(curl -s -X POST "https://api.supabase.com/v1/projects/$NAS/database/query" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\": \"SELECT COUNT(*) as cnt FROM clients\"}")
+          echo "Count: $COUNT"
+
+          echo "=== Check RLS ==="
+          RLS=$(curl -s -X POST "https://api.supabase.com/v1/projects/$NAS/database/query" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\": \"SELECT tablename, rowsecurity FROM pg_tables WHERE tablename='clients'\"}")
+          echo "RLS: $RLS"
