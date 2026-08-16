@@ -1,0 +1,33 @@
+name: Verify Nashville
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - name: Check Nashville counts
+        run: |
+          NAS="ydrvncdedgjtcprczwpu"
+          NASH="489ace07-1a6b-4864-833a-4f8420568b40"
+
+          query() {
+            curl -s -X POST "https://api.supabase.com/v1/projects/$NAS/database/query" \
+              -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{\"query\": \"$1\"}"
+          }
+
+          echo "=== Nashville DB Counts ==="
+          query "SELECT (SELECT COUNT(*) FROM clients WHERE tenant_id='$NASH') as clients, (SELECT COUNT(*) FROM cases WHERE tenant_id='$NASH') as cases, (SELECT COUNT(*) FROM payment_transactions WHERE tenant_id='$NASH') as transactions, (SELECT COUNT(*) FROM employees WHERE tenant_id='$NASH') as employees, (SELECT COUNT(*) FROM tasks WHERE tenant_id='$NASH') as tasks, (SELECT COUNT(*) FROM workflow_templates WHERE tenant_id='$NASH') as workflows"
+
+          echo "=== RLS Status ==="
+          query "SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname='public' AND tablename IN ('clients','employees','cases','tasks') ORDER BY tablename"
+
+          echo "=== Settings ==="
+          query "SELECT name, firmname, phone, logourl FROM settings WHERE tenant_id='$NASH'"
+
+          echo "=== Tenants ==="
+          query "SELECT tenant_code, firm_name, plan_tier, status FROM tenants WHERE id='$NASH'"
