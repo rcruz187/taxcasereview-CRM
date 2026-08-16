@@ -1,0 +1,31 @@
+name: Deploy Nashville Edge Functions
+on:
+  workflow_dispatch:
+    inputs:
+      function:
+        description: 'Function slug or ALL_INTENTIONAL'
+        required: true
+        default: 'ALL_INTENTIONAL'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Deploy to Nashville
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          PROJECT_REF="ydrvncdedgjtcprczwpu"
+          FUNCTION="${{ github.event.inputs.function }}"
+          if [ "$FUNCTION" = "ALL_INTENTIONAL" ]; then
+            for fn in receive-call ivr-extension run-autopay-batch xero-oauth-callback turn-credentials stripe-resolution-fee-confirm stripe-save-payment-method; do
+              echo "Deploying $fn to Nashville..."
+              supabase functions deploy "$fn" --project-ref "$PROJECT_REF" || echo "FAILED: $fn"
+            done
+          else
+            supabase functions deploy "$FUNCTION" --project-ref "$PROJECT_REF"
+          fi
