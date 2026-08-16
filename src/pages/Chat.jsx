@@ -8,7 +8,7 @@ import { useVideoBackground } from '../lib/videoBackground'
 import VirtualBackground from '../components/VirtualBackground'
 import VideoTile from '../components/VideoTile'
 
-// Channels are now loaded from the chat_channels table (per-tenant, persistent)
+// Channels are now loaded from the chat_channels table (per-tenant, persistent) [v2]
 // CHANNELS is kept as a fallback only for the very first render before the DB loads
 const CHANNELS = [
   { id: 'general', label: 'general', desc: 'All staff announcements' },
@@ -199,9 +199,9 @@ export default function Chat() {
   const isChannel = !active.id.startsWith('dm_')
   const channelId = (!isChannel && active.empId && myEmpId) ? dmPair(myEmpId, active.empId) : active.id
 
-  // ── load channels from DB on mount ──
+  // ── load channels from DB on mount ── [v3 - cache busted]
   useEffect(() => {
-    supabase.from('chat_channels').select('*').order('position').order('label')
+    console.log('[Chat v3] loading channels from DB'); supabase.from('chat_channels').select('*').order('position').order('label')
       .then(({ data }) => {
         if (data?.length) setDbChannels(data.map(c => ({ id: c.id, label: c.label, desc: c.description || '' })))
       })
