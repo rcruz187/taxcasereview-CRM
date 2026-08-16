@@ -8,37 +8,9 @@ jobs:
   migrate:
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
     steps:
+      - uses: actions/checkout@v4
       - name: Migrate clients
-        run: |
-          TCR="mpxgxfqdbquzkrvvejkh"
-          NAS="ydrvncdedgjtcprczwpu"
-          NASH="489ace07-1a6b-4864-833a-4f8420568b40"
-
-          tcr() { curl -s -X POST "https://api.supabase.com/v1/projects/$TCR/database/query" \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{\"query\": \"$1\"}"; }
-
-          nas() { curl -s -X POST "https://api.supabase.com/v1/projects/$NAS/database/query" \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{\"query\": \"$1\"}"; }
-
-          echo "Migrating clients in batches of 50..."
-          TOTAL=2109
-          OFFSET=0
-          while [ $OFFSET -lt $TOTAL ]; do
-            SQL=$(tcr "SELECT 'INSERT INTO clients (id,name,first,last,phone,phone2,email,street,city,state,zip,county,ssn,ein,dob,spousename,spousessn,filingstatus,dependents,irsbalance,issuetype,irsorstate,taxyears,status,clientsince,assignedto,notes,custnum,dnd,created_at,source,pipelinestage,business_name,archived,tenant_id,internal_note,\"taxAssociate\",\"salesRep\",tags,occupation,employer,\"contactPerson\",industry,\"leadSource\",\"clientOwes\",\"referredBy\",\"businessType\",autopay_enabled) SELECT id,name,first,last,phone,phone2,email,street,city,state,zip,county,ssn,ein,dob::text,spousename,spousessn,filingstatus,dependents,irsbalance,issuetype,irsorstate,taxyears,status,clientsince,assignedto,notes,custnum,dnd,created_at,source,pipelinestage,business_name,archived,tenant_id,internal_note,\"taxAssociate\",\"salesRep\",tags,occupation,employer,\"contactPerson\",industry,\"leadSource\",\"clientOwes\",\"referredBy\",\"businessType\",autopay_enabled FROM json_populate_recordset(NULL::clients, ''' || json_agg(row_to_json(t))::text || ''') ON CONFLICT (id) DO NOTHING;' as stmt FROM (SELECT id,name,first,last,phone,phone2,email,street,city,state,zip,county,ssn,ein,dob::text as dob,spousename,spousessn,filingstatus,dependents,irsbalance,issuetype,irsorstate,taxyears,status,clientsince,assignedto,notes,custnum,dnd,created_at,source,pipelinestage,business_name,archived,tenant_id,internal_note,\"taxAssociate\",\"salesRep\",tags,occupation,employer,\"contactPerson\",industry,\"leadSource\",\"clientOwes\",\"referredBy\",\"businessType\",autopay_enabled FROM clients WHERE tenant_id='$NASH' ORDER BY id LIMIT 50 OFFSET $OFFSET) t" | grep -o '"stmt":"[^"]*"' | sed 's/"stmt":"//;s/"$//;s/\\\\n/ /g;s/\\n/ /g')
-
-            if [ -n "$SQL" ]; then
-              RESULT=$(nas "$SQL")
-              echo "Offset $OFFSET: $RESULT" | head -c 200
-            fi
-            OFFSET=$((OFFSET + 50))
-          done
-
-          COUNT=$(nas "SELECT COUNT(*) as cnt FROM clients WHERE tenant_id='$NASH'" | grep -o '"cnt":[0-9]*' | grep -o '[0-9]*')
-          echo "Nashville clients: $COUNT"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/migrate_clients.py
