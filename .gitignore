@@ -7,6 +7,5 @@ dist/
 
 # Security
 .env.*.local
-.env.production
 *.pem
 *.key
