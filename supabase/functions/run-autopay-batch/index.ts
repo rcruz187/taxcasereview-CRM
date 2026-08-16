@@ -93,7 +93,7 @@ serve(async (req) => {
         `<tr><td style="padding:4px 8px;color:#334155">${r.name}</td><td style="padding:4px 8px;text-align:right">$${Number(r.amount).toFixed(2)}</td><td style="padding:4px 8px;color:${r.ok ? '#16a34a' : '#dc2626'}">${r.ok ? '✅ Charged' : '❌ ' + r.msg}</td></tr>`
       ).join('')
       const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">
-        <div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:8px">Tax Case Review</div>
+        <div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:8px">${firmName}</div>
         <p style="font-size:14px;color:#334155">Today's autopay batch ran automatically: <strong>${succeeded.length} charged</strong>${failed.length ? `, <strong style="color:#dc2626">${failed.length} failed</strong>` : ''}.</p>
         <table style="font-size:13px;border-collapse:collapse;margin-top:10px">${rowsHtml}</table>
         ${failed.length ? `<p style="font-size:12px;color:#64748b;margin-top:14px">Failed charges will be retried automatically tomorrow, or you can charge a client manually from Payments → Autopay.</p>` : ''}

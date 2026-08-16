@@ -1,9 +1,9 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const VOICEMAIL_PROMPT_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/voicemail-prompt'
-const CALL_RECORDED_URL   = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/call-recorded'
-const HOLD_MUSIC_URL      = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/hold-music'
+const VOICEMAIL_PROMPT_URL = `${Deno.env.get('SUPABASE_URL')}/functions/v1/voicemail-prompt`
+const CALL_RECORDED_URL   = `${Deno.env.get('SUPABASE_URL')}/functions/v1/call-recorded`
+const HOLD_MUSIC_URL      = `${Deno.env.get('SUPABASE_URL')}/functions/v1/hold-music`
 
 serve(async (req) => {
   const body = await req.text()
@@ -35,13 +35,13 @@ serve(async (req) => {
 
     if (callSid) {
       const { error: insErr } = await supabase.from('incoming_calls').insert({
-        callsid: callSid, conference_name: conferenceName, from_number: from, department, status: 'ringing', tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a',
+        callsid: callSid, conference_name: conferenceName, from_number: from, department, status: 'ringing', tenant_id: tenantId,
       })
       if (insErr) console.error('incoming_calls insert error:', insErr)
     }
 
     console.log('routing to extension conference:', conferenceName, '| employee:', emp.name)
-    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Conference startConferenceOnEnter="true" endConferenceOnExit="false" waitUrl="${HOLD_MUSIC_URL}" waitMethod="GET" statusCallback="https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/caller-hangup?conf=${conferenceName}" statusCallbackEvent="leave end" statusCallbackMethod="POST" record="record-from-start" recordingStatusCallback="${CALL_RECORDED_URL}">${conferenceName}</Conference></Dial></Response>`
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Conference startConferenceOnEnter="true" endConferenceOnExit="false" waitUrl="${HOLD_MUSIC_URL}" waitMethod="GET" statusCallback="${Deno.env.get('SUPABASE_URL')}/functions/v1/caller-hangup?conf=${conferenceName}" statusCallbackEvent="leave end" statusCallbackMethod="POST" record="record-from-start" recordingStatusCallback="${CALL_RECORDED_URL}">${conferenceName}</Conference></Dial></Response>`
     return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
 
   } catch (err) {

@@ -14,7 +14,7 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
-const APP_ORIGIN = 'https://taxresolutioncrm.github.io/taxcasereview-CRM'
+const APP_ORIGIN = Deno.env.get('APP_ORIGIN') || 'https://taxrescrm.app'
 const REDIRECT_URI = `${APP_ORIGIN}/auth/xero-callback`
 
 serve(async (req) => {

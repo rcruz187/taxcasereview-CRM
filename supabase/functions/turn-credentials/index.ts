@@ -83,12 +83,13 @@ serve(async (req) => {
       }
     }
 
-    // Fall back to TCR's Metered credentials (platform-level key)
+    // Fall back to any tenant's Metered credentials (platform-level key)
     // Used for: unauthenticated participants (screenshare guests), tenants with no Metered key
     const { data: tcrSettings } = await supabase
       .from('settings')
       .select('metered_app_name, metered_api_key')
-      .eq('tenant_id', '61a89aef-0e7e-4ea2-b222-44ab2024655a')
+      .not('metered_app_name', 'is', null)
+      .limit(1)
       .maybeSingle()
 
     if (tcrSettings?.metered_app_name && tcrSettings?.metered_api_key) {
