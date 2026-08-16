@@ -199,6 +199,14 @@ export default function Chat() {
   const isChannel = !active.id.startsWith('dm_')
   const channelId = (!isChannel && active.empId && myEmpId) ? dmPair(myEmpId, active.empId) : active.id
 
+  // ── load channels from DB on mount ──
+  useEffect(() => {
+    supabase.from('chat_channels').select('*').order('position').order('label')
+      .then(({ data }) => {
+        if (data?.length) setDbChannels(data.map(c => ({ id: c.id, label: c.label, desc: c.description || '' })))
+      })
+  }, [])
+
   // ── escape page-content padding ──
   useEffect(() => {
     const el = document.querySelector('.page-content')
