@@ -11,7 +11,7 @@ jobs:
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
     steps:
-      - name: Migrate all Nashville data
+      - name: Migrate clients
         run: |
           TCR="mpxgxfqdbquzkrvvejkh"
           NAS="ydrvncdedgjtcprczwpu"
@@ -27,57 +27,18 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"query\": \"$1\"}"; }
 
-          migrate() {
-            TABLE=$1
-            echo "=== $TABLE ==="
+          echo "Migrating clients in batches of 50..."
+          TOTAL=2109
+          OFFSET=0
+          while [ $OFFSET -lt $TOTAL ]; do
+            SQL=$(tcr "SELECT 'INSERT INTO clients (id,name,first,last,phone,phone2,email,street,city,state,zip,county,ssn,ein,dob,spousename,spousessn,filingstatus,dependents,irsbalance,issuetype,irsorstate,taxyears,status,clientsince,assignedto,notes,custnum,dnd,created_at,source,pipelinestage,business_name,archived,tenant_id,internal_note,\"taxAssociate\",\"salesRep\",tags,occupation,employer,\"contactPerson\",industry,\"leadSource\",\"clientOwes\",\"referredBy\",\"businessType\",autopay_enabled) SELECT id,name,first,last,phone,phone2,email,street,city,state,zip,county,ssn,ein,dob::text,spousename,spousessn,filingstatus,dependents,irsbalance,issuetype,irsorstate,taxyears,status,clientsince,assignedto,notes,custnum,dnd,created_at,source,pipelinestage,business_name,archived,tenant_id,internal_note,\"taxAssociate\",\"salesRep\",tags,occupation,employer,\"contactPerson\",industry,\"leadSource\",\"clientOwes\",\"referredBy\",\"businessType\",autopay_enabled FROM json_populate_recordset(NULL::clients, ''' || json_agg(row_to_json(t))::text || ''') ON CONFLICT (id) DO NOTHING;' as stmt FROM (SELECT id,name,first,last,phone,phone2,email,street,city,state,zip,county,ssn,ein,dob::text as dob,spousename,spousessn,filingstatus,dependents,irsbalance,issuetype,irsorstate,taxyears,status,clientsince,assignedto,notes,custnum,dnd,created_at,source,pipelinestage,business_name,archived,tenant_id,internal_note,\"taxAssociate\",\"salesRep\",tags,occupation,employer,\"contactPerson\",industry,\"leadSource\",\"clientOwes\",\"referredBy\",\"businessType\",autopay_enabled FROM clients WHERE tenant_id='$NASH' ORDER BY id LIMIT 50 OFFSET $OFFSET) t" | grep -o '"stmt":"[^"]*"' | sed 's/"stmt":"//;s/"$//;s/\\\\n/ /g;s/\\n/ /g')
 
-            # Get total count
-            TOTAL=$(tcr "SELECT COUNT(*) as cnt FROM $TABLE WHERE tenant_id='$NASH'" | grep -o '"cnt":[0-9]*' | grep -o '[0-9]*')
-            echo "Total in TCR: $TOTAL"
-
-            if [ -z "$TOTAL" ] || [ "$TOTAL" = "0" ]; then
-              echo "Skipping - no rows"
-              return
+            if [ -n "$SQL" ]; then
+              RESULT=$(nas "$SQL")
+              echo "Offset $OFFSET: $RESULT" | head -c 200
             fi
+            OFFSET=$((OFFSET + 50))
+          done
 
-            # Process in batches of 50 rows
-            OFFSET=0
-            BATCH=50
-            while [ $OFFSET -lt $TOTAL ]; do
-              # Get batch as individual inserts using SQL generation
-              SQL=$(tcr "SELECT 'INSERT INTO $TABLE SELECT * FROM json_populate_recordset(NULL::$TABLE, ''' || json_agg(row_to_json(t))::text || ''') ON CONFLICT DO NOTHING;' as stmt FROM (SELECT * FROM $TABLE WHERE tenant_id='$NASH' ORDER BY created_at LIMIT $BATCH OFFSET $OFFSET) t" | grep -o '"stmt":"[^"]*"' | sed 's/"stmt":"//;s/"$//' | sed 's/\\n/ /g')
-
-              if [ -n "$SQL" ]; then
-                nas "$SQL" > /dev/null
-              fi
-
-              OFFSET=$((OFFSET + BATCH))
-              echo "  Processed $OFFSET/$TOTAL"
-            done
-
-            # Verify
-            COUNT=$(nas "SELECT COUNT(*) as cnt FROM $TABLE WHERE tenant_id='$NASH'" | grep -o '"cnt":[0-9]*' | grep -o '[0-9]*')
-            echo "Nashville $TABLE: $COUNT rows"
-          }
-
-          migrate clients
-          migrate cases
-          migrate payment_transactions
-          migrate payments
-          migrate client_notes
-          migrate lead_notes
-          migrate leads
-          migrate tasks
-          migrate calevents
-          migrate invoices
-          migrate documents
-          migrate esigns
-          migrate workflow_templates
-          migrate workflow_statuses
-          migrate workflow_status_categories
-          migrate deadlines
-          migrate poa_records
-          migrate employees
-
-          echo "=== FINAL COUNTS ==="
-          nas "SELECT (SELECT COUNT(*) FROM clients WHERE tenant_id='$NASH') as clients, (SELECT COUNT(*) FROM cases WHERE tenant_id='$NASH') as cases, (SELECT COUNT(*) FROM payment_transactions WHERE tenant_id='$NASH') as transactions"
+          COUNT=$(nas "SELECT COUNT(*) as cnt FROM clients WHERE tenant_id='$NASH'" | grep -o '"cnt":[0-9]*' | grep -o '[0-9]*')
+          echo "Nashville clients: $COUNT"
