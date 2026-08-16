@@ -10,4 +10,3 @@ dist/
 *.pem
 *.key
 
-.env.production
