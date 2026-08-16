@@ -18,7 +18,6 @@ def q(ref, sql):
     except:
         return {'error': r.stdout[:200]}
 
-# 1. Count all tenant-scoped tables in both TCR and Nashville
 tables = [
     'clients','cases','leads','tasks','calevents','payments','payment_transactions',
     'invoices','esigns','documents','client_notes','lead_notes','case_notes',
@@ -35,31 +34,35 @@ tables = [
     'bookkeeping','estimates','activity_log'
 ]
 
-print("TABLE | TCR | NASHVILLE | MATCH")
-print("-" * 60)
+print("TABLE | TCR | NASHVILLE | STATUS", flush=True)
+print("-" * 65, flush=True)
 
 mismatches = []
-missing_tables = []
+missing = []
 
 for t in tables:
     tcr_r = q(TCR, f"SELECT COUNT(*) as cnt FROM {t} WHERE tenant_id='{NASH}'")
     nas_r = q(NAS, f"SELECT COUNT(*) as cnt FROM {t} WHERE tenant_id='{NASH}'")
     
-    tcr_cnt = tcr_r[0]['cnt'] if isinstance(tcr_r, list) and tcr_r else 'ERR'
-    nas_cnt = nas_r[0]['cnt'] if isinstance(nas_r, list) and nas_r else 'MISSING'
+    if isinstance(tcr_r, list) and tcr_r:
+        tcr_cnt = int(tcr_r[0]['cnt'])
+    else:
+        tcr_cnt = -1
     
-    match = '✅' if str(tcr_cnt) == str(nas_cnt) else '❌'
-    print(f"{t:<40} {str(tcr_cnt):<8} {str(nas_cnt):<12} {match}")
+    if isinstance(nas_r, list) and nas_r:
+        nas_cnt = int(nas_r[0]['cnt'])
+        status = '✅' if tcr_cnt == nas_cnt else ('⚠️ DIFF' if tcr_cnt > 0 else '✅')
+    else:
+        nas_cnt = -1
+        status = '❌ MISSING TABLE'
+        missing.append(t)
     
-    if 'MISSING' in str(nas_cnt):
-        missing_tables.append(t)
-    elif str(tcr_cnt) != str(nas_cnt) and int(str(tcr_cnt)) > 0:
+    if tcr_cnt != nas_cnt and tcr_cnt > 0 and nas_cnt >= 0:
+        status = f'❌ TCR={tcr_cnt} NAS={nas_cnt}'
         mismatches.append((t, tcr_cnt, nas_cnt))
+    
+    print(f"{t:<42} {str(tcr_cnt):<6} {str(nas_cnt):<8} {status}", flush=True)
 
-print("\n=== MISSING TABLES IN NASHVILLE ===")
-for t in missing_tables:
-    print(f"  {t}")
-
-print("\n=== DATA MISMATCHES (TCR has data, Nashville doesn't) ===")
-for t, tcr_cnt, nas_cnt in mismatches:
-    print(f"  {t}: TCR={tcr_cnt} NAS={nas_cnt}")
+print(f"\n=== SUMMARY ===", flush=True)
+print(f"Missing tables: {missing}", flush=True)
+print(f"Data gaps: {[(t,a,b) for t,a,b in mismatches]}", flush=True)

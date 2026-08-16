@@ -13,4 +13,12 @@ jobs:
       - name: Run audit
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: python3 scripts/audit_nashville.py
+        run: python3 scripts/audit_nashville.py 2>&1 | tee /tmp/audit.txt
+
+      - name: Upload audit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nashville-audit-${{ github.run_id }}
+          path: /tmp/audit.txt
+          retention-days: 1
