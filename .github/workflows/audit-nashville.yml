@@ -7,19 +7,17 @@ on:
 jobs:
   audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Run audit and post results
+      - name: Fix Nashville gaps
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          python3 scripts/audit_nashville.py > /tmp/audit.txt 2>&1
-          cat /tmp/audit.txt
-          # Post to issue using GH Actions token
-          BODY=$(cat /tmp/audit.txt | head -100 | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))")
+          python3 scripts/fix_nashville.py 2>&1 | tee /tmp/fix.txt
+          cat /tmp/fix.txt
           curl -s -X POST \
             "https://api.github.com/repos/taxresolutioncrm/taxcasereview-CRM/issues" \
             -H "Authorization: token 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" \
             -H "Content-Type: application/json" \
-            -d "{\"title\":\"audit-result-$GITHUB_RUN_ID\",\"body\":$BODY}"
+            -d "{\"title\":\"fix-result-$GITHUB_RUN_ID\",\"body\":$(cat /tmp/fix.txt | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')}"
