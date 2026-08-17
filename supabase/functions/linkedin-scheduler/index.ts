@@ -362,15 +362,18 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, ...results, error: 'token_expired' }), { headers: { ...cors, 'Content-Type': 'application/json' } })
     }
 
-    // Check autopilot setting
-    const { data: settings } = await supabase.from('linkedin_settings')
-      .select('autopilot').eq('tenant_id', ADMIN_TENANT).single()
-
-    if (!settings?.autopilot) {
-      console.log('[linkedin-scheduler] Autopilot OFF — skipping scheduled publish')
-      results.skipped++
-      return new Response(JSON.stringify({ ok: true, ...results }), { headers: { ...cors, 'Content-Type': 'application/json' } })
-    }
+    // ── APPROVAL MODE vs AUTOPILOT MODE ─────────────────────────────────
+    // autopilot=false (APPROVAL MODE — default):
+    //   Manually approved posts (status='approved') publish automatically on schedule.
+    //   Draft posts NEVER auto-publish. Approval is the gate, not a publish blocker.
+    //   Romy clicks Approve → post is eligible → scheduler fires it at scheduled_at.
+    //
+    // autopilot=true (AUTOPILOT MODE — optional):
+    //   Monday drafts are auto-approved without manual review.
+    //   Approved posts still publish on schedule (same path as above).
+    //
+    // In BOTH modes: approved + scheduled_at <= now = publishes automatically.
+    // autopilot flag NEVER blocks publishing of already-approved posts.
 
     // Find approved posts ready to publish (scheduled_at <= now)
     const { data: duePosts } = await supabase.from('linkedin_posts')
