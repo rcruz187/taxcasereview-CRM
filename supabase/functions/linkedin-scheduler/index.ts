@@ -14,7 +14,7 @@ const cors = {
 
 const TIMEZONE      = 'America/New_York'
 const MAX_RETRIES   = 3
-const ADMIN_EMAIL   = 'romy@taxcasereview.org'
+const ADMIN_EMAIL   = 'romy@taxrescrm.net'
 const ADMIN_TENANT  = 'a0000000-0000-0000-0000-000000000001'
 
 // Publish slots: Tuesday=2, Thursday=4 at 9:00 AM ET
