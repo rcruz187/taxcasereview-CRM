@@ -2072,7 +2072,7 @@ const PRODUCTS = [
   { value:'bocasync',    label:'BocaSync'      },
 ]
 const PRICING_LABELS = { monthly:'Monthly', perpetual:'Perpetual License', undecided:'Undecided' }
-const ACTIVITY_ICONS = { note:'📝', call:'📞', email:'📧', demo:'🖥️', proposal:'📄', stage_change:'🔄', won:'🏆', lost:'❌' }
+const ACTIVITY_ICONS = { note:'📝', call:'📞', email:'📧', demo:'🖥️', proposal:'📄', stage_change:'🔄', won:'🏆', lost:'❌', outreach_linkedin:'💼', outreach_email:'📤', outreach_phone:'📱', follow_up:'🔁', demo_booked:'📅', converted:'⭐' }
 
 function SalesPipeline({ data, supabase }) {
   const [prospects, setProspects]     = useState(data?.sales?.prospects || [])
@@ -2087,6 +2087,7 @@ function SalesPipeline({ data, supabase }) {
   const [saving, setSaving]           = useState(false)
   const [newNote, setNewNote]         = useState('')
   const [addingNote, setAddingNote]   = useState(false)
+  const [activityType, setActivityType] = useState('note')
   const [toast, setToast]             = useState(null)
 
   function showToast(msg, ok=true) { setToast({msg,ok}); setTimeout(()=>setToast(null),3000) }
@@ -2184,7 +2185,7 @@ function SalesPipeline({ data, supabase }) {
     setAddingNote(true)
     await supabase.from('prospect_activities').insert({
       prospect_id: selected.id,
-      activity_type: 'note',
+      activity_type: activityType,
       body: newNote.trim(),
       actor: 'romy@taxrescrm.net',
     })
@@ -2258,6 +2259,25 @@ function SalesPipeline({ data, supabase }) {
           </div>
         ))}
       </div>
+
+      {/* ── Source attribution ── */}
+      {(() => {
+        const sources = {}
+        all.forEach(p => { const s = p.source || 'Unknown'; sources[s] = (sources[s]||0)+1 })
+        const sorted = Object.entries(sources).sort((a,b)=>b[1]-a[1])
+        if (sorted.length === 0) return null
+        return (
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:16 }}>
+            <span style={{ fontSize:10, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', alignSelf:'center' }}>By source:</span>
+            {sorted.map(([src,cnt]) => (
+              <span key={src} onClick={() => setStageFilter('all')} style={{ fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:20,
+                background:'rgba(99,102,241,.1)', border:'1px solid rgba(99,102,241,.2)', color:'#a5b4fc', cursor:'default' }}>
+                {src} ({cnt})
+              </span>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* ── Funnel ── */}
       <div style={{ ...CC2.card({ padding:'20px 24px', marginBottom:18 }) }}>
@@ -2394,6 +2414,7 @@ function SalesPipeline({ data, supabase }) {
                   ['Perpetual',     fmt$(selected.perpetual_price)],
                   ['Seats',         selected.seats || '—'],
                   ['Source',        selected.source || '—'],
+                  ['Campaign',      selected.source_campaign || '—'],
                   ['Demo Date',     fmtDate(selected.demo_date)],
                   ['Proposal Sent', fmtDate(selected.proposal_sent_date)],
                   ['Expected Close',fmtDate(selected.expected_close_date)],
@@ -2453,16 +2474,27 @@ function SalesPipeline({ data, supabase }) {
             <div style={{ padding:'12px 18px', maxHeight:280, overflowY:'auto' }}>
               <div style={{ fontSize:9, fontWeight:700, color:'#334155', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:10 }}>Activity</div>
 
-              {/* Add note */}
-              <div style={{ display:'flex', gap:6, marginBottom:12 }}>
-                <input value={newNote} onChange={e=>setNewNote(e.target.value)}
-                  onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&addNote()}
-                  placeholder="Add a note or activity…"
-                  style={{ ...inp, padding:'6px 10px', fontSize:11 }} />
-                <button onClick={addNote} disabled={addingNote||!newNote.trim()}
-                  style={{ ...S.btn('primary'), fontSize:11, padding:'6px 12px', flexShrink:0 }}>
-                  {addingNote ? '…' : 'Add'}
-                </button>
+              {/* Add note / outreach log */}
+              <div style={{ marginBottom:12 }}>
+                <div style={{ display:'flex', gap:4, marginBottom:6, flexWrap:'wrap' }}>
+                  {[['note','📝 Note'],['outreach_linkedin','💼 LinkedIn'],['outreach_email','📤 Email'],['outreach_phone','📱 Call'],['follow_up','🔁 Follow-up'],['demo_booked','📅 Demo']].map(([type,label])=>(
+                    <button key={type} onClick={()=>setActivityType(type)} style={{
+                      padding:'2px 8px', borderRadius:20, border:'none', cursor:'pointer', fontSize:10, fontWeight:700,
+                      background: activityType===type ? 'rgba(99,102,241,.4)' : 'rgba(255,255,255,.06)',
+                      color: activityType===type ? '#a5b4fc' : '#64748b',
+                    }}>{label}</button>
+                  ))}
+                </div>
+                <div style={{ display:'flex', gap:6 }}>
+                  <input value={newNote} onChange={e=>setNewNote(e.target.value)}
+                    onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&addNote()}
+                    placeholder={activityType==='outreach_linkedin'?'LinkedIn outreach — what you sent…':activityType==='outreach_email'?'Email outreach — subject/summary…':activityType==='outreach_phone'?'Call notes…':activityType==='follow_up'?'Follow-up notes…':activityType==='demo_booked'?'Demo booked — date/time…':'Add a note…'}
+                    style={{ ...inp, padding:'6px 10px', fontSize:11 }} />
+                  <button onClick={addNote} disabled={addingNote||!newNote.trim()}
+                    style={{ ...S.btn('primary'), fontSize:11, padding:'6px 12px', flexShrink:0 }}>
+                    {addingNote ? '…' : 'Add'}
+                  </button>
+                </div>
               </div>
 
               {actLoading ? (

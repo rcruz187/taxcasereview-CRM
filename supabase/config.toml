@@ -137,3 +137,6 @@ verify_jwt = false
 
 [functions.platform-metrics]
 verify_jwt = false
+
+[functions.demo-followup]
+verify_jwt = false
