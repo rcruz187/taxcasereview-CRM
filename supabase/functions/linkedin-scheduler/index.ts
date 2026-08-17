@@ -251,96 +251,58 @@ function makeUtmCampaign(category: string, topic: string, now: Date): string {
 function buildPostBody(category: string, topic: string, _tenantName: string, now: Date): string {
   const destUrl = DESTINATION_URLS[category] || 'https://taxrescrm.net'
   const campaign = makeUtmCampaign(category, topic, now)
-  const utmUrl = `${destUrl}?utm_source=linkedin&utm_medium=social&utm_campaign=${campaign}`
+  const utmUrl = destUrl + '?utm_source=linkedin&utm_medium=social&utm_campaign=' + campaign
+  const nl = "\n"
 
-  // Note: [DRAFT — complete before approving] marker tells Romy this needs editing
-  // The scheduler generates structure; Romy adds the specific practitioner insight
   const templates: Record<string, (t: string) => string> = {
-    educational: (t) => [
-      `[DRAFT — add specific practitioner detail before approving]`,
-      ``,
-      `Most firms handle ${t.split(' ')[0].toLowerCase()} issues without pulling the relevant IRS transcript first.`,
-      ``,
-      `Here is what the process actually requires:`,
-      ``,
-      `[Add 3–5 specific steps, form numbers, or IRS criteria relevant to: ${t}]`,
-      ``,
-      `What does your firm do when this comes up?`,
-      ``,
-      `More at: ${utmUrl}`,
-    ].join('
-'),
+    educational: (t) =>
+      '[DRAFT -- add specific practitioner detail before approving]' + nl + nl +
+      'Most firms handle this type of issue without pulling the relevant IRS transcript first.' + nl + nl +
+      'Topic: ' + t + nl + nl +
+      '[Add 3-5 specific steps, form numbers, or IRS criteria for this topic]' + nl + nl +
+      'What does your firm do when this comes up?' + nl + nl +
+      'More at: ' + utmUrl,
 
-    practitioner: (t) => [
-      `[DRAFT — add specific workflow detail before approving]`,
-      ``,
-      `Here is a workflow problem most resolution firms have.`,
-      ``,
-      `[Describe the manual/inefficient current state related to: ${t}]`,
-      ``,
-      `[Describe how the workflow improves — either generally or with Tax Res CRM]`,
-      ``,
-      `If your firm is still handling this manually, happy to show you a different approach.`,
-      ``,
-      `${utmUrl}`,
-    ].join('
-'),
+    practitioner: (t) =>
+      '[DRAFT -- add specific workflow detail before approving]' + nl + nl +
+      'Here is a workflow problem most resolution firms have.' + nl + nl +
+      'Topic: ' + t + nl + nl +
+      '[Describe the current manual state and what improves with better tooling]' + nl + nl +
+      'If your firm is still handling this manually, happy to show you a different approach.' + nl + nl +
+      utmUrl,
 
-    product: (t) => [
-      `[DRAFT — describe specific production capability before approving]`,
-      ``,
-      `[Describe the before state — what the workflow looks like without this feature]`,
-      ``,
-      `[Describe what Tax Res CRM does specifically related to: ${t}]`,
-      ``,
-      `[Describe the after state — what changes for the practitioner]`,
-      ``,
-      `If you want to see it: ${utmUrl}`,
-    ].join('
-'),
+    product: (t) =>
+      '[DRAFT -- describe a specific live production capability before approving]' + nl + nl +
+      '[Describe the before state without this feature]' + nl + nl +
+      'Topic: ' + t + nl + nl +
+      '[Describe the after state with Tax Res CRM -- specific and verifiable today]' + nl + nl +
+      'If you want to see it: ' + utmUrl,
 
-    founder_story: (t) => [
-      `[DRAFT — write in Romy's voice before approving]`,
-      ``,
-      `[Open with a specific observation from running Tax Case Review]`,
-      ``,
-      `Topic: ${t}`,
-      ``,
-      `[Share what you learned, decided, or built — specific details only]`,
-      ``,
-      `${utmUrl}`,
-    ].join('
-'),
+    founder_story: (t) =>
+      '[DRAFT -- write in Romy voice before approving]' + nl + nl +
+      '[Open with a specific observation from running Tax Case Review]' + nl + nl +
+      'Topic: ' + t + nl + nl +
+      '[Share what you learned or decided -- specific details only]' + nl + nl +
+      utmUrl,
 
-    resource: (t) => [
-      `[DRAFT — verify resource URL exists before approving]`,
-      ``,
-      `[Open with the problem this resource solves]`,
-      ``,
-      `The guide covers: ${t}`,
-      ``,
-      `[Add 2–3 specific things the reader will find]`,
-      ``,
-      `Link: ${utmUrl}`,
-    ].join('
-'),
+    resource: (t) =>
+      '[DRAFT -- verify resource URL exists at taxrescrm.net before approving]' + nl + nl +
+      '[Open with the problem this resource solves for resolution practitioners]' + nl + nl +
+      'Topic: ' + t + nl + nl +
+      '[Add 2-3 specific things the reader will find in the guide]' + nl + nl +
+      'Link: ' + utmUrl,
 
-    demo_invite: (t) => [
-      `[DRAFT — must describe a specific live production capability before approving]`,
-      ``,
-      `[Open with a specific resolution workflow problem]`,
-      ``,
-      `[Show what changes with Tax Res CRM — specific, verifiable, in production today]`,
-      ``,
-      `${t}`,
-      ``,
-      `Book a 30-minute walkthrough: ${utmUrl}`,
-    ].join('
-'),
+    demo_invite: (t) =>
+      '[DRAFT -- must describe a live production capability before approving]' + nl + nl +
+      '[Open with a specific resolution workflow problem]' + nl + nl +
+      t + nl + nl +
+      '[Describe what changes with Tax Res CRM -- production-ready only]' + nl + nl +
+      'Book a 30-minute walkthrough: ' + utmUrl,
   }
 
   return (templates[category] || templates['educational'])(topic)
 }
+
 
 async function generateMondayDrafts(supabase: ReturnType<typeof createClient>, tenantId: string, now: Date) {
   const slots = getNextSlots(now, 2) // Next Tue + Thu
@@ -524,7 +486,7 @@ Deno.serve(async (req) => {
         if (drafts.length > 0) {
           const draftList = drafts.map(d =>
             `• ${d.slot.label}: "${d.post.title || d.post.body.slice(0,80)}..." [${d.post.category}]`
-          ).join('\n')
+          ).join("\n")
 
           await sendAdminAlert(supabase,
             `✅ LinkedIn: ${drafts.length} drafts ready for approval`,
