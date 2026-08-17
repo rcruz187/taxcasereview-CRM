@@ -56,7 +56,9 @@ function getNextSlots(from: Date, count = 8) {
   return slots.slice(0, count)
 }
 
-// Content strategy: 30% edu, 25% practitioner, 20% product, 10% founder, 10% resource, 5% demo
+// ── CONTENT STRATEGY ─────────────────────────────────────────────────────
+// Governed by docs/LINKEDIN_CONTENT_STRATEGY.md
+// 30% edu | 25% practitioner | 20% product | 10% founder | 10% resource | 5% demo
 const CONTENT_STRATEGY = [
   { category: 'educational',    label: 'Tax Resolution Education',    weight: 30 },
   { category: 'practitioner',   label: 'Practitioner / Workflow',     weight: 25 },
@@ -66,14 +68,132 @@ const CONTENT_STRATEGY = [
   { category: 'demo_invite',    label: 'Demo / Sales CTA',            weight:  5 },
 ]
 
-// Topic pool — ensures 30-day non-repeat
+// Hard rotation rules (from content strategy doc):
+// - No two demo_invite posts in same week
+// - No two product posts in same week
+// - founder_story: max 1x per 3 weeks (21-day cooldown enforced in pickCategory)
+
+// Topic pool — 30-day dedup enforced in getRecentTopics
+// All topics are specific IRS processes, forms, or resolution-firm workflows.
+// Generic tax topics ("IRS debt", "tax problems") are excluded by design.
 const TOPIC_POOL: Record<string, string[]> = {
-  educational:   ['CP2000 response process','IRS transcript types explained','Collection Due Process rights','Penalty abatement qualification','Trust Fund Recovery Penalty basics','Innocent Spouse relief overview','Offer in Compromise qualification math','CSED calculation and extension traps','IRS levy release requirements','Currently Not Collectible status'],
-  practitioner:  ['A2A transcript pull workflow','Case file documentation best practices','IRS Power of Attorney (2848) tips','Client communication during IRS enforcement','Installment agreement monitoring','Tax lien subordination requests','Streamlined installment vs PPIA','Managing 433-A vs 433-B differences','Client onboarding checklist for resolution','Tracking CSED across multiple tax years'],
-  product:       ['IRS transcript pull in Tax Res CRM','Client portal e-signature walkthrough','Case pipeline overview','Automated follow-up reminders','Document management built-in','Multi-office management','Per-seat pricing for growing firms','Demo booking integration','Task automation for resolution workflows','Role-based access control'],
-  founder_story: ['Why I built Tax Res CRM','Moving from Canopy to a custom solution','Building for tax resolution specifically','First firm to use Tax Res CRM','Lessons from running a resolution practice','What Canopy gets wrong for resolution firms','The IRS transcript problem that started everything','Building SaaS while running a practice'],
-  resource:      ['OIC qualification guide','CDP hearing checklist','IRS enforcement timeline reference','Penalty abatement letter templates','Trust Fund interview prep guide','Collection alternatives comparison','IRS notice response deadlines','Resolution case types reference'],
-  demo_invite:   ['Book a demo of Tax Res CRM','See A2A transcript pull live','30-minute walkthrough available','Tax Res CRM for your firm'],
+  educational: [
+    'CP2000 response process and transcript comparison',
+    'IRS transcript types — Account, Wage & Income, Record of Account, Tax Return',
+    'Collection Due Process hearing rights under IRC 6320/6330',
+    'First-time penalty abatement qualification criteria',
+    'Trust Fund Recovery Penalty — who is responsible and how to dispute',
+    'Innocent Spouse relief — Form 8857 qualification',
+    'Offer in Compromise RCP calculation — Quick Sale Value vs FMV',
+    'CSED calculation and what tolls the 10-year statute',
+    'IRS levy release — Form 668-D and hardship criteria',
+    'Currently Not Collectible status — 53 designation and review cycles',
+    'Partial Pay Installment Agreement vs full-pay IA',
+    'IRS notice sequence — from CP14 to levy',
+    'CDP vs Equivalent Hearing — when each applies',
+    'IRS lien withdrawal vs discharge vs subordination',
+    'Streamlined Processing vs standard OIC review',
+    'Tax lien impact on credit and real estate transactions',
+    'IRS ACS vs Revenue Officer — different collection paths',
+    'CP501/CP503/CP504 — what each means and response deadlines',
+    'IRC 6672 Trust Fund assessment — timeline and appeal rights',
+    'Offer in Compromise Doubt as to Liability vs Collectibility',
+  ],
+  practitioner: [
+    'IRS transcript pull workflow — what to pull before every case review',
+    'Case file documentation for representation — what the IRS expects',
+    'Form 2848 Power of Attorney — authorization scope and CAF processing times',
+    'Client communication during active IRS enforcement',
+    'Monitoring installment agreements — default triggers and cure procedures',
+    'Tax lien subordination request process — Form 14134',
+    'Streamlined IA vs PPIA — when each applies and how to calculate',
+    'Managing 433-A vs 433-B — individual vs business collection information',
+    'Client onboarding checklist for new resolution cases',
+    'Tracking CSED across multiple tax years in active cases',
+    'Handling unresponsive clients during IRS deadlines',
+    'Revenue Officer contact protocol — what to say and what not to say',
+    'When to file for CDP hearing vs accept proposed collection action',
+    'Building a resolution practice billing model — hourly vs flat fee',
+    'Managing a 40+ case resolution caseload without missing deadlines',
+    'Prioritizing cases by enforcement risk — levy vs lien',
+    'Document retention for closed resolution cases',
+    'Setting client expectations on OIC timelines',
+  ],
+  product: [
+    'IRS transcript import in Tax Res CRM — current workflow',
+    'Client portal e-signature for resolution engagement letters',
+    'Resolution case pipeline — stages mapped to actual IRS process',
+    'Automated follow-up reminders keyed to IRS response deadlines',
+    'Document management for resolution case files',
+    'Role-based access — keeping client data isolated by rep',
+    'Booking integration — clients self-schedule without the back-and-forth',
+    'Task automation when a case moves to a new resolution stage',
+    'Multi-tenant architecture for firms with multiple locations',
+    'Built-in IRS form pre-fill — 2848 and 8821',
+  ],
+  founder_story: [
+    'Why I built Tax Res CRM instead of customizing what already existed',
+    'What running a resolution practice taught me about CRM design',
+    'The IRS transcript pull problem that started this whole project',
+    'Why generic CRMs require so much adaptation for resolution work',
+    'What I learned building Tax Res CRM while running an active caseload',
+    'The difference between software built for resolution vs adapted for it',
+    'What Tax Case Review looks like as the first office on Tax Res CRM',
+    'Why I chose to build on Supabase and what that means for data ownership',
+  ],
+  resource: [
+    'OIC qualification guide — step-by-step RCP calculation',
+    'CDP hearing checklist — what to prepare before the hearing',
+    'IRS enforcement timeline — notice to levy reference guide',
+    'Penalty abatement request — first-time and reasonable cause criteria',
+    'Trust Fund interview preparation guide for 4180 interviews',
+    'Collection alternatives comparison — IA vs PPIA vs CNC vs OIC',
+    'IRS notice response deadlines reference — CP series',
+    'Resolution case types reference — which path for which situation',
+  ],
+  demo_invite: [
+    'See IRS transcript import in Tax Res CRM — 30-minute walkthrough',
+    'Tax Res CRM for resolution firms — book a demo',
+    'See the resolution case pipeline live — book a walkthrough',
+    'Built for resolution work — see what that means in practice',
+  ],
+}
+
+// Compliance safeguards — applied in buildPostBody
+// Any post body violating these will be flagged in logs
+const CLAIM_SAFEGUARDS = {
+  prohibited_phrases: [
+    'guaranteed', 'eliminate your tax debt', 'settle for pennies',
+    'IRS approved', 'IRS certified', 'always works', 'never fails',
+    'saves 20 minutes', // only use with verified data
+    'fully automated transcript', // A2A is watched-folder import currently
+  ],
+  require_qualification: [
+    'acceptance rate', 'rejection rate', 'approval rate',
+    'most firms', 'most practitioners', 'typically results in',
+  ],
+  // A2A transcript status — must not claim full automation
+  a2a_accurate_description: 'Tax Res CRM supports transcript import via watched folder. Full A2A automated retrieval is on the product roadmap.',
+}
+
+// UTM naming: li_[category_short]_[topic_slug]_[mmdd]
+const CATEGORY_SHORT: Record<string, string> = {
+  educational:   'edu',
+  practitioner:  'workflow',
+  product:       'product',
+  founder_story: 'founder',
+  resource:      'resource',
+  demo_invite:   'demo',
+}
+
+// Destination URLs per category
+const DESTINATION_URLS: Record<string, string> = {
+  educational:   'https://taxrescrm.net/resources',
+  practitioner:  'https://taxrescrm.net/demo',
+  product:       'https://taxrescrm.net/demo',
+  founder_story: 'https://taxrescrm.net',
+  resource:      'https://taxrescrm.net/resources',
+  demo_invite:   'https://taxrescrm.net/demo',
 }
 
 async function getRecentTopics(supabase: ReturnType<typeof createClient>, tenantId: string, days = 30) {
@@ -94,13 +214,24 @@ function pickTopic(category: string, recentBodies: string[]): string {
   return available[Math.floor(Math.random() * available.length)]
 }
 
-function pickCategory(recentCategories: string[]): string {
-  // Weighted random, biased away from recently-used categories
-  const weights = CONTENT_STRATEGY.map(s => ({
-    ...s,
-    adjusted: recentCategories.slice(-4).includes(s.category) ? Math.max(1, s.weight - 15) : s.weight
-  }))
+function pickCategory(recentCategories: string[], recentBodies: string[]): string {
+  // Weighted random with hard rotation rules from LINKEDIN_CONTENT_STRATEGY.md
+  const last7 = recentCategories.slice(-7)
+  const last4 = recentCategories.slice(-4)
+  const last21days_founder = recentCategories.slice(-6).includes('founder_story')
+
+  const weights = CONTENT_STRATEGY.map(s => {
+    let adj = s.weight
+    // Recency penalty
+    if (last4.includes(s.category)) adj = Math.max(1, adj - 15)
+    // Hard rules
+    if (s.category === 'demo_invite' && last7.filter(c => c === 'demo_invite').length >= 1) adj = 0
+    if (s.category === 'product' && last7.filter(c => c === 'product').length >= 1) adj = 0
+    if (s.category === 'founder_story' && last21days_founder) adj = 0
+    return { ...s, adjusted: adj }
+  })
   const total = weights.reduce((s, w) => s + w.adjusted, 0)
+  if (total === 0) return 'educational' // fallback if all suppressed
   let rand = Math.random() * total
   for (const w of weights) {
     rand -= w.adjusted
@@ -109,22 +240,103 @@ function pickCategory(recentCategories: string[]): string {
   return 'educational'
 }
 
-function buildPostBody(category: string, topic: string, tenantName: string): string {
-  const crmUrl = 'https://taxrescrm.net'
-  const utmBase = `utm_source=linkedin&utm_medium=social`
+function makeUtmCampaign(category: string, topic: string, now: Date): string {
+  const short = CATEGORY_SHORT[category] || 'content'
+  const slug = topic.split(' ').slice(0,3).join('_').toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,20)
+  const month = now.toLocaleString('en-US',{month:'short',timeZone:'America/New_York'}).toLowerCase()
+  const day = now.toLocaleString('en-US',{day:'numeric',timeZone:'America/New_York'})
+  return `li_${short}_${slug}_${month}${day}`
+}
 
+function buildPostBody(category: string, topic: string, _tenantName: string, now: Date): string {
+  const destUrl = DESTINATION_URLS[category] || 'https://taxrescrm.net'
+  const campaign = makeUtmCampaign(category, topic, now)
+  const utmUrl = `${destUrl}?utm_source=linkedin&utm_medium=social&utm_campaign=${campaign}`
+
+  // Note: [DRAFT — complete before approving] marker tells Romy this needs editing
+  // The scheduler generates structure; Romy adds the specific practitioner insight
   const templates: Record<string, (t: string) => string> = {
-    educational: (t) => `Most tax professionals handle ${t} wrong.\n\nHere's what the IRS actually expects — and where firms leave money on the table.\n\n[This post will be completed with specific educational content about: ${t}]\n\nWhat's your firm's process for this? Drop a comment below.\n\n📚 More at: ${crmUrl}/resources?${utmBase}&utm_campaign=li_edu_${t.split(' ')[0].toLowerCase()}_${Date.now().toString(36)}`,
+    educational: (t) => [
+      `[DRAFT — add specific practitioner detail before approving]`,
+      ``,
+      `Most firms handle ${t.split(' ')[0].toLowerCase()} issues without pulling the relevant IRS transcript first.`,
+      ``,
+      `Here is what the process actually requires:`,
+      ``,
+      `[Add 3–5 specific steps, form numbers, or IRS criteria relevant to: ${t}]`,
+      ``,
+      `What does your firm do when this comes up?`,
+      ``,
+      `More at: ${utmUrl}`,
+    ].join('
+'),
 
-    practitioner: (t) => `Here's a workflow problem every tax resolution firm has:\n\n${t}\n\n[This post will be completed with specific workflow content about: ${t}]\n\nIf your firm is still doing this manually, I'd love to show you a better way.\n\nDM me or book a walkthrough: ${crmUrl}/demo?${utmBase}&utm_campaign=li_workflow_${t.split(' ')[0].toLowerCase()}_${Date.now().toString(36)}`,
+    practitioner: (t) => [
+      `[DRAFT — add specific workflow detail before approving]`,
+      ``,
+      `Here is a workflow problem most resolution firms have.`,
+      ``,
+      `[Describe the manual/inefficient current state related to: ${t}]`,
+      ``,
+      `[Describe how the workflow improves — either generally or with Tax Res CRM]`,
+      ``,
+      `If your firm is still handling this manually, happy to show you a different approach.`,
+      ``,
+      `${utmUrl}`,
+    ].join('
+'),
 
-    product: (t) => `We built ${t} directly into Tax Res CRM.\n\n[This post will be completed with specific product content about: ${t}]\n\nIf you want to see it in action: ${crmUrl}/demo?${utmBase}&utm_campaign=li_product_${t.split(' ')[0].toLowerCase()}_${Date.now().toString(36)}`,
+    product: (t) => [
+      `[DRAFT — describe specific production capability before approving]`,
+      ``,
+      `[Describe the before state — what the workflow looks like without this feature]`,
+      ``,
+      `[Describe what Tax Res CRM does specifically related to: ${t}]`,
+      ``,
+      `[Describe the after state — what changes for the practitioner]`,
+      ``,
+      `If you want to see it: ${utmUrl}`,
+    ].join('
+'),
 
-    founder_story: (t) => `${t}.\n\n[This post will be completed with founder story content about: ${t}]\n\nFollowing along: ${crmUrl}?${utmBase}&utm_campaign=li_founder_${t.split(' ')[0].toLowerCase()}_${Date.now().toString(36)}`,
+    founder_story: (t) => [
+      `[DRAFT — write in Romy's voice before approving]`,
+      ``,
+      `[Open with a specific observation from running Tax Case Review]`,
+      ``,
+      `Topic: ${t}`,
+      ``,
+      `[Share what you learned, decided, or built — specific details only]`,
+      ``,
+      `${utmUrl}`,
+    ].join('
+'),
 
-    resource: (t) => `We put together a complete ${t} for tax professionals.\n\n[This post will be completed with resource content about: ${t}]\n\nLink in comments: ${crmUrl}/resources?${utmBase}&utm_campaign=li_resource_${t.split(' ')[0].toLowerCase()}_${Date.now().toString(36)}`,
+    resource: (t) => [
+      `[DRAFT — verify resource URL exists before approving]`,
+      ``,
+      `[Open with the problem this resource solves]`,
+      ``,
+      `The guide covers: ${t}`,
+      ``,
+      `[Add 2–3 specific things the reader will find]`,
+      ``,
+      `Link: ${utmUrl}`,
+    ].join('
+'),
 
-    demo_invite: (t) => `${t}.\n\n[This post will be completed with demo invite content.]\n\nBook your 30-minute walkthrough: ${crmUrl}/demo?${utmBase}&utm_campaign=li_demo_${Date.now().toString(36)}`,
+    demo_invite: (t) => [
+      `[DRAFT — must describe a specific live production capability before approving]`,
+      ``,
+      `[Open with a specific resolution workflow problem]`,
+      ``,
+      `[Show what changes with Tax Res CRM — specific, verifiable, in production today]`,
+      ``,
+      `${t}`,
+      ``,
+      `Book a 30-minute walkthrough: ${utmUrl}`,
+    ].join('
+'),
   }
 
   return (templates[category] || templates['educational'])(topic)
@@ -138,10 +350,10 @@ async function generateMondayDrafts(supabase: ReturnType<typeof createClient>, t
 
   const drafts = []
   for (const slot of slots) {
-    const category = pickCategory(recentCategories)
+    const category = pickCategory(recentCategories, recentBodies)
     const topic    = pickTopic(category, recentBodies)
-    const body     = buildPostBody(category, topic, 'Tax Res CRM')
-    const title    = `${CONTENT_STRATEGY.find(s => s.category === category)?.label} — ${topic}`
+    const body     = buildPostBody(category, topic, 'Tax Res CRM', now)
+    const title    = `[DRAFT] ${CONTENT_STRATEGY.find(s => s.category === category)?.label} — ${topic}`
 
     const { data, error } = await supabase.from('linkedin_posts').insert({
       tenant_id:    tenantId,
