@@ -79,6 +79,7 @@ export default function Chat() {
   })
   const [messages, setMessages]   = useState([])
   const [input, setInput]         = useState('')
+  const [mentionQuery, setMentionQuery] = useState(null) // null = hidden, string = query text
   const [sending, setSending]     = useState(false)
   const [loading, setLoading]     = useState(false)
   const [onlineUsers, setOnlineUsers] = useState(new Set()) // names of currently online employees
@@ -1250,7 +1251,37 @@ export default function Chat() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
             </button>
             <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={sendFile}/>
-            <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKey}
+            {mentionQuery !== null && (
+              <div style={{ position: 'absolute', bottom: 60, left: 16, background: 'var(--s2)', border: '1px solid var(--b2)', borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,.3)', zIndex: 100, minWidth: 220, maxHeight: 240, overflowY: 'auto', padding: '4px 0' }}>
+                <div style={{ padding: '6px 14px 4px', fontSize: 11, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: 1 }}>Mention someone</div>
+                {TEAM.filter(t => t.name.toLowerCase().includes(mentionQuery.toLowerCase())).slice(0, 8).map(t => (
+                  <div key={t.empId} onClick={() => {
+                    // Replace the @query with @Name
+                    setInput(prev => prev.replace(/@\w*$/, '@' + t.name + ' '))
+                    setMentionQuery(null)
+                    inputRef.current?.focus()
+                  }} style={{ padding: '8px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontSize: 14 }}
+                  onMouseEnter={e => e.currentTarget.style.background='var(--s3)'}
+                  onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: colorFor(t.name), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: '#fff', fontWeight: 600, flexShrink: 0 }}>
+                      {t.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}
+                    </div>
+                    <span style={{ color: 'var(--tx)' }}>{t.name}</span>
+                    {t.role && <span style={{ color: 'var(--t3)', fontSize: 12 }}>{t.role}</span>}
+                  </div>
+                ))}
+                {TEAM.filter(t => t.name.toLowerCase().includes(mentionQuery.toLowerCase())).length === 0 && (
+                  <div style={{ padding: '8px 14px', color: 'var(--t3)', fontSize: 13 }}>No match for "@{mentionQuery}"</div>
+                )}
+              </div>
+            )}
+            <textarea ref={inputRef} value={input} onChange={e => {
+                  const val = e.target.value
+                  setInput(val)
+                  // Detect @ mention: find @ followed by word chars at end of text
+                  const match = val.match(/@(\w*)$/)
+                  setMentionQuery(match ? match[1] : null)
+                }} onKeyDown={handleKey}
               placeholder={`Message ${isChannel ? '#'+active.label : active.name}…`}
               rows={1}
               style={{ flex: 1, resize: 'none', border: 'none', outline: 'none', background: 'transparent', color: 'var(--tx)', fontSize: 14, lineHeight: 1.5, padding: '12px 8px', fontFamily: 'inherit', minHeight: 44, maxHeight: 160 }}/>
