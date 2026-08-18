@@ -4,7 +4,7 @@ import { PIPELINE_STAGES, DEFAULT_PIPELINE_STAGE, pipelineStageLabel, CASE_SERVI
 import { NOTE_TEMPLATES } from '../lib/noteTemplates'
 import { logActivity, getActor } from '../lib/activityLog'
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import IRSFormFiller from '../components/IRSFormFiller'
 import ErrorBoundary from '../components/ErrorBoundary'
@@ -1234,30 +1234,32 @@ export default function Clients() {
       } catch(e) {}
     }
   }
-  const _clientSearchLower = clientSearch.toLowerCase()
-  const repOptions = ['All', ...Array.from(new Set(clients.map(c => c.assignedTo).filter(Boolean))).sort()]
-  const pipelineOptions = ['All', ...Array.from(new Set(clients.map(c => c.pipelineStage).filter(Boolean))).sort()]
-  const filtered = clients
-    .filter(c => showArchived ? !!c.archived : !c.archived)
-    .filter(c => filter==='All' || c.clientType===filter)
-    .filter(c => filterStatus==='All' || (c.status||'Active')===filterStatus)
-    .filter(c => filterRep==='All' || (c.assignedTo||'')===filterRep)
-    .filter(c => filterPipeline==='All' || (c.pipelineStage||'')===filterPipeline)
-    .filter(c => !_clientSearchLower || (
-      (c.name||'').toLowerCase().includes(_clientSearchLower) ||
-      (c.email||'').toLowerCase().includes(_clientSearchLower) ||
-      (c.phone||'').replace(/\D/g,'').includes(_clientSearchLower.replace(/\D/g,'')) ||
-      (c.assignedTo||'').toLowerCase().includes(_clientSearchLower) ||
-      (c.taxAssociate||'').toLowerCase().includes(_clientSearchLower) ||
-      (c.city||'').toLowerCase().includes(_clientSearchLower) ||
-      (c.business_name||'').toLowerCase().includes(_clientSearchLower) ||
-      (c.spouseName||'').toLowerCase().includes(_clientSearchLower) ||
-      (c.tags||'').toLowerCase().includes(_clientSearchLower) ||
-      (c.ssn||'').replace(/-/g,'').includes(_clientSearchLower.replace(/-/g,''))
-    ))
+  const repOptions = useMemo(() => ['All', ...Array.from(new Set(clients.map(c => c.assignedTo).filter(Boolean))).sort()], [clients])
+  const pipelineOptions = useMemo(() => ['All', ...Array.from(new Set(clients.map(c => c.pipelineStage).filter(Boolean))).sort()], [clients])
+  const filtered = useMemo(() => {
+    const q = clientSearch.toLowerCase().trim()
+    return clients
+      .filter(c => showArchived ? !!c.archived : !c.archived)
+      .filter(c => filter==='All' || c.clientType===filter)
+      .filter(c => filterStatus==='All' || (c.status||'Active')===filterStatus)
+      .filter(c => filterRep==='All' || (c.assignedTo||'')===filterRep)
+      .filter(c => filterPipeline==='All' || (c.pipelineStage||'')===filterPipeline)
+      .filter(c => !q || (
+        (c.name||'').toLowerCase().includes(q) ||
+        (c.email||'').toLowerCase().includes(q) ||
+        (c.phone||'').replace(/\D/g,'').includes(q.replace(/\D/g,'')) ||
+        (c.assignedTo||'').toLowerCase().includes(q) ||
+        (c.taxAssociate||'').toLowerCase().includes(q) ||
+        (c.city||'').toLowerCase().includes(q) ||
+        (c.business_name||'').toLowerCase().includes(q) ||
+        (c.spouseName||'').toLowerCase().includes(q) ||
+        (c.tags||'').toLowerCase().includes(q) ||
+        (c.ssn||'').replace(/-/g,'').includes(q.replace(/-/g,''))
+      ))
+  }, [clients, clientSearch, showArchived, filter, filterStatus, filterRep, filterPipeline])
 
   // Sort
-  const sortedFiltered = [...filtered].sort((a, b) => {
+  const sortedFiltered = useMemo(() => [...filtered].sort((a, b) => {
     let av, bv
     if (sortCol === 'name')         { av = a.name||''; bv = b.name||'' }
     else if (sortCol === 'type')    { av = a.clientType||''; bv = b.clientType||'' }
@@ -1269,7 +1271,7 @@ export default function Clients() {
     else                            { av = a.name||''; bv = b.name||'' }
     if (typeof av === 'number') return sortDir === 'asc' ? av - bv : bv - av
     return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
-  })
+  }), [filtered, sortCol, sortDir])
 
   function buildPayload(f) {
     const {
@@ -3333,7 +3335,7 @@ export default function Clients() {
               placeholder="Search clients…"
               value={clientSearch}
               onChange={e=>setClientSearch(e.target.value)}
-              style={{padding:'5px 10px',borderRadius:6,border:'1px solid var(--br)',background:'var(--bg2)',color:'var(--tx)',fontSize:13,width:200,outline:'none'}}
+              style={{padding:'5px 10px',borderRadius:6,border:'1px solid var(--br)',background:'var(--s2)',color:'var(--tx)',fontSize:13,width:200,outline:'none'}}
             />
             {['All','Individual','Business'].map(f=>(
               <span key={f} className={`chip${filter===f?' on':''}`} onClick={()=>setFilter(f)}>{f}</span>
