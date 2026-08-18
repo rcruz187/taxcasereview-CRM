@@ -928,6 +928,8 @@ export default function Clients() {
   const [filterRep,      setFilterRep]      = useState('All')
   const [filterPipeline, setFilterPipeline] = useState('All')
   const [clientSearch, setClientSearch] = useState('')
+  // Sync TopBar search into local clientSearch so both inputs work
+  useEffect(() => { setClientSearch(searchQ) }, [searchQ])
   const [sortCol, setSortCol] = useState('name')
   const [sortDir, setSortDir] = useState('asc')
 
