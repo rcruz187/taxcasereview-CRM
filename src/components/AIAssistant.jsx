@@ -98,7 +98,12 @@ export default function AIAssistant({ adminMode = false }) {
       )
 
       const data = await res.json()
-      setMessages(prev => [...prev, { role: 'assistant', content: data.reply || 'Sorry, something went wrong.' }])
+      if (!res.ok || data.error) {
+        const errMsg = data.error || 'AI service temporarily unavailable. Please try again in a moment.'
+        setMessages(prev => [...prev, { role: 'assistant', content: errMsg }])
+      } else {
+        setMessages(prev => [...prev, { role: 'assistant', content: data.reply || 'Sorry, something went wrong.' }])
+      }
     } catch (err) {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Connection error. Please try again.' }])
     } finally {

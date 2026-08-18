@@ -56,6 +56,7 @@ export function useWebRTCRoom(channelPrefix) {
   const [cameraOn, setCameraOn] = useState(true)
   const [joined, setJoined] = useState(false)
   const [error, setError] = useState('')
+  const [localStream, setLocalStream] = useState(null)
 
   const localStreamRef = useRef(null)
   const peerConnsRef = useRef({})
@@ -267,6 +268,7 @@ export function useWebRTCRoom(channelPrefix) {
       }
     }
     localStreamRef.current = stream
+    setLocalStream(stream)
     await iceServersPromise // guarantee real ICE servers are set before anyone can offer to us
 
     await ch.track({ name: myName }) // this IS the announcement now -- triggers presence 'join' for everyone already in the room, who then offer to us
@@ -290,7 +292,7 @@ export function useWebRTCRoom(channelPrefix) {
       localStreamRef.current.getTracks().forEach(t => t.stop())
       localStreamRef.current = null
     }
-    setMembers([]); setRemoteStreams({}); setJoined(false)
+    setMembers([]); setRemoteStreams({}); setLocalStream(null); setJoined(false)
   }, [])
 
   function toggleMic() {
@@ -304,7 +306,7 @@ export function useWebRTCRoom(channelPrefix) {
 
   return {
     members, remoteStreams, micOn, cameraOn, joined, error,
-    localStreamRef, peerConnsRef, channelRef, screenTrackRef, join, leave, toggleMic, toggleCamera,
+    localStream, localStreamRef, peerConnsRef, channelRef, screenTrackRef, join, leave, toggleMic, toggleCamera,
     remoteScreenStreams, setRemoteScreenStreams,
   }
 }

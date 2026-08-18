@@ -61,6 +61,13 @@ Decline clearly and briefly in one sentence. Do not explain how to work around t
 
 Be direct, concise, and practical. Never refuse a legitimate question.`
 
+// Groq model — primary and fallback
+const GROQ_MODELS = [
+  'llama-3.3-70b-versatile',
+  'llama3-70b-8192',
+  'mixtral-8x7b-32768',
+]
+
 // Detect if a question needs live data
 function needsLiveData(message: string): boolean {
   const lower = message.toLowerCase()
@@ -76,9 +83,6 @@ function needsLiveData(message: string): boolean {
 // Free weather via wttr.in — no API key needed
 async function getWeather(query: string): Promise<string | null> {
   try {
-    // Extract location from query
-    const lower = query.toLowerCase()
-    // Try to find "in <location>" pattern
     const match = query.match(/(?:in|for|at)\s+([\w\s,]+?)(?:\s+today|\s+tonight|\s+tomorrow|\?|$)/i)
     const location = match ? match[1].trim() : null
     if (!location) return null
@@ -101,7 +105,6 @@ async function getWeather(query: string): Promise<string | null> {
     const areaName = area?.areaName?.[0]?.value || location
     const region = area?.region?.[0]?.value || ''
 
-    // Today's forecast
     const today = data.weather?.[0]
     const maxF = today?.maxtempF
     const minF = today?.mintempF
@@ -130,7 +133,6 @@ async function webSearch(query: string): Promise<string | null> {
     if (data.Answer) parts.push(`Answer: ${data.Answer}`)
     if (data.Definition) parts.push(`Definition: ${data.Definition}`)
 
-    // Related topics for extra context
     const topics = (data.RelatedTopics || []).slice(0, 3)
     for (const t of topics) {
       if (t.Text) parts.push(t.Text)
@@ -143,6 +145,52 @@ async function webSearch(query: string): Promise<string | null> {
   }
 }
 
+// Call Groq with model fallback
+async function callGroq(GROQ_KEY: string, messages: any[]): Promise<string> {
+  let lastError = ''
+  for (const model of GROQ_MODELS) {
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${GROQ_KEY}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          max_tokens: 2048,
+          temperature: 0.3,
+        })
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        lastError = `${model}: HTTP ${res.status} — ${JSON.stringify(data)}`
+        console.error('ai-chat: Groq error with model', model, res.status, JSON.stringify(data))
+        // If it's a 401 (bad key) or 429 (rate limit), don't try other models
+        if (res.status === 401) throw new Error('Groq API key invalid')
+        continue // try next model
+      }
+
+      const reply = data.choices?.[0]?.message?.content
+      if (!reply) {
+        lastError = `${model}: empty response`
+        console.error('ai-chat: empty Groq response with model', model, JSON.stringify(data))
+        continue
+      }
+
+      return reply
+    } catch (e) {
+      lastError = String(e)
+      console.error('ai-chat: exception with model', model, e)
+      if (String(e).includes('API key')) throw e
+    }
+  }
+  throw new Error(`All Groq models failed. Last error: ${lastError}`)
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
@@ -150,7 +198,11 @@ serve(async (req) => {
     const { message, context, history } = await req.json()
     if (!message) return new Response(JSON.stringify({ error: 'missing message' }), { status: 400, headers: CORS })
 
-    const GROQ_KEY = Deno.env.get('GROQ_API_KEY')!
+    const GROQ_KEY = Deno.env.get('GROQ_API_KEY')
+    if (!GROQ_KEY) {
+      console.error('ai-chat: GROQ_API_KEY not set')
+      return new Response(JSON.stringify({ error: 'AI service not configured' }), { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } })
+    }
 
     // Fetch live data if the question needs it
     let liveData: string | null = null
@@ -160,7 +212,6 @@ serve(async (req) => {
           lower.includes('forecast') || lower.includes('sunny') || lower.includes('storm') || lower.includes('hurricane')) {
         liveData = await getWeather(message)
       }
-      // Fall back to DDG search if no weather result or not a weather question
       if (!liveData) {
         liveData = await webSearch(message)
       }
@@ -179,35 +230,13 @@ serve(async (req) => {
       }
     }
 
-    // Inject live data into the message if we have it
     const finalMessage = liveData
       ? `${message}\n\n[Live data retrieved]:\n${liveData}`
       : message
 
     messages.push({ role: 'user', content: finalMessage })
 
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${GROQ_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages,
-        max_tokens: 2048,
-        temperature: 0.3,
-      })
-    })
-
-    if (!res.ok) {
-      const err = await res.text()
-      console.error('ai-chat: Groq error', res.status, err)
-      return new Response(JSON.stringify({ error: 'AI service error' }), { status: 500, headers: CORS })
-    }
-
-    const data = await res.json()
-    const reply = data.choices?.[0]?.message?.content || 'Sorry, I could not generate a response.'
+    const reply = await callGroq(GROQ_KEY, messages)
 
     return new Response(JSON.stringify({ reply }), {
       status: 200,
@@ -216,6 +245,7 @@ serve(async (req) => {
 
   } catch (err) {
     console.error('ai-chat error:', err)
-    return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: CORS })
+    const msg = String(err).includes('API key') ? 'AI service configuration error' : 'AI service temporarily unavailable'
+    return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } })
   }
 })

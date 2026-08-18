@@ -919,7 +919,7 @@ export default function Chat() {
                   </div>
                 )}
                 <div style={{ width: huddleMembers.length <= 2 ? 380 : 280, borderRadius: 12, overflow: 'hidden', flexShrink: 0, position: 'relative', border: '2px solid rgba(255,255,255,.12)' }}>
-                  <VideoTile stream={huddleProcessedStream || webrtc.localStreamRef.current} name={myName} label={`${myName} (you)`} muted mirror videoEnabled={cameraOn}/>
+                  <VideoTile stream={huddleProcessedStream || webrtc.localStream} name={myName} label={`${myName} (you)`} muted mirror videoEnabled={cameraOn}/>
                   {raisedHand && <div style={{ position: 'absolute', top: 8, right: 8, fontSize: 20, background: 'rgba(0,0,0,.55)', borderRadius: 8, padding: '2px 6px' }}>✋</div>}
                   {!micOn && <div style={{ position: 'absolute', bottom: 8, left: 8, background: 'rgba(0,0,0,.6)', borderRadius: 20, padding: '2px 8px', fontSize: 11, color: '#fca5a5' }}>🔇</div>}
                 </div>
