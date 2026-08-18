@@ -155,3 +155,6 @@ verify_jwt = false
 
 [functions.weekly-growth-report]
 verify_jwt = false
+
+[functions.gsc-sync]
+verify_jwt = false
