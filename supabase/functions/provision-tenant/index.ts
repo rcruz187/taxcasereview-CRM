@@ -20,7 +20,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-const PLATFORM_ADMIN_EMAIL = 'romy@taxcasereview.org'
+const PLATFORM_ADMIN_EMAILS = ['romy@taxcasereview.org', 'romy@taxrescrm.net']
 
 function genPassword(): string {
   const bytes = new Uint8Array(18)
@@ -49,7 +49,7 @@ serve(async (req) => {
     if (userErr || !user?.email) return json({ error: 'Invalid session' }, 401)
 
     // ── verify caller is THIS platform admin specifically (not any Super Admin) ──
-    if (user.email.toLowerCase() !== PLATFORM_ADMIN_EMAIL) return json({ error: 'Not authorized to provision offices' }, 403)
+    if (!PLATFORM_ADMIN_EMAILS.includes(user.email.toLowerCase())) return json({ error: 'Not authorized to provision offices' }, 403)
     const admin = createClient(url, serviceKey)
 
     // ── inputs ──
