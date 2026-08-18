@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!
+const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY')!
 
 const BRAND_VOICE = `You are writing content for TaxRes CRM — a purpose-built CRM for tax resolution firms.
 Audience: Licensed Enrolled Agents (EAs), CPAs, and tax attorneys who represent clients before the IRS.
@@ -45,22 +45,23 @@ const LINKEDIN_ROTATIONS = [
 ]
 
 async function callClaude(prompt: string, system: string = BRAND_VOICE, maxTokens = 800): Promise<string> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
+      'Authorization': `Bearer ${GROQ_API_KEY}`,
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'llama-3.3-70b-versatile',
       max_tokens: maxTokens,
-      system,
-      messages: [{ role: 'user', content: prompt }],
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: prompt },
+      ],
     }),
   })
   const data = await res.json()
-  return data.content?.[0]?.text || ''
+  return data.choices?.[0]?.message?.content || ''
 }
 
 serve(async (req) => {

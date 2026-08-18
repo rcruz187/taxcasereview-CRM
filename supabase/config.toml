@@ -98,9 +98,6 @@ verify_jwt = true
 [functions.ga4-sync]
 verify_jwt = true
 
-[functions.content-generator]
-verify_jwt = true
-
 [functions.linkedin-publish]
 verify_jwt = true
 
@@ -139,4 +136,22 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.demo-followup]
+verify_jwt = false
+
+[functions.linkedin-scheduler]
+verify_jwt = false
+
+[functions.daily-briefing]
+verify_jwt = false
+
+[functions.gsc-data]
+verify_jwt = false
+
+[functions.bing-data]
+verify_jwt = false
+
+[functions.content-generator]
+verify_jwt = false
+
+[functions.weekly-growth-report]
 verify_jwt = false
