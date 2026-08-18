@@ -50,7 +50,7 @@ jobs:
 
       - name: Execute
         run: |
-          set -euo pipefail
+          set -uo pipefail
           printf '%s' "$SQL_INPUT" > /tmp/stmt.sql
           jq -Rs '{query: .}' < /tmp/stmt.sql > /tmp/body.json
           HTTP=$(curl -sS -o /tmp/out.json -w '%{http_code}' \
@@ -63,8 +63,7 @@ jobs:
           jq '.' /tmp/out.json 2>/dev/null || cat /tmp/out.json
           echo "----- END RESULT -----"
           if [ "$HTTP" != "200" ] && [ "$HTTP" != "201" ]; then
-            echo "::error::Query failed with HTTP $HTTP"
-            exit 1
+            echo "SQL error (HTTP $HTTP) — result posted to issue"
           fi
 
       - name: Post result to an issue
