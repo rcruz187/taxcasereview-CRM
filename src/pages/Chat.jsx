@@ -471,7 +471,7 @@ export default function Chat() {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2,7)}`
     setShowHuddleInvite(false)
     const result = await webrtc.join(id, myName, true)
-    if (!result.ok) { showToast(result.reason || 'Could not start huddle'); return }
+    if (!result.ok) { showToast(result.reason || 'Could not start huddle'); return null }
     rawHuddleRef.current = webrtc.localStreamRef.current
     setHuddleId(id)
     // Post to the current active channel so it works for any tenant,
@@ -482,6 +482,7 @@ export default function Chat() {
       text: `📞 ${myName} started a Huddle! Click "Join Huddle" to join the call.`,
       huddle_id: id, created_at: new Date().toISOString()
     }])
+    return id  // caller needs this before React state update applies
   }
 
   async function joinHuddle(id) {
@@ -494,12 +495,11 @@ export default function Chat() {
 
   // Ring a specific person directly — posts into their DM pair channel with
   // invite_to so only they get the incoming call notification, not everyone.
-  async function ringPerson(rep) {
-    const roomId = huddleId || (() => {
-      // shouldn't happen — startHuddle sets huddleId before we get here
-      const id = Math.random().toString(36).slice(2, 8).toUpperCase()
-      return id
-    })()
+  async function ringPerson(rep, explicitRoomId) {
+    // explicitRoomId is passed by the caller (startHuddle returns the id directly)
+    // because huddleId React state may not have updated yet (setState is async).
+    // Falling back to huddleId handles the case where we're already in a huddle.
+    const roomId = explicitRoomId || huddleId
 
     // Find the rep's empId to build the DM pair channel
     const repEmpId = rep.empId
@@ -1304,7 +1304,7 @@ export default function Chat() {
           <MenuItem onClick={() => {
             const rep = repMenu.rep; setRepMenu(null)
             if (huddle) { ringPerson(rep) }
-            else { startHuddle().then(() => ringPerson(rep)) }
+            else { startHuddle().then(newRoomId => { if (newRoomId) ringPerson(rep, newRoomId) }) }
           }}>🎙️ Start huddle with {repMenu.rep.name.split(' ')[0]}</MenuItem>
           <MenuDivider/>
           <MenuItem onClick={() => { setDetailsPanel({ conv: repMenu.rep, convType: 'dm' }); setRepMenu(null) }}>Conversation details</MenuItem>
