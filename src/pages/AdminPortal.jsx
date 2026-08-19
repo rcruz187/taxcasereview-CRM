@@ -1753,7 +1753,7 @@ const PRODUCT_REGISTRY = [
     url:       'https://nashville.taxrescrm.app',
     status:    'live',
     desc:      'TRC-002 — Nashville tenant on its own Supabase project',
-    metricsUrl: null, // deploy platform-metrics to Nash Supabase to enable
+    metricsUrl: 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/platform-metrics?view=nash',
   },
   {
     key:       'cloudcpa',

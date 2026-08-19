@@ -1,5 +1,5 @@
 // platform-metrics — TCR live metrics endpoint for the Admin Portal hub
-// Accepts ?view=tcr (Tax Case Review practice) or ?view=saas (Tax Res CRM product)
+// Accepts ?view=tcr (Tax Case Review practice) | ?view=saas (Tax Res CRM SaaS) | ?view=nash (Nashville)
 // Called on-demand by the hub when a product card is clicked.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -10,6 +10,7 @@ const cors = {
 }
 
 const TCR_TENANT_ID  = '61a89aef-0e7e-4ea2-b222-44ab2024655a' // Tax Case Review (TRC-001)
+const NASH_TENANT_ID = '489ace07-1a6b-4864-833a-4f8420568b40' // Nashville Tax Solutions (TRC-002)
 const ADMIN_CODE     = 'ADMIN'
 const TCR_CODE       = 'TRC-001'  // Romy's own practice — shown on Tax Case Review card
 const DEMO_CODE      = 'DEMO'
@@ -25,7 +26,7 @@ Deno.serve(async (req) => {
   }
 
   const url  = new URL(req.url)
-  const view = url.searchParams.get('view') || 'saas' // 'tcr' | 'saas'
+  const view = url.searchParams.get('view') || 'saas' // 'tcr' | 'saas' | 'nash'
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -71,6 +72,53 @@ Deno.serve(async (req) => {
           active_users:   0,
         },
         offices: [{ id: TCR_TENANT_ID, name: 'Tax Case Review', is_active: true, mrr: 0, since: '2025-01-01' }],
+        recent_activity: (recentActivity || []).map((n: any) => ({
+          text: (n.body || '').slice(0, 120),
+          at:   n.created_at,
+          by:   n.author_email,
+        })),
+      }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+    }
+
+
+    if (view === 'nash') {
+      // ── Nashville Tax Solutions — TRC-002 tenant ──────────────────────────
+      const [
+        { count: clientCount },
+        { count: leadCount },
+        { count: taskCount },
+        { data: docs },
+        { data: recentActivity },
+        { data: employees },
+      ] = await Promise.all([
+        supabase.from('clients').select('*', { count: 'exact', head: true }).eq('tenant_id', NASH_TENANT_ID),
+        supabase.from('leads').select('*', { count: 'exact', head: true }).eq('tenant_id', NASH_TENANT_ID),
+        supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('tenant_id', NASH_TENANT_ID).eq('status', 'pending'),
+        supabase.from('documents').select('file_size').eq('tenant_id', NASH_TENANT_ID),
+        supabase.from('notes').select('body,created_at,author_email').eq('tenant_id', NASH_TENANT_ID)
+          .order('created_at', { ascending: false }).limit(5),
+        supabase.from('employees').select('id').eq('tenant_id', NASH_TENANT_ID).eq('is_active', true),
+      ])
+
+      const totalStorage = (docs || []).reduce((s: number, d: any) => s + Number(d.file_size || 0), 0)
+
+      return new Response(JSON.stringify({
+        ok: true,
+        product: 'nashville',
+        product_label: 'Nashville Tax Solutions',
+        fetched_at: now.toISOString(),
+        metrics: {
+          mrr:            1625,
+          arr:            1625 * 12,
+          active_clients: clientCount  || 0,
+          active_leads:   leadCount    || 0,
+          pending_tasks:  taskCount    || 0,
+          storage_bytes:  totalStorage,
+          active_offices: 1,
+          total_offices:  1,
+          active_users:   (employees || []).length,
+        },
+        offices: [{ id: NASH_TENANT_ID, name: 'Nashville Tax Solutions', is_active: true, mrr: 1625, since: '2025-01-01' }],
         recent_activity: (recentActivity || []).map((n: any) => ({
           text: (n.body || '').slice(0, 120),
           at:   n.created_at,
@@ -141,3 +189,4 @@ Deno.serve(async (req) => {
     })
   }
 })
+
