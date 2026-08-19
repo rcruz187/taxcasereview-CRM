@@ -186,7 +186,7 @@ Deno.serve(async (req) => {
     ] = await Promise.all([
       supabase.from('tenants').select('id,firm_name,tenant_code,monthly_rate,created_at')
         .not('tenant_code', 'in', `(${ADMIN_CODE},${TCR_CODE},${DEMO_CODE})`)
-        .neq('id', '489ace07-1a6b-4864-833a-4f8420568b40') // Nashville — moving to own project,
+        .neq('id', '489ace07-1a6b-4864-833a-4f8420568b40'), // Nashville is on its own project
       supabase.from('clients').select('*', { count: 'exact', head: true }),
       supabase.from('leads').select('*', { count: 'exact', head: true }),
       supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
