@@ -84,6 +84,7 @@ export default function Chat() {
   const [loading, setLoading]     = useState(false)
   const [onlineUsers, setOnlineUsers] = useState(new Set()) // names of currently online employees
   const [huddleId, setHuddleId]         = useState(null)  // unique room ID
+  const [isHuddleHost, setIsHuddleHost]   = useState(false)
   const [showHuddleInvite, setShowHuddleInvite] = useState(false)
   const [incomingHuddle, setIncomingHuddle] = useState(null) // { from, huddleId }
   const webrtc = useWebRTCRoom('huddle')
@@ -474,6 +475,7 @@ export default function Chat() {
     if (!result.ok) { showToast(result.reason || 'Could not start huddle'); return null }
     rawHuddleRef.current = webrtc.localStreamRef.current
     setHuddleId(id)
+    setIsHuddleHost(true)
     // Post to the current active channel so it works for any tenant,
     // not just ones that have a channel named 'general'
     const notifyChannel = isChannel ? channelId : 'general'
@@ -491,6 +493,9 @@ export default function Chat() {
     if (!result.ok) { showToast(result.reason || 'Could not join huddle'); return }
     rawHuddleRef.current = webrtc.localStreamRef.current
     setHuddleId(id)
+    setIsHuddleHost(false)
+    // Register callback: if host ends the huddle, auto-leave
+    webrtc.onHuddleEndRef.current = () => leaveHuddle()
   }
 
   // Ring a specific person directly — posts into their DM pair channel with
@@ -530,11 +535,19 @@ export default function Chat() {
   }
 
   async function leaveHuddle() {
+    if (isHuddleHost) {
+      // Host ending = end for everyone — broadcast before leaving
+      webrtc.broadcastEnd()
+      // Small delay so broadcast reaches peers before the channel is torn down
+      await new Promise(r => setTimeout(r, 300))
+    }
+    webrtc.onHuddleEndRef.current = null // clear so we don't self-trigger
     stopHuddleScreenShare()
     vbg.stopLoop()
     setHuddleProcessedStream(null)
     setShowBgPanel(false)
     await webrtc.leave()
+    setIsHuddleHost(false)
     setHuddleId(null)
     setShowHuddleInvite(false)
   }
@@ -733,7 +746,7 @@ export default function Chat() {
                   <button onClick={webrtc.toggleCamera} style={{ background: 'none', border: 'none', color: cameraOn ? '#4ade80' : '#f87171', fontSize: 11, cursor: 'pointer', fontWeight: 700, padding: '1px 5px' }} title={cameraOn ? 'Turn camera off' : 'Turn camera on'}>
                     {cameraOn ? '📹' : '📷'}
                   </button>
-                  <button onClick={leaveHuddle} style={{ background: 'none', border: 'none', color: '#f87171', fontSize: 11, cursor: 'pointer', fontWeight: 700, padding: '1px 5px' }}>Leave</button>
+                  <button onClick={leaveHuddle} style={{ background: 'none', border: 'none', color: '#f87171', fontSize: 11, cursor: 'pointer', fontWeight: 700, padding: '1px 5px' }}>{isHuddleHost ? 'End' : 'Leave'}</button>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
@@ -1033,7 +1046,7 @@ export default function Chat() {
               <button onClick={leaveHuddle}
                 style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: 'rgba(239,68,68,.2)', border: '1px solid #ef4444', borderRadius: 12, padding: '8px 16px', cursor: 'pointer', color: '#fca5a5', minWidth: 64 }}>
                 <span style={{ fontSize: 20 }}>📵</span>
-                <span style={{ fontSize: 10, fontWeight: 600 }}>Leave</span>
+                <span style={{ fontSize: 10, fontWeight: 600 }}>{isHuddleHost ? 'End' : 'Leave'}</span>
               </button>
             </div>
           </div>
@@ -1049,7 +1062,7 @@ export default function Chat() {
               <button onClick={webrtc.toggleMic} style={{ padding: '3px 10px', borderRadius: 5, background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.2)', color: '#dcfce7', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>{micOn ? '🎤' : '🔇'}</button>
               <button onClick={webrtc.toggleCamera} style={{ padding: '3px 10px', borderRadius: 5, background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.2)', color: '#dcfce7', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>{cameraOn ? '📹' : '📷'}</button>
               <button onClick={() => setHuddleFullscreen(true)} style={{ padding: '3px 10px', borderRadius: 5, background: 'rgba(99,102,241,.2)', border: '1px solid #6366f1', color: '#a5b4fc', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>⬆ Open</button>
-              <button onClick={leaveHuddle} style={{ padding: '3px 10px', borderRadius: 5, background: 'rgba(239,68,68,.15)', border: '1px solid #ef4444', color: '#fca5a5', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>Leave</button>
+              <button onClick={leaveHuddle} style={{ padding: '3px 10px', borderRadius: 5, background: 'rgba(239,68,68,.15)', border: '1px solid #ef4444', color: '#fca5a5', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>{isHuddleHost ? 'End' : 'Leave'}</button>
             </div>
           </div>
         )}

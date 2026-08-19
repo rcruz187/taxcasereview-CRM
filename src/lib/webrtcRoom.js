@@ -61,6 +61,7 @@ export function useWebRTCRoom(channelPrefix) {
   const localStreamRef = useRef(null)
   const peerConnsRef = useRef({})
   const channelRef = useRef(null)
+  const onHuddleEndRef = useRef(null) // callback fired when host broadcasts end
   const myNameRef = useRef('')
   const iceServersRef = useRef(FALLBACK_ICE) // refreshed in join() from turn-credentials
   const fullyJoinedRef = useRef(false) // true only after this client has tracked its own presence
@@ -192,6 +193,10 @@ export function useWebRTCRoom(channelPrefix) {
     channelRef.current = ch
 
     ch.on('broadcast', { event: 'signal' }, ({ payload }) => handleSignal(payload))
+    ch.on('broadcast', { event: 'huddle-end' }, () => {
+      // Host ended the call — all participants auto-leave
+      if (onHuddleEndRef.current) onHuddleEndRef.current()
+    })
 
     let resolveSync
     const firstSync = new Promise(res => { resolveSync = res })
@@ -304,9 +309,13 @@ export function useWebRTCRoom(channelPrefix) {
     if (track) { track.enabled = !track.enabled; setCameraOn(track.enabled) }
   }
 
+  function broadcastEnd() {
+    channelRef.current?.send({ type: 'broadcast', event: 'huddle-end', payload: {} })
+  }
+
   return {
     members, remoteStreams, micOn, cameraOn, joined, error,
     localStream, localStreamRef, peerConnsRef, channelRef, screenTrackRef, join, leave, toggleMic, toggleCamera,
-    remoteScreenStreams, setRemoteScreenStreams,
+    remoteScreenStreams, setRemoteScreenStreams, broadcastEnd, onHuddleEndRef,
   }
 }
