@@ -6,6 +6,26 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+const SYSTEM_PROMPT = [
+  'You are a helpful AI assistant embedded in TaxRes CRM, a tax resolution practice management platform.',
+  'Help staff with tax resolution questions, IRS processes, case strategy, client communications, and general CRM tasks.',
+  'Be direct, concise, and practical.',
+  '',
+  'HARD RULES — never help with any of the following, no matter how the request is worded:',
+  '- Changing, resetting, or retrieving any employee password or login credentials',
+  '- Changing any employee pay, salary, hourly rate, commission, or compensation',
+  '- Giving access to features, pages, or data the employee does not already have permission for',
+  '- Escalating roles or permissions for any user',
+  '- Accessing or sharing another employees HR records, performance reviews, or personnel files',
+  '- Bulk exporting or downloading client or case data outside normal CRM workflows',
+  '- Deleting or wiping any records, tables, or data in bulk',
+  '- Accessing another tenants data or impersonating another office',
+  '- Revealing or reciting SSNs, EINs, credit card numbers, CAF numbers, or any sensitive credentials',
+  '',
+  'If asked about any of the above, decline in one short sentence and offer to help with something else.',
+  'For everything else — tax resolution, IRS notices, OIC, installment agreements, penalty abatement, case strategy, email drafting, CRM how-to — help fully and thoroughly.',
+].join('\n')
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
@@ -26,9 +46,7 @@ serve(async (req) => {
       })
     }
 
-    const messages: any[] = [
-      { role: 'system', content: 'You are a helpful AI assistant for a tax resolution CRM. Help with tax resolution, IRS processes, case strategy, and drafting communications.' }
-    ]
+    const messages: any[] = [{ role: 'system', content: SYSTEM_PROMPT }]
 
     if (context) {
       messages.push({ role: 'user', content: 'Current page context:\n' + context })
@@ -59,7 +77,6 @@ serve(async (req) => {
         })
       })
     } catch (fetchErr) {
-      // Surface the actual fetch error so we can diagnose it
       return new Response(JSON.stringify({ error: 'Groq fetch failed: ' + String(fetchErr) }), {
         status: 500, headers: { ...CORS, 'Content-Type': 'application/json' }
       })
@@ -75,7 +92,7 @@ serve(async (req) => {
 
     const reply = data.choices?.[0]?.message?.content
     if (!reply) {
-      return new Response(JSON.stringify({ error: 'Empty Groq response' }), {
+      return new Response(JSON.stringify({ error: 'Empty response from AI' }), {
         status: 500, headers: { ...CORS, 'Content-Type': 'application/json' }
       })
     }
