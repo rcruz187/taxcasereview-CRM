@@ -476,14 +476,6 @@ export default function Chat() {
     rawHuddleRef.current = webrtc.localStreamRef.current
     setHuddleId(id)
     setIsHuddleHost(true)
-    // Post to the current active channel so it works for any tenant,
-    // not just ones that have a channel named 'general'
-    const notifyChannel = isChannel ? channelId : 'general'
-    await supabase.from('chat_messages').insert([{
-      channel: notifyChannel, sender: '🔔 System',
-      text: `📞 ${myName} started a Huddle! Click "Join Huddle" to join the call.`,
-      huddle_id: id, created_at: new Date().toISOString()
-    }])
     return id  // caller needs this before React state update applies
   }
 
