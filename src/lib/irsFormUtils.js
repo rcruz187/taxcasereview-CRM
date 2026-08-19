@@ -984,7 +984,7 @@ export async function generateCcAuthPdf(client) {
   let firmFooterLine1 = 'Tax Case Review · 631 US Highway One Ste 304, North Palm Beach, FL 33408';
   let firmFooterLine2 = 'info@taxcasereview.org · (888) 334-5052 · Fax (561) 420-6999';
   try {
-    const { data: s } = await supabase.from('settings').select('name,address,city,state,zip,phone,email,firm_fax_number').not('name','is',null).limit(1).maybeSingle();
+    const { data: s } = await supabase.from('settings').select('name,address,city,state,zip,phone,email,firm_fax_number').maybeSingle();
     if (s?.name) {
       firmName = s.name;
       const addr = [s.address, [s.city, s.state].filter(Boolean).join(', '), s.zip].filter(Boolean).join(', ');

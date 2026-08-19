@@ -198,6 +198,8 @@ export function AppProvider({ children }) {
   // notify everyone. Muted conversations are skipped, matching the mute
   // toggle already stored in chat_conv_prefs.
   const myEmpIdRef  = useRef(null)
+  const [myTenantId, setMyTenantId] = useState(null)
+  const [myEmpId, setMyEmpId] = useState(null)
   const myRealNameRef = useRef(null)
   const mutedRef    = useRef(new Set())
 
@@ -210,10 +212,12 @@ export function AppProvider({ children }) {
     // chat-mute lookup below (keyed by name) and the sender!==myName check in
     // the realtime handler (new-message sound never fired reliably).
     const fallbackName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'You'
-    supabase.from('employees').select('id, name').eq('email', user.email).maybeSingle()
+    supabase.from('employees').select('id, name, tenant_id').eq('email', user.email).maybeSingle()
       .then(({ data }) => {
         if (cancelled || !data) return
         myEmpIdRef.current = data.id
+          setMyTenantId(data.tenant_id || null)
+          setMyEmpId(data.id || null)
         myRealNameRef.current = data.name?.trim() || null
         // Re-run the mute-prefs load now that we may have a corrected name —
         // cheap, and only runs once per mount.
@@ -557,6 +561,7 @@ export function AppProvider({ children }) {
       modal, openModal, closeModal,
       searchQ, setSearchQ,
       mobileNavOpen, setMobileNavOpen,
+      myTenantId, myEmpId,
     }}>
       {children}
     </AppContext.Provider>
