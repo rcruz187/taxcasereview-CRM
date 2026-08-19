@@ -1739,11 +1739,32 @@ const PRODUCT_REGISTRY = [
     label:     'Tax Case Review',
     icon:      '⚖️',
     color:     '#10b981',
-    url:       'https://taxrescrm.app',
+    // url intentionally omitted — Open CRM uses impersonation via tenantId
     status:    'live',
     desc:      "Origin CRM — Romy's own tax resolution practice (TRC-001)",
     metricsUrl: 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/platform-metrics?view=tcr',
     tenantId:  '61a89aef-0e7e-4ea2-b222-44ab2024655a',
+  },
+  {
+    key:       'nashville',
+    label:     'Nashville Tax Solutions',
+    icon:      '🎸',
+    color:     '#14b8a6',
+    url:       'https://nashville.taxrescrm.app',
+    status:    'live',
+    desc:      'TRC-002 — Nashville tenant on its own Supabase project',
+    metricsUrl: null, // deploy platform-metrics to Nash Supabase to enable
+  },
+  {
+    key:       'cloudcpa',
+    label:     'CloudCPA Inc',
+    icon:      '☁️',
+    color:     '#38bdf8',
+    // url intentionally omitted — Open CRM uses impersonation via tenantId
+    status:    'live',
+    desc:      'TRC-003 — CloudCPA Inc on Tax Res CRM platform',
+    metricsUrl: 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/platform-metrics?view=saas',
+    tenantId:  'ecd3d3ce-016a-4bb4-800e-f090f51e4cae',
   },
   {
     key:       'camvella',
@@ -1770,10 +1791,10 @@ const PRODUCT_REGISTRY = [
     label:     'Arcvena',
     icon:      '⚡',
     color:     '#8b5cf6',
-    url:       '#',
-    status:    'building',
-    desc:      'Field service CRM for HVAC & electrical contractors',
-    metricsUrl: null,
+    url:       'https://app.arcvena.com/login',
+    status:    'live',
+    desc:      'Field service CRM for electrical contractors',
+    metricsUrl: null, // deploy platform-metrics to Arcvena Supabase to enable
   },
   {
     key:       'bocasync',
@@ -1855,13 +1876,28 @@ function ProductsTab({ supabase }) {
                       </div>
                     </div>
                   </div>
-                  {p.url !== '#' && !isSelected && (
-                    <a href={p.url} target="_blank" rel="noreferrer"
-                      onClick={e => e.stopPropagation()}
-                      style={{ fontSize: 10, color: '#fff', fontWeight: 700, textDecoration: 'none',
-                        background: p.color, padding: '4px 10px', borderRadius: 6, flexShrink: 0 }}>
-                      Open →
-                    </a>
+                  {!isSelected && (p.tenantId || (p.url && p.url !== '#')) && (
+                    p.tenantId ? (
+                      <button
+                        onClick={async e => {
+                          e.stopPropagation()
+                          if (!p.tenantId) return
+                          const { data: token } = await supabase.rpc('create_impersonation_token', { p_tenant_id: p.tenantId })
+                          if (token) window.open(`${window.location.origin}/impersonate?admin_token=${token}`, '_blank')
+                        }}
+                        style={{ fontSize: 10, color: '#fff', fontWeight: 700, textDecoration: 'none',
+                          background: p.color, padding: '4px 10px', borderRadius: 6, flexShrink: 0,
+                          border: 'none', cursor: 'pointer' }}>
+                        Open →
+                      </button>
+                    ) : (
+                      <a href={p.url} target="_blank" rel="noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        style={{ fontSize: 10, color: '#fff', fontWeight: 700, textDecoration: 'none',
+                          background: p.color, padding: '4px 10px', borderRadius: 6, flexShrink: 0 }}>
+                        Open →
+                      </a>
+                    )
                   )}
                 </div>
                 <div style={{ fontSize: 11, color: '#475569', marginBottom: 10, lineHeight: 1.4 }}>{p.desc}</div>
