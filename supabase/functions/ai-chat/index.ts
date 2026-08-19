@@ -21,14 +21,13 @@ serve(async (req) => {
 
     const GROQ_KEY = Deno.env.get('GROQ_API_KEY')
     if (!GROQ_KEY) {
-      console.error('ai-chat: GROQ_API_KEY not set')
-      return new Response(JSON.stringify({ error: 'AI service not configured' }), {
+      return new Response(JSON.stringify({ error: 'AI service not configured — GROQ_API_KEY missing' }), {
         status: 500, headers: { ...CORS, 'Content-Type': 'application/json' }
       })
     }
 
     const messages: any[] = [
-      { role: 'system', content: 'You are a helpful AI assistant for a tax resolution CRM. Help staff with tax resolution questions, IRS processes, case strategy, and drafting communications. Be direct and concise.' }
+      { role: 'system', content: 'You are a helpful AI assistant for a tax resolution CRM. Help with tax resolution, IRS processes, case strategy, and drafting communications.' }
     ]
 
     if (context) {
@@ -44,33 +43,39 @@ serve(async (req) => {
 
     messages.push({ role: 'user', content: message })
 
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + GROQ_KEY,
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages,
-        max_tokens: 1024,
-        temperature: 0.3,
+    let groqRes: Response
+    try {
+      groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + GROQ_KEY,
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages,
+          max_tokens: 1024,
+          temperature: 0.3,
+        })
       })
-    })
+    } catch (fetchErr) {
+      // Surface the actual fetch error so we can diagnose it
+      return new Response(JSON.stringify({ error: 'Groq fetch failed: ' + String(fetchErr) }), {
+        status: 500, headers: { ...CORS, 'Content-Type': 'application/json' }
+      })
+    }
 
     const data = await groqRes.json()
 
     if (!groqRes.ok) {
-      console.error('ai-chat: Groq error', groqRes.status, JSON.stringify(data))
-      return new Response(JSON.stringify({ error: 'AI service temporarily unavailable' }), {
+      return new Response(JSON.stringify({ error: 'Groq API error ' + groqRes.status + ': ' + (data?.error?.message || JSON.stringify(data)) }), {
         status: 500, headers: { ...CORS, 'Content-Type': 'application/json' }
       })
     }
 
     const reply = data.choices?.[0]?.message?.content
     if (!reply) {
-      console.error('ai-chat: empty Groq response', JSON.stringify(data))
-      return new Response(JSON.stringify({ error: 'AI returned empty response' }), {
+      return new Response(JSON.stringify({ error: 'Empty Groq response' }), {
         status: 500, headers: { ...CORS, 'Content-Type': 'application/json' }
       })
     }
@@ -81,8 +86,7 @@ serve(async (req) => {
     })
 
   } catch (err) {
-    console.error('ai-chat exception:', err)
-    return new Response(JSON.stringify({ error: 'AI service temporarily unavailable' }), {
+    return new Response(JSON.stringify({ error: 'Exception: ' + String(err) }), {
       status: 500, headers: { ...CORS, 'Content-Type': 'application/json' }
     })
   }
