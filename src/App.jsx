@@ -1,3 +1,4 @@
+import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { Suspense, lazy, useEffect } from 'react'
@@ -11,6 +12,38 @@ import TopBar   from './components/layout/TopBar'
 import { Modal, Toast } from './components/ui'
 import ActiveCallBar from './components/calling/ActiveCallBar'
 import ImpersonationBanner from './components/ImpersonationBanner'
+
+
+class PageErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
+  }
+  componentDidCatch(error, info) {
+    console.error('[PageErrorBoundary] Page crash:', error, info)
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center',
+          justifyContent:'center', height:'60vh', gap:16, color:'var(--t3)',
+          textAlign:'center', padding:32 }}>
+          <div style={{ fontSize:36 }}>⚠️</div>
+          <div style={{ fontWeight:800, fontSize:18, color:'var(--tx)' }}>Something went wrong</div>
+          <div style={{ fontSize:13, color:'var(--t2)', maxWidth:340, lineHeight:1.6 }}>
+            {String(this.state.error?.message || this.state.error || 'Unknown error')}
+          </div>
+          <button className="btn pri" onClick={() => { this.setState({ hasError:false, error:null }); window.location.reload() }}
+            style={{ padding:'8px 20px', marginTop:8 }}>Reload page</button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 // Public, unauthenticated entry points stay eager — loaded immediately on
 // first paint with no extra network round-trip, since these are the very
@@ -170,6 +203,7 @@ function Shell() {
       <div className="main-area">
         <TopBar onNew={handleNew} />
         <div className="page-content">
+          <PageErrorBoundary>
           <Suspense fallback={
             <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'40vh', color:'var(--t3)', fontSize:13 }}>
               Loading…
@@ -224,6 +258,7 @@ function Shell() {
             <Route path="*"            element={<Navigate to="/" />} />
           </Routes>
           </Suspense>
+          </PageErrorBoundary>
         </div>
       </div>
       {!realtimeOk && (
