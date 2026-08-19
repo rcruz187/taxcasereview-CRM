@@ -127,6 +127,53 @@ Deno.serve(async (req) => {
       }), { headers: { ...cors, 'Content-Type': 'application/json' } })
     }
 
+    if (view === 'cloudcpa') {
+      // ── CloudCPA Inc — TRC-003 tenant ─────────────────────────────────────
+      const CLOUDCPA_TENANT_ID = 'ecd3d3ce-016a-4bb4-800e-f090f51e4cae'
+      const [
+        { count: clientCount },
+        { count: leadCount },
+        { count: taskCount },
+        { data: docs },
+        { data: recentActivity },
+        { data: employees },
+      ] = await Promise.all([
+        supabase.from('clients').select('*', { count: 'exact', head: true }).eq('tenant_id', CLOUDCPA_TENANT_ID),
+        supabase.from('leads').select('*', { count: 'exact', head: true }).eq('tenant_id', CLOUDCPA_TENANT_ID),
+        supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('tenant_id', CLOUDCPA_TENANT_ID).eq('status', 'pending'),
+        supabase.from('documents').select('file_size').eq('tenant_id', CLOUDCPA_TENANT_ID),
+        supabase.from('notes').select('body,created_at,author_email').eq('tenant_id', CLOUDCPA_TENANT_ID)
+          .order('created_at', { ascending: false }).limit(5),
+        supabase.from('employees').select('id').eq('tenant_id', CLOUDCPA_TENANT_ID),
+      ])
+
+      const totalStorage = (docs || []).reduce((s: number, d: any) => s + Number(d.file_size || 0), 0)
+
+      return new Response(JSON.stringify({
+        ok: true,
+        product: 'cloudcpa',
+        product_label: 'CloudCPA Inc',
+        fetched_at: now.toISOString(),
+        metrics: {
+          mrr:            0,
+          arr:            0,
+          active_clients: clientCount  || 0,
+          active_leads:   leadCount    || 0,
+          pending_tasks:  taskCount    || 0,
+          storage_bytes:  totalStorage,
+          active_offices: 1,
+          total_offices:  1,
+          active_users:   (employees || []).length,
+        },
+        offices: [{ id: CLOUDCPA_TENANT_ID, name: 'CloudCPA Inc', is_active: true, mrr: 0, since: '2026-08-18' }],
+        recent_activity: (recentActivity || []).map((n: any) => ({
+          text: (n.body || '').slice(0, 120),
+          at:   n.created_at,
+          by:   n.author_email,
+        })),
+      }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+    }
+
     // ── Tax Res CRM SaaS — all paying tenants (exclude TRC-001, ADMIN, DEMO) ──
     const [
       { data: tenants },

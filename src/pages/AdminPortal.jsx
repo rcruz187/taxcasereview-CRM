@@ -1762,8 +1762,8 @@ const PRODUCT_REGISTRY = [
     color:     '#38bdf8',
     // url intentionally omitted — Open CRM uses impersonation via tenantId
     status:    'live',
-    desc:      'TRC-003 — CloudCPA Inc on Tax Res CRM platform',
-    metricsUrl: 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/platform-metrics?view=saas',
+    desc:      'TRC-003 — CloudCPA Inc on Tax Res CRM platform (trial)',
+    metricsUrl: 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/platform-metrics?view=cloudcpa',
     tenantId:  'ecd3d3ce-016a-4bb4-800e-f090f51e4cae',
   },
   {
@@ -2100,12 +2100,14 @@ function ProductsTab({ supabase }) {
 const PIPELINE_STAGES = ['Prospect','Contacted','Interested','Demo Scheduled','Demo Completed','Proposal Sent','Negotiation','Won','Lost']
 const STAGE_COLORS    = ['#64748b','#6366f1','#8b5cf6','#0ea5e9','#a855f7','#f59e0b','#f97316','#10b981','#ef4444']
 const PRODUCTS = [
-  { value:'all',         label:'All Products' },
-  { value:'taxres_crm',  label:'Tax Res CRM'  },
-  { value:'camvella',    label:'Camvella'      },
-  { value:'phl',         label:'PHL Land Care' },
-  { value:'arcvena',     label:'Arcvena'       },
-  { value:'bocasync',    label:'BocaSync'      },
+  { value:'all',         label:'All Products'           },
+  { value:'taxres_crm',  label:'Tax Res CRM'            },
+  { value:'nashville',   label:'Nashville Tax Solutions' },
+  { value:'cloudcpa',    label:'CloudCPA Inc'            },
+  { value:'camvella',    label:'Camvella'               },
+  { value:'phl',         label:'PHL Land Care'          },
+  { value:'arcvena',     label:'Arcvena'                },
+  { value:'bocasync',    label:'BocaSync'               },
 ]
 const PRICING_LABELS = { monthly:'Monthly', perpetual:'Perpetual License', undecided:'Undecided' }
 const ACTIVITY_ICONS = { note:'📝', call:'📞', email:'📧', demo:'🖥️', proposal:'📄', stage_change:'🔄', won:'🏆', lost:'❌', outreach_linkedin:'💼', outreach_email:'📤', outreach_phone:'📱', follow_up:'🔁', demo_booked:'📅', converted:'⭐' }
