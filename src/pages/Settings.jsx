@@ -7,7 +7,7 @@ import { loadFirmBranding } from '../lib/firmBranding'
 const BUCKET = 'firm-assets'
 
 export default function Settings() {
-  const { showToast, user, role } = useApp()
+  const { showToast, user, role, myTenantId} = useApp()
   const isPrivileged = ['Super Admin','Admin'].includes(role)
   const [tab, setTab] = useState(isPrivileged ? 'firm' : 'mysignature')
   const [saving, setSaving] = useState(false)
@@ -16,7 +16,7 @@ export default function Settings() {
 
   // Accounting integrations (QuickBooks/Xero) — need this tenant's own id to
   // build the OAuth "state" param and to call get_accounting_status.
-  const [myTenantId, setMyTenantId] = useState(null)
+  // myTenantId comes from useApp() — see destructuring above
   const [acctStatus, setAcctStatus] = useState({}) // { quickbooks: {...}, xero: {...} }
   const [syncing, setSyncing] = useState({ quickbooks: false, xero: false })
   const [expandedInt, setExpandedInt] = useState({}) // which integration cards are expanded
@@ -24,8 +24,6 @@ export default function Settings() {
 
   useEffect(() => {
     if (!user?.email) return
-    supabase.from('employees').select('tenant_id').eq('email', user.email).maybeSingle()
-      .then(({ data }) => { if (data?.tenant_id) setMyTenantId(data.tenant_id) })
     loadAcctStatus()
   }, [user?.email])
 
