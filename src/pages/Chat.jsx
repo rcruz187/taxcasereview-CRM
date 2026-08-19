@@ -495,7 +495,18 @@ export default function Chat() {
     setHuddleId(id)
     setIsHuddleHost(false)
     // Register callback: if host ends the huddle, auto-leave
-    webrtc.onHuddleEndRef.current = () => leaveHuddle()
+    // Directly call the stable webrtc.leave() + reset UI state — no stale closure risk
+    webrtc.onHuddleEndRef.current = async () => {
+      webrtc.onHuddleEndRef.current = null
+      stopHuddleScreenShare()
+      vbg.stopLoop()
+      setHuddleProcessedStream(null)
+      setShowBgPanel(false)
+      await webrtc.leave()
+      setIsHuddleHost(false)
+      setHuddleId(null)
+      setShowHuddleInvite(false)
+    }
   }
 
   // Ring a specific person directly — posts into their DM pair channel with
