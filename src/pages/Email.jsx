@@ -184,7 +184,7 @@ export default function Email() {
       // Reverted to select('*'): narrowing the projection broke the inbox in
       // production. A column name that doesn't exist makes PostgREST fail the
       // whole query, and the page then renders no mail at all.
-      supabase.from('emails').select('*').eq('mailbox_owner', user.email).order('created_at', { ascending: false }).limit(300),
+      supabase.from('emails').select('*').eq('mailbox_owner', user.email).is('deleted_at', null).order('created_at', { ascending: false }).limit(300),
       supabase.from('clients').select('id,name,email'),
       supabase.from('leads').select('id,name,email'),
     ])
@@ -367,12 +367,11 @@ export default function Email() {
   }
 
   async function permanentlyDeleteEmail(id) {
-    // Hard delete — only shown for Archive folder emails
-    // Mark deleted_at so sync never re-imports, then remove from local state
+    // Soft delete — sets deleted_at so gmail-sync-cron won't re-import it
     setEmails(es => es.filter(e => e.id !== id))
     if (selected?.id === id) setSelected(null)
     setCheckedIds(s => { const n = new Set(s); n.delete(id); return n })
-    supabase.from('emails').delete().eq('id', id)
+    supabase.from('emails').update({ deleted_at: new Date().toISOString() }).eq('id', id)
   }
 
   async function permanentlyDeleteSelected() {
@@ -382,7 +381,7 @@ export default function Email() {
     if (selected && ids.includes(selected.id)) setSelected(null)
     setCheckedIds(new Set())
     showToast(`Deleted ${ids.length} email${ids.length === 1 ? '' : 's'}`)
-    supabase.from('emails').delete().in('id', ids)
+    supabase.from('emails').update({ deleted_at: new Date().toISOString() }).in('id', ids)
   }
 
   async function markRead(email) {
