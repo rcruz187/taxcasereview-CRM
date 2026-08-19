@@ -52,7 +52,7 @@ serve(async (req) => {
           'Authorization': 'Bearer ' + GROQ_KEY,
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: 'llama3-70b-8192',
           messages,
           max_tokens: 1024,
           temperature: 0.3,
