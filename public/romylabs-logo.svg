@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 60" width="260" height="60">
+  <!-- RomyLabs Core Connect — full lockup for sidebar/header (dark bg) -->
+  <!-- Mark -->
+  <g transform="translate(4,2)">
+    <path d="M26,2 L46,13.5 L46,36.5 L26,48 L6,36.5 L6,13.5 Z"
+      fill="none" stroke="#FFFFFF" stroke-width="3.8" stroke-linejoin="round"/>
+    <path d="M26,10 L38.7,17.3 L38.7,31.7 L26,39 L13.3,31.7 L13.3,17.3 Z"
+      fill="none" stroke="#C6FF00" stroke-width="3.2" stroke-linejoin="round"
+      transform="rotate(30,26,25)"/>
+    <rect x="18" y="15" width="3.4" height="22" rx="1" fill="#FFFFFF"/>
+    <path d="M21.4,15 C32,15 32,24.5 21.4,24.5" fill="none" stroke="#FFFFFF" stroke-width="3.4" stroke-linecap="round"/>
+    <line x1="27" y1="24.5" x2="34" y2="37" stroke="#FFFFFF" stroke-width="3.4" stroke-linecap="round"/>
+  </g>
+  <!-- Wordmark: ROMY in white, LABS in lime -->
+  <text x="62" y="38"
+    font-family="'Arial Black','Helvetica Neue',Arial,sans-serif"
+    font-size="26" font-weight="900" letter-spacing="2"
+    fill="#FFFFFF">ROMY</text>
+  <text x="162" y="38"
+    font-family="'Arial Black','Helvetica Neue',Arial,sans-serif"
+    font-size="26" font-weight="900" letter-spacing="2"
+    fill="#C6FF00">LABS</text>
+</svg>

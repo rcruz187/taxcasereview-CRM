@@ -116,10 +116,10 @@ function Sidebar({ onSignOut }) {
     <div style={{ width:220, minHeight:'100vh', flexShrink:0, background:'#0f0e1a',
       borderRight:'1px solid rgba(99,102,241,.2)', display:'flex', flexDirection:'column' }}>
       <div style={{ padding:'18px 16px 16px', borderBottom:'1px solid rgba(99,102,241,.15)' }}>
-        <img src="/taxrescrm-logo.png" alt="TaxRes CRM"
+        <img src="/romylabs-logo.png" alt="RomyLabs"
           style={{ height:38, objectFit:'contain', display:'block', marginBottom:6 }}
           onError={e=>{e.target.style.display='none'}} />
-        <div style={{ fontSize:10, color:'#6366f1', letterSpacing:'.04em', fontWeight:700 }}>Admin Portal</div>
+        <div style={{ fontSize:10, color:'#C6FF00', letterSpacing:'.06em', fontWeight:700, textTransform:'uppercase' }}>Command Center</div>
       </div>
 
       <nav style={{ flex:1, padding:'10px 8px', overflowY:'auto' }}>
@@ -195,7 +195,7 @@ function Overview() {
         <div style={{ fontSize:26, fontWeight:800, color:'#fff', marginBottom:4 }}>
           {h<12?'Good morning':h<17?'Good afternoon':'Good evening'}, Romy 👋
         </div>
-        <div style={{ fontSize:14, color:'#475569' }}>TaxRes CRM — {(stats||[]).length} offices on the platform</div>
+        <div style={{ fontSize:14, color:'#475569' }}>RomyLabs Platform — {(stats||[]).length} offices</div>
       </div>
 
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))', gap:14, marginBottom:32 }}>
@@ -1171,26 +1171,26 @@ function Email(){return(
 )}
 
 // ── Training (screen-share training, admin context) ──────────────────────────
-// Stamps FIRM with TaxRes CRM product branding — never loads TCR practice tenant.
-// Restores Admin Portal favicon on unmount so navigating away leaves no trace.
+// Stamps FIRM with RomyLabs platform branding — never loads TCR practice tenant.
+// Restores RomyLabs favicon on unmount so navigating away leaves no trace.
 function AdminTraining(){
   const ss = useScreenShare()
 
   useEffect(()=>{
-    // Set FIRM to TaxRes CRM product identity — no DB call needed
-    FIRM.name     = 'TaxRes CRM'
-    FIRM.logoUrl  = 'https://taxrescrm.app/taxrescrm-logo.png'
+    // Set FIRM to RomyLabs platform identity — no DB call needed
+    FIRM.name     = 'RomyLabs'
+    FIRM.logoUrl  = '/romylabs-logo.png'
     FIRM.email    = 'romy@taxrescrm.net'
     FIRM.tenantId = 'a0000000-0000-0000-0000-000000000001'
     FIRM.loaded   = true
-    document.title = 'TaxRes CRM — IRS Resolution CRM'
+    document.title = 'RomyLabs — Command Center'
     return ()=>{
-      // Restore Admin Portal favicon on unmount
+      // Restore RomyLabs favicon on unmount
       try {
         document.querySelectorAll("link[rel*='icon']").forEach(el => {
-          el.href = '/taxrescrm-favicon.png'
+          el.href = '/romylabs-favicon.png'
         })
-        document.title = 'TaxRes CRM — IRS Resolution CRM'
+        document.title = 'RomyLabs — Command Center'
       } catch(_) {}
     }
   },[])
@@ -4676,10 +4676,10 @@ export default function AdminPortal() {
   const navigate = useNavigate()
   const location = useLocation()
   const { logout } = useApp()
-  // Swap favicon + title to TaxRes CRM brand while in the admin portal
+  // Swap favicon + title to RomyLabs brand while in the admin portal
   useEffect(() => {
     const prev = document.title
-    document.title = 'TaxRes CRM — Admin'
+    document.title = 'RomyLabs — Command Center'
     const setFavicon = (href) => {
       document.querySelectorAll("link[rel*='icon']").forEach(el => el.remove())
       const link = document.createElement('link')
@@ -4688,11 +4688,11 @@ export default function AdminPortal() {
       link.href = href
       document.head.appendChild(link)
     }
-    setFavicon('/taxrescrm-favicon.png')
+    setFavicon('/romylabs-favicon.png')
     return () => {
       document.title = prev
-      // Always restore TaxRes CRM favicon — never restore a tenant favicon
-      setFavicon('/taxrescrm-favicon.png')
+      // Always restore RomyLabs favicon — never restore a tenant favicon
+      setFavicon('/romylabs-favicon.png')
     }
   }, [])
 
