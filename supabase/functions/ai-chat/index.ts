@@ -52,7 +52,7 @@ serve(async (req) => {
           'Authorization': 'Bearer ' + GROQ_KEY,
         },
         body: JSON.stringify({
-          model: 'llama3-70b-8192',
+          model: 'openai/gpt-oss-120b',
           messages,
           max_tokens: 1024,
           temperature: 0.3,
