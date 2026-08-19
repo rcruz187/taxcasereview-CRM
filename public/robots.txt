@@ -6,5 +6,7 @@ Disallow: /sign/
 Disallow: /employee/
 Disallow: /kiosk/
 Disallow: /meet/
+Disallow: /crm-admin
+Disallow: /crm-admin/
 
 Sitemap: https://taxrescrm.app/sitemap.xml
