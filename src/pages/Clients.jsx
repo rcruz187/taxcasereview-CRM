@@ -902,7 +902,7 @@ export default function Clients() {
   const navigate = useNavigate()
   const { id: urlId } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { user } = useApp()
+  const { user, searchQ } = useApp()
 
   // Cache settings at load time — avoids re-fetching signalwire_backend on every action
   const settingsRef = useRef(null)
