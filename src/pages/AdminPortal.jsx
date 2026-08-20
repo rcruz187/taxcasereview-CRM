@@ -1724,24 +1724,109 @@ function StatusDot({ ok }) {
 // Shows cross-product metrics from platform_metrics table.
 // Products tab — hub for all CRMs. Each card opens a live dashboard panel.
 const PRODUCT_REGISTRY = [
+  // ── ARCHITECTURE NOTE ────────────────────────────────────────────────────
+  // PRODUCTS: TaxRes CRM (platform), Camvella, Arcvena, BocaSync, PHL, + planned verticals
+  // CUSTOMERS/TENANTS: Tax Case Review, Nashville, CloudCPA (live TaxRes tenants — not products)
+  // connection: 'connected' | 'partial' | 'not_connected'
+  // lifecycleStage: 'live' | 'available' | 'building' | 'research' | 'internal'
+  // brandStatus: 'branded' | 'working_name' | 'unnamed'
+  // publicOnRomyLabs: bool — whether it appears on romylabs.com
+  // commerciallyAvailable: bool
+
+  // ── LIVE PRODUCTS ────────────────────────────────────────────────────────
   {
     key:       'taxres_crm',
     label:     'Tax Res CRM',
     icon:      '📊',
     color:     '#6366f1',
+    industry:  'Tax Resolution',
     url:       'https://taxrescrm.app',
-    status:    'live',
+    lifecycleStage: 'live',
+    connection:     'connected',
+    brandStatus:    'branded',
+    publicOnRomyLabs: true,
+    commerciallyAvailable: true,
     desc:      'Multi-tenant SaaS CRM for tax resolution firms',
     metricsUrl: 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/platform-metrics?view=saas',
   },
+  {
+    key:       'camvella',
+    label:     'Camvella',
+    icon:      '🏘️',
+    color:     '#0ea5e9',
+    industry:  'HOA / Property Management',
+    url:       'https://www.camvella.com',
+    lifecycleStage: 'available',
+    connection:     'partial',  // push-platform-metrics not yet deployed
+    brandStatus:    'branded',
+    publicOnRomyLabs: true,
+    commerciallyAvailable: true,
+    desc:      'HOA & community association management CRM',
+    metricsUrl: null, // CF Actions blocked until Sept 1 — deploy push-platform-metrics
+  },
+  {
+    key:       'arcvena',
+    label:     'Arcvena',
+    icon:      '⚡',
+    color:     '#8b5cf6',
+    industry:  'Electrical Contractors',
+    url:       'https://www.arcvena.com',
+    lifecycleStage: 'available',
+    connection:     'partial',  // metricsUrl not yet wired
+    brandStatus:    'branded',
+    publicOnRomyLabs: true,
+    commerciallyAvailable: false,
+    desc:      'Asset intelligence & job management for electrical contractors',
+    metricsUrl: null, // need Arcvena Supabase project ref
+  },
+  {
+    key:       'bocasync',
+    label:     'BocaSync',
+    icon:      '🦷',
+    color:     '#ec4899',
+    industry:  'Dental Practice',
+    url:       null,
+    lifecycleStage: 'building',
+    connection:     'not_connected',
+    brandStatus:    'branded',
+    publicOnRomyLabs: true,
+    commerciallyAvailable: false,
+    desc:      'Modern practice management for dental offices',
+    metricsUrl: null,
+    nextMilestone: 'Complete build phase — Supabase + edge fn setup pending',
+  },
+  {
+    key:       'phl',
+    label:     'PHL Land Care',
+    icon:      '🌿',
+    color:     '#f59e0b',
+    industry:  'Landscaping & Field Service',
+    url:       null,
+    lifecycleStage: 'internal',
+    connection:     'not_connected',
+    brandStatus:    'working_name',
+    publicOnRomyLabs: false,
+    commerciallyAvailable: false,
+    desc:      'Internal field service CRM — rebrand/migration pending',
+    metricsUrl: null,
+    nextMilestone: 'Decide commercial rebrand — do not publish under current name',
+  },
+
+  // ── TENANTS (not products — operational data, not product counts) ─────────
   {
     key:       'tax_case_review',
     label:     'Tax Case Review',
     icon:      '⚖️',
     color:     '#10b981',
-    // url intentionally omitted — Open CRM uses impersonation via tenantId
-    status:    'live',
-    desc:      "Origin CRM — Romy's own tax resolution practice (TRC-001)",
+    industry:  'Tax Resolution',
+    isTenant:  true,  // customer/tenant — not a product
+    url:       null,
+    lifecycleStage: 'live',
+    connection:     'connected',
+    brandStatus:    'branded',
+    publicOnRomyLabs: false,
+    commerciallyAvailable: false,
+    desc:      "Romy's own tax practice — origin CRM (TRC-001)",
     metricsUrl: 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/platform-metrics?view=tcr',
     tenantId:  '61a89aef-0e7e-4ea2-b222-44ab2024655a',
   },
@@ -1750,8 +1835,14 @@ const PRODUCT_REGISTRY = [
     label:     'Nashville Tax Solutions',
     icon:      '🎸',
     color:     '#14b8a6',
+    industry:  'Tax Resolution',
+    isTenant:  true,
     url:       'https://nashville.taxrescrm.app',
-    status:    'live',
+    lifecycleStage: 'live',
+    connection:     'connected',
+    brandStatus:    'branded',
+    publicOnRomyLabs: false,
+    commerciallyAvailable: false,
     desc:      'TRC-002 — Nashville tenant on its own Supabase project',
     metricsUrl: 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/platform-metrics?view=nash',
   },
@@ -1760,62 +1851,206 @@ const PRODUCT_REGISTRY = [
     label:     'CloudCPA Inc',
     icon:      '☁️',
     color:     '#38bdf8',
-    // url intentionally omitted — Open CRM uses impersonation via tenantId
-    status:    'live',
-    desc:      'TRC-003 — CloudCPA Inc on Tax Res CRM platform (trial)',
+    industry:  'Tax Resolution',
+    isTenant:  true,
+    url:       null,
+    lifecycleStage: 'live',
+    connection:     'connected',
+    brandStatus:    'branded',
+    publicOnRomyLabs: false,
+    commerciallyAvailable: false,
+    desc:      'TRC-003 — CloudCPA Inc (trial) — contract pending',
     metricsUrl: 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/platform-metrics?view=cloudcpa',
     tenantId:  'ecd3d3ce-016a-4bb4-800e-f090f51e4cae',
   },
+
+  // ── PLANNED / RESEARCH CRM INITIATIVES ────────────────────────────────────
   {
-    key:       'camvella',
-    label:     'Camvella',
-    icon:      '🏘️',
-    color:     '#0ea5e9',
-    url:       'https://www.camvella.com',
-    status:    'live',
-    desc:      'HOA & property management CRM',
-    metricsUrl: 'https://fjqywulzsyfyzitneazb.supabase.co/functions/v1/platform-metrics',
-  },
-  {
-    key:       'phl',
-    label:     'PHL Land Care',
-    icon:      '🌿',
-    color:     '#f59e0b',
-    url:       '#',
-    status:    'internal',  // Internal product — not publicly marketed
-    desc:      'Field service CRM for lawn care & landscaping',
-    metricsUrl: null, // deploy platform-metrics to PHL Supabase to enable
-  },
-  {
-    key:       'arcvena',
-    label:     'Arcvena',
-    icon:      '⚡',
-    color:     '#8b5cf6',
-    url:       'https://www.arcvena.com',
-    status:    'coming',  // Marketing site live; CRM metrics not yet wired
-    desc:      'Field service CRM for electrical contractors',
-    metricsUrl: null, // deploy platform-metrics to Arcvena Supabase to enable
-  },
-  {
-    key:       'bocasync',
-    label:     'BocaSync',
-    icon:      '🦷',
-    color:     '#ec4899',
-    url:       'https://bocasync.com',
-    status:    'building',
-    desc:      'Practice management for dental offices',
+    key:       'hvac_plumbing',
+    label:     'HVAC / Plumbing CRM',
+    icon:      '🔧',
+    color:     '#64748b',
+    industry:  'HVAC & Plumbing',
+    url:       null,
+    lifecycleStage: 'research',
+    connection:     'not_connected',
+    brandStatus:    'unnamed',
+    publicOnRomyLabs: false,
+    commerciallyAvailable: false,
+    desc:      'Field service CRM for HVAC and plumbing contractors',
     metricsUrl: null,
+    nextMilestone: 'Define product architecture / brand / build phase',
+  },
+  {
+    key:       'auto_repair',
+    label:     'Auto Repair CRM',
+    icon:      '🚗',
+    color:     '#64748b',
+    industry:  'Automotive / Auto Repair',
+    url:       null,
+    lifecycleStage: 'research',
+    connection:     'not_connected',
+    brandStatus:    'unnamed',
+    publicOnRomyLabs: false,
+    commerciallyAvailable: false,
+    desc:      'Shop management CRM for auto repair businesses',
+    metricsUrl: null,
+    nextMilestone: 'Define product architecture / brand / build phase',
+  },
+  {
+    key:       'contractors',
+    label:     'General Contractors CRM',
+    icon:      '🏗️',
+    color:     '#64748b',
+    industry:  'General Contracting / Construction',
+    url:       null,
+    lifecycleStage: 'research',
+    connection:     'not_connected',
+    brandStatus:    'unnamed',
+    publicOnRomyLabs: false,
+    commerciallyAvailable: false,
+    desc:      'Project & client management for general contractors',
+    metricsUrl: null,
+    nextMilestone: 'Define product architecture / brand / build phase',
+  },
+  {
+    key:       'legal',
+    label:     'Legal Practice CRM',
+    icon:      '⚖️',
+    color:     '#64748b',
+    industry:  'Legal / Law Firm',
+    url:       null,
+    lifecycleStage: 'research',
+    connection:     'not_connected',
+    brandStatus:    'unnamed',
+    publicOnRomyLabs: false,
+    commerciallyAvailable: false,
+    desc:      'Client & case management for law firms and solo practitioners',
+    metricsUrl: null,
+    nextMilestone: 'Define product architecture / brand / build phase',
+  },
+  {
+    key:       'health_insurance',
+    label:     'Health Insurance Agency CRM',
+    icon:      '🏥',
+    color:     '#64748b',
+    industry:  'Health Insurance',
+    url:       null,
+    lifecycleStage: 'research',
+    connection:     'not_connected',
+    brandStatus:    'unnamed',
+    publicOnRomyLabs: false,
+    commerciallyAvailable: false,
+    desc:      'Policy and client management for health insurance agents',
+    metricsUrl: null,
+    nextMilestone: 'Define product architecture / brand / build phase',
+  },
+  {
+    key:       'real_estate',
+    label:     'Real Estate CRM',
+    icon:      '🏠',
+    color:     '#64748b',
+    industry:  'Real Estate',
+    url:       null,
+    lifecycleStage: 'research',
+    connection:     'not_connected',
+    brandStatus:    'unnamed',
+    publicOnRomyLabs: false,
+    commerciallyAvailable: false,
+    desc:      'Lead and transaction management for real estate agents and brokers',
+    metricsUrl: null,
+    nextMilestone: 'Define product architecture / brand / build phase',
+  },
+  {
+    key:       'cleaning',
+    label:     'Cleaning / Janitorial CRM',
+    icon:      '🧹',
+    color:     '#64748b',
+    industry:  'Cleaning & Janitorial Services',
+    url:       null,
+    lifecycleStage: 'research',
+    connection:     'not_connected',
+    brandStatus:    'unnamed',
+    publicOnRomyLabs: false,
+    commerciallyAvailable: false,
+    desc:      'Scheduling and client management for cleaning businesses',
+    metricsUrl: null,
+    nextMilestone: 'Define product architecture / brand / build phase',
+  },
+  {
+    key:       'med_spa',
+    label:     'Med Spa CRM',
+    icon:      '💆',
+    color:     '#64748b',
+    industry:  'Medical Spa / Aesthetics',
+    url:       null,
+    lifecycleStage: 'research',
+    connection:     'not_connected',
+    brandStatus:    'unnamed',
+    publicOnRomyLabs: false,
+    commerciallyAvailable: false,
+    desc:      'Appointment, treatment, and client management for med spas',
+    metricsUrl: null,
+    nextMilestone: 'Define product architecture / brand / build phase',
+  },
+  {
+    key:       'home_care',
+    label:     'Home Care CRM',
+    icon:      '🏡',
+    color:     '#64748b',
+    industry:  'Home Care / Senior Care',
+    url:       null,
+    lifecycleStage: 'research',
+    connection:     'not_connected',
+    brandStatus:    'unnamed',
+    publicOnRomyLabs: false,
+    commerciallyAvailable: false,
+    desc:      'Caregiver scheduling and client management for home care agencies',
+    metricsUrl: null,
+    nextMilestone: 'Define product architecture / brand / build phase',
+  },
+  {
+    key:       'veterinary',
+    label:     'Veterinary Practice CRM',
+    icon:      '🐾',
+    color:     '#64748b',
+    industry:  'Veterinary / Animal Health',
+    url:       null,
+    lifecycleStage: 'research',
+    connection:     'not_connected',
+    brandStatus:    'unnamed',
+    publicOnRomyLabs: false,
+    commerciallyAvailable: false,
+    desc:      'Patient records and appointment management for veterinary practices',
+    metricsUrl: null,
+    nextMilestone: 'Define product architecture / brand / build phase',
+  },
+  {
+    key:       'restoration_roofing',
+    label:     'Restoration / Roofing CRM',
+    icon:      '🏚️',
+    color:     '#64748b',
+    industry:  'Restoration & Roofing',
+    url:       null,
+    lifecycleStage: 'research',
+    connection:     'not_connected',
+    brandStatus:    'unnamed',
+    publicOnRomyLabs: false,
+    commerciallyAvailable: false,
+    desc:      'Claim, project, and client management for restoration and roofing contractors',
+    metricsUrl: null,
+    nextMilestone: 'Define product architecture / brand / build phase',
   },
 ]
-
 const HUB_SECRET = 'hub-metrics-2026'
 
 function fmt$(n) { return n ? `$${Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—' }
 function fmtN(n) { return n != null ? Number(n).toLocaleString() : '—' }
 function ProductsTab({ supabase }) {
-  const [selected, setSelected]     = useState(null) // the product registry entry
-  const [liveData, setLiveData]     = useState({})   // key → fetched metrics
-  const [loading, setLoading]       = useState({})   // key → bool
+  const [selected, setSelected]     = useState(null)
+  const [liveData, setLiveData]     = useState({})
+  const [loading, setLoading]       = useState({})
+  const [filter, setFilter]         = useState('all') // 'all' | 'products' | 'tenants' | 'planned'
 
   async function fetchMetrics(product) {
     if (!product.metricsUrl) return
@@ -1840,257 +2075,360 @@ function ProductsTab({ supabase }) {
 
   const CC = { card: (s={}) => ({ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 12, ...s }) }
 
+  // ── Status helpers ──────────────────────────────────────────────────────
+  const LIFECYCLE_LABEL = {
+    live:      { label: '✅ Live',       color: '#10b981' },
+    available: { label: '🟢 Available',  color: '#10b981' },
+    building:  { label: '🔨 Building',   color: '#f59e0b' },
+    research:  { label: '🔬 Research',   color: '#64748b' },
+    internal:  { label: '🔒 Internal',   color: '#475569' },
+  }
+  const CONN_LABEL = {
+    connected:     { label: 'Connected',     color: '#10b981', dot: '🟢' },
+    partial:       { label: 'Partial',       color: '#f59e0b', dot: '🟡' },
+    not_connected: { label: 'Not Connected', color: '#64748b', dot: '⚪' },
+  }
+  const BRAND_LABEL = {
+    branded:      'Branded',
+    working_name: 'Working Name',
+    unnamed:      'Not Selected',
+  }
+
+  function getLifecycle(p) { return LIFECYCLE_LABEL[p.lifecycleStage] || { label: p.lifecycleStage, color: '#64748b' } }
+  function getConn(p)      { return CONN_LABEL[p.connection] || { label: p.connection, color: '#64748b', dot: '⚪' } }
+
+  // ── Portfolio counts (from registry only — no live data needed) ─────────
+  const products = PRODUCT_REGISTRY.filter(p => !p.isTenant)
+  const tenants  = PRODUCT_REGISTRY.filter(p =>  p.isTenant)
+  const liveCount     = products.filter(p => p.lifecycleStage === 'live' || p.lifecycleStage === 'available').length
+  const buildingCount = products.filter(p => p.lifecycleStage === 'building').length
+  const researchCount = products.filter(p => p.lifecycleStage === 'research').length
+  const internalCount = products.filter(p => p.lifecycleStage === 'internal').length
+  const connectedCount= products.filter(p => p.connection === 'connected').length
+  const partialCount  = products.filter(p => p.connection === 'partial').length
+
+  // ── Filtered list ───────────────────────────────────────────────────────
+  const filtered = filter === 'tenants' ? tenants
+                 : filter === 'planned' ? products.filter(p => p.lifecycleStage === 'research')
+                 : filter === 'products' ? products.filter(p => p.lifecycleStage !== 'research')
+                 : [...products, ...tenants]
+
+  const BADGE = (txt, color) => (
+    <span style={{ fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:20,
+      background:`${color}15`, color, border:`1px solid ${color}30`, whiteSpace:'nowrap' }}>
+      {txt}
+    </span>
+  )
+
   return (
-    <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
-
-      {/* ── Card Grid ── */}
-      <div style={{ flex: selected ? '0 0 340px' : '1', minWidth: 0 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr' : 'repeat(3,1fr)', gap: 12 }}>
-          {PRODUCT_REGISTRY.map(p => {
-            const isBuilding = p.status === 'building'
-            const isSelected = selected?.key === p.key
-            const clickable  = p.url !== '#' || p.metricsUrl
-            return (
-              <div key={p.key}
-                onClick={() => isSelected ? setSelected(null) : selectProduct(p)}
-                style={{
-                  ...CC.card(),
-                  padding: '18px 20px',
-                  opacity:    isBuilding ? .7 : 1,
-                  cursor:     'pointer',
-                  border:     isSelected ? `1px solid ${p.color}` : `1px solid ${p.color}30`,
-                  background: isSelected ? `${p.color}12` : 'rgba(255,255,255,.04)',
-                  transition: 'all .15s',
-                }}
-                onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.border = `1px solid ${p.color}60`; e.currentTarget.style.background = `${p.color}08` } }}
-                onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.border = `1px solid ${p.color}30`; e.currentTarget.style.background = 'rgba(255,255,255,.04)' } }}
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 22 }}>{p.icon}</span>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0' }}>{p.label}</div>
-                      <div style={{ fontSize: 9, fontWeight: 700, color: isBuilding ? '#f59e0b' : '#10b981',
-                        textTransform: 'uppercase', letterSpacing: '.06em', marginTop: 2 }}>
-                        {isBuilding ? '🔨 Building' : '✅ Live'}
-                      </div>
-                    </div>
-                  </div>
-                  {!isSelected && (p.tenantId || (p.url && p.url !== '#')) && (
-                    p.tenantId ? (
-                      <button
-                        onClick={async e => {
-                          e.stopPropagation()
-                          if (!p.tenantId) return
-                          const { data: token } = await supabase.rpc('create_impersonation_token', { p_tenant_id: p.tenantId })
-                          if (token) window.open(`${window.location.origin}/impersonate?admin_token=${token}`, '_blank')
-                        }}
-                        style={{ fontSize: 10, color: '#fff', fontWeight: 700, textDecoration: 'none',
-                          background: p.color, padding: '4px 10px', borderRadius: 6, flexShrink: 0,
-                          border: 'none', cursor: 'pointer' }}>
-                        Open →
-                      </button>
-                    ) : (
-                      <a href={p.url} target="_blank" rel="noreferrer"
-                        onClick={e => e.stopPropagation()}
-                        style={{ fontSize: 10, color: '#fff', fontWeight: 700, textDecoration: 'none',
-                          background: p.color, padding: '4px 10px', borderRadius: 6, flexShrink: 0 }}>
-                        Open →
-                      </a>
-                    )
-                  )}
-                </div>
-                <div style={{ fontSize: 11, color: '#475569', marginBottom: 10, lineHeight: 1.4 }}>{p.desc}</div>
-
-                {/* Mini metrics preview */}
-                {liveData[p.key]?.ok && !isSelected && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                    {[
-                      ['MRR',     fmt$(liveData[p.key].metrics?.mrr)],
-                      ['Clients', fmtN(liveData[p.key].metrics?.active_clients)],
-                    ].map(([l, v]) => (
-                      <div key={l} style={{ background: 'rgba(255,255,255,.03)', borderRadius: 6, padding: '6px 8px' }}>
-                        <div style={{ fontSize: 9, color: '#334155', fontWeight: 700, textTransform: 'uppercase' }}>{l}</div>
-                        <div style={{ fontSize: 12, color: '#e2e8f0', fontWeight: 700, marginTop: 2 }}>{v}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {loading[p.key] && <div style={{ fontSize: 11, color: '#475569' }}>Loading…</div>}
-                {!p.metricsUrl && !isBuilding && (
-                  <div style={{ fontSize: 10, color: '#334155' }}>Deploy platform-metrics to connect</div>
-                )}
-                {isBuilding && !p.metricsUrl && (
-                  <div style={{ fontSize: 10, color: '#334155' }}>Not yet pushing metrics</div>
-                )}
-              </div>
-            )
-          })}
-        </div>
+    <div>
+      {/* ── Portfolio summary bar ────────────────────────────────────────── */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:10, marginBottom:20 }}>
+        {[
+          { label:'Total Products',  val:products.length,  color:'#6366f1' },
+          { label:'Live / Available',val:liveCount,        color:'#10b981' },
+          { label:'Building',        val:buildingCount,    color:'#f59e0b' },
+          { label:'Research',        val:researchCount,    color:'#64748b' },
+          { label:'Internal',        val:internalCount,    color:'#475569' },
+          { label:'Tenants',         val:tenants.length,   color:'#14b8a6' },
+        ].map(k => (
+          <div key={k.label} style={{ background:`${k.color}10`, border:`1px solid ${k.color}20`,
+            borderRadius:10, padding:'10px 14px', textAlign:'center' }}>
+            <div style={{ fontSize:9, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:4 }}>{k.label}</div>
+            <div style={{ fontSize:24, fontWeight:900, color:k.color }}>{k.val}</div>
+          </div>
+        ))}
       </div>
 
-      {/* ── Dashboard Panel ── */}
-      {selected && (
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ ...CC.card({ padding: '0' }) }}>
-
-            {/* Header */}
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(99,102,241,.1)',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: 28 }}>{selected.icon}</span>
-                <div>
-                  <div style={{ fontSize: 18, fontWeight: 900, color: '#fff' }}>{selected.label}</div>
-                  <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>{selected.desc}</div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                {selected.tenantId ? (
-                  <button onClick={async () => {
-                    const { data: token } = await supabase.rpc('create_impersonation_token', { p_tenant_id: selected.tenantId })
-                    if (token) window.open(`${window.location.origin}/impersonate?admin_token=${token}`, '_blank')
-                  }} style={{ fontSize: 12, color: '#fff', fontWeight: 700,
-                    background: selected.color, padding: '7px 16px', borderRadius: 8, border: 'none', cursor: 'pointer' }}>
-                    Open CRM →
-                  </button>
-                ) : selected.url !== '#' && (
-                  <a href={selected.url} target="_blank" rel="noreferrer"
-                    style={{ fontSize: 12, color: '#fff', fontWeight: 700, textDecoration: 'none',
-                      background: selected.color, padding: '7px 16px', borderRadius: 8 }}>
-                    Open CRM →
-                  </a>
-                )}
-                {selected.metricsUrl && (
-                  <button onClick={() => fetchMetrics(selected)}
-                    style={{ fontSize: 11, color: '#6366f1', background: 'rgba(99,102,241,.1)',
-                      border: '1px solid rgba(99,102,241,.2)', borderRadius: 8, padding: '7px 14px', cursor: 'pointer' }}>
-                    ↻ Refresh
-                  </button>
-                )}
-                <button onClick={() => setSelected(null)}
-                  style={{ fontSize: 18, color: '#475569', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}>×</button>
-              </div>
-            </div>
-
-            {/* Body */}
-            <div style={{ padding: '20px 24px' }}>
-              {!selected.metricsUrl ? (
-                <div style={{ textAlign: 'center', padding: '48px 0', color: '#334155' }}>
-                  <div style={{ fontSize: 36, marginBottom: 12 }}>🔌</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#475569', marginBottom: 8 }}>
-                    {selected.status === 'building' ? 'Not yet built' : 'Metrics not connected'}
-                  </div>
-                  <div style={{ fontSize: 12, color: '#334155', maxWidth: 320, margin: '0 auto', lineHeight: 1.6 }}>
-                    {selected.status === 'building'
-                      ? 'This product is still being built. Check back soon.'
-                      : 'Deploy the platform-metrics edge function to this product\'s Supabase project to see live data here.'}
-                  </div>
-                </div>
-              ) : loading[selected.key] ? (
-                <div style={{ textAlign: 'center', padding: '48px 0', color: '#475569', fontSize: 13 }}>
-                  Loading live data…
-                </div>
-              ) : liveData[selected.key]?.ok === false ? (
-                <div style={{ textAlign: 'center', padding: '48px 0' }}>
-                  <div style={{ fontSize: 13, color: '#ef4444', marginBottom: 8 }}>Failed to load metrics</div>
-                  <div style={{ fontSize: 11, color: '#334155' }}>{liveData[selected.key]?.error}</div>
-                </div>
-              ) : liveData[selected.key] ? (() => {
-                const d = liveData[selected.key]
-                const m = d.metrics || {}
-                return (
-                  <div>
-                    {/* KPI tiles */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
-                      {[
-                        { label: 'MRR',           value: fmt$(m.mrr),            color: '#10b981' },
-                        { label: 'ARR',           value: fmt$(m.arr),            color: '#6366f1' },
-                        { label: 'Active Clients',value: fmtN(m.active_clients), color: '#0ea5e9' },
-                        { label: 'Active Leads',  value: fmtN(m.active_leads),   color: '#8b5cf6' },
-                        { label: 'Active Offices',value: fmtN(m.active_offices), color: '#f59e0b' },
-                        { label: 'Total Offices', value: fmtN(m.total_offices),  color: '#f59e0b' },
-                        { label: 'Pending Tasks', value: fmtN(m.pending_tasks),  color: '#ef4444' },
-                        { label: 'Storage',       value: fmtBytes(m.storage_bytes), color: '#475569' },
-                      ].map(k => (
-                        <div key={k.label} style={{ background: `${k.color}10`, border: `1px solid ${k.color}25`,
-                          borderRadius: 10, padding: '12px 14px' }}>
-                          <div style={{ fontSize: 9, fontWeight: 700, color: '#64748b',
-                            textTransform: 'uppercase', letterSpacing: '.07em' }}>{k.label}</div>
-                          <div style={{ fontSize: 20, fontWeight: 900, color: k.color, marginTop: 6 }}>{k.value}</div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                      {/* Offices table */}
-                      {d.offices?.length > 0 && (
-                        <div style={CC.card({ padding: '16px 18px' })}>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: '#475569',
-                            textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 12 }}>
-                            Offices / Tenants
-                          </div>
-                          {d.offices.map((o, i) => (
-                            <div key={o.id}
-                              onClick={async () => {
-                                const { data: token } = await supabase.rpc('create_impersonation_token', { p_tenant_id: o.id })
-                                if (token) window.open(`${window.location.origin}/impersonate?admin_token=${token}`, '_blank')
-                              }}
-                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                padding: '8px 0', borderBottom: i < d.offices.length-1 ? '1px solid rgba(99,102,241,.06)' : 'none',
-                                cursor: 'pointer', borderRadius: 6, transition: 'background .1s' }}
-                              onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,.06)'}
-                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                              <div>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0' }}>{o.name} <span style={{ fontSize: 10, color: '#334155' }}>↗</span></div>
-                                <div style={{ fontSize: 10, color: '#475569' }}>Since {o.since || '—'}</div>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ fontSize: 11, fontWeight: 700, color: '#10b981' }}>{fmt$(o.mrr)}/mo</span>
-                                <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
-                                  background: o.is_active ? 'rgba(16,185,129,.12)' : 'rgba(71,85,105,.12)',
-                                  color: o.is_active ? '#10b981' : '#475569' }}>
-                                  {o.is_active ? 'Active' : 'Inactive'}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Recent activity */}
-                      {d.recent_activity?.length > 0 && (
-                        <div style={CC.card({ padding: '16px 18px' })}>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: '#475569',
-                            textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 12 }}>
-                            Recent Activity
-                          </div>
-                          {d.recent_activity.map((a, i) => (
-                            <div key={i} style={{ padding: '8px 0',
-                              borderBottom: i < d.recent_activity.length-1 ? '1px solid rgba(99,102,241,.06)' : 'none' }}>
-                              <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.5 }}>{a.text}</div>
-                              <div style={{ fontSize: 10, color: '#334155', marginTop: 3 }}>
-                                {fmtAgo(a.at)} · {a.by || '—'}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div style={{ fontSize: 10, color: '#334155', marginTop: 14, textAlign: 'right' }}>
-                      Live data · fetched {fmtAgo(d.fetched_at)}
-                    </div>
-                  </div>
-                )
-              })() : (
-                <div style={{ textAlign: 'center', padding: '48px 0', color: '#475569', fontSize: 13 }}>
-                  Click Refresh to load live data
-                </div>
-              )}
-            </div>
+      {/* ── Integrations needed ────────────────────────────────────────── */}
+      {(partialCount > 0) && (
+        <div style={{ background:'rgba(245,158,11,.06)', border:'1px solid rgba(245,158,11,.25)',
+          borderRadius:10, padding:'10px 16px', marginBottom:16,
+          display:'flex', alignItems:'center', gap:10 }}>
+          <span style={{ fontSize:16 }}>🟡</span>
+          <div>
+            <span style={{ fontSize:12, fontWeight:700, color:'#f59e0b' }}>Setup Needed</span>
+            <span style={{ fontSize:12, color:'#94a3b8', marginLeft:8 }}>
+              {partialCount} product{partialCount>1?'s':''} partially connected — metrics deploy pending
+            </span>
           </div>
         </div>
       )}
+
+      {/* ── Filter tabs ────────────────────────────────────────────────── */}
+      <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+        {[
+          { key:'all',      label:`All (${PRODUCT_REGISTRY.length})` },
+          { key:'products', label:`Products (${products.filter(p=>p.lifecycleStage!=='research').length})` },
+          { key:'planned',  label:`Research (${researchCount})` },
+          { key:'tenants',  label:`Tenants (${tenants.length})` },
+        ].map(f => (
+          <button key={f.key} onClick={()=>{setFilter(f.key);setSelected(null)}}
+            style={{ fontSize:11, fontWeight:700, padding:'6px 14px', borderRadius:8, cursor:'pointer',
+              background: filter===f.key ? 'rgba(99,102,241,.2)' : 'rgba(255,255,255,.04)',
+              color: filter===f.key ? '#a5b4fc' : '#64748b',
+              border: filter===f.key ? '1px solid rgba(99,102,241,.4)' : '1px solid rgba(255,255,255,.08)' }}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display:'flex', gap:20, alignItems:'flex-start' }}>
+        {/* ── Card Grid ─────────────────────────────────────────────────── */}
+        <div style={{ flex: selected ? '0 0 360px' : '1', minWidth:0 }}>
+          <div style={{ display:'grid', gridTemplateColumns: selected ? '1fr' : 'repeat(3,1fr)', gap:12 }}>
+            {filtered.map(p => {
+              const lc   = getLifecycle(p)
+              const conn = getConn(p)
+              const isSelected = selected?.key === p.key
+              const isResearch = p.lifecycleStage === 'research'
+              const isInternal = p.lifecycleStage === 'internal'
+              const accentColor = isResearch ? '#64748b' : isInternal ? '#475569' : p.color
+              return (
+                <div key={p.key}
+                  onClick={() => isSelected ? setSelected(null) : selectProduct(p)}
+                  style={{
+                    background: isSelected ? `${accentColor}12` : 'rgba(255,255,255,.04)',
+                    border: isSelected ? `1px solid ${accentColor}` : `1px solid ${accentColor}30`,
+                    borderRadius:12, padding:'16px 18px', cursor:'pointer', transition:'all .15s',
+                    opacity: isResearch ? .75 : 1,
+                  }}
+                  onMouseEnter={e=>{ if(!isSelected){e.currentTarget.style.border=`1px solid ${accentColor}60`; e.currentTarget.style.background=`${accentColor}08`} }}
+                  onMouseLeave={e=>{ if(!isSelected){e.currentTarget.style.border=`1px solid ${accentColor}30`; e.currentTarget.style.background='rgba(255,255,255,.04)'} }}
+                >
+                  {/* Card header */}
+                  <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:8 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:9 }}>
+                      <span style={{ fontSize:20 }}>{p.icon}</span>
+                      <div>
+                        <div style={{ fontSize:12, fontWeight:800, color:'#e2e8f0', lineHeight:1.2 }}>{p.label}</div>
+                        <div style={{ fontSize:9, color:'#64748b', marginTop:2 }}>{p.industry}</div>
+                      </div>
+                    </div>
+                    {/* Open button — only for connected products with a URL */}
+                    {!isSelected && p.connection==='connected' && (p.tenantId || p.url) && !isResearch && !isInternal && (
+                      p.tenantId ? (
+                        <button onClick={async e=>{e.stopPropagation();const{data:t}=await supabase.rpc('create_impersonation_token',{p_tenant_id:p.tenantId});if(t)window.open(`${window.location.origin}/impersonate?admin_token=${t}`,'_blank')}}
+                          style={{ fontSize:10,color:'#fff',fontWeight:700,background:accentColor,padding:'3px 9px',borderRadius:6,border:'none',cursor:'pointer',flexShrink:0 }}>Open →</button>
+                      ) : (
+                        <a href={p.url} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}
+                          style={{ fontSize:10,color:'#fff',fontWeight:700,textDecoration:'none',background:accentColor,padding:'3px 9px',borderRadius:6,flexShrink:0 }}>Open →</a>
+                      )
+                    )}
+                  </div>
+
+                  {/* Status badges */}
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:8 }}>
+                    {BADGE(lc.label, lc.color)}
+                    {BADGE(`${conn.dot} ${conn.label}`, conn.color)}
+                    {p.isTenant && BADGE('Tenant', '#14b8a6')}
+                  </div>
+
+                  {/* Mini metrics or planned card info */}
+                  {p.connection === 'connected' && liveData[p.key]?.ok && !isSelected ? (
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5 }}>
+                      {[['MRR', fmt$(liveData[p.key].metrics?.mrr)],['Clients', fmtN(liveData[p.key].metrics?.active_clients)]].map(([l,v])=>(
+                        <div key={l} style={{ background:'rgba(255,255,255,.03)', borderRadius:6, padding:'5px 7px' }}>
+                          <div style={{ fontSize:8, color:'#334155', fontWeight:700, textTransform:'uppercase' }}>{l}</div>
+                          <div style={{ fontSize:12, color:'#e2e8f0', fontWeight:700, marginTop:1 }}>{v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : isResearch || isInternal ? (
+                    <div style={{ fontSize:10, color:'#475569', lineHeight:1.5 }}>
+                      <div><span style={{ color:'#334155' }}>Brand:</span> {BRAND_LABEL[p.brandStatus]}</div>
+                      <div><span style={{ color:'#334155' }}>Domain:</span> —</div>
+                      {p.nextMilestone && <div style={{ marginTop:4, color:'#6366f1', fontStyle:'italic' }}>→ {p.nextMilestone}</div>}
+                    </div>
+                  ) : p.connection === 'partial' ? (
+                    <div style={{ fontSize:10, color:'#f59e0b' }}>⚙ Metrics deploy pending</div>
+                  ) : p.connection === 'not_connected' && !isResearch ? (
+                    <div style={{ fontSize:10, color:'#334155' }}>Deploy platform-metrics to connect</div>
+                  ) : null}
+
+                  {loading[p.key] && <div style={{ fontSize:11, color:'#475569', marginTop:4 }}>Loading…</div>}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* ── Detail Panel ─────────────────────────────────────────────── */}
+        {selected && (
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ ...CC.card({ padding:0 }) }}>
+
+              {/* Header */}
+              <div style={{ padding:'18px 22px', borderBottom:'1px solid rgba(99,102,241,.1)',
+                display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                  <span style={{ fontSize:26 }}>{selected.icon}</span>
+                  <div>
+                    <div style={{ fontSize:17, fontWeight:900, color:'#fff' }}>{selected.label}</div>
+                    <div style={{ fontSize:11, color:'#475569', marginTop:2 }}>{selected.industry} · {selected.desc}</div>
+                  </div>
+                </div>
+                <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                  {selected.connection==='connected' && selected.tenantId && (
+                    <button onClick={async()=>{const{data:t}=await supabase.rpc('create_impersonation_token',{p_tenant_id:selected.tenantId});if(t)window.open(`${window.location.origin}/impersonate?admin_token=${t}`,'_blank')}}
+                      style={{ fontSize:12,color:'#fff',fontWeight:700,background:selected.color,padding:'7px 16px',borderRadius:8,border:'none',cursor:'pointer' }}>Open CRM →</button>
+                  )}
+                  {selected.connection==='connected' && selected.url && !selected.tenantId && (
+                    <a href={selected.url} target="_blank" rel="noreferrer"
+                      style={{ fontSize:12,color:'#fff',fontWeight:700,textDecoration:'none',background:selected.color,padding:'7px 16px',borderRadius:8 }}>Open CRM →</a>
+                  )}
+                  {selected.metricsUrl && (
+                    <button onClick={()=>fetchMetrics(selected)}
+                      style={{ fontSize:11,color:'#6366f1',background:'rgba(99,102,241,.1)',border:'1px solid rgba(99,102,241,.2)',borderRadius:8,padding:'7px 14px',cursor:'pointer' }}>
+                      ↻ Refresh
+                    </button>
+                  )}
+                  <button onClick={()=>setSelected(null)}
+                    style={{ fontSize:18,color:'#475569',background:'none',border:'none',cursor:'pointer',lineHeight:1 }}>×</button>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div style={{ padding:'18px 22px' }}>
+
+                {/* Status grid — always shown */}
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:20 }}>
+                  {[
+                    { label:'Stage',      val: LIFECYCLE_LABEL[selected.lifecycleStage]?.label || selected.lifecycleStage },
+                    { label:'Connection', val: `${getConn(selected).dot} ${getConn(selected).label}` },
+                    { label:'Brand',      val: BRAND_LABEL[selected.brandStatus] || selected.brandStatus },
+                    { label:'Domain',     val: selected.url || '—' },
+                    { label:'Public',     val: selected.publicOnRomyLabs ? 'Yes — romylabs.com' : 'No' },
+                    { label:'Commercial', val: selected.commerciallyAvailable ? 'Yes' : 'Not yet' },
+                  ].map(k => (
+                    <div key={k.label} style={{ background:'rgba(255,255,255,.03)', borderRadius:8, padding:'10px 12px' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'.06em' }}>{k.label}</div>
+                      <div style={{ fontSize:12, color:'#e2e8f0', marginTop:4, wordBreak:'break-all' }}>{k.val}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Next milestone for planned products */}
+                {selected.nextMilestone && (
+                  <div style={{ background:'rgba(99,102,241,.08)', border:'1px solid rgba(99,102,241,.2)',
+                    borderRadius:10, padding:'12px 16px', marginBottom:16 }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:'#6366f1', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:4 }}>Next Milestone</div>
+                    <div style={{ fontSize:13, color:'#a5b4fc' }}>{selected.nextMilestone}</div>
+                  </div>
+                )}
+
+                {/* Metrics for connected products */}
+                {selected.connection === 'not_connected' ? (
+                  <div style={{ textAlign:'center', padding:'32px 0', color:'#334155' }}>
+                    <div style={{ fontSize:32, marginBottom:10 }}>
+                      {selected.lifecycleStage==='research' ? '🔬' : selected.lifecycleStage==='internal' ? '🔒' : '🔌'}
+                    </div>
+                    <div style={{ fontSize:14, fontWeight:700, color:'#475569', marginBottom:8 }}>
+                      {selected.lifecycleStage==='research' ? 'Research Stage — Not yet built'
+                       : selected.lifecycleStage==='internal' ? 'Internal product — Not publicly marketed'
+                       : 'No backend connected'}
+                    </div>
+                    <div style={{ fontSize:12, color:'#334155', maxWidth:340, margin:'0 auto', lineHeight:1.6 }}>
+                      {selected.lifecycleStage==='research'
+                        ? 'This product is in the research and planning phase. No backend, domain, or metrics have been set up yet. Data will populate here once the build phase begins.'
+                        : selected.lifecycleStage==='internal'
+                        ? 'This product operates internally. No live metrics are connected. Rebrand or migration needed before public launch.'
+                        : 'Deploy the platform-metrics edge function to this product\'s Supabase project to connect live data.'}
+                    </div>
+                  </div>
+                ) : selected.connection === 'partial' ? (
+                  <div style={{ textAlign:'center', padding:'32px 0', color:'#334155' }}>
+                    <div style={{ fontSize:32, marginBottom:10 }}>🟡</div>
+                    <div style={{ fontSize:14, fontWeight:700, color:'#f59e0b', marginBottom:8 }}>Partial Connection</div>
+                    <div style={{ fontSize:12, color:'#94a3b8', maxWidth:340, margin:'0 auto', lineHeight:1.6 }}>
+                      Product exists and is deployed, but platform-metrics edge function has not been wired yet.
+                      Deploy <code style={{ background:'rgba(255,255,255,.06)', padding:'1px 5px', borderRadius:4 }}>push-platform-metrics</code> to this product's Supabase project to enable live data.
+                    </div>
+                  </div>
+                ) : loading[selected.key] ? (
+                  <div style={{ textAlign:'center', padding:'32px 0', color:'#475569', fontSize:13 }}>Loading live data…</div>
+                ) : liveData[selected.key]?.ok === false ? (
+                  <div style={{ textAlign:'center', padding:'32px 0' }}>
+                    <div style={{ fontSize:13, color:'#ef4444', marginBottom:8 }}>Failed to load metrics</div>
+                    <div style={{ fontSize:11, color:'#334155' }}>{liveData[selected.key]?.error}</div>
+                  </div>
+                ) : liveData[selected.key] ? (() => {
+                  const d = liveData[selected.key]
+                  const m = d.metrics || {}
+                  return (
+                    <div>
+                      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:20 }}>
+                        {[
+                          { label:'MRR',           value: fmt$(m.mrr),            color:'#10b981' },
+                          { label:'ARR',           value: fmt$(m.arr),            color:'#6366f1' },
+                          { label:'Active Clients',value: fmtN(m.active_clients), color:'#0ea5e9' },
+                          { label:'Active Leads',  value: fmtN(m.active_leads),   color:'#8b5cf6' },
+                          { label:'Active Offices',value: fmtN(m.active_offices), color:'#f59e0b' },
+                          { label:'Total Offices', value: fmtN(m.total_offices),  color:'#f59e0b' },
+                          { label:'Pending Tasks', value: fmtN(m.pending_tasks),  color:'#ef4444' },
+                          { label:'Storage',       value: fmtBytes(m.storage_bytes), color:'#475569' },
+                        ].map(k => (
+                          <div key={k.label} style={{ background:`${k.color}10`, border:`1px solid ${k.color}25`, borderRadius:10, padding:'12px 14px' }}>
+                            <div style={{ fontSize:9, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'.07em' }}>{k.label}</div>
+                            <div style={{ fontSize:20, fontWeight:900, color:k.color, marginTop:6 }}>{k.value}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+                        {d.offices?.length > 0 && (
+                          <div style={CC.card({ padding:'16px 18px' })}>
+                            <div style={{ fontSize:10, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:12 }}>Offices / Tenants</div>
+                            {d.offices.map((o, i) => (
+                              <div key={o.id}
+                                onClick={async()=>{const{data:t}=await supabase.rpc('create_impersonation_token',{p_tenant_id:o.id});if(t)window.open(`${window.location.origin}/impersonate?admin_token=${t}`,'_blank')}}
+                                style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 0',
+                                  borderBottom: i < d.offices.length-1 ? '1px solid rgba(99,102,241,.06)' : 'none',
+                                  cursor:'pointer' }}
+                                onMouseEnter={e=>e.currentTarget.style.background='rgba(99,102,241,.06)'}
+                                onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                                <div>
+                                  <div style={{ fontSize:12, fontWeight:600, color:'#e2e8f0' }}>{o.name} <span style={{ fontSize:10, color:'#334155' }}>↗</span></div>
+                                  <div style={{ fontSize:10, color:'#475569' }}>Since {o.since || '—'}</div>
+                                </div>
+                                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                                  <span style={{ fontSize:11, fontWeight:700, color:'#10b981' }}>{fmt$(o.mrr)}/mo</span>
+                                  <span style={{ fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:20,
+                                    background: o.is_active ? 'rgba(16,185,129,.12)' : 'rgba(71,85,105,.12)',
+                                    color: o.is_active ? '#10b981' : '#475569' }}>
+                                    {o.is_active ? 'Active' : 'Inactive'}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {d.recent_activity?.length > 0 && (
+                          <div style={CC.card({ padding:'16px 18px' })}>
+                            <div style={{ fontSize:10, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:12 }}>Recent Activity</div>
+                            {d.recent_activity.map((a, i) => (
+                              <div key={i} style={{ padding:'8px 0', borderBottom: i < d.recent_activity.length-1 ? '1px solid rgba(99,102,241,.06)' : 'none' }}>
+                                <div style={{ fontSize:11, color:'#94a3b8', lineHeight:1.5 }}>{a.text}</div>
+                                <div style={{ fontSize:10, color:'#334155', marginTop:3 }}>{fmtAgo(a.at)} · {a.by || '—'}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ fontSize:10, color:'#334155', marginTop:14, textAlign:'right' }}>
+                        Live data · fetched {fmtAgo(d.fetched_at)}
+                      </div>
+                    </div>
+                  )
+                })() : (
+                  <div style={{ textAlign:'center', padding:'32px 0', color:'#475569', fontSize:13 }}>
+                    Click Refresh to load live data
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
