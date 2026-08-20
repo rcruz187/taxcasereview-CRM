@@ -3408,8 +3408,10 @@ function CommandCenter() {
                   { label:'Email (Stalwart)',      ok: sysStatus?.mailOk ?? null },
                   { label:'taxrescrm.net',         ok: sysStatus?.netOk ?? null },
                   { label:'taxrescrm.app',         ok: sysStatus?.appOk ?? null },
-                  { label:'GA4 (G-M6J80B65LG)',   ok: true },
-                  { label:'Clarity (xyck7g2mfl)', ok: true },
+                  { label:'GA4 · TaxRes (G-M6J80B65LG)',   ok: true },
+                  { label:'GA4 · RomyLabs (G-2MSNYF9XBE)', ok: true },
+                  { label:'Clarity · TaxRes (xyck7g2mfl)',  ok: true },
+                  { label:'Clarity · RomyLabs (y54zqoj6c2)',ok: true },
                   { label:'Google Search Console', ok: gscConnected ? true : null },
                   { label:'Bing Webmaster',        ok: bingConnected ? true : null },
                 ]
@@ -3431,9 +3433,11 @@ function CommandCenter() {
             <div style={CC.card({padding:'22px 24px'})}>
               <div style={CC.sectionLabel}>Connect APIs</div>
               {[
-                { label:'Google Analytics 4',   key:'ga4',     status: 'connected · G-M6J80B65LG', color: '#10b981' },
+                { label:'GA4 · TaxRes',          key:'ga4',     status: 'connected · G-M6J80B65LG', color: '#10b981' },
+                { label:'GA4 · RomyLabs',         key:'ga4rl',   status: 'connected · G-2MSNYF9XBE', color: '#10b981' },
                 { label:'Google Search Console', key:'gsc',     status: gscConnected ? 'connected' : 'not connected', color: gscConnected ? '#10b981' : '#f59e0b' },
-                { label:'Microsoft Clarity',     key:'clarity', status:'connected · xyck7g2mfl', color:'#10b981' },
+                { label:'Clarity · TaxRes',       key:'clarity', status:'connected · xyck7g2mfl', color:'#10b981' },
+                { label:'Clarity · RomyLabs',     key:'claritrl',status:'connected · y54zqoj6c2', color:'#10b981' },
                 { label:'Bing Webmaster',        key:'bing',    status: bingConnected ? 'connected' : 'not connected', color: bingConnected ? '#10b981' : '#64748b' },
               ].map((api,i) => (
                 <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
@@ -3444,9 +3448,11 @@ function CommandCenter() {
                   </div>
                   <button onClick={()=>{
                     if(api.key==='gsc') handleGSCConnect()
-                    else if(api.key==='ga4') alert('GA4: Add your Measurement ID in Settings')
+                    else if(api.key==='ga4') alert('GA4 TaxRes: G-M6J80B65LG — connected')
+                    else if(api.key==='ga4rl') alert('GA4 RomyLabs: G-2MSNYF9XBE — connected')
                     else if(api.key==='bing') alert('Bing: Send your API key to connect')
-                    else if(api.key==='clarity') alert('Clarity: Add your Project ID in Settings')
+                    else if(api.key==='clarity') alert('Clarity TaxRes: xyck7g2mfl — connected')
+                    else if(api.key==='claritrl') alert('Clarity RomyLabs: y54zqoj6c2 — connected')
                   }} style={{ ...S.btn('ghost'), fontSize:11, padding:'5px 14px' }}>Connect</button>
                 </div>
               ))}
