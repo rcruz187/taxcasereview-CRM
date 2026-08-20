@@ -2042,7 +2042,6 @@ const PRODUCT_REGISTRY = [
     nextMilestone: 'Define product architecture / brand / build phase',
   },
 ]
-const HUB_SECRET = 'hub-metrics-2026'
 
 function fmt$(n) { return n ? `$${Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—' }
 function fmtN(n) { return n != null ? Number(n).toLocaleString() : '—' }
@@ -2055,12 +2054,23 @@ function ProductsTab({ supabase, taxresActivity = [] }) {
   const [taxresLoading, setTaxresLoading] = useState(false)
 
   async function fetchMetrics(product) {
-    if (!product.metricsUrl) return
+    if (!product.metricsUrl) return          // only fetch products with a connected endpoint
     if (loading[product.key]) return
     setLoading(l => ({ ...l, [product.key]: true }))
     try {
-      const res = await fetch(product.metricsUrl, {
-        headers: { 'x-hub-secret': HUB_SECRET, 'Content-Type': 'application/json' }
+      // Route through hub-proxy — HUB_METRICS_SECRET never reaches the browser.
+      // Browser sends its Supabase JWT; hub-proxy verifies platform_admin server-side.
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
+      const HUB_PROXY = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/hub-proxy'
+      const res = await fetch(HUB_PROXY, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type':  'application/json',
+          'apikey':        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1weGd4ZnFkYnF1emtydnZlamtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTkwMDE4OTIsImV4cCI6MjAzNDU3Nzg5Mn0.zr0F_sV9-TJxO1wOST3VHr_n-5jPTpLY_AzEfKR1hSo',
+        },
+        body: JSON.stringify({ product: product.key }),
       })
       const data = await res.json()
       setLiveData(d => ({ ...d, [product.key]: data }))
