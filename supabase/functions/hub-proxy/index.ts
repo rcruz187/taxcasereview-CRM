@@ -14,10 +14,21 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const cors = {
-  'Access-Control-Allow-Origin': 'https://admin.romylabs.com',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+// Allowed origins for the Command Center
+// Both domains serve the same CF Pages build (taxcasereview-crm project)
+const ALLOWED_ORIGINS = new Set([
+  'https://admin.romylabs.com',
+  'https://taxrescrm.app',
+])
+
+function getCors(req: Request) {
+  const origin = req.headers.get('Origin') || ''
+  const allowed = ALLOWED_ORIGINS.has(origin) ? origin : 'https://admin.romylabs.com'
+  return {
+    'Access-Control-Allow-Origin':  allowed,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  }
 }
 
 // ── Server-side product allowlist ─────────────────────────────────────────
@@ -34,6 +45,7 @@ const PRODUCT_ENDPOINTS: Record<string, string> = {
 }
 
 Deno.serve(async (req) => {
+  const cors = getCors(req)
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
