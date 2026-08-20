@@ -1771,7 +1771,7 @@ const PRODUCT_REGISTRY = [
     color:     '#8b5cf6',
     industry:  'Electrical Contractors',
     url:       'https://www.arcvena.com',
-    lifecycleStage: 'available',
+    lifecycleStage: 'coming',   // public as Coming Soon — built but not commercially launched
     connection:     'partial',  // metricsUrl not yet wired
     brandStatus:    'branded',
     publicOnRomyLabs: true,
@@ -2077,11 +2077,12 @@ function ProductsTab({ supabase }) {
 
   // ── Status helpers ──────────────────────────────────────────────────────
   const LIFECYCLE_LABEL = {
-    live:      { label: '✅ Live',       color: '#10b981' },
-    available: { label: '🟢 Available',  color: '#10b981' },
-    building:  { label: '🔨 Building',   color: '#f59e0b' },
-    research:  { label: '🔬 Research',   color: '#64748b' },
-    internal:  { label: '🔒 Internal',   color: '#475569' },
+    live:      { label: '✅ Live',         color: '#10b981' },
+    available: { label: '🟢 Available',    color: '#10b981' },
+    coming:    { label: '🔜 Coming Soon',  color: '#8b5cf6' },
+    building:  { label: '🔨 Building',     color: '#f59e0b' },
+    research:  { label: '🔬 Research',     color: '#64748b' },
+    internal:  { label: '🔒 Internal',     color: '#475569' },
   }
   const CONN_LABEL = {
     connected:     { label: 'Connected',     color: '#10b981', dot: '🟢' },
@@ -2101,6 +2102,7 @@ function ProductsTab({ supabase }) {
   const products = PRODUCT_REGISTRY.filter(p => !p.isTenant)
   const tenants  = PRODUCT_REGISTRY.filter(p =>  p.isTenant)
   const liveCount     = products.filter(p => p.lifecycleStage === 'live' || p.lifecycleStage === 'available').length
+  const comingCount   = products.filter(p => p.lifecycleStage === 'coming').length
   const buildingCount = products.filter(p => p.lifecycleStage === 'building').length
   const researchCount = products.filter(p => p.lifecycleStage === 'research').length
   const internalCount = products.filter(p => p.lifecycleStage === 'internal').length
@@ -2127,9 +2129,9 @@ function ProductsTab({ supabase }) {
         {[
           { label:'Total Products',  val:products.length,  color:'#6366f1' },
           { label:'Live / Available',val:liveCount,        color:'#10b981' },
+          { label:'Coming Soon',     val:comingCount,      color:'#8b5cf6' },
           { label:'Building',        val:buildingCount,    color:'#f59e0b' },
           { label:'Research',        val:researchCount,    color:'#64748b' },
-          { label:'Internal',        val:internalCount,    color:'#475569' },
           { label:'Tenants',         val:tenants.length,   color:'#14b8a6' },
         ].map(k => (
           <div key={k.label} style={{ background:`${k.color}10`, border:`1px solid ${k.color}20`,
