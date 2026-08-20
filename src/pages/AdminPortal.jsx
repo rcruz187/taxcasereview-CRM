@@ -2051,6 +2051,8 @@ function ProductsTab({ supabase }) {
   const [liveData, setLiveData]     = useState({})
   const [loading, setLoading]       = useState({})
   const [filter, setFilter]         = useState('all') // 'all' | 'products' | 'tenants' | 'planned'
+  const [taxresOps, setTaxresOps]   = useState(null)
+  const [taxresLoading, setTaxresLoading] = useState(false)
 
   async function fetchMetrics(product) {
     if (!product.metricsUrl) return
@@ -2068,9 +2070,25 @@ function ProductsTab({ supabase }) {
     setLoading(l => ({ ...l, [product.key]: false }))
   }
 
+  async function loadTaxResOps() {
+    if (taxresLoading || taxresOps) return
+    setTaxresLoading(true)
+    try {
+      const [statsRes, tenantsRes] = await Promise.all([
+        supabase.rpc('admin_command_center_stats'),
+        supabase.rpc('admin_tenant_overview'),
+      ])
+      const stats   = statsRes.data || {}
+      const tenants = tenantsRes.data || []
+      setTaxresOps({ stats, tenants })
+    } catch(e) { console.error('TaxRes ops load:', e) }
+    setTaxresLoading(false)
+  }
+
   function selectProduct(p) {
     setSelected(p)
     if (p.metricsUrl && !liveData[p.key]) fetchMetrics(p)
+    if (p.key === 'taxres_crm') loadTaxResOps()
   }
 
   const CC = { card: (s={}) => ({ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 12, ...s }) }
@@ -2426,6 +2444,97 @@ function ProductsTab({ supabase }) {
                     Click Refresh to load live data
                   </div>
                 )}
+
+                {/* TaxRes-specific operational data — only shown when TaxRes is selected */}
+                {selected.key === 'taxres_crm' && (() => {
+                  if (taxresLoading) return <div style={{ textAlign:'center', padding:'20px 0', color:'#475569', fontSize:12 }}>Loading TaxRes operations…</div>
+                  if (!taxresOps) return (
+                    <div style={{ textAlign:'center', padding:'20px 0' }}>
+                      <button onClick={loadTaxResOps} style={{ fontSize:12, color:'#6366f1', background:'rgba(99,102,241,.1)', border:'1px solid rgba(99,102,241,.2)', borderRadius:8, padding:'7px 14px', cursor:'pointer' }}>
+                        Load TaxRes Operations Data
+                      </button>
+                    </div>
+                  )
+                  const { stats, tenants } = taxresOps
+                  const activeTenants = tenants.filter(r=>r.status==='active')
+                  const totalMRR      = tenants.reduce((s,r)=>s+Number(r.effective_monthly||0),0)
+                  return (
+                    <div style={{ marginTop:20, borderTop:'1px solid rgba(99,102,241,.1)', paddingTop:20 }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:12 }}>
+                        TaxRes Operations &amp; Tenant Data
+                      </div>
+                      {/* Office / Revenue KPIs */}
+                      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:16 }}>
+                        {[
+                          { label:'Active Offices', val:activeTenants.length, color:'#10b981' },
+                          { label:'Total Offices',  val:tenants.length,        color:'#6366f1' },
+                          { label:'TaxRes MRR',     val:fmt$(totalMRR),        color:'#10b981' },
+                          { label:'Total Seats',    val:tenants.reduce((s,r)=>s+Number(r.employee_count||0),0), color:'#f59e0b' },
+                          { label:'Total Clients',  val:fmtN(tenants.reduce((s,r)=>s+Number(r.client_count||0),0)), color:'#0ea5e9' },
+                          { label:'Total Leads',    val:fmtN(tenants.reduce((s,r)=>s+Number(r.lead_count||0),0)), color:'#8b5cf6' },
+                          { label:'Pending E-Signs',val:fmtN(Number(stats.pending_esigns||0)), color:'#f59e0b' },
+                          { label:'Demos Today',    val:fmtN(Number(stats.today_demos||0)),    color:'#ec4899' },
+                        ].map(k => (
+                          <div key={k.label} style={{ background:`${k.color}10`, border:`1px solid ${k.color}25`, borderRadius:10, padding:'10px 12px' }}>
+                            <div style={{ fontSize:9, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'.07em' }}>{k.label}</div>
+                            <div style={{ fontSize:18, fontWeight:900, color:k.color, marginTop:4 }}>{k.val}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Tenant table */}
+                      <div style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:8 }}>
+                        Tenants / Offices
+                      </div>
+                      {tenants.map((t, i) => (
+                        <div key={t.id}
+                          onClick={async()=>{const{data:tk}=await supabase.rpc('create_impersonation_token',{p_tenant_id:t.id});if(tk)window.open(`${window.location.origin}/impersonate?admin_token=${tk}`,'_blank')}}
+                          style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 12px',
+                            borderRadius:8, marginBottom:6, cursor:'pointer',
+                            background:'rgba(255,255,255,.03)', border:'1px solid rgba(99,102,241,.06)' }}
+                          onMouseEnter={e=>e.currentTarget.style.background='rgba(99,102,241,.08)'}
+                          onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,.03)'}>
+                          <div>
+                            <div style={{ fontSize:13, fontWeight:700, color:'#e2e8f0' }}>{t.name} <span style={{ fontSize:10, color:'#334155' }}>↗ Open CRM</span></div>
+                            <div style={{ fontSize:10, color:'#475569' }}>
+                              {t.employee_count||0} seats · {t.client_count||0} clients · {t.lead_count||0} leads
+                            </div>
+                          </div>
+                          <div style={{ textAlign:'right' }}>
+                            <div style={{ fontSize:13, fontWeight:700, color:'#10b981' }}>{fmt$(Number(t.effective_monthly||0))}/mo</div>
+                            <span style={{ fontSize:9, fontWeight:700, padding:'2px 8px', borderRadius:20,
+                              background: t.status==='active'?'rgba(16,185,129,.12)':'rgba(71,85,105,.12)',
+                              color: t.status==='active'?'#10b981':'#475569' }}>
+                              {t.status==='active'?'Active':'Inactive'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                      {/* IRS Deadlines */}
+                      {(stats.upcoming_deadlines||[]).length > 0 && (<>
+                        <div style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginTop:16, marginBottom:8 }}>
+                          Upcoming IRS Deadlines
+                        </div>
+                        {(stats.upcoming_deadlines||[]).slice(0,5).map((d,i)=>{
+                          const days = Math.ceil((new Date(d.dueDate)-new Date())/86400000)
+                          return (
+                            <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 12px',
+                              borderRadius:8, marginBottom:4, background:'rgba(255,255,255,.02)' }}>
+                              <div>
+                                <div style={{ fontSize:12, color:'#e2e8f0', fontWeight:600 }}>{d.title}</div>
+                                <div style={{ fontSize:10, color:'#475569' }}>{d.dueDate}</div>
+                              </div>
+                              <span style={{ fontSize:10, fontWeight:700, padding:'2px 9px', borderRadius:20,
+                                background: days<=3?'rgba(239,68,68,.15)':'rgba(245,158,11,.15)',
+                                color: days<=3?'#ef4444':'#f59e0b' }}>
+                                {days<=0?'TODAY':days===1?'TOMORROW':`${days}d`}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </>)}
+                    </div>
+                  )
+                })()}
               </div>
             </div>
           </div>
@@ -3159,11 +3268,13 @@ function CommandCenter() {
     async function checkSys(){
       let dbOk = false
       try { const r = await supabase.from('tenants').select('id').limit(1); dbOk = !r.error } catch(_){}
-      let mailOk=false,netOk=false,appOk=false
+      let mailOk=false,netOk=false,appOk=false,romylabsOk=false,adminOk=false
       try{await fetch('https://webmail.taxrescrm.net:7443',{mode:'no-cors',signal:AbortSignal.timeout(4000)});mailOk=true}catch(_){}
       try{await fetch('https://taxrescrm.net',{mode:'no-cors',signal:AbortSignal.timeout(4000)});netOk=true}catch(_){}
       try{await fetch('https://taxrescrm.app',{mode:'no-cors',signal:AbortSignal.timeout(4000)});appOk=true}catch(_){}
-      setSysStatus({dbOk,mailOk,netOk,appOk})
+      try{await fetch('https://romylabs.com',{mode:'no-cors',signal:AbortSignal.timeout(4000)});romylabsOk=true}catch(_){}
+      try{await fetch('https://admin.romylabs.com',{mode:'no-cors',signal:AbortSignal.timeout(4000)});adminOk=true}catch(_){}
+      setSysStatus({dbOk,mailOk,netOk,appOk,romylabsOk,adminOk})
     }
     checkSys()
   },[])
@@ -3312,10 +3423,10 @@ function CommandCenter() {
   const TABS = [
     { key:'overview',  label:'Overview'  },
     { key:'products',  label:'Products'  },
-    { key:'marketing', label:'Marketing' },
+    { key:'marketing', label:'TaxRes — Marketing' },
     { key:'linkedin',  label:'LinkedIn'  },
     { key:'content',   label:'Content'   },
-    { key:'search',    label:'Search'    },
+    { key:'search',    label:'TaxRes — SEO' },
     { key:'sales',     label:'Sales'     },
     { key:'crm',       label:'CRM'       },
     { key:'goals',     label:'Goals'     },
@@ -3351,83 +3462,242 @@ function CommandCenter() {
           ))}
         </div>
 
-        {/* ═══ OVERVIEW TAB ═══ */}
+        {/* ═══ OVERVIEW TAB — RomyLabs Portfolio Level ═══ */}
         {tab==='overview' && (<>
 
-          {/* Platform KPIs */}
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:10, marginBottom:24 }}>
-            {[
-              { label:'Active Offices',  value:data.kpis.activeTenants,  icon:'🏢',  color:'#10b981', to:'/crm-admin/offices' },
-              { label:'Total Offices',   value:data.kpis.totalTenants,   icon:'🏗️',  color:'#6366f1', to:'/crm-admin/offices' },
-              { label:'Platform MRR',    value:`$${data.kpis.totalMRR.toLocaleString('en-US',{maximumFractionDigits:0})}`, icon:'📈', color:'#10b981', to:'/crm-admin/billing' },
-              { label:'Total Seats',     value:data.kpis.totalSeats,     icon:'👥',  color:'#f59e0b', to:'/crm-admin/offices' },
-              { label:'Total Clients',   value:data.kpis.totalClients.toLocaleString(), icon:'📋', color:'#0ea5e9', tabKey:'crm' },
-              { label:'Total Leads',     value:data.kpis.totalLeads.toLocaleString(),   icon:'🎯', color:'#8b5cf6', tabKey:'crm' },
-            ].map(k => <KPICard key={k.label} {...k} onNav={navigate} onTab={setTab} />)}
-          </div>
-
-          {/* Platform KPIs Row 2 */}
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:10, marginBottom:28 }}>
-            {[
-              { label:'Storage Used',    value:fmtBytes(data.kpis.totalStorage), icon:'💾', color:'#8b5cf6', to:'/crm-admin/health' },
-              { label:'Pending E-Signs', value:data.kpis.pendingEsigns,  icon:'✍️', color:'#f59e0b', tabKey:'crm' },
-              { label:'Demos Today',     value:data.kpis.todayDemos,     icon:'📅', color:'#ec4899', to:'/crm-admin/demo' },
-              { label:'Visitors Today',  value:ga4Data?.users ?? 0,      icon:'🌐', color:'#0ea5e9', sub: ga4Data ? null : 'connect GA4', tabKey:'marketing' },
-              { label:'Clicks (GSC)',    value:gscConnected && gscData ? gscData.clicks : 0, icon:'🔍', color:'#6366f1', sub: gscConnected ? null : 'connect GSC', tabKey:'search' },
-              { label:'Impressions',     value:gscConnected && gscData ? gscData.impressions : 0, icon:'👁', color:'#0ea5e9', sub: gscConnected ? null : 'connect GSC', tabKey:'search' },
-            ].map(k => <KPICard key={k.label} {...k} onNav={navigate} onTab={setTab} />)}
-          </div>
-
-          {/* What changed + Activity side-by-side */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 340px', gap:18, marginBottom:24 }}>
-
-            {/* What changed */}
-            <div style={CC.card({padding:'22px 24px'})}>
-              <div style={CC.sectionLabel}>What changed since yesterday</div>
-              {data.changes.length===0
-                ? <div style={{ fontSize:13, color:'#475569' }}>No significant changes yet today.</div>
-                : data.changes.map((c,i) => (
-                <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 0',
-                  borderBottom: i<data.changes.length-1 ? '1px solid rgba(99,102,241,.1)' : 'none' }}>
-                  <span style={{ fontSize:16, width:24, textAlign:'center' }}>
-                    {c.dir==='up' ? '▲' : c.dir==='down' ? '▼' : '→'}
-                  </span>
-                  <span style={{ fontSize:13, color: c.dir==='up'?'#10b981':c.dir==='down'?'#ef4444':'#94a3b8', fontWeight:600 }}>
-                    {c.label}
-                  </span>
+          {/* ── Portfolio Scorecard ───────────────────────────────────────── */}
+          {(() => {
+            const products   = PRODUCT_REGISTRY.filter(p => !p.isTenant)
+            const liveN      = products.filter(p => ['live','available'].includes(p.lifecycleStage)).length
+            const comingN    = products.filter(p => p.lifecycleStage === 'coming').length
+            const buildN     = products.filter(p => p.lifecycleStage === 'building').length
+            const researchN  = products.filter(p => p.lifecycleStage === 'research').length
+            const internalN  = products.filter(p => p.lifecycleStage === 'internal').length
+            const connectedN = products.filter(p => p.connection === 'connected').length
+            const partialN   = products.filter(p => p.connection === 'partial').length
+            const noConnN    = products.filter(p => p.connection === 'not_connected').length
+            const attentionN = products.filter(p => p.connection === 'partial').length +
+                               products.filter(p => p.lifecycleStage === 'coming' && !p.metricsUrl).length
+            return (
+              <div style={{ marginBottom:24 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.1em', marginBottom:12 }}>
+                  RomyLabs Portfolio
                 </div>
-              ))}
-            </div>
-
-            {/* Live activity */}
-            <div style={CC.card({padding:'22px 20px', display:'flex', flexDirection:'column'})}>
-              <div style={{ ...CC.sectionLabel, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <span>Live activity</span>
-                <span style={{ fontSize:9, color:'#10b981', fontWeight:700, animation:'pulse 2s infinite' }}>● LIVE</span>
-              </div>
-              <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:0 }}>
-                {activity.length===0
-                  ? <div style={{ fontSize:12, color:'#475569' }}>No recent activity.</div>
-                  : activity.map((a,i) => (
-                  <div key={i} style={{ display:'flex', gap:10, padding:'8px 0',
-                    borderBottom: i<activity.length-1?'1px solid rgba(99,102,241,.08)':'none' }}>
-                    <div style={{ fontSize:14, width:22, textAlign:'center', flexShrink:0 }}>{a.icon}</div>
-                    <div style={{ minWidth:0 }}>
-                      <div style={{ fontSize:12, color:'#e2e8f0', fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{a.text}</div>
-                      <div style={{ fontSize:10, color:'#475569' }}>{a.sub} · {fmtAgo(a.ts)}</div>
+                {/* Row 1 — lifecycle */}
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:8, marginBottom:8 }}>
+                  {[
+                    { label:'Total Products',  val:products.length, color:'#6366f1', big:true },
+                    { label:'Live / Available', val:liveN,    color:'#10b981' },
+                    { label:'Coming Soon',      val:comingN,  color:'#8b5cf6' },
+                    { label:'Building',         val:buildN,   color:'#f59e0b' },
+                    { label:'Research',         val:researchN,color:'#64748b' },
+                    { label:'Internal',         val:internalN,color:'#475569' },
+                    { label:'Need Attention',   val:attentionN, color:'#ef4444' },
+                  ].map(k => (
+                    <div key={k.label} style={{ background:`${k.color}10`, border:`1px solid ${k.color}20`,
+                      borderRadius:10, padding:'10px 12px', textAlign:'center' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:4, lineHeight:1.3 }}>{k.label}</div>
+                      <div style={{ fontSize:k.big?26:20, fontWeight:900, color:k.color }}>{k.val}</div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                {/* Row 2 — connection */}
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
+                  {[
+                    { label:'🟢 Connected', val:connectedN, color:'#10b981', note:'live metrics' },
+                    { label:'🟡 Partial',   val:partialN,   color:'#f59e0b', note:'metrics deploy pending' },
+                    { label:'⚪ Not Connected', val:noConnN, color:'#64748b', note:'planned / research' },
+                  ].map(k => (
+                    <div key={k.label} style={{ background:`${k.color}08`, border:`1px solid ${k.color}20`,
+                      borderRadius:10, padding:'10px 16px', display:'flex', alignItems:'center', gap:12 }}>
+                      <div style={{ fontSize:24, fontWeight:900, color:k.color }}>{k.val}</div>
+                      <div>
+                        <div style={{ fontSize:11, fontWeight:700, color:k.color }}>{k.label}</div>
+                        <div style={{ fontSize:10, color:'#334155' }}>{k.note}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          </div>
+            )
+          })()}
 
-          {/* Bottom row: Calendar + Deadlines + System Status */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 260px', gap:18 }}>
+          {/* ── Portfolio Grid (compact — not a duplicate of Products tab) ── */}
+          {(() => {
+            const products = PRODUCT_REGISTRY.filter(p => !p.isTenant)
+            const LIFECYCLE_COLOR = { live:'#10b981', available:'#10b981', coming:'#8b5cf6', building:'#f59e0b', research:'#64748b', internal:'#475569' }
+            const LIFECYCLE_LABEL = { live:'✅ Live', available:'🟢 Available', coming:'🔜 Coming Soon', building:'🔨 Building', research:'🔬 Research', internal:'🔒 Internal' }
+            const CONN_DOT = { connected:'🟢', partial:'🟡', not_connected:'⚪' }
+            return (
+              <div style={{ marginBottom:24 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.1em', marginBottom:10 }}>
+                  Product Portfolio
+                </div>
+                <div style={{ background:'rgba(255,255,255,.04)', border:'1px solid rgba(99,102,241,.1)', borderRadius:12, overflow:'hidden' }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'1.5fr 1fr 1fr .8fr .8fr .8fr 1.2fr', padding:'8px 16px',
+                    borderBottom:'1px solid rgba(99,102,241,.1)', background:'rgba(99,102,241,.06)' }}>
+                    {['Product','Lifecycle','Connection','Commercial','Public','Analytics','Next Milestone'].map(h => (
+                      <div key={h} style={{ fontSize:9, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em' }}>{h}</div>
+                    ))}
+                  </div>
+                  {products.map((p, i) => {
+                    const lc = p.lifecycleStage
+                    const lcColor = LIFECYCLE_COLOR[lc] || '#64748b'
+                    const analyticsStatus = (p.ga4Connected || p.connection === 'connected')
+                      ? '🟢 Connected'
+                      : (p.publicOnRomyLabs ? '🟡 Pending' : 'N/A')
+                    return (
+                      <div key={p.key} style={{ display:'grid', gridTemplateColumns:'1.5fr 1fr 1fr .8fr .8fr .8fr 1.2fr',
+                        padding:'10px 16px', borderBottom: i < products.length-1 ? '1px solid rgba(99,102,241,.06)' : 'none',
+                        background: i%2===0 ? 'transparent' : 'rgba(255,255,255,.01)' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                          <span style={{ fontSize:14 }}>{p.icon}</span>
+                          <div>
+                            <div style={{ fontSize:12, fontWeight:700, color:'#e2e8f0' }}>{p.label}</div>
+                            <div style={{ fontSize:9, color:'#475569' }}>{p.industry}</div>
+                          </div>
+                        </div>
+                        <div>
+                          <span style={{ fontSize:10, fontWeight:700, color:lcColor,
+                            background:`${lcColor}12`, padding:'2px 8px', borderRadius:20, whiteSpace:'nowrap' }}>
+                            {LIFECYCLE_LABEL[lc] || lc}
+                          </span>
+                        </div>
+                        <div style={{ fontSize:11, color: p.connection==='connected' ? '#10b981' : p.connection==='partial' ? '#f59e0b' : '#475569' }}>
+                          {CONN_DOT[p.connection]} {p.connection === 'connected' ? 'Connected' : p.connection === 'partial' ? 'Partial' : 'Not Connected'}
+                        </div>
+                        <div style={{ fontSize:11, color: p.commerciallyAvailable ? '#10b981' : '#475569' }}>
+                          {p.commerciallyAvailable ? 'Live' : '—'}
+                        </div>
+                        <div style={{ fontSize:11, color: p.publicOnRomyLabs ? '#10b981' : '#475569' }}>
+                          {p.publicOnRomyLabs ? 'Yes' : 'No'}
+                        </div>
+                        <div style={{ fontSize:11, color:'#64748b' }}>{analyticsStatus}</div>
+                        <div style={{ fontSize:10, color:'#6366f1', fontStyle:'italic', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                          {p.nextMilestone || '—'}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div style={{ fontSize:10, color:'#334155', marginTop:6 }}>
+                  {PRODUCT_REGISTRY.filter(p=>p.isTenant).length} TaxRes tenants excluded from product count · view in Products → Tax Res CRM
+                </div>
+              </div>
+            )
+          })()}
 
-            {/* Today's schedule */}
+          {/* ── Cross-Product SEO / Analytics Status ─────────────────────── */}
+          {(() => {
+            const SEO_STATUS = [
+              { label:'RomyLabs',  ga4:'G-2MSNYF9XBE — Connected', gsc:'romylabs.com — Connected', clarity:'y54zqoj6c2 — Connected', sitemap:'https://romylabs.com/sitemap-index.xml', seoStatus:'Active' },
+              { label:'TaxRes',    ga4:'G-M6J80B65LG — Connected', gsc:'taxrescrm.net — Connected', clarity:'xyck7g2mfl — Connected', sitemap:'https://taxrescrm.net/sitemap.xml', seoStatus:'Active' },
+              { label:'Camvella',  ga4:'Pending — property not yet created', gsc:'Pending', clarity:'Pending', sitemap:'https://camvella.com/sitemap.xml ✓', seoStatus:'Pending Setup' },
+              { label:'Arcvena',   ga4:'Pending — property not yet created', gsc:'Pending — DNS cutover needed', clarity:'Pending', sitemap:'https://arcvena.com/sitemap.xml ✓', seoStatus:'Pending DNS' },
+              { label:'BocaSync',  ga4:'—', gsc:'—', clarity:'—', sitemap:'—', seoStatus:'Not Started' },
+              { label:'PHL',       ga4:'N/A', gsc:'N/A', clarity:'N/A', sitemap:'N/A', seoStatus:'Internal — N/A' },
+            ]
+            const COLOR = { 'Active':'#10b981', 'Pending Setup':'#f59e0b', 'Pending DNS':'#f59e0b', 'Not Started':'#64748b', 'Internal — N/A':'#475569' }
+            return (
+              <div style={{ marginBottom:24 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.1em', marginBottom:10 }}>
+                  SEO & Analytics Status by Product
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10 }}>
+                  {SEO_STATUS.map(p => (
+                    <div key={p.label} style={{ background:'rgba(255,255,255,.04)', border:'1px solid rgba(99,102,241,.1)', borderRadius:10, padding:'14px 16px' }}>
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                        <div style={{ fontSize:13, fontWeight:800, color:'#e2e8f0' }}>{p.label}</div>
+                        <span style={{ fontSize:9, fontWeight:700, padding:'2px 8px', borderRadius:20,
+                          background:`${COLOR[p.seoStatus]||'#64748b'}15`, color:COLOR[p.seoStatus]||'#64748b' }}>
+                          {p.seoStatus}
+                        </span>
+                      </div>
+                      {[['GA4', p.ga4], ['GSC', p.gsc], ['Clarity', p.clarity], ['Sitemap', p.sitemap]].map(([k,v]) => (
+                        <div key={k} style={{ display:'flex', gap:6, marginBottom:4 }}>
+                          <div style={{ fontSize:9, fontWeight:700, color:'#475569', width:44, flexShrink:0, textTransform:'uppercase', letterSpacing:'.05em', paddingTop:1 }}>{k}</div>
+                          <div style={{ fontSize:10, color: v.includes('Connected') ? '#10b981' : v.includes('Pending') ? '#f59e0b' : '#475569', lineHeight:1.4 }}>{v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize:10, color:'#334155', marginTop:6 }}>
+                  Detailed TaxRes analytics → Products → Tax Res CRM · TaxRes GSC queries/impressions → TaxRes — SEO tab
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* ── Needs Attention ─────────────────────────────────────────── */}
+          {(() => {
+            const products = PRODUCT_REGISTRY.filter(p => !p.isTenant)
+            const attention = []
+            // Partial connections — metrics not deployed
+            products.filter(p => p.connection === 'partial').forEach(p => {
+              attention.push({ product: p.label, icon: '🟡', item: 'Platform metrics deploy pending', priority: 'medium' })
+            })
+            // Coming Soon with no marketing domain
+            products.filter(p => p.lifecycleStage === 'coming').forEach(p => {
+              if (!p.url) attention.push({ product: p.label, icon: '🔴', item: 'Production marketing domain not configured', priority: 'high' })
+              if (p.url && !p.metricsUrl) attention.push({ product: p.label, icon: '🟡', item: 'Metrics not connected', priority: 'medium' })
+            })
+            // Building products with no backend
+            products.filter(p => p.lifecycleStage === 'building').forEach(p => {
+              attention.push({ product: p.label, icon: '🟡', item: 'In active development — commercialization pending', priority: 'low' })
+            })
+            // Internal — needs decision
+            products.filter(p => p.lifecycleStage === 'internal').forEach(p => {
+              attention.push({ product: p.label, icon: '⚪', item: 'Rebrand/migration decision pending before public launch', priority: 'low' })
+            })
+            // Known external blockers from data state
+            const externalBlockers = [
+              { product: 'TaxRes', icon: '🔴', item: 'GSC deceptive pages review pending (taxrescrm.net)', priority: 'high' },
+              { product: 'TaxRes', icon: '🟡', item: 'CloudCPA contract not yet signed', priority: 'medium' },
+              { product: 'TaxRes', icon: '🟡', item: 'Nashville SignalWire credentials pending', priority: 'medium' },
+              { product: 'Arcvena', icon: '🔴', item: 'arcvena.com DNS cutover not complete', priority: 'high' },
+              { product: 'Arcvena', icon: '🟡', item: 'CRM UI polish — GH Actions minutes exhausted (Sept 1)', priority: 'medium' },
+              { product: 'Camvella', icon: '🔴', item: 'provision-org edge fn not yet deployed — no customers', priority: 'high' },
+              { product: 'Camvella', icon: '🟡', item: 'GA4, Clarity, GSC setup pending', priority: 'medium' },
+            ]
+            const all = [...attention, ...externalBlockers]
+              .sort((a,b) => { const p = {high:0,medium:1,low:2}; return p[a.priority]-p[b.priority] })
+            return (
+              <div style={{ marginBottom:24 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.1em', marginBottom:10 }}>
+                  Needs Attention
+                </div>
+                <div style={{ background:'rgba(255,255,255,.04)', border:'1px solid rgba(99,102,241,.1)', borderRadius:12, overflow:'hidden' }}>
+                  {all.slice(0,10).map((item, i) => (
+                    <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'10px 16px',
+                      borderBottom: i < Math.min(all.length,10)-1 ? '1px solid rgba(99,102,241,.06)' : 'none' }}>
+                      <span style={{ fontSize:14, flexShrink:0, marginTop:1 }}>{item.icon}</span>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:11, fontWeight:700, color:'#a5b4fc', marginBottom:2 }}>{item.product}</div>
+                        <div style={{ fontSize:12, color:'#94a3b8' }}>{item.item}</div>
+                      </div>
+                      <span style={{ fontSize:9, fontWeight:700, padding:'2px 8px', borderRadius:20, flexShrink:0,
+                        background: item.priority==='high' ? 'rgba(239,68,68,.15)' : item.priority==='medium' ? 'rgba(245,158,11,.15)' : 'rgba(100,116,139,.15)',
+                        color: item.priority==='high' ? '#ef4444' : item.priority==='medium' ? '#f59e0b' : '#64748b' }}>
+                        {item.priority.toUpperCase()}
+                      </span>
+                    </div>
+                  ))}
+                  {all.length === 0 && (
+                    <div style={{ padding:'20px 16px', fontSize:13, color:'#10b981' }}>✅ No blockers — all products on track</div>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* ── Bottom row: Schedule + Sales Pipeline + System Status ──── */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 280px', gap:18 }}>
+
+            {/* Romy's schedule — operator-level, not portfolio metric */}
             <div style={CC.card({padding:'22px 24px'})}>
-              <div style={CC.sectionLabel}>Today's schedule</div>
+              <div style={CC.sectionLabel}>Romy's schedule today</div>
+              <div style={{ fontSize:9, color:'#334155', marginBottom:10 }}>Demo calendar — TaxRes CRM operator view</div>
               {data.todaySchedule.length===0
                 ? <div style={{ fontSize:13, color:'#475569' }}>Nothing on the calendar today.</div>
                 : data.todaySchedule.map((e,i) => (
@@ -3442,42 +3712,56 @@ function CommandCenter() {
                   </div>
                 </div>
               ))}
-              {data.todaySchedule.length===0 && (
-                <div style={{ fontSize:12, color:'#334155', marginTop:12 }}>Check calendar for upcoming demos →</div>
-              )}
             </div>
 
-            {/* IRS Deadlines */}
+            {/* Sales Pipeline — company-level lead tracking */}
             <div style={CC.card({padding:'22px 24px'})}>
-              <div style={CC.sectionLabel}>Upcoming IRS deadlines</div>
-              {data.upcomingDl.length===0
-                ? <div style={{ fontSize:13, color:'#10b981' }}>✅ No urgent deadlines this week</div>
-                : data.upcomingDl.map((d,i) => {
-                  const days = Math.ceil((new Date(d.dueDate)-new Date())/86400000)
-                  return (
-                    <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'9px 0',
-                      borderBottom: i<data.upcomingDl.length-1?'1px solid rgba(99,102,241,.1)':'none' }}>
-                      <div>
-                        <div style={{ fontSize:13, color:'#e2e8f0', fontWeight:600 }}>{d.title}</div>
-                        <div style={{ fontSize:10, color:'#475569' }}>{d.dueDate}</div>
+              <div style={CC.sectionLabel}>Sales Pipeline</div>
+              <div style={{ fontSize:9, color:'#334155', marginBottom:10 }}>RomyLabs prospects · full detail → Sales tab</div>
+              {data.sales?.stages ? (() => {
+                const active = data.sales.stages.filter(s=>!['Won','Lost'].includes(s.label))
+                const totalActive = active.reduce((s,r)=>s+r.count,0)
+                const won   = data.sales.stages.find(s=>s.label==='Won')?.count || 0
+                const lost  = data.sales.stages.find(s=>s.label==='Lost')?.count || 0
+                return (<>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:12 }}>
+                    {[
+                      { label:'Active',  val:totalActive, color:'#6366f1' },
+                      { label:'Won',     val:won,         color:'#10b981' },
+                      { label:'Pipeline',val:`$${(data.sales.pipeline||0).toLocaleString()}`, color:'#f59e0b' },
+                    ].map(k => (
+                      <div key={k.label} style={{ textAlign:'center', background:'rgba(255,255,255,.03)', borderRadius:8, padding:'8px' }}>
+                        <div style={{ fontSize:9, color:'#475569', textTransform:'uppercase', letterSpacing:'.06em' }}>{k.label}</div>
+                        <div style={{ fontSize:18, fontWeight:800, color:k.color, marginTop:2 }}>{k.val}</div>
                       </div>
-                      <span style={{ fontSize:10, fontWeight:700, padding:'3px 9px', borderRadius:20,
-                        background: days<=3?'rgba(239,68,68,.15)':'rgba(245,158,11,.15)',
-                        color: days<=3?'#ef4444':'#f59e0b' }}>
-                        {days<=0?'TODAY':days===1?'TOMORROW':`${days}d`}
-                      </span>
+                    ))}
+                  </div>
+                  {active.filter(s=>s.count>0).map((s,i) => (
+                    <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'5px 0',
+                      borderBottom: '1px solid rgba(99,102,241,.06)' }}>
+                      <div style={{ fontSize:11, color:'#94a3b8' }}>{s.label}</div>
+                      <div style={{ fontSize:12, fontWeight:700, color:s.color }}>{s.count}</div>
                     </div>
-                  )
-                })}
+                  ))}
+                </>)
+              })() : <div style={{ fontSize:12, color:'#475569' }}>Loading…</div>}
             </div>
 
-            {/* System status */}
+            {/* RomyLabs system status — multi-product */}
             <div style={CC.card({padding:'22px 20px'})}>
-              <div style={CC.sectionLabel}>System status</div>
-              {data.systemStatus.map((s,i) => (
+              <div style={CC.sectionLabel}>System Status</div>
+              <div style={{ fontSize:9, color:'#334155', marginBottom:10 }}>RomyLabs infrastructure</div>
+              {[
+                { label:'romylabs.com',       ok: sysStatus?.romylabsOk ?? null },
+                { label:'admin.romylabs.com', ok: sysStatus?.adminOk    ?? null },
+                { label:'TaxRes (taxrescrm.app)', ok: sysStatus?.appOk ?? null },
+                { label:'TaxRes (taxrescrm.net)', ok: sysStatus?.netOk ?? null },
+                { label:'TaxRes Mail (Stalwart)', ok: sysStatus?.mailOk ?? null },
+                { label:'Supabase (TaxRes DB)',   ok: sysStatus?.dbOk  ?? null },
+              ].map((s,i) => (
                 <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
-                  padding:'7px 0', borderBottom: i<data.systemStatus.length-1?'1px solid rgba(99,102,241,.08)':'none' }}>
-                  <div style={{ fontSize:12, color:'#94a3b8' }}>{s.label}</div>
+                  padding:'7px 0', borderBottom: i<5?'1px solid rgba(99,102,241,.08)':'none' }}>
+                  <div style={{ fontSize:11, color:'#94a3b8' }}>{s.label}</div>
                   <StatusDot ok={s.ok} />
                 </div>
               ))}
