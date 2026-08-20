@@ -1782,7 +1782,7 @@ const PRODUCT_REGISTRY = [
     icon:      '🌿',
     color:     '#f59e0b',
     url:       '#',
-    status:    'live',
+    status:    'internal',  // Internal product — not publicly marketed
     desc:      'Field service CRM for lawn care & landscaping',
     metricsUrl: null, // deploy platform-metrics to PHL Supabase to enable
   },
@@ -1791,8 +1791,8 @@ const PRODUCT_REGISTRY = [
     label:     'Arcvena',
     icon:      '⚡',
     color:     '#8b5cf6',
-    url:       'https://app.arcvena.com/login',
-    status:    'live',
+    url:       'https://www.arcvena.com',
+    status:    'coming',  // Marketing site live; CRM metrics not yet wired
     desc:      'Field service CRM for electrical contractors',
     metricsUrl: null, // deploy platform-metrics to Arcvena Supabase to enable
   },
