@@ -2046,7 +2046,7 @@ const HUB_SECRET = 'hub-metrics-2026'
 
 function fmt$(n) { return n ? `$${Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—' }
 function fmtN(n) { return n != null ? Number(n).toLocaleString() : '—' }
-function ProductsTab({ supabase }) {
+function ProductsTab({ supabase, taxresActivity = [] }) {
   const [selected, setSelected]     = useState(null)
   const [liveData, setLiveData]     = useState({})
   const [loading, setLoading]       = useState({})
@@ -2532,6 +2532,32 @@ function ProductsTab({ supabase }) {
                           )
                         })}
                       </>)}
+
+                      {/* ── Recent TaxRes Activity ──────────────────────────── */}
+                      <div style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em', marginTop:20, marginBottom:8 }}>
+                        Recent TaxRes Activity
+                      </div>
+                      {taxresActivity.length === 0 ? (
+                        <div style={{ textAlign:'center', padding:'16px 0', color:'#334155', fontSize:12 }}>
+                          No recent activity recorded yet.
+                        </div>
+                      ) : (
+                        <div style={{ background:'rgba(255,255,255,.02)', borderRadius:10, overflow:'hidden', border:'1px solid rgba(99,102,241,.06)' }}>
+                          {taxresActivity.slice(0, 15).map((a, i) => (
+                            <div key={i} style={{ display:'flex', gap:10, padding:'9px 12px',
+                              borderBottom: i < Math.min(taxresActivity.length,15)-1 ? '1px solid rgba(99,102,241,.06)' : 'none',
+                              background: i%2===0 ? 'transparent' : 'rgba(255,255,255,.01)' }}>
+                              <div style={{ fontSize:15, width:22, textAlign:'center', flexShrink:0, marginTop:1 }}>{a.icon}</div>
+                              <div style={{ minWidth:0, flex:1 }}>
+                                <div style={{ fontSize:12, color:'#e2e8f0', fontWeight:600 }}>{a.text}</div>
+                                <div style={{ fontSize:10, color:'#475569', marginTop:2 }}>
+                                  {a.sub ? `${a.sub} · ` : ''}{fmtAgo(a.ts)}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )
                 })()}
@@ -4102,7 +4128,7 @@ function CommandCenter() {
           </div>
         </>)}
 
-        {tab==='products' && <ProductsTab supabase={supabase} />}
+        {tab==='products' && <ProductsTab supabase={supabase} taxresActivity={activity} />}
 
         {tab==='linkedin' && (
           <div style={{ marginTop:0 }}>
