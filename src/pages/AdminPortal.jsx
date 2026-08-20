@@ -1762,7 +1762,7 @@ const PRODUCT_REGISTRY = [
     publicOnRomyLabs: true,
     commerciallyAvailable: true,
     desc:      'HOA & community association management CRM',
-    metricsUrl: null, // CF Actions blocked until Sept 1 — deploy push-platform-metrics
+    metricsUrl: 'https://fjqywulzsyfyzitneazb.supabase.co/functions/v1/platform-metrics',
   },
   {
     key:       'arcvena',
