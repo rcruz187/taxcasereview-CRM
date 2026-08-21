@@ -8,6 +8,7 @@ DECLARE
   v_post       record;
   v_alert_key  text;
   v_fired      int := 0;
+  v_r          int;
   v_resolved   int := 0;
 BEGIN
   v_health := get_linkedin_health();
@@ -17,7 +18,7 @@ BEGIN
     v_alert_key := 'cron_down_' || TO_CHAR(NOW(), 'YYYY-MM-DD');
     INSERT INTO linkedin_alert_log (alert_type, incident_key, details)
     VALUES ('cron_down', v_alert_key, v_health)
-    ON CONFLICT (alert_type, incident_key, resolved_at) DO NOTHING;
+    ON CONFLICT (alert_type, incident_key) WHERE resolved_at IS NULL DO NOTHING;
     IF FOUND THEN
       PERFORM send_linkedin_alert(
         '🚨 LinkedIn Scheduler DOWN',
@@ -44,7 +45,7 @@ BEGIN
     v_alert_key := 'stuck_' || v_post.id::text;
     INSERT INTO linkedin_alert_log (alert_type, incident_key, details)
     VALUES ('stuck_post', v_alert_key, jsonb_build_object('post_id', v_post.id, 'minutes_stuck', v_post.mins))
-    ON CONFLICT (alert_type, incident_key, resolved_at) DO NOTHING;
+    ON CONFLICT (alert_type, incident_key) WHERE resolved_at IS NULL DO NOTHING;
     IF FOUND THEN
       PERFORM send_linkedin_alert(
         '⚠️ LinkedIn post stuck in publishing',
@@ -66,7 +67,7 @@ BEGIN
     INSERT INTO linkedin_alert_log (alert_type, incident_key, details)
     VALUES ('overdue_post', v_alert_key,
       jsonb_build_object('post_id', v_post.id, 'scheduled_at', v_post.scheduled_at, 'minutes_overdue', v_post.mins))
-    ON CONFLICT (alert_type, incident_key, resolved_at) DO NOTHING;
+    ON CONFLICT (alert_type, incident_key) WHERE resolved_at IS NULL DO NOTHING;
     IF FOUND THEN
       PERFORM send_linkedin_alert(
         '⚠️ LinkedIn post overdue — ' || v_post.mins || ' min past schedule',
@@ -87,7 +88,7 @@ BEGIN
     INSERT INTO linkedin_alert_log (alert_type, incident_key, details)
     VALUES ('api_failure', v_alert_key,
       jsonb_build_object('post_id', v_post.id, 'error', LEFT(COALESCE(v_post.error_msg,''), 300)))
-    ON CONFLICT (alert_type, incident_key, resolved_at) DO NOTHING;
+    ON CONFLICT (alert_type, incident_key) WHERE resolved_at IS NULL DO NOTHING;
     IF FOUND THEN
       PERFORM send_linkedin_alert(
         '🚨 LinkedIn post FAILED after ' || v_post.retry_count || ' retries',
@@ -106,7 +107,8 @@ BEGIN
     WHERE lp.id::text = REPLACE(REPLACE(REPLACE(al.incident_key,'stuck_',''),'overdue_',''),'api_fail_','')
     AND   lp.status   = 'published'
   );
-  GET DIAGNOSTICS v_resolved = v_resolved + ROW_COUNT;
+  GET DIAGNOSTICS v_r = ROW_COUNT;
+  v_resolved := v_resolved + v_r;
 
   RETURN jsonb_build_object(
     'ok', true, 'alerts_fired', v_fired, 'alerts_resolved', v_resolved, 'health', v_health
