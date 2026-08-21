@@ -582,34 +582,44 @@ Deno.serve(async (req) => {
         continue
       }
 
-      // Append UTM to any URLs in the post body
-      const campaign = `li_${post.category || 'content'}_${post.id.slice(0,8)}`
-      const bodyWithUtm = post.body.replace(/(https?:\/\/[^\s)]+)/g, (url: string) => {
-        if (url.includes('utm_')) return url
-        const sep = url.includes('?') ? '&' : '?'
-        return `${url}${sep}utm_source=linkedin&utm_medium=social&utm_campaign=${campaign}`
-      })
-
       try {
-        const publishRes = await fetch('https://api.linkedin.com/v2/ugcPosts', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${fullConn!.access_token}`,
-            'Content-Type': 'application/json',
-            'X-Restli-Protocol-Version': '2.0.0',
-          },
-          body: JSON.stringify({
-            author: `urn:li:person:${fullConn!.linkedin_person_id}`,
-            lifecycleState: 'PUBLISHED',
-            specificContent: {
-              'com.linkedin.ugc.ShareContent': {
-                shareCommentary: { text: bodyWithUtm },
-                shareMediaCategory: 'NONE',
-              },
-            },
-            visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' },
-          }),
+        // Append UTM to any URLs in the post body
+        const campaign = `li_${post.category || 'content'}_${post.id.slice(0,8)}`
+        const bodyWithUtm = (post.body || '').replace(/(https?:\/\/[^\s)]+)/g, (url: string) => {
+          if (url.includes('utm_')) return url
+          const sep = url.includes('?') ? '&' : '?'
+          return `${url}${sep}utm_source=linkedin&utm_medium=social&utm_campaign=${campaign}`
         })
+
+        // 25s timeout — pg_net kills connections at 30s, so fail fast with an error msg
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 25000)
+
+        let publishRes: Response
+        try {
+          publishRes = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+            method: 'POST',
+            signal: controller.signal,
+            headers: {
+              Authorization: `Bearer ${fullConn!.access_token}`,
+              'Content-Type': 'application/json',
+              'X-Restli-Protocol-Version': '2.0.0',
+            },
+            body: JSON.stringify({
+              author: `urn:li:person:${fullConn!.linkedin_person_id}`,
+              lifecycleState: 'PUBLISHED',
+              specificContent: {
+                'com.linkedin.ugc.ShareContent': {
+                  shareCommentary: { text: bodyWithUtm },
+                  shareMediaCategory: 'NONE',
+                },
+              },
+              visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' },
+            }),
+          })
+        } finally {
+          clearTimeout(timeoutId)
+        }
 
         const publishData = await publishRes.json()
         console.log(`[linkedin-scheduler] Post ${post.id} response:`, redact(JSON.stringify(publishData)))
@@ -646,12 +656,16 @@ Deno.serve(async (req) => {
         }
       } catch (e) {
         const retries = (post.retry_count || 0) + 1
+        const errMsg = e instanceof Error && e.name === 'AbortError'
+          ? 'LinkedIn API timeout (>25s) — will retry next scheduled run'
+          : String(e)
+        // Safety: always reset the lock — never leave a post stranded at 'publishing'
         await supabase.from('linkedin_posts').update({
           status: retries >= MAX_RETRIES ? 'failed' : 'approved',
-          retry_count: retries, error_msg: String(e), updated_at: now.toISOString(),
+          retry_count: retries, error_msg: errMsg, updated_at: now.toISOString(),
         }).eq('id', post.id)
         results.failed++
-        console.error(`[linkedin-scheduler] Post ${post.id} exception:`, e)
+        console.error(`[linkedin-scheduler] Post ${post.id} exception:`, errMsg)
       }
     }
 
