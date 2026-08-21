@@ -89,6 +89,9 @@ create trigger support_tickets_updated_at
 --   product_tenant_name provides the display name.
 -- The INNER JOIN to tenants is changed to LEFT JOIN so non-TaxRes tickets
 -- (tenant_id = NULL) are not silently excluded.
+-- Must drop before recreating — PostgreSQL cannot change return type via CREATE OR REPLACE
+drop function if exists list_support_tickets();
+
 create or replace function list_support_tickets()
 returns table (
   -- Existing columns (unchanged order, unchanged types):
@@ -145,6 +148,9 @@ $$;
 --   need it (Romy sees all; staff/customer sees only is_internal = false).
 -- is_internal filtering: non-Romy callers cannot read internal notes.
 -- The LEFT JOIN to tenants changed to LEFT JOIN (same as list_support_tickets).
+-- Must drop before recreating — extended return type
+drop function if exists get_ticket_thread(uuid);
+
 create or replace function get_ticket_thread(p_ticket_id uuid)
 returns table (
   -- Existing columns (unchanged):
