@@ -8,6 +8,24 @@ import { useLocation } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { DOC_FOLDERS as ROOT_FOLDERS } from './Clients'
 
+// Generate a short-lived signed URL for private storage bucket access
+async function getDocumentUrl(supabase, storedUrl) {
+  if (!storedUrl) return null
+  try {
+    // Extract the storage path from the stored URL
+    const match = storedUrl.match(/\/documents\/(.+)$/)
+    if (!match) return storedUrl // Not a storage URL, return as-is
+    const path = match[1]
+    const { data, error } = await supabase.storage
+      .from('documents')
+      .createSignedUrl(path, 3600) // 1 hour expiry
+    if (error || !data?.signedUrl) return storedUrl
+    return data.signedUrl
+  } catch {
+    return storedUrl
+  }
+}
+
 const FILE_ICONS = { pdf:'📄', doc:'📝', docx:'📝', xls:'📊', xlsx:'📊', jpg:'🖼️', jpeg:'🖼️', png:'🖼️', mp3:'🎵', mp4:'🎬', default:'📎' }
 function fileIcon(name='') { const ext=(name.split('.').pop()||'').toLowerCase(); return FILE_ICONS[ext]||FILE_ICONS.default }
 function fmtSize(b) { if(!b)return ''; if(b<1024)return b+'B'; if(b<1048576)return (b/1024).toFixed(1)+'KB'; return (b/1048576).toFixed(1)+'MB' }
@@ -107,8 +125,8 @@ export default function Documents() {
       const path = `docs/${safeName}/${Date.now()}_${file.name}`
       const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
       if (upErr) { showToast('Upload error: '+upErr.message); setSaving(false); return }
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
-      fileUrl = urlData.publicUrl; fileName = file.name; fileSize = file.size
+      const { data: signedData } = await supabase.storage.from('documents').createSignedUrl(path, 3600)
+      fileUrl = signedData?.signedUrl || null; fileName = file.name; fileSize = file.size
     }
     const { error } = await supabase.from('documents').insert([{
       ...form, file_url: fileUrl, file_name: fileName, file_size: fileSize,
@@ -311,7 +329,7 @@ export default function Documents() {
                   </div>
                   <div className="doc-actions" style={{display:'flex',gap:6,opacity:0,transition:'opacity .15s'}}>
                     {doc.file_url ? (
-                      <a href={doc.file_url} target="_blank" rel="noreferrer"
+                      <a href="#" onClick={async e => { e.preventDefault(); const u = await getDocumentUrl(supabase, doc.file_url); if (u) window.open(u, '_blank') }} rel="noreferrer"
                         style={{flex:1,padding:'6px 0',background:'var(--blue)',color:'#fff',borderRadius:7,
                           fontSize:11,fontWeight:700,textAlign:'center',textDecoration:'none'}}>Open</a>
                     ) : <div style={{flex:1}}/>}
@@ -343,7 +361,7 @@ export default function Documents() {
                   <span style={{fontSize:11,color:'var(--t3)',flexShrink:0,whiteSpace:'nowrap'}}>{fmtDate(doc.created_at)}</span>
                   <div style={{display:'flex',gap:6,flexShrink:0}}>
                     {doc.file_url && (
-                      <a href={doc.file_url} target="_blank" rel="noreferrer"
+                      <a href="#" onClick={async e => { e.preventDefault(); const u = await getDocumentUrl(supabase, doc.file_url); if (u) window.open(u, '_blank') }} rel="noreferrer"
                         style={{padding:'5px 12px',background:'var(--blue)',color:'#fff',borderRadius:6,
                           fontSize:11,fontWeight:700,textDecoration:'none'}}>Open</a>
                     )}
@@ -391,7 +409,7 @@ export default function Documents() {
                       <td style={{padding:'8px 12px',borderBottom:'1px solid var(--br)'}}>
                         <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>
                           {doc.file_url && (
-                            <a href={doc.file_url} target="_blank" rel="noreferrer"
+                            <a href="#" onClick={async e => { e.preventDefault(); const u = await getDocumentUrl(supabase, doc.file_url); if (u) window.open(u, '_blank') }} rel="noreferrer"
                               style={{padding:'4px 10px',background:'var(--blue)',color:'#fff',borderRadius:5,
                                 fontSize:11,fontWeight:700,textDecoration:'none'}}>Open</a>
                           )}

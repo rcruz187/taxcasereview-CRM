@@ -227,8 +227,8 @@ function InlineFaxForm({ client, onClose, showToast, onLogged }) {
     if (file) {
       const path = 'fax/'+Date.now()+'_'+file.name
       await supabase.storage.from('documents').upload(path, file, {upsert:true})
-      const { data:u } = supabase.storage.from('documents').getPublicUrl(path)
-      fileUrl = u?.publicUrl
+      const { data:u } = await supabase.storage.from('documents').createSignedUrl(path, 3600)
+      fileUrl = u?.signedUrl || null
     }
     const toFull = '+1'+toNum.slice(-10)
     const fromNum = s?.sw_inbound_did || ''
@@ -316,8 +316,8 @@ function InlineEsignForm({ client, onClose, showToast }) {
         const path=`esign-custom/${(client?.name||'client').replace(/[^A-Za-z0-9 _-]/g,'')}/${Date.now()}-${customFile.name}`
         const{error:upErr}=await supabase.storage.from('documents').upload(path,customFile,{upsert:true})
         if(!upErr){
-          const{data:u}=supabase.storage.from('documents').getPublicUrl(path)
-          pdfAttachments=[{formType:'custom',label:customFile.name,url:u?.publicUrl}]
+          const{data:u}=await supabase.storage.from('documents').createSignedUrl(path, 3600)
+          pdfAttachments=[{formType:'custom',label:customFile.name,url:u?.signedUrl||null}]
         }
       }catch(e){console.error('custom upload:',e)}
     }
@@ -745,8 +745,8 @@ export function ClientDocs({ clientName, supabase, showToast, onLogged }) {
       const path = `docs/${clientName.replace(/\s+/g,'-')}/${Date.now()}_${file.name}`
       const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
       if (upErr) { showToast('Upload error: '+upErr.message); setSaving(false); return }
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
-      fileUrl = urlData.publicUrl; fileName = file.name; fileSize = file.size
+      const { data: urlData } = await supabase.storage.from('documents').createSignedUrl(path, 3600)
+      fileUrl = urlData?.signedUrl || null; fileName = file.name; fileSize = file.size
     }
     const { error } = await supabase.from('documents').insert([{
       name: form.name, client: clientName, docType: form.docType,
