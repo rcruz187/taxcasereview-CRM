@@ -3,11 +3,13 @@ import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { sendClientConfirmation, sendFirmNotification } from '../lib/bookingEmails'
 import { etLabelInZone, visitorZone, zoneShort } from '../lib/timezones'
+import { resolveProductConfig } from '../lib/productBookingConfig'
 
 // ── Public booking page (Calendly-style), served at #/book with no login ──
-// All data access goes through SECURITY DEFINER RPCs (booking_get_config,
-// booking_get_slots, booking_create) — anon never touches tables directly,
-// consistent with the RLS lockdown.
+// Supports multi-product via ?product=<key> URL parameter.
+// Unknown product keys fall back to taxres_crm (safe, backward-compatible).
+// Existing ?t=<tenant_uuid> per-office TaxRes links remain fully backward-compatible.
+// All data access goes through SECURITY DEFINER RPCs — anon never touches tables directly.
 
 const C = {
   bg: '#0f172a', card: '#1e293b', line: '#334155',
@@ -23,16 +25,6 @@ const fmt12 = (t) => {
 export default function BookAppointment() {
   const [params] = useSearchParams()
   const [cfg, setCfg] = useState(null)
-  // ?demo=true on the URL → show TaxRes CRM product branding instead of
-  // the practice's logo. Used when the link comes from taxrescrm.net.
-  const isProductDemo = params.get('demo') === 'true' ||
-    new URLSearchParams(window.location.search).get('demo') === 'true'
-  const [meta, setMeta] = useState(
-    isProductDemo
-      ? { firm_name: 'TaxRes CRM', logo_url: 'https://taxrescrm.net/assets/img/logo.png',
-          subtitle: 'Schedule a Product Demonstration', payment: { required: false } }
-      : { firm_name: 'TaxRes CRM', logo_url: '/assets/taxrescrm-logo.png', payment: { required: false } }
-  )
   const [loadErr, setLoadErr] = useState('')
   const [type, setType] = useState('')
   const [date, setDate] = useState('')
@@ -45,38 +37,57 @@ export default function BookAppointment() {
   const [payReturn, setPayReturn] = useState(params.get('booking') || '')
   const zone = visitorZone()
 
-  // Tenant hint from the link (?t=<tenant uuid>). Links come in two shapes —
-  // hash-side query (#/book?t=x, read by useSearchParams) and search-side
-  // (/book?t=x from emailed links) — so check both. Absent → the RPCs fall
-  // back to the primary (TCR) tenant, exactly the pre-tenant behavior.
+  // ── Product resolution ────────────────────────────────────────────────────
+  // ?product= is validated server-side against the allowlist in productBookingConfig.
+  // Unknown/inactive values silently fall back to taxres_crm — no error, no leak.
+  const productKey = (params.get('product') || '').toLowerCase().trim()
+  const productCfg = resolveProductConfig(productKey)
+
+  // ── Tenant hint (TaxRes per-office links) ─────────────────────────────────
+  // ?t=<tenant_uuid> carries a specific TaxRes office. If present, overrides
+  // product branding with that office's own branding via booking_get_public_meta.
+  // This is the existing TaxRes behavior — fully preserved and unchanged.
   const tid = (params.get('t') || new URLSearchParams(window.location.search).get('t') || '').trim()
-  // When no tenant hint, default to TaxRes CRM tenant (product booking page)
   const TAXRESCRM_TENANT = 'a0000000-0000-0000-0000-000000000001'
+
+  // When ?t= is present, use that tenant's slot availability and config (TaxRes path).
+  // When only ?product= is present, use TCR primary tenant for availability
+  // (all demos book into Romy's calendar regardless of product).
   const tenantArgs = { p_tenant: tid || TAXRESCRM_TENANT }
 
+  // Display meta: ?t= → fetch office branding from RPC; ?product= → use productCfg
+  const [meta, setMeta] = useState({
+    firm_name:  productCfg.name,
+    logo_url:   productCfg.logo,
+    logo_alt:   productCfg.logoAlt,
+    subtitle:   productCfg.headline,
+    payment:    { required: false },
+  })
+
   useEffect(() => {
-    (async () => {
+    // Load booking availability config from Supabase
+    ;(async () => {
       const { data, error } = await supabase.rpc('booking_get_config', tenantArgs)
-      if (error || !data) { setLoadErr('Online booking is unavailable right now. Please call us instead.'); return }
-      setCfg(data)
-      if ((data.types || []).length) setType(data.types[0])
+      if (error || !data) { setLoadErr('Online booking is unavailable right now. Please contact us instead.'); return }
+      // Use product-specific types when no tenant hint; ?t= uses the office's own types
+      const effectiveTypes = tid ? (data.types || []) : productCfg.types
+      setCfg({ ...data, types: effectiveTypes })
+      if (effectiveTypes.length) setType(effectiveTypes[0])
     })()
-    // Branding + payment config — additive RPC; safe fallback if not present yet.
-    // Pass the tenant hint (?t=) so a demo /book link shows the demo's firm name and
-    // logo; absent → the RPC's legacy first-row fallback (TCR) is preserved.
-    if (!isProductDemo) {
-      // Only fetch branding from RPC if a specific tenant hint (?t=) is in the URL.
-      // Without a hint this is the TaxRes CRM product booking page — keep TaxRes CRM branding.
-      // With a hint (?t=<tenant uuid>) it's a specific office's booking link — use their branding.
-      if (tid) {
-        supabase.rpc('booking_get_public_meta', { p_tenant: tid }).then(({ data }) => {
-          if (data) setMeta(m => ({ ...m, ...data, payment: { ...m.payment, ...(data.payment || {}) } }))
-        }).catch(() => {})
-      }
+
+    // If ?t= is present (TaxRes per-office link), fetch office branding to override.
+    // If only ?product= (or nothing), productCfg already has the right branding — no RPC needed.
+    if (tid) {
+      supabase.rpc('booking_get_public_meta', { p_tenant: tid }).then(({ data }) => {
+        if (data) setMeta(m => ({ ...m, ...data, payment: { ...m.payment, ...(data.payment || {}) } }))
+      }).catch(() => {})
+    } else if (!productKey) {
+      // Legacy: no ?product= and no ?t= → backward-compatible TaxRes CRM booking page
+      // (already handled by productCfg resolving to taxres_crm)
     }
   }, [])
 
-  // Next N days from config
+  // Next available days from config
   const days = []
   if (cfg) {
     const dayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
@@ -103,8 +114,7 @@ export default function BookAppointment() {
       setErr('Please enter your name and email so we can send your confirmation.'); return
     }
 
-    // Pay-to-book: hand off to Stripe Checkout. The appointment is created by
-    // the webhook only after payment clears (never an unpaid hold).
+    // Pay-to-book: Stripe Checkout. Appointment created by webhook on payment success.
     if (meta.payment?.required) {
       setSaving(true); setErr('')
       const base = window.location.origin + window.location.pathname
@@ -113,12 +123,16 @@ export default function BookAppointment() {
         event_type: type, date, time, notes: form.notes.trim(), tenant: tid || '',
         success_url: `${base}?booking=paid`, cancel_url: `${base}?booking=canceled`,
       }})
-      if (error || !data?.url) { setSaving(false); setErr((data && data.error) || 'Could not start payment. Please call us instead.'); return }
+      if (error || !data?.url) { setSaving(false); setErr((data && data.error) || 'Could not start payment. Please contact us instead.'); return }
       window.location.href = data.url
       return
     }
 
     setSaving(true); setErr('')
+
+    // Calendar event title carries the product label prefix for Command Center identification
+    const calTitle = `${productCfg.calendarLabel} ${type} — ${form.name.trim()}`
+
     const { data, error } = await supabase.rpc('booking_create', {
       p_name: form.name.trim(), p_email: form.email.trim(), p_phone: form.phone.trim(),
       p_event_type: type, p_date: date, p_time: time, p_notes: form.notes.trim(),
@@ -132,14 +146,28 @@ export default function BookAppointment() {
       return
     }
 
-    // Confirmation to the client + notification to the firm/rep — best-effort.
+    // Update product_id on the created calevents row (booking_create doesn't know the product)
+    if (data && data.booking_id) {
+      supabase
+        .from('calevents')
+        .update({ product_id: productCfg.key, title: calTitle })
+        .eq('id', data.booking_id)
+        .then(() => {})
+        .catch(() => {})
+    }
+
+    // Confirmation to the client + notification to the appropriate product inbox
     const bookingTenant = tid || TAXRESCRM_TENANT
-    sendClientConfirmation({ name: form.name.trim(), email: form.email.trim(), type, date, time, token: data && data.booking_token, tenantId: bookingTenant })
+    sendClientConfirmation({
+      name: form.name.trim(), email: form.email.trim(),
+      type, date, time, token: data && data.booking_token,
+      tenantId: bookingTenant, productCfg,
+    })
     sendFirmNotification({
       name: form.name.trim(), email: form.email.trim(), phone: form.phone.trim(),
       notes: form.notes.trim(), type, date, time,
       notifyEmail: data && data.notify_email,
-      tenantId: bookingTenant,
+      tenantId: bookingTenant, productCfg,
     })
 
     setDone({ date, time, type })
@@ -152,21 +180,33 @@ export default function BookAppointment() {
     border: `1px solid ${active ? C.accent : C.line}`, background: active ? C.accent : 'transparent', color: C.text,
   })
 
+  // Effective display name: prefer meta (which may be overridden by ?t= RPC) then productCfg
+  const displayName = meta.firm_name || productCfg.name
+  const displayLogo = meta.logo_url || productCfg.logo
+  const displayLogoAlt = meta.logo_alt || productCfg.logoAlt || displayName
+  const displaySubtitle = meta.subtitle || productCfg.headline
+
   return (
     <div style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: 'system-ui, -apple-system, sans-serif', padding: '32px 16px' }}>
       <div style={{ maxWidth: 640, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          {meta.logo_url && <img src={meta.logo_url} alt="" style={{ maxHeight: 56, maxWidth: 200, objectFit: 'contain', marginBottom: 10 }} onError={e => { e.target.style.display = 'none' }} />}
-          <div style={{ fontSize: 24, fontWeight: 800 }}>{meta.firm_name || 'Tax Case Review'}</div>
-          {meta.subtitle && <div style={{ fontSize: 14, color: '#a0b0c8', marginTop: 4 }}>{meta.subtitle}</div>}
-          <div style={{ color: C.dim, fontSize: 14, marginTop: 4 }}>Schedule an appointment</div>
+          {displayLogo && (
+            <img
+              src={displayLogo}
+              alt={displayLogoAlt}
+              style={{ maxHeight: 56, maxWidth: 220, objectFit: 'contain', marginBottom: 10 }}
+              onError={e => { e.target.style.display = 'none' }}
+            />
+          )}
+          <div style={{ fontSize: 24, fontWeight: 800 }}>{displayName}</div>
+          {displaySubtitle && <div style={{ fontSize: 14, color: '#a0b0c8', marginTop: 4 }}>{displaySubtitle}</div>}
         </div>
 
         {payReturn === 'paid' ? (
           <div style={{ ...box, textAlign: 'center' }}>
             <div style={{ fontSize: 40 }}>✅</div>
             <div style={{ fontWeight: 800, fontSize: 18, marginTop: 8 }}>Payment received — you're booked!</div>
-            <div style={{ color: C.dim, marginTop: 8, fontSize: 14 }}>A confirmation email is on its way. If anything looks off, just give us a call.</div>
+            <div style={{ color: C.dim, marginTop: 8, fontSize: 14 }}>A confirmation email is on its way. If anything looks off, just contact us.</div>
           </div>
         ) : payReturn === 'canceled' ? (
           <div style={{ ...box, textAlign: 'center' }}>
@@ -188,7 +228,7 @@ export default function BookAppointment() {
               {done.type}<br />
               {new Date(done.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} at {fmt12(done.time)} (Eastern){zone !== 'America/New_York' && <> — {etLabelInZone(done.date, done.time, zone)} your time</>}
             </div>
-            <div style={{ color: C.dim, marginTop: 12, fontSize: 12.5 }}>We'll reach out to confirm. If anything changes, just give us a call.</div>
+            <div style={{ color: C.dim, marginTop: 12, fontSize: 12.5 }}>We'll reach out to confirm. If anything changes, just contact us.</div>
           </div>
         ) : (
           <div style={box}>
@@ -250,7 +290,7 @@ export default function BookAppointment() {
         )}
 
         <div style={{ textAlign: 'center', color: C.dim, fontSize: 11.5, marginTop: 16 }}>
-          {meta.firm_name || 'Tax Case Review'}
+          {displayName}
         </div>
       </div>
     </div>
