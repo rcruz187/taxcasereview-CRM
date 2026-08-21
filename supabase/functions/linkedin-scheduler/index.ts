@@ -451,6 +451,22 @@ Deno.serve(async (req, ctx) => {
       { headers: { ...cors, 'Content-Type': 'application/json' } })
   }
 
+  // ── Monitor: send alert email (called by pg_net from check_linkedin_health) ─
+  if (action === 'send_alert') {
+    const subject = body.subject as string
+    const html    = body.html    as string
+    if (!subject || !html) return new Response(JSON.stringify({ ok: false, error: 'subject and html required' }), { status: 400 })
+    await sendAdminAlert(supabase, subject, html)
+    return new Response(JSON.stringify({ ok: true }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  // ── Monitor: read health status (called by UI Settings panel) ─────────────
+  if (action === 'get_health') {
+    const { data, error } = await supabase.rpc('get_linkedin_health')
+    if (error) return new Response(JSON.stringify({ ok: false, error: error.message }), { status: 500 })
+    return new Response(JSON.stringify({ ok: true, health: data }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
   // ── Manual Monday draft generation ────────────────────────────────────────
   if (action === 'generate_monday_drafts') {
     const drafts = await generateMondayDrafts(supabase, ADMIN_TENANT, now)
