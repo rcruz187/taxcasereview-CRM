@@ -402,7 +402,7 @@ async function generateWeeklyReport(supabase: ReturnType<typeof createClient>, t
   return report
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async (req, ctx) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
 
   const supabase = createClient(
@@ -569,7 +569,11 @@ Deno.serve(async (req) => {
       .select('access_token, linkedin_person_id')
       .eq('tenant_id', ADMIN_TENANT).single()
 
-    for (const post of duePosts) {
+    // ── Return immediately so pg_net gets its response before the 30s timeout ──
+    // The LinkedIn API call runs in the background via ctx.waitUntil().
+    // This prevents pg_net from killing the connection mid-publish.
+    const publishWork = async () => {
+      for (const post of duePosts) {
       // ── IDEMPOTENCY LOCK: only update if still 'approved' ──────────────
       const { error: lockErr, count: locked } = await supabase.from('linkedin_posts')
         .update({ status: 'publishing', updated_at: now.toISOString() })
@@ -667,17 +671,26 @@ Deno.serve(async (req) => {
         results.failed++
         console.error(`[linkedin-scheduler] Post ${post.id} exception:`, errMsg)
       }
-    }
+    } // end for loop
 
-    // ── Weekly report: Monday 7am ET ──────────────────────────────────────
-    if (etDay === 1 && etHour === 7) {
-      try {
-        await generateWeeklyReport(supabase, ADMIN_TENANT, now)
-        console.log('[linkedin-scheduler] Weekly report generated')
-      } catch (e) {
-        console.error('[linkedin-scheduler] Weekly report error:', e)
+      // ── Weekly report: Monday 7am ET (runs in background alongside publish) ─
+      if (etDay === 1 && etHour === 7) {
+        try {
+          await generateWeeklyReport(supabase, ADMIN_TENANT, now)
+          console.log('[linkedin-scheduler] Weekly report generated')
+        } catch (e) {
+          console.error('[linkedin-scheduler] Weekly report error:', e)
+        }
       }
-    }
+    } // end publishWork
+
+    // Register background work THEN return immediately — pg_net gets its response
+    // in <1s and closes the connection; Deno keeps running publishWork to completion.
+    ctx.waitUntil(publishWork())
+    console.log(`[linkedin-scheduler] Queued ${duePosts.length} post(s) for background publish`)
+    return new Response(JSON.stringify({ ok: true, queued: duePosts.length }), {
+      headers: { ...cors, 'Content-Type': 'application/json' }
+    })
 
   } catch (e) {
     console.error('[linkedin-scheduler] Fatal error:', e)
