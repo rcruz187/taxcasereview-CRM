@@ -3733,7 +3733,7 @@ function CommandCenter() {
             {/* Romy's schedule — operator-level, not portfolio metric */}
             <div style={CC.card({padding:'22px 24px'})}>
               <div style={CC.sectionLabel}>Romy's schedule today</div>
-              <div style={{ fontSize:9, color:'#334155', marginBottom:10 }}>Demo calendar — TaxRes CRM operator view</div>
+              <div style={{ fontSize:9, color:'#334155', marginBottom:10 }}>RomyLabs platform calendar — all products</div>
               {data.todaySchedule.length===0
                 ? <div style={{ fontSize:13, color:'#475569' }}>Nothing on the calendar today.</div>
                 : data.todaySchedule.map((e,i) => (
@@ -3742,8 +3742,11 @@ function CommandCenter() {
                   <div style={{ fontSize:11, color:'#6366f1', fontWeight:700, width:44, flexShrink:0, marginTop:1 }}>
                     {e.start ? new Date(e.start).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}) : '—'}
                   </div>
-                  <div>
-                    <div style={{ fontSize:13, color:'#e2e8f0', fontWeight:600 }}>{e.title||'Meeting'}</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    {(() => { const badge = parseEventBadge(e.title); return badge ? (
+                      <span style={{ display:'inline-block', background:badge.bg, color:badge.text, fontSize:9, fontWeight:700, padding:'1px 5px', borderRadius:3, marginBottom:2, textTransform:'uppercase', letterSpacing:'.04em' }}>{badge.label}</span>
+                    ) : null })()}
+                    <div style={{ fontSize:13, color:'#e2e8f0', fontWeight:600 }}>{(e.title||'Meeting').replace(/^\[[^\]]+\]\s*/,'')}</div>
                     <div style={{ fontSize:10, color:'#475569' }}>{e.type||'Event'}</div>
                   </div>
                 </div>
@@ -3989,14 +3992,19 @@ function CommandCenter() {
             <div style={CC.card({padding:'22px 24px'})}>
               <div style={CC.sectionLabel}>Upcoming demos</div>
               {data.upcomingDemos.length===0
-                ? <div style={{ fontSize:13, color:'#475569' }}>No demos scheduled. Book one at taxrescrm.net →</div>
+                ? <div style={{ fontSize:13, color:'#475569' }}>No demos scheduled — all product bookings appear here.</div>
                 : data.upcomingDemos.map((e,i) => (
                 <div key={i} style={{ display:'flex', gap:10, padding:'9px 0',
                   borderBottom: i<data.upcomingDemos.length-1?'1px solid rgba(99,102,241,.1)':'none' }}>
                   <div style={{ fontSize:11, color:'#6366f1', fontWeight:700, width:60, flexShrink:0 }}>
                     {new Date(e.start).toLocaleDateString('en-US',{month:'short',day:'numeric'})}
                   </div>
-                  <div style={{ fontSize:13, color:'#e2e8f0' }}>{e.title||'Demo'}</div>
+                  <div>
+                    {(() => { const badge = parseEventBadge(e.title); return badge ? (
+                      <span style={{ display:'inline-block', background:badge.bg, color:badge.text, fontSize:9, fontWeight:700, padding:'1px 5px', borderRadius:3, marginBottom:2, textTransform:'uppercase', letterSpacing:'.04em' }}>{badge.label}</span>
+                    ) : null })()}
+                    <div style={{ fontSize:13, color:'#e2e8f0' }}>{(e.title||'Demo').replace(/^\[[^\]]+\]\s*/,'')}</div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -5337,6 +5345,23 @@ function LinkedInPublisher({ embeddedMode = false }) {
     </div>
   )
 }
+
+
+  // Parse product badge from calendar event title prefix [Product Name]
+  function parseEventBadge(title) {
+    const BADGE_COLORS = {
+      'RomyLabs':   { bg:'#1a1a1a', text:'#C6FF00' },
+      'TaxRes CRM': { bg:'#1e3a5f', text:'#60a5fa' },
+      'Camvella':   { bg:'#0b2748', text:'#55B96A' },
+      'Arcvena':    { bg:'#1a0a2e', text:'#a78bfa' },
+      'BocaSync':   { bg:'#1a2e1a', text:'#34d399' },
+    }
+    const m = (title||'').match(/^\[([^\]]+)\]/)
+    if (!m) return null
+    const label = m[1]
+    const colors = BADGE_COLORS[label] || { bg:'#1e293b', text:'#94a3b8' }
+    return { label, ...colors }
+  }
 
 export default function AdminPortal() {
   const navigate = useNavigate()
