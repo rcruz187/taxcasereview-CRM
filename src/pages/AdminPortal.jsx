@@ -3458,6 +3458,7 @@ function CommandCenter() {
 
   const TABS = [
     { key:'overview',  label:'Overview'  },
+    { key:'support',   label:'Support'   },
     { key:'products',  label:'Products'  },
     { key:'marketing', label:'TaxRes — Marketing' },
     { key:'linkedin',  label:'LinkedIn'  },
@@ -4154,6 +4155,8 @@ function CommandCenter() {
           </div>
         )}
 
+        {tab==='support' && <SupportCenterTab supabase={supabase} />}
+
         {tab==='content' && (
           <div style={{ marginTop:0 }}>
             <ContentCenter embeddedMode />
@@ -4187,6 +4190,273 @@ const GENERATION_STEPS = [
   { key:'outreach_2',   label:'Outreach Message 2',  icon:'📨' },
   { key:'outreach_3',   label:'Outreach Message 3',  icon:'📨' },
 ]
+
+// ── SupportCenterTab ──────────────────────────────────────────────────────────
+// Registry-driven: reads product labels from list_all_product_tickets().
+// Automatically shows new products without UI changes when they're support-enabled.
+function SupportCenterTab({ supabase }) {
+  const [tickets, setTickets]       = useState(null)
+  const [loading, setLoading]       = useState(true)
+  const [filter, setFilter]         = useState('all')       // product_id or 'all'
+  const [statusFilter, setStatus]   = useState('all')       // 'Open'|'In Progress'|'Resolved'|'all'
+  const [selected, setSelected]     = useState(null)        // selected ticket id
+  const [thread, setThread]         = useState(null)
+  const [reply, setReply]           = useState('')
+  const [replying, setReplying]     = useState(false)
+  const [internalNote, setNote]     = useState('')
+  const [addingNote, setAddingNote] = useState(false)
+
+  // Badge colors — keyed to ticket_prefix for registry-agnostic rendering
+  const PREFIX_COLORS = {
+    TAX: { bg:'#1e3a5f', text:'#60a5fa' },
+    CAM: { bg:'#0b2748', text:'#55B96A' },
+    ARC: { bg:'#1a0a2e', text:'#a78bfa' },
+    BOC: { bg:'#1a2e1a', text:'#34d399' },
+  }
+  function badgeStyle(ticketNumber) {
+    const prefix = (ticketNumber || '').split('-')[0]
+    const colors = PREFIX_COLORS[prefix] || { bg:'#1e293b', text:'#94a3b8' }
+    return { display:'inline-block', background:colors.bg, color:colors.text,
+             fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:4,
+             letterSpacing:'.05em', marginRight:6 }
+  }
+
+  async function load() {
+    setLoading(true)
+    const { data } = await supabase.rpc('list_all_product_tickets', {
+      p_product_id: filter === 'all' ? null : filter,
+      p_status: statusFilter === 'all' ? null : statusFilter,
+      p_limit: 100,
+    })
+    setTickets(data || [])
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [filter, statusFilter])
+
+  async function openTicket(t) {
+    setSelected(t)
+    setThread(null)
+    setReply('')
+    setNote('')
+    const { data } = await supabase.rpc('get_ticket_thread', { p_ticket_id: t.id })
+    setThread(data || [])
+  }
+
+  async function sendReply() {
+    if (!reply.trim() || !selected) return
+    setReplying(true)
+    await supabase.rpc('add_ticket_message_typed', {
+      p_ticket_id: selected.id,
+      p_sender: 'romy',
+      p_message: reply.trim(),
+      p_internal: false,
+    })
+    setReply('')
+    setReplying(false)
+    openTicket(selected)
+    load()
+  }
+
+  async function sendInternalNote() {
+    if (!internalNote.trim() || !selected) return
+    setAddingNote(true)
+    await supabase.rpc('add_ticket_message_typed', {
+      p_ticket_id: selected.id,
+      p_sender: 'romy',
+      p_message: internalNote.trim(),
+      p_internal: true,
+    })
+    setNote('')
+    setAddingNote(false)
+    openTicket(selected)
+  }
+
+  async function changeStatus(status) {
+    if (!selected) return
+    await supabase.rpc('update_ticket_status', { p_ticket_id: selected.id, p_status: status })
+    setSelected(s => ({ ...s, status }))
+    load()
+  }
+
+  // Derive unique products from loaded tickets for the filter bar
+  const products = tickets
+    ? [...new Map(tickets.map(t => [t.product_id, { id:t.product_id, label:t.product_label }])).values()]
+    : []
+
+  const STATUS_COLOR = { 'Open':'#ef4444', 'In Progress':'#f59e0b', 'Resolved':'#22c55e' }
+
+  const S2 = {
+    card:   { background:'#1e293b', border:'1px solid #334155', borderRadius:10 },
+    input:  { background:'#0f172a', border:'1px solid #334155', borderRadius:8,
+               color:'#f1f5f9', padding:'9px 12px', fontSize:13, width:'100%',
+               boxSizing:'border-box' },
+    btn: (v) => v === 'primary'
+      ? { background:'#6366f1', color:'#fff', border:'none', borderRadius:8,
+          padding:'9px 18px', fontSize:13, fontWeight:700, cursor:'pointer' }
+      : { background:'transparent', color:'#94a3b8', border:'1px solid #334155',
+          borderRadius:8, padding:'7px 14px', fontSize:12, cursor:'pointer' },
+  }
+
+  return (
+    <div style={{ display:'grid', gridTemplateColumns:'1fr 420px', gap:20, alignItems:'start' }}>
+
+      {/* ── Ticket list ── */}
+      <div>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+          <div style={{ fontSize:17, fontWeight:800, color:'#fff' }}>🎫 Support Center</div>
+          <div style={{ display:'flex', gap:8 }}>
+            <select value={statusFilter} onChange={e=>setStatus(e.target.value)}
+              style={{ ...S2.input, width:'auto', padding:'6px 10px', fontSize:12 }}>
+              <option value="all">All Statuses</option>
+              <option value="Open">Open</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Resolved">Resolved</option>
+            </select>
+            <select value={filter} onChange={e=>setFilter(e.target.value)}
+              style={{ ...S2.input, width:'auto', padding:'6px 10px', fontSize:12 }}>
+              <option value="all">All Products</option>
+              {products.map(p => (
+                <option key={p.id} value={p.id}>{p.label}</option>
+              ))}
+            </select>
+            <button onClick={load} style={S2.btn('ghost')}>↻</button>
+          </div>
+        </div>
+
+        <div style={S2.card}>
+          {loading ? (
+            <div style={{ padding:24, textAlign:'center', color:'#475569' }}>Loading…</div>
+          ) : !tickets || tickets.length === 0 ? (
+            <div style={{ padding:24, textAlign:'center', color:'#475569', fontSize:13 }}>
+              No tickets match these filters.
+            </div>
+          ) : tickets.map(t => (
+            <div key={t.id}
+              onClick={() => openTicket(t)}
+              style={{ padding:'12px 18px', borderBottom:'1px solid #1e293b',
+                cursor:'pointer', background: selected?.id === t.id ? 'rgba(99,102,241,.1)' : 'transparent',
+                transition:'background .1s' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                {t.ticket_number && (
+                  <span style={badgeStyle(t.ticket_number)}>{t.ticket_number}</span>
+                )}
+                <span style={{ fontSize:11, padding:'2px 8px', borderRadius:12, fontWeight:700,
+                  background: STATUS_COLOR[t.status] + '22',
+                  color: STATUS_COLOR[t.status] || '#94a3b8' }}>{t.status}</span>
+                {t.needs_reply && (
+                  <span style={{ fontSize:10, padding:'2px 7px', borderRadius:12, fontWeight:700,
+                    background:'#ef444422', color:'#ef4444' }}>Needs Reply</span>
+                )}
+                <span style={{ fontSize:11, color:'#475569', marginLeft:'auto' }}>
+                  {t.product_label}
+                </span>
+              </div>
+              <div style={{ fontSize:13, fontWeight:600, color:'#e2e8f0' }}>{t.subject}</div>
+              <div style={{ fontSize:11, color:'#475569', marginTop:2 }}>
+                {t.display_customer || t.submitted_by_email}
+                {' · '}
+                {t.category} · {t.priority}
+                {t.message_count > 0 && ` · ${t.message_count} message${t.message_count > 1 ? 's' : ''}`}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Ticket thread ── */}
+      {selected ? (
+        <div style={{ position:'sticky', top:0 }}>
+          <div style={{ ...S2.card, padding:20, marginBottom:12 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+              {selected.ticket_number && <span style={badgeStyle(selected.ticket_number)}>{selected.ticket_number}</span>}
+              <span style={{ fontSize:11, padding:'2px 8px', borderRadius:12, fontWeight:700,
+                background: STATUS_COLOR[selected.status] + '22',
+                color: STATUS_COLOR[selected.status] || '#94a3b8' }}>{selected.status}</span>
+              <span style={{ fontSize:11, color:'#475569', marginLeft:'auto' }}>{selected.product_label}</span>
+            </div>
+            <div style={{ fontSize:14, fontWeight:700, color:'#f1f5f9', marginBottom:4 }}>{selected.subject}</div>
+            <div style={{ fontSize:12, color:'#64748b', marginBottom:12 }}>
+              {selected.display_customer || selected.submitted_by_email}
+              {' · '}{selected.category}{' · '}{selected.priority}
+            </div>
+            <div style={{ display:'flex', gap:6 }}>
+              {['Open','In Progress','Resolved'].map(s => (
+                <button key={s} onClick={() => changeStatus(s)} style={{
+                  ...S2.btn(s === selected.status ? 'primary' : 'ghost'),
+                  fontSize:11, padding:'5px 12px' }}>{s}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Thread */}
+          <div style={{ ...S2.card, padding:0, marginBottom:12, maxHeight:320, overflowY:'auto' }}>
+            {thread === null ? (
+              <div style={{ padding:16, color:'#475569', fontSize:13 }}>Loading thread…</div>
+            ) : thread.length === 0 ? (
+              <div style={{ padding:16, color:'#475569', fontSize:13 }}>No messages yet.</div>
+            ) : thread.filter(m => m.id).map(m => (
+              <div key={m.id} style={{ padding:'10px 16px', borderBottom:'1px solid #1e293b' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+                  <span style={{ fontSize:11, fontWeight:700,
+                    color: m.is_internal ? '#f59e0b'
+                         : m.sender === 'customer' ? '#60a5fa' : '#a78bfa' }}>
+                    {m.is_internal ? '🔒 Internal' : m.sender === 'customer' ? '👤 Customer' : '🛠 Staff'}
+                  </span>
+                  <span style={{ fontSize:10, color:'#475569', marginLeft:'auto' }}>
+                    {m.created_at ? new Date(m.created_at).toLocaleString() : ''}
+                  </span>
+                </div>
+                {m.message ? (
+                  <div style={{ fontSize:13, color: m.is_internal ? '#fbbf24' : '#e2e8f0',
+                    fontStyle: m.is_internal ? 'italic' : 'normal', lineHeight:1.5 }}>
+                    {m.message}
+                  </div>
+                ) : (
+                  <div style={{ fontSize:12, color:'#475569', fontStyle:'italic' }}>
+                    [internal note — not visible to customer]
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Reply */}
+          <div style={{ ...S2.card, padding:14, marginBottom:8 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'#6366f1', marginBottom:6 }}>Reply to Customer</div>
+            <textarea style={{ ...S2.input, resize:'vertical' }} rows={3}
+              placeholder="Type your reply…"
+              value={reply} onChange={e => setReply(e.target.value)} />
+            <button onClick={sendReply} disabled={replying || !reply.trim()}
+              style={{ ...S2.btn('primary'), marginTop:8, width:'100%',
+                opacity: replying || !reply.trim() ? 0.5 : 1 }}>
+              {replying ? 'Sending…' : 'Send Reply'}
+            </button>
+          </div>
+
+          {/* Internal Note */}
+          <div style={{ ...S2.card, padding:14 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>🔒 Internal Note</div>
+            <textarea style={{ ...S2.input, resize:'vertical', borderColor:'#78350f' }} rows={2}
+              placeholder="Private note — never visible to customer…"
+              value={internalNote} onChange={e => setNote(e.target.value)} />
+            <button onClick={sendInternalNote} disabled={addingNote || !internalNote.trim()}
+              style={{ ...S2.btn('ghost'), marginTop:8, width:'100%', color:'#f59e0b',
+                borderColor:'#78350f', opacity: addingNote || !internalNote.trim() ? 0.5 : 1 }}>
+              {addingNote ? 'Saving…' : 'Save Internal Note'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ ...S2.card, padding:32, textAlign:'center', color:'#475569' }}>
+          <div style={{ fontSize:28, marginBottom:8 }}>🎫</div>
+          <div style={{ fontSize:13 }}>Select a ticket to view the thread.</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 
 function ContentCenter({ embeddedMode = false }) {
   const [drafts, setDrafts]           = useState([])
