@@ -18,10 +18,6 @@ on:
         description: "READ_ONLY (default) or APPLY_INTENTIONAL for writes/DDL"
         required: false
         default: 'READ_ONLY'
-      project_ref:
-        description: "Supabase project ref (leave blank for TCR default)"
-        required: false
-        default: ''
 
 permissions:
   contents: read
@@ -32,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      PROJECT_REF: ${{ github.event.inputs.project_ref != '' && github.event.inputs.project_ref || 'mpxgxfqdbquzkrvvejkh' }}
+      PROJECT_REF: mpxgxfqdbquzkrvvejkh
       SQL_INPUT: ${{ github.event.inputs.sql }}
       MODE: ${{ github.event.inputs.mode }}
     steps:
