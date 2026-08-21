@@ -40,23 +40,14 @@ const MAX_DESC_LEN    = 20_000
 const CATEGORIES = ['Bug Report', 'Feature Request', 'Account Issue', 'Billing Question', 'Other'] as const
 const PRIORITIES  = ['Low', 'Normal', 'High', 'Urgent'] as const
 
-// Server-side product allowlist.
-// Adding a new product requires: (1) a new secret in Supabase, (2) an entry here.
-// The browser cannot extend this list.
-const PRODUCT_SECRET_ENV: Record<string, string> = {
-  taxres_crm: 'TAXRES_SUPPORT_SECRET',
-  camvella:   'CAMVELLA_SUPPORT_SECRET',
-  arcvena:    'ARCVENA_SUPPORT_SECRET',
-  bocasync:   'BOCASYNC_SUPPORT_SECRET',
-}
-
-// Human-readable labels for ticket display
-const PRODUCT_LABEL: Record<string, string> = {
-  taxres_crm: 'Tax Res CRM',
-  camvella:   'Camvella',
-  arcvena:    'Arcvena',
-  bocasync:   'BocaSync',
-}
+// Server-side product authentication.
+// Product allowlist is registry-driven: romylabs_product_support.
+// Adding a new product requires only an INSERT into romylabs_product_support
+// with support_enabled=true. No code changes required here.
+// The browser cannot extend the allowlist — the DB lookup enforces it.
+//
+// Secret env var names must match this pattern — prevents arbitrary env var lookup.
+const SUPPORT_SECRET_KEY_PATTERN = /^[A-Z][A-Z0-9_]{0,48}_SUPPORT_SECRET$/
 
 // ── CORS ───────────────────────────────────────────────────────────────────────
 // support-api is a server-to-server endpoint.
@@ -126,33 +117,52 @@ async function verifyHMAC(keyStr: string, message: string, expectedHex: string):
 async function authenticate(
   req: Request,
   rawBody: string,
+  supabase: ReturnType<typeof createClient>,
 ): Promise<{ ok: false } | { ok: true; product: string }> {
-  const product   = req.headers.get('x-romylabs-product')?.toLowerCase() ?? ''
+  const product   = req.headers.get('x-romylabs-product')?.toLowerCase().trim() ?? ''
   const timestamp = req.headers.get('x-romylabs-timestamp') ?? ''
   const signature = req.headers.get('x-romylabs-signature') ?? ''
 
   // Step 1: All headers present
   if (!product || !timestamp || !signature) return { ok: false }
 
-  // Step 2: Product in allowlist — look up before touching secrets
-  const secretEnvKey = PRODUCT_SECRET_ENV[product]
-  if (!secretEnvKey) return { ok: false }
-
-  // Step 3: Timestamp within ±5 minutes (anti-replay)
+  // Step 2: Timestamp within ±5 minutes (anti-replay) — checked before any DB call
   const ts  = parseInt(timestamp, 10)
   const now = Math.floor(Date.now() / 1000)
   if (isNaN(ts) || Math.abs(now - ts) > TIMESTAMP_TOLERANCE_SECONDS) return { ok: false }
 
-  // Step 4: Load product secret server-side — never from request
+  // Step 3: Registry lookup — product must be in romylabs_product_support
+  // with support_enabled=true AND romylabs_products.active=true.
+  // Single indexed PK lookup: sub-millisecond on a ~10-row table.
+  const { data: cfg } = await supabase
+    .from('romylabs_product_support')
+    .select('secret_env_key, romylabs_products!inner(active)')
+    .eq('product_id', product)
+    .eq('support_enabled', true)
+    .maybeSingle()
+
+  // If product not found, not support-enabled, or product not active: generic failure.
+  // Never reveal which check failed — identical response for all non-auth reasons.
+  if (!cfg) return { ok: false }
+  const productActive = (cfg as any).romylabs_products?.active
+  if (!productActive) return { ok: false }
+
+  // Step 4: Env var name allowlist — prevents arbitrary env var lookup
+  // even in the hypothetical case of a DB row misconfiguration.
+  const secretEnvKey = (cfg as any).secret_env_key as string
+  if (!secretEnvKey || !SUPPORT_SECRET_KEY_PATTERN.test(secretEnvKey)) {
+    console.error(`support-api: malformed secret_env_key for product '${product}'`)
+    return { ok: false }
+  }
+
+  // Step 5: Load product secret server-side — never from request, never logged
   const secret = Deno.env.get(secretEnvKey)
   if (!secret) {
-    // Secret not yet configured — treat as auth failure, not config error
-    // (avoids leaking which products are configured)
     console.error(`support-api: secret ${secretEnvKey} not configured`)
     return { ok: false }
   }
 
-  // Step 5: Verify HMAC — signature = HMAC(secret, timestamp + "." + rawBody)
+  // Step 6: Verify HMAC — constant-time comparison prevents timing attacks
   const signingInput = `${timestamp}.${rawBody}`
   const valid = await verifyHMAC(secret, signingInput, signature)
   if (!valid) return { ok: false }
@@ -419,7 +429,7 @@ Deno.serve(async (req: Request) => {
   }
 
   // ── HMAC authentication ─────────────────────────────────────────────────────
-  const authResult = await authenticate(req, rawBody)
+  const authResult = await authenticate(req, rawBody, supabase)
   if (!authResult.ok) {
     return authError()
   }
