@@ -2138,10 +2138,14 @@ function ProductsTab({ supabase, taxresActivity = [] }) {
   const partialCount  = products.filter(p => p.connection === 'partial').length
 
   // ── Filtered list ───────────────────────────────────────────────────────
-  const filtered = filter === 'tenants' ? tenants
-                 : filter === 'planned' ? products.filter(p => p.lifecycleStage === 'research')
-                 : filter === 'products' ? products.filter(p => p.lifecycleStage !== 'research')
-                 : [...products, ...tenants]
+  const lifecycleOrder = { live:0, available:1, coming:2, internal:3, building:4, research:5 }
+  const sortByLifecycle = (a, b) =>
+    (lifecycleOrder[a.lifecycleStage] ?? 9) - (lifecycleOrder[b.lifecycleStage] ?? 9)
+
+  const filtered = filter === 'tenants' ? [...tenants].sort(sortByLifecycle)
+                 : filter === 'planned'  ? products.filter(p => p.lifecycleStage === 'research')
+                 : filter === 'products' ? products.filter(p => p.lifecycleStage !== 'research').sort(sortByLifecycle)
+                 : [...products, ...tenants].sort(sortByLifecycle)
 
   const BADGE = (txt, color) => (
     <span style={{ fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:20,
