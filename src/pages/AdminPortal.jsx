@@ -4274,7 +4274,12 @@ function SupportCenterTab({ supabase }) {
 
   async function changeStatus(status) {
     if (!selected) return
-    await supabase.rpc('update_ticket_status', { p_ticket_id: selected.id, p_status: status })
+    // update_ticket_status() is tenant-scoped and won't update non-TaxRes tickets
+    // (those have tenant_id=NULL). Use direct table update with platform admin check.
+    await supabase
+      .from('support_tickets')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', selected.id)
     setSelected(s => ({ ...s, status }))
     load()
   }
