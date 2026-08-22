@@ -9,6 +9,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 serve(async (req) => {
   try {
     const form = await req.formData()
+    // Basic structural validation: key SignalWire fields must be present
+    const callSid = form.get('CallSid')
+    const recordingUrl = form.get('RecordingUrl')
+    if (!callSid || !recordingUrl) {
+      console.warn('call-recorded: missing CallSid or RecordingUrl — rejected')
+      return new Response('Bad Request', { status: 400 })
+    }
     const recordingUrl = form.get('RecordingUrl')?.toString() || ''
     const callSid = form.get('CallSid')?.toString() || form.get('DialCallSid')?.toString() || ''
     const duration = form.get('RecordingDuration')?.toString() || null

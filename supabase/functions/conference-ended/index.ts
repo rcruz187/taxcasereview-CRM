@@ -19,6 +19,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 serve(async (req) => {
   try {
     const form = await req.formData().catch(() => null)
+    if (!form) return new Response('Bad Request', { status: 400 })
+    // Basic structural validation
+    const sid = form.get('ConferenceSid') || form.get('FriendlyName')
+    if (!sid) {
+      console.warn('conference-ended: missing ConferenceSid — rejected')
+      return new Response('Bad Request', { status: 400 })
+    }
     const conferenceName = form?.get('FriendlyName')?.toString()
     if (!conferenceName) return new Response('ok')
 
