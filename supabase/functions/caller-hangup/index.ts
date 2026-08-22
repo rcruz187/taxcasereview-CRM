@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { validateSignalWireRequest } from '../_shared/sw-verify.ts'
 
 // Called by SignalWire via Conference statusCallback when a participant
 // leaves (StatusCallbackEvent=participant-leave) or the conference ends.
@@ -12,6 +13,24 @@ serve(async (req) => {
     const confFromQuery = url.searchParams.get('conf')
 
     const body = await req.text()
+
+    // ── SignalWire webhook authentication ──────────────────────────────────────
+    const swSignature = req.headers.get('x-signalwire-signature') ?? ''
+    const swSecret = Deno.env.get('SW_SIGNING_SECRET') ?? ''
+    if (!swSecret) {
+      console.error('[caller-hangup] SW_SIGNING_SECRET not configured')
+      return new Response('Service unavailable', { status: 503 })
+    }
+    const webhookUrl = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/caller-hangup'
+    const paramMap: Record<string,string> = {}
+    for (const [k,v] of new URLSearchParams(body)) { paramMap[k] = v }
+    const sigValid = await validateSignalWireRequest(swSecret, webhookUrl, paramMap, swSignature)
+    if (!sigValid) {
+      console.warn('[caller-hangup] Invalid SignalWire signature — rejected')
+      return new Response('Unauthorized', { status: 403 })
+    }
+    // ── End authentication ─────────────────────────────────────────────────────
+
     const params = new URLSearchParams(body)
     const event = params.get('StatusCallbackEvent') || ''
     const confFromBody = params.get('FriendlyName') || ''
