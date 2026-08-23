@@ -1757,7 +1757,7 @@ const PRODUCT_REGISTRY = [
     industry:  'HOA / Property Management',
     url:       'https://www.camvella.com',
     lifecycleStage: 'available',
-    connection:     'partial',  // push-platform-metrics not yet deployed
+    connection:     'connected',  // platform-metrics deployed 2026-08-23
     brandStatus:    'branded',
     publicOnRomyLabs: true,
     commerciallyAvailable: true,
