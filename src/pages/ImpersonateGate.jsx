@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
-const LOGO = '/logo.png'
+const LOGO = '/taxrescrm-logo.png'
 const TAXRESCRM_TENANT = 'a0000000-0000-0000-0000-000000000001'
 
 export default function ImpersonateGate() {
