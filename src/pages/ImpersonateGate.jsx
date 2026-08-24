@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
-const LOGO = '/assets/taxrescrm-logo.png'
+const LOGO = '/logo.png'
 const TAXRESCRM_TENANT = 'a0000000-0000-0000-0000-000000000001'
 
 export default function ImpersonateGate() {
@@ -34,9 +34,8 @@ export default function ImpersonateGate() {
         return
       }
 
-      // Product context must control product branding. RomyLabs branding belongs
-      // only to /crm-admin; opening the TaxRes product from Command Center must
-      // render the TaxRes CRM identity even though the platform owner is signed in.
+      // Product context controls product branding. RomyLabs branding belongs
+      // only to /crm-admin. Tenant sessions keep each tenant's own branding.
       const isTaxResProduct = data.tenant_id === TAXRESCRM_TENANT
       const firmName = isTaxResProduct ? 'TaxRes CRM' : data.firm_name
       const logoUrl = isTaxResProduct ? LOGO : data.logo_url
@@ -96,12 +95,12 @@ export default function ImpersonateGate() {
             <div style={{ fontSize: 17, fontWeight: 700, color: '#10b981', marginBottom: 8 }}>
               Jumping into {info.firm_name}
             </div>
-            <div style={{ fontSize: 13, color: '#475569', marginBottom: 16 }}>
+            <div style={{ fontSize: 13, color:'#475569', marginBottom:16 }}>
               Super Admin session · Token validated · Redirecting…
             </div>
             <div style={{
-              background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.3)',
-              borderRadius: 10, padding: '10px 16px', fontSize: 12, color: '#10b981'
+              background:'rgba(16,185,129,.1)', border:'1px solid rgba(16,185,129,.3)',
+              borderRadius:10, padding:'10px 16px', fontSize:12, color:'#10b981'
             }}>
               You are acting as Super Admin inside this office.<br/>
               All actions will be logged in the audit trail.
@@ -111,17 +110,17 @@ export default function ImpersonateGate() {
 
         {status === 'error' && (
           <>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>❌</div>
-            <div style={{ fontSize: 17, fontWeight: 700, color: '#ef4444', marginBottom: 8 }}>
+            <div style={{ fontSize:40, marginBottom:12 }}>❌</div>
+            <div style={{ fontSize:17, fontWeight:700, color:'#ef4444', marginBottom:8 }}>
               Token invalid or expired
             </div>
-            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>{error}</div>
+            <div style={{ fontSize:13, color:'#64748b', marginBottom:20 }}>{error}</div>
             <button onClick={() => window.close()}
-              style={{ padding: '10px 24px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                background: 'rgba(99,102,241,.2)', color: '#a5b4fc', fontSize: 13, fontWeight: 600 }}>
+              style={{ padding:'10px 24px', borderRadius:8, border:'none', cursor:'pointer',
+                background:'rgba(99,102,241,.2)', color:'#a5b4fc', fontSize:13, fontWeight:600 }}>
               Close this tab
             </button>
-            <div style={{ fontSize: 12, color: '#475569', marginTop: 10 }}>
+            <div style={{ fontSize:12, color:'#475569', marginTop:10 }}>
               Tokens expire after 15 minutes. Generate a new one from the admin portal.
             </div>
           </>
