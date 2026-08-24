@@ -2,17 +2,30 @@ import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import { supabase } from '../lib/supabase'
 
+const ROMYLABS_OWNER = 'romy@romylabs.com'
+
 export default function Login() {
   const { login, showToast } = useApp()
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
-  const [branding, setBranding] = useState(null) // { firm_name, logo_url, sub }
+  const [branding, setBranding] = useState(null)
   const debounceRef = useRef(null)
+  const isRomyLabsOwner = email.trim().toLowerCase() === ROMYLABS_OWNER
 
-  // Lookup tenant branding by email domain as user types
+  // Lookup tenant branding by email domain as user types. The RomyLabs platform
+  // owner gets platform branding rather than inheriting TaxRes tenant branding.
   useEffect(() => {
+    if (email.trim().toLowerCase() === ROMYLABS_OWNER) {
+      setBranding({
+        firm_name: 'RomyLabs',
+        logo_url: '/romylabs-logo.png',
+        sub: 'Platform Administration',
+      })
+      return
+    }
+
     const domain = email.split('@')[1]?.toLowerCase()
     if (!domain || !domain.includes('.')) {
       setBranding(null)
@@ -47,7 +60,12 @@ export default function Login() {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
       login(data.user)
-      showToast(`Welcome back!`)
+      showToast('Welcome back!')
+
+      // Platform owner belongs in RomyLabs Command Center, never the TaxRes app.
+      if (data.user?.email?.toLowerCase() === ROMYLABS_OWNER) {
+        window.location.href = '/crm-admin'
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -65,7 +83,7 @@ export default function Login() {
         <div className="login-logo">
           {logoUrl ? (
             <img src={logoUrl} alt={firmName}
-              style={{ height: 52, objectFit: 'contain', display: 'block', margin: '0 auto' }}
+              style={{ height: isRomyLabsOwner ? 64 : 52, maxWidth: 220, objectFit: 'contain', display: 'block', margin: '0 auto' }}
               onError={e => { e.target.style.display = 'none' }} />
           ) : (
             <div style={{
@@ -113,7 +131,7 @@ export default function Login() {
         </button>
 
         <div style={{ marginTop: 16, fontSize: 11, color: 'var(--t3)', textAlign: 'center' }}>
-          Powered by TaxRes CRM
+          {isRomyLabsOwner ? 'RomyLabs Platform' : 'Powered by TaxRes CRM'}
         </div>
       </form>
     </div>
