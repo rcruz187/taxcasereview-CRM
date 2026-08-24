@@ -1723,8 +1723,8 @@ function StatusDot({ ok }) {
 
 const REPORTING_PRODUCTS = [
   { key:'taxres_crm', label:'TaxRes CRM', icon:'📊', color:'#6366f1', website:'taxrescrm.net', marketing:'connected', seo:'connected' },
-  { key:'camvella', label:'Camvella', icon:'🏘️', color:'#0ea5e9', website:'camvella.com', marketing:'implemented', seo:'implemented' },
-  { key:'arcvena', label:'Arcvena', icon:'⚡', color:'#8b5cf6', website:'arcvena.com', marketing:'implemented', seo:'implemented' },
+  { key:'camvella', label:'Camvella', icon:'🏘️', color:'#0ea5e9', website:'camvella.com', marketing:'implemented', seo:'connected' },
+  { key:'arcvena', label:'Arcvena', icon:'⚡', color:'#8b5cf6', website:'arcvena.com', marketing:'implemented', seo:'connected' },
 ]
 
 function ProductReportingSelector({ value, onChange, channel }) {
@@ -3414,10 +3414,13 @@ function CommandCenter() {
     } catch(e) { console.error('Bing fetch:', e); setBingConnected(false) }
   }
 
-  async function fetchGSC() {
+  async function fetchGSC(productKey = 'taxres_crm') {
     setGscLoading(true)
+    setGscConnected(false)
+    setGscData(null)
     try {
-      const { data: gsc } = await supabase.functions.invoke('gsc-data', { body: {} })
+      const { data: gsc, error } = await supabase.functions.invoke('gsc-data', { body: { product_key: productKey } })
+      if (error) throw error
       if (gsc && !gsc.mock && !gsc.error) {
         setGscData(gsc)
         setGscConnected(true)
@@ -3437,6 +3440,10 @@ function CommandCenter() {
   const [seoProduct, setSeoProduct] = useState('taxres_crm')
   const [ga4Data, setGa4Data] = useState(null)
   const [ga4Loading, setGa4Loading] = useState(false)
+
+  useEffect(() => {
+    fetchGSC(seoProduct)
+  }, [seoProduct])
 
   async function loadGA4() {
     setGa4Loading(true)
@@ -3951,7 +3958,7 @@ function CommandCenter() {
         {/* ═══ SEARCH TAB ═══ */}
         {tab==='search' && (<>
           <ProductReportingSelector value={seoProduct} onChange={setSeoProduct} channel="seo" />
-          {seoProduct==='taxres_crm' ? <>
+          <>
 
           {/* ── Google Search Console ── */}
           <div style={CC.card({padding:'22px 24px', marginBottom:18})}>
@@ -4004,7 +4011,8 @@ function CommandCenter() {
             </>)})()}
           </div>
 
-          {/* ── Bing Webmaster Tools ── */}
+          {/* Bing reporting is currently configured only for TaxRes. */}
+          {seoProduct === 'taxres_crm' && (
           <div style={CC.card({padding:'22px 24px'})}>
             <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
               <span style={{ fontSize:16 }}>🟠</span>
@@ -4050,7 +4058,8 @@ function CommandCenter() {
               </div>
             )}
           </div>
-          </> : <ProductReportingSetup productKey={seoProduct} channel="seo" />}
+          )}
+          </>
         </>)}
 
         {/* ═══ SALES TAB ═══ */}
