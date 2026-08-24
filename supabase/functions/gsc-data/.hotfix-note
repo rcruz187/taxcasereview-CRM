@@ -1,1 +1,0 @@
-GSC reconnect hotfix: preserve existing refresh token when Google omits a new one and resolve both domain and URL-prefix Search Console properties for TaxRes, Camvella, and Arcvena.
