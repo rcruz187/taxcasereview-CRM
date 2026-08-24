@@ -2123,7 +2123,7 @@ function ProductsTab({ supabase, taxresActivity = [] }) {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.access_token) throw new Error('Not authenticated')
       const HUB_PROXY = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/hub-proxy'
-      const res = product.key === 'arcvena'
+      const res = ['camvella', 'arcvena'].includes(product.key)
         ? await fetch(product.metricsUrl, {
             method: 'GET',
             headers: {
