@@ -1720,6 +1720,63 @@ function StatusDot({ ok }) {
     boxShadow: ok ? '0 0 6px #10b98160' : '0 0 6px #ef444460' }} />
 }
 
+
+const REPORTING_PRODUCTS = [
+  { key:'taxres_crm', label:'TaxRes CRM', icon:'📊', color:'#6366f1', website:'taxrescrm.net', marketing:'connected', seo:'connected' },
+  { key:'camvella', label:'Camvella', icon:'🏘️', color:'#0ea5e9', website:'camvella.com', marketing:'tag_live', seo:'setup' },
+  { key:'arcvena', label:'Arcvena', icon:'⚡', color:'#8b5cf6', website:'arcvena.com', marketing:'setup', seo:'setup' },
+]
+
+function ProductReportingSelector({ value, onChange, channel }) {
+  return (
+    <div style={{ display:'flex', gap:10, flexWrap:'wrap', marginBottom:22 }}>
+      {REPORTING_PRODUCTS.map(p => {
+        const status = p[channel]
+        const statusLabel = status === 'connected' ? 'Connected' : status === 'tag_live' ? 'Tracking tag live' : 'Setup needed'
+        const statusColor = status === 'connected' ? '#10b981' : status === 'tag_live' ? '#0ea5e9' : '#f59e0b'
+        return (
+          <button key={p.key} onClick={() => onChange(p.key)} style={{
+            minWidth:190, textAlign:'left', padding:'12px 14px', borderRadius:10, cursor:'pointer',
+            background:value===p.key ? p.color+'20' : 'rgba(255,255,255,.025)',
+            border:value===p.key ? `1px solid ${p.color}` : '1px solid rgba(255,255,255,.08)',
+            color:'#fff'
+          }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:5 }}>
+              <span>{p.icon}</span><span style={{ fontSize:13, fontWeight:800 }}>{p.label}</span>
+            </div>
+            <div style={{ fontSize:10, color:statusColor }}>● {statusLabel}</div>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function ProductReportingSetup({ productKey, channel }) {
+  const p = REPORTING_PRODUCTS.find(x => x.key === productKey)
+  const isCamvellaMarketing = productKey === 'camvella' && channel === 'marketing'
+  const title = channel === 'marketing' ? 'Marketing analytics' : 'SEO reporting'
+  const details = isCamvellaMarketing
+    ? 'The GA4 tracking tag is live on camvella.com. The GA4 Data API property still needs to be connected before traffic numbers can be displayed here.'
+    : `${p.label} does not have a dedicated ${channel === 'marketing' ? 'GA4 Data API connection' : 'Search Console data connection'} in the RomyLabs reporting hub yet.`
+  return (
+    <div style={{ ...CC.card(), padding:'30px', maxWidth:780 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
+        <span style={{ fontSize:26 }}>{p.icon}</span>
+        <div>
+          <div style={{ fontSize:16, fontWeight:900, color:'#fff' }}>{p.label} — {title}</div>
+          <div style={{ fontSize:11, color:'#64748b' }}>{p.website}</div>
+        </div>
+        <span style={{ marginLeft:'auto', fontSize:10, fontWeight:800, color:'#f59e0b', background:'rgba(245,158,11,.12)', padding:'4px 9px', borderRadius:12 }}>Setup required</span>
+      </div>
+      <div style={{ fontSize:13, lineHeight:1.7, color:'#94a3b8', marginBottom:18 }}>{details}</div>
+      <div style={{ fontSize:11, color:'#475569', borderTop:'1px solid rgba(255,255,255,.07)', paddingTop:14 }}>
+        No TaxRes data is shown here. This panel will stay separate until {p.label}'s own connection is verified.
+      </div>
+    </div>
+  )
+}
+
 // ── Products Tab ──────────────────────────────────────────────────────────────
 // Shows cross-product metrics from platform_metrics table.
 // Products tab — hub for all CRMs. Each card opens a live dashboard panel.
@@ -1771,13 +1828,14 @@ const PRODUCT_REGISTRY = [
     color:     '#8b5cf6',
     industry:  'Electrical Contractors',
     url:       'https://www.arcvena.com',
-    lifecycleStage: 'coming',   // public as Coming Soon — built but not commercially launched
-    connection:     'partial',  // metricsUrl not yet wired
+    lifecycleStage: 'available', // product and public site are active; final reporting connection remains
+    connection:     'partial',  // product is active; platform metrics endpoint not yet deployed
     brandStatus:    'branded',
     publicOnRomyLabs: true,
-    commerciallyAvailable: false,
+    commerciallyAvailable: true,
     desc:      'Asset intelligence & job management for electrical contractors',
-    metricsUrl: null, // need Arcvena Supabase project ref
+    metricsUrl: null,
+    nextMilestone: 'Connect Arcvena platform metrics, GA4 Data API, and Search Console reporting'
   },
   {
     key:       'bocasync',
@@ -3365,6 +3423,8 @@ function CommandCenter() {
   }
 
   // ── GA4 real data load ─────────────────────────────────────────────────────
+  const [marketingProduct, setMarketingProduct] = useState('taxres_crm')
+  const [seoProduct, setSeoProduct] = useState('taxres_crm')
   const [ga4Data, setGa4Data] = useState(null)
   const [ga4Loading, setGa4Loading] = useState(false)
 
@@ -3432,7 +3492,7 @@ function CommandCenter() {
     setGa4Loading(false)
   }
 
-  useEffect(() => { if (tab==='marketing') loadGA4() }, [tab])
+  useEffect(() => { if (tab==='marketing' && marketingProduct==='taxres_crm') loadGA4() }, [tab, marketingProduct])
 
   // Poll activity every 30s
   useEffect(() => {
@@ -3464,10 +3524,10 @@ function CommandCenter() {
     { key:'overview',  label:'Overview'  },
     { key:'support',   label:'Support'   },
     { key:'products',  label:'Products'  },
-    { key:'marketing', label:'TaxRes — Marketing' },
+    { key:'marketing', label:'Marketing' },
     { key:'linkedin',  label:'LinkedIn'  },
     { key:'content',   label:'Content'   },
-    { key:'search',    label:'TaxRes — SEO' },
+    { key:'search',    label:'SEO' },
     { key:'sales',     label:'Sales'     },
     { key:'crm',       label:'CRM'       },
     { key:'goals',     label:'Goals'     },
@@ -3816,6 +3876,8 @@ function CommandCenter() {
 
         {/* ═══ MARKETING TAB ═══ */}
         {tab==='marketing' && (<>
+          <ProductReportingSelector value={marketingProduct} onChange={setMarketingProduct} channel="marketing" />
+          {marketingProduct==='taxres_crm' ? <>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
             <div style={{ fontSize:11, color:'#475569' }}>
               {ga4Data ? `Last synced: ${ga4Data.lastSync}` : 'Loading GA4 data…'}
@@ -3873,10 +3935,13 @@ function CommandCenter() {
               GA4 sync failed. Check System tab for details.
             </div>
           )}
+          </> : <ProductReportingSetup productKey={marketingProduct} channel="marketing" />}
         </>)}
 
         {/* ═══ SEARCH TAB ═══ */}
         {tab==='search' && (<>
+          <ProductReportingSelector value={seoProduct} onChange={setSeoProduct} channel="seo" />
+          {seoProduct==='taxres_crm' ? <>
 
           {/* ── Google Search Console ── */}
           <div style={CC.card({padding:'22px 24px', marginBottom:18})}>
@@ -3975,6 +4040,7 @@ function CommandCenter() {
               </div>
             )}
           </div>
+          </> : <ProductReportingSetup productKey={seoProduct} channel="seo" />}
         </>)}
 
         {/* ═══ SALES TAB ═══ */}
