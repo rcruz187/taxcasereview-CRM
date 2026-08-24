@@ -7,6 +7,10 @@ name: Deploy Supabase Edge Functions
 # change, and a blank/all deploy resets server-side verify_jwt settings not in
 # config.toml. Deploys are now deliberate and scoped to one named function.
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/hub-proxy/**'
   workflow_dispatch:
     inputs:
       function:
@@ -32,7 +36,11 @@ jobs:
           set -euo pipefail
           # JWT settings come from supabase/config.toml (the source of truth),
           # so a plain `functions deploy` respects each function's verify_jwt.
-          FN="${{ github.event.inputs.function }}"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            FN="hub-proxy"
+          else
+            FN="${{ github.event.inputs.function }}"
+          fi
           if [ -z "$FN" ]; then
             echo "::error::No function specified. Blanket deploys are disabled on"
             echo "::error::purpose — they reset server-side settings (verify_jwt) not"
