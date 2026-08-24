@@ -8,9 +8,10 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const LOGO = '/assets/taxrescrm-logo.png'
+const TAXRESCRM_TENANT = 'a0000000-0000-0000-0000-000000000001'
 
 export default function ImpersonateGate() {
-  const [status, setStatus] = useState('validating') // validating | ok | error
+  const [status, setStatus] = useState('validating')
   const [info, setInfo]     = useState(null)
   const [error, setError]   = useState('')
   const navigate = useNavigate()
@@ -33,25 +34,26 @@ export default function ImpersonateGate() {
         return
       }
 
-      // Store the impersonation context in sessionStorage
-      // The AppContext reads this on init and sets the tenant override
+      // Product context must control product branding. RomyLabs branding belongs
+      // only to /crm-admin; opening the TaxRes product from Command Center must
+      // render the TaxRes CRM identity even though the platform owner is signed in.
+      const isTaxResProduct = data.tenant_id === TAXRESCRM_TENANT
+      const firmName = isTaxResProduct ? 'TaxRes CRM' : data.firm_name
+      const logoUrl = isTaxResProduct ? LOGO : data.logo_url
+
       sessionStorage.setItem('admin_impersonation', JSON.stringify({
         tenant_id:   data.tenant_id,
         tenant_code: data.tenant_code,
-        firm_name:   data.firm_name,
+        firm_name:   firmName,
         admin_email: data.admin_email,
-        logo_url:    data.logo_url,
+        logo_url:    logoUrl,
         brand_color: data.brand_color,
         started_at:  new Date().toISOString(),
       }))
 
-      setInfo(data)
+      setInfo({ ...data, firm_name: firmName, logo_url: logoUrl })
       setStatus('ok')
 
-      // After 1.5s, do a hard redirect to the CRM home.
-      // We use window.location.href (not React Router navigate) so the entire
-      // app re-initializes and AppContext reads the sessionStorage impersonation.
-      // The '?imp=1' param tells AdminGate NOT to redirect to /crm-admin.
       setTimeout(() => {
         window.location.href = window.location.origin + '/?imp=1'
       }, 1500)
