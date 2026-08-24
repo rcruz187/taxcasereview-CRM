@@ -4,7 +4,6 @@
 // The banner at the top reminds you you're in impersonation mode.
 
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const LOGO = '/taxrescrm-logo.png'
@@ -14,7 +13,6 @@ export default function ImpersonateGate() {
   const [status, setStatus] = useState('validating')
   const [info, setInfo]     = useState(null)
   const [error, setError]   = useState('')
-  const navigate = useNavigate()
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -38,9 +36,9 @@ export default function ImpersonateGate() {
       // only to /crm-admin. Tenant sessions keep each tenant's own branding.
       const isTaxResProduct = data.tenant_id === TAXRESCRM_TENANT
       const firmName = isTaxResProduct ? 'TaxRes CRM' : data.firm_name
-      const logoUrl = isTaxResProduct ? LOGO : data.logo_url
+      const logoUrl = isTaxResProduct ? LOGO : (data.logo_url || '')
 
-      sessionStorage.setItem('admin_impersonation', JSON.stringify({
+      const impersonation = {
         tenant_id:   data.tenant_id,
         tenant_code: data.tenant_code,
         firm_name:   firmName,
@@ -48,7 +46,22 @@ export default function ImpersonateGate() {
         logo_url:    logoUrl,
         brand_color: data.brand_color,
         started_at:  new Date().toISOString(),
-      }))
+      }
+      sessionStorage.setItem('admin_impersonation', JSON.stringify(impersonation))
+
+      // Prevent the next page from briefly showing a stale logo from whichever
+      // tenant was opened previously. The CRM sidebar reads this cache on first
+      // paint before the async branding loader runs.
+      try {
+        localStorage.setItem('tcr_firm_branding', JSON.stringify({
+          name: firmName,
+          slug: String(firmName || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
+          tenantId: data.tenant_id,
+          logoUrl,
+          address: '', phone: '', email: '', website: '', fax: '', labels: {},
+          paymentProvider: 'stripe'
+        }))
+      } catch (_) {}
 
       setInfo({ ...data, firm_name: firmName, logo_url: logoUrl })
       setStatus('ok')
@@ -63,6 +76,9 @@ export default function ImpersonateGate() {
     }
   }
 
+  const displayLogo = status === 'ok' && info ? (info.logo_url || '') : LOGO
+  const displayAlt = status === 'ok' && info ? info.firm_name : 'TaxRes CRM'
+
   return (
     <div style={{
       minHeight: '100vh', background: '#0d0c1a',
@@ -75,9 +91,13 @@ export default function ImpersonateGate() {
         borderRadius: 20, padding: '40px 48px',
         textAlign: 'center', maxWidth: 420, width: '100%'
       }}>
-        <img src={LOGO} alt="TaxRes CRM"
-          style={{ height: 44, objectFit: 'contain', marginBottom: 24, display: 'block', margin: '0 auto 24px' }}
-          onError={e => { e.target.style.display = 'none' }} />
+        {displayLogo ? (
+          <img src={displayLogo} alt={displayAlt}
+            style={{ height: 44, maxWidth: 220, objectFit: 'contain', marginBottom: 24, display: 'block', margin: '0 auto 24px' }}
+            onError={e => { e.currentTarget.style.display = 'none' }} />
+        ) : (
+          <div style={{ fontSize:18, fontWeight:800, color:'#fff', marginBottom:24 }}>{displayAlt}</div>
+        )}
 
         {status === 'validating' && (
           <>
