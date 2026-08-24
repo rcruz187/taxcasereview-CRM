@@ -1831,7 +1831,7 @@ const PRODUCT_REGISTRY = [
     industry:  'Electrical Contractors',
     url:       'https://www.arcvena.com',
     lifecycleStage: 'available', // product and public site are active; final reporting connection remains
-    connection:     'partial',  // product is active; platform metrics endpoint not yet deployed
+    connection:     'connected', // live Arcvena platform metrics deployed and session-authenticated
     brandStatus:    'branded',
     publicOnRomyLabs: true,
     commerciallyAvailable: true,
@@ -2123,15 +2123,23 @@ function ProductsTab({ supabase, taxresActivity = [] }) {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.access_token) throw new Error('Not authenticated')
       const HUB_PROXY = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/hub-proxy'
-      const res = await fetch(HUB_PROXY, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type':  'application/json',
-          'apikey':        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1weGd4ZnFkYnF1emtydnZlamtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTkwMDE4OTIsImV4cCI6MjAzNDU3Nzg5Mn0.zr0F_sV9-TJxO1wOST3VHr_n-5jPTpLY_AzEfKR1hSo',
-        },
-        body: JSON.stringify({ product: product.key }),
-      })
+      const res = product.key === 'arcvena'
+        ? await fetch(product.metricsUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+          })
+        : await fetch(HUB_PROXY, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type':  'application/json',
+              'apikey':        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1weGd4ZnFkYnF1emtydnZlamtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTkwMDE4OTIsImV4cCI6MjAzNDU3Nzg5Mn0.zr0F_sV9-TJxO1wOST3VHr_n-5jPTpLY_AzEfKR1hSo',
+            },
+            body: JSON.stringify({ product: product.key }),
+          })
       const data = await res.json()
       setLiveData(d => ({ ...d, [product.key]: data }))
     } catch (e) {
