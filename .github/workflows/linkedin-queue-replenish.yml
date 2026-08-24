@@ -10,7 +10,25 @@ on:
       - '.github/workflows/linkedin-queue-replenish.yml'
 
 jobs:
+  cleanup-duplicate:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: mpxgxfqdbquzkrvvejkh
+    steps:
+      - name: Remove duplicate founder-story queue row
+        shell: bash
+        run: |
+          set -euo pipefail
+          SQL="DELETE FROM linkedin_posts WHERE tenant_id='a0000000-0000-0000-0000-000000000001' AND lower(title)=lower('Why I built Tax Res CRM') AND status IN ('draft','approved','scheduled') AND linkedin_post_id IS NULL RETURNING id,title,status,scheduled_at;"
+          jq -n --arg query "$SQL" '{query:$query}' > /tmp/body.json
+          curl --fail-with-body -sS -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data-binary @/tmp/body.json
+
   replenish:
+    needs: cleanup-duplicate
     runs-on: ubuntu-latest
     steps:
       - name: Maintain rolling LinkedIn queue
