@@ -18,7 +18,8 @@
     </script>
     <script>
       (function(){
-        if (window.location.hostname === 'admin.romylabs.com') {
+        var isRomyLabsAdmin = window.location.hostname === 'admin.romylabs.com' && window.location.pathname.indexOf('/crm-admin') === 0;
+        if (isRomyLabsAdmin) {
           document.title = 'RomyLabs — Command Center';
           document.querySelectorAll("link[rel*='icon'],link[rel='apple-touch-icon']").forEach(function(el){ el.remove(); });
           var link = document.createElement('link');
@@ -36,7 +37,6 @@
                 node.nodeValue = node.nodeValue.replace(/romy@taxrescrm\.net/g, 'romy@romylabs.com');
               }
             }
-            /* Global Command Center must never render a tenant firm's logo. */
             var all = document.querySelectorAll('h1,h2,h3,div');
             for (var i=0; i<all.length; i++) {
               var text = (all[i].textContent || '').trim();
@@ -50,6 +50,24 @@
           window.addEventListener('DOMContentLoaded', function(){
             cleanRomyLabsAdmin();
             new MutationObserver(cleanRomyLabsAdmin).observe(document.body, { childList:true, subtree:true, characterData:true });
+          });
+        } else if (window.location.hostname === 'admin.romylabs.com') {
+          /* Product CRM on the admin hostname is still TaxRes CRM. RomyLabs branding is admin-only. */
+          document.title = 'TaxRes CRM';
+          try { localStorage.removeItem('tcr_firm_branding'); } catch (_) {}
+          function enforceTaxResProductBrand(){
+            if (sessionStorage.getItem('admin_impersonation')) return;
+            document.querySelectorAll('img').forEach(function(img){
+              var src = img.getAttribute('src') || '';
+              if (src.indexOf('romylabs-logo') !== -1) {
+                img.setAttribute('src','/assets/taxrescrm-logo.png');
+                img.setAttribute('alt','TaxRes CRM');
+              }
+            });
+          }
+          window.addEventListener('DOMContentLoaded', function(){
+            enforceTaxResProductBrand();
+            new MutationObserver(enforceTaxResProductBrand).observe(document.body, { childList:true, subtree:true, attributes:true, attributeFilter:['src'] });
           });
         }
       })();
