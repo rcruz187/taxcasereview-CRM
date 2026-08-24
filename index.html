@@ -18,18 +18,26 @@
     </script>
     <script>
       (function(){
-        var isRomyLabsAdmin = window.location.hostname === 'admin.romylabs.com' && window.location.pathname.indexOf('/crm-admin') === 0;
-        if (isRomyLabsAdmin) {
-          document.title = 'RomyLabs — Command Center';
+        /* HARD RULE: RomyLabs branding is route-scoped to /crm-admin only.
+           The TaxRes product CRM must never inherit RomyLabs branding, regardless
+           of which owner account or hostname opened it. */
+        var isRomyLabsAdmin = window.location.pathname.indexOf('/crm-admin') === 0;
+
+        function setIcons(href) {
           document.querySelectorAll("link[rel*='icon'],link[rel='apple-touch-icon']").forEach(function(el){ el.remove(); });
           var link = document.createElement('link');
-          link.rel = 'icon'; link.type = 'image/png'; link.href = '/romylabs-favicon.png';
+          link.rel = 'icon'; link.type = 'image/png'; link.href = href;
           document.head.appendChild(link);
           var apple = document.createElement('link');
-          apple.rel = 'apple-touch-icon'; apple.sizes = '180x180'; apple.href = '/romylabs-favicon.png';
+          apple.rel = 'apple-touch-icon'; apple.sizes = '180x180'; apple.href = href;
           document.head.appendChild(apple);
+        }
 
-          function cleanRomyLabsAdmin(){
+        if (isRomyLabsAdmin) {
+          document.title = 'RomyLabs — Command Center';
+          setIcons('/romylabs-favicon.png');
+
+          function enforceRomyLabsAdmin(){
             var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
             var node;
             while ((node = walker.nextNode())) {
@@ -37,6 +45,7 @@
                 node.nodeValue = node.nodeValue.replace(/romy@taxrescrm\.net/g, 'romy@romylabs.com');
               }
             }
+            /* No tenant logo may appear above the global Command Center greeting. */
             var all = document.querySelectorAll('h1,h2,h3,div');
             for (var i=0; i<all.length; i++) {
               var text = (all[i].textContent || '').trim();
@@ -48,18 +57,29 @@
             }
           }
           window.addEventListener('DOMContentLoaded', function(){
-            cleanRomyLabsAdmin();
-            new MutationObserver(cleanRomyLabsAdmin).observe(document.body, { childList:true, subtree:true, characterData:true });
+            enforceRomyLabsAdmin();
+            new MutationObserver(enforceRomyLabsAdmin).observe(document.body, { childList:true, subtree:true, characterData:true });
           });
-        } else if (window.location.hostname === 'admin.romylabs.com') {
-          /* Product CRM on the admin hostname is still TaxRes CRM. RomyLabs branding is admin-only. */
+        } else {
           document.title = 'TaxRes CRM';
-          try { localStorage.removeItem('tcr_firm_branding'); } catch (_) {}
+          setIcons('/taxrescrm-favicon.png');
+
+          /* A stale RomyLabs cache was the source of the product-brand leak. */
+          try {
+            var cached = localStorage.getItem('tcr_firm_branding');
+            if (cached && /romylabs/i.test(cached)) localStorage.removeItem('tcr_firm_branding');
+          } catch (_) {}
+
           function enforceTaxResProductBrand(){
-            if (sessionStorage.getItem('admin_impersonation')) return;
-            document.querySelectorAll('img').forEach(function(img){
+            /* Real office impersonation keeps that office's branding. */
+            var imp = null;
+            try { imp = JSON.parse(sessionStorage.getItem('admin_impersonation') || 'null'); } catch (_) {}
+            if (imp && imp.tenant_id && imp.tenant_id !== 'a0000000-0000-0000-0000-000000000001') return;
+
+            document.querySelectorAll('.sidebar .brand img, aside .brand img').forEach(function(img){
               var src = img.getAttribute('src') || '';
-              if (src.indexOf('romylabs-logo') !== -1) {
+              var alt = img.getAttribute('alt') || '';
+              if (/romylabs/i.test(src) || /romy\s*labs/i.test(alt)) {
                 img.setAttribute('src','/assets/taxrescrm-logo.png');
                 img.setAttribute('alt','TaxRes CRM');
               }
@@ -67,7 +87,7 @@
           }
           window.addEventListener('DOMContentLoaded', function(){
             enforceTaxResProductBrand();
-            new MutationObserver(enforceTaxResProductBrand).observe(document.body, { childList:true, subtree:true, attributes:true, attributeFilter:['src'] });
+            new MutationObserver(enforceTaxResProductBrand).observe(document.body, { childList:true, subtree:true, attributes:true, attributeFilter:['src','alt'] });
           });
         }
       })();
