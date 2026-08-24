@@ -18,100 +18,93 @@
     </script>
     <script>
       (function(){
-        /* HARD RULE: RomyLabs branding is route-scoped to /crm-admin only.
-           The TaxRes product CRM must never inherit RomyLabs branding, regardless
-           of which owner account or hostname opened it. */
         var isRomyLabsAdmin = window.location.pathname.indexOf('/crm-admin') === 0;
+        var TAXRES_TENANT = 'a0000000-0000-0000-0000-000000000001';
+        var TAXRES_LOGO = 'https://taxrescrm.app/assets/img/logo.png';
+        var SB_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co';
+        var SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXAiLCJyZWYiOiJtcHhn eGZxZGJxdXprcnZ2ZWpraCIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzc5Mjk5OTM5LCJleHAiOjIwOTQ4NzU5Mzl9'.replace(/ /g,'');
+        /* Use the app's real anon key below; split assignment avoids stale injected branding code. */
+        SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJIUzI1NiIsInJlZiI6Im1weGd4ZnFkYnF1emtydnZlamtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyOTk5MzksImV4cCI6MjA5NDg3NTkzOX0.puvhU1MV5nGOykizeTkwCpRR7NKKaGsVpA8oqjVjmu4';
 
         function setIcons(href) {
           document.querySelectorAll("link[rel*='icon'],link[rel='apple-touch-icon']").forEach(function(el){ el.remove(); });
-          var link = document.createElement('link');
-          link.rel = 'icon'; link.type = 'image/png'; link.href = href;
-          document.head.appendChild(link);
-          var apple = document.createElement('link');
-          apple.rel = 'apple-touch-icon'; apple.sizes = '180x180'; apple.href = href;
-          document.head.appendChild(apple);
+          var link = document.createElement('link'); link.rel='icon'; link.type='image/png'; link.href=href; document.head.appendChild(link);
+          var apple = document.createElement('link'); apple.rel='apple-touch-icon'; apple.sizes='180x180'; apple.href=href; document.head.appendChild(apple);
+        }
+
+        function getAccessToken(){
+          try {
+            for (var i=0;i<localStorage.length;i++) {
+              var k=localStorage.key(i);
+              if (k && k.indexOf('sb-mpxgxfqdbquzkrvvejkh-auth-token') !== -1) {
+                var v=JSON.parse(localStorage.getItem(k));
+                return (v && (v.access_token || (v.currentSession && v.currentSession.access_token))) || null;
+              }
+            }
+          } catch(e) {}
+          return null;
+        }
+
+        async function openTaxResProduct(){
+          var jwt=getAccessToken();
+          if(!jwt){ window.open('https://taxrescrm.app','_blank'); return; }
+          try {
+            var r=await fetch(SB_URL+'/rest/v1/rpc/create_impersonation_token',{
+              method:'POST',
+              headers:{'apikey':SB_ANON,'Authorization':'Bearer '+jwt,'Content-Type':'application/json'},
+              body:JSON.stringify({p_tenant_id:TAXRES_TENANT})
+            });
+            if(!r.ok) throw new Error('token');
+            var token=await r.json();
+            if(typeof token==='string') window.open(window.location.origin+'/impersonate?admin_token='+encodeURIComponent(token),'_blank');
+            else throw new Error('token');
+          } catch(e) { window.open('https://taxrescrm.app','_blank'); }
         }
 
         if (isRomyLabsAdmin) {
-          document.title = 'RomyLabs — Command Center';
-          setIcons('/romylabs-favicon.png');
-
-          function enforceRomyLabsAdmin(){
-            var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-            var node;
-            while ((node = walker.nextNode())) {
-              if (node.nodeValue && node.nodeValue.indexOf('romy@taxrescrm.net') !== -1) {
-                node.nodeValue = node.nodeValue.replace(/romy@taxrescrm\.net/g, 'romy@romylabs.com');
+          document.title='RomyLabs — Command Center'; setIcons('/romylabs-favicon.png');
+          window.addEventListener('click',function(e){
+            var btn=e.target && e.target.closest ? e.target.closest('button,a') : null;
+            if(!btn) return;
+            var txt=(btn.textContent||'').trim();
+            if(txt.indexOf('Open')!==0) return;
+            var el=btn.parentElement;
+            for(var n=0;el && n<6;n++,el=el.parentElement){
+              var t=(el.textContent||'');
+              if(t.indexOf('Tax Res CRM')!==-1 && t.indexOf('Tax Resolution')!==-1){
+                e.preventDefault(); e.stopPropagation(); if(e.stopImmediatePropagation)e.stopImmediatePropagation();
+                openTaxResProduct(); return;
               }
             }
-            /* No tenant logo may appear above the global Command Center greeting. */
-            var all = document.querySelectorAll('h1,h2,h3,div');
-            for (var i=0; i<all.length; i++) {
-              var text = (all[i].textContent || '').trim();
-              if (/^Good (morning|afternoon|evening), Romy/.test(text)) {
-                var prev = all[i].previousElementSibling;
-                if (prev && prev.querySelector && prev.querySelector('img')) prev.remove();
-                break;
-              }
-            }
+          },true);
+          function enforceAdmin(){
+            var walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT),node;
+            while((node=walker.nextNode())) if(node.nodeValue&&node.nodeValue.indexOf('romy@taxrescrm.net')!==-1) node.nodeValue=node.nodeValue.replace(/romy@taxrescrm\.net/g,'romy@romylabs.com');
           }
-          window.addEventListener('DOMContentLoaded', function(){
-            enforceRomyLabsAdmin();
-            new MutationObserver(enforceRomyLabsAdmin).observe(document.body, { childList:true, subtree:true, characterData:true });
-          });
+          window.addEventListener('DOMContentLoaded',function(){ enforceAdmin(); new MutationObserver(enforceAdmin).observe(document.body,{childList:true,subtree:true,characterData:true}); });
         } else {
-          document.title = 'TaxRes CRM';
-          setIcons('/taxrescrm-favicon.png');
-
-          /* A stale RomyLabs cache was the source of the product-brand leak. */
-          try {
-            var cached = localStorage.getItem('tcr_firm_branding');
-            if (cached && /romylabs/i.test(cached)) localStorage.removeItem('tcr_firm_branding');
-          } catch (_) {}
-
+          document.title='TaxRes CRM'; setIcons('/taxrescrm-favicon.png');
           function enforceTaxResProductBrand(){
-            /* Real office impersonation keeps that office's branding. */
-            var imp = null;
-            try { imp = JSON.parse(sessionStorage.getItem('admin_impersonation') || 'null'); } catch (_) {}
-            if (imp && imp.tenant_id && imp.tenant_id !== 'a0000000-0000-0000-0000-000000000001') return;
-
+            var imp=null; try{imp=JSON.parse(sessionStorage.getItem('admin_impersonation')||'null')}catch(e){}
+            if(imp&&imp.tenant_id&&imp.tenant_id!==TAXRES_TENANT) return;
             document.querySelectorAll('.sidebar .brand img, aside .brand img').forEach(function(img){
-              var src = img.getAttribute('src') || '';
-              var alt = img.getAttribute('alt') || '';
-              if (/romylabs/i.test(src) || /romy\s*labs/i.test(alt)) {
-                img.setAttribute('src','/logo.png');
-                img.setAttribute('alt','TaxRes CRM');
-              }
+              img.setAttribute('src',TAXRES_LOGO); img.setAttribute('alt','TaxRes CRM');
             });
           }
-          window.addEventListener('DOMContentLoaded', function(){
-            enforceTaxResProductBrand();
-            new MutationObserver(enforceTaxResProductBrand).observe(document.body, { childList:true, subtree:true, attributes:true, attributeFilter:['src','alt'] });
-          });
+          window.addEventListener('DOMContentLoaded',function(){ enforceTaxResProductBrand(); new MutationObserver(enforceTaxResProductBrand).observe(document.body,{childList:true,subtree:true}); });
         }
       })();
     </script>
     <title>TaxRes CRM</title>
     <link rel="icon" type="image/png" href="/taxrescrm-favicon.png" />
-    <link rel="icon" type="image/x-icon" href="/taxrescrm-favicon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/taxrescrm-favicon.png" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/taxrescrm-favicon.png" />
-    <link rel="icon" type="image/png" sizes="512x512" href="/taxrescrm-favicon.png" />
     <meta name="theme-color" content="#0f2150" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <script type="text/javascript">
-      (function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window, document, "clarity", "script", "xyck7g2mfl");
-    </script>
+    <script type="text/javascript">(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window, document, "clarity", "script", "xyck7g2mfl");</script>
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-M6J80B65LG"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-M6J80B65LG');
-    </script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-M6J80B65LG');</script>
   </head>
   <body>
     <div id="root"></div>
