@@ -1,0 +1,23 @@
+name: LinkedIn Queue Replenishment
+
+on:
+  schedule:
+    - cron: '15 12 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/linkedin-queue-replenish.yml'
+
+jobs:
+  replenish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Maintain rolling LinkedIn queue
+        shell: bash
+        run: |
+          set -euo pipefail
+          sleep 45
+          BODY="$(curl --fail-with-body --retry 4 --retry-delay 15 --max-time 60 -sS -X POST 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/linkedin-queue-replenisher' -H 'Content-Type: application/json' -d '{}')"
+          echo "$BODY"
+          echo "$BODY" | grep -q '"ok":true'
