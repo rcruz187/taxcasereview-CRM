@@ -1,16 +1,13 @@
 name: Deploy Supabase Edge Functions
 
-# Deploys edge functions to Supabase whenever function code or config changes
-# on main. Also runnable on demand from the Actions tab (workflow_dispatch),
-# with an optional single-function input for targeted redeploys.
-# Manual dispatch only. A push trigger would auto-run a deploy on any function
-# change, and a blank/all deploy resets server-side verify_jwt settings not in
-# config.toml. Deploys are now deliberate and scoped to one named function.
+# Scoped production deploys only. Pushes are restricted to known function paths so
+# an unrelated change can never trigger a blanket Edge Function redeploy.
 on:
   push:
     branches: [main]
     paths:
       - 'supabase/functions/hub-proxy/**'
+      - 'supabase/functions/linkedin-scheduler/**'
   workflow_dispatch:
     inputs:
       function:
@@ -31,25 +28,38 @@ jobs:
         with:
           version: latest
 
-      - name: Deploy edge functions
+      - name: Resolve scoped function
+        id: scope
+        shell: bash
         run: |
           set -euo pipefail
-          # JWT settings come from supabase/config.toml (the source of truth),
-          # so a plain `functions deploy` respects each function's verify_jwt.
-          if [ "${{ github.event_name }}" = "push" ]; then
-            FN="hub-proxy"
-          else
-            FN="${{ github.event.inputs.function }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "fn=${{ github.event.inputs.function }}" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.sha }}"
+          CHANGED="$(git diff --name-only "$BEFORE" "$AFTER" || true)"
+          echo "$CHANGED"
+          if echo "$CHANGED" | grep -q '^supabase/functions/linkedin-scheduler/'; then
+            echo "fn=linkedin-scheduler" >> "$GITHUB_OUTPUT"
+          elif echo "$CHANGED" | grep -q '^supabase/functions/hub-proxy/'; then
+            echo "fn=hub-proxy" >> "$GITHUB_OUTPUT"
+          else
+            echo "No supported function path changed."
+            exit 1
+          fi
+
+      - name: Deploy edge function
+        shell: bash
+        run: |
+          set -euo pipefail
+          FN="${{ steps.scope.outputs.fn }}"
           if [ -z "$FN" ]; then
-            echo "::error::No function specified. Blanket deploys are disabled on"
-            echo "::error::purpose — they reset server-side settings (verify_jwt) not"
-            echo "::error::captured in config.toml. Dispatch with a single function slug,"
-            echo "::error::or use 'ALL_INTENTIONAL' only when a full redeploy is truly meant."
+            echo "::error::No function resolved"
             exit 1
           fi
           if [ "$FN" = "ALL_INTENTIONAL" ]; then
-            echo "Explicit full redeploy requested."
             supabase functions deploy --project-ref "$PROJECT_REF"
           else
             echo "Deploying single function: $FN"
