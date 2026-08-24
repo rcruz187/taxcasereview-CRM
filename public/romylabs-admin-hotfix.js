@@ -1,32 +1,33 @@
 /* RomyLabs admin production guard.
-   Keeps platform-level UI isolated from tenant branding and normalizes product
-   launch destinations while the legacy AdminPortal registry is refactored.
    Scoped to admin.romylabs.com only. */
 (function () {
   if (window.location.hostname !== 'admin.romylabs.com') return;
 
+  // Use the actual application deployments, never marketing or parked domains.
+  // Camvella is restored to its default GitHub Pages origin while app.camvella.com
+  // DNS is completed. Arcvena uses its Cloudflare Pages application origin.
   var CRM_URL_MAP = {
-    'https://www.camvella.com': 'https://app.camvella.com',
-    'https://camvella.com': 'https://app.camvella.com',
-    'https://www.arcvena.com': 'https://app.arcvena.com',
-    'https://arcvena.com': 'https://app.arcvena.com'
+    'https://www.camvella.com': 'https://taxresolutioncrm.github.io/camvella/',
+    'https://camvella.com': 'https://taxresolutioncrm.github.io/camvella/',
+    'https://app.camvella.com': 'https://taxresolutioncrm.github.io/camvella/',
+    'https://www.arcvena.com': 'https://arcvena-app.pages.dev/',
+    'https://arcvena.com': 'https://arcvena-app.pages.dev/',
+    'https://app.arcvena.com': 'https://arcvena-app.pages.dev/'
   };
 
   function normalizeUrl(url) {
     if (!url) return url;
-    var trimmed = String(url).replace(/\/$/, '');
-    return CRM_URL_MAP[trimmed] || url;
+    var raw = String(url);
+    var trimmed = raw.replace(/\/$/, '');
+    return CRM_URL_MAP[trimmed] || CRM_URL_MAP[raw] || url;
   }
 
-  // AdminPortal currently uses window.open(product.url) for product launch
-  // buttons. Normalize those destinations before the browser opens the tab.
   var nativeOpen = window.open;
   window.open = function (url, target, features) {
     return nativeOpen.call(window, normalizeUrl(url), target, features);
   };
 
   function fixPlatformUI() {
-    // Normalize the legacy hard-coded Platform Owner address.
     var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     var node;
     while ((node = walker.nextNode())) {
@@ -35,8 +36,6 @@
       }
     }
 
-    // Any direct anchor launch should also point to the product application,
-    // never the public marketing site.
     var anchors = document.querySelectorAll('a[href]');
     for (var a = 0; a < anchors.length; a++) {
       var href = anchors[a].getAttribute('href');
@@ -44,8 +43,6 @@
       if (normalized !== href) anchors[a].setAttribute('href', normalized);
     }
 
-    // The global Overview header must never render a tenant logo. Find the
-    // RomyLabs Platform subtitle, then remove only the image in that header.
     var all = document.querySelectorAll('div');
     for (var i = 0; i < all.length; i++) {
       var el = all[i];
@@ -72,9 +69,6 @@
     });
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', start);
-  } else {
-    start();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
 })();
