@@ -8,6 +8,7 @@ on:
     paths:
       - 'supabase/functions/hub-proxy/**'
       - 'supabase/functions/linkedin-scheduler/**'
+      - 'supabase/functions/linkedin-queue-replenisher/**'
   workflow_dispatch:
     inputs:
       function:
@@ -41,7 +42,9 @@ jobs:
           fi
           CHANGED="$(git diff --name-only HEAD^ HEAD)"
           echo "$CHANGED"
-          if echo "$CHANGED" | grep -q '^supabase/functions/linkedin-scheduler/'; then
+          if echo "$CHANGED" | grep -q '^supabase/functions/linkedin-queue-replenisher/'; then
+            echo "fn=linkedin-queue-replenisher" >> "$GITHUB_OUTPUT"
+          elif echo "$CHANGED" | grep -q '^supabase/functions/linkedin-scheduler/'; then
             echo "fn=linkedin-scheduler" >> "$GITHUB_OUTPUT"
           elif echo "$CHANGED" | grep -q '^supabase/functions/hub-proxy/'; then
             echo "fn=hub-proxy" >> "$GITHUB_OUTPUT"
