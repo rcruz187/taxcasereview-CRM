@@ -1723,8 +1723,8 @@ function StatusDot({ ok }) {
 
 const REPORTING_PRODUCTS = [
   { key:'taxres_crm', label:'TaxRes CRM', icon:'📊', color:'#6366f1', website:'taxrescrm.net', marketing:'connected', seo:'connected' },
-  { key:'camvella', label:'Camvella', icon:'🏘️', color:'#0ea5e9', website:'camvella.com', marketing:'tag_live', seo:'implemented' },
-  { key:'arcvena', label:'Arcvena', icon:'⚡', color:'#8b5cf6', website:'arcvena.com', marketing:'setup', seo:'implemented' },
+  { key:'camvella', label:'Camvella', icon:'🏘️', color:'#0ea5e9', website:'camvella.com', marketing:'implemented', seo:'implemented' },
+  { key:'arcvena', label:'Arcvena', icon:'⚡', color:'#8b5cf6', website:'arcvena.com', marketing:'implemented', seo:'implemented' },
 ]
 
 function ProductReportingSelector({ value, onChange, channel }) {
@@ -1732,8 +1732,8 @@ function ProductReportingSelector({ value, onChange, channel }) {
     <div style={{ display:'flex', gap:10, flexWrap:'wrap', marginBottom:22 }}>
       {REPORTING_PRODUCTS.map(p => {
         const status = p[channel]
-        const statusLabel = status === 'connected' ? 'Connected' : status === 'tag_live' ? 'Tracking tag live' : status === 'implemented' ? 'SEO implemented · reporting pending' : 'Setup needed'
-        const statusColor = status === 'connected' ? '#10b981' : status === 'tag_live' ? '#0ea5e9' : status === 'implemented' ? '#a78bfa' : '#f59e0b'
+        const statusLabel = status === 'connected' ? 'Connected' : status === 'implemented' ? `${channel === 'seo' ? 'SEO' : 'Marketing'} implemented · reporting pending` : 'Setup needed'
+        const statusColor = status === 'connected' ? '#10b981' : status === 'implemented' ? '#a78bfa' : '#f59e0b'
         return (
           <button key={p.key} onClick={() => onChange(p.key)} style={{
             minWidth:190, textAlign:'left', padding:'12px 14px', borderRadius:10, cursor:'pointer',
@@ -1754,14 +1754,13 @@ function ProductReportingSelector({ value, onChange, channel }) {
 
 function ProductReportingSetup({ productKey, channel }) {
   const p = REPORTING_PRODUCTS.find(x => x.key === productKey)
-  const isCamvellaMarketing = productKey === 'camvella' && channel === 'marketing'
-  const seoImplemented = channel === 'seo' && p.seo === 'implemented'
+  const reportingPending = p[channel] === 'implemented'
   const title = channel === 'marketing' ? 'Marketing analytics' : 'SEO reporting'
-  const details = isCamvellaMarketing
-    ? 'The GA4 tracking tag is live on camvella.com. The GA4 Data API property still needs to be connected before traffic numbers can be displayed here.'
-    : seoImplemented
+  const details = reportingPending
+    ? channel === 'seo'
       ? `${p.label}'s SEO implementation is complete. Only its dedicated Search Console reporting feed into RomyLabs is still pending.`
-      : `${p.label} does not have a dedicated ${channel === 'marketing' ? 'GA4 Data API connection' : 'Search Console data connection'} in the RomyLabs reporting hub yet.`
+      : `${p.label}'s marketing foundation is implemented. Only its dedicated analytics reporting feed into RomyLabs is still pending.`
+    : `${p.label} does not have a dedicated ${channel === 'marketing' ? 'GA4 Data API connection' : 'Search Console data connection'} in the RomyLabs reporting hub yet.`
   return (
     <div style={{ ...CC.card(), padding:'30px', maxWidth:780 }}>
       <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
@@ -1770,7 +1769,7 @@ function ProductReportingSetup({ productKey, channel }) {
           <div style={{ fontSize:16, fontWeight:900, color:'#fff' }}>{p.label} — {title}</div>
           <div style={{ fontSize:11, color:'#64748b' }}>{p.website}</div>
         </div>
-        <span style={{ marginLeft:'auto', fontSize:10, fontWeight:800, color:seoImplemented ? '#a78bfa' : '#f59e0b', background:seoImplemented ? 'rgba(139,92,246,.14)' : 'rgba(245,158,11,.12)', padding:'4px 9px', borderRadius:12 }}>{seoImplemented ? 'SEO implemented · feed pending' : 'Reporting setup required'}</span>
+        <span style={{ marginLeft:'auto', fontSize:10, fontWeight:800, color:reportingPending ? '#a78bfa' : '#f59e0b', background:reportingPending ? 'rgba(139,92,246,.14)' : 'rgba(245,158,11,.12)', padding:'4px 9px', borderRadius:12 }}>{reportingPending ? `${channel === 'seo' ? 'SEO' : 'Marketing'} implemented · feed pending` : 'Reporting setup required'}</span>
       </div>
       <div style={{ fontSize:13, lineHeight:1.7, color:'#94a3b8', marginBottom:18 }}>{details}</div>
       <div style={{ fontSize:11, color:'#475569', borderTop:'1px solid rgba(255,255,255,.07)', paddingTop:14 }}>
