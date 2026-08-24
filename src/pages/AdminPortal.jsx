@@ -1836,8 +1836,8 @@ const PRODUCT_REGISTRY = [
     publicOnRomyLabs: true,
     commerciallyAvailable: true,
     desc:      'Asset intelligence & job management for electrical contractors',
-    metricsUrl: null,
-    nextMilestone: 'Connect Arcvena platform metrics, GA4 Data API, and Search Console reporting'
+    metricsUrl: 'https://wzalqfxovxxszojfbnis.supabase.co/functions/v1/platform-metrics',
+    nextMilestone: 'Verify Arcvena live metrics, GA4 Data API, and Search Console reporting'
   },
   {
     key:       'bocasync',

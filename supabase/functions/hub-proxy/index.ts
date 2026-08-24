@@ -42,6 +42,7 @@ const PRODUCT_ENDPOINTS: Record<string, string> = {
   nashville:         'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/platform-metrics?view=nash',
   cloudcpa:          'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/platform-metrics?view=cloudcpa',
   camvella:          'https://fjqywulzsyfyzitneazb.supabase.co/functions/v1/platform-metrics',
+  arcvena:           'https://wzalqfxovxxszojfbnis.supabase.co/functions/v1/platform-metrics',
 }
 
 Deno.serve(async (req) => {
