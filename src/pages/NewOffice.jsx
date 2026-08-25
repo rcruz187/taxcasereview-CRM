@@ -3,7 +3,7 @@ import Papa from 'papaparse'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 
-const PLATFORM_ADMIN_EMAILS = ['romy@taxcasereview.org', 'romy@taxrescrm.net', 'romy@romylabs.com']
+const PLATFORM_ADMIN_EMAILS = ['romy@taxcasereview.org', 'romy@taxrescrm.net', 'romy@romylabs.com', 'info@romylabs.com']
 const TCR_TENANT = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
 const BLANK = { firm_name:'', tenant_code:'', admin_name:'', admin_email:'', firm_phone:'', brand_color:'#2563eb', plan_tier:'starter' }
 const STATUS_COLORS = { active:'#10b981', trial:'#f59e0b', past_due:'#f97316', cancelled:'#ef4444' }
