@@ -7,7 +7,7 @@ import { supabase }   from '../lib/supabase'
 import { useApp }     from '../context/AppContext'
 import { FIRM }       from '../lib/firmBranding'
 
-const PLATFORM_EMAILS = ['romy@taxcasereview.org', 'romy@taxrescrm.net', 'romy@romylabs.com']
+const PLATFORM_EMAILS = ['romy@taxcasereview.org', 'romy@taxrescrm.net', 'romy@romylabs.com', 'info@romylabs.com']
 const FROM_EMAIL = 'romy@taxrescrm.net'
 const FROM_NAME  = 'TaxRes CRM Support'
 
