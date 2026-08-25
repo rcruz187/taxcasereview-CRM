@@ -2,8 +2,8 @@
 (function () {
   if (window.location.hostname !== 'admin.romylabs.com') return;
 
-  var CAMVELLA_CRM = 'https://taxresolutioncrm.github.io/camvella/';
-  var ARCVENA_CRM = 'https://arcvena-app.pages.dev/';
+  var CAMVELLA_CRM = 'https://app.camvella.com';
+  var ARCVENA_CRM = 'https://app.arcvena.com';
 
   function normalized(url) {
     try {
