@@ -142,7 +142,7 @@ function Sidebar({ onSignOut }) {
       </nav>
 
       <div style={{ padding:'14px 14px', borderTop:'1px solid rgba(99,102,241,.15)' }}>
-        <div style={{ fontSize:11, color:'#a5b4fc', fontWeight:600, marginBottom:2 }}>romy@taxrescrm.net</div>
+        <div style={{ fontSize:11, color:'#a5b4fc', fontWeight:600, marginBottom:2 }}>{session?.user?.email || 'romy@romylabs.com'}</div>
         <div style={{ fontSize:10, color:'#6366f1', fontWeight:700, marginBottom:10 }}>Platform Owner</div>
         <button onClick={onSignOut} style={{ ...S.btn('ghost'), width:'100%', justifyContent:'center', fontSize:12, padding:'7px 0' }}>
           Sign Out
@@ -1723,8 +1723,8 @@ function StatusDot({ ok }) {
 
 const REPORTING_PRODUCTS = [
   { key:'taxres_crm', label:'TaxRes CRM', icon:'📊', color:'#6366f1', website:'taxrescrm.net', marketing:'connected', seo:'connected' },
-  { key:'camvella', label:'Camvella', icon:'🏘️', color:'#0ea5e9', website:'camvella.com', marketing:'implemented', seo:'connected' },
-  { key:'arcvena', label:'Arcvena', icon:'⚡', color:'#8b5cf6', website:'arcvena.com', marketing:'implemented', seo:'connected' },
+  { key:'camvella', label:'Camvella', icon:'🏘️', color:'#0ea5e9', website:'camvella.com', marketing:'connected', seo:'connected' },
+  { key:'arcvena', label:'Arcvena', icon:'⚡', color:'#8b5cf6', website:'arcvena.com', marketing:'connected', seo:'connected' },
 ]
 
 function ProductReportingSelector({ value, onChange, channel }) {
@@ -1794,12 +1794,14 @@ const PRODUCT_REGISTRY = [
 
   // ── LIVE PRODUCTS ────────────────────────────────────────────────────────
   {
-    key:       'taxres_crm',
-    label:     'Tax Res CRM',
-    icon:      '📊',
-    color:     '#6366f1',
-    industry:  'Tax Resolution',
-    url:       'https://taxrescrm.app',
+    key:        'taxres_crm',
+    label:      'Tax Res CRM',
+    icon:       '📊',
+    color:      '#6366f1',
+    industry:   'Tax Resolution',
+    url:        'https://taxrescrm.app',
+    appUrl:     'https://taxrescrm.app',
+    websiteUrl: 'https://taxrescrm.net',
     lifecycleStage: 'live',
     connection:     'connected',
     brandStatus:    'branded',
@@ -1809,12 +1811,14 @@ const PRODUCT_REGISTRY = [
     metricsUrl: 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/platform-metrics?view=saas',
   },
   {
-    key:       'camvella',
-    label:     'Camvella',
-    icon:      '🏘️',
-    color:     '#0ea5e9',
-    industry:  'HOA / Property Management',
-    url:       'https://www.camvella.com',
+    key:        'camvella',
+    label:      'Camvella',
+    icon:       '🏘️',
+    color:      '#0ea5e9',
+    industry:   'HOA / Property Management',
+    url:        'https://app.camvella.com',
+    appUrl:     'https://app.camvella.com',
+    websiteUrl: 'https://www.camvella.com',
     lifecycleStage: 'available',
     connection:     'connected',  // platform-metrics deployed 2026-08-23
     brandStatus:    'branded',
@@ -1824,12 +1828,14 @@ const PRODUCT_REGISTRY = [
     metricsUrl: 'https://fjqywulzsyfyzitneazb.supabase.co/functions/v1/platform-metrics',
   },
   {
-    key:       'arcvena',
-    label:     'Arcvena',
-    icon:      '⚡',
-    color:     '#8b5cf6',
-    industry:  'Electrical Contractors',
-    url:       'https://www.arcvena.com',
+    key:        'arcvena',
+    label:      'Arcvena',
+    icon:       '⚡',
+    color:      '#8b5cf6',
+    industry:   'Electrical Contractors',
+    url:        'https://app.arcvena.com',
+    appUrl:     'https://app.arcvena.com',
+    websiteUrl: 'https://www.arcvena.com',
     lifecycleStage: 'available', // product and public site are active; final reporting connection remains
     connection:     'connected', // live Arcvena platform metrics deployed and session-authenticated
     brandStatus:    'branded',
@@ -2377,7 +2383,11 @@ function ProductsTab({ supabase, taxresActivity = [] }) {
                   )}
                   {selected.connection==='connected' && selected.url && !selected.tenantId && (
                     <a href={selected.url} target="_blank" rel="noreferrer"
-                      style={{ fontSize:12,color:'#fff',fontWeight:700,textDecoration:'none',background:selected.color,padding:'7px 16px',borderRadius:8 }}>Open CRM →</a>
+                      style={{ fontSize:12,color:'#fff',fontWeight:700,textDecoration:'none',background:selected.color,padding:'7px 16px',borderRadius:8 }}>Open App →</a>
+                  )}
+                  {selected.websiteUrl && !selected.tenantId && (
+                    <a href={selected.websiteUrl} target="_blank" rel="noreferrer"
+                      style={{ fontSize:12,color:selected.color,fontWeight:700,textDecoration:'none',background:'rgba(99,102,241,.08)',border:`1px solid ${selected.color}33`,padding:'7px 16px',borderRadius:8 }}>Website →</a>
                   )}
                   {selected.metricsUrl && (
                     <button onClick={()=>fetchMetrics(selected)}
@@ -3710,8 +3720,8 @@ function CommandCenter() {
             const SEO_STATUS = [
               { label:'RomyLabs',  ga4:'G-2MSNYF9XBE — Connected', gsc:'romylabs.com — Connected', clarity:'y54zqoj6c2 — Connected', sitemap:'https://romylabs.com/sitemap-index.xml', seoStatus:'Active' },
               { label:'TaxRes',    ga4:'G-M6J80B65LG — Connected', gsc:'taxrescrm.net — Connected', clarity:'xyck7g2mfl — Connected', sitemap:'https://taxrescrm.net/sitemap.xml', seoStatus:'Active' },
-              { label:'Camvella',  ga4:'Pending — property not yet created', gsc:'Pending', clarity:'Pending', sitemap:'https://camvella.com/sitemap.xml ✓', seoStatus:'Pending Setup' },
-              { label:'Arcvena',   ga4:'Pending — property not yet created', gsc:'Pending — DNS cutover needed', clarity:'Pending', sitemap:'https://arcvena.com/sitemap.xml ✓', seoStatus:'Pending DNS' },
+              { label:'Camvella',  ga4:'G-H1ZPCP2EE9 — Connected', gsc:'camvella.com — Active', clarity:'y62zna7yna — Connected', sitemap:'https://camvella.com/sitemap.xml ✓', seoStatus:'Active' },
+              { label:'Arcvena',   ga4:'Connected', gsc:'arcvena.com — Active', clarity:'Connected', sitemap:'https://arcvena.com/sitemap.xml ✓', seoStatus:'Active' },
               { label:'BocaSync',  ga4:'—', gsc:'—', clarity:'—', sitemap:'—', seoStatus:'Not Started' },
               { label:'PHL',       ga4:'N/A', gsc:'N/A', clarity:'N/A', sitemap:'N/A', seoStatus:'Internal — N/A' },
             ]
