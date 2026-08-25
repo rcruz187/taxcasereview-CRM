@@ -36,7 +36,7 @@ serve(async (req) => {
     const { data: { user } } = await userClient.auth.getUser()
     if (!user?.email) return json({ error: 'Not authenticated' }, 401)
 
-    const adminEmails = ['romy@taxcasereview.org', 'romy@taxrescrm.net']
+    const adminEmails = ['romy@taxcasereview.org', 'romy@taxrescrm.net', 'romy@romylabs.com', 'info@romylabs.com']
     if (!adminEmails.includes(user.email)) return json({ error: 'Not authorized' }, 403)
 
     const { tenant_id, amount, description, notes } = await req.json()
