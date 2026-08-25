@@ -481,7 +481,7 @@ export function AppProvider({ children }) {
       return
     }
 
-    if (email === 'romy@taxcasereview.org' || email === 'romy@taxrescrm.net') {
+    if (['romy@taxcasereview.org', 'romy@taxrescrm.net', 'romy@romylabs.com', 'info@romylabs.com'].includes(email)) {
       setRole('Super Admin')
       setPerms(null)
       setEmployeeName('')
