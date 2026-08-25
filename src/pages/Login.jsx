@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import { supabase } from '../lib/supabase'
 
-const ROMYLABS_OWNER = 'romy@romylabs.com'
+const ROMYLABS_OWNERS = ['romy@romylabs.com', 'info@romylabs.com']
 
 export default function Login() {
   const { login, showToast } = useApp()
@@ -12,12 +12,12 @@ export default function Login() {
   const [loading, setLoading]   = useState(false)
   const [branding, setBranding] = useState(null)
   const debounceRef = useRef(null)
-  const isRomyLabsOwner = email.trim().toLowerCase() === ROMYLABS_OWNER
+  const isRomyLabsOwner = ROMYLABS_OWNERS.includes(email.trim().toLowerCase())
 
   // Lookup tenant branding by email domain as user types. The RomyLabs platform
   // owner gets platform branding rather than inheriting TaxRes tenant branding.
   useEffect(() => {
-    if (email.trim().toLowerCase() === ROMYLABS_OWNER) {
+    if (ROMYLABS_OWNERS.includes(email.trim().toLowerCase())) {
       setBranding({
         firm_name: 'RomyLabs',
         logo_url: '/romylabs-logo.png',
@@ -63,7 +63,7 @@ export default function Login() {
       showToast('Welcome back!')
 
       // Platform owner belongs in RomyLabs Command Center, never the TaxRes app.
-      if (data.user?.email?.toLowerCase() === ROMYLABS_OWNER) {
+      if (ROMYLABS_OWNERS.includes(data.user?.email?.toLowerCase())) {
         window.location.href = '/crm-admin'
       }
     } catch (err) {
