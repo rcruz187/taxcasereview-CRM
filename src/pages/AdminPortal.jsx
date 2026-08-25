@@ -142,7 +142,7 @@ function Sidebar({ onSignOut }) {
       </nav>
 
       <div style={{ padding:'14px 14px', borderTop:'1px solid rgba(99,102,241,.15)' }}>
-        <div style={{ fontSize:11, color:'#a5b4fc', fontWeight:600, marginBottom:2 }}>{session?.user?.email || 'romy@romylabs.com'}</div>
+        <div style={{ fontSize:11, color:'#a5b4fc', fontWeight:600, marginBottom:2 }}>romy@romylabs.com</div>
         <div style={{ fontSize:10, color:'#6366f1', fontWeight:700, marginBottom:10 }}>Platform Owner</div>
         <button onClick={onSignOut} style={{ ...S.btn('ghost'), width:'100%', justifyContent:'center', fontSize:12, padding:'7px 0' }}>
           Sign Out
