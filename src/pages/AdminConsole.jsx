@@ -15,7 +15,7 @@ import { useApp } from '../context/AppContext'
 import NewOffice from './NewOffice'
 import Support from './Support'
 
-const PLATFORM_ADMIN_EMAILS = ['romy@taxcasereview.org', 'romy@taxrescrm.net', 'romy@romylabs.com']
+const PLATFORM_ADMIN_EMAILS = ['romy@taxcasereview.org', 'romy@taxrescrm.net', 'romy@romylabs.com', 'info@romylabs.com']
 const isTaxResCRM = (email) => (email||'').toLowerCase() === 'romy@taxrescrm.net'
 const STATUS_COLORS = { active:'#10b981', trial:'#f59e0b', past_due:'#f97316', cancelled:'#ef4444' }
 
