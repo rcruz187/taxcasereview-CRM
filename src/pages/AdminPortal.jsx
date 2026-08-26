@@ -1721,13 +1721,6 @@ function StatusDot({ ok }) {
 }
 
 
-const REPORTING_PRODUCTS = [
-  // status values: 'connected'=live reporting | 'implemented'=setup done, reporting pending | 'pending'=setup needed
-  { key:'taxres_crm', label:'TaxRes CRM', icon:'📊', color:'#6366f1', website:'taxrescrm.net', marketing:'connected',   seo:'connected'   },
-  { key:'camvella',   label:'Camvella',   icon:'🏘️', color:'#0ea5e9', website:'camvella.com',  marketing:'connected',   seo:'implemented' },
-  { key:'arcvena',    label:'Arcvena',    icon:'⚡', color:'#8b5cf6',  website:'arcvena.com',   marketing:'implemented', seo:'implemented' },
-  { key:'groundivo',  label:'Groundivo',  icon:'🌿', color:'#16a34a',  website:'groundivo.com',  marketing:'pending',     seo:'pending'     },
-]
 
 function ProductReportingSelector({ value, onChange, channel, gscConnected, activeGscProduct, registryProducts }) {
   // Derives entirely from romylabs_products registry — no hardcoded product list.
@@ -1780,28 +1773,24 @@ function ProductReportingSelector({ value, onChange, channel, gscConnected, acti
   )
 }
 
-function ProductReportingSetup({ productKey, channel }) {
-  const p = REPORTING_PRODUCTS.find(x => x.key === productKey)
-  const reportingPending = p[channel] === 'implemented'
+function ProductReportingSetup({ productKey, channel, registryProduct }) {
+  // Registry-driven: no hardcoded REPORTING_PRODUCTS lookup.
+  const label = registryProduct?.name || productKey
+  const icon  = registryProduct?.icon_ref || '📦'
   const title = channel === 'marketing' ? 'Marketing analytics' : 'SEO reporting'
-  const details = reportingPending
-    ? channel === 'seo'
-      ? `${p.label}'s SEO implementation is complete. Only its dedicated Search Console reporting feed into RomyLabs is still pending.`
-      : `${p.label}'s marketing foundation is implemented. Only its dedicated analytics reporting feed into RomyLabs is still pending.`
-    : `${p.label} does not have a dedicated ${channel === 'marketing' ? 'GA4 Data API connection' : 'Search Console data connection'} in the RomyLabs reporting hub yet.`
+  const details = `${label} does not have a dedicated ${channel === 'marketing' ? 'GA4 Data API connection' : 'Search Console data connection'} in the RomyLabs reporting hub yet.`
   return (
     <div style={{ ...CC.card(), padding:'30px', maxWidth:780 }}>
       <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
-        <span style={{ fontSize:26 }}>{p.icon}</span>
+        <span style={{ fontSize:26 }}>{icon}</span>
         <div>
-          <div style={{ fontSize:16, fontWeight:900, color:'#fff' }}>{p.label} — {title}</div>
-          <div style={{ fontSize:11, color:'#64748b' }}>{p.website}</div>
+          <div style={{ fontSize:16, fontWeight:900, color:'#fff' }}>{label} — {title}</div>
         </div>
-        <span style={{ marginLeft:'auto', fontSize:10, fontWeight:800, color:reportingPending ? '#a78bfa' : '#f59e0b', background:reportingPending ? 'rgba(139,92,246,.14)' : 'rgba(245,158,11,.12)', padding:'4px 9px', borderRadius:12 }}>{reportingPending ? `${channel === 'seo' ? 'SEO' : 'Marketing'} implemented · feed pending` : 'Reporting setup required'}</span>
+        <span style={{ marginLeft:'auto', fontSize:10, fontWeight:800, color:'#f59e0b', background:'rgba(245,158,11,.12)', padding:'4px 9px', borderRadius:12 }}>Reporting setup needed</span>
       </div>
       <div style={{ fontSize:13, lineHeight:1.7, color:'#94a3b8', marginBottom:18 }}>{details}</div>
       <div style={{ fontSize:11, color:'#475569', borderTop:'1px solid rgba(255,255,255,.07)', paddingTop:14 }}>
-        No TaxRes data is shown here. This panel will stay separate until {p.label}'s own connection is verified.
+        No TaxRes data is shown here. This panel stays separate until {label}'s own connection is verified.
       </div>
     </div>
   )
@@ -4066,7 +4055,7 @@ function CommandCenter() {
               GA4 sync failed. Check System tab for details.
             </div>
           )}
-          </> : <ProductReportingSetup productKey={marketingProduct} channel="marketing" />}
+          </> : <ProductReportingSetup productKey={marketingProduct} channel="marketing" registryProduct={reportingProducts.find(r=>r.product_id===marketingProduct)} />}
         </>)}
 
         {/* ═══ SEARCH TAB ═══ */}
@@ -5387,10 +5376,9 @@ function LinkedInPublisher({ embeddedMode = false }) {
   // Status badges for selected product
   const autopilotOn = settings?.autopilot === true
   const liConnected = connection?.connected === true
-  // SEO/Marketing: derive from REPORTING_PRODUCTS (registry-declared, not live-probed)
-  const reportingEntry = REPORTING_PRODUCTS.find(p => p.key === selectedPid) || null
-  const seoStatus   = reportingEntry?.seo   || 'unknown'
-  const mktStatus   = reportingEntry?.marketing || 'unknown'
+  // Integration status: always 'pending' by default — live connections override in the integration layer
+  const seoStatus = 'pending'
+  const mktStatus = 'pending'
 
   // Filtered product list for selector
   const filteredProducts = products.filter(p =>
