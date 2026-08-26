@@ -49,8 +49,9 @@ Deno.serve(async (req) => {
   let body: Record<string, unknown> = {}
   try { body = await req.json() } catch (_) {}
   const action = body.action as string
-  // product_id is REQUIRED for all operations — default to taxres_crm for backward compat only
-  const productId: string = (body.product_id as string) || 'taxres_crm'
+  // product_id is REQUIRED — fail closed if not provided
+  const productId: string | undefined = (body.product_id as string) || undefined
+  if (!productId) return json({ ok: false, error: 'product_id is required' }, 400)
 
   if (action === 'oauth_callback') {
     const code         = body.code as string
@@ -178,7 +179,7 @@ Deno.serve(async (req) => {
     const post_id = body.post_id as string
     if (!post_id) return json({ ok: false, error: 'post_id required' }, 400)
     await supabase.from('linkedin_posts').delete()
-      .eq('id', post_id).eq('tenant_id', tenantId)
+      .eq('id', post_id).eq('tenant_id', tenantId).eq('product_id', productId)
     return json({ ok: true })
   }
 
