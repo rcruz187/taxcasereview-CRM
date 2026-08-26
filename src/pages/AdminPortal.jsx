@@ -1730,27 +1730,24 @@ const REPORTING_PRODUCTS = [
 ]
 
 function ProductReportingSelector({ value, onChange, channel, gscConnected, activeGscProduct, registryProducts }) {
+  // Derives entirely from romylabs_products registry — no hardcoded product list.
+  // Integration status starts as 'pending' (setup needed) for all products.
+  // Live GSC connection overrides the SEO badge when gscConnected===true for the active product.
+  // Adding a new product to romylabs_products automatically makes it appear here — no frontend edit needed.
+  if (!registryProducts || registryProducts.length === 0) {
+    return <div style={{ fontSize:12, color:'#475569', marginBottom:22 }}>Loading products…</div>
+  }
+  const mapped = registryProducts.map(r => ({
+    key:       r.product_id,
+    label:     r.name,
+    icon:      r.icon_ref || '📦',
+    color:     r.accent_color || '#6366f1',
+    seo:       'pending',
+    marketing: 'pending',
+  }))
   return (
     <div style={{ display:'flex', gap:10, flexWrap:'wrap', marginBottom:22 }}>
-      {(registryProducts && registryProducts.length > 0
-        ? registryProducts.map(r => ({
-            key:   r.product_id,
-            label: r.name,
-            icon:  r.product_id === 'taxres_crm' ? '📊'
-                 : r.product_id === 'camvella'   ? '🏘️'
-                 : r.product_id === 'arcvena'    ? '⚡'
-                 : r.product_id === 'bocasync'   ? '🦷'
-                 : r.product_id === 'groundivo'  ? '🌿' : '📦',
-            color: r.accent_color || '#6366f1',
-            seo:   r.product_id === 'taxres_crm' ? 'connected'
-                 : r.product_id === 'camvella'   ? 'implemented'
-                 : r.product_id === 'arcvena'    ? 'implemented'
-                 : 'pending',
-            marketing: r.product_id === 'taxres_crm' ? 'connected'
-                     : r.product_id === 'camvella'   ? 'connected' : 'pending',
-          }))
-        : REPORTING_PRODUCTS
-      ).map(p => {
+      {mapped.map(p => {
         const status = p[channel]
         // Live GSC connection overrides static label for the active product on the SEO channel
         const isGscLive = channel === 'seo' && gscConnected && p.key === activeGscProduct
@@ -2718,18 +2715,16 @@ function ProductsTab({ supabase, taxresActivity = [] }) {
 // ── Sales Pipeline ────────────────────────────────────────────────────────────
 const PIPELINE_STAGES = ['Prospect','Contacted','Interested','Demo Scheduled','Demo Completed','Proposal Sent','Negotiation','Won','Lost']
 const STAGE_COLORS    = ['#64748b','#6366f1','#8b5cf6','#0ea5e9','#a855f7','#f59e0b','#f97316','#10b981','#ef4444']
+// PRODUCTS derived from romylabs_products registry — never hardcoded.
+// New products appear automatically when added to the registry with active=true, public=true.
 const PRODUCTS = [
-  { value:'all',         label:'All Products'           },
-  { value:'taxres_crm',  label:'Tax Res CRM'            },
-  { value:'camvella',    label:'Camvella'               },
-  { value:'arcvena',     label:'Arcvena'                },
-  { value:'groundivo',   label:'Groundivo'              },
-  { value:'bocasync',    label:'BocaSync'               },
+  { value:'all', label:'All Products' },
+  ...(registryProducts || []).map(r => ({ value: r.product_id, label: r.name }))
 ]
 const PRICING_LABELS = { monthly:'Monthly', perpetual:'Perpetual License', undecided:'Undecided' }
 const ACTIVITY_ICONS = { note:'📝', call:'📞', email:'📧', demo:'🖥️', proposal:'📄', stage_change:'🔄', won:'🏆', lost:'❌', outreach_linkedin:'💼', outreach_email:'📤', outreach_phone:'📱', follow_up:'🔁', demo_booked:'📅', converted:'⭐' }
 
-function SalesPipeline({ data, supabase }) {
+function SalesPipeline({ data, supabase, registryProducts }) {
   const [prospects, setProspects]     = useState(data?.sales?.prospects || [])
   const [selected, setSelected]       = useState(null)
   const [activities, setActivities]   = useState([])
@@ -3474,7 +3469,7 @@ function CommandCenter() {
   const [reportingProducts, setReportingProducts] = React.useState([])
   React.useEffect(() => {
     supabase.from('romylabs_products')
-      .select('product_id,name,accent_color,sort_order')
+      .select('product_id,name,accent_color,icon_ref,sort_order,lifecycle,app_url,marketing_url')
       .eq('active', true).eq('public', true)
       .order('sort_order')
       .then(({ data }) => { if (data?.length) setReportingProducts(data) })
@@ -4011,7 +4006,8 @@ function CommandCenter() {
 
         {/* ═══ MARKETING TAB ═══ */}
         {tab==='marketing' && (<>
-          <ProductReportingSelector value={marketingProduct} onChange={setMarketingProduct} channel="marketing" />
+          <ProductReportingSelector value={marketingProduct} onChange={setMarketingProduct} channel="marketing"
+            registryProducts={reportingProducts} />
           {marketingProduct==='taxres_crm' ? <>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
             <div style={{ fontSize:11, color:'#475569' }}>
@@ -4183,7 +4179,7 @@ function CommandCenter() {
         </>)}
 
         {/* ═══ SALES TAB ═══ */}
-        {tab==='sales' && <SalesPipeline data={data} supabase={supabase} />}
+        {tab==='sales' && <SalesPipeline data={data} supabase={supabase} registryProducts={reportingProducts} />}
 
         {/* ═══ CRM TAB ═══ */}
         {tab==='crm' && (<>
