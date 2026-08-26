@@ -1,10 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { useLocation } from 'react-router-dom'
-
-// Floating AI assistant panel — available on every page.
-// Sends user message + current page context to the ai-chat edge function.
-// Uses Gemini Flash via server-side key — no key exposed to frontend.
 
 const SUGGESTED = [
   'What resolution options work best for this client?',
@@ -27,26 +22,30 @@ const ADMIN_SUGGESTED = [
 ]
 
 function getPageContext() {
-  // Pull visible text from the current page as context
   const main = document.querySelector('.page-content') || document.querySelector('main') || document.body
   let text = main?.innerText || ''
 
-  // If we're on the email page, grab email subjects/senders for context
   const emailRows = document.querySelectorAll('[data-email-row]')
-  if (emailRows.length > 0) {
+  if (emailRows.length) {
     const emailCtx = Array.from(emailRows).slice(0, 10).map(r => r.innerText?.trim()).filter(Boolean).join('\n')
-    text = 'INBOX EMAILS:\n' + emailCtx + '\n\n' + text
+    text = `INBOX EMAILS:\n${emailCtx}\n\n${text}`
   }
 
-  // If we're on the calendar page, grab event titles
   const calEvents = document.querySelectorAll('[data-cal-event]')
-  if (calEvents.length > 0) {
+  if (calEvents.length) {
     const calCtx = Array.from(calEvents).slice(0, 15).map(r => r.innerText?.trim()).filter(Boolean).join('\n')
-    text = 'CALENDAR EVENTS:\n' + calCtx + '\n\n' + text
+    text = `CALENDAR EVENTS:\n${calCtx}\n\n${text}`
   }
 
-  // Limit to 3000 chars to avoid token overflow
   return text.slice(0, 3000)
+}
+
+function safeError(data, status) {
+  const raw = data?.error || data?.message || data?.detail || ''
+  if (status === 401 || status === 403) return 'Your session expired or is not authorized. Please sign in again and retry.'
+  if (status === 429) return 'The AI service is busy right now. Please wait a moment and retry.'
+  if (status >= 500) return raw ? `AI service error: ${String(raw).slice(0, 220)}` : 'The AI service is temporarily unavailable. Please retry.'
+  return raw ? String(raw).slice(0, 220) : `AI request failed (${status}). Please retry.`
 }
 
 export default function AIAssistant({ adminMode = false }) {
@@ -54,36 +53,32 @@ export default function AIAssistant({ adminMode = false }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [lastError, setLastError] = useState('')
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
-  const location = useLocation()
-
-  // Reset chat on page navigation (optional — remove if you want persistent history)
-  // useEffect(() => { setMessages([]) }, [location.pathname])
 
   useEffect(() => {
-    if (open) {
-      setTimeout(() => inputRef.current?.focus(), 100)
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }
-  }, [open, messages])
+    if (!open) return
+    const t = setTimeout(() => inputRef.current?.focus(), 100)
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    return () => clearTimeout(t)
+  }, [open, messages, loading])
 
   async function send(text) {
     const msg = (text || input).trim()
     if (!msg || loading) return
-    setInput('')
 
+    setInput('')
+    setLastError('')
     const userMsg = { role: 'user', content: msg }
-    const newMessages = [...messages, userMsg]
-    setMessages(newMessages)
+    const nextMessages = [...messages, userMsg]
+    setMessages(nextMessages)
     setLoading(true)
 
     try {
-      const context = getPageContext()
-      const history = newMessages.slice(-10) // last 10 messages for context window
-
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
+      if (!token) throw new Error('Your session is no longer active. Please sign in again.')
 
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL || 'https://mpxgxfqdbquzkrvvejkh.supabase.co'}/functions/v1/ai-chat`,
@@ -93,19 +88,26 @@ export default function AIAssistant({ adminMode = false }) {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
           },
-          body: JSON.stringify({ message: msg, context, history: history.slice(0, -1) })
+          body: JSON.stringify({
+            message: msg,
+            context: getPageContext(),
+            history: nextMessages.slice(-10, -1),
+          }),
         }
       )
 
-      const data = await res.json()
-      if (!res.ok || data.error) {
-        const errMsg = data.error || 'AI service temporarily unavailable. Please try again in a moment.'
-        setMessages(prev => [...prev, { role: 'assistant', content: errMsg }])
-      } else {
-        setMessages(prev => [...prev, { role: 'assistant', content: data.reply || 'Sorry, something went wrong.' }])
-      }
+      const raw = await res.text()
+      let data = {}
+      try { data = raw ? JSON.parse(raw) : {} } catch { data = { error: raw } }
+
+      if (!res.ok) throw new Error(safeError(data, res.status))
+      if (!data?.reply?.trim()) throw new Error('The AI service returned an empty response. Please retry.')
+
+      setMessages(prev => [...prev, { role: 'assistant', content: data.reply.trim() }])
     } catch (err) {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Connection error. Please try again.' }])
+      const message = err?.message || 'Connection error. Please try again.'
+      setLastError(message)
+      setMessages(prev => [...prev, { role: 'assistant', content: message, error: true }])
     } finally {
       setLoading(false)
     }
@@ -118,76 +120,90 @@ export default function AIAssistant({ adminMode = false }) {
     }
   }
 
+  const suggestions = adminMode ? ADMIN_SUGGESTED : SUGGESTED
+
   return (
     <>
-      {/* Floating button */}
       <button
-        onClick={() => setOpen(o => !o)}
-        title="AI Assistant"
+        onClick={() => setOpen(v => !v)}
+        title={open ? 'Close AI Assistant' : 'Open AI Assistant'}
+        aria-label={open ? 'Close AI Assistant' : 'Open AI Assistant'}
         style={{
-          position: 'fixed', bottom: 80, right: 24, zIndex: 10000,
-          width: 52, height: 52, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-          border: 'none', cursor: 'pointer', boxShadow: '0 4px 20px rgba(99,102,241,0.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 22, transition: 'transform 0.2s',
-          transform: open ? 'rotate(45deg)' : 'none',
+          position:'fixed', right:24, bottom:80, zIndex:10000,
+          width:56, height:56, borderRadius:18, border:'1px solid rgba(255,255,255,.16)',
+          background: open ? '#111827' : 'linear-gradient(135deg,#4f46e5,#7c3aed 62%,#9333ea)',
+          color:'#fff', cursor:'pointer', boxShadow:'0 14px 38px rgba(79,70,229,.38)',
+          display:'flex', alignItems:'center', justifyContent:'center', fontSize:22,
+          transition:'transform .18s ease, box-shadow .18s ease, background .18s ease',
+          transform: open ? 'scale(.96)' : 'scale(1)',
         }}
       >
-        {open ? '✕' : '🤖'}
+        {open ? '×' : '✦'}
       </button>
 
-      {/* Panel */}
       {open && (
         <div style={{
-          position: 'fixed', bottom: 144, right: 24, zIndex: 9999,
-          width: 420, height: 560, maxHeight: 'calc(100vh - 120px)',
-          background: '#0f172a', border: '1px solid #334155',
-          borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
-          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          position:'fixed', right:24, bottom:148, zIndex:9999,
+          width:'min(430px, calc(100vw - 32px))', height:'min(610px, calc(100vh - 180px))',
+          background:'linear-gradient(180deg,#0b1220 0%,#0f172a 100%)',
+          border:'1px solid rgba(148,163,184,.2)', borderRadius:20,
+          boxShadow:'0 28px 80px rgba(2,6,23,.72)', overflow:'hidden',
+          display:'flex', flexDirection:'column', backdropFilter:'blur(16px)',
         }}>
-          {/* Header */}
           <div style={{
-            padding: '14px 16px', borderBottom: '1px solid #1e293b',
-            background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.1))',
-            display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
+            padding:'16px 17px', borderBottom:'1px solid rgba(148,163,184,.14)',
+            background:'linear-gradient(135deg,rgba(79,70,229,.2),rgba(124,58,237,.08))',
+            display:'flex', alignItems:'center', gap:12,
           }}>
-            <span style={{ fontSize: 20 }}>🤖</span>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9' }}>{adminMode ? 'Platform AI Assistant' : 'TaxRes AI Assistant'}</div>
-              <div style={{ fontSize: 11, color: '#64748b' }}>{adminMode ? 'Powered by Groq · Platform & business strategy' : 'Powered by Groq · Tax resolution expert'}</div>
+            <div style={{
+              width:38, height:38, borderRadius:12,
+              background:'linear-gradient(135deg,#4f46e5,#8b5cf6)',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              boxShadow:'0 8px 24px rgba(79,70,229,.35)', fontSize:18,
+            }}>✦</div>
+            <div style={{ minWidth:0 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <div style={{ fontSize:14, fontWeight:800, color:'#f8fafc' }}>
+                  {adminMode ? 'Platform AI' : 'TaxRes AI'}
+                </div>
+                <span style={{ fontSize:10, fontWeight:800, letterSpacing:'.04em', color:'#86efac', background:'rgba(34,197,94,.1)', border:'1px solid rgba(34,197,94,.22)', padding:'2px 7px', borderRadius:999 }}>
+                  LIVE
+                </span>
+              </div>
+              <div style={{ fontSize:11, color:'#64748b', marginTop:2 }}>
+                {adminMode ? 'Platform strategy and operations assistant' : 'Tax resolution copilot with page context'}
+              </div>
             </div>
             {messages.length > 0 && (
-              <button
-                onClick={() => setMessages([])}
-                style={{ marginLeft: 'auto', fontSize: 11, color: '#475569', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}
-              >
+              <button onClick={() => { setMessages([]); setLastError('') }} style={{ marginLeft:'auto', border:0, background:'transparent', color:'#64748b', cursor:'pointer', fontSize:11, padding:6 }}>
                 Clear
               </button>
             )}
           </div>
 
-          {/* Messages */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ flex:1, overflowY:'auto', padding:'16px', display:'flex', flexDirection:'column', gap:12 }}>
             {messages.length === 0 && (
               <div>
-                <p style={{ fontSize: 13, color: '#94a3b8', margin: '0 0 14px' }}>
-                  {adminMode
-                    ? 'Ask me anything about the platform, offices, billing, or business strategy. I can see what\'s on your screen.'
-                    : 'Ask me anything about this client, case, or tax resolution strategy. I can see what\'s on your screen.'}
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {(adminMode ? ADMIN_SUGGESTED : SUGGESTED).map((s, i) => (
-                    <button
-                      key={i}
-                      onClick={() => send(s)}
-                      style={{
-                        textAlign: 'left', background: 'rgba(99,102,241,0.08)',
-                        border: '1px solid rgba(99,102,241,0.2)', borderRadius: 8,
-                        padding: '7px 10px', fontSize: 12, color: '#94a3b8',
-                        cursor: 'pointer', lineHeight: 1.4,
-                      }}
-                    >
+                <div style={{
+                  padding:'16px', borderRadius:14,
+                  background:'rgba(79,70,229,.08)', border:'1px solid rgba(99,102,241,.16)', marginBottom:14,
+                }}>
+                  <div style={{ fontSize:13, fontWeight:800, color:'#e2e8f0', marginBottom:5 }}>
+                    {adminMode ? 'What can I help you run today?' : 'What can I help you solve today?'}
+                  </div>
+                  <div style={{ fontSize:12, color:'#94a3b8', lineHeight:1.55 }}>
+                    {adminMode
+                      ? 'Ask about operations, platform data, onboarding, pricing, or anything visible on this screen.'
+                      : 'Ask about the current client, case strategy, IRS procedures, forms, deadlines, or draft communications.'}
+                  </div>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  {suggestions.slice(0, 6).map((s, i) => (
+                    <button key={i} onClick={() => send(s)} style={{
+                      textAlign:'left', minHeight:66, padding:'10px 11px', borderRadius:11,
+                      background:'rgba(15,23,42,.72)', border:'1px solid rgba(148,163,184,.14)',
+                      color:'#cbd5e1', cursor:'pointer', fontSize:11.5, lineHeight:1.45,
+                    }}>
                       {s}
                     </button>
                   ))}
@@ -196,16 +212,17 @@ export default function AIAssistant({ adminMode = false }) {
             )}
 
             {messages.map((m, i) => (
-              <div key={i} style={{
-                display: 'flex', flexDirection: 'column',
-                alignItems: m.role === 'user' ? 'flex-end' : 'flex-start',
-              }}>
+              <div key={i} style={{ display:'flex', justifyContent:m.role === 'user' ? 'flex-end' : 'flex-start' }}>
                 <div style={{
-                  maxWidth: '88%', padding: '9px 12px', borderRadius: m.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-                  background: m.role === 'user' ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : '#1e293b',
-                  color: m.role === 'user' ? '#fff' : '#e2e8f0',
-                  fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap',
-                  border: m.role === 'assistant' ? '1px solid #334155' : 'none',
+                  maxWidth:'88%', padding:'10px 12px',
+                  borderRadius:m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                  background:m.role === 'user'
+                    ? 'linear-gradient(135deg,#4f46e5,#7c3aed)'
+                    : m.error ? 'rgba(127,29,29,.28)' : 'rgba(30,41,59,.86)',
+                  border:m.role === 'assistant' ? `1px solid ${m.error ? 'rgba(248,113,113,.28)' : 'rgba(148,163,184,.13)'}` : 'none',
+                  color:m.error ? '#fecaca' : '#e2e8f0',
+                  fontSize:13, lineHeight:1.6, whiteSpace:'pre-wrap',
+                  boxShadow:m.role === 'user' ? '0 8px 22px rgba(79,70,229,.2)' : 'none',
                 }}>
                   {m.content}
                 </div>
@@ -213,58 +230,63 @@ export default function AIAssistant({ adminMode = false }) {
             ))}
 
             {loading && (
-              <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-                <div style={{
-                  background: '#1e293b', border: '1px solid #334155',
-                  borderRadius: '12px 12px 12px 2px', padding: '10px 14px',
-                  fontSize: 13, color: '#64748b',
-                }}>
-                  Thinking<span style={{ animation: 'blink 1s infinite' }}>...</span>
-                </div>
+              <div style={{ display:'flex', alignItems:'center', gap:8, color:'#64748b', fontSize:12 }}>
+                <div style={{ width:28, height:28, borderRadius:9, background:'rgba(79,70,229,.12)', display:'flex', alignItems:'center', justifyContent:'center', color:'#a5b4fc' }}>✦</div>
+                <span>Analyzing<span style={{ animation:'aiPulse 1.2s infinite' }}>•••</span></span>
               </div>
             )}
 
             <div ref={bottomRef} />
           </div>
 
-          {/* Input */}
-          <div style={{
-            padding: '10px 12px', borderTop: '1px solid #1e293b', flexShrink: 0,
-            display: 'flex', gap: 8, alignItems: 'flex-end',
-          }}>
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKey}
-              placeholder="Ask anything... (Enter to send)"
-              rows={1}
-              style={{
-                flex: 1, background: '#1e293b', border: '1px solid #334155',
-                borderRadius: 10, padding: '8px 12px', color: '#f1f5f9',
-                fontSize: 13, resize: 'none', outline: 'none', lineHeight: 1.5,
-                fontFamily: 'inherit', maxHeight: 80, overflowY: 'auto',
-              }}
-            />
-            <button
-              onClick={() => send()}
-              disabled={loading || !input.trim()}
-              style={{
-                width: 36, height: 36, borderRadius: 10, border: 'none', cursor: 'pointer',
-                background: input.trim() ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : '#1e293b',
-                color: input.trim() ? '#fff' : '#475569', fontSize: 16, flexShrink: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                transition: 'background 0.2s',
-              }}
-            >
-              ↑
-            </button>
+          <div style={{ padding:'11px 12px 12px', borderTop:'1px solid rgba(148,163,184,.12)', background:'rgba(2,6,23,.28)' }}>
+            {lastError && (
+              <div style={{ fontSize:10.5, color:'#fca5a5', margin:'0 3px 7px' }}>
+                Last request failed — you can edit your prompt or retry.
+              </div>
+            )}
+            <div style={{ display:'flex', gap:8, alignItems:'flex-end' }}>
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={handleKey}
+                placeholder="Ask TaxRes AI…"
+                rows={1}
+                style={{
+                  flex:1, minHeight:40, maxHeight:100, resize:'none', overflowY:'auto',
+                  background:'rgba(15,23,42,.9)', color:'#f8fafc', border:'1px solid rgba(148,163,184,.18)',
+                  borderRadius:12, padding:'10px 12px', outline:'none', fontFamily:'inherit', fontSize:13, lineHeight:1.45,
+                }}
+              />
+              <button
+                onClick={() => send()}
+                disabled={loading || !input.trim()}
+                aria-label="Send message"
+                style={{
+                  width:40, height:40, borderRadius:12, border:0,
+                  cursor:loading || !input.trim() ? 'default' : 'pointer',
+                  background:input.trim() && !loading ? 'linear-gradient(135deg,#4f46e5,#7c3aed)' : '#1e293b',
+                  color:input.trim() && !loading ? '#fff' : '#475569', fontSize:17,
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                }}
+              >
+                ↑
+              </button>
+            </div>
+            <div style={{ display:'flex', justifyContent:'space-between', marginTop:7, padding:'0 3px', fontSize:10, color:'#475569' }}>
+              <span>Enter to send · Shift+Enter for a new line</span>
+              <span>Powered by Groq</span>
+            </div>
           </div>
         </div>
       )}
 
       <style>{`
-        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        @keyframes aiPulse { 0%,100%{opacity:.35} 50%{opacity:1} }
+        @media (max-width: 640px) {
+          textarea[placeholder="Ask TaxRes AI…"] { font-size: 16px !important; }
+        }
       `}</style>
     </>
   )
