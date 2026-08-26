@@ -1729,13 +1729,21 @@ const REPORTING_PRODUCTS = [
   { key:'groundivo',  label:'Groundivo',  icon:'🌿', color:'#16a34a',  website:'groundivo.com',  marketing:'pending',     seo:'pending'     },
 ]
 
-function ProductReportingSelector({ value, onChange, channel }) {
+function ProductReportingSelector({ value, onChange, channel, gscConnected, activeGscProduct }) {
   return (
     <div style={{ display:'flex', gap:10, flexWrap:'wrap', marginBottom:22 }}>
       {REPORTING_PRODUCTS.map(p => {
         const status = p[channel]
-        const statusLabel = status === 'connected' ? 'Connected' : status === 'implemented' ? `${channel === 'seo' ? 'SEO' : 'Marketing'} implemented · reporting pending` : 'Setup needed'
-        const statusColor = status === 'connected' ? '#10b981' : status === 'implemented' ? '#a78bfa' : '#f59e0b'
+        // Live GSC connection overrides static label for the active product on the SEO channel
+        const isGscLive = channel === 'seo' && gscConnected && p.key === activeGscProduct
+        const statusLabel = isGscLive
+          ? 'GSC Connected'
+          : status === 'connected' ? 'Connected'
+          : status === 'implemented' ? `${channel === 'seo' ? 'SEO' : 'Marketing'} implemented · reporting pending`
+          : 'Setup needed'
+        const statusColor = (status === 'connected' || isGscLive) ? '#10b981'
+          : status === 'implemented' ? '#a78bfa'
+          : '#f59e0b'
         return (
           <button key={p.key} onClick={() => onChange(p.key)} style={{
             minWidth:190, textAlign:'left', padding:'12px 14px', borderRadius:10, cursor:'pointer',
@@ -1747,6 +1755,9 @@ function ProductReportingSelector({ value, onChange, channel }) {
               <span>{p.icon}</span><span style={{ fontSize:13, fontWeight:800 }}>{p.label}</span>
             </div>
             <div style={{ fontSize:10, color:statusColor }}>● {statusLabel}</div>
+            {isGscLive && status === 'implemented' && (
+              <div style={{ fontSize:9, color:'#a78bfa', marginTop:2 }}>SEO implemented · GA4 reporting pending</div>
+            )}
           </button>
         )
       })}
@@ -3257,11 +3268,13 @@ function CommandCenter() {
       const h = now.getHours()
 
       try {
-        // Three parallel calls: stats RPC + tenant overview + prospects pipeline
-        const [statsRes, tenantsRes, prospectsRes] = await Promise.all([
+        // Load prospects independently so a stats RPC error never zeroes out Sales
+        const prospectsRes = await supabase.from('prospects').select('*').order('created_at', { ascending: false })
+
+        // Stats + tenant overview — may throw; prospects already captured above
+        const [statsRes, tenantsRes] = await Promise.all([
           supabase.rpc('admin_command_center_stats'),
           supabase.rpc('admin_tenant_overview'),
-          supabase.from('prospects').select('*').order('created_at', { ascending: false }),
         ])
 
         const stats   = statsRes.data
@@ -3988,7 +4001,8 @@ function CommandCenter() {
 
         {/* ═══ SEARCH TAB ═══ */}
         {tab==='search' && (<>
-          <ProductReportingSelector value={seoProduct} onChange={setSeoProduct} channel="seo" />
+          <ProductReportingSelector value={seoProduct} onChange={setSeoProduct} channel="seo"
+            gscConnected={gscConnected} activeGscProduct={seoProduct} />
           <>
 
           {/* ── Google Search Console ── */}
