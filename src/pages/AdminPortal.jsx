@@ -1722,9 +1722,11 @@ function StatusDot({ ok }) {
 
 
 const REPORTING_PRODUCTS = [
-  { key:'taxres_crm', label:'TaxRes CRM', icon:'📊', color:'#6366f1', website:'taxrescrm.net', marketing:'connected', seo:'connected' },
-  { key:'camvella',   label:'Camvella',   icon:'🏘️', color:'#0ea5e9', website:'camvella.com',  marketing:'connected', seo:'pending' },
-  { key:'arcvena',    label:'Arcvena',    icon:'⚡', color:'#8b5cf6',  website:'arcvena.com',   marketing:'pending',   seo:'pending' },
+  // status values: 'connected'=live reporting | 'implemented'=setup done, reporting pending | 'pending'=setup needed
+  { key:'taxres_crm', label:'TaxRes CRM', icon:'📊', color:'#6366f1', website:'taxrescrm.net', marketing:'connected',   seo:'connected'   },
+  { key:'camvella',   label:'Camvella',   icon:'🏘️', color:'#0ea5e9', website:'camvella.com',  marketing:'connected',   seo:'implemented' },
+  { key:'arcvena',    label:'Arcvena',    icon:'⚡', color:'#8b5cf6',  website:'arcvena.com',   marketing:'implemented', seo:'implemented' },
+  { key:'groundivo',  label:'Groundivo',  icon:'🌿', color:'#16a34a',  website:'groundivo.com',  marketing:'pending',     seo:'pending'     },
 ]
 
 function ProductReportingSelector({ value, onChange, channel }) {
@@ -1851,15 +1853,17 @@ const PRODUCT_REGISTRY = [
     icon:      '🦷',
     color:     '#ec4899',
     industry:  'Dental Practice',
-    url:       null,
-    lifecycleStage: 'building',
-    connection:     'not_connected',
+    url:       'https://app.bocasync.com',
+    appUrl:    'https://app.bocasync.com',
+    websiteUrl: null,  // bocasync.com is parked — no marketing site yet
+    lifecycleStage: 'available',
+    connection:     'partial',   // CRM live on Supabase (zmejbkttzvaqzzbmjclz); no analytics
     brandStatus:    'branded',
     publicOnRomyLabs: true,
-    commerciallyAvailable: false,
-    desc:      'Modern practice management for dental offices',
+    commerciallyAvailable: true,
+    desc:      'Modern practice management for dental offices — CRM live at app.bocasync.com',
     metricsUrl: null,
-    nextMilestone: 'Complete build phase — Supabase + edge fn setup pending',
+    nextMilestone: 'Marketing site (bocasync.com) + GA4/GSC/Clarity setup',
   },
   {
     key:       'phl',
@@ -3803,8 +3807,7 @@ function CommandCenter() {
               { product: 'TaxRes', icon: '🟡', item: 'Nashville SignalWire credentials pending', priority: 'medium' },
               { product: 'Arcvena', icon: '🔴', item: 'arcvena.com DNS cutover not complete', priority: 'high' },
               { product: 'Arcvena', icon: '🟡', item: 'CRM UI polish — GH Actions minutes exhausted (Sept 1)', priority: 'medium' },
-              { product: 'Camvella', icon: '🔴', item: 'provision-org edge fn not yet deployed — no customers', priority: 'high' },
-              { product: 'Camvella', icon: '🟡', item: 'GA4, Clarity, GSC setup pending', priority: 'medium' },
+              { product: 'Camvella', icon: '🟡', item: 'GA4 Data API reporting not yet wired to RomyLabs hub', priority: 'medium' },
             ]
             const all = [...attention, ...externalBlockers]
               .sort((a,b) => { const p = {high:0,medium:1,low:2}; return p[a.priority]-p[b.priority] })
