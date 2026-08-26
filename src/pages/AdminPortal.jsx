@@ -2704,12 +2704,7 @@ function ProductsTab({ supabase, taxresActivity = [] }) {
 // ── Sales Pipeline ────────────────────────────────────────────────────────────
 const PIPELINE_STAGES = ['Prospect','Contacted','Interested','Demo Scheduled','Demo Completed','Proposal Sent','Negotiation','Won','Lost']
 const STAGE_COLORS    = ['#64748b','#6366f1','#8b5cf6','#0ea5e9','#a855f7','#f59e0b','#f97316','#10b981','#ef4444']
-// PRODUCTS derived from romylabs_products registry — never hardcoded.
-// New products appear automatically when added to the registry with active=true, public=true.
-const PRODUCTS = [
-  { value:'all', label:'All Products' },
-  ...(registryProducts || []).map(r => ({ value: r.product_id, label: r.name }))
-]
+// PRODUCTS: derived inside SalesPipeline from registryProducts prop — see below
 const PRICING_LABELS = { monthly:'Monthly', perpetual:'Perpetual License', undecided:'Undecided' }
 const ACTIVITY_ICONS = { note:'📝', call:'📞', email:'📧', demo:'🖥️', proposal:'📄', stage_change:'🔄', won:'🏆', lost:'❌', outreach_linkedin:'💼', outreach_email:'📤', outreach_phone:'📱', follow_up:'🔁', demo_booked:'📅', converted:'⭐' }
 
@@ -2728,6 +2723,12 @@ function SalesPipeline({ data, supabase, registryProducts }) {
   const [addingNote, setAddingNote]   = useState(false)
   const [activityType, setActivityType] = useState('note')
   const [toast, setToast]             = useState(null)
+
+  // PRODUCTS: derived from registry prop — auto-updates when new products are registered
+  const PRODUCTS = [
+    { value:'all', label:'All Products' },
+    ...(registryProducts || []).map(r => ({ value: r.product_id, label: r.name }))
+  ]
 
   function showToast(msg, ok=true) { setToast({msg,ok}); setTimeout(()=>setToast(null),3000) }
 
