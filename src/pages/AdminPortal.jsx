@@ -1723,8 +1723,8 @@ function StatusDot({ ok }) {
 
 const REPORTING_PRODUCTS = [
   { key:'taxres_crm', label:'TaxRes CRM', icon:'📊', color:'#6366f1', website:'taxrescrm.net', marketing:'connected', seo:'connected' },
-  { key:'camvella', label:'Camvella', icon:'🏘️', color:'#0ea5e9', website:'camvella.com', marketing:'connected', seo:'connected' },
-  { key:'arcvena', label:'Arcvena', icon:'⚡', color:'#8b5cf6', website:'arcvena.com', marketing:'connected', seo:'connected' },
+  { key:'camvella',   label:'Camvella',   icon:'🏘️', color:'#0ea5e9', website:'camvella.com',  marketing:'connected', seo:'pending' },
+  { key:'arcvena',    label:'Arcvena',    icon:'⚡', color:'#8b5cf6',  website:'arcvena.com',   marketing:'pending',   seo:'pending' },
 ]
 
 function ProductReportingSelector({ value, onChange, channel }) {
@@ -5237,12 +5237,10 @@ function LinkedInPublisher({ embeddedMode = false }) {
   // Status badges for selected product
   const autopilotOn = settings?.autopilot === true
   const liConnected = connection?.connected === true
-  // SEO/Marketing: read from PRODUCT_REGISTRY if available
-  const productEntry = typeof PRODUCT_REGISTRY !== 'undefined'
-    ? PRODUCT_REGISTRY.find(p => p.key === selectedPid)
-    : null
-  const seoStatus   = productEntry?.seoStatus   || 'unknown'
-  const mktStatus   = productEntry?.marketingStatus || 'unknown'
+  // SEO/Marketing: derive from REPORTING_PRODUCTS (registry-declared, not live-probed)
+  const reportingEntry = REPORTING_PRODUCTS.find(p => p.key === selectedPid) || null
+  const seoStatus   = reportingEntry?.seo   || 'unknown'
+  const mktStatus   = reportingEntry?.marketing || 'unknown'
 
   // Filtered product list for selector
   const filteredProducts = products.filter(p =>
@@ -5344,6 +5342,14 @@ function LinkedInPublisher({ embeddedMode = false }) {
               color: seoStatus==='connected' ? '#10b981' : '#f59e0b',
               border: `1px solid ${seoStatus==='connected' ? 'rgba(16,185,129,.25)' : 'rgba(245,158,11,.25)'}`,
             }}>SEO {seoStatus==='connected' ? 'Connected' : 'Pending'}</span>
+          )}
+          {mktStatus && mktStatus !== 'unknown' && (
+            <span style={{
+              fontSize:10, fontWeight:700, padding:'3px 9px', borderRadius:20,
+              background: mktStatus==='connected' ? 'rgba(99,102,241,.12)' : 'rgba(245,158,11,.1)',
+              color: mktStatus==='connected' ? '#a5b4fc' : '#f59e0b',
+              border: `1px solid ${mktStatus==='connected' ? 'rgba(99,102,241,.3)' : 'rgba(245,158,11,.25)'}`,
+            }}>Mktg {mktStatus==='connected' ? 'Connected' : 'Pending'}</span>
           )}
         </div>
 
