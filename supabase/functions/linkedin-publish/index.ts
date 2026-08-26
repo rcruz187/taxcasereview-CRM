@@ -1,6 +1,6 @@
-// linkedin-publish v6 — organization target support
-// All operations go through this edge function (service role).
-// TaxRes existing person publishing remains the default; organization publishing is opt-in per tenant.
+// linkedin-publish v7 — product_id scoped
+// All operations are scoped by tenant_id + product_id.
+// product_id defaults to 'taxres_crm' for backward compatibility.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const cors = {
@@ -30,18 +30,27 @@ Deno.serve(async (req) => {
   )
   if (authError || !user) return json({ ok: false, error: 'Unauthorized' }, 401)
 
-  const { data: emp, error: empError } = await supabase
-    .from('employees')
-    .select('tenant_id')
-    .eq('email', user.email)
-    .limit(1)
-    .single()
-  if (empError || !emp?.tenant_id) return json({ ok: false, error: 'No tenant found' }, 403)
-  const tenantId = emp.tenant_id
+  // Resolve tenant — platform admin uses fixed admin tenant
+  const PLATFORM_ADMINS = ['romy@taxcasereview.org', 'romy@romylabs.com', 'info@romylabs.com']
+  let tenantId: string
+  if (PLATFORM_ADMINS.includes(user.email || '')) {
+    tenantId = 'a0000000-0000-0000-0000-000000000001'
+  } else {
+    const { data: emp, error: empError } = await supabase
+      .from('employees')
+      .select('tenant_id')
+      .eq('email', user.email)
+      .limit(1)
+      .single()
+    if (empError || !emp?.tenant_id) return json({ ok: false, error: 'No tenant found' }, 403)
+    tenantId = emp.tenant_id
+  }
 
   let body: Record<string, unknown> = {}
   try { body = await req.json() } catch (_) {}
   const action = body.action as string
+  // product_id is REQUIRED for all operations — default to taxres_crm for backward compat only
+  const productId: string = (body.product_id as string) || 'taxres_crm'
 
   if (action === 'oauth_callback') {
     const code         = body.code as string
@@ -69,13 +78,14 @@ Deno.serve(async (req) => {
 
     await supabase.from('linkedin_connections').upsert({
       tenant_id: tenantId,
+      product_id: productId,
       linkedin_person_id: profile.sub,
       display_name: profile.name || profile.email || 'LinkedIn Account',
       access_token: tokenData.access_token,
       expires_at: new Date(Date.now() + (tokenData.expires_in || 5184000) * 1000).toISOString(),
       scopes: tokenData.scope || 'openid,profile,email,w_member_social',
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'tenant_id' })
+    }, { onConflict: 'tenant_id,product_id' })
 
     return json({ ok: true, name: profile.name || 'LinkedIn Account' })
   }
@@ -85,6 +95,7 @@ Deno.serve(async (req) => {
       .from('linkedin_connections')
       .select('display_name, expires_at, scopes, publish_target_type, linkedin_organization_id')
       .eq('tenant_id', tenantId)
+      .eq('product_id', productId)
       .limit(1)
       .single()
 
@@ -118,7 +129,7 @@ Deno.serve(async (req) => {
       publish_target_type: targetType,
       linkedin_organization_id: targetType === 'ORGANIZATION' ? organizationId : null,
       updated_at: new Date().toISOString(),
-    }).eq('tenant_id', tenantId)
+    }).eq('tenant_id', tenantId).eq('product_id', productId)
 
     if (error) return json({ ok: false, error: error.message }, 500)
     return json({ ok: true, publish_target_type: targetType, linkedin_organization_id: targetType === 'ORGANIZATION' ? organizationId : null })
@@ -129,20 +140,25 @@ Deno.serve(async (req) => {
     const p_status = (body.status as string) || 'draft'
     const p_scheduled_at = body.scheduled_at as string | null || null
     const p_id = body.id as string | null || null
+    const p_title = body.title as string || p_body.slice(0, 60)
+    const p_category = body.category as string || 'general'
 
     if (!p_body) return json({ ok: false, error: 'Post body is required' }, 400)
 
     if (p_id) {
       const { data: updated, error } = await supabase
         .from('linkedin_posts')
-        .update({ body: p_body, status: p_status, scheduled_at: p_scheduled_at, updated_at: new Date().toISOString() })
+        .update({ body: p_body, status: p_status, scheduled_at: p_scheduled_at,
+                  title: p_title, category: p_category, updated_at: new Date().toISOString() })
         .eq('id', p_id).eq('tenant_id', tenantId).select().single()
       if (error) return json({ ok: false, error: error.message }, 500)
       return json({ ok: true, post: updated })
     }
 
     const { data: inserted, error } = await supabase.from('linkedin_posts').insert({
-      tenant_id: tenantId, body: p_body, status: p_status, scheduled_at: p_scheduled_at,
+      tenant_id: tenantId, product_id: productId,
+      body: p_body, status: p_status, scheduled_at: p_scheduled_at,
+      title: p_title, category: p_category,
     }).select().single()
     if (error) return json({ ok: false, error: error.message }, 500)
     return json({ ok: true, post: inserted })
@@ -151,7 +167,9 @@ Deno.serve(async (req) => {
   if (action === 'list_posts') {
     const limit = Number(body.limit) || 100
     const { data: posts, error } = await supabase.from('linkedin_posts').select('*')
-      .eq('tenant_id', tenantId).order('created_at', { ascending: false }).limit(limit)
+      .eq('tenant_id', tenantId)
+      .eq('product_id', productId)
+      .order('created_at', { ascending: false }).limit(limit)
     if (error) return json({ ok: false, error: error.message }, 500)
     return json({ ok: true, posts: posts || [] })
   }
@@ -159,7 +177,8 @@ Deno.serve(async (req) => {
   if (action === 'delete_post') {
     const post_id = body.post_id as string
     if (!post_id) return json({ ok: false, error: 'post_id required' }, 400)
-    await supabase.from('linkedin_posts').delete().eq('id', post_id).eq('tenant_id', tenantId)
+    await supabase.from('linkedin_posts').delete()
+      .eq('id', post_id).eq('tenant_id', tenantId)
     return json({ ok: true })
   }
 
@@ -167,12 +186,15 @@ Deno.serve(async (req) => {
     const post_id = body.post_id as string
     if (!post_id) return json({ ok: false, error: 'post_id required' }, 400)
 
+    // Connection MUST be for this product — no fallback to other products
     const { data: conn, error: connError } = await supabase
       .from('linkedin_connections')
       .select('access_token, expires_at, linkedin_person_id, publish_target_type, linkedin_organization_id')
-      .eq('tenant_id', tenantId).limit(1).single()
+      .eq('tenant_id', tenantId)
+      .eq('product_id', productId)
+      .limit(1).single()
 
-    if (connError || !conn) return json({ ok: false, error: 'LinkedIn not connected' }, 401)
+    if (connError || !conn) return json({ ok: false, error: 'LinkedIn not connected for this product' }, 401)
     if (new Date(conn.expires_at) < new Date()) {
       return json({ ok: false, error: 'LinkedIn token expired — please reconnect' }, 401)
     }
@@ -233,7 +255,8 @@ Deno.serve(async (req) => {
   }
 
   if (action === 'disconnect') {
-    await supabase.from('linkedin_connections').delete().eq('tenant_id', tenantId)
+    await supabase.from('linkedin_connections').delete()
+      .eq('tenant_id', tenantId).eq('product_id', productId)
     return json({ ok: true })
   }
 
