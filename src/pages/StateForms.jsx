@@ -41,6 +41,7 @@ const STATE_FORMS = [
   { num: 'OK-BT-129',      state: 'OK', label: 'Power of Attorney',                                  url: `${BASE}/state-forms/OK_POA.pdf` },
   { num: 'OR-150-800-005', state: 'OR', label: 'Tax Information Authorization and POA',              url: `${BASE}/state-forms/OR_POA.pdf` },
   { num: 'PA-PSRS-248',    state: 'PA', label: 'Power of Attorney',                                  url: `${BASE}/state-forms/PA_POA.pdf` },
+  { num: 'SC-SC2848',      state: 'SC', label: 'Power of Attorney and Declaration of Representative',url: `${BASE}/state-forms/SC_POA.pdf` },
   { num: 'TN-RV-F0103801', state: 'TN', label: 'Power of Attorney',                                  url: `${BASE}/state-forms/TN_POA.pdf` },
   { num: 'TX-85-272',      state: 'TX', label: 'Power of Attorney',                                  url: `${BASE}/state-forms/TX_POA.pdf` },
   { num: 'UT-TC-737',      state: 'UT', label: 'Power of Attorney',                                  url: `${BASE}/state-forms/UT_POA.pdf` },
