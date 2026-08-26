@@ -1729,10 +1729,28 @@ const REPORTING_PRODUCTS = [
   { key:'groundivo',  label:'Groundivo',  icon:'🌿', color:'#16a34a',  website:'groundivo.com',  marketing:'pending',     seo:'pending'     },
 ]
 
-function ProductReportingSelector({ value, onChange, channel, gscConnected, activeGscProduct }) {
+function ProductReportingSelector({ value, onChange, channel, gscConnected, activeGscProduct, registryProducts }) {
   return (
     <div style={{ display:'flex', gap:10, flexWrap:'wrap', marginBottom:22 }}>
-      {REPORTING_PRODUCTS.map(p => {
+      {(registryProducts && registryProducts.length > 0
+        ? registryProducts.map(r => ({
+            key:   r.product_id,
+            label: r.name,
+            icon:  r.product_id === 'taxres_crm' ? '📊'
+                 : r.product_id === 'camvella'   ? '🏘️'
+                 : r.product_id === 'arcvena'    ? '⚡'
+                 : r.product_id === 'bocasync'   ? '🦷'
+                 : r.product_id === 'groundivo'  ? '🌿' : '📦',
+            color: r.accent_color || '#6366f1',
+            seo:   r.product_id === 'taxres_crm' ? 'connected'
+                 : r.product_id === 'camvella'   ? 'implemented'
+                 : r.product_id === 'arcvena'    ? 'implemented'
+                 : 'pending',
+            marketing: r.product_id === 'taxres_crm' ? 'connected'
+                     : r.product_id === 'camvella'   ? 'connected' : 'pending',
+          }))
+        : REPORTING_PRODUCTS
+      ).map(p => {
         const status = p[channel]
         // Live GSC connection overrides static label for the active product on the SEO channel
         const isGscLive = channel === 'seo' && gscConnected && p.key === activeGscProduct
@@ -3452,6 +3470,16 @@ function CommandCenter() {
     load()
   }, [])
 
+  // ── Reporting registry — dynamic product list from romylabs_products ──
+  const [reportingProducts, setReportingProducts] = React.useState([])
+  React.useEffect(() => {
+    supabase.from('romylabs_products')
+      .select('product_id,name,accent_color,sort_order')
+      .eq('active', true).eq('public', true)
+      .order('sort_order')
+      .then(({ data }) => { if (data?.length) setReportingProducts(data) })
+  }, [])
+
   // ── GSC state + fetch ──
   const [gscData, setGscData]         = useState(null)
   const [gscLoading, setGscLoading]   = useState(false)
@@ -4048,7 +4076,8 @@ function CommandCenter() {
         {/* ═══ SEARCH TAB ═══ */}
         {tab==='search' && (<>
           <ProductReportingSelector value={seoProduct} onChange={setSeoProduct} channel="seo"
-            gscConnected={gscConnected} activeGscProduct={seoProduct} />
+            gscConnected={gscConnected} activeGscProduct={seoProduct}
+            registryProducts={reportingProducts} />
           <>
 
           {/* ── Google Search Console ── */}
