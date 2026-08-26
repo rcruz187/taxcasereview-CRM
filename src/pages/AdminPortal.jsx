@@ -3272,9 +3272,10 @@ function CommandCenter() {
         const prospectsRes = await supabase.from('prospects').select('*').order('created_at', { ascending: false })
 
         // Stats + tenant overview — may throw; prospects already captured above
-        const [statsRes, tenantsRes] = await Promise.all([
+        const [statsRes, tenantsRes, storageRes] = await Promise.all([
           supabase.rpc('admin_command_center_stats'),
           supabase.rpc('admin_tenant_overview'),
+          supabase.rpc('admin_storage_stats'),
         ])
 
         const stats   = statsRes.data
@@ -3322,6 +3323,9 @@ function CommandCenter() {
           totalClients:  tenants.reduce((s,r)=>s+Number(r.client_count||0),0),
           totalLeads:    tenants.reduce((s,r)=>s+Number(r.lead_count||0),0),
           totalStorage:  tenants.reduce((s,r)=>s+Number(r.storage_bytes||0),0),
+          // Real Supabase File Storage from storage.objects metadata
+          realStorageBytes:   Number(storageRes?.data?.total_bytes || 0),
+          realStorageObjects: Number(storageRes?.data?.total_objects || 0),
           pendingEsigns: Number(stats.pending_esigns||0),
           todayDemos:    Number(stats.today_demos||0),
         },
@@ -4112,16 +4116,56 @@ function CommandCenter() {
 
         {/* ═══ CRM TAB ═══ */}
         {tab==='crm' && (<>
+          {/* ── CRM scope: TaxRes CRM offices only (TCR Supabase) ── */}
+          {(()=>{
+            // CRM account drilldown — derived from live tenant data
+            const crmTenants = data.tenants || []
+            const [crmAccount, setCrmAccount] = React.useState('all')
+            const activeTenant = crmAccount === 'all' ? null : crmTenants.find(t=>t.id===crmAccount)
+            const crmClients = activeTenant ? Number(activeTenant.client_count||0) : data.kpis.totalClients
+            const crmLeads   = activeTenant ? Number(activeTenant.lead_count||0)   : data.kpis.totalLeads
+            const crmSeats   = activeTenant ? Number(activeTenant.employee_count||0): data.kpis.totalSeats
+            const realMB     = (data.kpis.realStorageBytes / 1048576).toFixed(2)
+            const realObjs   = data.kpis.realStorageObjects
+            return (<>
+          <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:18,
+            background:'rgba(99,102,241,.06)', border:'1px solid rgba(99,102,241,.15)',
+            borderRadius:10, padding:'10px 16px' }}>
+            <span style={{ fontSize:11, fontWeight:700, color:'#475569' }}>Product:</span>
+            <span style={{ fontSize:12, fontWeight:800, color:'#a5b4fc' }}>TaxRes CRM</span>
+            <span style={{ fontSize:11, fontWeight:700, color:'#475569', marginLeft:8 }}>Account:</span>
+            <select value={crmAccount} onChange={e=>setCrmAccount(e.target.value)}
+              style={{ fontSize:12, fontWeight:700, background:'rgba(99,102,241,.15)',
+                border:'1px solid rgba(99,102,241,.3)', borderRadius:6, color:'#e2e8f0',
+                padding:'4px 8px', cursor:'pointer' }}>
+              <option value="all">All TaxRes Offices</option>
+              {crmTenants.map(t=>(
+                <option key={t.id} value={t.id}>{t.firm_name}</option>
+              ))}
+            </select>
+            {activeTenant && (
+              <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20,
+                background: activeTenant.status==='active'?'rgba(16,185,129,.15)':'rgba(245,158,11,.15)',
+                color: activeTenant.status==='active'?'#10b981':'#f59e0b' }}>
+                {activeTenant.status} · {activeTenant.tenant_code}
+              </span>
+            )}
+          </div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:24 }}>
             {[
-              { label:'Total Clients (All Offices)',  value:data.kpis.totalClients.toLocaleString(), icon:'🏢', color:'#10b981' },
-              { label:'Total Leads (All Offices)',    value:data.kpis.totalLeads.toLocaleString(),   icon:'👤', color:'#a855f7' },
-              { label:'Total Seats (All Offices)',    value:data.kpis.totalSeats,                    icon:'👥', color:'#6366f1' },
+              { label: activeTenant?`Clients — ${activeTenant.firm_name}`:'Total Clients — TaxRes Offices',
+                value:crmClients.toLocaleString(), icon:'🏢', color:'#10b981' },
+              { label: activeTenant?`Leads — ${activeTenant.firm_name}`:'Total Leads — TaxRes Offices',
+                value:crmLeads.toLocaleString(),   icon:'👤', color:'#a855f7' },
+              { label: activeTenant?`Seats — ${activeTenant.firm_name}`:'Total Seats — TaxRes Offices',
+                value:crmSeats,                    icon:'👥', color:'#6366f1' },
               { label:'Pending E-Signs',              value:data.kpis.pendingEsigns,                 icon:'✍️', color:'#8b5cf6' },
               { label:'Demos Today',                  value:data.kpis.todayDemos,                    icon:'📅', color:'#0ea5e9' },
-              { label:'Storage Used',                 value:fmtBytes(data.kpis.totalStorage),        icon:'💾', color:'#f59e0b' },
+              { label:'File Storage', value:`${realMB} MB · ${realObjs} files`,                      icon:'💾', color:'#f59e0b' },
             ].map(k => <KPICard key={k.label} {...k} />)}
           </div>
+          </>)
+          })()}
 
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18 }}>
             <div style={CC.card({padding:'22px 24px'})}>
