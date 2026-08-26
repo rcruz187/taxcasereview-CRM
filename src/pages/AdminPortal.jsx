@@ -1894,7 +1894,7 @@ const PRODUCT_REGISTRY = [
     commerciallyAvailable: false,
     desc:      'Internal use only — commercial launch as Groundivo (groundivo.com)',
     metricsUrl: null,
-    nextMilestone: 'Rebranded as Groundivo — internal PHL instance remains operational',
+    nextMilestone: 'Marketing site launch + LinkedIn auth',
   },
 
   {
@@ -1911,7 +1911,7 @@ const PRODUCT_REGISTRY = [
     brandStatus:    'branded',
     publicOnRomyLabs: true,
     commerciallyAvailable: true,
-    desc:      'Field service CRM for landscaping, lawn care, and pest control — commercial rebrand of PHL Land Care',
+    desc:      'Field service CRM built for landscaping, lawn care, and pest control businesses.',
     metricsUrl: null,
     nextMilestone: 'LinkedIn auth + marketing site launch',
   },
