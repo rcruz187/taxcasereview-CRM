@@ -158,3 +158,8 @@ verify_jwt = false
 
 [functions.gsc-sync]
 verify_jwt = false
+
+# RomyLabs central support endpoint — server-to-server callers authenticate
+# with timestamped HMAC signatures inside the function, not Supabase JWTs.
+[functions.support-api]
+verify_jwt = false
