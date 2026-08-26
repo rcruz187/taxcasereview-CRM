@@ -2749,9 +2749,30 @@ function SalesPipeline({ data, supabase }) {
 
   useEffect(() => { if (selected) loadActivities(selected.id) }, [selected?.id])
 
+  // ── Account/Firm filter — derived from live prospect records ──
+  const [firmFilter, setFirmFilter] = React.useState('all')
+
+  // Build firm list from prospects matching current productFilter
+  const availableFirms = React.useMemo(() => {
+    const base = productFilter === 'all' ? prospects : prospects.filter(p => p.product === productFilter)
+    const seen = new Set()
+    const firms = []
+    for (const p of base) {
+      if (p.firm_name && !seen.has(p.firm_name)) {
+        seen.add(p.firm_name)
+        firms.push({ name: p.firm_name, product: p.product })
+      }
+    }
+    return firms.sort((a,b) => a.name.localeCompare(b.name))
+  }, [prospects, productFilter])
+
+  // Reset firm filter when product filter changes
+  React.useEffect(() => { setFirmFilter('all') }, [productFilter])
+
   // Filtered list
   const filtered = prospects.filter(p => {
     if (productFilter !== 'all' && p.product !== productFilter) return false
+    if (firmFilter !== 'all' && p.firm_name !== firmFilter) return false
     if (stageFilter !== 'all' && p.stage !== stageFilter) return false
     return true
   })
@@ -2929,6 +2950,27 @@ function SalesPipeline({ data, supabase }) {
               }}>{p.label}</button>
             ))}
           </div>
+          {/* ── Account/Firm selector ── */}
+          {availableFirms.length > 0 && (
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:10 }}>
+              <span style={{ fontSize:9, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.07em' }}>Account / Firm:</span>
+              <select value={firmFilter} onChange={e=>setFirmFilter(e.target.value)}
+                style={{ fontSize:11, fontWeight:700, background:'rgba(99,102,241,.12)',
+                  border:'1px solid rgba(99,102,241,.25)', borderRadius:6, color:'#e2e8f0',
+                  padding:'3px 8px', cursor:'pointer' }}>
+                <option value="all">All Firms</option>
+                {availableFirms.map(f=>(
+                  <option key={f.name} value={f.name}>{f.name}</option>
+                ))}
+              </select>
+              {firmFilter !== 'all' && (
+                <button onClick={()=>setFirmFilter('all')}
+                  style={{ fontSize:10, background:'none', border:'none', color:'#64748b', cursor:'pointer' }}>
+                  × Clear
+                </button>
+              )}
+            </div>
+          )}
         </div>
         <div style={{ display:'flex', gap:3, alignItems:'flex-end', height:100, marginBottom:12 }}>
           {PIPELINE_STAGES.map((stage, i) => {
