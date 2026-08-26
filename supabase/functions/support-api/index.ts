@@ -428,6 +428,13 @@ Deno.serve(async (req: Request) => {
     return jsonResp({ error: 'Request body too large' }, 413)
   }
 
+  // Create the privileged database client before HMAC authentication because
+  // authenticate() performs the server-side product registry lookup.
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  )
+
   // ── HMAC authentication ─────────────────────────────────────────────────────
   const authResult = await authenticate(req, rawBody, supabase)
   if (!authResult.ok) {
@@ -452,11 +459,6 @@ Deno.serve(async (req: Request) => {
   // ── Route action ────────────────────────────────────────────────────────────
   const action = body.action as string | undefined
   if (!action) return validationError('Missing action')
-
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-  )
 
   switch (action) {
     case 'create_ticket': return handleCreateTicket(supabase, product, body)
