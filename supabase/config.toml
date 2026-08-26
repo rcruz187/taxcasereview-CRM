@@ -163,3 +163,6 @@ verify_jwt = false
 # with timestamped HMAC signatures inside the function, not Supabase JWTs.
 [functions.support-api]
 verify_jwt = false
+
+[functions.trigger-site-rebuild]
+verify_jwt = false
