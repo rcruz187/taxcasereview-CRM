@@ -1873,9 +1873,28 @@ const PRODUCT_REGISTRY = [
     brandStatus:    'working_name',
     publicOnRomyLabs: false,
     commerciallyAvailable: false,
-    desc:      'Internal field service CRM — rebrand/migration pending',
+    desc:      'Internal use only — commercial launch as Groundivo (groundivo.com)',
     metricsUrl: null,
-    nextMilestone: 'Decide commercial rebrand — do not publish under current name',
+    nextMilestone: 'Rebranded as Groundivo — internal PHL instance remains operational',
+  },
+
+  {
+    key:        'groundivo',
+    label:      'Groundivo',
+    icon:       '🌿',
+    color:      '#16a34a',
+    industry:   'Landscaping & Field Service',
+    url:        'https://app.groundivo.com',
+    appUrl:     'https://app.groundivo.com',
+    websiteUrl: 'https://www.groundivo.com',
+    lifecycleStage: 'available',
+    connection:     'partial',
+    brandStatus:    'branded',
+    publicOnRomyLabs: true,
+    commerciallyAvailable: true,
+    desc:      'Field service CRM for landscaping, lawn care, and pest control — commercial rebrand of PHL Land Care',
+    metricsUrl: null,
+    nextMilestone: 'LinkedIn auth + marketing site launch',
   },
 
   // ── TENANTS (not products — operational data, not product counts) ─────────
@@ -2669,11 +2688,9 @@ const STAGE_COLORS    = ['#64748b','#6366f1','#8b5cf6','#0ea5e9','#a855f7','#f59
 const PRODUCTS = [
   { value:'all',         label:'All Products'           },
   { value:'taxres_crm',  label:'Tax Res CRM'            },
-  { value:'nashville',   label:'Nashville Tax Solutions' },
-  { value:'cloudcpa',    label:'CloudCPA Inc'            },
   { value:'camvella',    label:'Camvella'               },
-  { value:'phl',         label:'PHL Land Care'          },
   { value:'arcvena',     label:'Arcvena'                },
+  { value:'groundivo',   label:'Groundivo'              },
   { value:'bocasync',    label:'BocaSync'               },
 ]
 const PRICING_LABELS = { monthly:'Monthly', perpetual:'Perpetual License', undecided:'Undecided' }
@@ -2766,7 +2783,7 @@ function SalesPipeline({ data, supabase }) {
       expected_close_date:form.expected_close_date || null,
       demo_date:          form.demo_date || null,
       notes:              form.notes || null,
-      owner:              form.owner || 'romy@taxrescrm.net',
+      owner:              form.owner || 'info@romylabs.com',
       updated_at:         new Date().toISOString(),
     }
     if (editMode && form.id) {
@@ -2792,7 +2809,7 @@ function SalesPipeline({ data, supabase }) {
       prospect_id: selected.id,
       activity_type: activityType,
       body: newNote.trim(),
-      actor: 'romy@taxrescrm.net',
+      actor: 'info@romylabs.com',
     })
     setNewNote('')
     await loadActivities(selected.id)
@@ -3333,10 +3350,11 @@ function CommandCenter() {
         // Sales pipeline — real prospect data
         sales: (()=>{
           const pros = (prospectsRes && prospectsRes.data) || []
-          const STAGES = ['New Lead','Contacted','Qualified','Demo Scheduled','Demo Completed','Proposal','Won','Lost']
+          // Use PIPELINE_STAGES as the canonical stage list (matches DB values)
+          const STAGES = PIPELINE_STAGES
           const stageCounts = {}
           STAGES.forEach(s => { stageCounts[s] = 0 })
-          pros.forEach(p => { if (stageCounts[p.stage] !== undefined) stageCounts[p.stage]++ })
+          pros.forEach(p => { stageCounts[p.stage] = (stageCounts[p.stage] || 0) + 1 })
           const won = pros.filter(p=>p.stage==='Won').length
           const lost = pros.filter(p=>p.stage==='Lost').length
           const winRate = (won+lost) > 0 ? Math.round((won/(won+lost))*100) : 0
