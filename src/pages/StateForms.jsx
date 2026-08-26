@@ -34,6 +34,7 @@ const STATE_FORMS = [
   { num: 'MT-POA',         state: 'MT', label: 'Power of Attorney',                                  url: `${BASE}/state-forms/MT_POA.pdf` },
   { num: 'NE-POA',         state: 'NE', label: 'Power of Attorney',                                  url: `${BASE}/state-forms/NE_POA.pdf` },
   { num: 'NM-POA',         state: 'NM', label: 'Power of Attorney',                                  url: `${BASE}/state-forms/NM_POA.pdf` },
+  { num: 'NJ-M-5008-R',   state: 'NJ', label: 'Appointment of Taxpayer Representative',             url: `${BASE}/state-forms/NJ_POA.pdf` },
   { num: 'NY-POA-1',       state: 'NY', label: 'Power of Attorney',                                  url: `${BASE}/state-forms/NY_POA.pdf` },
   { num: 'NC-GEN-58',      state: 'NC', label: 'Power of Attorney',                                  url: `${BASE}/state-forms/NC_POA.pdf` },
   { num: 'OH-SPOA',        state: 'OH', label: 'Power of Attorney',                                  url: `${BASE}/state-forms/OH_POA.pdf` },
