@@ -1,9 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// SignalWire webhook authentication — HMAC-SHA1 per SW Compatibility API docs
-// Algorithm: HMAC-SHA1(signing_key, url + sorted_params_concatenated), base64 encoded
-// Header: x-signalwire-signature
 async function validateSWSignature(
   signingKey: string,
   url: string,
@@ -25,15 +22,8 @@ async function validateSWSignature(
   return diff === 0
 }
 
-
-// Called BY SignalWire once an inbound call's recording is ready.
-// Downloads the recording, re-hosts it in Supabase Storage, saves a row,
-// then async-fires call-ai-summary for Gemini transcription + action items.
-// JWT verification must be OFF (SignalWire calls this directly).
-
 serve(async (req) => {
   try {
-    // ── SignalWire webhook authentication ──────────────────────────────────────
     const rawBody = await req.text()
     const swSignature = req.headers.get('x-signalwire-signature') ?? ''
     const swSecret = Deno.env.get('SW_SIGNING_SECRET') ?? ''
@@ -43,15 +33,13 @@ serve(async (req) => {
     }
     const webhookUrl = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/call-recorded'
     const paramMap: Record<string,string> = {}
-    for (const [k,v] of new URLSearchParams(rawBody)) { paramMap[k] = v }
-    const sigValid = await validateSWSignature(swSecret, webhookUrl, paramMap, swSignature)
-    if (!sigValid) {
+    for (const [k,v] of new URLSearchParams(rawBody)) paramMap[k] = v
+    if (!await validateSWSignature(swSecret, webhookUrl, paramMap, swSignature)) {
       console.warn('[call-recorded] Invalid SignalWire signature — rejected')
       return new Response('Unauthorized', { status: 403 })
     }
-    // ── End authentication ─────────────────────────────────────────────────────
+
     const form = new URLSearchParams(rawBody)
-    // Basic structural validation: key SignalWire fields must be present
     if (!form.get('CallSid') || !form.get('RecordingUrl')) {
       console.warn('call-recorded: missing CallSid or RecordingUrl — rejected')
       return new Response('Bad Request', { status: 400 })
@@ -67,8 +55,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    // Resolve tenant from the called number (to) — multi-tenant safe
-    let tenant_id = '61a89aef-0e7e-4ea2-b222-44ab2024655a' // fallback to TCR
+    let tenant_id = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
     if (to) {
       const toClean = to.replace(/\D/g, '').slice(-10)
       const { data: setting } = await supabase
@@ -92,8 +79,8 @@ serve(async (req) => {
             contentType: 'audio/mpeg', upsert: true,
           })
           if (!upErr) {
-            const { data: pub } = supabase.storage.from('documents').getPublicUrl(path)
-            storedUrl = pub.publicUrl
+            const { data: signed } = await supabase.storage.from('documents').createSignedUrl(path, 3600)
+            if (signed?.signedUrl) storedUrl = signed.signedUrl
           }
         }
       } catch (e) {
@@ -111,11 +98,13 @@ serve(async (req) => {
       tenant_id,
     })
 
-    // Fire AI summary async — non-blocking so SignalWire gets 200 fast
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     fetch(`${supabaseUrl}/functions/v1/call-ai-summary`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-call-secret': swSecret,
+      },
       body: JSON.stringify({
         recording_url: storedUrl,
         call_sid: callSid,
@@ -127,9 +116,8 @@ serve(async (req) => {
     }).catch(e => console.error('call-recorded: failed to trigger ai-summary', e))
 
     return new Response('ok', { status: 200 })
-
   } catch (err) {
     console.error('call-recorded error:', err)
-    return new Response('error', { status: 200 }) // 200 so SignalWire doesn't retry forever
+    return new Response('error', { status: 200 })
   }
 })
