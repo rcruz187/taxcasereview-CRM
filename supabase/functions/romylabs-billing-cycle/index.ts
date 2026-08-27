@@ -27,10 +27,36 @@ Deno.serve(async (req) => {
   const today = now.toISOString().slice(0, 10)
   const actions: Record<string, unknown>[] = []
 
-  const { data: accounts, error: accountError } = await db.from('romylabs_billing_accounts').select('*').in('status', ['active','past_due','suspension_pending','suspended'])
+  const { data: accounts, error: accountError } = await db.from('romylabs_billing_accounts').select('*').in('status', ['active','past_due','suspension_pending','suspended','restore_pending'])
   if (accountError) return json({ error: accountError.message }, 500)
 
   for (const account of accounts || []) {
+    // A payment may cure the balance while the product adapter is temporarily unavailable.
+    // Keep the central state truthful (`restore_pending`) and retry every daily cycle until
+    // the product confirms access is actually restored.
+    if (account.status === 'restore_pending') {
+      try {
+        const result = await enforce(url, entitlementSecret, account.id, 'restore')
+        await db.from('romylabs_billing_accounts').update({
+          status: 'active', suspended_at: null, suspension_reason: null,
+          enforcement_error: null, enforcement_updated_at: now.toISOString(), updated_at: now.toISOString()
+        }).eq('id', account.id)
+        await db.from('romylabs_collection_events').insert({
+          account_id: account.id,
+          event_type: 'restored',
+          detail: { reason: 'balance_cured_retry', enforced: true, adapter: result }
+        })
+        actions.push({ account: account.account_name, action: 'restored_after_retry' })
+      } catch (e) {
+        const message = String((e as Error)?.message || e)
+        await db.from('romylabs_billing_accounts').update({
+          enforcement_error: message, enforcement_updated_at: now.toISOString(), updated_at: now.toISOString()
+        }).eq('id', account.id)
+        actions.push({ account: account.account_name, action: 'restore_retry_pending', error: message })
+      }
+      continue
+    }
+
     const day = Number(today.slice(8, 10))
     if (account.auto_invoice && day >= account.billing_day && ['active','past_due'].includes(account.status)) {
       const periodStart = `${today.slice(0,7)}-01`
