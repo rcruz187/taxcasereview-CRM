@@ -17,8 +17,24 @@
       })();
     </script>
     <title>TaxRes CRM</title>
-    <link rel="icon" type="image/png" href="/taxrescrm-favicon.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/taxrescrm-favicon.png" />
+    <link id="app-favicon" rel="icon" type="image/png" href="/taxrescrm-favicon.png" />
+    <link id="app-apple-touch-icon" rel="apple-touch-icon" sizes="180x180" href="/taxrescrm-favicon.png" />
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var product = (params.get('product') || '').toLowerCase();
+        if (product === 'bocasync') {
+          document.title = 'Schedule a BocaSync Demo';
+          var favicon = document.getElementById('app-favicon');
+          var apple = document.getElementById('app-apple-touch-icon');
+          if (favicon) {
+            favicon.type = 'image/svg+xml';
+            favicon.href = '/bocasync-logo.svg?v=1';
+          }
+          if (apple) apple.href = '/bocasync-logo.svg?v=1';
+        }
+      })();
+    </script>
     <meta name="theme-color" content="#0f2150" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
