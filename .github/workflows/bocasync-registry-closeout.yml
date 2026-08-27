@@ -1,0 +1,92 @@
+name: BocaSync Registry Closeout
+
+on:
+  push:
+    paths:
+      - '.github/workflows/bocasync-registry-closeout.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-registry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch BocaSync registry block exactly
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('src/pages/AdminPortal.jsx')
+          text = path.read_text(encoding='utf-8')
+
+          old = """  {
+    key:       'bocasync',
+    label:     'BocaSync',
+    icon:      '🦷',
+    color:     '#ec4899',
+    industry:  'Dental Practice',
+    url:       'https://app.bocasync.com',
+    appUrl:    'https://app.bocasync.com',
+    websiteUrl: null,  // bocasync.com is parked — no marketing site yet
+    lifecycleStage: 'available',
+    connection:     'partial',   // CRM live on Supabase (zmejbkttzvaqzzbmjclz); no analytics
+    brandStatus:    'branded',
+    publicOnRomyLabs: true,
+    commerciallyAvailable: true,
+    desc:      'Modern practice management for dental offices — CRM live at app.bocasync.com',
+    metricsUrl: null,
+    nextMilestone: 'Marketing site (bocasync.com) + GA4/GSC/Clarity setup',
+  },"""
+
+          new = """  {
+    key:        'bocasync',
+    label:      'BocaSync',
+    icon:       '🦷',
+    color:      '#ec4899',
+    industry:   'Dental Practice Management',
+    url:        'https://app.bocasync.com',
+    appUrl:     'https://app.bocasync.com',
+    websiteUrl: 'https://bocasync.com',
+    repo:        'taxresolutioncrm/bocasync',
+    supabaseRef: 'zmejbkttzvaqzzbmjclz',
+    languages:   ['en-US', 'es-DO'],
+    lifecycleStage: 'available',
+    connection:     'connected',
+    brandStatus:    'branded',
+    publicOnRomyLabs: true,
+    commerciallyAvailable: true,
+    desc:      'Bilingual dental practice management SaaS for patients, scheduling, clinical workflows, billing, payments, communications, workforce, and reporting.',
+    metricsUrl: 'https://zmejbkttzvaqzzbmjclz.supabase.co/functions/v1/platform-metrics',
+    nextMilestone: 'Complete production metrics verification, payment-plan workflow, appointment creation, and analytics/Search Console closeout',
+  },"""
+
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f'Expected exactly one BocaSync registry block; found {count}. No change made.')
+
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+      - name: Verify portal was not truncated
+        shell: bash
+        run: |
+          test "$(wc -l < src/pages/AdminPortal.jsx)" -gt 5000
+          grep -q "metricsUrl: 'https://zmejbkttzvaqzzbmjclz.supabase.co/functions/v1/platform-metrics'" src/pages/AdminPortal.jsx
+          test "$(grep -c "key:        'bocasync'" src/pages/AdminPortal.jsx)" -eq 1
+
+      - name: Commit registry closeout
+        shell: bash
+        run: |
+          if git diff --quiet -- src/pages/AdminPortal.jsx; then
+            echo 'No registry changes required.'
+            exit 0
+          fi
+          git config user.name 'RomyLabs Automation'
+          git config user.email 'actions@romylabs.com'
+          git add src/pages/AdminPortal.jsx
+          git commit -m 'Connect BocaSync in RomyLabs admin registry'
+          git push origin HEAD:main
