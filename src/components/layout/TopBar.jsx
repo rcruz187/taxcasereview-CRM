@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { useFirm } from '../../lib/useFirm'
 import { isSoundEnabled, setSoundEnabled, playSound } from '../../lib/notifySound'
+import GlobalSearch from '../GlobalSearch'
 
 const PAGE_TITLES = {
   '/':             'Dashboard',      '/calendar':    'Calendar',
@@ -107,13 +108,7 @@ export default function TopBar({ onNew }) {
       {/* Left side: title + search together */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, minWidth: 0 }}>
         <span className="page-title" style={{ flexShrink: 0 }}>{title}</span>
-        <input
-          className="search-input"
-          placeholder="Search clients, cases, leads…"
-          value={searchQ}
-          onChange={e => setSearchQ(e.target.value)}
-          style={{ maxWidth: 260 }}
-        />
+        <GlobalSearch value={searchQ} onChange={setSearchQ} />
       </div>
 
       {/* Right side: firm numbers, clock, controls */}
