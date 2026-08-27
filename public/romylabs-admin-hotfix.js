@@ -1,19 +1,23 @@
 /* RomyLabs admin production guard — canonical admin host + legacy product-link cleanup. */
 (function () {
   var host = window.location.hostname.toLowerCase();
+  var path = window.location.pathname;
 
-  /* /crm-admin belongs to the RomyLabs admin host. This also repairs stale
-   * browser bookmarks/sessions that land on taxrescrm.app/crm-admin. */
-  if ((host === 'taxrescrm.app' || host === 'www.taxrescrm.app') &&
-      window.location.pathname.indexOf('/crm-admin') === 0) {
-    window.location.replace(
-      'https://admin.romylabs.com' + window.location.pathname +
-      window.location.search + window.location.hash
-    );
+  /* /crm-admin belongs to the RomyLabs admin host. Repair stale TaxRes links. */
+  if ((host === 'taxrescrm.app' || host === 'www.taxrescrm.app') && path.indexOf('/crm-admin') === 0) {
+    window.location.replace('https://admin.romylabs.com' + path + window.location.search + window.location.hash);
     return;
   }
 
   if (host !== 'admin.romylabs.com') return;
+
+  /* admin.romylabs.com is a dedicated control-plane host. Never allow an
+   * authenticated owner session to fall through to the TaxRes demo CRM shell.
+   * Deep admin routes are preserved; root/CRM-shell routes return to portal. */
+  if (path.indexOf('/crm-admin') !== 0 && path !== '/login' && path.indexOf('/auth/') !== 0) {
+    window.location.replace('/crm-admin');
+    return;
+  }
 
   var CAMVELLA_CRM = 'https://app.camvella.com';
   var ARCVENA_CRM = 'https://app.arcvena.com';
@@ -25,9 +29,7 @@
       if (targetHost === 'www.camvella.com' || targetHost === 'camvella.com' || targetHost === 'app.camvella.com') return CAMVELLA_CRM;
       if (targetHost === 'www.arcvena.com' || targetHost === 'arcvena.com' || targetHost === 'app.arcvena.com' || targetHost === 'arcvena-com.link' || targetHost === 'www.arcvena-com.link') return ARCVENA_CRM;
       return url;
-    } catch (_) {
-      return url;
-    }
+    } catch (_) { return url; }
   }
 
   function productFromCard(el) {
@@ -45,28 +47,21 @@
     return product === 'camvella' ? CAMVELLA_CRM : product === 'arcvena' ? ARCVENA_CRM : null;
   }
 
-  /* Capture legacy Open actions before React/anchor navigation. */
   document.addEventListener('click', function (event) {
     var clickable = event.target && event.target.closest ? event.target.closest('a,button') : null;
     if (!clickable) return;
-
     var href = clickable.getAttribute && clickable.getAttribute('href');
     var direct = href ? normalized(href) : href;
     var label = (clickable.textContent || '').replace(/\s+/g, ' ').trim();
     var product = productFromCard(clickable);
     var forced = crmFor(product);
-
     if (direct && direct !== href) {
-      event.preventDefault();
-      event.stopPropagation();
+      event.preventDefault(); event.stopPropagation();
       if (event.stopImmediatePropagation) event.stopImmediatePropagation();
-      window.open(direct, '_blank', 'noopener,noreferrer');
-      return;
+      window.open(direct, '_blank', 'noopener,noreferrer'); return;
     }
-
     if (/^Open(?: CRM)?\s*→?$/i.test(label) && forced) {
-      event.preventDefault();
-      event.stopPropagation();
+      event.preventDefault(); event.stopPropagation();
       if (event.stopImmediatePropagation) event.stopImmediatePropagation();
       window.open(forced, '_blank', 'noopener,noreferrer');
     }
@@ -79,10 +74,7 @@
       if (!pattern.test(text)) continue;
       var card = nodes[i];
       for (var j = 0; j < 5 && card && card !== document.body; j++, card = card.parentElement) {
-        if (card.children && card.children.length > 0) {
-          card.style.display = 'none';
-          break;
-        }
+        if (card.children && card.children.length > 0) { card.style.display = 'none'; break; }
       }
     }
   }
@@ -98,23 +90,14 @@
       if (/^Open(?: CRM)?\s*→?$/i.test(label) && forced) newHref = forced;
       if (newHref && newHref !== oldHref) anchors[i].setAttribute('href', newHref);
     }
-
     removeResolvedAlert(/GSC deceptive pages review pending/i);
     removeResolvedAlert(/arcvena\.com DNS cutover not complete/i);
     removeResolvedAlert(/provision-org edge fn not yet deployed/i);
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', rewrite, { once: true });
-  } else {
-    rewrite();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', rewrite, { once: true });
+  else rewrite();
 
-  /* React renders cards asynchronously. Re-run briefly without a mutation loop. */
   var count = 0;
-  var timer = window.setInterval(function () {
-    rewrite();
-    count += 1;
-    if (count >= 20) window.clearInterval(timer);
-  }, 500);
+  var timer = window.setInterval(function () { rewrite(); count += 1; if (count >= 20) window.clearInterval(timer); }, 500);
 })();
