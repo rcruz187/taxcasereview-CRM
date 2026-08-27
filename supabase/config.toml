@@ -71,6 +71,13 @@ verify_jwt = false
 [functions.stripe-invoice-pay-confirm]
 verify_jwt = false
 
+# Cron-only reminder sweeps. pg_cron calls these server-to-server; they do not
+# have a browser/user JWT. Function bodies use service-role access internally.
+[functions.send-appointment-reminders]
+verify_jwt = false
+[functions.booking-reminders]
+verify_jwt = false
+
 [functions.trigger-workflow]
 verify_jwt = false
 [functions.sunbiz-search]
