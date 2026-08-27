@@ -312,14 +312,13 @@ function AdminGate() {
 
 function AuthRouter() {
   const { user, checking } = useApp()
+  const path = window.location.pathname
 
   // Public routes must render immediately — never block them on the auth check.
   // /book, /sign, /portal etc are anonymous; showing a spinner loses prospects.
   const publicPaths = ['/book', '/sign', '/portal', '/clockin', '/kiosk',
     '/employee', '/meet', '/screenshare', '/screenshare-host', '/financial-intake', '/organizer']
-  const isPublicPath = publicPaths.some(p =>
-    window.location.pathname.startsWith(p)
-  )
+  const isPublicPath = publicPaths.some(p => path.startsWith(p))
 
   if (checking && !isPublicPath) return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg)' }}>
@@ -327,17 +326,27 @@ function AuthRouter() {
     </div>
   )
 
+  // Kiosk and Employee Portal are public when opened directly without a CRM
+  // session, but when an authenticated user clicks them in the sidebar they
+  // must remain on the SAME outer wildcard route as every other CRM page.
+  // Keeping all authenticated sidebar navigation on one route branch prevents
+  // Shell/contexts from unmounting and remounting (the residual "almost like a
+  // refresh" behavior users could still see after the earlier routing fix).
+  const publicHrPage = !user && path === '/kiosk'
+    ? <Kiosk />
+    : !user && path === '/employee'
+      ? <EmployeePortal />
+      : null
+
   return (
     <Routes>
       <Route path="/impersonate" element={<ImpersonateGate />} />
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/auth/quickbooks-callback" element={<QuickBooksCallback />} />
-      <Route path="/kiosk" element={user ? <AdminGate /> : <Kiosk />} />
       <Route path="/book" element={<BookAppointment />} />
       <Route path="/book/manage/:token" element={<ManageBooking />} />
       <Route path="/clockin" element={<ClockIn />} />
-      <Route path="/employee" element={user ? <AdminGate /> : <EmployeePortal />} />
       <Route path="/sign/:id" element={<SignPage />} />
       <Route path="/meet/:id"          element={<MeetingRoom />} />
       <Route path="/screenshare"       element={<ScreenShareJoin />} />
@@ -352,12 +361,12 @@ function AuthRouter() {
           </Suspense>
         </RequireAuth>
       } />
-      <Route path="*" element={
+      <Route path="*" element={publicHrPage || (
         <RequireAuth>
           {/* romy@taxrescrm.net always goes to the admin portal */}
           <AdminGate />
         </RequireAuth>
-      } />
+      )} />
     </Routes>
   )
 }
