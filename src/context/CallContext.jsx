@@ -3,6 +3,7 @@ import { Relay } from '@signalwire/js'
 import { supabase } from '../lib/supabase'
 import { useApp } from './AppContext'
 import { playSound, playRing, stopRingAudio, playRingback, stopRingback } from '../lib/notifySound'
+import { advanceLeadStatus } from '../lib/leadStatus'
 
 // ──────────────────────────────────────────────────────────────────────
 // This used to live entirely inside Dialer.jsx. The problem: React
@@ -703,7 +704,10 @@ export function CallProvider({ children }) {
 
     if (active.entityType !== 'client') {
       if (logForm.outcome === 'Converted') {
-        await supabase.from('leads').update({ status: 'Consultation' }).eq('id', active.id)
+        // 'Converted' = call resulted in booking a consultation.
+        // Use advanceLeadStatus (forward-only) so a lead already further
+        // along in the pipeline is never regressed by logging a call.
+        await advanceLeadStatus(supabase, active.name, 'Consultation Scheduled')
       }
       if (logForm.outcome === 'Callback Requested') {
         await supabase.from('leads').update({ status: 'Contacted' }).eq('id', active.id)

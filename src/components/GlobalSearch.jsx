@@ -137,7 +137,7 @@ export default function GlobalSearch({ value, onChange }) {
       {showDropdown && (
         <div style={{
           position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 9999,
-          background: 'var(--surface)', border: '1px solid var(--br)',
+          background: 'var(--s2)', border: '1px solid var(--br)',
           borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.35)',
           maxHeight: 420, overflowY: 'auto',
         }}>
@@ -202,7 +202,7 @@ export default function GlobalSearch({ value, onChange }) {
 function Section({ label, children }) {
   return (
     <div>
-      <div style={{ padding: '8px 12px 4px', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', color: 'var(--t3)', textTransform: 'uppercase' }}>{label}</div>
+      <div style={{ padding: '8px 12px 4px', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', color: 'var(--t3)', textTransform: 'uppercase', background: 'var(--s2)' }}>{label}</div>
       {children}
     </div>
   )
