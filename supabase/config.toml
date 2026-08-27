@@ -167,5 +167,3 @@ verify_jwt = false
 [functions.trigger-site-rebuild]
 verify_jwt = false
 
-[functions.sw-diag]
-verify_jwt = false
