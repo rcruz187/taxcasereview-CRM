@@ -79,5 +79,27 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   </React.StrictMode>
 )
 
+// HR routes include both outer public routes (/kiosk, /employee) and inner CRM
+// routes. Production users reported that client-side transitions into this
+// mixed route group could leave a stale lazy-route shell until Ctrl+F5. Make
+// sidebar HR navigation perform a normal same-origin document navigation so
+// the destination always boots with the correct route graph and current deploy.
+// This is deliberately scoped to sidebar .nav-item links only; it changes no
+// auth, permissions, payroll/time-clock logic, or links elsewhere in the app.
+const HR_NAV_PATHS = new Set([
+  '/kiosk', '/employee', '/timeclock', '/timeoff', '/payroll', '/activity-report'
+])
+document.addEventListener('click', (event) => {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+  const link = event.target?.closest?.('a.nav-item[href]')
+  if (!link) return
+  try {
+    const url = new URL(link.href, window.location.href)
+    if (url.origin !== window.location.origin || !HR_NAV_PATHS.has(url.pathname)) return
+    event.preventDefault()
+    window.location.assign(url.href)
+  } catch (_) {}
+}, true)
+
 // Register service worker to ensure all users always get fresh deploys
 // service worker removed
