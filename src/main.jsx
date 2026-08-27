@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom/client'
 import './index.css'
 import './theme-scrollbars.css'
 import App from './App.jsx'
-import GlobalUiBridge from './components/GlobalUiBridge.jsx'
 
 // Apply saved brand color instantly — before React renders (no flash)
 ;(function() {
@@ -53,7 +52,6 @@ import GlobalUiBridge from './components/GlobalUiBridge.jsx'
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />
-    <GlobalUiBridge />
   </React.StrictMode>
 )
 
