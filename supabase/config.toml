@@ -1,190 +1,132 @@
 project_id = "mpxgxfqdbquzkrvvejkh"
 
-# These three are called directly BY SignalWire (not by your logged-in app),
-# so they can never carry a Supabase login token. JWT verification must stay
-# off for all three or SignalWire's webhooks get rejected before your code
-# even runs.
+# SignalWire/provider callbacks — external services call these directly.
 [functions.receive-call]
 verify_jwt = false
-
 [functions.call-recorded]
 verify_jwt = false
-
 [functions.receive-sms]
-verify_jwt = false
-
-[functions.trigger-workflow]
 verify_jwt = false
 [functions.receive-fax]
 verify_jwt = false
-
-# Same deal — these three are the IVR/conference-hold chain, all called
-# directly BY SignalWire (auto-attendant digit routing, voicemail prompt
-# playback, and the no-answer-redirect-to-voicemail timeout). None of these
-# can carry a Supabase login token either.
+[functions.caller-hangup]
+verify_jwt = false
+[functions.conference-ended]
+verify_jwt = false
+[functions.hold-music]
+verify_jwt = false
 [functions.ivr-route]
 verify_jwt = false
-
+[functions.ivr-extension]
+verify_jwt = false
+[functions.join-conference]
+verify_jwt = false
+[functions.outbound-call-status]
+verify_jwt = false
+[functions.outbound-leg]
+verify_jwt = false
 [functions.voicemail-prompt]
 verify_jwt = false
-
+[functions.voicemail-recorded]
+verify_jwt = false
 [functions.redirect-to-voicemail]
 verify_jwt = false
 
-# Public FormaCorp name-check — called from the entity-formation wizard before
-# any auth context exists, so JWT verification must be off (like the other
-# public-facing endpoints above).
-[functions.sunbiz-search]
-verify_jwt = false
-
-# ── Public endpoints called WITHOUT a Supabase JWT ──────────────────────────
-# These are hit directly by external services (SignalWire call webhooks, the
-# Stripe payment webhook) or before a session exists (client portal login), so
-# they MUST have verify_jwt = false or the caller is rejected. Recorded here in
-# the repo so a deploy can never silently reset them again.
-[functions.caller-hangup]
-verify_jwt = false
-
-[functions.conference-ended]
-verify_jwt = false
-
-[functions.hold-music]
-verify_jwt = false
-
-[functions.ivr-extension]
-verify_jwt = false
-
-[functions.join-conference]
-verify_jwt = false
-
-[functions.log-call]
-verify_jwt = false
-
-[functions.outbound-call-status]
-verify_jwt = false
-
-[functions.outbound-leg]
-verify_jwt = false
-
-[functions.voicemail-recorded]
-verify_jwt = false
-
-[functions.stripe-checkout-webhook]
-verify_jwt = false
-
-[functions.portal-login]
-verify_jwt = false
-
-[functions.retention-purge]
-verify_jwt = false
-
-[functions.run-autopay-batch]
-verify_jwt = false
-
-[functions.gmail-sync-cron]
-verify_jwt = false
-
-[functions.quickbooks-oauth-callback]
-verify_jwt = false
-
-[functions.xero-oauth-callback]
-verify_jwt = false
-
-[functions.quickbooks-sync]
+# Browser phone-control endpoints — authenticated CRM staff only.
+[functions.signalwire-relay-token]
+verify_jwt = true
+[functions.start-outbound-call]
+verify_jwt = true
+[functions.end-conference]
+verify_jwt = true
+[functions.call-hold]
+verify_jwt = true
+[functions.call-transfer]
+verify_jwt = true
+[functions.call-add-participant]
 verify_jwt = true
 
+[functions.trigger-workflow]
+verify_jwt = false
+[functions.sunbiz-search]
+verify_jwt = false
+[functions.log-call]
+verify_jwt = false
+[functions.stripe-checkout-webhook]
+verify_jwt = false
+[functions.portal-login]
+verify_jwt = false
+[functions.portal-action]
+verify_jwt = false
+[functions.organizer-action]
+verify_jwt = false
+[functions.retention-purge]
+verify_jwt = false
+[functions.run-autopay-batch]
+verify_jwt = false
+[functions.gmail-sync-cron]
+verify_jwt = false
+[functions.quickbooks-oauth-callback]
+verify_jwt = false
+[functions.xero-oauth-callback]
+verify_jwt = false
+[functions.quickbooks-sync]
+verify_jwt = true
 [functions.xero-sync]
 verify_jwt = true
 [functions.ga4-sync]
 verify_jwt = true
-
 [functions.linkedin-publish]
 verify_jwt = true
-
 [functions.m365-oauth-callback]
 verify_jwt = false
-
 [functions.m365-sync]
 verify_jwt = true
-
 [functions.slack-events]
 verify_jwt = false
-
 [functions.slack-send]
 verify_jwt = true
-
 [functions.slack-import]
 verify_jwt = true
 [functions.call-ai-summary]
 verify_jwt = false
-
 [functions.ai-chat]
 verify_jwt = true
-
 [functions.esign-reminders]
 verify_jwt = false
-
-# Public — called by unauthenticated screenshare participants to get TURN creds
 [functions.turn-credentials]
 verify_jwt = false
-
-# Platform metrics push — runs nightly, service-role only
 [functions.push-platform-metrics]
 verify_jwt = false
-
 [functions.platform-metrics]
 verify_jwt = false
-
 [functions.demo-followup]
 verify_jwt = false
-
 [functions.linkedin-scheduler]
 verify_jwt = false
-
 [functions.daily-briefing]
 verify_jwt = false
-
 [functions.gsc-data]
 verify_jwt = false
-
 [functions.bing-data]
 verify_jwt = false
-
 [functions.content-generator]
 verify_jwt = false
-
 [functions.weekly-growth-report]
 verify_jwt = false
-
 [functions.gsc-sync]
 verify_jwt = false
-
-# RomyLabs central support endpoint — server-to-server callers authenticate
-# with timestamped HMAC signatures inside the function, not Supabase JWTs.
 [functions.support-api]
 verify_jwt = false
-
 [functions.trigger-site-rebuild]
 verify_jwt = false
-
-# RomyLabs SaaS billing endpoints use dedicated high-entropy server-side secrets
-# inside each function. They are invoked by cron/payment adapters/server-to-server
-# product calls, not by browser Supabase sessions.
 [functions.romylabs-billing-cycle]
 verify_jwt = false
-
 [functions.romylabs-billing-notify]
 verify_jwt = false
-
 [functions.romylabs-billing-payment]
 verify_jwt = false
-
 [functions.romylabs-billing-enforce]
 verify_jwt = false
-
-# Production is currently at its Edge Function slot limit. The already-closed
-# temporary GitHub credential-check slot is safely repurposed as the consolidated
-# RomyLabs billing runtime until capacity is expanded. It performs its own
-# cron/webhook/entitlement-secret authentication.
 [functions.github-credential-check-temp]
 verify_jwt = false
