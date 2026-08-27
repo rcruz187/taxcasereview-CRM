@@ -1,6 +1,21 @@
-/* RomyLabs admin production guard — admin.romylabs.com only. */
+/* RomyLabs admin production guard. Keep admin traffic on the canonical host and
+ * protect the CRM reporting tab from the legacy conditional-hook crash until
+ * the tab state is fully lifted into CommandCenter. */
 (function () {
-  if (window.location.hostname !== 'admin.romylabs.com') return;
+  var host = window.location.hostname.toLowerCase();
+
+  /* /crm-admin belongs to the RomyLabs admin host. This also repairs stale
+   * Chrome bookmarks/sessions that land on taxrescrm.app/crm-admin. */
+  if ((host === 'taxrescrm.app' || host === 'www.taxrescrm.app') &&
+      window.location.pathname.indexOf('/crm-admin') === 0) {
+    window.location.replace(
+      'https://admin.romylabs.com' + window.location.pathname +
+      window.location.search + window.location.hash
+    );
+    return;
+  }
+
+  if (host !== 'admin.romylabs.com') return;
 
   var CAMVELLA_CRM = 'https://app.camvella.com';
   var ARCVENA_CRM = 'https://app.arcvena.com';
@@ -8,9 +23,9 @@
   function normalized(url) {
     try {
       var u = new URL(url, window.location.href);
-      var host = u.hostname.toLowerCase();
-      if (host === 'www.camvella.com' || host === 'camvella.com' || host === 'app.camvella.com') return CAMVELLA_CRM;
-      if (host === 'www.arcvena.com' || host === 'arcvena.com' || host === 'app.arcvena.com' || host === 'arcvena-com.link' || host === 'www.arcvena-com.link') return ARCVENA_CRM;
+      var targetHost = u.hostname.toLowerCase();
+      if (targetHost === 'www.camvella.com' || targetHost === 'camvella.com' || targetHost === 'app.camvella.com') return CAMVELLA_CRM;
+      if (targetHost === 'www.arcvena.com' || targetHost === 'arcvena.com' || targetHost === 'app.arcvena.com' || targetHost === 'arcvena-com.link' || targetHost === 'www.arcvena-com.link') return ARCVENA_CRM;
       return url;
     } catch (_) {
       return url;
@@ -42,6 +57,22 @@
     var label = (clickable.textContent || '').replace(/\s+/g, ' ').trim();
     var product = productFromCard(clickable);
     var forced = crmFor(product);
+
+    /* The CRM reporting view currently contains a state hook inside a
+     * tab-conditional render. Switching to it client-side changes hook order
+     * and can crash CommandCenter. A document navigation makes CRM the initial
+     * tab so hook order stays stable and the portal remains usable. */
+    if (label === 'CRM' && window.location.pathname.indexOf('/crm-admin') === 0) {
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('tab') !== 'crm') {
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+        params.set('tab', 'crm');
+        window.location.assign(window.location.pathname + '?' + params.toString());
+        return;
+      }
+    }
 
     if (direct && direct !== href) {
       event.preventDefault();
