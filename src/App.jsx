@@ -145,10 +145,10 @@ function Guard({ section, children }) {
         height: '60vh', gap: 16, color: 'var(--t3)', textAlign: 'center', padding: 32
       }}>
         <div style={{ fontSize: 48 }}>⭐</div>
-        <div style={{ fontWeight: 800, fontSize: 20, color: 'var(--tx)' }}>
+        <div style={{ fontWeight: 800, fontSize: 20, color:'var(--tx)' }}>
           {requiredTier.charAt(0).toUpperCase() + requiredTier.slice(1)} Plan Required
         </div>
-        <div style={{ fontSize: 14, color: 'var(--t2)', maxWidth: 340, lineHeight: 1.6 }}>
+        <div style={{ fontSize:14, color:'var(--t2)', maxWidth:340, lineHeight:1.6 }}>
           This feature requires the <strong>{requiredTier.charAt(0).toUpperCase() + requiredTier.slice(1)}</strong> plan.
           Contact <strong>romy@taxrescrm.net</strong> to upgrade.
         </div>
@@ -158,14 +158,14 @@ function Guard({ section, children }) {
   if (!can('view', section)) {
     return (
       <div style={{
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        height: '60vh', gap: 12, color: 'var(--t3)'
+        display:'flex', flexDirection:'column',
+        alignItems:'center', justifyContent:'center',
+        height:'60vh', gap:12, color:'var(--t3)'
       }}>
-        <div style={{ fontSize: 40 }}>🔒</div>
-        <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--tx)' }}>Access Restricted</div>
-        <div style={{ fontSize: 13 }}>You don't have permission to view this page.</div>
-        <div style={{ fontSize: 12 }}>Contact Romy Cruz to request access.</div>
+        <div style={{ fontSize:40 }}>🔒</div>
+        <div style={{ fontWeight:700, fontSize:16, color:'var(--tx)' }}>Access Restricted</div>
+        <div style={{ fontSize:13 }}>You don't have permission to view this page.</div>
+        <div style={{ fontSize:12 }}>Contact Romy Cruz to request access.</div>
       </div>
     )
   }
@@ -236,6 +236,8 @@ function Shell() {
             <Route path="/email"       element={<Guard section="email"><Email /></Guard>} />
             <Route path="/documents"   element={<Guard section="documents"><Documents /></Guard>} />
             <Route path="/esign"       element={<Guard section="esign"><Esign /></Guard>} />
+            <Route path="/kiosk"       element={<Kiosk />} />
+            <Route path="/employee"    element={<EmployeePortal />} />
             <Route path="/timeclock"   element={<TimeClock />} />
             <Route path="/payroll"     element={<Guard section="payroll"><Payroll /></Guard>} />
             <Route path="/timeoff"     element={<Guard section="timeoff"><TimeOff /></Guard>} />
@@ -263,10 +265,10 @@ function Shell() {
       </div>
       {!realtimeOk && (
         <div style={{
-          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999,
-          background: '#f59e0b', color: '#1c1917', padding: '8px 16px',
-          fontSize: 12, fontWeight: 700, textAlign: 'center', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', gap: 8,
+          position:'fixed', bottom:0, left:0, right:0, zIndex:9999,
+          background:'#f59e0b', color:'#1c1917', padding:'8px 16px',
+          fontSize:12, fontWeight:700, textAlign:'center', display:'flex',
+          alignItems:'center', justifyContent:'center', gap:8,
         }}>
           ⚠️ Connection interrupted — real-time updates paused. Reconnecting...
         </div>
@@ -330,12 +332,12 @@ function AuthRouter() {
       <Route path="/impersonate" element={<ImpersonateGate />} />
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
-              <Route path="/auth/quickbooks-callback" element={<QuickBooksCallback />} />
-      <Route path="/kiosk" element={<Kiosk />} />
+      <Route path="/auth/quickbooks-callback" element={<QuickBooksCallback />} />
+      <Route path="/kiosk" element={user ? <AdminGate /> : <Kiosk />} />
       <Route path="/book" element={<BookAppointment />} />
       <Route path="/book/manage/:token" element={<ManageBooking />} />
       <Route path="/clockin" element={<ClockIn />} />
-      <Route path="/employee" element={<EmployeePortal />} />
+      <Route path="/employee" element={user ? <AdminGate /> : <EmployeePortal />} />
       <Route path="/sign/:id" element={<SignPage />} />
       <Route path="/meet/:id"          element={<MeetingRoom />} />
       <Route path="/screenshare"       element={<ScreenShareJoin />} />
@@ -389,4 +391,3 @@ export default function App() {
     </AppProvider>
   )
 }
-
