@@ -49,6 +49,10 @@ verify_jwt = true
 # Staff-only payment control endpoints.
 [functions.stripe-setup-intent]
 verify_jwt = true
+[functions.stripe-create-checkout-session]
+verify_jwt = true
+[functions.stripe-create-subscription]
+verify_jwt = true
 [functions.run-autopay-batch]
 verify_jwt = true
 
