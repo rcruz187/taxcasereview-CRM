@@ -2,13 +2,7 @@
 // Handles the STANDALONE Tax Organizer link (OrganizerPage.jsx, and the
 // same wizard embedded in the Client Portal) — reached via a direct link
 // containing only the organizer's own row id, with no separate login.
-// That's a legitimate "unguessable share link" security model (the id is
-// a random UUID), same as a Google Doc share link — but it means this
-// function is the only thing standing between "anyone with the link" and
-// "anyone at all", so it deliberately never returns or accepts anything
-// beyond this one specific organizer record.
-//
-// JWT Verification must be OFF — this has no login step at all by design.
+// JWT Verification must be OFF — this has no login step by design.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -17,6 +11,7 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+const ARCHIVE_URL_TTL_SECONDS = 60 * 60 * 24 * 365 * 3
 
 function ok(data: any) {
   return new Response(JSON.stringify({ ok: true, ...data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -72,16 +67,17 @@ serve(async (req) => {
         const path = `organizer/${safeClient}/${taxYear || 'na'}/${Date.now()}-${fileName}`
         const { error: upErr } = await supabase.storage.from('documents').upload(path, bytes, { upsert: true, contentType: fileType || 'application/octet-stream' })
         if (upErr) throw upErr
-        const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+        const { data: signedData, error: signErr } = await supabase.storage.from('documents').createSignedUrl(path, ARCHIVE_URL_TTL_SECONDS)
+        if (signErr || !signedData?.signedUrl) throw signErr || new Error('Could not create secure organizer document URL')
 
         const { error } = await supabase.from('documents').insert([{
           name: fileName, client: clientName || '', docType: 'Tax Organizer',
           notes: `Uploaded via Tax Organizer (${taxYear || ''})`,
-          file_url: urlData.publicUrl, file_name: fileName, file_size: bytes.length,
+          file_url: signedData.signedUrl, file_name: fileName, file_size: bytes.length,
           created_at: new Date().toISOString(),
         }])
         if (error) throw error
-        return ok({ url: urlData.publicUrl })
+        return ok({ url: signedData.signedUrl })
       }
 
       default:
