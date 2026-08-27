@@ -235,16 +235,16 @@ export default function SignPage() {
         const path = `docs/${safeName}/signed/${att.formType}_signed.pdf`
         await supabase.storage.from('documents')
           .upload(path, new Blob([signedBytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
-        const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+        const { data: urlData } = await supabase.storage.from('documents').createSignedUrl(path, 94608000)
 
         const clientPath = `docs/${safeName}/signed/${att.formType}_client_copy.pdf`
         await supabase.storage.from('documents')
           .upload(clientPath, new Blob([clientBytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
-        const { data: clientUrlData } = supabase.storage.from('documents').getPublicUrl(clientPath)
+        const { data: clientUrlData } = await supabase.storage.from('documents').createSignedUrl(clientPath, 94608000)
 
         signedAttachments.push({
           formType: att.formType, label: att.label,
-          url: urlData.publicUrl, clientUrl: clientUrlData?.publicUrl,
+          url: urlData?.signedUrl || '', clientUrl: clientUrlData?.signedUrl || '',
           fileSize: signedBytes.byteLength,
           folder: SIGNED_DOC_FOLDER[att.formType] || null,
         })
@@ -260,8 +260,8 @@ export default function SignPage() {
       await supabase.storage.from('documents')
         .upload(certPath, new Blob([certBytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
         .catch(() => {})
-      const { data: certUrlData } = supabase.storage.from('documents').getPublicUrl(certPath)
-      certUrl = certUrlData?.publicUrl || null
+      const { data: certUrlData } = await supabase.storage.from('documents').createSignedUrl(certPath, 94608000)
+      certUrl = certUrlData?.signedUrl || null
     }
 
     // Everything that used to be scattered leads/tasks/lead_notes/

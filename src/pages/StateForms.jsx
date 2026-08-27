@@ -175,8 +175,8 @@ export default function StateForms() {
         .upload(path, pdfBlob, { upsert: true, contentType: 'application/pdf' })
       if (upErr) throw new Error(upErr.message)
 
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
-      const pdfUrl = urlData.publicUrl
+      const { data: urlData } = await supabase.storage.from('documents').createSignedUrl(path, 94608000)
+      const pdfUrl = urlData?.signedUrl || ''
 
       // Create esign record
       const { data: esign, error: esignErr } = await supabase.from('esigns').insert([{

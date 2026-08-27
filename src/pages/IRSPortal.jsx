@@ -175,8 +175,8 @@ export default function IRSPortal() {
     const path = `poa/${(poaForm.clientName || 'unknown').replace(/[^A-Za-z0-9 _-]/g, '')}/${Date.now()}-${file.name}`
     const { error } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
     if (error) { alert('Upload failed: ' + error.message); return }
-    const { data: u } = supabase.storage.from('documents').getPublicUrl(path)
-    pf('fileUrl', u?.publicUrl || '')
+    const { data: u } = await supabase.storage.from('documents').createSignedUrl(path, 94608000)
+    pf('fileUrl', u?.signedUrl || '')
   }
 
   async function deletePoa(id) {

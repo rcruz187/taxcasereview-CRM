@@ -197,7 +197,7 @@ function LeadInlineFax({ lead, onClose, onLogged }) {
     set3(true)
     const s = await getSettings()
     let fileUrl=null
-    if(file){const path='fax/'+Date.now()+'_'+file.name;await supabase.storage.from('documents').upload(path,file,{upsert:true});const{data:u}=supabase.storage.from('documents').getPublicUrl(path);fileUrl=u?.publicUrl}
+    if(file){const path='fax/'+Date.now()+'_'+file.name;await supabase.storage.from('documents').upload(path,file,{upsert:true});const{data:u}=await supabase.storage.from('documents').createSignedUrl(path,3600);fileUrl=u?.signedUrl||null}
     const toFull='+1'+toNum.slice(-10)
     const fromNum=s?.sw_inbound_did||''
     let sent=false
@@ -257,8 +257,8 @@ function LeadInlineEsign({ lead, onClose }) {
         const path=`esign-custom/${(lead?.name||'lead').replace(/[^A-Za-z0-9 _-]/g,'')}/${Date.now()}-${customFile.name}`
         const{error:upErr}=await supabase.storage.from('documents').upload(path,customFile,{upsert:true})
         if(!upErr){
-          const{data:u}=supabase.storage.from('documents').getPublicUrl(path)
-          pdfAttachments=[{formType:'custom',label:customFile.name,url:u?.publicUrl}]
+          const{data:u}=await supabase.storage.from('documents').createSignedUrl(path,94608000)
+          pdfAttachments=[{formType:'custom',label:customFile.name,url:u?.signedUrl||''}]
         }
       }catch(e){console.error('custom upload:',e)}
       setUploading(false)
@@ -754,9 +754,9 @@ export default function Leads() {
         const path = `docs/${safeName}/state-poa/${formDef.state}_POA${suffix}_${stamp}.pdf`
         const { error: upErr } = await supabase.storage.from('documents').upload(path, pdfBlob, { upsert:true, contentType:'application/pdf' })
         if (upErr) throw new Error(upErr.message)
-        const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+        const { data: urlData } = await supabase.storage.from('documents').createSignedUrl(path, 94608000)
         const partyLabel = parties.length > 1 ? ` (${party==='business'?'Business':'Personal'})` : ''
-        poaAttachments.push({ formType:`state_poa${suffix}`, label:`${formDef.state} POA — ${formDef.label}${partyLabel}`, url:urlData.publicUrl })
+        poaAttachments.push({ formType:`state_poa${suffix}`, label:`${formDef.state} POA — ${formDef.label}${partyLabel}`, url:urlData?.signedUrl||'' })
       }
       const { data: esign, error: esignErr } = await supabase.from('esigns').insert([{
         doc_type: `State POA — ${formDef.state} (${formDef.num})`,
@@ -1649,10 +1649,10 @@ export default function Leads() {
             const { error: upErr } = await supabase.storage.from('documents')
               .upload(path, new Blob([pdfBytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
             if (!upErr) {
-              const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+              const { data: urlData } = await supabase.storage.from('documents').createSignedUrl(path, 94608000)
               await supabase.from('documents').insert([{
                 client: l.name, name: 'Financial Intake', docType: 'Financial Statements',
-                file_url: urlData.publicUrl, file_name: 'Financial Intake.pdf',
+                file_url: urlData?.signedUrl || '', file_name: 'Financial Intake.pdf',
                 notes: `Submitted ${existingIntake.submitted_at ? new Date(existingIntake.submitted_at).toLocaleDateString() : ''}`,
                 created_at: new Date().toISOString(),
               }])

@@ -103,7 +103,7 @@ export default function IRSFormFiller({ client, onClose }) {
         .upload(path, blob, { upsert: true, contentType: 'application/pdf' });
       if (upErr) throw new Error(upErr.message);
 
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path);
+      const { data: urlData } = await supabase.storage.from('documents').createSignedUrl(path, 94608000);
       const label = FORM_LABELS[formType] || formType;
 
       const { data: esign, error: esignErr } = await supabase.from('esigns').insert([{
@@ -112,7 +112,7 @@ export default function IRSFormFiller({ client, onClose }) {
         client_email: client.email || '',
         client_phone: client.phone || '',
         message: `Please review and sign your ${label}.`,
-        pdf_attachments: [{ formType, label, url: urlData.publicUrl }],
+        pdf_attachments: [{ formType, label, url: urlData?.signedUrl || '' }],
         priority: 'Normal',
         status: 'Awaiting',
         sent_at: new Date().toISOString(),

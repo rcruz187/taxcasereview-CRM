@@ -283,10 +283,10 @@ export default function Employees() {
       const path = `docs/${form.name.replace(/\s+/g,'-')}/${Date.now()}_${file.name}`
       const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
       if (!upErr) {
-        const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+        const { data: urlData } = await supabase.storage.from('documents').createSignedUrl(path, 94608000)
         const { data: inserted, error: insErr } = await supabase.from('documents').insert([{
           name: file.name, employee: form.name, docType: nextDocLabel,
-          file_url: urlData.publicUrl, file_name: file.name, file_size: file.size,
+          file_url: urlData?.signedUrl || '', file_name: file.name, file_size: file.size,
           created_at: new Date().toISOString()
         }]).select().single()
         if (!insErr && inserted) setEmpDocs(prev => [inserted, ...prev])

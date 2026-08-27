@@ -235,11 +235,11 @@ export default function Email() {
       const path = `docs/${targetName.replace(/\s+/g,'-')}/${Date.now()}_${att.filename}`
       const { error: upErr } = await supabase.storage.from('documents').upload(path, blob, { upsert: true, contentType: att.mimeType })
       if (upErr) throw upErr
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+      const { data: urlData } = await supabase.storage.from('documents').createSignedUrl(path, 94608000)
       const { error } = await supabase.from('documents').insert([{
         name: att.filename, client: targetName, docType: folder || 'Correspondence',
         notes: `Received via email from ${email.recipient || email.clientName || 'unknown sender'} on ${email.created_at ? new Date(email.created_at).toLocaleString() : 'unknown date'}`,
-        file_url: urlData.publicUrl, file_name: att.filename, file_size: att.size || null,
+        file_url: urlData?.signedUrl || '', file_name: att.filename, file_size: att.size || null,
         created_at: new Date().toISOString(),
       }])
       if (error) throw error

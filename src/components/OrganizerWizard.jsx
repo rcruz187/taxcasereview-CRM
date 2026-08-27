@@ -60,11 +60,11 @@ export default function OrganizerWizard({ organizerId, embedded = false, onCompl
       const path = `organizer-docs/${organizerId}/${Date.now()}_${file.name}`
       const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
       if (upErr) throw upErr
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+      const { data: urlData } = await supabase.storage.from('documents').createSignedUrl(path, 94608000)
       if (entryIdx !== null) {
-        updateEntry(questionId, entryIdx, '_uploadUrl', urlData.publicUrl)
+        updateEntry(questionId, entryIdx, '_uploadUrl', urlData?.signedUrl || '')
       } else {
-        setAnswer(questionId, urlData.publicUrl)
+        setAnswer(questionId, urlData?.signedUrl || '')
       }
     } catch (e) {
       setError('Upload failed: ' + e.message)

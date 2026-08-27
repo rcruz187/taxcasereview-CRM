@@ -1589,12 +1589,12 @@ export default function Clients() {
       const path = `docs/${safeName}/state-poa/${formDef.state}_POA_${Date.now()}.pdf`
       const { error: upErr } = await supabase.storage.from('documents').upload(path, pdfBlob, { upsert:true, contentType:'application/pdf' })
       if (upErr) throw new Error(upErr.message)
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+      const { data: urlData } = await supabase.storage.from('documents').createSignedUrl(path, 94608000)
       const { data: esign, error: esignErr } = await supabase.from('esigns').insert([{
         doc_type: `State POA — ${formDef.state} (${formDef.num})`,
         client_name: client.name, client_email: client.email||'', client_phone: client.phone||'',
         message: `Please review and sign your ${formDef.state} Power of Attorney. This authorizes ${FIRM.name || 'Tax Case Review'} to represent you before the ${formDef.state} tax authority.`,
-        pdf_attachments: [{ formType:'state_poa', label:`${formDef.state} POA — ${formDef.label}`, url:urlData.publicUrl }],
+        pdf_attachments: [{ formType:'state_poa', label:`${formDef.state} POA — ${formDef.label}`, url:urlData?.signedUrl || '' }],
         priority:'Normal', status:'Awaiting', sent_at:new Date().toISOString(), created_at:new Date().toISOString(), sent_by:actor,
       }]).select().single()
       if (esignErr) throw new Error(esignErr.message)

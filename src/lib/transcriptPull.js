@@ -117,8 +117,8 @@ export async function storeTranscriptAnalysis(file, clientName, a) {
     filePath = `transcripts/${clientName.trim().replace(/[^A-Za-z0-9 _-]/g, '')}/${Date.now()}-${file.name}`
     const { error: upErr } = await supabase.storage.from('documents').upload(filePath, file, { upsert: true })
     if (!upErr) {
-      const { data: u } = supabase.storage.from('documents').getPublicUrl(filePath)
-      fileUrl = u?.publicUrl || null
+      const { data: u } = await supabase.storage.from('documents').createSignedUrl(filePath, 94608000)
+      fileUrl = u?.signedUrl || null
     }
   } catch { /* analysis still saves without the file */ }
 

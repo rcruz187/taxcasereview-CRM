@@ -1092,8 +1092,8 @@ export async function sendFullPackage(client, supabase) {
     const { error: agErr } = await supabase.storage.from('documents')
       .upload(agreementPath, new Blob([agreementBytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
     if (agErr) throw agErr
-    const { data: agUrl } = supabase.storage.from('documents').getPublicUrl(agreementPath)
-    pdfAttachments.push({ formType: 'agreement', label: 'Tax Service Agreement', url: agUrl.publicUrl })
+    const { data: agUrl } = await supabase.storage.from('documents').createSignedUrl(agreementPath, 94608000)
+    pdfAttachments.push({ formType: 'agreement', label: 'Tax Service Agreement', url: agUrl?.signedUrl || '' })
   } catch (e) {
     console.warn('Agreement PDF could not be generated:', e.message)
   }
@@ -1108,8 +1108,8 @@ export async function sendFullPackage(client, supabase) {
       const { error: upErr } = await supabase.storage.from('documents')
         .upload(path, new Blob([bytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
       if (upErr) throw upErr
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
-      pdfAttachments.push({ formType, label: FORM_LABELS[formType], url: urlData.publicUrl })
+      const { data: urlData } = await supabase.storage.from('documents').createSignedUrl(path, 94608000)
+      pdfAttachments.push({ formType, label: FORM_LABELS[formType], url: urlData?.signedUrl || '' })
     } catch (e) {
       return { error: `Failed to build ${FORM_LABELS[formType] || formType}: ${e.message}` }
     }
@@ -1139,14 +1139,14 @@ export async function sendFullPackage(client, supabase) {
         const { error: upErr } = await supabase.storage.from('documents')
           .upload(path, new Blob([mergedBytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
         if (upErr) throw upErr
-        const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+        const { data: urlData } = await supabase.storage.from('documents').createSignedUrl(path, 94608000)
         const partyLabel = stateParties.length > 1
           ? ` (${party === 'business' ? 'Business' : 'Personal'})`
           : ''
         pdfAttachments.push({
           formType: `state_poa${suffix}`,
           label: `${clientState} State Power of Attorney${partyLabel}`,
-          url: urlData.publicUrl,
+          url: urlData?.signedUrl || '',
         })
       } catch (e) {
         console.warn(`State POA auto-include failed (${party}):`, e.message)
@@ -1193,8 +1193,8 @@ export async function sendAddendumForSignature(record, opts, supabase, sentBy) {
   const { error: upErr } = await supabase.storage.from('documents')
     .upload(path, new Blob([bytes], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' })
   if (upErr) return { error: upErr.message }
-  const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
-  const pdfAttachments = [{ formType: 'addendum', label: 'Service Addendum', url: urlData.publicUrl }]
+  const { data: urlData } = await supabase.storage.from('documents').createSignedUrl(path, 94608000)
+  const pdfAttachments = [{ formType: 'addendum', label: 'Service Addendum', url: urlData?.signedUrl || '' }]
 
   const { data, error } = await supabase.from('esigns').insert([{
     doc_type: 'Service Addendum',

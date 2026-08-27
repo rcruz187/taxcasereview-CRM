@@ -437,10 +437,10 @@ export default function Chat() {
     const path = `chat/${Date.now()}_${file.name}`
     const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
     if (upErr) { alert('Upload failed: ' + upErr.message); return }
-    const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+    const { data: urlData } = await supabase.storage.from('documents').createSignedUrl(path, 94608000)
     await supabase.from('chat_messages').insert([{
       channel: channelId, sender: myName, text: null,
-      attachment_url: urlData.publicUrl, attachment_name: file.name,
+      attachment_url: urlData?.signedUrl || '', attachment_name: file.name,
       created_at: new Date().toISOString()
     }])
     loadMessages(true); e.target.value = ''

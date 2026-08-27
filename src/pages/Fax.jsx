@@ -133,8 +133,8 @@ export default function Fax() {
         const path = `fax/${Date.now()}_${file.name}`
         const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
         if (upErr) throw new Error('Upload failed: ' + upErr.message)
-        const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
-        mediaUrl = urlData.publicUrl
+        const { data: urlData } = await supabase.storage.from('documents').createSignedUrl(path, 3600)
+        mediaUrl = urlData?.signedUrl || ''
       }
 
       const toNum   = '+1' + form.to_number.replace(/\D/g,'').slice(-10)

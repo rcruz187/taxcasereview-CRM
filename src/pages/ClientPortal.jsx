@@ -279,10 +279,10 @@ export default function ClientPortal() {
       const path = `docs/${client.name.replace(/\s+/g, '-')}/${Date.now()}_${file.name}`
       const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
       if (upErr) throw upErr
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+      const { data: urlData } = await supabase.storage.from('documents').createSignedUrl(path, 94608000)
       const { error } = await supabase.rpc('portal_action_upload_document', {
         p_token: portalToken, p_file_name: file.name, p_doc_type: uploadFolder,
-        p_file_url: urlData.publicUrl, p_file_size: file.size,
+        p_file_url: urlData?.signedUrl || '', p_file_size: file.size,
       })
       if (error) throw error
       const { data } = await supabase.rpc('portal_get_data', { p_token: portalToken })
