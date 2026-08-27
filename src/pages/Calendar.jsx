@@ -26,6 +26,20 @@ const COLOR_MAP = {
 const DAYS  = ['SUN','MON','TUE','WED','THU','FRI','SAT']
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
+const PRODUCT_IDENTITIES = {
+  taxres_crm: { label: 'TaxRes CRM', logo: '/taxrescrm-favicon.png' },
+  romylabs:   { label: 'RomyLabs',   logo: '/romylabs-favicon-32.png' },
+  camvella:   { label: 'Camvella',   logo: '/camvella-logo.svg' },
+  arcvena:    { label: 'Arcvena',    logo: '/arcvena-favicon-64.png' },
+  bocasync:   { label: 'BocaSync',   logo: '/bocasync-logo.svg' },
+}
+
+function productIdentity(ev) {
+  if (ev?.product_id && PRODUCT_IDENTITIES[ev.product_id]) return PRODUCT_IDENTITIES[ev.product_id]
+  const label = (ev?.title || '').match(/^\[([^\]]+)\]/)?.[1]
+  return Object.values(PRODUCT_IDENTITIES).find(product => product.label === label) || null
+}
+
 function fmtTime(d) {
   if (!d) return ''
   // Handle HH:MM format
@@ -317,13 +331,17 @@ export default function Calendar() {
 
   const EventPill = ({ ev, onClick }) => {
     const sc = scOf(ev)
+    const identity = productIdentity(ev)
     return (
       <div onClick={e => { e.stopPropagation(); onClick() }} data-cal-event
         style={{ background: sc.bg, borderLeft: `3px solid ${sc.border}`, borderRadius: 4, padding: '3px 6px', marginBottom: 2, cursor: 'pointer', overflow: 'hidden' }}>
-        <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: sc.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {ev.time && <span style={{ opacity: .7 }}>{fmtTime(ev.time)} </span>}
-          {ev._isDl ? '⏰ ' : ''}{ev.clientName || ev.title}
-        </p>
+        <div style={{ display:'flex', alignItems:'center', gap:4, minWidth:0 }}>
+          {identity?.logo && <img src={identity.logo} alt="" aria-hidden="true" style={{ width:13, height:13, objectFit:'contain', borderRadius:3, flexShrink:0 }} />}
+          <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: sc.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {ev.time && <span style={{ opacity: .7 }}>{fmtTime(ev.time)} </span>}
+            {identity ? `${identity.label} · ` : ''}{ev._isDl ? '⏰ ' : ''}{ev.clientName || ev.title}
+          </p>
+        </div>
       </div>
     )
   }
@@ -331,6 +349,7 @@ export default function Calendar() {
   // ── EVENT DETAIL PANEL ──
   if (selectedEvent) {
     const sc = scOf(selectedEvent)
+    const identity = productIdentity(selectedEvent)
     return (
       <div style={{ padding: '1.5rem', background: 'var(--bg)', minHeight: '100%' }}>
         {toast && <div style={{ position: 'fixed', bottom: 24, right: 24, background: '#16a34a', color: '#fff', padding: '12px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 999 }}>{toast}</div>}
@@ -341,6 +360,12 @@ export default function Calendar() {
             <span style={{ background: sc.bg, color: sc.text, border: `1px solid ${sc.border}`, padding: '3px 10px', borderRadius: 99, fontSize: 11, fontWeight: 700, textTransform: 'capitalize', marginBottom: 8, display: 'inline-block' }}>
               {(selectedEvent.status || 'scheduled').replace('_', ' ')}
             </span>
+            {identity && (
+              <div style={{ display:'flex', alignItems:'center', gap:6, margin:'6px 0' }}>
+                <img src={identity.logo} alt="" aria-hidden="true" style={{ width:20, height:20, objectFit:'contain', borderRadius:4 }} />
+                <span style={{ fontSize:11, fontWeight:800, color:'var(--t2)', textTransform:'uppercase', letterSpacing:'.05em' }}>{identity.label}</span>
+              </div>
+            )}
             <h1 style={{ margin: '6px 0 4px', fontSize: 22, fontWeight: 800, color: 'var(--tx)' }}>{selectedEvent.title}</h1>
             {selectedEvent.clientName && <p style={{ margin: 0, fontSize: 14, color: 'var(--t3)' }}>{selectedEvent.clientName}</p>}
           </div>

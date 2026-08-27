@@ -24,6 +24,17 @@
         var params = new URLSearchParams(window.location.search);
         var product = (params.get('product') || '').toLowerCase();
         var lang = (params.get('lang') || '').toLowerCase();
+        if (product === 'arcvena') {
+          document.title = 'Schedule an Arcvena Demo';
+          var arcvenaFavicon = document.getElementById('app-favicon');
+          var arcvenaApple = document.getElementById('app-apple-touch-icon');
+          if (arcvenaFavicon) {
+            arcvenaFavicon.type = 'image/png';
+            arcvenaFavicon.href = '/arcvena-favicon-64.png?v=20260827-1';
+          }
+          if (arcvenaApple) arcvenaApple.href = '/arcvena-favicon-64.png?v=20260827-1';
+        }
+
         if (product === 'bocasync') {
           document.title = lang === 'es' ? 'Agendar una Demo de BocaSync' : 'Schedule a BocaSync Demo';
           document.documentElement.lang = lang === 'es' ? 'es' : 'en';
