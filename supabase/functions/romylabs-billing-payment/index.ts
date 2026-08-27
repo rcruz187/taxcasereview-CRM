@@ -2,6 +2,17 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 
+async function enforce(url: string, secret: string, accountId: string, action: 'suspend'|'restore') {
+  const res = await fetch(`${url}/functions/v1/romylabs-billing-enforce`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-entitlement-secret': secret },
+    body: JSON.stringify({ account_id: accountId, action }),
+  })
+  const payload = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+  if (!res.ok || payload?.ok !== true) throw new Error(payload?.error || `Entitlement enforcement failed (${res.status})`)
+  return payload
+}
+
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
   const expected = Deno.env.get('ROMYLABS_BILLING_WEBHOOK_SECRET')
@@ -15,7 +26,8 @@ Deno.serve(async (req) => {
   }
   if (!['pending','succeeded','failed','refunded','partially_refunded'].includes(status)) return json({ error: 'Invalid status' }, 400)
 
-  const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
+  const url = Deno.env.get('SUPABASE_URL')!
+  const db = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
   let query = db.from('romylabs_invoices').select('*')
   query = invoice_id ? query.eq('id', invoice_id) : query.eq('provider_invoice_id', provider_invoice_id)
   const { data: invoice, error: invoiceError } = await query.maybeSingle()
@@ -44,18 +56,37 @@ Deno.serve(async (req) => {
   await db.from('romylabs_collection_events').insert({ account_id: invoice.account_id, invoice_id: invoice.id, event_type: 'payment_received', detail: { provider, provider_payment_id, amount_cents, fully_paid: fullyPaid } })
 
   let restoreDue = false
+  let restored = false
+  let restoreError: string | null = null
   if (fullyPaid) {
     const { count, error: countError } = await db.from('romylabs_invoices').select('id', { count: 'exact', head: true }).eq('account_id', invoice.account_id).eq('status', 'open').lt('due_at', paidAt)
     if (countError) return json({ error: countError.message }, 500)
     if ((count || 0) === 0) {
-      const { data: account } = await db.from('romylabs_billing_accounts').select('status').eq('id', invoice.account_id).single()
-      restoreDue = account?.status === 'suspended'
-      await db.from('romylabs_billing_accounts').update({ status: 'active', suspended_at: null, suspension_reason: null, last_paid_at: paidAt, updated_at: paidAt }).eq('id', invoice.account_id)
-      if (restoreDue) await db.from('romylabs_collection_events').insert({ account_id: invoice.account_id, invoice_id: invoice.id, event_type: 'restored', detail: { reason: 'balance_cured', enforcement_pending: true } })
+      const { data: account, error: accountError } = await db.from('romylabs_billing_accounts').select('status').eq('id', invoice.account_id).single()
+      if (accountError) return json({ error: accountError.message }, 500)
+      restoreDue = ['suspended','suspension_pending','restore_pending'].includes(account?.status)
+      if (restoreDue) {
+        const entitlementSecret = Deno.env.get('ROMYLABS_ENTITLEMENT_SECRET')
+        if (!entitlementSecret) restoreError = 'ROMYLABS_ENTITLEMENT_SECRET is not configured'
+        await db.from('romylabs_billing_accounts').update({ status: 'restore_pending', last_paid_at: paidAt, enforcement_error: restoreError, enforcement_updated_at: paidAt, updated_at: paidAt }).eq('id', invoice.account_id)
+        if (!restoreError) {
+          try {
+            const result = await enforce(url, entitlementSecret!, invoice.account_id, 'restore')
+            await db.from('romylabs_billing_accounts').update({ status: 'active', suspended_at: null, suspension_reason: null, last_paid_at: paidAt, enforcement_error: null, enforcement_updated_at: paidAt, updated_at: paidAt }).eq('id', invoice.account_id)
+            await db.from('romylabs_collection_events').insert({ account_id: invoice.account_id, invoice_id: invoice.id, event_type: 'restored', detail: { reason: 'balance_cured', enforced: true, adapter: result } })
+            restored = true
+          } catch (e) {
+            restoreError = String((e as Error)?.message || e)
+            await db.from('romylabs_billing_accounts').update({ enforcement_error: restoreError, enforcement_updated_at: paidAt, updated_at: paidAt }).eq('id', invoice.account_id)
+          }
+        }
+      } else {
+        await db.from('romylabs_billing_accounts').update({ status: 'active', last_paid_at: paidAt, enforcement_error: null, updated_at: paidAt }).eq('id', invoice.account_id)
+      }
     } else {
       await db.from('romylabs_billing_accounts').update({ last_paid_at: paidAt, updated_at: paidAt }).eq('id', invoice.account_id)
     }
   }
 
-  return json({ ok: true, payment_id: payment.id, invoice_id: invoice.id, fully_paid: fullyPaid, restore_due: restoreDue })
+  return json({ ok: true, payment_id: payment.id, invoice_id: invoice.id, fully_paid: fullyPaid, restore_due: restoreDue, restored, restore_error: restoreError })
 })
