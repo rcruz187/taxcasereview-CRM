@@ -284,7 +284,8 @@ function Shell() {
   )
 }
 
-const ADMIN_EMAIL = 'romy@taxrescrm.net'
+const ADMIN_EMAILS = new Set(['info@romylabs.com','romy@romylabs.com','romy@taxrescrm.net','romy@taxcasereview.org'])
+const isPlatformOwner = (email) => ADMIN_EMAILS.has((email || '').toLowerCase())
 
 // Renders the admin portal for the product owner, regular CRM for everyone else.
 // When ?imp=1 is in the URL, we're in an impersonation session — skip the
@@ -299,14 +300,14 @@ function AdminGate() {
 
   useEffect(() => {
     // Only redirect to admin portal if NOT in an impersonation session
-    if (user?.email?.toLowerCase() === ADMIN_EMAIL && !isImpersonating && !impParam) {
+    if (isPlatformOwner(user?.email) && !isImpersonating && !impParam) {
       navigate('/crm-admin', { replace: true })
     }
   }, [user])
 
   // If impersonating, always show the CRM shell regardless of email
   if (isImpersonating || impParam) return <Shell />
-  if (user?.email?.toLowerCase() === ADMIN_EMAIL && !isImpersonating) return null
+  if (isPlatformOwner(user?.email) && !isImpersonating) return null
   return <Shell />
 }
 

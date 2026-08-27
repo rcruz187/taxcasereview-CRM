@@ -3284,6 +3284,7 @@ function CommandCenter() {
   const tab = searchParams.get('tab') || 'overview'
   const setTab = (key) => setSearchParams({ tab: key }, { replace: false })
   const [data, setData] = useState(null)
+  const [crmAccount, setCrmAccount] = useState('all')
   const [activity, setActivity] = useState([])
   const [activityPoll, setActivityPoll] = useState(0)
 
@@ -3300,10 +3301,14 @@ function CommandCenter() {
         const prospectsRes = await supabase.from('prospects').select('*').order('created_at', { ascending: false })
 
         // Stats + tenant overview — may throw; prospects already captured above
+        const withTimeout = (promise, label, ms = 12000) => Promise.race([
+          promise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error(label + ' timed out after ' + ms + 'ms')), ms)),
+        ])
         const [statsRes, tenantsRes, storageRes] = await Promise.all([
-          supabase.rpc('admin_command_center_stats'),
-          supabase.rpc('admin_tenant_overview'),
-          supabase.rpc('admin_storage_stats'),
+          withTimeout(supabase.rpc('admin_command_center_stats'), 'admin_command_center_stats'),
+          withTimeout(supabase.rpc('admin_tenant_overview'), 'admin_tenant_overview'),
+          withTimeout(supabase.rpc('admin_storage_stats'), 'admin_storage_stats'),
         ])
 
         const stats   = statsRes.data
@@ -4162,7 +4167,6 @@ function CommandCenter() {
           {(()=>{
             // CRM account drilldown — derived from live tenant data
             const crmTenants = data.tenants || []
-            const [crmAccount, setCrmAccount] = React.useState('all')
             const activeTenant = crmAccount === 'all' ? null : crmTenants.find(t=>t.id===crmAccount)
             const crmClients = activeTenant ? Number(activeTenant.client_count||0) : data.kpis.totalClients
             const crmLeads   = activeTenant ? Number(activeTenant.lead_count||0)   : data.kpis.totalLeads
