@@ -1,9 +1,35 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+function adminPortalCrmHookFix() {
+  return {
+    name: 'admin-portal-crm-hook-fix',
+    enforce: 'pre',
+    transform(code, id) {
+      if (!id.endsWith('/src/pages/AdminPortal.jsx')) return null
+
+      const stateAnchor = "  const [data, setData] = useState(null)\n"
+      const conditionalHook = "            const [crmAccount, setCrmAccount] = React.useState('all')\n"
+
+      if (!code.includes(stateAnchor)) {
+        throw new Error('AdminPortal CRM hotfix anchor missing: data state')
+      }
+      if (!code.includes(conditionalHook)) {
+        throw new Error('AdminPortal CRM hotfix anchor missing: conditional crmAccount hook')
+      }
+
+      const fixed = code
+        .replace(stateAnchor, stateAnchor + "  const [crmAccount, setCrmAccount] = useState('all')\n")
+        .replace(conditionalHook, '')
+
+      return { code: fixed, map: null }
+    }
+  }
+}
+
 export default defineConfig({
   base: '/',
-  plugins: [react()],
+  plugins: [adminPortalCrmHookFix(), react()],
   server: {
     port: 5173,
     proxy: {
