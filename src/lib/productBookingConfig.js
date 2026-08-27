@@ -78,10 +78,10 @@ export const PRODUCT_BOOKING_CONFIGS = {
   bocasync: {
     key:           'bocasync',
     name:          'BocaSync',
-    logo:          null,                  // logo asset pending — do not substitute placeholder
+    logo:          '/bocasync-logo.svg',
     logoAlt:       'BocaSync',
     headline:      'Schedule a BocaSync Demo',
-    types:         ['Product Demo', 'Dental Practice Consultation', 'Follow-Up Call'],
+    types:         ['BocaSync Product Demo', 'Dental Practice Consultation', 'BocaSync Follow-Up Call'],
     calendarLabel: '[BocaSync]',
     notifyEmail:   'info@romylabs.com',   // CENTRALIZED_FALLBACK
     replyTo:       'info@romylabs.com',   // CENTRALIZED_FALLBACK
