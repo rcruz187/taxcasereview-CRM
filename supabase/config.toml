@@ -181,3 +181,10 @@ verify_jwt = false
 
 [functions.romylabs-billing-enforce]
 verify_jwt = false
+
+# Production is currently at its Edge Function slot limit. The already-closed
+# temporary GitHub credential-check slot is safely repurposed as the consolidated
+# RomyLabs billing runtime until capacity is expanded. It performs its own
+# cron/webhook/entitlement-secret authentication.
+[functions.github-credential-check-temp]
+verify_jwt = false
