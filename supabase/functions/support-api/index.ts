@@ -402,6 +402,97 @@ async function handleAddReply(
   return jsonResp({ ok: true, message_id: msg.id, created_at: msg.created_at })
 }
 
+// ── Shared RomyLabs calendar ingestion ─────────────────────────────────────────
+
+async function handleCreateCalendarEvent(
+  supabase: ReturnType<typeof createClient>,
+  product: string,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const productTenantId = String(body.product_tenant_id ?? '')
+  const productTenantName = String(body.product_tenant_name ?? '')
+  const productUserId = String(body.product_user_id ?? '')
+  const productUserEmail = String(body.product_user_email ?? '')
+  const blockId = String(body.block_id ?? '')
+  const title = String(body.title ?? '').trim()
+  const startsAt = String(body.starts_at ?? '')
+  const endsAt = String(body.ends_at ?? '')
+  const notes = String(body.notes ?? '').trim()
+
+  if (!productTenantId || !productUserId || !blockId || !title || !startsAt || !endsAt) {
+    return validationError('Missing required calendar event fields')
+  }
+  if (title.length > 500) return validationError('title exceeds 500 characters')
+  if (notes.length > 10_000) return validationError('notes exceeds 10000 characters')
+
+  const start = new Date(startsAt)
+  const end = new Date(endsAt)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+    return validationError('Invalid calendar event time range')
+  }
+
+  // Preserve the operator-selected wall-clock values for the RomyLabs calendar.
+  const date = startsAt.slice(0, 10)
+  const time = startsAt.includes('T') ? startsAt.slice(11, 16) : ''
+  const endTime = endsAt.includes('T') ? endsAt.slice(11, 16) : ''
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || !/^\\d{2}:\\d{2}$/.test(time)) {
+    return validationError('Invalid calendar date or time')
+  }
+
+  const label = product === 'arcvena' ? '[Arcvena]' : `[${product}]`
+  const source = `${product}:${productTenantId}:${blockId}`
+  const payload = {
+    title: `${label} ${title}`,
+    clientName: productTenantName || null,
+    assignedTo: productUserEmail || null,
+    date,
+    time,
+    endTime: endTime || null,
+    eventType: 'Appointment',
+    color: 'bb',
+    notes: notes || null,
+    recurring: 'none',
+    status: 'scheduled',
+    source,
+    product_id: product,
+    updated_at: new Date().toISOString(),
+  }
+
+  const { data: existing, error: lookupError } = await supabase
+    .from('calevents')
+    .select('id')
+    .eq('source', source)
+    .limit(1)
+    .maybeSingle()
+
+  if (lookupError) {
+    console.error('support-api calendar lookup error:', lookupError.code, lookupError.message)
+    return jsonResp({ error: 'Failed to synchronize calendar event' }, 500)
+  }
+
+  if (existing?.id) {
+    const { error } = await supabase.from('calevents').update(payload).eq('id', existing.id)
+    if (error) {
+      console.error('support-api calendar update error:', error.code, error.message)
+      return jsonResp({ error: 'Failed to synchronize calendar event' }, 500)
+    }
+    return jsonResp({ ok: true, calendar_event_id: existing.id, created: false })
+  }
+
+  const { data, error } = await supabase
+    .from('calevents')
+    .insert({ ...payload, created_at: new Date().toISOString() })
+    .select('id')
+    .single()
+
+  if (error || !data) {
+    console.error('support-api calendar insert error:', error?.code, error?.message)
+    return jsonResp({ error: 'Failed to synchronize calendar event' }, 500)
+  }
+
+  return jsonResp({ ok: true, calendar_event_id: data.id, created: true })
+}
+
 // ── Main handler ───────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -465,6 +556,7 @@ Deno.serve(async (req: Request) => {
     case 'list_tickets':  return handleListTickets(supabase, product, body)
     case 'get_ticket':    return handleGetTicket(supabase, product, body)
     case 'add_reply':     return handleAddReply(supabase, product, body)
+    case 'create_calendar_event': return handleCreateCalendarEvent(supabase, product, body)
     default:
       return validationError(`Unknown action: ${action}`)
   }
