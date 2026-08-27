@@ -167,3 +167,24 @@ verify_jwt = false
 [functions.trigger-site-rebuild]
 verify_jwt = false
 
+# RomyLabs SaaS billing endpoints use dedicated high-entropy server-side secrets
+# inside each function. They are invoked by cron/payment adapters/server-to-server
+# product calls, not by browser Supabase sessions.
+[functions.romylabs-billing-cycle]
+verify_jwt = false
+
+[functions.romylabs-billing-notify]
+verify_jwt = false
+
+[functions.romylabs-billing-payment]
+verify_jwt = false
+
+[functions.romylabs-billing-enforce]
+verify_jwt = false
+
+# Production is currently at its Edge Function slot limit. The already-closed
+# temporary GitHub credential-check slot is safely repurposed as the consolidated
+# RomyLabs billing runtime until capacity is expanded. It performs its own
+# cron/webhook/entitlement-secret authentication.
+[functions.github-credential-check-temp]
+verify_jwt = false
