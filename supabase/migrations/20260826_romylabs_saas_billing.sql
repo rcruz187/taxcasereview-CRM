@@ -14,7 +14,7 @@ create table if not exists public.romylabs_billing_accounts (
   billing_day smallint not null default 1 check (billing_day between 1 and 28),
   status text not null default 'active' check (status in ('trial','active','past_due','suspended','cancelled')),
   auto_invoice boolean not null default true,
-  auto_suspend boolean not null default true,
+  auto_suspend boolean not null default false,
   notice_1_after_days integer not null default 10 check (notice_1_after_days >= 1),
   notice_2_after_days integer not null default 15 check (notice_2_after_days > notice_1_after_days),
   suspend_after_days integer not null default 20 check (suspend_after_days > notice_2_after_days),
