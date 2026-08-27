@@ -84,7 +84,6 @@ alter table public.romylabs_invoices enable row level security;
 alter table public.romylabs_subscription_payments enable row level security;
 alter table public.romylabs_collection_events enable row level security;
 
--- Platform owner/admin only. Service-role automation bypasses RLS.
 drop policy if exists romylabs_billing_accounts_platform_admin on public.romylabs_billing_accounts;
 create policy romylabs_billing_accounts_platform_admin on public.romylabs_billing_accounts for all to authenticated using (public._is_platform_admin()) with check (public._is_platform_admin());
 drop policy if exists romylabs_invoices_platform_admin on public.romylabs_invoices;
@@ -102,7 +101,9 @@ set search_path = public
 as $$
   select case when public._is_platform_admin() then jsonb_build_object(
     'accounts', coalesce((select jsonb_agg(to_jsonb(a) order by a.account_name) from public.romylabs_billing_accounts a), '[]'::jsonb),
-    'invoices', coalesce((select jsonb_agg(to_jsonb(i) order by i.due_at desc) from public.romylabs_invoices i where i.status in ('open','paid','uncollectible')), '[]'::jsonb),
+    'invoices', coalesce((select jsonb_agg(to_jsonb(i) order by i.issued_at desc) from public.romylabs_invoices i), '[]'::jsonb),
+    'payments', coalesce((select jsonb_agg(to_jsonb(p) order by p.created_at desc) from public.romylabs_subscription_payments p), '[]'::jsonb),
+    'events', coalesce((select jsonb_agg(to_jsonb(e) order by e.created_at desc) from public.romylabs_collection_events e), '[]'::jsonb),
     'mrr_cents', coalesce((select sum(monthly_amount_cents) from public.romylabs_billing_accounts where status in ('active','past_due')),0),
     'past_due_cents', coalesce((select sum(greatest(amount_cents-amount_paid_cents,0)) from public.romylabs_invoices where status='open' and due_at < now()),0),
     'past_due_accounts', coalesce((select count(distinct account_id) from public.romylabs_invoices where status='open' and due_at < now()),0),
