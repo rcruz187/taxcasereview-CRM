@@ -29,12 +29,13 @@ Deno.serve(async (req) => {
   try {
     if (account.product_key === 'taxres_crm') {
       // TaxRes CRM and its customer offices live in this same Supabase project.
-      // external_tenant_id may be either the canonical UUID or tenant_code.
+      // The live tenant schema has a status column but no `suspended_at` column.
+      // AppContext already rejects suspended/cancelled tenant status, so changing only
+      // status is sufficient and avoids inventing schema fields.
       const nextStatus = action === 'suspend' ? 'suspended' : 'active'
-      const timestamps = action === 'suspend' ? { suspended_at: new Date().toISOString() } : { suspended_at: null }
-      let result = await db.from('tenants').update({ status: nextStatus, ...timestamps }).eq('id', account.external_tenant_id).select('id,status').maybeSingle()
+      let result = await db.from('tenants').update({ status: nextStatus }).eq('id', account.external_tenant_id).select('id,status').maybeSingle()
       if (!result.data && !result.error) {
-        result = await db.from('tenants').update({ status: nextStatus, ...timestamps }).eq('tenant_code', account.external_tenant_id).select('id,status').maybeSingle()
+        result = await db.from('tenants').update({ status: nextStatus }).eq('tenant_code', account.external_tenant_id).select('id,status').maybeSingle()
       }
       if (result.error) throw result.error
       if (!result.data) return json({ error: `TaxRes tenant not found: ${account.external_tenant_id}` }, 404)
