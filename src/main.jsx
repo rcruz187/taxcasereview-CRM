@@ -5,7 +5,6 @@ import './theme-scrollbars.css'
 import App from './App.jsx'
 import EsignAuditBridge from './components/EsignAuditBridge.jsx'
 import EsignManagerAuditBridge from './components/EsignManagerAuditBridge.jsx'
-import TeamChatProBridge from './components/TeamChatProBridge.jsx'
 
 // Apply saved brand color instantly — before React renders (no flash)
 ;(function() {
@@ -60,7 +59,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <App />
     <EsignAuditBridge />
     <EsignManagerAuditBridge />
-    <TeamChatProBridge />
   </React.StrictMode>
 )
 
