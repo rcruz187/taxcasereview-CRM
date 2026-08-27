@@ -130,12 +130,12 @@ export default function BookAppointment() {
 
     setSaving(true); setErr('')
 
-    // Calendar event title carries the product label prefix for Command Center identification
-    const calTitle = `${productCfg.calendarLabel} ${type} — ${form.name.trim()}`
-
-    const { data, error } = await supabase.rpc('booking_create', {
+    // Product identity is validated and persisted inside the server-side RPC.
+    // Anonymous browsers never write directly to calevents.
+    const { data, error } = await supabase.rpc('booking_create_product', {
       p_name: form.name.trim(), p_email: form.email.trim(), p_phone: form.phone.trim(),
       p_event_type: type, p_date: date, p_time: time, p_notes: form.notes.trim(),
+      p_product: productCfg.key,
       ...tenantArgs,
     })
     setSaving(false)
@@ -146,15 +146,6 @@ export default function BookAppointment() {
       return
     }
 
-    // Update product_id on the created calevents row (booking_create doesn't know the product)
-    if (data && data.booking_id) {
-      supabase
-        .from('calevents')
-        .update({ product_id: productCfg.key, title: calTitle })
-        .eq('id', data.booking_id)
-        .then(() => {})
-        .catch(() => {})
-    }
 
     // Confirmation to the client + notification to the appropriate product inbox
     const bookingTenant = tid || TAXRESCRM_TENANT

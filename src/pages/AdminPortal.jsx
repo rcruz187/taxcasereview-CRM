@@ -3911,7 +3911,10 @@ function CommandCenter() {
                   </div>
                   <div style={{ flex:1, minWidth:0 }}>
                     {(() => { const badge = parseEventBadge(e.title); return badge ? (
-                      <span style={{ display:'inline-block', background:badge.bg, color:badge.text, fontSize:9, fontWeight:700, padding:'1px 5px', borderRadius:3, marginBottom:2, textTransform:'uppercase', letterSpacing:'.04em' }}>{badge.label}</span>
+                      <span style={{ display:'inline-flex', alignItems:'center', gap:4, background:badge.bg, color:badge.text, fontSize:9, fontWeight:700, padding:'2px 6px', borderRadius:3, marginBottom:2, textTransform:'uppercase', letterSpacing:'.04em' }}>
+                         {badge.logo && <img src={badge.logo} alt="" aria-hidden="true" style={{ width:14, height:14, objectFit:'contain', borderRadius:3 }} />}
+                         {badge.label}
+                       </span>
                     ) : null })()}
                     <div style={{ fontSize:13, color:'#e2e8f0', fontWeight:600 }}>{(e.title||'Meeting').replace(/^\[[^\]]+\]\s*/,'')}</div>
                     <div style={{ fontSize:10, color:'#475569' }}>{e.type||'Event'}</div>
@@ -4223,7 +4226,10 @@ function CommandCenter() {
                   </div>
                   <div>
                     {(() => { const badge = parseEventBadge(e.title); return badge ? (
-                      <span style={{ display:'inline-block', background:badge.bg, color:badge.text, fontSize:9, fontWeight:700, padding:'1px 5px', borderRadius:3, marginBottom:2, textTransform:'uppercase', letterSpacing:'.04em' }}>{badge.label}</span>
+                      <span style={{ display:'inline-flex', alignItems:'center', gap:4, background:badge.bg, color:badge.text, fontSize:9, fontWeight:700, padding:'2px 6px', borderRadius:3, marginBottom:2, textTransform:'uppercase', letterSpacing:'.04em' }}>
+                         {badge.logo && <img src={badge.logo} alt="" aria-hidden="true" style={{ width:14, height:14, objectFit:'contain', borderRadius:3 }} />}
+                         {badge.label}
+                       </span>
                     ) : null })()}
                     <div style={{ fontSize:13, color:'#e2e8f0' }}>{(e.title||'Demo').replace(/^\[[^\]]+\]\s*/,'')}</div>
                   </div>
@@ -5837,10 +5843,10 @@ function LinkedInPublisher({ embeddedMode = false }) {
   function parseEventBadge(title) {
     const BADGE_COLORS = {
       'RomyLabs':   { bg:'#1a1a1a', text:'#C6FF00' },
-      'TaxRes CRM': { bg:'#1e3a5f', text:'#60a5fa' },
-      'Camvella':   { bg:'#0b2748', text:'#55B96A' },
-      'Arcvena':    { bg:'#1a0a2e', text:'#a78bfa' },
-      'BocaSync':   { bg:'#1a2e1a', text:'#34d399' },
+      'TaxRes CRM': { bg:'#1e3a5f', text:'#60a5fa', logo:'/taxrescrm-favicon.png' },
+      'Camvella':   { bg:'#0b2748', text:'#55B96A', logo:'/camvella-logo.svg' },
+      'Arcvena':    { bg:'#1a0a2e', text:'#a78bfa', logo:'/arcvena-favicon-64.png' },
+      'BocaSync':   { bg:'#1a2e1a', text:'#34d399', logo:'/bocasync-logo.svg' },
     }
     const m = (title||'').match(/^\[([^\]]+)\]/)
     if (!m) return null
