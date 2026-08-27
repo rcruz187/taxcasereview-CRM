@@ -1,11 +1,9 @@
-/* RomyLabs admin production guard. Keep admin traffic on the canonical host and
- * protect the CRM reporting tab from the legacy conditional-hook crash until
- * the tab state is fully lifted into CommandCenter. */
+/* RomyLabs admin production guard — canonical admin host + legacy product-link cleanup. */
 (function () {
   var host = window.location.hostname.toLowerCase();
 
   /* /crm-admin belongs to the RomyLabs admin host. This also repairs stale
-   * Chrome bookmarks/sessions that land on taxrescrm.app/crm-admin. */
+   * browser bookmarks/sessions that land on taxrescrm.app/crm-admin. */
   if ((host === 'taxrescrm.app' || host === 'www.taxrescrm.app') &&
       window.location.pathname.indexOf('/crm-admin') === 0) {
     window.location.replace(
@@ -47,7 +45,7 @@
     return product === 'camvella' ? CAMVELLA_CRM : product === 'arcvena' ? ARCVENA_CRM : null;
   }
 
-  /* Capture Open actions before React/anchor navigation. */
+  /* Capture legacy Open actions before React/anchor navigation. */
   document.addEventListener('click', function (event) {
     var clickable = event.target && event.target.closest ? event.target.closest('a,button') : null;
     if (!clickable) return;
@@ -57,22 +55,6 @@
     var label = (clickable.textContent || '').replace(/\s+/g, ' ').trim();
     var product = productFromCard(clickable);
     var forced = crmFor(product);
-
-    /* The CRM reporting view currently contains a state hook inside a
-     * tab-conditional render. Switching to it client-side changes hook order
-     * and can crash CommandCenter. A document navigation makes CRM the initial
-     * tab so hook order stays stable and the portal remains usable. */
-    if (label === 'CRM' && window.location.pathname.indexOf('/crm-admin') === 0) {
-      var params = new URLSearchParams(window.location.search);
-      if (params.get('tab') !== 'crm') {
-        event.preventDefault();
-        event.stopPropagation();
-        if (event.stopImmediatePropagation) event.stopImmediatePropagation();
-        params.set('tab', 'crm');
-        window.location.assign(window.location.pathname + '?' + params.toString());
-        return;
-      }
-    }
 
     if (direct && direct !== href) {
       event.preventDefault();
