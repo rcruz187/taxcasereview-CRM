@@ -385,7 +385,17 @@ function LeadInlineEsign({ lead, onClose }) {
 }
 
 export default function Leads() {
-  const { user, role, employeeName } = useApp()
+  const { user, role, employeeName, leadWorkflowModel } = useApp()
+
+  // ── Model-aware pipeline config ───────────────────────────────────────────
+  // All pipeline rendering and logic reads from this — never hardcoded arrays.
+  // getModel() falls back to investigation-resolution if model key is unknown.
+  // Recalculated only when leadWorkflowModel changes (session/tenant switch).
+  const activeModel  = React.useMemo(() => getModel(leadWorkflowModel), [leadWorkflowModel])
+  const MODEL_STAGES = activeModel.stages         // ordered forward pipeline stages
+  const MODEL_FLOW   = activeModel.flow           // [{s, c}] for the pipeline widget
+  const MODEL_BADGE  = activeModel.badge          // {status: cssClass} for <Bdg>
+  const MODEL_CLOSED = activeModel.closedStatuses // statuses that close a lead
   const { id: urlLeadId } = useParams()
   const [searchParams] = useSearchParams()
   const isTaxAdvisor = role === 'Tax Advisor'

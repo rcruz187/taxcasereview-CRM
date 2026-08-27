@@ -100,6 +100,11 @@ export function AppProvider({ children }) {
   const [toast, setToast]       = useState({ msg: '', type: 'ok', show: false })
   const [modal, setModal]       = useState({ open: false, title: '', body: null })
   const [searchQ, setSearchQ]   = useState('')
+  // Tenant lead pipeline model — read from settings at session start.
+  // 'investigation-resolution' (default) or 'direct-resolution'.
+  // Resolved from the authenticated tenant's own settings row (RLS-scoped),
+  // so it is always the current tenant's value — not FIRM which can be stale.
+  const [leadWorkflowModel, setLeadWorkflowModel] = useState('investigation-resolution')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [planTier, setPlanTier] = useState('pro') // default pro — loads from tenants on login
   const toastTimer = useRef(null)
@@ -130,13 +135,14 @@ export function AppProvider({ children }) {
 
   async function loadBrandColor() {
     try {
-      let q = supabase.from('settings').select('primary_color')
+      let q = supabase.from('settings').select('primary_color,lead_workflow_model')
       try {
         const imp = sessionStorage.getItem('admin_impersonation')
         if (imp) { const { tenant_id } = JSON.parse(imp); if (tenant_id) q = q.eq('tenant_id', tenant_id) }
       } catch (_) {}
       const { data } = await q.limit(1).maybeSingle()
       if (data?.primary_color) applyBrandColor(data.primary_color)
+      if (data?.lead_workflow_model) setLeadWorkflowModel(data.lead_workflow_model)
     } catch(e) {}
   }
 
@@ -560,6 +566,7 @@ export function AppProvider({ children }) {
       toast, showToast,
       modal, openModal, closeModal,
       searchQ, setSearchQ,
+      leadWorkflowModel,
       mobileNavOpen, setMobileNavOpen,
       myTenantId, myEmpId,
     }}>
