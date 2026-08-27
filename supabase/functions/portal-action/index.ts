@@ -14,6 +14,7 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+const ARCHIVE_URL_TTL_SECONDS = 60 * 60 * 24 * 365 * 3
 
 async function getSessionClientName(supabase: any, token: string) {
   const { data: session } = await supabase.from('portal_sessions').select('*').eq('token', token).maybeSingle()
@@ -66,7 +67,6 @@ serve(async (req) => {
       }
 
       case 'upload_document': {
-        // fileBase64 is the file's raw bytes, base64-encoded, sent from the browser
         const { fileName, fileType, fileBase64, docType } = body
         if (!fileName || !fileBase64) return new Response(JSON.stringify({ error: 'Missing file' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
@@ -77,12 +77,13 @@ serve(async (req) => {
         const path = `docs/${clientName.replace(/\s+/g, '-')}/${Date.now()}_${fileName}`
         const { error: upErr } = await supabase.storage.from('documents').upload(path, bytes, { upsert: true, contentType: fileType || 'application/octet-stream' })
         if (upErr) throw upErr
-        const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+        const { data: signedData, error: signErr } = await supabase.storage.from('documents').createSignedUrl(path, ARCHIVE_URL_TTL_SECONDS)
+        if (signErr || !signedData?.signedUrl) throw signErr || new Error('Could not create secure document URL')
 
         const { error } = await supabase.from('documents').insert([{
           name: fileName, client: clientName, docType: docType || 'Other',
           notes: 'Uploaded by client via portal',
-          file_url: urlData.publicUrl, file_name: fileName, file_size: bytes.length,
+          file_url: signedData.signedUrl, file_name: fileName, file_size: bytes.length,
           created_at: new Date().toISOString(),
         }])
         if (error) throw error
