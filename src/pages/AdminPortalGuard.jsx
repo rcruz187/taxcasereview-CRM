@@ -3,6 +3,8 @@ import { useApp } from '../context/AppContext'
 import AdminPortal from './AdminPortal'
 
 const PLATFORM_OWNER_EMAILS = new Set([
+  'info@romylabs.com',
+  'romy@romylabs.com',
   'romy@taxrescrm.net',
   'romy@taxcasereview.org',
 ])
