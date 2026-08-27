@@ -2334,13 +2334,13 @@ function ProductsTab({ supabase, taxresActivity = [] }) {
                         <div style={{ fontSize:9, color:'#64748b', marginTop:2 }}>{p.industry}</div>
                       </div>
                     </div>
-                    {/* Open button — only for connected products with a URL */}
-                    {!isSelected && p.connection==='connected' && (p.tenantId || p.url) && !isResearch && !isInternal && (
+                    {/* Open button — shown whenever appUrl or url is available, regardless of metrics connection */}
+                    {!isSelected && (p.tenantId || p.appUrl || p.url) && !isResearch && !isInternal && (
                       p.tenantId ? (
                         <button onClick={async e=>{e.stopPropagation();const{data:t}=await supabase.rpc('create_impersonation_token',{p_tenant_id:p.tenantId});if(t)window.open(`${window.location.origin}/impersonate?admin_token=${t}`,'_blank')}}
                           style={{ fontSize:10,color:'#fff',fontWeight:700,background:accentColor,padding:'3px 9px',borderRadius:6,border:'none',cursor:'pointer',flexShrink:0 }}>Open →</button>
                       ) : (
-                        <a href={p.url} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}
+                        <a href={p.appUrl || p.url} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}
                           style={{ fontSize:10,color:'#fff',fontWeight:700,textDecoration:'none',background:accentColor,padding:'3px 9px',borderRadius:6,flexShrink:0 }}>Open →</a>
                       )
                     )}
@@ -2402,8 +2402,8 @@ function ProductsTab({ supabase, taxresActivity = [] }) {
                     <button onClick={async()=>{const{data:t}=await supabase.rpc('create_impersonation_token',{p_tenant_id:selected.tenantId});if(t)window.open(`${window.location.origin}/impersonate?admin_token=${t}`,'_blank')}}
                       style={{ fontSize:12,color:'#fff',fontWeight:700,background:selected.color,padding:'7px 16px',borderRadius:8,border:'none',cursor:'pointer' }}>Open CRM →</button>
                   )}
-                  {selected.connection==='connected' && selected.url && !selected.tenantId && (
-                    <a href={selected.url} target="_blank" rel="noreferrer"
+                  {(selected.appUrl || selected.url) && !selected.tenantId && (
+                    <a href={selected.appUrl || selected.url} target="_blank" rel="noreferrer"
                       style={{ fontSize:12,color:'#fff',fontWeight:700,textDecoration:'none',background:selected.color,padding:'7px 16px',borderRadius:8 }}>Open App →</a>
                   )}
                   {selected.websiteUrl && !selected.tenantId && (
