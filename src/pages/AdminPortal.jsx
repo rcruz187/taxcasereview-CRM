@@ -1867,18 +1867,18 @@ const PRODUCT_REGISTRY = [
     label:     'BocaSync',
     icon:      '🦷',
     color:     '#ec4899',
-    industry:  'Dental Practice',
+    industry:  'Dental Practice Management',
     url:       'https://app.bocasync.com',
     appUrl:    'https://app.bocasync.com',
-    websiteUrl: null,  // bocasync.com is parked — no marketing site yet
+    websiteUrl: 'https://bocasync.com',
     lifecycleStage: 'available',
-    connection:     'partial',   // CRM live on Supabase (zmejbkttzvaqzzbmjclz); no analytics
+    connection:     'partial',   // hub-proxy wired; platform-metrics fn pending deployment in bocasync repo
     brandStatus:    'branded',
     publicOnRomyLabs: true,
     commerciallyAvailable: true,
-    desc:      'Modern practice management for dental offices — CRM live at app.bocasync.com',
-    metricsUrl: null,
-    nextMilestone: 'Marketing site (bocasync.com) + GA4/GSC/Clarity setup',
+    desc:      'Dental practice management CRM — scheduling, patient records, billing, and team management.',
+    metricsUrl: 'https://zmejbkttzvaqzzbmjclz.supabase.co/functions/v1/platform-metrics',
+    nextMilestone: 'Deploy platform-metrics in bocasync repo → Command Center goes live',
   },
   {
     key:       'phl',
@@ -1905,7 +1905,7 @@ const PRODUCT_REGISTRY = [
     industry:   'Landscaping & Field Service',
     url:        'https://app.groundivo.com',
     appUrl:     'https://app.groundivo.com',
-    websiteUrl: 'https://www.groundivo.com',
+    websiteUrl: null,  // www.groundivo.com is parked; set when real marketing site deploys
     lifecycleStage: 'available',
     connection:     'partial',
     brandStatus:    'branded',
