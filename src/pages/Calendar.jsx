@@ -1,5 +1,6 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { advanceLeadStatus } from '../lib/leadStatus'
@@ -53,6 +54,8 @@ export default function Calendar() {
   const [view,          setView]          = useState('month')
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [showForm,      setShowForm]      = useState(false)
+  const [searchParams] = useSearchParams()
+  useEffect(() => { if (searchParams.get('new') === '1') setShowForm(true) }, [searchParams])
   const [dayMenuPos,    setDayMenuPos]    = useState(null)
   const [dayMenuDate,   setDayMenuDate]   = useState(null)
   const [showUnscheduled, setShowUnscheduled] = useState(true)

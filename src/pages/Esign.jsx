@@ -53,7 +53,7 @@ export default function Esign() {
     taxYears: qp2.get('years') || '',
     repName: qp2.get('rep') || ''
   })
-  useEffect(() => { if (qp2.get('client')) setModal(true) }, [])
+  useEffect(() => { if (qp2.get('client') || qp2.get('new') === '1') setModal(true) }, [])
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('All')

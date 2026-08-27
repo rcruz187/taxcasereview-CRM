@@ -2,7 +2,7 @@ import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { formatMoneyInput, parseMoney } from '../lib/money'
 import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { useApp } from '../context/AppContext'
@@ -42,7 +42,10 @@ export default function Cases() {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortCol(col); setSortDir('asc') }
   }
-  const [modal,       setModal]       = useState(false)
+    const [modal,       setModal]       = useState(false)
+  // Auto-open add modal when navigated here with ?new=1
+  const [searchParams] = useSearchParams()
+  useEffect(() => { if (searchParams.get('new') === '1') { setForm(BLANK); setModal(true) } }, [searchParams])
   const [editCase,    setEditCase]    = useState(null)
   const [form,        setForm]        = useState(BLANK)
   const [sug,         setSug]         = useState([])

@@ -1,7 +1,7 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import { applyWorkflowTemplate } from '../lib/triggerWorkflow'
@@ -36,7 +36,9 @@ export default function Tasks() {
   const [leads,     setLeads]     = useState([])
   const [employees, setEmployees] = useState([])
   const [statusCategories, setStatusCategories] = useState([]) // [{...category, statuses:[...]}]
-  const [modal,     setModal]     = useState(false)
+    const [modal,     setModal]     = useState(false)
+  const [searchParams] = useSearchParams()
+  useEffect(() => { if (searchParams.get('new') === '1') { setForm(BLANK); setModal(true) } }, [searchParams])
   const [form,      setForm]      = useState(BLANK)
   // Additional sub-task titles being built in the same Add Task session —
   // lets someone create a whole section (main task + N sub-tasks) in one

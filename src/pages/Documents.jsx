@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { validateFile, maybeCompressImage } from '../lib/uploadUtils'
 import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { DOC_FOLDERS as ROOT_FOLDERS } from './Clients'
 
@@ -42,7 +42,9 @@ export default function Documents() {
   const [folder,       setFolder]        = useState('All')
   const [clientFilter, setClientFilter]  = useState(clientParam)
   const [search,       setSearch]        = useState('')
-  const [modal,        setModal]         = useState(false)
+    const [modal,        setModal]         = useState(false)
+  const [searchParams] = useSearchParams()
+  useEffect(() => { if (searchParams.get('new') === '1') setModal(true) }, [searchParams])
   const [form,         setForm]          = useState({ name:'', client:'', docType:'IRS Docs', notes:'' })
   const [file,         setFile]          = useState(null)
   const [saving,       setSaving]        = useState(false)

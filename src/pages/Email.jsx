@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { FIRM } from '../lib/firmBranding'
 import { supabase } from '../lib/supabase'
 import { sendGmailEmail, downloadGmailAttachment, fetchGmailAttachmentBlob } from '../lib/gmailUtils'
@@ -25,6 +26,8 @@ export default function Email() {
   const [saving, setSaving]     = useState(false)
   const [toast, setToast]       = useState('')
   const [view, setView]         = useState('inbox') // inbox | compose | templates
+  const [searchParams] = useSearchParams()
+  useEffect(() => { if (searchParams.get('new') === '1') { setForm(BLANK); setView('compose') } }, [searchParams])
   const [readLayout, setReadLayout] = useState(() => localStorage.getItem('tcr_email_layout') || 'side') // side | stacked
   const [listSize, setListSize] = useState(() => ({
     side: parseInt(localStorage.getItem('tcr_email_list_width')) || 320,

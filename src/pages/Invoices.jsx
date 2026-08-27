@@ -2,6 +2,7 @@ import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { formatMoneyInput, parseMoney } from '../lib/money'
 import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { sendGmailEmail } from '../lib/gmailUtils'
@@ -32,7 +33,9 @@ function SBdg({s}) {
 export default function Invoices() {
   const [items,    setItems]    = useState([])
   const [clients,  setClients]  = useState([])
-  const [modal,    setModal]    = useState(false)
+    const [modal,    setModal]    = useState(false)
+  const [searchParams] = useSearchParams()
+  useEffect(() => { if (searchParams.get('new') === '1') { setForm(BLANK); setEditId(null); setModal(true) } }, [searchParams])
   const [editId,   setEditId]   = useState(null)
   const [form,     setForm]     = useState(BLANK)
   const [saving,   setSaving]   = useState(false)
