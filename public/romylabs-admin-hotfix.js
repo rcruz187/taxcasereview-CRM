@@ -1,4 +1,5 @@
 /* RomyLabs admin production guard — canonical admin host + legacy product-link cleanup. */
+/* CC_HIDE_FIX_20260827: never hide Command Center containers by textContent. */
 (function () {
   var host = window.location.hostname.toLowerCase();
   var path = window.location.pathname;
