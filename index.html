@@ -23,8 +23,10 @@
       (function () {
         var params = new URLSearchParams(window.location.search);
         var product = (params.get('product') || '').toLowerCase();
+        var lang = (params.get('lang') || '').toLowerCase();
         if (product === 'bocasync') {
-          document.title = 'Schedule a BocaSync Demo';
+          document.title = lang === 'es' ? 'Agendar una Demo de BocaSync' : 'Schedule a BocaSync Demo';
+          document.documentElement.lang = lang === 'es' ? 'es' : 'en';
           var favicon = document.getElementById('app-favicon');
           var apple = document.getElementById('app-apple-touch-icon');
           if (favicon) {
@@ -32,6 +34,57 @@
             favicon.href = '/bocasync-logo.svg?v=1';
           }
           if (apple) apple.href = '/bocasync-logo.svg?v=1';
+        }
+
+        if (product === 'bocasync' && lang === 'es') {
+          var textMap = {
+            'Schedule a BocaSync Demo': 'Agendar una Demo de BocaSync',
+            'What is this about?': '¿De qué se trata?',
+            'Pick a day': 'Elige un día',
+            'Pick a time': 'Elige una hora',
+            'Your details': 'Tus datos',
+            'Product Demo': 'Demo del Producto',
+            'Dental Practice Consultation': 'Consulta para Consultorio Dental',
+            'Follow-Up Call': 'Llamada de Seguimiento',
+            'Checking availability…': 'Verificando disponibilidad…',
+            'No open times that day — try another date.': 'No hay horarios disponibles ese día — prueba otra fecha.',
+            'You’re booked!': '¡Tu cita está confirmada!',
+            "You're booked!": '¡Tu cita está confirmada!',
+            "We'll reach out to confirm. If anything changes, just contact us.": 'Te enviaremos la confirmación. Si algo cambia, contáctanos.',
+            'Loading…': 'Cargando…',
+            'Online booking is unavailable right now. Please contact us instead.': 'La reserva en línea no está disponible en este momento. Contáctanos directamente.'
+          };
+          var placeholderMap = {
+            'Full name *': 'Nombre completo *',
+            'Email *': 'Correo electrónico *',
+            'Phone': 'Teléfono',
+            'Notes (optional)': 'Notas (opcional)'
+          };
+          function translateNode(root) {
+            var walker = document.createTreeWalker(root || document.body, NodeFilter.SHOW_TEXT);
+            var nodes = [];
+            while (walker.nextNode()) nodes.push(walker.currentNode);
+            nodes.forEach(function (node) {
+              var raw = node.nodeValue || '';
+              var trimmed = raw.trim();
+              if (textMap[trimmed]) node.nodeValue = raw.replace(trimmed, textMap[trimmed]);
+            });
+            document.querySelectorAll('input[placeholder], textarea[placeholder]').forEach(function (el) {
+              var p = el.getAttribute('placeholder') || '';
+              if (placeholderMap[p]) el.setAttribute('placeholder', placeholderMap[p]);
+            });
+            document.querySelectorAll('button').forEach(function (button) {
+              var t = (button.textContent || '').trim();
+              if (t === 'Book appointment') button.textContent = 'Reservar cita';
+              if (t === 'Book now') button.textContent = 'Reservar ahora';
+              if (t === 'Try again') button.textContent = 'Intentar de nuevo';
+            });
+          }
+          window.addEventListener('DOMContentLoaded', function () {
+            translateNode(document.body);
+            var observer = new MutationObserver(function () { translateNode(document.body); });
+            observer.observe(document.getElementById('root') || document.body, { childList: true, subtree: true });
+          });
         }
       })();
     </script>
