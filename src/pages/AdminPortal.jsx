@@ -1801,7 +1801,7 @@ function ProductReportingSetup({ productKey, channel, registryProduct }) {
 // Products tab — hub for all CRMs. Each card opens a live dashboard panel.
 const PRODUCT_REGISTRY = [
   // ── ARCHITECTURE NOTE ────────────────────────────────────────────────────
-  // PRODUCTS: TaxRes CRM (platform), Camvella, Arcvena, BocaSync, PHL, + planned verticals
+  // PRODUCTS: TaxRes CRM (platform), Camvella, Arcvena, BocaSync, Groundivo, + planned verticals
   // CUSTOMERS/TENANTS: Tax Case Review, Nashville, CloudCPA (live TaxRes tenants — not products)
   // connection: 'connected' | 'partial' | 'not_connected'
   // lifecycleStage: 'live' | 'available' | 'building' | 'research' | 'internal'
@@ -1880,23 +1880,6 @@ const PRODUCT_REGISTRY = [
     metricsUrl: 'https://zmejbkttzvaqzzbmjclz.supabase.co/functions/v1/platform-metrics',
     nextMilestone: 'Deploy platform-metrics in bocasync repo → Command Center goes live',
   },
-  {
-    key:       'phl',
-    label:     'PHL Land Care',
-    icon:      '🌿',
-    color:     '#f59e0b',
-    industry:  'Landscaping & Field Service',
-    url:       null,
-    lifecycleStage: 'internal',
-    connection:     'not_connected',
-    brandStatus:    'working_name',
-    publicOnRomyLabs: false,
-    commerciallyAvailable: false,
-    desc:      'Internal use only — commercial launch as Groundivo (groundivo.com)',
-    metricsUrl: null,
-    nextMilestone: 'Marketing site launch + LinkedIn auth',
-  },
-
   {
     key:        'groundivo',
     label:      'Groundivo',
@@ -3817,7 +3800,6 @@ function CommandCenter() {
               { label:'Camvella',  ga4:'G-H1ZPCP2EE9 — Connected', gsc:'camvella.com — Active', clarity:'y62zna7yna — Connected', sitemap:'https://camvella.com/sitemap.xml ✓', seoStatus:'Active' },
               { label:'Arcvena',   ga4:'Connected', gsc:'arcvena.com — Active', clarity:'Connected', sitemap:'https://arcvena.com/sitemap.xml ✓', seoStatus:'Active' },
               { label:'BocaSync',  ga4:'—', gsc:'—', clarity:'—', sitemap:'—', seoStatus:'Not Started' },
-              { label:'PHL',       ga4:'N/A', gsc:'N/A', clarity:'N/A', sitemap:'N/A', seoStatus:'Internal — N/A' },
             ]
             const COLOR = { 'Active':'#10b981', 'Pending Setup':'#f59e0b', 'Pending DNS':'#f59e0b', 'Not Started':'#64748b', 'Internal — N/A':'#475569' }
             return (
