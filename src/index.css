@@ -587,26 +587,21 @@ tbody tr:hover td { background: var(--s2); cursor: pointer; }
 .task-cb.done { background: var(--ok); border-color: var(--ok); }
 
 /* ── Login page ── */
-.login-wrap {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg);
+/* Legacy classes kept as no-ops so any stale reference doesn't break layout */
+.login-wrap {}
+.login-box {}
+.login-logo {}
+.login-title {}
+.login-sub {}
+.login-err {}
+
+/* New split-screen login responsive overrides */
+@media (max-width: 700px) {
+  .tcr-login-card { flex-direction: column !important; max-width: 420px !important; }
+  .tcr-login-left { flex: none !important; padding: 36px 28px 28px !important; }
+  .tcr-login-right { padding: 32px 28px 36px !important; }
+  .tcr-login-left h1 { font-size: 22px !important; }
 }
-.login-box {
-  background: var(--sf);
-  border: 1px solid var(--b2c);
-  border-radius: var(--radius-lg);
-  padding: 32px;
-  width: 380px;
-  max-width: 95vw;
-  box-shadow: var(--shadow);
-}
-.login-logo { display: flex; justify-content: center; margin-bottom: 20px; }
-.login-title { font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 4px; }
-.login-sub { font-size: 12px; color: var(--t3); text-align: center; margin-bottom: 24px; }
-.login-err { background: var(--bdt); color: #E84B5A; border: 1px solid var(--bad); border-radius: 6px; padding: 8px 12px; font-size: 12px; margin-bottom: 12px; }
 
 /* ── Info box ── */
 .info-box { background: var(--s2); border-radius: 8px; padding: 12px; font-size: 12.5px; color: var(--t2); line-height: 1.7; margin-bottom: 12px; }
