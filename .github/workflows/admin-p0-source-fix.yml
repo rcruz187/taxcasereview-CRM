@@ -1,0 +1,73 @@
+name: Admin P0 Source Repair
+
+on:
+  push:
+    paths:
+      - '.github/workflows/admin-p0-source-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Patch admin source directly
+        shell: python
+        run: |
+          from pathlib import Path
+
+          admin = Path('src/pages/AdminPortal.jsx')
+          text = admin.read_text()
+
+          state_anchor = "  const [data, setData] = useState(null)\n"
+          lifted_state = "  const [data, setData] = useState(null)\n  const [crmAccount, setCrmAccount] = useState('all')\n"
+          bad_hook = "            const [crmAccount, setCrmAccount] = React.useState('all')\n"
+
+          if text.count(state_anchor) != 1:
+              raise SystemExit(f'Expected exactly one CommandCenter data state anchor, found {text.count(state_anchor)}')
+          if text.count(bad_hook) != 1:
+              raise SystemExit(f'Expected exactly one conditional CRM hook, found {text.count(bad_hook)}')
+
+          text = text.replace(state_anchor, lifted_state, 1)
+          text = text.replace(bad_hook, '', 1)
+          admin.write_text(text)
+
+          app = Path('src/App.jsx')
+          app_text = app.read_text()
+          old = "const ADMIN_EMAIL = 'romy@taxrescrm.net'"
+          new = "const ADMIN_EMAILS = new Set(['info@romylabs.com','romy@romylabs.com','romy@taxrescrm.net','romy@taxcasereview.org'])"
+          if old in app_text:
+              app_text = app_text.replace(old, new, 1)
+              app_text = app_text.replace("user?.email?.toLowerCase() === ADMIN_EMAIL", "ADMIN_EMAILS.has(user?.email?.toLowerCase() || '')")
+              app.write_text(app_text)
+
+      - name: Verify source repair
+        shell: bash
+        run: |
+          test "$(grep -c "const \[crmAccount, setCrmAccount\] = useState('all')" src/pages/AdminPortal.jsx)" -eq 1
+          test "$(grep -c "React.useState('all')" src/pages/AdminPortal.jsx || true)" -eq 0
+          npm ci
+          npm run build
+
+      - name: Commit repaired source
+        shell: bash
+        run: |
+          git config user.name 'RomyLabs Repair Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add src/pages/AdminPortal.jsx src/App.jsx
+          if git diff --cached --quiet; then
+            echo 'No source changes needed'
+            exit 0
+          fi
+          git commit -m 'fix(admin): repair Command Center hook order at source'
+          git push origin HEAD:main
