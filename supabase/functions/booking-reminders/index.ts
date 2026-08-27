@@ -1,7 +1,3 @@
-// booking-reminders — cron-invoked sweep. Finds online bookings entering the
-// 24h / 1h windows (Eastern), sends the reminder through the existing
-// send-email function, and stamps the row so nothing double-sends.
-// Deploy with JWT verification OFF; the cron job calls it every 10 minutes.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const BOOK_MANAGE = "https://taxrescrm.app/book/manage/";
@@ -12,7 +8,6 @@ Deno.serve(async () => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  // "Now" on the firm's clock (Eastern), as sortable strings.
   const fmt = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/New_York",
     year: "numeric", month: "2-digit", day: "2-digit",
@@ -20,11 +15,11 @@ Deno.serve(async () => {
   });
   const g: Record<string, string> = {};
   fmt.formatToParts(new Date()).forEach((p) => { g[p.type] = p.value; });
-  const nowMin = Date.UTC(+g.year, +g.month - 1, +g.day, +g.hour % 24, +g.minute); // ET wall time as UTC ms
+  const nowMin = Date.UTC(+g.year, +g.month - 1, +g.day, +g.hour % 24, +g.minute);
 
   const { data: rows, error } = await supabase
     .from("calevents")
-    .select('id, "clientName", "eventType", date, time, contact_email, booking_token, reminder_24_sent, reminder_1_sent, status, source')
+    .select('id, "clientName", "eventType", date, time, contact_email, booking_token, reminder_24_sent, reminder_1_sent, status, source, tenant_id')
     .eq("source", "online")
     .eq("status", "scheduled")
     .not("contact_email", "is", null)
@@ -53,9 +48,13 @@ Deno.serve(async () => {
 
     const resp = await fetch(Deno.env.get("SUPABASE_URL") + "/functions/v1/send-email", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+      },
       body: JSON.stringify({
         to: r.contact_email,
+        tenant_id: r.tenant_id || undefined,
         subject: kind === "1h"
           ? `See you soon — ${r.eventType} at ${new Date(y, m - 1, d, hh, mm).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} ET`
           : `Reminder — ${r.eventType} tomorrow`,
@@ -65,8 +64,7 @@ Deno.serve(async () => {
           `<p style="line-height:1.9"><strong>${r.eventType}</strong><br>${whenLabel}</p>` +
           (manage
             ? `<p>Need to change it? <a href="${manage}">Reschedule</a> · <a href="${manage}?cancel=1">Cancel</a></p>`
-            : `<p>Need to change it? Reply to this email or give us a call.</p>`) +
-          `<p style="margin-top:20px"><strong>Tax Case Review</strong></p>`,
+            : `<p>Need to change it? Reply to this email or give us a call.</p>`),
       }),
     });
     if (resp.ok) {
@@ -74,6 +72,8 @@ Deno.serve(async () => {
         .update(kind === "1h" ? { reminder_1_sent: true } : { reminder_24_sent: true })
         .eq("id", r.id);
       sent++;
+    } else {
+      console.error('[booking-reminders] send-email failed', resp.status);
     }
   }
   return new Response(JSON.stringify({ ok: true, sent }), { headers: { "Content-Type": "application/json" } });

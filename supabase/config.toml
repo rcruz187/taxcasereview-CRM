@@ -45,10 +45,10 @@ verify_jwt = true
 verify_jwt = true
 [functions.call-add-participant]
 verify_jwt = true
+[functions.log-call]
+verify_jwt = true
 
 # Staff-only payment control endpoints.
-[functions.stripe-setup-intent]
-verify_jwt = true
 [functions.stripe-create-checkout-session]
 verify_jwt = true
 [functions.stripe-create-subscription]
@@ -56,11 +56,31 @@ verify_jwt = true
 [functions.run-autopay-batch]
 verify_jwt = true
 
+# Client Portal payment endpoints use an opaque portal session token when the
+# browser is anonymous and validate authenticated staff server-side otherwise.
+# Supabase JWT verification must stay off so the anonymous portal can reach
+# the custom authorization layer.
+[functions.stripe-setup-intent]
+verify_jwt = false
+[functions.stripe-save-payment-method]
+verify_jwt = false
+[functions.stripe-set-autopay]
+verify_jwt = false
+[functions.stripe-invoice-pay-intent]
+verify_jwt = false
+[functions.stripe-invoice-pay-confirm]
+verify_jwt = false
+
+# Cron-only reminder sweeps. pg_cron calls these server-to-server; they do not
+# have a browser/user JWT. Function bodies use service-role access internally.
+[functions.send-appointment-reminders]
+verify_jwt = false
+[functions.booking-reminders]
+verify_jwt = false
+
 [functions.trigger-workflow]
 verify_jwt = false
 [functions.sunbiz-search]
-verify_jwt = false
-[functions.log-call]
 verify_jwt = false
 [functions.stripe-checkout-webhook]
 verify_jwt = false
