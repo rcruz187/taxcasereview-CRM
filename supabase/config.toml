@@ -167,3 +167,17 @@ verify_jwt = false
 [functions.trigger-site-rebuild]
 verify_jwt = false
 
+# RomyLabs SaaS billing endpoints use dedicated high-entropy server-side secrets
+# inside each function. They are invoked by cron/payment adapters/server-to-server
+# product calls, not by browser Supabase sessions.
+[functions.romylabs-billing-cycle]
+verify_jwt = false
+
+[functions.romylabs-billing-notify]
+verify_jwt = false
+
+[functions.romylabs-billing-payment]
+verify_jwt = false
+
+[functions.romylabs-billing-enforce]
+verify_jwt = false
