@@ -1,42 +1,35 @@
-// outbound-call-status
-// Called BY SignalWire as the StatusCallback on the call CREATED in
-// start-outbound-call (the destination leg) -- fires once that leg
-// reaches a terminal state (completed). This is the server-confirmed
-// signal CallContext.jsx polls outbound_calls for, as a backup to the
-// browser RELAY SDK's own call.state hangup/destroy notification, which
-// has proven unreliable for noticing when a call really ended (confirmed
-// case: agent hung up on their own end and the CRM kept showing
-// "connected" indefinitely).
-//
-// Deliberately separate from outbound-leg's cXML response -- this
-// function has zero influence over how the call is routed or behaves; it
-// only ever runs AFTER the call has already ended, and only writes one
-// column. A previous attempt added a statusCallback directly on the
-// Conference noun in outbound-leg instead, which visibly broke live call
-// connection/audio -- this version can't do that even in theory, since
-// it never returns cXML/SWML and isn't in the call-control path at all.
-//
-// Deploy via: Supabase Dashboard -> Edge Functions -> Deploy new function
-// (paste this file in as index.ts), name it "outbound-call-status". JWT
-// verification must be OFF -- SignalWire calls this directly.
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// SignalWire status callback for the PSTN destination leg. This endpoint is
+// deliberately outside the cXML call-control path: it only mirrors provider
+// state into outbound_calls so the browser can render the real call lifecycle.
 serve(async (req) => {
   try {
     const url = new URL(req.url)
     const conf = url.searchParams.get('conf')
     if (!conf) return new Response('ok')
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
+    const body = await req.text()
+    const form = new URLSearchParams(body)
+    const rawStatus = (form.get('CallStatus') || form.get('CallState') || '').toLowerCase()
 
-    await supabase.from('outbound_calls')
-      .update({ status: 'completed' })
-      .eq('conference_name', conf)
+    // Compatibility API statuses vary slightly by event. Normalize them to
+    // the small state set consumed by the CRM.
+    let status = rawStatus
+    if (rawStatus === 'in-progress' || rawStatus === 'answered') status = 'answered'
+    else if (rawStatus === 'queued' || rawStatus === 'initiated') status = 'pending'
+    else if (rawStatus === 'ringing') status = 'ringing'
+    else if (['completed', 'busy', 'failed', 'no-answer', 'canceled'].includes(rawStatus)) status = 'completed'
+
+    // A completed-only callback from older SignalWire configuration may not
+    // include CallStatus. In that case this callback itself is terminal.
+    if (!status) status = 'completed'
+
+    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+    const { error } = await supabase.from('outbound_calls').update({ status }).eq('conference_name', conf)
+    if (error) console.error('outbound-call-status update failed:', error)
+    else console.log('outbound-call-status:', conf, rawStatus || '(empty)', '=>', status)
 
     return new Response('ok')
   } catch (err) {
