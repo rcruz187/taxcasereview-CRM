@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-serve(async (req) => {
+serve(async (_req) => {
   // DIAGNOSTIC ONLY — reports which secrets are present (names only, never values)
   const hasSwSecret = Boolean(Deno.env.get('SW_SIGNING_SECRET'))
   const hasGroq = Boolean(Deno.env.get('GROQ_API_KEY'))
