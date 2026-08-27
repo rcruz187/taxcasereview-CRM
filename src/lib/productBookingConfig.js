@@ -86,7 +86,7 @@ export const PRODUCT_BOOKING_CONFIGS = {
     notifyEmail:   'info@romylabs.com',   // CENTRALIZED_FALLBACK
     replyTo:       'info@romylabs.com',   // CENTRALIZED_FALLBACK
     fromName:      'BocaSync',
-    inactive:      true,                  // no public booking until commercially ready
+    inactive:      false,
   },
 }
 
