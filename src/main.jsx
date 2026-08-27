@@ -4,6 +4,7 @@ import './index.css'
 import './theme-scrollbars.css'
 import App from './App.jsx'
 import EsignAuditBridge from './components/EsignAuditBridge.jsx'
+import EsignManagerAuditBridge from './components/EsignManagerAuditBridge.jsx'
 
 // Apply saved brand color instantly — before React renders (no flash)
 ;(function() {
@@ -57,6 +58,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />
     <EsignAuditBridge />
+    <EsignManagerAuditBridge />
   </React.StrictMode>
 )
 
