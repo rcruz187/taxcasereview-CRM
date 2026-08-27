@@ -1,0 +1,19 @@
+-- Internal-only SECURITY DEFINER RPCs must not be callable anonymously.
+revoke execute on function public.add_ticket_message(uuid,text,text) from public, anon;
+revoke execute on function public.add_ticket_message_typed(uuid,text,text,boolean) from public, anon;
+revoke execute on function public.assign_ticket_number() from public, anon;
+revoke execute on function public.check_linkedin_health() from public, anon;
+revoke execute on function public.create_addendum_installments(text,uuid) from public, anon;
+revoke execute on function public.current_tenant_id() from public, anon;
+revoke execute on function public.disconnect_accounting(text) from public, anon;
+revoke execute on function public.get_accounting_status() from public, anon;
+revoke execute on function public.get_next_tax_associate() from public, anon;
+revoke execute on function public.get_tenant_supabase_config() from public, anon;
+revoke execute on function public.leadflow_book_appointment(text,text,text,text,text,text,text) from public, anon;
+revoke execute on function public.leadflow_create_case(text,text,text,text,text,text,text) from public, anon;
+revoke execute on function public.leadflow_upsert_lead(text,text,text,text,text,text,text,text,text,text,numeric,text) from public, anon;
+revoke execute on function public.list_support_tickets() from public, anon;
+revoke execute on function public.notify_romylabs_site_rebuild() from public, anon;
+revoke execute on function public.open_ticket_count() from public, anon;
+revoke execute on function public.seed_default_chat_channels() from public, anon;
+revoke execute on function public.update_ticket_status(uuid,text,text) from public, anon;
