@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import './index.css'
 import './theme-scrollbars.css'
 import App from './App.jsx'
+import GlobalUiBridge from './components/GlobalUiBridge.jsx'
 
 // Apply saved brand color instantly — before React renders (no flash)
 ;(function() {
@@ -39,9 +40,6 @@ import App from './App.jsx'
 // to the app root — we read it back here and replace the history entry so
 // React Router sees the correct path + query string on first render.
 ;(function() {
-  // Restore deep-link URL after the GitHub Pages 404 SPA redirect.
-  // 404.html saves the full URL to sessionStorage before bouncing to root.
-  // We read it back here BEFORE React Router initialises so Router sees /book.
   try {
     const saved = sessionStorage.getItem('redirect') || sessionStorage.redirect
     if (saved && saved.includes('/')) {
@@ -55,6 +53,7 @@ import App from './App.jsx'
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />
+    <GlobalUiBridge />
   </React.StrictMode>
 )
 
