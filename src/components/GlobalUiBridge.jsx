@@ -175,6 +175,7 @@ export default function GlobalUiBridge() {
     }
 
     const clickCapture = e => {
+      if (!e.isTrusted) return
       const b = e.target?.closest?.('button')
       if (!b) return
       const text = (b.textContent || '').trim()
