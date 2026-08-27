@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'
+import './theme-scrollbars.css'
 import App from './App.jsx'
 
 // Apply saved brand color instantly — before React renders (no flash)
