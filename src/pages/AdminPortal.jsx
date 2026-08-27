@@ -1882,7 +1882,7 @@ const PRODUCT_REGISTRY = [
   },
   {
     key:        'groundivo',
-    label:      'Groundivo',
+    label:      'GroundIVO',
     icon:       '🌿',
     color:      '#16a34a',
     industry:   'Landscaping & Field Service',
