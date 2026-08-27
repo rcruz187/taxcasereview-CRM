@@ -19,6 +19,12 @@ import './index.css'
 import './theme-scrollbars.css'
 import App from './App.jsx'
 
+// Compatibility guard for legacy/lazy-loaded modules that still reference
+// React.* while using named React imports. Keep this assignment synchronous
+// and side-effect free; it mounts nothing and prevents route-level
+// "React is not defined" crashes after a hard refresh.
+globalThis.React = React
+
 // Apply saved brand color instantly — before React renders (no flash)
 ;(function() {
   const hex = localStorage.getItem('tcr_brand_color')
