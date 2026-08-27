@@ -1,3 +1,18 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// main.jsx MUST remain minimal.
+//
+// HARD RULE: Only App is mounted here. Nothing else.
+//
+// DO NOT mount additional components directly in this file. Components mounted
+// here run OUTSIDE App's ErrorBoundary and outside AppContext/auth state.
+// Any crash here (network error, missing RPC, uninitialized context) brings
+// down the entire application with a white screen — there is no recovery.
+//
+// Audit trail: EsignAuditBridge, EsignManagerAuditBridge, and TeamChatProBridge
+// were mounted here and caused a full production outage (2026-08-27).
+// They were removed to restore service. Their RPCs exist; if this functionality
+// is needed, mount inside App.jsx wrapped in an ErrorBoundary.
+// ─────────────────────────────────────────────────────────────────────────────
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'
