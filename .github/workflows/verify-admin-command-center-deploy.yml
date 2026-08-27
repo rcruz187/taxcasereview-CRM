@@ -1,0 +1,49 @@
+name: Verify Admin Command Center Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/verify-admin-command-center-deploy.yml'
+      - 'public/romylabs-admin-hotfix.js'
+      - 'src/pages/AdminPortal.jsx'
+      - 'src/App.jsx'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Production build
+        run: npm run build
+
+      - name: Verify dangerous DOM-hiding code is absent
+        run: |
+          ! grep -q "removeResolvedAlert" public/romylabs-admin-hotfix.js
+          ! grep -q "card.style.display = 'none'" public/romylabs-admin-hotfix.js
+          grep -q "CC_HIDE_FIX_20260827" public/romylabs-admin-hotfix.js
+
+      - name: Wait for Cloudflare production fingerprint
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://admin.romylabs.com/romylabs-admin-hotfix.js"
+          for i in {1..30}; do
+            body="$(curl -fsSL --max-time 15 -H 'Cache-Control: no-cache' "${url}?verify=$(date +%s)" || true)"
+            if printf '%s' "$body" | grep -q 'CC_HIDE_FIX_20260827'; then
+              echo "Production is serving the Command Center visibility fix."
+              if printf '%s' "$body" | grep -q 'removeResolvedAlert'; then
+                echo "ERROR: stale DOM-hiding code is still present in production"
+                exit 1
+              fi
+              exit 0
+            fi
+            echo "Attempt $i/30: production not updated yet; waiting 10s..."
+            sleep 10
+          done
+          echo "ERROR: production never served the expected fingerprint"
+          exit 1
