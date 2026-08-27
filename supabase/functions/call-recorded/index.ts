@@ -52,9 +52,7 @@ serve(async (req) => {
     // ── End authentication ─────────────────────────────────────────────────────
     const form = new URLSearchParams(rawBody)
     // Basic structural validation: key SignalWire fields must be present
-    const callSid = form.get('CallSid')
-    const recordingUrl = form.get('RecordingUrl')
-    if (!callSid || !recordingUrl) {
+    if (!form.get('CallSid') || !form.get('RecordingUrl')) {
       console.warn('call-recorded: missing CallSid or RecordingUrl — rejected')
       return new Response('Bad Request', { status: 400 })
     }
