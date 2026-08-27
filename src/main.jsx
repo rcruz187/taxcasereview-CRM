@@ -18,12 +18,15 @@ import ReactDOM from 'react-dom/client'
 import './index.css'
 import './theme-scrollbars.css'
 import App from './App.jsx'
+import { getModel } from './lib/leadStatus'
 
-// Compatibility guard for legacy/lazy-loaded modules that still reference
-// React.* while using named React imports. Keep this assignment synchronous
-// and side-effect free; it mounts nothing and prevents route-level
-// "React is not defined" crashes after a hard refresh.
+// Emergency compatibility guards for lazy-loaded modules that were recently
+// refactored to use new helpers/hooks without importing them locally. These are
+// synchronous and side-effect free; they mount nothing. Keep the app available
+// while the individual modules are normalized back to explicit imports.
 globalThis.React = React
+globalThis.getModel = getModel
+globalThis.useMemo = React.useMemo
 
 // Apply saved brand color instantly — before React renders (no flash)
 ;(function() {
