@@ -67,19 +67,13 @@
     }
   }, true);
 
-  function removeResolvedAlert(pattern) {
-    var nodes = document.querySelectorAll('div,span,p,li');
-    for (var i = 0; i < nodes.length; i++) {
-      var text = (nodes[i].textContent || '').replace(/\s+/g, ' ').trim();
-      if (!pattern.test(text)) continue;
-      var card = nodes[i];
-      for (var j = 0; j < 5 && card && card !== document.body; j++, card = card.parentElement) {
-        if (card.children && card.children.length > 0) { card.style.display = 'none'; break; }
-      }
-    }
-  }
-
-  function rewrite() {
+  /* IMPORTANT: this guard must never hide or mutate rendered Command Center
+   * containers based on textContent. Previous alert-cleanup code walked every
+   * div/span/p/li and set display:none on matching ancestors; because Overview
+   * contains the old alert phrases inside its own text tree, that could hide the
+   * entire Command Center shortly after render. Product-link normalization is
+   * intentionally limited to anchor hrefs only. */
+  function rewriteLinks() {
     var anchors = document.querySelectorAll('a[href]');
     for (var i = 0; i < anchors.length; i++) {
       var oldHref = anchors[i].getAttribute('href');
@@ -90,14 +84,11 @@
       if (/^Open(?: CRM)?\s*→?$/i.test(label) && forced) newHref = forced;
       if (newHref && newHref !== oldHref) anchors[i].setAttribute('href', newHref);
     }
-    removeResolvedAlert(/GSC deceptive pages review pending/i);
-    removeResolvedAlert(/arcvena\.com DNS cutover not complete/i);
-    removeResolvedAlert(/provision-org edge fn not yet deployed/i);
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', rewrite, { once: true });
-  else rewrite();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', rewriteLinks, { once: true });
+  else rewriteLinks();
 
   var count = 0;
-  var timer = window.setInterval(function () { rewrite(); count += 1; if (count >= 20) window.clearInterval(timer); }, 500);
+  var timer = window.setInterval(function () { rewriteLinks(); count += 1; if (count >= 20) window.clearInterval(timer); }, 500);
 })();
