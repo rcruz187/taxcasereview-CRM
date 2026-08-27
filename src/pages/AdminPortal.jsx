@@ -1801,7 +1801,7 @@ function ProductReportingSetup({ productKey, channel, registryProduct }) {
 // Products tab — hub for all CRMs. Each card opens a live dashboard panel.
 const PRODUCT_REGISTRY = [
   // ── ARCHITECTURE NOTE ────────────────────────────────────────────────────
-  // PRODUCTS: TaxRes CRM (platform), Camvella, Arcvena, BocaSync, Groundivo, + planned verticals
+  // PRODUCTS: TaxRes CRM (platform), Camvella, Arcvena, BocaSync, GroundIVO, + planned verticals
   // CUSTOMERS/TENANTS: Tax Case Review, Nashville, CloudCPA (live TaxRes tenants — not products)
   // connection: 'connected' | 'partial' | 'not_connected'
   // lifecycleStage: 'live' | 'available' | 'building' | 'research' | 'internal'
@@ -1882,7 +1882,7 @@ const PRODUCT_REGISTRY = [
   },
   {
     key:        'groundivo',
-    label:      'Groundivo',
+    label:      'GroundIVO',
     icon:       '🌿',
     color:      '#16a34a',
     industry:   'Landscaping & Field Service',
