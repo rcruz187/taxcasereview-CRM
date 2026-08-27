@@ -7,10 +7,10 @@ This subsystem bills RomyLabs customers for SaaS subscriptions. It is intentiona
 - Invoice automatically each billing cycle.
 - Day 10 after invoice issuance: first past-due notice if unpaid.
 - Day 15: second/final notice with the suspension deadline.
-- Day 20: move to `suspension_pending`, call the product entitlement adapter, and mark `suspended` only after the CRM confirms access was denied.
-- Successful full payment moves an enforced account to `restore_pending`, calls the product entitlement adapter, and marks `active` only after the CRM confirms access was restored.
-- Failed suspend/restore enforcement remains pending with `enforcement_error` recorded and is retried by the daily billing cycle.
-- Platform owner can disable auto-suspension or place a manual hold for exceptions.
+- Day 20: account becomes eligible for suspension only when `auto_suspend=true` and the balance is still unpaid.
+- New billing accounts default to `auto_suspend=false`; suspension must be explicitly enabled after the product adapter has passed acceptance testing.
+- Successful full payment restores the account through a server-side payment/access adapter and records a `restored` event.
+- Platform owner can keep auto-suspension disabled for exceptions or products that have not completed entitlement testing.
 
 The day values are per-account configuration, not hardcoded business logic, so RomyLabs can change the policy without rebuilding every CRM.
 
@@ -20,9 +20,9 @@ The day values are per-account configuration, not hardcoded business logic, so R
 2. Never mix SaaS subscription invoices with tenant end-customer billing.
 3. Suspension is an entitlement/access state, not deletion. Never delete tenant data for nonpayment.
 4. Product adapters must preserve the tenant and its data while denying normal application access.
-5. Restoration must be reversible, audited, server-side, and confirmed before the central account is marked active.
-6. Every notice, suspension, restoration, failed payment, enforcement failure, and manual override is written to the RomyLabs billing/audit state.
-7. The central enforcer accepts product keys/accounts only; arbitrary proxy URLs are never accepted.
+5. Restoration must be reversible, audited, and server-side.
+6. Every notice, suspension, restoration, failed payment, and manual override is written to `romylabs_collection_events`.
+7. Never mark an account `suspended` or restored to `active` until the product adapter confirms enforcement.
 
 ## Tables
 
@@ -33,31 +33,41 @@ The day values are per-account configuration, not hardcoded business logic, so R
 
 ## Automation
 
-`romylabs-billing-cycle` is intended for a daily authenticated cron. It creates monthly invoices, advances unpaid invoices through collections, retries pending suspensions, and retries pending restorations.
+The billing runtime creates monthly invoices and advances unpaid invoices through the collection state machine. It supports authenticated cycle, notification, payment and entitlement-enforcement operations. Email delivery uses Brevo server-side; payment events must arrive through a trusted provider adapter/webhook.
 
-`romylabs-billing-notify` delivers invoice/reminder email through the server-side mail provider.
+The TaxRes Supabase project is currently at its Edge Function slot limit. Rather than increasing spend or deleting a live function without approval, the already-closed `github-credential-check-temp` slot has been repurposed in production as the consolidated RomyLabs billing runtime. It is an internal deployment alias only. The dedicated `romylabs-billing-*` source functions remain the canonical implementation and can be deployed under their final names once function capacity is available.
 
-`romylabs-billing-payment` records idempotent subscription payment events and initiates restoration after all overdue balances are cured.
+The live runtime performs its own secret authentication and therefore has Supabase JWT verification disabled. Required server-side secrets are:
 
-`romylabs-billing-enforce` is the central server-side entitlement dispatcher. TaxRes tenants are enforced locally. Camvella, Arcvena, and BocaSync use protected product-side `romylabs-entitlement` endpoints.
+- `ROMYLABS_ENTITLEMENT_SECRET`
+- `ROMYLABS_BILLING_CRON_SECRET`
+- `ROMYLABS_BILLING_WEBHOOK_SECRET`
+- `BREVO_API_KEY`
+- optional `ROMYLABS_BILLING_FROM_EMAIL` (defaults to `billing@romylabs.com`)
 
-## Product entitlement status
+Do not put any of these values in browser code or commit them to GitHub.
 
-- **TaxRes CRM:** local `tenants.status` enforcement; existing app tenant-status gate blocks suspended/cancelled offices.
-- **Camvella:** product adapter uses `saas_subscriptions.status` (`paused` / `active`) and the auth gate rejects paused subscriptions.
-- **Arcvena:** product adapter uses tenant `SUSPENDED` / `ACTIVE` state and the auth gate rejects suspended/inactive tenants.
-- **BocaSync:** product adapter uses a practice-level `billing_suspended` entitlement flag; patient billing and clinical data are not involved.
-- **GroundIVO:** intentionally excluded from automatic entitlement enforcement while the CRM recovery/stabilization freeze is active. Any GroundIVO billing account must keep `auto_suspend=false` until that freeze is formally lifted and its product adapter is implemented/tested.
+## Product integration contract
 
-## Production prerequisites
+Each commercial CRM implements a protected server-side entitlement endpoint accepting only RomyLabs-authorized requests and actions such as `suspend` and `restore`. The endpoint changes tenant/practice subscription access only. It must not expose or mutate clinical, tax, financial, payroll, resident, patient, or other customer records.
 
-Before enabling automatic suspension in production:
+Current product adapters:
 
-1. Apply both RomyLabs billing migrations.
-2. Deploy `romylabs-billing-cycle`, `romylabs-billing-notify`, `romylabs-billing-payment`, and `romylabs-billing-enforce` in the RomyLabs/TaxRes Supabase project.
-3. Deploy each product's `romylabs-entitlement` endpoint and auth-gate changes for Camvella, Arcvena, and BocaSync.
-4. Configure the same strong `ROMYLABS_ENTITLEMENT_SECRET` in the central and product Supabase environments.
-5. Configure `ROMYLABS_BILLING_CRON_SECRET`, `ROMYLABS_BILLING_WEBHOOK_SECRET`, `BREVO_API_KEY`, and the billing sender address server-side.
-6. Wire a trusted payment-provider webhook/adapter into `romylabs-billing-payment`; do not expose the generic billing secret to clients.
-7. Run an end-to-end non-production test: invoice → notice 1 → final notice → suspension confirmed → payment → restoration confirmed.
-8. Only after that test should `auto_suspend=true` be enabled for live customer accounts.
+- TaxRes CRM: local tenant status enforcement in the central runtime.
+- Camvella: merged entitlement endpoint + authenticated org subscription gate; production migration/function deployment still requires Camvella Supabase access and the shared entitlement secret.
+- Arcvena: merged entitlement endpoint + tenant-status auth gate; production function deployment still requires Arcvena Supabase access and the shared entitlement secret.
+- BocaSync: merged practice-level entitlement migration + endpoint + auth gate; production migration/function deployment still requires BocaSync Supabase access and the shared entitlement secret.
+- GroundIVO: intentionally excluded from entitlement enforcement while its recovery/stabilization freeze remains active.
+
+## Production acceptance gate
+
+Keep `auto_suspend=false` until all of the following are true for a product:
+
+1. Its entitlement migration (if any) is installed in production.
+2. Its `romylabs-entitlement` function is deployed with custom secret authentication.
+3. `ROMYLABS_ENTITLEMENT_SECRET` matches the central runtime value.
+4. A non-production tenant/practice has completed suspend -> login blocked -> restore -> login restored testing.
+5. Payment processing has completed invoice -> payment -> confirmed restoration testing.
+6. No customer, patient, resident, clinical, tax, payroll, document, or payment-card data changed during the test.
+
+Only after the acceptance gate passes should `auto_suspend=true` be enabled for a live billing account.
