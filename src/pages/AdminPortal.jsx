@@ -3426,7 +3426,12 @@ function CommandCenter() {
   const tab = searchParams.get('tab') || 'overview'
   const setTab = (key) => setSearchParams({ tab: key }, { replace: false })
   const [data, setData] = useState(null)
+  const [crmProduct, setCrmProduct] = useState('taxres_crm')
   const [crmAccount, setCrmAccount] = useState('all')
+  const [crmRemoteData, setCrmRemoteData] = useState(null)
+  const [crmRemoteLoading, setCrmRemoteLoading] = useState(false)
+  const [crmRemoteError, setCrmRemoteError] = useState('')
+  const [crmAccountMetrics, setCrmAccountMetrics] = useState(null)
   const [activity, setActivity] = useState([])
   const [activityPoll, setActivityPoll] = useState(0)
 
@@ -3594,10 +3599,53 @@ function CommandCenter() {
   React.useEffect(() => {
     supabase.from('romylabs_products')
       .select('product_id,name,accent_color,icon_ref,sort_order,lifecycle,app_url,marketing_url')
-      .eq('active', true).eq('public', true)
+      .eq('active', true)
       .order('sort_order')
-      .then(({ data }) => { if (data?.length) setReportingProducts(data) })
+      .then(({ data, error }) => {
+        if (error) console.error('CRM product registry:', error)
+        if (data?.length) setReportingProducts(data.filter(p => String(p.lifecycle || '').toLowerCase() !== 'internal'))
+      })
   }, [])
+
+  const fetchCrmMetricsUrl = React.useCallback(async (url) => {
+    if (!url) return null
+    const { data: sessionData } = await supabase.auth.getSession()
+    const token = sessionData?.session?.access_token
+    if (!token) throw new Error('Admin session unavailable')
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok || body?.ok === false) throw new Error(body?.error || `Metrics request failed (${res.status})`)
+    return body
+  }, [])
+
+  React.useEffect(() => {
+    setCrmAccount('all')
+    setCrmAccountMetrics(null)
+    setCrmRemoteError('')
+    if (crmProduct === 'taxres_crm') { setCrmRemoteData(null); return }
+    const product = PRODUCT_REGISTRY.find(p => p.key === crmProduct && !p.isTenant)
+    if (!product?.metricsUrl) { setCrmRemoteData(null); return }
+    let cancelled = false
+    setCrmRemoteLoading(true)
+    fetchCrmMetricsUrl(product.metricsUrl)
+      .then(body => { if (!cancelled) setCrmRemoteData(body) })
+      .catch(err => { if (!cancelled) { setCrmRemoteData(null); setCrmRemoteError(String(err?.message || err)) } })
+      .finally(() => { if (!cancelled) setCrmRemoteLoading(false) })
+    return () => { cancelled = true }
+  }, [crmProduct, fetchCrmMetricsUrl])
+
+  React.useEffect(() => {
+    setCrmAccountMetrics(null)
+    if (crmProduct !== 'taxres_crm' || !String(crmAccount).startsWith('registry:')) return
+    const key = String(crmAccount).slice('registry:'.length)
+    const tenantProduct = PRODUCT_REGISTRY.find(p => p.isTenant && p.key === key)
+    if (!tenantProduct?.metricsUrl) return
+    let cancelled = false
+    fetchCrmMetricsUrl(tenantProduct.metricsUrl)
+      .then(body => { if (!cancelled) setCrmAccountMetrics(body) })
+      .catch(err => { if (!cancelled) setCrmRemoteError(String(err?.message || err)) })
+    return () => { cancelled = true }
+  }, [crmProduct, crmAccount, fetchCrmMetricsUrl])
 
   // ── GSC state + fetch ──
   const [gscData, setGscData]         = useState(null)
@@ -4311,12 +4359,30 @@ function CommandCenter() {
         {tab==='crm' && (<>
           {/* ── CRM scope: TaxRes CRM offices only (TCR Supabase) ── */}
           {(()=>{
-            // CRM account drilldown — derived from live tenant data
-            const crmTenants = data.tenants || []
-            const activeTenant = crmAccount === 'all' ? null : crmTenants.find(t=>t.id===crmAccount)
-            const crmClients = activeTenant ? Number(activeTenant.client_count||0) : data.kpis.totalClients
-            const crmLeads   = activeTenant ? Number(activeTenant.lead_count||0)   : data.kpis.totalLeads
-            const crmSeats   = activeTenant ? Number(activeTenant.employee_count||0): data.kpis.totalSeats
+            // CRM account drilldown — TaxRes local tenants + product platform-metrics offices.
+            const selectedProduct = PRODUCT_REGISTRY.find(p => p.key === crmProduct && !p.isTenant)
+              || { key: crmProduct, label: reportingProducts.find(p=>p.product_id===crmProduct)?.name || crmProduct }
+            const localTaxRes = data.tenants || []
+            const taxResRegistryTenants = PRODUCT_REGISTRY.filter(p=>p.isTenant).map(p=>({
+              id:`registry:${p.key}`, firm_name:p.label, status:'active', tenant_code:p.key.toUpperCase(), metricsUrl:p.metricsUrl, registryOnly:true,
+            }))
+            const seenNames = new Set(localTaxRes.map(t=>String(t.firm_name||'').trim().toLowerCase()))
+            const mergedTaxRes = [...localTaxRes, ...taxResRegistryTenants.filter(t=>!seenNames.has(String(t.firm_name||'').trim().toLowerCase()))]
+            const remoteOffices = (crmRemoteData?.offices || []).map(o=>({
+              id:o.id, firm_name:o.name, status:o.is_active===false?'inactive':'active', tenant_code:o.subscription_status || '',
+              client_count:o.active_clients ?? o.customer_count, lead_count:o.active_leads ?? o.lead_count, employee_count:o.active_staff ?? o.staff_count,
+              cases_count:o.open_jobs ?? o.job_count, tasks_count:o.pending_tasks, transactions_count:o.outstanding_invoices, mrr:o.mrr, remote:true,
+            }))
+            const crmTenants = crmProduct === 'taxres_crm' ? mergedTaxRes : remoteOffices
+            const activeTenant = crmAccount === 'all' ? null : crmTenants.find(t=>String(t.id)===String(crmAccount))
+            const productMetrics = crmProduct === 'taxres_crm' ? null : (crmRemoteData?.metrics || {})
+            const selectedMetrics = activeTenant?.registryOnly ? (crmAccountMetrics?.metrics || {}) : null
+            const metricValue = (tenantKey, productKey, taxresFallback) => {
+              if (selectedMetrics) return selectedMetrics[productKey] ?? '—'
+              if (activeTenant) return activeTenant[tenantKey] ?? '—'
+              if (crmProduct !== 'taxres_crm') return productMetrics[productKey] ?? '—'
+              return taxresFallback
+            }
             const realMB     = (data.kpis.realStorageBytes / 1048576).toFixed(2)
             const realObjs   = data.kpis.realStorageObjects
             return (<>
@@ -4324,13 +4390,18 @@ function CommandCenter() {
             background:'rgba(99,102,241,.06)', border:'1px solid rgba(99,102,241,.15)',
             borderRadius:10, padding:'10px 16px' }}>
             <span style={{ fontSize:11, fontWeight:700, color:'#475569' }}>Product:</span>
-            <span style={{ fontSize:12, fontWeight:800, color:'#a5b4fc' }}>TaxRes CRM</span>
+            <select value={crmProduct} onChange={e=>setCrmProduct(e.target.value)}
+              style={{ fontSize:12, fontWeight:800, background:'rgba(99,102,241,.15)', border:'1px solid rgba(99,102,241,.3)', borderRadius:6, color:'#a5b4fc', padding:'4px 8px', cursor:'pointer' }}>
+              {(reportingProducts.length ? reportingProducts.map(p=>({ key:p.product_id, label:p.name })) : PRODUCT_REGISTRY.filter(p=>!p.isTenant && ['live','available','building'].includes(p.lifecycleStage)).map(p=>({key:p.key,label:p.label})))
+                .filter((p,i,a)=>a.findIndex(x=>x.key===p.key)===i)
+                .map(p=><option key={p.key} value={p.key}>{p.label}</option>)}
+            </select>
             <span style={{ fontSize:11, fontWeight:700, color:'#475569', marginLeft:8 }}>Account:</span>
             <select value={crmAccount} onChange={e=>setCrmAccount(e.target.value)}
               style={{ fontSize:12, fontWeight:700, background:'rgba(99,102,241,.15)',
                 border:'1px solid rgba(99,102,241,.3)', borderRadius:6, color:'#e2e8f0',
                 padding:'4px 8px', cursor:'pointer' }}>
-              <option value="all">All TaxRes Offices</option>
+              <option value="all">All {selectedProduct.label} Offices</option>
               {crmTenants.map(t=>(
                 <option key={t.id} value={t.id}>{t.firm_name}</option>
               ))}
@@ -4345,20 +4416,29 @@ function CommandCenter() {
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:24 }}>
             {(activeTenant ? [
-              { label:`Clients — ${activeTenant.firm_name}`,     value:Number(activeTenant.client_count||0).toLocaleString(), icon:'🏢', color:'#10b981' },
-              { label:`Leads — ${activeTenant.firm_name}`,       value:Number(activeTenant.lead_count||0).toLocaleString(),   icon:'👤', color:'#a855f7' },
-              { label:`Seats — ${activeTenant.firm_name}`,       value:Number(activeTenant.employee_count||0),                icon:'👥', color:'#6366f1' },
-              { label:`Cases — ${activeTenant.firm_name}`,       value:Number(activeTenant.cases_count||0).toLocaleString(),  icon:'📁', color:'#6366f1' },
-              { label:`Open Tasks — ${activeTenant.firm_name}`,  value:Number(activeTenant.tasks_count||0).toLocaleString(),  icon:'✅', color:'#0ea5e9' },
-              { label:`Transactions — ${activeTenant.firm_name}`,value:Number(activeTenant.transactions_count||0).toLocaleString(), icon:'💳', color:'#f59e0b' },
+              { label:`Clients — ${activeTenant.firm_name}`, value:String(metricValue('client_count','active_clients','—')), icon:'🏢', color:'#10b981' },
+              { label:`Leads — ${activeTenant.firm_name}`, value:String(metricValue('lead_count','active_leads','—')), icon:'👤', color:'#a855f7' },
+              { label:`Seats — ${activeTenant.firm_name}`, value:String(metricValue('employee_count','active_staff','—')), icon:'👥', color:'#6366f1' },
+              { label:`Jobs / Cases — ${activeTenant.firm_name}`, value:String(metricValue('cases_count','open_jobs','—')), icon:'📁', color:'#6366f1' },
+              { label:`Pending Tasks — ${activeTenant.firm_name}`, value:String(metricValue('tasks_count','pending_tasks','—')), icon:'✅', color:'#0ea5e9' },
+              { label:`Outstanding — ${activeTenant.firm_name}`, value:String(metricValue('transactions_count','outstanding_invoices','—')), icon:'💳', color:'#f59e0b' },
+            ] : crmProduct !== 'taxres_crm' ? [
+              { label:`Active Clients — ${selectedProduct.label}`, value:String(productMetrics.active_clients ?? '—'), icon:'🏢', color:'#10b981' },
+              { label:`Active Leads — ${selectedProduct.label}`, value:String(productMetrics.active_leads ?? '—'), icon:'👤', color:'#a855f7' },
+              { label:`Active Staff — ${selectedProduct.label}`, value:String(productMetrics.active_staff ?? '—'), icon:'👥', color:'#6366f1' },
+              { label:`Active Offices — ${selectedProduct.label}`, value:String(productMetrics.active_offices ?? crmTenants.length), icon:'📁', color:'#6366f1' },
+              { label:`Open Jobs — ${selectedProduct.label}`, value:String(productMetrics.open_jobs ?? productMetrics.pending_tasks ?? '—'), icon:'✅', color:'#0ea5e9' },
+              { label:`MRR — ${selectedProduct.label}`, value:productMetrics.mrr != null ? `$${Number(productMetrics.mrr).toLocaleString()}` : '—', icon:'💳', color:'#f59e0b' },
             ] : [
-              { label:'Total Clients — TaxRes Offices',  value:data.kpis.totalClients.toLocaleString(), icon:'🏢', color:'#10b981' },
-              { label:'Total Leads — TaxRes Offices',    value:data.kpis.totalLeads.toLocaleString(),   icon:'👤', color:'#a855f7' },
-              { label:'Total Seats — TaxRes Offices',    value:data.kpis.totalSeats,                    icon:'👥', color:'#6366f1' },
-              { label:'Pending E-Signs',                 value:data.kpis.pendingEsigns,                 icon:'✍️', color:'#8b5cf6' },
-              { label:'Demos Today',                     value:data.kpis.todayDemos,                    icon:'📅', color:'#0ea5e9' },
-              { label:'File Storage',  value:`${realMB} MB · ${realObjs} files`,                       icon:'💾', color:'#f59e0b' },
+              { label:'Total Clients — TaxRes Offices', value:data.kpis.totalClients.toLocaleString(), icon:'🏢', color:'#10b981' },
+              { label:'Total Leads — TaxRes Offices', value:data.kpis.totalLeads.toLocaleString(), icon:'👤', color:'#a855f7' },
+              { label:'Total Seats — TaxRes Offices', value:data.kpis.totalSeats, icon:'👥', color:'#6366f1' },
+              { label:'Pending E-Signs', value:data.kpis.pendingEsigns, icon:'✍️', color:'#8b5cf6' },
+              { label:'Demos Today', value:data.kpis.todayDemos, icon:'📅', color:'#0ea5e9' },
+              { label:'File Storage', value:`${realMB} MB · ${realObjs} files`, icon:'💾', color:'#f59e0b' },
             ]).map(k => <KPICard key={k.label} {...k} />)}
+            {crmRemoteLoading && <div style={{gridColumn:'1/-1',fontSize:12,color:'#64748b'}}>Loading {selectedProduct.label} offices…</div>}
+            {crmRemoteError && <div style={{gridColumn:'1/-1',fontSize:12,color:'#fca5a5'}}>CRM metrics: {crmRemoteError}</div>}
           </div>
           </>)
           })()}
