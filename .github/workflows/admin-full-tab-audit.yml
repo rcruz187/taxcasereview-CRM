@@ -1,0 +1,30 @@
+name: Admin Portal Full Tab Audit
+on:
+  push:
+    branches: [fix/admin-portal-full-tab-audit-20260827]
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - name: Production build
+        run: npm run build
+      - name: Verify admin route ownership and tab wiring
+        run: |
+          grep -q "AdminPortalGuard" src/App.jsx
+          grep -q 'path="/crm-admin/\*"' src/App.jsx
+          grep -q 'path="/command-center"' src/pages/AdminPortal.jsx
+          grep -q 'path="/offices"' src/pages/AdminPortal.jsx
+          grep -q 'path="/provision"' src/pages/AdminPortal.jsx
+          grep -q 'path="/billing"' src/pages/AdminPortal.jsx
+          grep -q 'path="/demo"' src/pages/AdminPortal.jsx
+          grep -q 'path="/employees"' src/pages/AdminPortal.jsx
+          grep -q 'path="/support"' src/pages/AdminPortal.jsx
+          grep -q 'path="/audit"' src/pages/AdminPortal.jsx
+          grep -q 'path="/email"' src/pages/AdminPortal.jsx
+          grep -q 'path="/calendar"' src/pages/AdminPortal.jsx
+          grep -q 'path="/chat"' src/pages/AdminPortal.jsx
+          grep -q "const \[crmAccount, setCrmAccount\] = useState('all')" src/pages/AdminPortal.jsx
+          ! grep -q "removeResolvedAlert" public/romylabs-admin-hotfix.js
