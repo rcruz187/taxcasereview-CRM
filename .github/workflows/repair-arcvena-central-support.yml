@@ -1,0 +1,67 @@
+name: Repair Arcvena Central Support
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/repair-arcvena-central-support.yml']
+permissions:
+  contents: read
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      CENTRAL_REF: mpxgxfqdbquzkrvvejkh
+      ARCVENA_REF: wzalqfxovxxszojfbnis
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24' }
+      - name: Confirm central project and registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >/tmp/q.json
+          import json
+          q="""
+          select jsonb_build_object(
+            'product',(select to_jsonb(p) from (select product_id,name,active,lifecycle from public.romylabs_products where product_id='arcvena') p),
+            'support',(select to_jsonb(s) from (select product_id,support_enabled,secret_env_key from public.romylabs_product_support where product_id='arcvena') s)
+          ) as audit;
+          """
+          print(json.dumps({'query':q}))
+          PY
+          OUT=$(curl --fail-with-body -sS -X POST "https://api.supabase.com/v1/projects/${CENTRAL_REF}/database/query" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" -H 'Content-Type: application/json' --data-binary @/tmp/q.json)
+          echo "$OUT" | tee /tmp/registry.json
+          echo "$OUT" | grep -q '"product_id":"arcvena"'
+          echo "$OUT" | grep -q '"active":true'
+          echo "$OUT" | grep -q '"support_enabled":true'
+          echo "$OUT" | grep -q '"secret_env_key":"ARCVENA_SUPPORT_SECRET"'
+          echo CENTRAL_REGISTRY_OK
+      - name: Confirm central secret name exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes supabase@latest secrets list --project-ref "$CENTRAL_REF" | tee /tmp/central-secrets.txt
+          grep -q 'ARCVENA_SUPPORT_SECRET' /tmp/central-secrets.txt
+          echo CENTRAL_ARCVENA_SECRET_NAME_PRESENT
+      - name: Confirm Arcvena secret name and support URL exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes supabase@latest secrets list --project-ref "$ARCVENA_REF" | tee /tmp/arcvena-secrets.txt
+          grep -q 'ARCVENA_SUPPORT_SECRET' /tmp/arcvena-secrets.txt
+          grep -q 'ROMYLABS_SUPPORT_API_URL' /tmp/arcvena-secrets.txt
+          echo ARCVENA_CALLER_CONFIG_NAMES_PRESENT
+      - name: Deploy latest central support-api without JWT verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes supabase@latest functions deploy support-api --project-ref "$CENTRAL_REF" --no-verify-jwt
+          npx --yes supabase@latest functions list --project-ref "$CENTRAL_REF" | tee /tmp/functions.txt
+          grep -q 'support-api' /tmp/functions.txt
+          echo CENTRAL_SUPPORT_API_DEPLOYED
+      - name: Show functions CLI capabilities for log follow-up
+        shell: bash
+        run: |
+          npx --yes supabase@latest functions --help || true
