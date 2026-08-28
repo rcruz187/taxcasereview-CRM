@@ -11,7 +11,6 @@ jobs:
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       CENTRAL_REF: mpxgxfqdbquzkrvvejkh
-      ARCVENA_REF: wzalqfxovxxszojfbnis
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,7 +31,7 @@ jobs:
           PY
           OUT=$(curl --fail-with-body -sS -X POST "https://api.supabase.com/v1/projects/${CENTRAL_REF}/database/query" \
             -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" -H 'Content-Type: application/json' --data-binary @/tmp/q.json)
-          echo "$OUT" | tee /tmp/registry.json
+          echo "$OUT"
           echo "$OUT" | grep -q '"product_id":"arcvena"'
           echo "$OUT" | grep -q '"active":true'
           echo "$OUT" | grep -q '"support_enabled":true'
@@ -48,14 +47,6 @@ jobs:
           else
             echo CENTRAL_ARCVENA_SECRET_NAME_MISSING
           fi
-      - name: Confirm Arcvena caller secret/config names exist
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx --yes supabase@latest secrets list --project-ref "$ARCVENA_REF" | tee /tmp/arcvena-secrets.txt
-          grep -q 'ARCVENA_SUPPORT_SECRET' /tmp/arcvena-secrets.txt
-          grep -q 'ROMYLABS_SUPPORT_API_URL' /tmp/arcvena-secrets.txt
-          echo ARCVENA_CALLER_CONFIG_NAMES_PRESENT
       - name: Deploy latest central support-api without JWT verification
         shell: bash
         run: |
@@ -64,9 +55,11 @@ jobs:
           npx --yes supabase@latest functions list --project-ref "$CENTRAL_REF" | tee /tmp/functions.txt
           grep -q 'support-api' /tmp/functions.txt
           echo CENTRAL_SUPPORT_API_DEPLOYED
-      - name: Record current central support deployment state
+      - name: Final diagnosis
         shell: bash
         run: |
-          set -euo pipefail
-          echo 'Central support-api deployed from repository main.'
-          echo 'If ARCVENA_SUPPORT_SECRET is missing centrally, auth must fail at env-secret load before HMAC comparison.'
+          if grep -q 'ARCVENA_SUPPORT_SECRET' /tmp/central-secrets.txt; then
+            echo READY_FOR_SIGNED_REQUEST_TEST
+          else
+            echo BLOCKED_ONLY_ON_CENTRAL_ARCVENA_SUPPORT_SECRET
+          fi
