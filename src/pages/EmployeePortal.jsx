@@ -238,25 +238,21 @@ export default function EmployeePortal() {
   }
 
   async function loadSmsThread(phone) {
-    if (!phone) return
-    const clean = phone.replace(/\D/g, '').slice(-10)
-    const { data } = await supabase
-      .from('sms_messages')
-      .select('*')
-      .or(`from_number.ilike.%${clean}%,to_number.ilike.%${clean}%`)
-      .order('created_at', { ascending: true })
-      .limit(50)
-    setSmsMessages(data || [])
+    if (!phone || !empToken) return
+    const { data, error } = await supabase.rpc('emp_sms_messages', { p_token: empToken, p_phone: phone })
+    setSmsMessages(error ? [] : (Array.isArray(data) ? data : []))
   }
 
   async function sendSms(client) {
-    if (!smsBody.trim() || !client?.phone) return
+    if (!smsBody.trim() || !client?.phone || !empToken || !client?.id) return
     setSmsSending(true)
-    await supabase.functions.invoke('send-sms', {
-      body: { to: client.phone, body: smsBody, client_id: client.client_id, tenant_id: emp.tenant_id }
+    const { error } = await supabase.functions.invoke('send-sms', {
+      body: { to: client.phone, body: smsBody, client_id: client.id, employee_portal_token: empToken }
     })
-    setSmsBody('')
-    await loadSmsThread(client.phone)
+    if (!error) {
+      setSmsBody('')
+      await loadSmsThread(client.phone)
+    }
     setSmsSending(false)
   }
 
