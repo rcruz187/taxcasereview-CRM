@@ -18,55 +18,29 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import os, json, urllib.request, urllib.error
-          token=os.environ['SUPABASE_ACCESS_TOKEN']; ref=os.environ['PROJECT_REF']
-          sql=r'''
-          select 'TENANTS' as section, coalesce(json_agg(x),'[]'::json) as data
-          from (
-            select id, firm_name, tenant_code, plan_tier, status, monthly_rate, per_seat_rate, created_at
-            from public.tenants
-            where lower(coalesce(firm_name,'')) like '%nashville%'
-               or lower(coalesce(tenant_code,'')) like '%nashville%'
-            order by created_at
-          ) x;
-
-          select 'PROSPECTS' as section, coalesce(json_agg(x),'[]'::json) as data
-          from (
-            select *
-            from public.prospects
-            where lower(coalesce(company_name,'')) like '%nashville%'
-               or lower(coalesce(contact_name,'')) like '%nashville%'
-               or lower(coalesce(notes,'')) like '%nashville%'
-            order by created_at desc
-            limit 20
-          ) x;
-
-          select 'ALL_TENANTS' as section, coalesce(json_agg(x),'[]'::json) as data
-          from (
-            select id, firm_name, tenant_code, plan_tier, status, monthly_rate, per_seat_rate, created_at
-            from public.tenants
-            order by created_at
-          ) x;
-
-          select 'RELATED_TABLES' as section, coalesce(json_agg(x),'[]'::json) as data
-          from (
-            select table_name
-            from information_schema.tables
-            where table_schema='public'
-              and (table_name ilike '%customer%' or table_name ilike '%billing%' or table_name ilike '%tenant%' or table_name ilike '%account%')
-            order by table_name
-          ) x;
-          '''
-          req=urllib.request.Request(
-            f'https://api.supabase.com/v1/projects/{ref}/database/query',
-            data=json.dumps({'query':sql}).encode(),
-            headers={'Authorization':f'Bearer {token}','Content-Type':'application/json'},
-            method='POST')
-          try:
-            with urllib.request.urlopen(req,timeout=60) as r:
-              print(r.read().decode())
-          except urllib.error.HTTPError as e:
-            print(e.read().decode())
-            raise
-          PY
+          cat > /tmp/query.sql <<'SQL'
+          select json_build_object(
+            'nashville_tenants', coalesce((
+              select json_agg(x) from (
+                select id, firm_name, tenant_code, plan_tier, status, monthly_rate, per_seat_rate, created_at
+                from public.tenants
+                where lower(coalesce(firm_name,'')) like '%nashville%'
+                   or lower(coalesce(tenant_code,'')) like '%nashville%'
+                order by created_at
+              ) x
+            ), '[]'::json),
+            'all_tenants', coalesce((
+              select json_agg(x) from (
+                select id, firm_name, tenant_code, plan_tier, status, monthly_rate, per_seat_rate, created_at
+                from public.tenants order by created_at
+              ) x
+            ), '[]'::json)
+          ) as result;
+          SQL
+          jq -Rs '{query:.}' /tmp/query.sql > /tmp/payload.json
+          curl --fail-with-body -sS \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "User-Agent: RomyLabs-GitHub-Actions" \
+            --data-binary @/tmp/payload.json \
+            "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query"
