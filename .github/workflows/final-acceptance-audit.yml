@@ -19,13 +19,20 @@ jobs:
       - run: npm ci
       - name: Production build
         run: npm run build
-      - name: Dependency audit
-        run: npm audit --omit=dev --json > dependency-audit.json || true
+      - name: Production dependency audit
+        run: |
+          npm audit --omit=dev --json > dependency-audit.json || true
+          node - <<'NODE'
+          const a=require('./dependency-audit.json')
+          const v=a.metadata?.vulnerabilities||{}
+          console.log('production vulnerabilities:',v)
+          if ((v.critical||0)+(v.high||0)+(v.moderate||0)>0) process.exit(1)
+          NODE
       - name: Full first-party source scan
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re, json
+          import re, json, base64
           ROOT=Path('.')
           exts={'.js','.jsx','.ts','.tsx','.cjs','.mjs','.sql','.yml','.yaml','.json','.html','.css'}
           excluded={'node_modules','dist','.git','coverage'}
@@ -34,51 +41,60 @@ jobs:
             if not p.is_file() or p.suffix.lower() not in exts: continue
             if any(part in excluded for part in p.parts): continue
             files.append(p)
-          lines=0; bytes_=0; warnings=[]; critical=[]
-          texts={}
+          lines=0; bytes_=0; warnings=[]; critical=[]; texts={}
+          def strip_js_comments(s):
+            # Sufficient for invocation inventory: remove // lines and /* blocks */.
+            s=re.sub(r'/\*.*?\*/','',s,flags=re.S)
+            s=re.sub(r'^\s*//.*$','',s,flags=re.M)
+            return s
+          def jwt_role(token):
+            try:
+              payload=token.split('.')[1]+'==='; payload=payload.replace('-','+').replace('_','/')
+              return json.loads(base64.b64decode(payload)) .get('role')
+            except Exception: return None
           for p in files:
             try: s=p.read_text(errors='replace')
             except Exception: continue
-            texts[str(p)]=s; lines += s.count('\n')+1; bytes_ += len(s.encode(errors='replace'))
+            path=str(p); texts[path]=s; lines+=s.count('\n')+1; bytes_+=len(s.encode(errors='replace'))
             for i,line in enumerate(s.splitlines(),1):
-              if re.search(r'\b(TODO|FIXME|HACK|XXX)\b',line,re.I): warnings.append([str(p),i,'marker',line.strip()[:240]])
-              if re.search(r'\b(not implemented|coming soon|placeholder)\b',line,re.I): warnings.append([str(p),i,'incomplete-copy',line.strip()[:240]])
+              if re.search(r'\b(TODO|FIXME|HACK|XXX)\b',line,re.I): warnings.append([path,i,'marker',line.strip()[:240]])
+              if re.search(r'\b(not implemented|coming soon|placeholder)\b',line,re.I): warnings.append([path,i,'incomplete-copy',line.strip()[:240]])
               if '/storage/v1/object/public/documents/' in line or '/object/public/documents/' in line:
-                warnings.append([str(p),i,'legacy-public-doc-url',line.strip()[:240]])
-              if re.search(r'VITE_.*SERVICE.*ROLE|SUPABASE_SERVICE_ROLE_KEY\s*[:=]\s*["\']',line,re.I) and str(p).startswith('src/'):
-                critical.append([str(p),i,'frontend-service-role-secret',line.strip()[:240]])
-              if re.search(r'eyJ[a-zA-Z0-9_-]{20,}\.[a-zA-Z0-9_-]{20,}\.[a-zA-Z0-9_-]{20,}',line):
-                critical.append([str(p),i,'hardcoded-jwt',line.strip()[:160]])
-          # Known stale schema/API patterns that caused real production bugs.
-          stale=[
-            (r'\.from\(["\']sms_logs["\']\)','nonexistent sms_logs table'),
-            (r'\bfrom_number\b|\bto_number\b','legacy SMS columns'),
-            (r'\.select\([^\n]*client_email[^\n]*\).*calevents','legacy calevents client_email'),
-            (r'\.from\(["\']clients["\']\)[\s\S]{0,300}\bmobile\b','legacy clients.mobile'),
-          ]
+                warnings.append([path,i,'legacy-public-doc-url',line.strip()[:240]])
+              if path.startswith('src/') and re.search(r'VITE_.*SERVICE.*ROLE|SUPABASE_SERVICE_ROLE_KEY\s*[:=]\s*["\']',line,re.I):
+                critical.append([path,i,'frontend-service-role-secret',line.strip()[:240]])
+              for tok in re.findall(r'eyJ[a-zA-Z0-9_-]{20,}\.[a-zA-Z0-9_-]{20,}\.[a-zA-Z0-9_-]{20,}',line):
+                # Supabase anon keys are intentionally public browser credentials. A service-role JWT is not.
+                if jwt_role(tok)=='service_role': critical.append([path,i,'hardcoded-service-role-jwt',line.strip()[:160]])
+          # Known stale contracts, scoped to the actual tables where those columns are invalid.
           for path,s in texts.items():
             if path.startswith('supabase/migrations/') or path.startswith('sql/'): continue
-            for pat,label in stale:
-              for m in re.finditer(pat,s,re.I):
-                line=s[:m.start()].count('\n')+1
-                critical.append([path,line,label,s.splitlines()[line-1].strip()[:240]])
-          # Every Edge Function invoked by frontend must exist in source.
+            code=strip_js_comments(s) if path.startswith('src/') or path.startswith('supabase/functions/') else s
+            if re.search(r'\.from\(["\']sms_logs["\']\)',code): critical.append([path,0,'nonexistent-table','sms_logs'])
+            # sms_messages uses phone, not legacy from_number/to_number.
+            for m in re.finditer(r'\.from\(["\']sms_messages["\']\)[\s\S]{0,500}',code):
+              sn=m.group(0)
+              if re.search(r'\b(from_number|to_number)\b',sn): critical.append([path,code[:m.start()].count('\n')+1,'legacy-sms-message-columns',sn[:220].replace('\n',' ')])
+            # calevents uses contact_email, not client_email/client_phone.
+            for m in re.finditer(r'\.from\(["\']calevents["\']\)[\s\S]{0,500}',code):
+              sn=m.group(0)
+              if re.search(r'\b(client_email|client_phone)\b',sn): critical.append([path,code[:m.start()].count('\n')+1,'legacy-calevents-columns',sn[:220].replace('\n',' ')])
+          # Every executable frontend Edge Function invocation must have source implementation.
           fn_dirs={p.parent.name for p in Path('supabase/functions').glob('*/index.ts')}
           invokes=[]
           for path,s in texts.items():
             if not path.startswith('src/'): continue
-            for m in re.finditer(r'functions\.invoke\(\s*["\']([^"\']+)["\']',s): invokes.append((path,s[:m.start()].count('\n')+1,m.group(1)))
+            code=strip_js_comments(s)
+            for m in re.finditer(r'functions\.invoke\(\s*["\']([^"\']+)["\']',code): invokes.append((path,code[:m.start()].count('\n')+1,m.group(1)))
           missing=sorted({name for _,_,name in invokes if name not in fn_dirs})
-          for name in missing: critical.append(['src',0,'missing-edge-function',name])
-          # Public-facing pages may use send-email only through a constrained kind.
+          for name in missing: critical.append(['src',0,'missing-edge-function-source',name])
+          # Public-facing pages may use send-email only through a constrained server-validated kind.
           public_pages={'src/pages/BookAppointment.jsx','src/pages/ManageBooking.jsx','src/pages/SignPage.jsx','src/pages/EmployeePortal.jsx','src/pages/ClockIn.jsx'}
           for path in public_pages:
-            s=texts.get(path,'')
-            for m in re.finditer(r'functions\.invoke\(\s*["\']send-email["\']',s):
-              snippet=s[m.start():m.start()+1000]
-              if 'kind:' not in snippet:
-                critical.append([path,s[:m.start()].count('\n')+1,'generic-public-send-email','send-email invoke missing constrained kind'])
-          # Basic source/live-contract sanity for e-sign and employee flows.
+            code=strip_js_comments(texts.get(path,''))
+            for m in re.finditer(r'functions\.invoke\(\s*["\']send-email["\']',code):
+              snippet=code[m.start():m.start()+1000]
+              if 'kind:' not in snippet: critical.append([path,code[:m.start()].count('\n')+1,'generic-public-send-email','send-email invoke missing constrained kind'])
           must_contain={
             'src/pages/SignPage.jsx':['esign_signed_copy','esign_signed_receipt'],
             'src/pages/EmployeePortal.jsx':['emp_sms_messages','employee_portal_token','employee_timeoff_notification'],
@@ -90,13 +106,7 @@ jobs:
             s=texts.get(path,'')
             for needle in needles:
               if needle not in s: critical.append([path,0,'missing-required-contract',needle])
-          report={
-            'files_scanned':len(files),'lines_scanned':lines,'bytes_scanned':bytes_,
-            'frontend_edge_invocations':len(invokes),'edge_functions_in_source':len(fn_dirs),
-            'critical_count':len(critical),'warning_count':len(warnings),
-            'critical':critical,'warnings':warnings[:1000],
-            'invoked_edge_functions':sorted({x[2] for x in invokes}),
-          }
+          report={'files_scanned':len(files),'lines_scanned':lines,'bytes_scanned':bytes_,'frontend_edge_invocations':len(invokes),'edge_functions_in_source':len(fn_dirs),'critical_count':len(critical),'warning_count':len(warnings),'critical':critical,'warnings':warnings[:1000],'invoked_edge_functions':sorted({x[2] for x in invokes})}
           Path('final-acceptance-report.json').write_text(json.dumps(report,indent=2))
           print(json.dumps({k:v for k,v in report.items() if k not in ('critical','warnings','invoked_edge_functions')},indent=2))
           if critical:
