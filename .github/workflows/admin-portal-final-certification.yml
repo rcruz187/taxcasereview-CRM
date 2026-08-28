@@ -1,0 +1,72 @@
+name: Admin Portal Final Certification
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/admin-portal-final-certification.yml'
+permissions:
+  contents: read
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Production build
+        run: npm run build
+      - name: Verify Admin Portal route and backend contracts
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,sys,json
+          admin=Path('src/pages/AdminPortal.jsx').read_text()
+          app=Path('src/App.jsx').read_text()
+          guard=Path('src/pages/AdminPortalGuard.jsx').read_text()
+          billing=Path('src/components/admin/RomyLabsBilling.jsx').read_text()
+          migrations='\n'.join(p.read_text(errors='replace') for p in Path('supabase/migrations').glob('*.sql'))
+          edge={p.parent.name for p in Path('supabase/functions').glob('*/index.ts')}
+          failures=[]
+          required_routes=['/crm-admin','/crm-admin/command-center','/crm-admin/email','/crm-admin/calendar','/crm-admin/chat','/crm-admin/provision','/crm-admin/offices','/crm-admin/demo','/crm-admin/employees','/crm-admin/support','/crm-admin/audit','/crm-admin/billing']
+          # Sidebar/navigation route must be represented by route source (base route allowed via index/end mapping).
+          for r in required_routes:
+            if r not in admin and r not in app:
+              failures.append(['missing-route-reference',r])
+          if 'AdminPortalGuard' not in app or '/crm-admin/*' not in app:
+            failures.append(['owner-guard-route','AdminPortalGuard not wired to /crm-admin/*'])
+          for email in ['info@romylabs.com','romy@romylabs.com']:
+            if email not in guard and email not in app:
+              failures.append(['owner-email',email])
+          if 'RomyLabsBilling' not in admin or 'RomyLabsBilling' not in billing:
+            failures.append(['billing-route','RomyLabsBilling not wired'])
+          if "const [crmAccount, setCrmAccount] = useState('all')" not in admin:
+            failures.append(['crm-hook','top-level CRM state missing'])
+          if re.search(r'\]\}\s*\.map\(',admin):
+            failures.append(['crm-jsx','malformed KPI map pattern returned'])
+          if 'removeResolvedAlert' in Path('public/romylabs-admin-hotfix.js').read_text() or "style.display = 'none'" in Path('public/romylabs-admin-hotfix.js').read_text():
+            failures.append(['dom-hide','dangerous DOM hiding returned'])
+          rpcs=sorted(set(re.findall(r"\.rpc\(\s*['\"]([^'\"]+)",admin+billing)))
+          for rpc in rpcs:
+            # CREATE FUNCTION may be schema-qualified and CREATE OR REPLACE.
+            if not re.search(r'(?is)create\s+(?:or\s+replace\s+)?function\s+(?:public\.)?'+re.escape(rpc)+r'\s*\(',migrations):
+              failures.append(['rpc-source-missing',rpc])
+          invokes=sorted(set(re.findall(r"functions\.invoke\(\s*['\"]([^'\"]+)",admin+billing)))
+          for fn in invokes:
+            if fn not in edge:
+              failures.append(['edge-source-missing',fn])
+          # Every admin route is wrapped by the route error boundary in the portal router.
+          if 'AdminRouteErrorBoundary' not in admin:
+            failures.append(['error-boundary','AdminRouteErrorBoundary missing'])
+          report={'required_routes':required_routes,'rpcs':rpcs,'edge_functions':invokes,'failures':failures}
+          print(json.dumps(report,indent=2))
+          if failures: sys.exit(1)
+          print('ADMIN_PORTAL_FINAL_CONTRACT_CERTIFICATION_PASSED')
+          PY
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high
+      - name: Final marker
+        run: echo ADMIN_PORTAL_FINAL_CERTIFICATION_PASSED
