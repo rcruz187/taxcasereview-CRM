@@ -63,7 +63,7 @@ begin
         and product_id = 'taxres_crm'
     ),
     'upcoming', (
-      select coalesce(jsonb_agg(e order by e.start), '[]'::jsonb)
+      select coalesce(jsonb_agg(e order by start), '[]'::jsonb)
       from (
         select jsonb_build_object(
           'id', id,
