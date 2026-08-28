@@ -1,3 +1,4 @@
+// Deployment refresh: reload central support registry and secrets (2026-08-28).
 // supabase/functions/support-api/index.ts
 //
 // RomyLabs Central Support API
