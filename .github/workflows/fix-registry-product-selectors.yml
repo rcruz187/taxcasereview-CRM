@@ -1,0 +1,55 @@
+name: Fix Registry Product Selectors
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/fix-registry-product-selectors.yml']
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: '24' }
+      - name: Patch selectors
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/pages/AdminPortal.jsx')
+          s=p.read_text()
+          old="""supabase.from('romylabs_products').select('product_id,name,active')
+      .order('name').then(({ data }) => {
+        const active = (data || []).filter(p => p.active)
+        setProducts(active)"""
+          new="""supabase.from('romylabs_products').select('product_id,name,active,lifecycle,public')
+      .order('name').then(({ data }) => {
+        // Product workspaces follow the canonical registry. Internal/back-burner
+        // products stay out; every active CRM we are actually building is enabled.
+        const active = (data || []).filter(p =>
+          p.active &&
+          p.product_id !== 'phl' &&
+          !/^PHL(?:\\s|$)/i.test(p.name || '') &&
+          String(p.lifecycle || '').toLowerCase() !== 'internal'
+        )
+        setProducts(active)"""
+          if old not in s: raise SystemExit('LinkedIn registry loader target not found')
+          s=s.replace(old,new,1)
+          p.write_text(s)
+          PY
+      - name: Build and verify
+        run: |
+          npm ci
+          npm run build
+          grep -q "p.product_id !== 'phl'" src/pages/AdminPortal.jsx
+          grep -q "String(p.lifecycle || '').toLowerCase() !== 'internal'" src/pages/AdminPortal.jsx
+          ! grep -n "PHL Land Care CRM" src/pages/AdminPortal.jsx
+      - name: Commit source fix
+        run: |
+          git config user.name 'RomyLabs Fix Bot'
+          git config user.email 'romy@romylabs.com'
+          git add src/pages/AdminPortal.jsx
+          git commit -m 'fix(admin): make product selectors registry-driven'
+          git pull --rebase origin main
+          git push origin HEAD:main
