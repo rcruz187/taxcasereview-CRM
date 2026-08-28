@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 
 const p='src/lib/irsFormUtils.js'
-let s=fs.readFileSync(p,'utf8')
+let s=fs.readFileSync(p,'utf8').replace(/\r\n/g,'\n')
 let changed=false
 
 function replaceBetween(startMarker,endMarker,replacement,from=0){
