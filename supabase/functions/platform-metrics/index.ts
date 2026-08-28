@@ -9,231 +9,50 @@ const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-hub-secret',
 }
 
-const TCR_TENANT_ID  = '61a89aef-0e7e-4ea2-b222-44ab2024655a' // Tax Case Review (TRC-001)
-const NASH_TENANT_ID = '489ace07-1a6b-4864-833a-4f8420568b40' // Nashville Tax Solutions (TRC-002)
+const TCR_TENANT_ID  = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
+const NASH_TENANT_ID = '489ace07-1a6b-4864-833a-4f8420568b40'
 const ADMIN_CODE     = 'ADMIN'
-const TCR_CODE       = 'TRC-001'  // Romy's own practice — shown on Tax Case Review card
+const TCR_CODE       = 'TRC-001'
 const DEMO_CODE      = 'DEMO'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
-
   const hubSecret = req.headers.get('x-hub-secret')
-  if (hubSecret !== Deno.env.get('HUB_METRICS_SECRET')) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401, headers: { ...cors, 'Content-Type': 'application/json' }
-    })
-  }
-
+  if (hubSecret !== Deno.env.get('HUB_METRICS_SECRET')) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...cors, 'Content-Type': 'application/json' } })
   const url  = new URL(req.url)
-  const view = url.searchParams.get('view') || 'saas' // 'tcr' | 'saas' | 'nash'
-
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  )
-
+  const view = url.searchParams.get('view') || 'saas'
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   try {
     const now = new Date()
-
-    if (view === 'tcr') {
-      // ── Tax Case Review — Romy's own practice only (TRC-001) ──────────────
-      const [
-        { count: clientCount },
-        { count: leadCount },
-        { count: taskCount },
-        { data: docs },
-        { data: recentActivity },
-      ] = await Promise.all([
-        supabase.from('clients').select('*', { count: 'exact', head: true }).eq('tenant_id', TCR_TENANT_ID),
-        supabase.from('leads').select('*', { count: 'exact', head: true }).eq('tenant_id', TCR_TENANT_ID),
-        supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('tenant_id', TCR_TENANT_ID).eq('status', 'pending'),
-        supabase.from('documents').select('file_size').eq('tenant_id', TCR_TENANT_ID),
-        supabase.from('activity_log').select('description,created_at,employee_email').eq('tenant_id', TCR_TENANT_ID)
-          .order('created_at', { ascending: false }).limit(5),
+    const tenantView = async (tenantId:string, product:string, label:string, mrr:number) => {
+      const [{ count: clientCount },{ count: leadCount },{ count: taskCount },{ data: docs },{ data: recentActivity },{ data: employees }] = await Promise.all([
+        supabase.from('clients').select('*',{count:'exact',head:true}).eq('tenant_id',tenantId),
+        supabase.from('leads').select('*',{count:'exact',head:true}).eq('tenant_id',tenantId),
+        supabase.from('tasks').select('*',{count:'exact',head:true}).eq('tenant_id',tenantId).eq('status','pending'),
+        supabase.from('documents').select('file_size').eq('tenant_id',tenantId),
+        supabase.from('activity_log').select('description,created_at,employee_email').eq('tenant_id',tenantId).order('created_at',{ascending:false}).limit(5),
+        supabase.from('employees').select('id').eq('tenant_id',tenantId).eq('is_active',true),
       ])
-
-      const totalStorage = (docs || []).reduce((s: number, d: any) => s + Number(d.file_size || 0), 0)
-
-      return new Response(JSON.stringify({
-        ok: true,
-        product: 'tax_case_review',
-        product_label: 'Tax Case Review',
-        fetched_at: now.toISOString(),
-        metrics: {
-          mrr:            0,   // practice, not billed monthly
-          arr:            0,
-          active_clients: clientCount  || 0,
-          active_leads:   leadCount    || 0,
-          pending_tasks:  taskCount    || 0,
-          storage_bytes:  totalStorage,
-          active_offices: 1,
-          total_offices:  1,
-          active_users:   0,
-        },
-        offices: [{ id: TCR_TENANT_ID, name: 'Tax Case Review', is_active: true, mrr: 0, since: '2025-01-01' }],
-        recent_activity: (recentActivity || []).map((n: any) => ({
-          text: (n.description || '').slice(0, 120),
-          at:   n.created_at,
-          by:   n.employee_email,
-        })),
-      }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+      const totalStorage=(docs||[]).reduce((s:number,d:any)=>s+Number(d.file_size||0),0)
+      return {ok:true,product,product_label:label,fetched_at:now.toISOString(),metrics:{mrr,arr:mrr*12,active_clients:clientCount||0,active_leads:leadCount||0,pending_tasks:taskCount||0,storage_bytes:totalStorage,active_offices:1,total_offices:1,active_users:(employees||[]).length},offices:[{id:tenantId,name:label,is_active:true,mrr}],recent_activity:(recentActivity||[]).map((n:any)=>({text:(n.description||'').slice(0,120),at:n.created_at,by:n.employee_email}))}
     }
+    if(view==='tcr') return new Response(JSON.stringify(await tenantView(TCR_TENANT_ID,'tax_case_review','Tax Case Review',0)),{headers:{...cors,'Content-Type':'application/json'}})
+    if(view==='nash') return new Response(JSON.stringify(await tenantView(NASH_TENANT_ID,'nashville','Nashville Tax Solutions',1625)),{headers:{...cors,'Content-Type':'application/json'}})
+    if(view==='cloudcpa') return new Response(JSON.stringify(await tenantView('ecd3d3ce-016a-4bb4-800e-f090f51e4cae','cloudcpa','CloudCPA Inc',0)),{headers:{...cors,'Content-Type':'application/json'}})
 
-
-    if (view === 'nash') {
-      // ── Nashville Tax Solutions — TRC-002 tenant ──────────────────────────
-      const [
-        { count: clientCount },
-        { count: leadCount },
-        { count: taskCount },
-        { data: docs },
-        { data: recentActivity },
-        { data: employees },
-      ] = await Promise.all([
-        supabase.from('clients').select('*', { count: 'exact', head: true }).eq('tenant_id', NASH_TENANT_ID),
-        supabase.from('leads').select('*', { count: 'exact', head: true }).eq('tenant_id', NASH_TENANT_ID),
-        supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('tenant_id', NASH_TENANT_ID).eq('status', 'pending'),
-        supabase.from('documents').select('file_size').eq('tenant_id', NASH_TENANT_ID),
-        supabase.from('activity_log').select('description,created_at,employee_email').eq('tenant_id', NASH_TENANT_ID)
-          .order('created_at', { ascending: false }).limit(5),
-        supabase.from('employees').select('id').eq('tenant_id', NASH_TENANT_ID).eq('is_active', true),
-      ])
-
-      const totalStorage = (docs || []).reduce((s: number, d: any) => s + Number(d.file_size || 0), 0)
-
-      return new Response(JSON.stringify({
-        ok: true,
-        product: 'nashville',
-        product_label: 'Nashville Tax Solutions',
-        fetched_at: now.toISOString(),
-        metrics: {
-          mrr:            1625,
-          arr:            1625 * 12,
-          active_clients: clientCount  || 0,
-          active_leads:   leadCount    || 0,
-          pending_tasks:  taskCount    || 0,
-          storage_bytes:  totalStorage,
-          active_offices: 1,
-          total_offices:  1,
-          active_users:   (employees || []).length,
-        },
-        offices: [{ id: NASH_TENANT_ID, name: 'Nashville Tax Solutions', is_active: true, mrr: 1625, since: '2025-01-01' }],
-        recent_activity: (recentActivity || []).map((n: any) => ({
-          text: (n.description || '').slice(0, 120),
-          at:   n.created_at,
-          by:   n.employee_email,
-        })),
-      }), { headers: { ...cors, 'Content-Type': 'application/json' } })
-    }
-
-    if (view === 'cloudcpa') {
-      // ── CloudCPA Inc — TRC-003 tenant ─────────────────────────────────────
-      const CLOUDCPA_TENANT_ID = 'ecd3d3ce-016a-4bb4-800e-f090f51e4cae'
-      const [
-        { count: clientCount },
-        { count: leadCount },
-        { count: taskCount },
-        { data: docs },
-        { data: recentActivity },
-        { data: employees },
-      ] = await Promise.all([
-        supabase.from('clients').select('*', { count: 'exact', head: true }).eq('tenant_id', CLOUDCPA_TENANT_ID),
-        supabase.from('leads').select('*', { count: 'exact', head: true }).eq('tenant_id', CLOUDCPA_TENANT_ID),
-        supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('tenant_id', CLOUDCPA_TENANT_ID).eq('status', 'pending'),
-        supabase.from('documents').select('file_size').eq('tenant_id', CLOUDCPA_TENANT_ID),
-        supabase.from('activity_log').select('description,created_at,employee_email').eq('tenant_id', CLOUDCPA_TENANT_ID)
-          .order('created_at', { ascending: false }).limit(5),
-        supabase.from('employees').select('id').eq('tenant_id', CLOUDCPA_TENANT_ID),
-      ])
-
-      const totalStorage = (docs || []).reduce((s: number, d: any) => s + Number(d.file_size || 0), 0)
-
-      return new Response(JSON.stringify({
-        ok: true,
-        product: 'cloudcpa',
-        product_label: 'CloudCPA Inc',
-        fetched_at: now.toISOString(),
-        metrics: {
-          mrr:            0,
-          arr:            0,
-          active_clients: clientCount  || 0,
-          active_leads:   leadCount    || 0,
-          pending_tasks:  taskCount    || 0,
-          storage_bytes:  totalStorage,
-          active_offices: 1,
-          total_offices:  1,
-          active_users:   (employees || []).length,
-        },
-        offices: [{ id: CLOUDCPA_TENANT_ID, name: 'CloudCPA Inc', is_active: true, mrr: 0, since: '2026-08-18' }],
-        recent_activity: (recentActivity || []).map((n: any) => ({
-          text: (n.description || '').slice(0, 120),
-          at:   n.created_at,
-          by:   n.employee_email,
-        })),
-      }), { headers: { ...cors, 'Content-Type': 'application/json' } })
-    }
-
-    // ── Tax Res CRM SaaS — all paying tenants (exclude TRC-001, ADMIN, DEMO) ──
-    const [
-      { data: tenants },
-      { count: clientCount },
-      { count: leadCount },
-      { count: taskCount },
-      { data: docs },
-      { data: recentActivity },
-      { data: employees },
-    ] = await Promise.all([
-      supabase.from('tenants').select('id,firm_name,tenant_code,monthly_rate,created_at')
-        .not('tenant_code', 'in', `(${ADMIN_CODE},${TCR_CODE},${DEMO_CODE})`)
-        .neq('id', '489ace07-1a6b-4864-833a-4f8420568b40'), // Nashville is on its own project
-      supabase.from('clients').select('*', { count: 'exact', head: true }),
-      supabase.from('leads').select('*', { count: 'exact', head: true }),
-      supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-      supabase.from('documents').select('file_size'),
-      supabase.from('activity_log').select('description,created_at,employee_email')
-        .order('created_at', { ascending: false }).limit(5),
-      supabase.from('employees').select('id').not('role', 'eq', 'admin').limit(200),
+    const {data:tenants}=await supabase.from('tenants').select('id,firm_name,tenant_code,monthly_rate,created_at').not('tenant_code','in',`(${ADMIN_CODE},${TCR_CODE},${DEMO_CODE})`).neq('id',NASH_TENANT_ID)
+    const tenantIds=(tenants||[]).map((t:any)=>t.id)
+    const scoped = <T>(q:T):T => (tenantIds.length ? (q as any).in('tenant_id',tenantIds) : (q as any).eq('tenant_id','00000000-0000-0000-0000-000000000000'))
+    const [{count:clientCount},{count:leadCount},{count:taskCount},{data:docs},{data:recentActivity},{data:employees}] = await Promise.all([
+      scoped(supabase.from('clients').select('*',{count:'exact',head:true})),
+      scoped(supabase.from('leads').select('*',{count:'exact',head:true})),
+      scoped(supabase.from('tasks').select('*',{count:'exact',head:true}).eq('status','pending')),
+      scoped(supabase.from('documents').select('file_size')),
+      scoped(supabase.from('activity_log').select('description,created_at,employee_email')).order('created_at',{ascending:false}).limit(5),
+      scoped(supabase.from('employees').select('id')).limit(200)
     ])
-
-    const totalMRR     = (tenants || []).reduce((s: number, t: any) => s + Number(t.monthly_rate || 0), 0)
-    const totalStorage = (docs    || []).reduce((s: number, d: any) => s + Number(d.file_size    || 0), 0)
-
-    return new Response(JSON.stringify({
-      ok: true,
-      product: 'taxres_crm',
-      product_label: 'Tax Res CRM',
-      fetched_at: now.toISOString(),
-      metrics: {
-        mrr:            totalMRR,
-        arr:            totalMRR * 12,
-        active_clients: clientCount  || 0,
-        active_leads:   leadCount    || 0,
-        pending_tasks:  taskCount    || 0,
-        storage_bytes:  totalStorage,
-        active_offices: (tenants || []).length,
-        total_offices:  (tenants || []).length,
-        active_users:   (employees || []).length,
-      },
-      offices: (tenants || []).map((t: any) => ({
-        id:        t.id,
-        name:      t.firm_name,
-        is_active: true,
-        mrr:       t.monthly_rate || 0,
-        since:     t.created_at?.slice(0, 10),
-      })),
-      recent_activity: (recentActivity || []).map((n: any) => ({
-        text: (n.description || '').slice(0, 120),
-        at:   n.created_at,
-        by:   n.employee_email,
-      })),
-    }), { headers: { ...cors, 'Content-Type': 'application/json' } })
-
-  } catch (err) {
-    console.error('platform-metrics error:', err)
-    return new Response(JSON.stringify({ ok: false, error: String(err) }), {
-      status: 500, headers: { ...cors, 'Content-Type': 'application/json' }
-    })
-  }
+    const totalMRR=(tenants||[]).reduce((s:number,t:any)=>s+Number(t.monthly_rate||0),0)
+    const totalStorage=(docs||[]).reduce((s:number,d:any)=>s+Number(d.file_size||0),0)
+    return new Response(JSON.stringify({ok:true,product:'taxres_crm',product_label:'Tax Res CRM',fetched_at:now.toISOString(),metrics:{mrr:totalMRR,arr:totalMRR*12,active_clients:clientCount||0,active_leads:leadCount||0,pending_tasks:taskCount||0,storage_bytes:totalStorage,active_offices:(tenants||[]).length,total_offices:(tenants||[]).length,active_users:(employees||[]).length},offices:(tenants||[]).map((t:any)=>({id:t.id,name:t.firm_name,is_active:true,mrr:t.monthly_rate||0,since:t.created_at?.slice(0,10)})),recent_activity:(recentActivity||[]).map((n:any)=>({text:(n.description||'').slice(0,120),at:n.created_at,by:n.employee_email}))}),{headers:{...cors,'Content-Type':'application/json'}})
+  } catch(err){console.error('platform-metrics error:',err);return new Response(JSON.stringify({ok:false,error:String(err)}),{status:500,headers:{...cors,'Content-Type':'application/json'}})}
 })
-
