@@ -31,18 +31,17 @@ function insertGuard(functionName, guard) {
 insertGuard('downloadPrefilledStatePOA', `if (form.state !== 'FL') { showToast(\`Autofill for \${form.state} is disabled until that exact state form mapping is verified. Open the official PDF instead.\`); return }`)
 insertGuard('sendStatePOA', `if (form.state !== 'FL') { showToast(\`E-sign autofill for \${form.state} is disabled until that exact state form mapping is verified. This prevents sending client data in the wrong fields.\`); return }`)
 
-// For the verified Florida path, e-sign must upload the exact same prefilled
-// artifact staff can preview/download. Match the current fetch/upload sequence
-// rather than depending on comments that may change over time.
+// For the verified Florida path, e-sign must upload the same prefilled artifact
+// staff can preview/download. Use a whitespace/line-ending tolerant match so
+// Windows CRLF checkouts cannot break the prebuild patch.
 const sendStart=s.indexOf('  async function sendStatePOA(form) {')
 const sendEnd=s.indexOf('\n  async function ', sendStart+10)
 const effectiveEnd=sendEnd<0?s.length:sendEnd
 let block=s.slice(sendStart,effectiveEnd)
 if(!block.includes('const mergedBytes = await generateStatePOAWithCover(selectedClient, rawBytes)')) {
-  const old=`      const pdfRes = await fetch(form.url)\n      if (!pdfRes.ok) throw new Error('Could not load state form PDF')\n      const pdfBlob = await pdfRes.blob()`
-  const neu=`      const pdfRes = await fetch(form.url)\n      if (!pdfRes.ok) throw new Error('Could not load state form PDF')\n      const rawBytes = new Uint8Array(await pdfRes.arrayBuffer())\n      const { generateStatePOAWithCover } = await import('../lib/irsFormUtils')\n      const mergedBytes = await generateStatePOAWithCover(selectedClient, rawBytes)\n      const pdfBlob = new Blob([mergedBytes], { type: 'application/pdf' })`
-  if(!block.includes(old)) throw new Error('sendStatePOA PDF fetch/upload sequence missing')
-  block=block.replace(old,neu)
+  const fetchPattern=/const pdfRes = await fetch\(form\.url\)\s*\r?\n\s*if \(!pdfRes\.ok\) throw new Error\('Could not load state form PDF'\)\s*\r?\n\s*const pdfBlob = await pdfRes\.blob\(\)/
+  if(!fetchPattern.test(block)) throw new Error('sendStatePOA PDF fetch/upload sequence missing')
+  block=block.replace(fetchPattern, `const pdfRes = await fetch(form.url)\n      if (!pdfRes.ok) throw new Error('Could not load state form PDF')\n      const rawBytes = new Uint8Array(await pdfRes.arrayBuffer())\n      const { generateStatePOAWithCover } = await import('../lib/irsFormUtils')\n      const mergedBytes = await generateStatePOAWithCover(selectedClient, rawBytes)\n      const pdfBlob = new Blob([mergedBytes], { type: 'application/pdf' })`)
   s=s.slice(0,sendStart)+block+s.slice(effectiveEnd)
   changed=true
 }
