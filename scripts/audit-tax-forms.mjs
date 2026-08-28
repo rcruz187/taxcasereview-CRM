@@ -47,6 +47,24 @@ function captureArray(src, marker) {
 }
 const evalLiteral = txt => Function(`"use strict";return (${txt})`)()
 
+async function loadTemplateBytes(rawPath) {
+  const raw = String(rawPath || '')
+  if (/^https?:\/\//i.test(raw)) {
+    const res = await fetch(raw, { redirect:'follow' })
+    if (!res.ok) throw new Error(`remote template HTTP ${res.status}`)
+    return new Uint8Array(await res.arrayBuffer())
+  }
+  const rel = raw.replace(/^\//,'')
+  const candidates = [
+    path.join(root,'public',rel),
+    path.join(root,rel),
+    path.join(root,'public','irs-forms',path.basename(rel)),
+  ]
+  const file = candidates.find(fs.existsSync)
+  if (!file) throw new Error(`missing local template ${raw}`)
+  return fs.readFileSync(file)
+}
+
 const irsSrc = read('src/lib/irsFormUtils.js')
 const fieldMaps = evalLiteral(captureObject(irsSrc,'export const FIELD_MAPS'))
 const templatePaths = evalLiteral(captureObject(irsSrc,'export const TEMPLATE_PATHS'))
@@ -56,19 +74,16 @@ console.log('=== IRS TEMPLATE / FIELD AUDIT ===')
 for (const [type,map] of Object.entries(fieldMaps)) {
   const relRaw = templatePaths[type]
   if (!relRaw) { hardFailures.push(`IRS ${type}: no TEMPLATE_PATHS entry`); continue }
-  const rel = String(relRaw).replace(/^\//,'')
-  const candidates=[path.join(root,'public',rel),path.join(root,rel)]
-  const file=candidates.find(fs.existsSync)
-  if (!file) { hardFailures.push(`IRS ${type}: missing template ${relRaw}`); continue }
   try {
-    const pdf=await PDFDocument.load(fs.readFileSync(file),{ignoreEncryption:true})
+    const bytes = await loadTemplateBytes(relRaw)
+    const pdf=await PDFDocument.load(bytes,{ignoreEncryption:true})
     const names=new Set(pdf.getForm().getFields().map(f=>f.getName()))
     const mapped=Object.entries(map).filter(([k,v])=>k!=='idType' && typeof v==='string')
     const missing=mapped.filter(([,v])=>!names.has(v))
     console.log(`${type}: template=OK fields=${names.size} mapped=${mapped.length} missing=${missing.length}`)
     for (const [k,v] of missing) console.log(`  MISSING ${k} -> ${v}`)
     if (missing.length) hardFailures.push(`IRS ${type}: ${missing.length} mapped PDF fields missing`)
-  } catch(e) { hardFailures.push(`IRS ${type}: PDF parse failed: ${e.message}`) }
+  } catch(e) { hardFailures.push(`IRS ${type}: ${e.message}`) }
 }
 
 console.log('\n=== STATE FORM ASSET / PREFILL AUDIT ===')
@@ -92,15 +107,16 @@ for (const f of stateForms) {
 }
 
 const stateSignals = {
-  importsPdfLib: /from ['\"]pdf-lib['\"]/.test(stateSrc),
-  usesPdfDocument: /PDFDocument/.test(stateSrc),
-  writesPdfFields: /getTextField|getCheckBox|getDropdown|setText\s*\(/.test(stateSrc),
   createsEsign: /from\(['\"]esigns['\"]\)|\.from\(['\"]esigns['\"]\)/.test(stateSrc),
   attachesStatePdf: /pdf_attachments/.test(stateSrc),
   selectedClientData: /selectedClient/.test(stateSrc),
+  nonFloridaAutofillGuard: /form\.state !== ['\"]FL['\"]/.test(stateSrc),
+  eSignUsesPrefilledBytes: /generateStatePOAWithCover\(selectedClient, rawBytes\)/.test(stateSrc),
 }
 console.log('StateForms implementation signals:', JSON.stringify(stateSignals,null,2))
 console.log(`state PDFs with zero AcroForm fields: ${stateNoFields}/${stateForms.length}`)
+if (!stateSignals.nonFloridaAutofillGuard) hardFailures.push('STATE: unverified non-Florida autofill is not blocked')
+if (!stateSignals.eSignUsesPrefilledBytes) hardFailures.push('STATE: verified e-sign path does not upload prefilled bytes')
 
 console.log('\n=== E-SIGN SIGNING PATH SIGNALS ===')
 const signSrc=read('src/pages/SignPage.jsx')
@@ -113,7 +129,5 @@ if (hardFailures.length) {
   hardFailures.forEach(x=>console.error('- '+x))
   process.exitCode=1
 } else {
-  console.log('\nNo hard asset/IRS mapped-field failures.')
+  console.log('\nNo hard asset/IRS mapped-field/e-sign safety failures.')
 }
-
-// Permanent regression guard: rerun whenever IRS/state templates or signing code changes.
