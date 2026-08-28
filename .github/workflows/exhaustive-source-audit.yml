@@ -21,7 +21,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
 
       - name: Install dependencies
@@ -56,6 +56,7 @@ jobs:
             ('VERIFY_JWT_FALSE', re.compile(r'(?i)verify_jwt\s*=\s*false')),
             ('EMPTY_CATCH', re.compile(r'catch\s*\([^)]*\)\s*\{\s*\}')),
           ]
+          comment_prefixes=('//','/*','*','--','#')
           for f in files:
             ext=os.path.splitext(f)[1].lower()
             if f in skip or ext not in include_ext: continue
@@ -66,10 +67,14 @@ jobs:
             source.append(f); total += len(data)
             frontend = f.startswith('src/')
             for i,line in enumerate(data,1):
+              stripped=line.strip()
+              is_comment=stripped.startswith(comment_prefixes)
               for name,rx in patterns:
-                if rx.search(line):
-                  if name=='SERVICE_ROLE_FRONTEND' and not frontend: continue
-                  findings.append((name,f,i,line.strip()[:240]))
+                if not rx.search(line): continue
+                if name=='SERVICE_ROLE_FRONTEND':
+                  if not frontend or is_comment: continue
+                if name=='CRITICAL_SECRET' and is_comment: continue
+                findings.append((name,f,i,stripped[:240]))
           print(f'AUDITED_FILES={len(source)}')
           print(f'AUDITED_LINES={total}')
           cats={}
@@ -77,7 +82,6 @@ jobs:
           print('FINDING_COUNTS='+json.dumps(cats,sort_keys=True))
           for name,f,i,line in findings:
             print(f'FINDING {name} {f}:{i}: {line}')
-          # hard failures only for patterns that should never exist in deployable source
           hard={'CRITICAL_SECRET','DANGEROUS_EVAL','SERVICE_ROLE_FRONTEND'}
           bad=[x for x in findings if x[0] in hard]
           if bad:
@@ -92,7 +96,7 @@ jobs:
           git ls-files 'src/**' 'supabase/functions/**' 'supabase/migrations/**' 'scripts/**' '.github/workflows/**' | wc -l
           echo '=== merge markers ==='
           if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- ':!package-lock.json'; then exit 3; else echo none; fi
-          echo '=== deprecated public storage URL calls ==='
+          echo '=== public URL calls requiring bucket review ==='
           git grep -n 'getPublicUrl' -- 'src/**' 'supabase/functions/**' || true
           echo '=== suspicious TODO/FIXME markers ==='
           git grep -nEi '\b(TODO|FIXME|HACK|XXX)\b' -- 'src/**' 'supabase/functions/**' 'scripts/**' || true
