@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/audit-tax-forms.mjs'
+      - 'scripts/fix-state-esign-prefill.mjs'
       - 'src/lib/irsFormUtils.js'
       - 'src/pages/StateForms.jsx'
       - 'src/pages/SignPage.jsx'
@@ -20,5 +21,7 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
+      - name: Apply deterministic state e-sign safety patch
+        run: node scripts/fix-state-esign-prefill.mjs
       - name: Audit IRS/state PDF field mappings and e-sign path
         run: node scripts/audit-tax-forms.mjs
