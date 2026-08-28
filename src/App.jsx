@@ -173,7 +173,8 @@ function Guard({ section, children }) {
 }
 
 function Shell() {
-  const { openModal, realtimeOk } = useApp()
+  const { openModal, closeModal, realtimeOk } = useApp()
+  const navigate = useNavigate()
 
   function handleNew() {
     openModal('Quick Add', (
@@ -185,8 +186,8 @@ function Shell() {
           ['✅ Task',    '/tasks'],
           ['📄 Invoice', '/invoices'],
           ['💰 Payment', '/payments'],
-        ].map(([label, _]) => (
-          <button key={label} className="btn lg full" style={{ justifyContent:'flex-start', gap:10 }}>
+        ].map(([label, path]) => (
+          <button key={label} onClick={() => { closeModal(); navigate(path) }} className="btn lg full" style={{ justifyContent:'flex-start', gap:10 }}>
             {label}
           </button>
         ))}
@@ -248,8 +249,8 @@ function Shell() {
             <Route path="/dialer"      element={<Guard section="dialer"><Dialer /></Guard>} />
             <Route path="/chat"        element={<Guard section="chat"><Chat /></Guard>} />
             <Route path="/books"       element={<Guard section="books"><Books /></Guard>} />
-            <Route path="/formacorp"   element={<Guard section="books"><FormaCorp /></Guard>} />
-            <Route path="/fax"         element={<Guard section="email"><Fax /></Guard>} />
+            <Route path="/formacorp"   element={<Guard section="formacorp"><FormaCorp /></Guard>} />
+            <Route path="/fax"         element={<Guard section="fax"><Fax /></Guard>} />
             <Route path="/workflows"   element={<Guard section="workflows"><Workflows /></Guard>} />
             <Route path="/timeentry"   element={<Guard section="payments"><TimeEntry /></Guard>} />
             <Route path="/new-office"  element={<NewOffice />} />

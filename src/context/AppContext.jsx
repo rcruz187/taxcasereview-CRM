@@ -32,10 +32,12 @@ export const SECTION_COLS = {
   timeoff:     'perm_hr',
   sms:         'perm_comms',
   email:       'perm_comms',
+  fax:         'perm_comms',
   dialer:      'perm_comms',
   chat:        'perm_comms',
   settings:    'perm_settings',
   workflows:   'perm_settings',   // workflows use settings perm — Admin/Super Admin only
+  formacorp:   'perm_billing',
   dashboard:   null,   // always visible
   kiosk:       null,
 }
