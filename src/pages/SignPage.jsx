@@ -295,15 +295,6 @@ export default function SignPage() {
     }
 
     // Notify the client a signed copy is on file
-      let cfg = null
-      try {
-        // settings is RLS-locked to anon — read via SECURITY DEFINER RPC
-        const res = await supabase.rpc('esign_get_settings')
-        cfg = res.data
-      } catch (e) { /* best-effort */ }
-      const attachmentLinks = signedAttachments.map(a =>
-        `<li><a href="${a.clientUrl || a.url}" style="color:#3b82f6">${a.label} — Your Signed Copy</a></li>`
-      ).join('')
       if (doc.client_email) {
         // Public signing pages never choose recipients or email content. The
         // server binds delivery to this signed e-sign request, rebuilds any
@@ -312,10 +303,11 @@ export default function SignPage() {
           body: { kind: 'esign_signed_copy', esign_id: id }
         }).catch(() => {})
       }
-      if (doc.client_phone && cfg?.signalwire_backend) {
-        await fetch(cfg.signalwire_backend + '/sms/send', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: doc.client_phone, body: `${FIRM.name}: your signature on ${doc.doc_type} was received and a copy has been saved to your file.` })
+      if (doc.client_phone) {
+        // Same rule for SMS: the browser supplies only the signed request ID.
+        // The server derives tenant, phone number and receipt text.
+        await supabase.functions.invoke('send-sms', {
+          body: { kind: 'esign_signed_receipt', esign_id: id }
         }).catch(() => {})
       }
       // Fire workflow trigger — esign_signed with doc_type as value
