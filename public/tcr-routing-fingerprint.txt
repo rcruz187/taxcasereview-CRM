@@ -1,0 +1,3 @@
+TCR_OWNER_ROUTING_HOST_SCOPED_20260828
+Admin portal host: admin.romylabs.com
+Product host behavior: owner credentials stay in CRM
