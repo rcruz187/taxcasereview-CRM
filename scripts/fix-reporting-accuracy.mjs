@@ -5,7 +5,9 @@ let src = fs.readFileSync(file, 'utf8')
 
 function replaceExact(from, to, label) {
   if (!src.includes(from)) throw new Error(`Reporting audit patch anchor missing: ${label}`)
-  src = src.replace(from, to)
+  // Function replacer is intentional: replacement strings containing currency
+  // text like '$' must never be interpreted as String.replace $-patterns.
+  src = src.replace(from, () => to)
 }
 
 replaceExact(
@@ -32,9 +34,8 @@ replaceExact(
 `...monthBuckets.map((b,i)=>[b.label,'$'+Math.round(revByMonth[i])])`,
 'Excel month labels')
 
-// Replace any remaining chart labels that use MONTHS[index] against revByMonth with the year-aware bucket label.
-src = src.replace(/MONTHS\[Number\(m\)\]/g, 'monthBuckets[Number(m)]?.label || m')
-src = src.replace(/MONTHS\[i\]/g, 'monthBuckets[i]?.label || MONTHS[i]')
+src = src.replace(/MONTHS\[Number\(m\)\]/g, () => 'monthBuckets[Number(m)]?.label || m')
+src = src.replace(/MONTHS\[i\]/g, () => 'monthBuckets[i]?.label || MONTHS[i]')
 
 fs.writeFileSync(file, src)
 console.log('✓ Reporting accuracy patch applied: settled payments, derived AR, lead conversion, tenant-safe rep attribution, year-aware monthly revenue')
