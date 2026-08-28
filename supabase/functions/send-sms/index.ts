@@ -18,9 +18,13 @@ serve(async(req)=>{
     if(u?.user){const{data:t}=await uc.rpc('current_tenant_id');tenantId=t||null;sentBy=u.user.email||'CRM'}
   }
   if(!tenantId&&employee_portal_token){
+    if(!client_id)return new Response(JSON.stringify({error:'client_id is required for employee portal SMS'}),{status:403,headers:{...corsHeaders,'Content-Type':'application/json'}})
     const{data:s}=await admin.from('employee_portal_sessions').select('employee_id,employee_name,tenant_id,expires_at').eq('token',String(employee_portal_token)).gt('expires_at',new Date().toISOString()).maybeSingle()
-    if(s){tenantId=s.tenant_id;employeeName=s.employee_name;sentBy=s.employee_name||'Employee Portal'
-      if(client_id){const{data:c}=await admin.from('clients').select('id,name,phone,phone2,assignedto,assignedTo,taxAssociate,tenant_id').eq('id',String(client_id)).eq('tenant_id',tenantId).maybeSingle();if(!c||(c.assignedto!==employeeName&&c.assignedTo!==employeeName&&c.taxAssociate!==employeeName)||digits(c.phone||c.phone2).slice(-10)!==digits(to).slice(-10))return new Response(JSON.stringify({error:'Client is not assigned to this employee'}),{status:403,headers:{...corsHeaders,'Content-Type':'application/json'}})}}
+    if(s){
+      tenantId=s.tenant_id;employeeName=s.employee_name;sentBy=s.employee_name||'Employee Portal'
+      const{data:c}=await admin.from('clients').select('id,name,phone,phone2,assignedto,assignedTo,taxAssociate,tenant_id').eq('id',String(client_id)).eq('tenant_id',tenantId).maybeSingle()
+      if(!c||(c.assignedto!==employeeName&&c.assignedTo!==employeeName&&c.taxAssociate!==employeeName)||digits(c.phone||c.phone2).slice(-10)!==digits(to).slice(-10))return new Response(JSON.stringify({error:'Client is not assigned to this employee'}),{status:403,headers:{...corsHeaders,'Content-Type':'application/json'}})
+    }
   }
   if(!tenantId)return new Response(JSON.stringify({error:'Unauthorized'}),{status:401,headers:{...corsHeaders,'Content-Type':'application/json'}})
   const{data:settings}=await admin.from('settings').select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did,sw_outbound_did').eq('tenant_id',tenantId).maybeSingle()
