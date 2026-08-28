@@ -21,11 +21,11 @@ jobs:
           q=r'''
           select jsonb_build_object(
             'prospect_columns',(select jsonb_agg(jsonb_build_object('name',column_name,'type',data_type) order by ordinal_position) from information_schema.columns where table_schema='public' and table_name='prospects'),
-            'prospects',(select coalesce(jsonb_agg(to_jsonb(p) order by p.updated_at desc nulls last),'[]'::jsonb) from (select * from public.prospects limit 100) p),
+            'prospects',(select coalesce(jsonb_agg(to_jsonb(p)),'[]'::jsonb) from (select * from public.prospects limit 100) p),
             'esign_columns',(select jsonb_agg(jsonb_build_object('name',column_name,'type',data_type) order by ordinal_position) from information_schema.columns where table_schema='public' and table_name='esigns'),
             'recent_esigns',(select coalesce(jsonb_agg(to_jsonb(e)),'[]'::jsonb) from (select * from public.esigns order by created_at desc limit 50) e),
             'tenant_columns',(select jsonb_agg(column_name order by ordinal_position) from information_schema.columns where table_schema='public' and table_name='tenants'),
-            'nashville_tenants',(select coalesce(jsonb_agg(to_jsonb(t)),'[]'::jsonb) from (select * from public.tenants where lower(coalesce(name,'')) like '%nashville%') t),
+            'tenant_sample',(select coalesce(jsonb_agg(to_jsonb(t)),'[]'::jsonb) from (select * from public.tenants limit 50) t),
             'contractish_tables',(select coalesce(jsonb_agg(table_name order by table_name),'[]'::jsonb) from information_schema.tables where table_schema='public' and (table_name ilike '%contract%' or table_name ilike '%proposal%' or table_name ilike '%esign%'))
           ) as audit;
           '''
