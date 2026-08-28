@@ -156,12 +156,16 @@ function Sidebar({ onSignOut }) {
 // ── Overview ─────────────────────────────────────────────────────────────────
 function Overview() {
   const [stats, setStats] = useState(null)
+  const [loadError, setLoadError] = useState('')
   const navigate = useNavigate()
   const { user } = useApp()
 
   useEffect(() => {
     if (!user) return
-    supabase.rpc('admin_tenant_overview').then(({ data }) => setStats(data || []))
+    supabase.rpc('admin_tenant_overview').then(({ data, error }) => {
+      if (error) { setLoadError(error.message); setStats([]); return }
+      setLoadError(''); setStats(data || [])
+    })
   }, [user])
 
   const totalMRR     = (stats||[]).reduce((s,r) => s+Number(r.effective_monthly||0), 0)
@@ -209,6 +213,7 @@ function Overview() {
         ))}
       </div>
 
+      {loadError && <div style={{padding:14,borderRadius:10,background:'rgba(239,68,68,.1)',border:'1px solid rgba(239,68,68,.25)',color:'#fca5a5',marginBottom:16}}>Unable to load platform offices: {loadError}</div>}
       <div style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:12 }}>All Offices</div>
       <div style={S.card}>
         <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
@@ -674,15 +679,20 @@ function OfficePage() {
 // ── Offices List ─────────────────────────────────────────────────────────────
 function OfficesList() {
   const [rows, setRows] = useState(null)
+  const [loadError, setLoadError] = useState('')
   const navigate = useNavigate()
-  useEffect(() => { supabase.rpc('admin_tenant_overview').then(({data})=>setRows(data||[])) }, [])
+  useEffect(() => { supabase.rpc('admin_tenant_overview').then(({data,error})=>{
+    if(error){setLoadError(error.message);setRows([]);return}
+    setLoadError('');setRows(data||[])
+  }) }, [])
   return (
     <div style={{ padding:'28px 36px', maxWidth:1050 }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
         <div style={{ fontSize:22, fontWeight:800, color:'#fff' }}>🏢 All Offices</div>
         <button onClick={()=>navigate('/crm-admin/provision')} style={S.btn('primary')}>➕ New Office</button>
       </div>
-      {!rows ? <Spinner /> : (
+      {loadError && <div style={{padding:14,borderRadius:10,background:'rgba(239,68,68,.1)',border:'1px solid rgba(239,68,68,.25)',color:'#fca5a5',marginBottom:16}}>Unable to load offices: {loadError}</div>}
+      {!rows ? <Spinner /> : rows.length===0 && !loadError ? <div style={{color:'#64748b',fontSize:13}}>No offices found.</div> : (
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
           {rows.map(r => (
             <div key={r.id} style={{ ...S.card, padding:'18px 20px', display:'flex', alignItems:'center', gap:16, cursor:'pointer' }}
@@ -1090,12 +1100,14 @@ function EmployeeLookup() {
 // ── Audit Log ────────────────────────────────────────────────────────────────
 function AuditLog() {
   const [log,setLog] = useState(null)
+  const [loadError,setLoadError] = useState('')
   useEffect(()=>{
-    supabase.rpc('admin_get_audit_log',{p_limit:100}).then(({data})=>setLog(data||[]))
+    supabase.rpc('admin_get_audit_log',{p_limit:100}).then(({data,error})=>{if(error){setLoadError(error.message);setLog([])}else{setLoadError('');setLog(data||[])}})
   },[])
   return (
     <div style={{ padding:'28px 36px', maxWidth:900 }}>
       <div style={{ fontSize:22,fontWeight:800,color:'#fff',marginBottom:24 }}>📋 Audit Log</div>
+      {loadError && <div style={{color:'#fca5a5',marginBottom:14}}>Unable to load audit log: {loadError}</div>}
       {!log ? <Spinner /> : log.length===0 ? (
         <div style={{ color:'#475569',fontSize:14 }}>No admin actions recorded yet.</div>
       ) : (
@@ -1130,8 +1142,9 @@ function Search() {
   async function search(){
     if(!q.trim())return
     setBusy(true)
-    const{data}=await supabase.rpc('admin_search_all',{p_query:q.trim()})
+    const{data,error}=await supabase.rpc('admin_search_all',{p_query:q.trim()})
     setBusy(false)
+    if(error){setResults([]);return}
     setResults(data||[])
   }
   return(
@@ -3477,6 +3490,7 @@ function CommandCenter() {
       setData({
         greeting: h<12?'Good morning':h<17?'Good afternoon':'Good evening',
         todayDate: now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}),
+        tenants,
         kpis: {
           activeTenants: activeTenants.length,
           totalTenants:  tenants.length,
