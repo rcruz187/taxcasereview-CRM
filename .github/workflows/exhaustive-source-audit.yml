@@ -4,11 +4,15 @@ on:
   push:
     branches: [main]
     paths:
+      - 'index.html'
       - 'src/**'
       - 'supabase/**'
       - 'scripts/**'
+      - 'e2e/**'
+      - 'playwright.config.mjs'
       - 'package.json'
       - 'package-lock.json'
+      - '.github/workflows/ui-browser-smoke.yml'
       - '.github/workflows/exhaustive-source-audit.yml'
   workflow_dispatch:
 
@@ -98,13 +102,13 @@ jobs:
         shell: bash
         run: |
           echo '=== tracked source stats ==='
-          git ls-files 'src/**' 'supabase/functions/**' 'supabase/migrations/**' 'scripts/**' '.github/workflows/**' | wc -l
+          git ls-files 'src/**' 'supabase/functions/**' 'supabase/migrations/**' 'scripts/**' 'e2e/**' '.github/workflows/**' | wc -l
           echo '=== merge markers ==='
           if git grep -nE '^(<<<<<<< .+|>>>>>>> .+)$' -- ':!package-lock.json'; then exit 3; else echo none; fi
           echo '=== public URL calls requiring bucket review ==='
           git grep -n 'getPublicUrl' -- 'src/**' 'supabase/functions/**' || true
           echo '=== suspicious TODO/FIXME markers ==='
-          git grep -nEi '\b(TODO|FIXME|HACK|XXX)\b' -- 'src/**' 'supabase/functions/**' 'scripts/**' || true
+          git grep -nEi '\b(TODO|FIXME|HACK|XXX)\b' -- 'src/**' 'supabase/functions/**' 'scripts/**' 'e2e/**' || true
 
       - name: Final audit marker
         run: echo 'EXHAUSTIVE_SOURCE_AUDIT_PASSED'
