@@ -21,14 +21,7 @@ jobs:
           python3 - <<'PY' > /tmp/q.json
           import json
           q=r'''
-          select 'create_impersonation_token' as name, pg_get_functiondef(p.oid) as def
-          from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-          where n.nspname='public' and p.proname='create_impersonation_token'
-          union all
-          select 'validate_impersonation_token', pg_get_functiondef(p.oid)
-          from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-          where n.nspname='public' and p.proname='validate_impersonation_token';
-          select column_name,data_type,is_nullable,column_default
+          select table_name,column_name,data_type,is_nullable,column_default
           from information_schema.columns
           where table_schema='public' and table_name ilike '%imperson%'
           order by table_name,ordinal_position;
@@ -39,10 +32,19 @@ jobs:
             -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" -H 'Content-Type: application/json' \
             --data-binary @/tmp/q.json > /tmp/out.json
           cat /tmp/out.json
-          grep -q 'create_impersonation_token' /tmp/out.json
-          grep -q 'validate_impersonation_token' /tmp/out.json
-      - name: Verify frontend route collision
+          grep -q 'tenant_id' /tmp/out.json
+          grep -q 'expires_at' /tmp/out.json
+      - name: Confirm RPCs are absent and route collision exists
+        shell: bash
         run: |
+          python3 - <<'PY' > /tmp/f.json
+          import json
+          q="select proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and proname in ('create_impersonation_token','validate_impersonation_token') order by proname"
+          print(json.dumps({'query':q}))
+          PY
+          OUT=$(curl --fail-with-body -sS -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" -H 'Content-Type: application/json' --data-binary @/tmp/f.json)
+          echo "$OUT"
+          test "$OUT" = '[]'
           grep -q 'path="/impersonate"' src/App.jsx
           grep -q "path.indexOf('/crm-admin') !== 0" public/romylabs-admin-hotfix.js
-          echo 'IMPERSONATION_ROUTE_COLLISION_CONFIRMED'
+          echo 'LIVE_IMPERSONATION_BREAKS_CONFIRMED'
