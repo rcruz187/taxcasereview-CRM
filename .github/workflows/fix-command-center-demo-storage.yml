@@ -31,6 +31,9 @@ jobs:
           from pathlib import Path
           p=Path('src/pages/AdminPortal.jsx')
           s=p.read_text()
+          if "admin_taxres_demo_stats" in s and "Storage RPC error" in s and "No TaxRes demos scheduled." in s:
+            print('Source already patched; continuing idempotently')
+            raise SystemExit(0)
           old="""        const [statsRes, tenantsRes, storageRes] = await Promise.all([\n          withTimeout(supabase.rpc('admin_command_center_stats'), 'admin_command_center_stats'),\n          withTimeout(supabase.rpc('admin_tenant_overview'), 'admin_tenant_overview'),\n          withTimeout(supabase.rpc('admin_storage_stats'), 'admin_storage_stats'),\n        ])"""
           new="""        const [statsRes, tenantsRes, storageRes, taxresDemoRes] = await Promise.all([\n          withTimeout(supabase.rpc('admin_command_center_stats'), 'admin_command_center_stats'),\n          withTimeout(supabase.rpc('admin_tenant_overview'), 'admin_tenant_overview'),\n          withTimeout(supabase.rpc('admin_storage_stats'), 'admin_storage_stats'),\n          withTimeout(supabase.rpc('admin_taxres_demo_stats'), 'admin_taxres_demo_stats'),\n        ])"""
           if old not in s: raise SystemExit('Promise.all target not found')
@@ -67,10 +70,18 @@ jobs:
           import json
           q=r'''
           begin;
-          select set_config('request.jwt.claim.email','info@romylabs.com',true);
-          select set_config('request.jwt.claim.role','authenticated',true);
+          select set_config('request.jwt.claims','{"role":"service_role","email":"info@romylabs.com"}',true);
           select public.admin_storage_stats() as storage;
           select public.admin_taxres_demo_stats() as demos;
+          select jsonb_build_object(
+            'today_by_product', coalesce(jsonb_object_agg(coalesce(product_id,'NULL'),n),'{}'::jsonb)
+          )
+          from (
+            select product_id,count(*)::int n
+            from public.calevents
+            where date::date=current_date
+            group by product_id
+          ) q;
           rollback;
           '''
           print(json.dumps({'query':q}))
@@ -79,7 +90,8 @@ jobs:
           echo "$OUT"
           echo "$OUT" | grep -q '18718717'
           echo "$OUT" | grep -q '161'
-          echo "$OUT" | grep -q 'taxres_crm'
+          echo "$OUT" | grep -q 'today_count'
+          echo "$OUT" | grep -q 'upcoming'
       - name: Commit source fix
         run: |
           git config user.name 'RomyLabs Fix Bot'
