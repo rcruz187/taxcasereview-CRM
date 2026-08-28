@@ -35,19 +35,52 @@ if (s.includes(oldLoad)) {
 
 const actionBlock = `  async function runMailboxAction(emailIds, action) {
     const ids = Array.isArray(emailIds) ? emailIds : [emailIds]
-    const { data, error } = await supabase.functions.invoke('gmail-sync-cron', {
-      body: { mode: 'message_action', email_ids: ids, action },
-    })
-    if (error) throw new Error(error.message || String(error))
-    if (!data?.ok) {
-      const detail = data?.failures?.[0]?.error || data?.error || 'Mailbox action failed'
-      throw new Error(detail)
+    const chunks = []
+    for (let i = 0; i < ids.length; i += 5) chunks.push(ids.slice(i, i + 5))
+
+    async function invokeChunk(chunk, attempt = 0) {
+      try {
+        const { data, error } = await supabase.functions.invoke('gmail-sync-cron', {
+          body: { mode: 'message_action', email_ids: chunk, action },
+        })
+        if (error) throw new Error(error.message || String(error))
+        if (!data?.ok) {
+          const detail = data?.failures?.[0]?.error || data?.error || 'Mailbox action failed'
+          throw new Error(detail)
+        }
+        return data
+      } catch (e) {
+        // A large Gmail action previously held one Edge invocation open for ~56s
+        // and the next browser preflight hit a transient 503. Retry a small
+        // chunk once after a short backoff instead of failing the entire bulk job.
+        if (attempt < 1) {
+          await new Promise(resolve => setTimeout(resolve, 700))
+          return invokeChunk(chunk, attempt + 1)
+        }
+        throw e
+      }
     }
-    return data
+
+    const succeeded = []
+    const failures = []
+    // Run at most three small chunks at a time. This keeps each Edge request
+    // short without flooding Gmail or Supabase with dozens of simultaneous calls.
+    for (let i = 0; i < chunks.length; i += 3) {
+      const wave = chunks.slice(i, i + 3)
+      const results = await Promise.allSettled(wave.map(chunk => invokeChunk(chunk)))
+      results.forEach((result, idx) => {
+        if (result.status === 'fulfilled') succeeded.push(...(result.value?.succeeded || wave[idx]))
+        else failures.push({ ids: wave[idx], error: result.reason?.message || String(result.reason) })
+      })
+    }
+    if (failures.length) throw new Error(failures[0].error || 'Mailbox action failed')
+    return { ok: true, action, succeeded, failures: [] }
   }
 
 `
-if (!s.includes('async function runMailboxAction(')) {
+if (s.includes('  async function runMailboxAction(')) {
+  replaceBetween(`  async function runMailboxAction(`, `  async function moveTriage(id, triage) {`, actionBlock)
+} else {
   const anchor = `  async function moveTriage(id, triage) {`
   if (!s.includes(anchor)) throw new Error('moveTriage anchor missing')
   s = s.replace(anchor, actionBlock + anchor)
