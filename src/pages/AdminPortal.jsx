@@ -253,6 +253,7 @@ function OfficePage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [data, setData] = useState(null)
+  const [loadError, setLoadError] = useState(null)
   const [tab, setTab] = useState('overview')
   const [toast, setToast] = useState(null)
   const [billing, setBilling] = useState({ per_seat_rate:'', monthly_rate:'', plan_tier:'', status:'', primary_contact_name:'', primary_contact_email:'', contract_start_date:'', contract_end_date:'', notes:'' })
@@ -268,9 +269,11 @@ function OfficePage() {
   const toast_ = (msg, type='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),3500) }
 
   useEffect(() => {
+    setLoadError(null)
     supabase.rpc('get_office_full', { p_tenant_id: id })
       .then(({ data:d, error }) => {
-        if (error) { toast_(error.message,'error'); return }
+        if (error) { setLoadError(error.message); toast_(error.message,'error'); return }
+        if (!d?.tenant) { setLoadError('Office data was not returned by get_office_full.'); return }
         setData(d)
         setBilling({
           per_seat_rate:        d.tenant.per_seat_rate||'',
@@ -345,10 +348,8 @@ function OfficePage() {
     loadOfficePayments(id)
   }
 
-  async function resetDemo() {
-    if (!confirm(`Reset ${data?.tenant?.firm_name} to a clean demo state? This wipes all leads, clients, tasks, notes, and activity.`)) return
-    // Run the demo reset SQL via the SQL runner pattern
-    toast_('Demo reset queued — check back in 30 seconds', 'ok')
+  function resetDemo() {
+    toast_('Demo reset is disabled until a secured server-side reset endpoint is deployed.', 'error')
   }
 
   useEffect(() => {
@@ -356,6 +357,15 @@ function OfficePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, id])
 
+  if (loadError) return (
+    <div style={{ padding:40, maxWidth:760 }}>
+      <div style={{ ...S.card, padding:24, border:'1px solid rgba(239,68,68,.35)' }}>
+        <div style={{ color:'#ef4444', fontWeight:800, marginBottom:8 }}>Unable to load office</div>
+        <div style={{ color:'#94a3b8', fontSize:13, lineHeight:1.6 }}>{loadError}</div>
+        <button onClick={()=>navigate('/crm-admin/offices')} style={{ ...S.btn('ghost'), marginTop:16 }}>← Back to Offices</button>
+      </div>
+    </div>
+  )
   if (!data) return <Spinner />
 
   const t = data.tenant
@@ -456,7 +466,7 @@ function OfficePage() {
               <div style={{ ...S.card, padding:18, border:'1px solid rgba(251,146,60,.3)' }}>
                 <div style={{ fontSize:12,fontWeight:700,color:'#f97316',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:10 }}>🎭 Demo Controls</div>
                 <div style={{ fontSize:12,color:'#475569',marginBottom:12 }}>Reset this tenant to a clean demo state before showing to a prospect.</div>
-                <button onClick={resetDemo} style={{ ...S.btn('danger'), fontSize:12 }}>🔄 Reset Demo Data</button>
+                <button onClick={resetDemo} disabled title="Requires secured server-side reset endpoint" style={{ ...S.btn('danger'), fontSize:12, opacity:.45, cursor:'not-allowed' }}>🔒 Demo Reset Unavailable</button>
               </div>
             )}
           </div>
