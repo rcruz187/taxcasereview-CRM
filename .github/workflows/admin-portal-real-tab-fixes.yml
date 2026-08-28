@@ -18,7 +18,7 @@ jobs:
       - run: npm ci
       - name: Build
         run: npm run build
-      - name: Verify all visible admin routes and Command Center tabs
+      - name: Verify every visible admin route and Command Center tab
         run: |
           for r in command-center email calendar chat provision offices demo employees support audit billing; do grep -q "path=\"/$r\"" src/pages/AdminPortal.jsx; done
           for t in overview support products marketing search linkedin content sales crm goals system; do grep -q "key:'$t'" src/pages/AdminPortal.jsx; done
@@ -28,6 +28,7 @@ jobs:
           grep -q 'Unable to load audit log:' src/pages/AdminPortal.jsx
           grep -qi 'function public.admin_tenant_overview' supabase/migrations/20260828033000_admin_portal_office_contracts.sql
           grep -qi 'function public.get_office_full' supabase/migrations/20260828033000_admin_portal_office_contracts.sql
+          ! grep -q 'removeResolvedAlert' public/romylabs-admin-hotfix.js
           git diff --check
       - name: Commit generated source
         run: |
