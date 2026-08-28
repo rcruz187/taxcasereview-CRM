@@ -50,9 +50,12 @@ const evalLiteral = txt => Function(`"use strict";return (${txt})`)()
 async function loadTemplateBytes(rawPath) {
   const raw = String(rawPath || '')
   if (/^https?:\/\//i.test(raw)) {
-    const res = await fetch(raw, { redirect:'follow' })
+    const res = await fetch(raw, { redirect:'follow', headers:{'User-Agent':'TaxRes-Forms-Audit/1.0'} })
     if (!res.ok) throw new Error(`remote template HTTP ${res.status}`)
-    return new Uint8Array(await res.arrayBuffer())
+    const type=(res.headers.get('content-type')||'').toLowerCase()
+    const bytes=new Uint8Array(await res.arrayBuffer())
+    if (!type.includes('pdf') && !(bytes[0]===0x25 && bytes[1]===0x50 && bytes[2]===0x44 && bytes[3]===0x46)) throw new Error(`remote template is not a PDF (${type||'unknown content-type'})`)
+    return bytes
   }
   const rel = raw.replace(/^\//,'')
   const candidates = [
@@ -92,18 +95,18 @@ let stateArrayText=captureArray(stateSrc,'const STATE_FORMS')
 stateArrayText=stateArrayText.replace(/`\$\{BASE\}([^`]*)`/g,(_,p)=>JSON.stringify(p))
 const stateForms=evalLiteral(stateArrayText)
 console.log(`registered state forms: ${stateForms.length}`)
-let stateNoFields=0
+let stateNoFields=0, remoteStateForms=0
 for (const f of stateForms) {
-  const rel=String(f.url).replace(/^\//,'')
-  const file=path.join(root,'public',rel)
-  if (!fs.existsSync(file)) { hardFailures.push(`STATE ${f.num}: missing ${f.url}`); console.log(`${f.num}: MISSING ASSET`); continue }
   try {
-    const pdf=await PDFDocument.load(fs.readFileSync(file),{ignoreEncryption:true})
+    const remote=/^https?:\/\//i.test(String(f.url))
+    const bytes=await loadTemplateBytes(f.url)
+    if(remote) remoteStateForms++
+    const pdf=await PDFDocument.load(bytes,{ignoreEncryption:true})
     let count=0
     try { count=pdf.getForm().getFields().length } catch {}
     if (!count) stateNoFields++
-    console.log(`${f.num}: asset=OK pages=${pdf.getPageCount()} acroFields=${count}`)
-  } catch(e) { hardFailures.push(`STATE ${f.num}: PDF parse failed: ${e.message}`) }
+    console.log(`${f.num}: asset=OK source=${remote?'official-remote':'local'} pages=${pdf.getPageCount()} acroFields=${count}`)
+  } catch(e) { hardFailures.push(`STATE ${f.num}: ${e.message}`); console.log(`${f.num}: ASSET FAILURE ${e.message}`) }
 }
 
 const stateSignals = {
@@ -112,11 +115,14 @@ const stateSignals = {
   selectedClientData: /selectedClient/.test(stateSrc),
   nonFloridaAutofillGuard: /form\.state !== ['\"]FL['\"]/.test(stateSrc),
   eSignUsesPrefilledBytes: /generateStatePOAWithCover\(selectedClient, rawBytes\)/.test(stateSrc),
+  officialAlabama: /revenue\.alabama\.gov\/.+Form_2848A_rev918\.pdf/.test(stateSrc),
 }
 console.log('StateForms implementation signals:', JSON.stringify(stateSignals,null,2))
 console.log(`state PDFs with zero AcroForm fields: ${stateNoFields}/${stateForms.length}`)
+console.log(`official remote state PDFs: ${remoteStateForms}/${stateForms.length}`)
 if (!stateSignals.nonFloridaAutofillGuard) hardFailures.push('STATE: unverified non-Florida autofill is not blocked')
 if (!stateSignals.eSignUsesPrefilledBytes) hardFailures.push('STATE: verified e-sign path does not upload prefilled bytes')
+if (!stateSignals.officialAlabama) hardFailures.push('STATE AL-2848A: official Alabama PDF is not wired')
 
 console.log('\n=== E-SIGN SIGNING PATH SIGNALS ===')
 const signSrc=read('src/pages/SignPage.jsx')
