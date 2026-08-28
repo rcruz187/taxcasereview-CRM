@@ -7,24 +7,7 @@ import { generateTaxReturnPdf, downloadTaxReturnPdf } from '../lib/taxReturnPdf'
 import ClientLink from '../components/ClientLink'
 import { FIRM } from '../lib/firmBranding'
 
-const SQL_SETUP = `create table if not exists tax_returns (
-  id uuid default gen_random_uuid() primary key,
-  returnNum text, clientName text, taxYear text,
-  returnType text, filingStatus text, status text default 'Draft',
-  assignedTo text, wages numeric, interest numeric, dividends numeric,
-  capitalGains numeric, businessIncome numeric, rentalIncome numeric,
-  retirementIncome numeric, socialSecurity numeric, otherIncome numeric,
-  studentLoanInterest numeric, iraDeduction numeric, selfEmployedHealth numeric,
-  selfEmployedTax numeric, alimonyPaid numeric, otherAdjustments numeric,
-  deductionType text default 'Standard', itemizedDeductions numeric,
-  stateLocalTax numeric, mortgageInterest numeric, charitableContrib numeric,
-  medicalExpenses numeric, childTaxCredit numeric, earnedIncomeCredit numeric,
-  childCareCredit numeric, educationCredit numeric, otherCredits numeric,
-  withholding numeric, estimatedPayments numeric, refundable numeric,
-  notes text, created_at timestamptz default now(), updated_at timestamptz
-);
-alter table tax_returns enable row level security;
-create policy "anon_all" on tax_returns for all using (true) with check (true);`
+const SQL_SETUP = `Tax Returns database setup is managed by secure Supabase migrations. Contact a platform administrator if this module reports that setup is required.`
 
 const TAX_YEARS = ['2026','2025','2024','2023','2022','2021','2020','2019','2018','2017','2016','2015']
 const FILING_STATUSES = ['Single','Married Filing Jointly','Married Filing Separately','Head of Household','Qualifying Surviving Spouse']
@@ -95,6 +78,39 @@ const BLANK_RETURN = {
   st_localTax: '', st_localJurisdiction: '',
 }
 
+const TAX_RULES = {
+  '2024': {
+    standard: { 'Single': 14600, 'Married Filing Jointly': 29200, 'Married Filing Separately': 14600, 'Head of Household': 21900, 'Qualifying Surviving Spouse': 29200 },
+    brackets: {
+      'Single': [[11600,.10],[47150,.12],[100525,.22],[191950,.24],[243725,.32],[609350,.35],[Infinity,.37]],
+      'Married Filing Jointly': [[23200,.10],[94300,.12],[201050,.22],[383900,.24],[487450,.32],[731200,.35],[Infinity,.37]],
+      'Married Filing Separately': [[11600,.10],[47150,.12],[100525,.22],[191950,.24],[243725,.32],[365600,.35],[Infinity,.37]],
+      'Head of Household': [[16550,.10],[63100,.12],[100500,.22],[191950,.24],[243700,.32],[609350,.35],[Infinity,.37]],
+      'Qualifying Surviving Spouse': [[23200,.10],[94300,.12],[201050,.22],[383900,.24],[487450,.32],[731200,.35],[Infinity,.37]],
+    },
+  },
+  '2025': {
+    standard: { 'Single': 15750, 'Married Filing Jointly': 31500, 'Married Filing Separately': 15750, 'Head of Household': 23625, 'Qualifying Surviving Spouse': 31500 },
+    brackets: {
+      'Single': [[11925,.10],[48475,.12],[103350,.22],[197300,.24],[250525,.32],[626350,.35],[Infinity,.37]],
+      'Married Filing Jointly': [[23850,.10],[96950,.12],[206700,.22],[394600,.24],[501050,.32],[751600,.35],[Infinity,.37]],
+      'Married Filing Separately': [[11925,.10],[48475,.12],[103350,.22],[197300,.24],[250525,.32],[375800,.35],[Infinity,.37]],
+      'Head of Household': [[17000,.10],[64850,.12],[103350,.22],[197300,.24],[250500,.32],[626350,.35],[Infinity,.37]],
+      'Qualifying Surviving Spouse': [[23850,.10],[96950,.12],[206700,.22],[394600,.24],[501050,.32],[751600,.35],[Infinity,.37]],
+    },
+  },
+  '2026': {
+    standard: { 'Single': 16100, 'Married Filing Jointly': 32200, 'Married Filing Separately': 16100, 'Head of Household': 24150, 'Qualifying Surviving Spouse': 32200 },
+    brackets: {
+      'Single': [[12400,.10],[50400,.12],[105700,.22],[201775,.24],[256225,.32],[640600,.35],[Infinity,.37]],
+      'Married Filing Jointly': [[24800,.10],[100800,.12],[211400,.22],[403550,.24],[512450,.32],[768700,.35],[Infinity,.37]],
+      'Married Filing Separately': [[12400,.10],[50400,.12],[105700,.22],[201775,.24],[256225,.32],[384350,.35],[Infinity,.37]],
+      'Head of Household': [[17700,.10],[67450,.12],[105700,.22],[201750,.24],[256200,.32],[640600,.35],[Infinity,.37]],
+      'Qualifying Surviving Spouse': [[24800,.10],[100800,.12],[211400,.22],[403550,.24],[512450,.32],[768700,.35],[Infinity,.37]],
+    },
+  },
+}
+
 function calcTotals(r) {
   const n = k => parseFloat(r[k] || 0) || 0
   const grossIncome = n('wages') + n('interest') + n('dividends') + n('capitalGains') +
@@ -102,19 +118,24 @@ function calcTotals(r) {
   const adjustments = n('studentLoanInterest') + n('iraDeduction') + n('selfEmployedHealth') +
     n('selfEmployedTax') + n('alimonyPaid') + n('otherAdjustments')
   const agi = grossIncome - adjustments
+  const rules = TAX_RULES[String(r.taxYear || '')]
+
+  // Historical returns remain editable/tracked, but we do not silently apply a
+  // different year's federal thresholds. Unsupported years show no estimate.
+  if (!rules) {
+    return { grossIncome, adjustments, agi, deductions: null, taxableIncome: null, tax: null,
+      credits: null, taxAfterCredits: null, payments: null, refundOrOwed: null, estimateUnsupported: true }
+  }
+
   let deductions = 0
   if (r.deductionType === 'Standard') {
-    const stdDed = { 'Single': 14600, 'Married Filing Jointly': 29200, 'Married Filing Separately': 14600, 'Head of Household': 21900, 'Qualifying Surviving Spouse': 29200 }
-    deductions = stdDed[r.filingStatus] || 14600
+    deductions = rules.standard[r.filingStatus] ?? rules.standard.Single
   } else {
     deductions = n('stateLocalTax') + n('mortgageInterest') + n('charitableContrib') + n('medicalExpenses') + n('itemizedDeductions')
   }
   const taxableIncome = Math.max(0, agi - deductions)
-  // 2024 tax brackets (single)
+  const brackets = rules.brackets[r.filingStatus] || rules.brackets.Single
   let tax = 0
-  const brackets = r.filingStatus === 'Married Filing Jointly'
-    ? [[23200,.1],[94300,.12],[201050,.22],[383900,.24],[487450,.32],[731200,.35],[Infinity,.37]]
-    : [[11600,.1],[47150,.12],[100525,.22],[191950,.24],[243725,.32],[609350,.35],[Infinity,.37]]
   let remaining = taxableIncome
   let prev = 0
   for (const [limit, rate] of brackets) {
@@ -130,9 +151,8 @@ function calcTotals(r) {
   const payments = n('withholding') + n('estimatedPayments') + n('refundable')
   const refundOrOwed = payments - taxAfterCredits
 
-  return { grossIncome, adjustments, agi, deductions, taxableIncome, tax, credits, taxAfterCredits, payments, refundOrOwed }
+  return { grossIncome, adjustments, agi, deductions, taxableIncome, tax, credits, taxAfterCredits, payments, refundOrOwed, estimateUnsupported: false }
 }
-
 function fmt(n) {
   if (!n && n !== 0) return '—'
   return '$' + Math.round(n).toLocaleString()

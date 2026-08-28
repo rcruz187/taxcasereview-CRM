@@ -188,7 +188,12 @@ export default function TaxDocParser({ clientName = '', taxYear = '2024', onPars
         parsed_data: parsed,
         created_at: new Date().toISOString(),
       }))
-      try { await supabase.from('tax_doc_uploads').insert(inserts) } catch (_) {}
+      try {
+        const { error: saveError } = await supabase.from('tax_doc_uploads').insert(inserts)
+        if (saveError) console.error('Failed to persist parsed tax-document metadata:', saveError)
+      } catch (saveError) {
+        console.error('Failed to persist parsed tax-document metadata:', saveError)
+      }
 
       onParsed(results.map(({ item, parsed }) => ({ docType: item.docType, data: parsed })))
     }
