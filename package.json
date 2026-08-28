@@ -8,7 +8,8 @@
     "check-polling": "node scripts/check-polling-intervals.cjs",
     "manual:style": "node scripts/manual-professionalize.mjs",
     "storage:fix-display": "node scripts/fix-storage-usage-display.mjs",
-    "prebuild": "npm run check-polling && npm run manual:style && npm run storage:fix-display",
+    "email:state-sync": "node scripts/fix-email-state-sync.mjs",
+    "prebuild": "npm run check-polling && npm run manual:style && npm run storage:fix-display && npm run email:state-sync",
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "gh-pages -d dist --dotfiles"
