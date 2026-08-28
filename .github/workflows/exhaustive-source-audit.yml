@@ -1,0 +1,101 @@
+name: Exhaustive Source Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/exhaustive-source-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Production build
+        run: npm run build
+
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Exhaustive tracked-source line scan
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os, re, subprocess, sys, json
+          files = subprocess.check_output(['git','ls-files'], text=True).splitlines()
+          include_ext = {'.js','.jsx','.ts','.tsx','.mjs','.cjs','.json','.sql','.yml','.yaml','.html','.css','.md','.toml'}
+          skip = {'package-lock.json'}
+          source=[]
+          total=0
+          findings=[]
+          patterns = [
+            ('CRITICAL_SECRET', re.compile(r'(?i)(service_role|api[_-]?key|secret|password|token)\s*[:=]\s*[\"\'][A-Za-z0-9_\-\.]{16,}[\"\']')),
+            ('PUBLIC_URL_PRIVATE_STORAGE', re.compile(r'getPublicUrl\s*\(')),
+            ('DANGEROUS_EVAL', re.compile(r'\beval\s*\(|new\s+Function\s*\(')),
+            ('DANGEROUS_HTML', re.compile(r'dangerouslySetInnerHTML')),
+            ('TODO', re.compile(r'\b(TODO|FIXME|HACK|XXX)\b', re.I)),
+            ('SERVICE_ROLE_FRONTEND', re.compile(r'SUPABASE_SERVICE_ROLE|service_role', re.I)),
+            ('OPEN_RLS_TRUE', re.compile(r'(?i)(using|with\s+check)\s*\(\s*true\s*\)')),
+            ('SECURITY_DEFINER', re.compile(r'(?i)security\s+definer')),
+            ('VERIFY_JWT_FALSE', re.compile(r'(?i)verify_jwt\s*=\s*false')),
+            ('EMPTY_CATCH', re.compile(r'catch\s*\([^)]*\)\s*\{\s*\}')),
+          ]
+          for f in files:
+            ext=os.path.splitext(f)[1].lower()
+            if f in skip or ext not in include_ext: continue
+            try:
+              data=open(f,'r',encoding='utf-8').read().splitlines()
+            except Exception:
+              continue
+            source.append(f); total += len(data)
+            frontend = f.startswith('src/')
+            for i,line in enumerate(data,1):
+              for name,rx in patterns:
+                if rx.search(line):
+                  if name=='SERVICE_ROLE_FRONTEND' and not frontend: continue
+                  findings.append((name,f,i,line.strip()[:240]))
+          print(f'AUDITED_FILES={len(source)}')
+          print(f'AUDITED_LINES={total}')
+          cats={}
+          for x in findings: cats[x[0]]=cats.get(x[0],0)+1
+          print('FINDING_COUNTS='+json.dumps(cats,sort_keys=True))
+          for name,f,i,line in findings:
+            print(f'FINDING {name} {f}:{i}: {line}')
+          # hard failures only for patterns that should never exist in deployable source
+          hard={'CRITICAL_SECRET','DANGEROUS_EVAL','SERVICE_ROLE_FRONTEND'}
+          bad=[x for x in findings if x[0] in hard]
+          if bad:
+            print(f'HARD_FAILURES={len(bad)}')
+            sys.exit(2)
+          PY
+
+      - name: Check imports and stale references
+        shell: bash
+        run: |
+          echo '=== tracked source stats ==='
+          git ls-files 'src/**' 'supabase/functions/**' 'supabase/migrations/**' 'scripts/**' '.github/workflows/**' | wc -l
+          echo '=== merge markers ==='
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- ':!package-lock.json'; then exit 3; else echo none; fi
+          echo '=== deprecated public storage URL calls ==='
+          git grep -n 'getPublicUrl' -- 'src/**' 'supabase/functions/**' || true
+          echo '=== suspicious TODO/FIXME markers ==='
+          git grep -nEi '\b(TODO|FIXME|HACK|XXX)\b' -- 'src/**' 'supabase/functions/**' 'scripts/**' || true
+
+      - name: Final audit marker
+        run: echo 'EXHAUSTIVE_SOURCE_AUDIT_PASSED'
