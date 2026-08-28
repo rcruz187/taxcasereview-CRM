@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
     paths:
+      - 'src/**'
+      - 'supabase/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/exhaustive-source-audit.yml'
   workflow_dispatch:
 
