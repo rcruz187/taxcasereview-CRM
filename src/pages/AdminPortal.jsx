@@ -2133,6 +2133,110 @@ const PRODUCT_REGISTRY = [
 
 function fmt$(n) { return n ? `$${Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—' }
 function fmtN(n) { return n != null ? Number(n).toLocaleString() : '—' }
+function ArcvenaOfficeOnboarding({ supabase, onCreated }) {
+  const [form, setForm] = useState({
+    company_name: '',
+    owner_name: '',
+    owner_email: '',
+    timezone: 'America/New_York',
+    subscription_status: 'TRIALING',
+    trial_days: 14,
+  })
+  const [saving, setSaving] = useState(false)
+  const [result, setResult] = useState(null)
+  const [error, setError] = useState('')
+
+  const field = (key, value) => setForm(current => ({ ...current, [key]: value }))
+
+  async function createOffice(e) {
+    e.preventDefault()
+    setSaving(true)
+    setError('')
+    setResult(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Admin session expired')
+      const response = await fetch('https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/hub-proxy', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + session.access_token,
+          'Content-Type': 'application/json',
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1weGd4ZnFkYnF1emtydnZlamtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTkwMDE4OTIsImV4cCI6MjAzNDU3Nzg5Mn0.zr0F_sV9-TJxO1wOST3VHr_n-5jPTpLY_AzEfKR1hSo',
+        },
+        body: JSON.stringify({ action: 'onboard_arcvena', payload: form }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Unable to create office')
+      setResult(data)
+      setForm(current => ({ ...current, company_name: '', owner_name: '', owner_email: '' }))
+      onCreated?.()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+    setSaving(false)
+  }
+
+  const inputStyle = {
+    width:'100%', boxSizing:'border-box', background:'rgba(2,6,23,.72)',
+    border:'1px solid rgba(139,92,246,.25)', color:'#e2e8f0',
+    borderRadius:8, padding:'9px 11px', fontSize:12, outline:'none',
+  }
+
+  return (
+    <div style={{ background:'rgba(139,92,246,.06)', border:'1px solid rgba(139,92,246,.25)',
+      borderRadius:12, padding:'16px 18px', marginBottom:20 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+        <div>
+          <div style={{ fontSize:13, fontWeight:900, color:'#fff' }}>⚡ Create New Arcvena Office</div>
+          <div style={{ fontSize:10, color:'#64748b', marginTop:3 }}>
+            Creates an isolated tenant, subscription, Owner membership, defaults, and invitation.
+          </div>
+        </div>
+        <span style={{ fontSize:9, color:'#10b981', background:'rgba(16,185,129,.1)', padding:'4px 8px', borderRadius:10 }}>
+          PLATFORM ADMIN ONLY
+        </span>
+      </div>
+      <form onSubmit={createOffice}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+          <input required value={form.company_name} onChange={e=>field('company_name',e.target.value)}
+            placeholder="Company legal name" style={inputStyle} />
+          <input required value={form.owner_name} onChange={e=>field('owner_name',e.target.value)}
+            placeholder="Owner full name" style={inputStyle} />
+          <input required type="email" value={form.owner_email} onChange={e=>field('owner_email',e.target.value)}
+            placeholder="Owner business email" style={inputStyle} />
+          <select value={form.timezone} onChange={e=>field('timezone',e.target.value)} style={inputStyle}>
+            <option value="America/New_York">Eastern Time</option>
+            <option value="America/Chicago">Central Time</option>
+            <option value="America/Denver">Mountain Time</option>
+            <option value="America/Phoenix">Arizona Time</option>
+            <option value="America/Los_Angeles">Pacific Time</option>
+            <option value="America/Anchorage">Alaska Time</option>
+            <option value="Pacific/Honolulu">Hawaii Time</option>
+          </select>
+          <select value={form.subscription_status} onChange={e=>field('subscription_status',e.target.value)} style={inputStyle}>
+            <option value="TRIALING">Trial</option>
+            <option value="ACTIVE">Active / approved pilot</option>
+          </select>
+          <input type="number" min="0" max="90" value={form.trial_days}
+            disabled={form.subscription_status === 'ACTIVE'}
+            onChange={e=>field('trial_days',Number(e.target.value))} placeholder="Trial days" style={inputStyle} />
+        </div>
+        {error && <div style={{ color:'#f87171', fontSize:11, marginTop:10 }}>{error}</div>}
+        {result && (
+          <div style={{ color:'#34d399', fontSize:11, marginTop:10 }}>
+            Office created. Owner invitation sent to {result.owner_email}. Tenant: {result.tenant_id}
+          </div>
+        )}
+        <button type="submit" disabled={saving}
+          style={{ marginTop:12, background:'#8b5cf6', color:'#fff', border:'none', borderRadius:8,
+            padding:'9px 16px', fontSize:12, fontWeight:800, cursor:saving?'wait':'pointer', opacity:saving?.65:1 }}>
+          {saving ? 'Creating isolated office…' : 'Create Office & Send Owner Invite'}
+        </button>
+      </form>
+    </div>
+  )
+}
+
 function ProductsTab({ supabase, taxresActivity = [] }) {
   const [selected, setSelected]     = useState(null)
   const [liveData, setLiveData]     = useState({})
@@ -2441,6 +2545,13 @@ function ProductsTab({ supabase, taxresActivity = [] }) {
                     </div>
                   ))}
                 </div>
+
+                {selected.key === 'arcvena' && (
+                  <ArcvenaOfficeOnboarding
+                    supabase={supabase}
+                    onCreated={() => fetchMetrics(selected)}
+                  />
+                )}
 
                 {/* Next milestone for planned products */}
                 {selected.nextMilestone && (
