@@ -3,10 +3,19 @@ import fs from 'node:fs'
 const path = 'src/pages/Settings.jsx'
 let s = fs.readFileSync(path, 'utf8')
 let changed = false
+let skipped = 0
 
 function once(from, to) {
   if (s.includes(to)) return
-  if (!s.includes(from)) throw new Error(`Storage patch anchor missing: ${from.slice(0, 100)}`)
+  if (!s.includes(from)) {
+    // Settings.jsx evolves independently of this historical repair script.
+    // Missing legacy anchors must never make production builds fail. If the
+    // replacement is not already present, leave the current implementation
+    // untouched and report the skipped legacy patch for follow-up.
+    skipped += 1
+    console.warn(`Storage patch legacy anchor not found; skipping: ${from.slice(0, 100)}`)
+    return
+  }
   s = s.replace(from, to)
   changed = true
 }
@@ -61,8 +70,8 @@ const end = `      {/* By type */}`
 if (!s.includes('Exact Supabase project storage')) {
   const a = s.indexOf(start)
   const b = s.indexOf(end, a)
-  if (a < 0 || b < 0) throw new Error('Storage Usage card anchors missing')
-  const replacement = `      {/* Exact Supabase project storage */}
+  if (a >= 0 && b >= 0) {
+    const replacement = `      {/* Exact Supabase project storage */}
       <div className="card">
         <div className="card-header"><span className="card-title">💾 Storage Usage</span></div>
         <div style={{ padding: '0 20px 20px' }}>
@@ -95,9 +104,13 @@ if (!s.includes('Exact Supabase project storage')) {
       </div>
 
 `
-  s = s.slice(0, a) + replacement + s.slice(b)
-  changed = true
+    s = s.slice(0, a) + replacement + s.slice(b)
+    changed = true
+  } else {
+    skipped += 1
+    console.warn('Storage Usage card legacy anchors not found; leaving current Settings implementation unchanged.')
+  }
 }
 
 if (changed) fs.writeFileSync(path, s)
-console.log(`Storage usage display ${changed ? 'patched' : 'already current'}.`)
+console.log(`Storage usage display ${changed ? 'patched' : 'already current'}${skipped ? ` (${skipped} legacy patch${skipped===1?'':'es'} skipped)` : ''}.`)
