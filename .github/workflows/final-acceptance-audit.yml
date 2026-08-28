@@ -1,0 +1,115 @@
+name: Final Acceptance Audit
+on:
+  push:
+    paths:
+      - '.github/workflows/final-acceptance-audit.yml'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Production build
+        run: npm run build
+      - name: Dependency audit
+        run: npm audit --omit=dev --json > dependency-audit.json || true
+      - name: Full first-party source scan
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, json
+          ROOT=Path('.')
+          exts={'.js','.jsx','.ts','.tsx','.cjs','.mjs','.sql','.yml','.yaml','.json','.html','.css'}
+          excluded={'node_modules','dist','.git','coverage'}
+          files=[]
+          for p in ROOT.rglob('*'):
+            if not p.is_file() or p.suffix.lower() not in exts: continue
+            if any(part in excluded for part in p.parts): continue
+            files.append(p)
+          lines=0; bytes_=0; warnings=[]; critical=[]
+          texts={}
+          for p in files:
+            try: s=p.read_text(errors='replace')
+            except Exception: continue
+            texts[str(p)]=s; lines += s.count('\n')+1; bytes_ += len(s.encode(errors='replace'))
+            for i,line in enumerate(s.splitlines(),1):
+              if re.search(r'\b(TODO|FIXME|HACK|XXX)\b',line,re.I): warnings.append([str(p),i,'marker',line.strip()[:240]])
+              if re.search(r'\b(not implemented|coming soon|placeholder)\b',line,re.I): warnings.append([str(p),i,'incomplete-copy',line.strip()[:240]])
+              if '/storage/v1/object/public/documents/' in line or '/object/public/documents/' in line:
+                warnings.append([str(p),i,'legacy-public-doc-url',line.strip()[:240]])
+              if re.search(r'VITE_.*SERVICE.*ROLE|SUPABASE_SERVICE_ROLE_KEY\s*[:=]\s*["\']',line,re.I) and str(p).startswith('src/'):
+                critical.append([str(p),i,'frontend-service-role-secret',line.strip()[:240]])
+              if re.search(r'eyJ[a-zA-Z0-9_-]{20,}\.[a-zA-Z0-9_-]{20,}\.[a-zA-Z0-9_-]{20,}',line):
+                critical.append([str(p),i,'hardcoded-jwt',line.strip()[:160]])
+          # Known stale schema/API patterns that caused real production bugs.
+          stale=[
+            (r'\.from\(["\']sms_logs["\']\)','nonexistent sms_logs table'),
+            (r'\bfrom_number\b|\bto_number\b','legacy SMS columns'),
+            (r'\.select\([^\n]*client_email[^\n]*\).*calevents','legacy calevents client_email'),
+            (r'\.from\(["\']clients["\']\)[\s\S]{0,300}\bmobile\b','legacy clients.mobile'),
+          ]
+          for path,s in texts.items():
+            if path.startswith('supabase/migrations/') or path.startswith('sql/'): continue
+            for pat,label in stale:
+              for m in re.finditer(pat,s,re.I):
+                line=s[:m.start()].count('\n')+1
+                critical.append([path,line,label,s.splitlines()[line-1].strip()[:240]])
+          # Every Edge Function invoked by frontend must exist in source.
+          fn_dirs={p.parent.name for p in Path('supabase/functions').glob('*/index.ts')}
+          invokes=[]
+          for path,s in texts.items():
+            if not path.startswith('src/'): continue
+            for m in re.finditer(r'functions\.invoke\(\s*["\']([^"\']+)["\']',s): invokes.append((path,s[:m.start()].count('\n')+1,m.group(1)))
+          missing=sorted({name for _,_,name in invokes if name not in fn_dirs})
+          for name in missing: critical.append(['src',0,'missing-edge-function',name])
+          # Public-facing pages may use send-email only through a constrained kind.
+          public_pages={'src/pages/BookAppointment.jsx','src/pages/ManageBooking.jsx','src/pages/SignPage.jsx','src/pages/EmployeePortal.jsx','src/pages/ClockIn.jsx'}
+          for path in public_pages:
+            s=texts.get(path,'')
+            for m in re.finditer(r'functions\.invoke\(\s*["\']send-email["\']',s):
+              snippet=s[m.start():m.start()+1000]
+              if 'kind:' not in snippet:
+                critical.append([path,s[:m.start()].count('\n')+1,'generic-public-send-email','send-email invoke missing constrained kind'])
+          # Basic source/live-contract sanity for e-sign and employee flows.
+          must_contain={
+            'src/pages/SignPage.jsx':['esign_signed_copy','esign_signed_receipt'],
+            'src/pages/EmployeePortal.jsx':['emp_sms_messages','employee_portal_token','employee_timeoff_notification'],
+            'src/pages/ClockIn.jsx':['kiosk_login','employee_timeoff_notification'],
+            'supabase/functions/send-email/index.ts':['esign_signed_copy','employee_timeoff_notification'],
+            'supabase/functions/send-sms/index.ts':['employee_portal_token','esign_signed_receipt'],
+          }
+          for path,needles in must_contain.items():
+            s=texts.get(path,'')
+            for needle in needles:
+              if needle not in s: critical.append([path,0,'missing-required-contract',needle])
+          report={
+            'files_scanned':len(files),'lines_scanned':lines,'bytes_scanned':bytes_,
+            'frontend_edge_invocations':len(invokes),'edge_functions_in_source':len(fn_dirs),
+            'critical_count':len(critical),'warning_count':len(warnings),
+            'critical':critical,'warnings':warnings[:1000],
+            'invoked_edge_functions':sorted({x[2] for x in invokes}),
+          }
+          Path('final-acceptance-report.json').write_text(json.dumps(report,indent=2))
+          print(json.dumps({k:v for k,v in report.items() if k not in ('critical','warnings','invoked_edge_functions')},indent=2))
+          if critical:
+            print('\nCRITICAL FINDINGS:')
+            for x in critical: print(' | '.join(map(str,x)))
+            raise SystemExit(1)
+          PY
+      - name: Upload audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-acceptance-audit
+          path: |
+            final-acceptance-report.json
+            dependency-audit.json
+          if-no-files-found: warn
