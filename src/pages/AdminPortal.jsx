@@ -5321,9 +5321,9 @@ function LinkedInPublisher({ embeddedMode = false }) {
 
   // Load active products from registry
   React.useEffect(() => {
-    supabase.from('romylabs_products').select('product_id,name,active')
+    supabase.from('romylabs_products').select('product_id,name,active,lifecycle,public')
       .order('name').then(({ data }) => {
-        const active = (data || []).filter(p => p.active)
+        const active = (data || []).filter(p => p.active && p.product_id !== 'phl' && !/^PHL(?:\s|$)/i.test(p.name || '') && String(p.lifecycle || '').toLowerCase() !== 'internal')
         setProducts(active)
         // Validate stored pid against active products
         if (active.length && !active.find(p => p.product_id === selectedPid)) {
