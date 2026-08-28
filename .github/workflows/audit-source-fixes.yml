@@ -1,0 +1,35 @@
+name: Audit Source Fixes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/audit-source-fixes.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Apply repairs
+        run: node scripts/audit-fix-source.cjs
+      - name: Verify build and production dependencies
+        run: |
+          npm ci
+          npm run build
+          npm audit --omit=dev --audit-level=high
+          git diff --check
+      - name: Commit repairs
+        run: |
+          git config user.name 'RomyLabs Audit Bot'
+          git config user.email 'romy@romylabs.com'
+          git add src/pages/TaxReturns.jsx src/components/TaxDocParser.jsx
+          git commit -m 'fix: harden tax return setup and tax-year calculations'
+          git push origin main
