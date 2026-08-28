@@ -100,12 +100,10 @@ export default function Esign() {
     const { data: cfg } = await supabase.from('settings').select('signalwire_backend,smtp_host,smtp_email').limit(1).maybeSingle()
     if ((sendVia === 'sms' || sendVia === 'both') && clientPhone) {
       try {
-        const res = await fetch((cfg?.signalwire_backend || '') + '/sms/send', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: clientPhone, body: msg })
+        const { error } = await supabase.functions.invoke('send-sms', {
+          body: { to: clientPhone, body: msg }
         })
-        const d = await res.json()
-        if (d.success) smsSent = true
+        if (!error) smsSent = true
       } catch (e) { console.error('SMS error:', e) }
     }
     if ((sendVia === 'email' || sendVia === 'both') && clientEmail) {
