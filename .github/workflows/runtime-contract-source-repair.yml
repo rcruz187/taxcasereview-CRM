@@ -1,0 +1,74 @@
+name: Runtime Contract Source Repair
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/runtime-contract-source-repair.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Repair source/runtime contract drift
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          # Transcript legacy migration: align to live legacy transcripts schema.
+          p=Path('src/components/TranscriptPull.jsx')
+          s=p.read_text()
+          replacements={
+            "t.clientName || 'Unknown'":"t.clientname || 'Unknown'",
+            "t.transcriptType ? [t.transcriptType] : []":"t.type ? [t.type] : []",
+            "t.assignedTo || null":"null",
+            "t.requestDate || t.created_at || new Date().toISOString()":"t.requesteddate || t.created_at || new Date().toISOString()",
+            "t.receivedDate || null":"null",
+          }
+          for old,new in replacements.items():
+            if old not in s: raise SystemExit(f'Missing TranscriptPull target: {old}')
+            s=s.replace(old,new)
+          p.write_text(s)
+
+          # Platform metrics referenced a retired `notes` table. Use audited
+          # activity_log fields instead so recent activity works for every tenant.
+          p=Path('supabase/functions/platform-metrics/index.ts')
+          s=p.read_text()
+          s=s.replace("supabase.from('notes').select('body,created_at,author_email')", "supabase.from('activity_log').select('description,created_at,employee_email')")
+          s=s.replace("text: (n.body || '').slice(0, 120)", "text: (n.description || '').slice(0, 120)")
+          s=s.replace("by:   n.author_email", "by:   n.employee_email")
+          if "from('notes')" in s: raise SystemExit('Retired notes table reference remains in platform-metrics')
+          p.write_text(s)
+
+          # Deployment config must match the live/custom-auth contract.
+          p=Path('supabase/config.toml')
+          s=p.read_text()
+          s=s.replace('[functions.run-autopay-batch]\nverify_jwt = true', '[functions.run-autopay-batch]\n# Server-to-server cron; function validates x-cron-secret itself.\nverify_jwt = false')
+          s=s.replace('[functions.gsc-data]\nverify_jwt = false', '[functions.gsc-data]\n# Admin Portal reporting; require an authenticated Supabase user.\nverify_jwt = true')
+          p.write_text(s)
+          PY
+
+      - name: Verify
+        run: |
+          npm ci
+          npm run build
+          npm audit --omit=dev --audit-level=high
+          ! git grep -n "from('notes')" -- supabase/functions/platform-metrics/index.ts
+          ! git grep -n "t.clientName\|t.transcriptType\|t.assignedTo\|t.requestDate\|t.receivedDate" -- src/components/TranscriptPull.jsx
+          git diff --check
+
+      - name: Commit
+        run: |
+          git config user.name 'RomyLabs Audit Bot'
+          git config user.email 'romy@romylabs.com'
+          git add src/components/TranscriptPull.jsx supabase/functions/platform-metrics/index.ts supabase/config.toml
+          git commit -m 'fix: align runtime contracts with live schema and auth'
+          git push origin main
