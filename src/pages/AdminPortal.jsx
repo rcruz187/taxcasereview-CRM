@@ -4199,7 +4199,7 @@ function CommandCenter() {
             )}
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:24 }}>
-            {activeTenant ? [
+            {(activeTenant ? [
               { label:`Clients — ${activeTenant.firm_name}`,     value:Number(activeTenant.client_count||0).toLocaleString(), icon:'🏢', color:'#10b981' },
               { label:`Leads — ${activeTenant.firm_name}`,       value:Number(activeTenant.lead_count||0).toLocaleString(),   icon:'👤', color:'#a855f7' },
               { label:`Seats — ${activeTenant.firm_name}`,       value:Number(activeTenant.employee_count||0),                icon:'👥', color:'#6366f1' },
@@ -4213,7 +4213,7 @@ function CommandCenter() {
               { label:'Pending E-Signs',                 value:data.kpis.pendingEsigns,                 icon:'✍️', color:'#8b5cf6' },
               { label:'Demos Today',                     value:data.kpis.todayDemos,                    icon:'📅', color:'#0ea5e9' },
               { label:'File Storage',  value:`${realMB} MB · ${realObjs} files`,                       icon:'💾', color:'#f59e0b' },
-            ]}.map(k => <KPICard key={k.label} {...k} />)}
+            ]).map(k => <KPICard key={k.label} {...k} />)}
           </div>
           </>)
           })()}
