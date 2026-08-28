@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { useFirm } from '../../lib/useFirm'
@@ -53,16 +54,16 @@ export default function TopBar({ onNew }) {
   const [dark, setDark] = useState(() => {
     const saved = localStorage.getItem('tcr-theme')
     if (saved) return saved === 'dark'
-    return true // default dark
+    return true
   })
 
   useEffect(() => {
     document.documentElement.classList.toggle('light', !dark)
     localStorage.setItem('tcr-theme', dark ? 'dark' : 'light')
   }, [dark])
-  const panelRef = useRef(null)
-  const btnRef   = useRef(null)
 
+  const panelRef = useRef(null)
+  const btnRef = useRef(null)
   const title = PAGE_TITLES[location.pathname] || 'Tax Resolution CRM'
 
   useEffect(() => {
@@ -76,7 +77,6 @@ export default function TopBar({ onNew }) {
     return () => clearInterval(t)
   }, [])
 
-  // Close on outside click
   useEffect(() => {
     if (!open) return
     const handler = (e) => {
@@ -86,7 +86,6 @@ export default function TopBar({ onNew }) {
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
-  // Close on route change
   useEffect(() => { setOpen(false) }, [location.pathname])
 
   const MODAL_PATHS = new Set(['/leads','/clients','/cases','/tasks','/invoices','/payments','/documents','/calendar','/email','/esign','/fax'])
@@ -94,6 +93,97 @@ export default function TopBar({ onNew }) {
     setOpen(false)
     navigate(MODAL_PATHS.has(path) ? path + '?new=1' : path)
   }
+
+  const newDrawer = open && typeof document !== 'undefined'
+    ? createPortal(
+      <>
+        <div
+          aria-hidden="true"
+          onClick={() => setOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 10040,
+            background: 'rgba(0,0,0,.36)'
+          }}
+        />
+        <aside
+          ref={panelRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Create New"
+          style={{
+            position: 'fixed', top: 0, right: 0, bottom: 0,
+            width: 'min(92vw, 340px)',
+            background: '#0F2033',
+            color: '#E8EEF4',
+            borderLeft: '1px solid rgba(255,255,255,.12)',
+            zIndex: 10050,
+            display: 'flex', flexDirection: 'column',
+            boxShadow: '-12px 0 40px rgba(0,0,0,.55)',
+            overflow: 'hidden'
+          }}
+        >
+          <div style={{
+            minHeight: 64, padding: '14px 16px',
+            borderBottom: '1px solid rgba(255,255,255,.10)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+            flexShrink: 0
+          }}>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#E8EEF4' }}>Create New</div>
+              <div style={{ fontSize: 11, color: '#99AABB', marginTop: 2 }}>What would you like to add?</div>
+            </div>
+            <button
+              onClick={() => setOpen(false)}
+              aria-label="Close create menu"
+              style={{
+                width: 34, height: 34, borderRadius: 8,
+                border: '1px solid rgba(255,255,255,.12)',
+                background: '#152840', color: '#E8EEF4', cursor: 'pointer',
+                fontSize: 18, lineHeight: 1
+              }}
+            >×</button>
+          </div>
+
+          <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
+            {NEW_ITEMS.map(item => (
+              <button
+                key={item.path}
+                onClick={() => go(item.path)}
+                style={{
+                  width: '100%', minHeight: 58,
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '9px 10px', borderRadius: 9,
+                  border: '1px solid transparent', background: 'transparent',
+                  color: '#E8EEF4', cursor: 'pointer', textAlign: 'left',
+                  marginBottom: 4, fontFamily: 'inherit'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = '#152840'
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,.08)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.borderColor = 'transparent'
+                }}
+              >
+                <div style={{
+                  width: 38, height: 38, borderRadius: 9, flexShrink: 0,
+                  background: item.color + '22', border: `1px solid ${item.color}55`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17
+                }}>{item.icon}</div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#E8EEF4' }}>{item.label}</div>
+                  <div style={{ fontSize: 11, color: '#99AABB' }}>{item.sub}</div>
+                </div>
+                <svg style={{ marginLeft: 'auto', flexShrink: 0, color: '#667788' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            ))}
+          </div>
+        </aside>
+      </>,
+      document.body
+    )
+    : null
 
   return (
     <div className="topbar" style={{ position: 'relative' }}>
@@ -105,13 +195,11 @@ export default function TopBar({ onNew }) {
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
 
-      {/* Left side: title + search together */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, minWidth: 0 }}>
         <span className="page-title" style={{ flexShrink: 0 }}>{title}</span>
         <GlobalSearch value={searchQ} onChange={setSearchQ} />
       </div>
 
-      {/* Right side: firm numbers, clock, controls */}
       <div style={{display:'flex',alignItems:'center',gap:14,flexShrink:0}}>
         <div style={{display:'flex',alignItems:'center',gap:5,fontSize:12,color:'var(--t2)',whiteSpace:'nowrap'}}>
           <span style={{fontSize:13}}>📞</span>
@@ -146,64 +234,11 @@ export default function TopBar({ onNew }) {
       <span className="topbar-datestr" style={{ fontSize: 12, color: 'var(--t3)', whiteSpace: 'nowrap' }}>{dateStr}</span>
       <span className="topbar-clock">{clock}</span>
 
-      {/* Jobber-style + New button */}
-      <button ref={btnRef} className="btn pri" onClick={() => setOpen(o => !o)}
-        style={{ position: 'relative', minWidth: 72 }}>
+      <button ref={btnRef} className="btn pri" onClick={() => setOpen(o => !o)} style={{ position: 'relative', minWidth: 72 }}>
         {open ? '✕ Close' : '+ New'}
       </button>
 
-      {/* Slide-out panel */}
-      {open && (
-        <>
-          {/* backdrop */}
-          <div style={{
-            position: 'fixed', inset: 0, zIndex: 998,
-            background: 'rgba(0,0,0,.25)',
-          }} onClick={() => setOpen(false)}/>
-
-          {/* panel */}
-          <div ref={panelRef} style={{
-            position: 'fixed', top: 52, right: 0, bottom: 0,
-            width: 'min(85vw, 280px)', background: 'var(--sf)', borderLeft: '1px solid var(--br)',
-            zIndex: 999, display: 'flex', flexDirection: 'column',
-            boxShadow: '-8px 0 32px rgba(0,0,0,.35)',
-            animation: 'slideInRight .18s ease-out',
-          }}>
-            <div style={{ padding: '16px 18px 12px', borderBottom: '1px solid var(--br)', flexShrink: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--tx)' }}>Create New</div>
-              <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>What would you like to add?</div>
-            </div>
-
-            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
-              {NEW_ITEMS.map(item => (
-                <button key={item.path} onClick={() => go(item.path)}
-                  style={{
-                    width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '10px 12px', borderRadius: 8, border: 'none', background: 'none',
-                    cursor: 'pointer', textAlign: 'left', marginBottom: 2,
-                    transition: 'background .12s',
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--s2)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'none'}>
-                  <div style={{
-                    width: 36, height: 36, borderRadius: 9, flexShrink: 0,
-                    background: item.color + '22', border: `1px solid ${item.color}44`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
-                  }}>{item.icon}</div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--tx)' }}>{item.label}</div>
-                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>{item.sub}</div>
-                  </div>
-                  <svg style={{ marginLeft: 'auto', flexShrink: 0, color: 'var(--t3)' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <style>{`@keyframes slideInRight { from { transform: translateX(100%); opacity: 0 } to { transform: translateX(0); opacity: 1 } }`}</style>
-        </>
-      )}
+      {newDrawer}
     </div>
   )
 }
-
