@@ -1,0 +1,10 @@
+/*
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+  Expires: 0
+
+# Admin portal routes — noindex on both taxrescrm.app and admin.romylabs.com
+/crm-admin
+  X-Robots-Tag: noindex, nofollow
+/crm-admin/*
+  X-Robots-Tag: noindex, nofollow

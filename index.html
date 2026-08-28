@@ -5,9 +5,6 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -16,38 +13,106 @@
       (function(){
         var redirect = sessionStorage.redirect;
         delete sessionStorage.redirect;
-        if (redirect && redirect !== location.href) {
-          history.replaceState(null, null, redirect);
-        }
+        if (redirect && redirect !== location.href) history.replaceState(null, null, redirect);
       })();
     </script>
     <title>TaxRes CRM</title>
-    <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="icon" type="image/x-icon" href="/favicon.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon.png" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/favicon.png" />
-    <link rel="icon" type="image/png" sizes="512x512" href="/favicon.png" />
+    <link id="app-favicon" rel="icon" type="image/png" href="/taxrescrm-favicon.png" />
+    <link id="app-apple-touch-icon" rel="apple-touch-icon" sizes="180x180" href="/taxrescrm-favicon.png" />
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var product = (params.get('product') || '').toLowerCase();
+        var lang = (params.get('lang') || '').toLowerCase();
+        if (product === 'arcvena') {
+          document.title = 'Schedule an Arcvena Demo';
+          var arcvenaFavicon = document.getElementById('app-favicon');
+          var arcvenaApple = document.getElementById('app-apple-touch-icon');
+          if (arcvenaFavicon) {
+            arcvenaFavicon.type = 'image/png';
+            arcvenaFavicon.href = '/arcvena-favicon-64.png?v=20260827-1';
+          }
+          if (arcvenaApple) arcvenaApple.href = '/arcvena-favicon-64.png?v=20260827-1';
+        }
+
+        if (product === 'bocasync') {
+          document.title = lang === 'es' ? 'Agendar una Demo de BocaSync' : 'Schedule a BocaSync Demo';
+          document.documentElement.lang = lang === 'es' ? 'es' : 'en';
+          var favicon = document.getElementById('app-favicon');
+          var apple = document.getElementById('app-apple-touch-icon');
+          if (favicon) {
+            favicon.type = 'image/svg+xml';
+            favicon.href = '/bocasync-logo.svg?v=1';
+          }
+          if (apple) apple.href = '/bocasync-logo.svg?v=1';
+        }
+
+        if (product === 'bocasync' && lang === 'es') {
+          var textMap = {
+            'Schedule a BocaSync Demo': 'Agendar una Demo de BocaSync',
+            'What is this about?': '¿De qué se trata?',
+            'Pick a day': 'Elige un día',
+            'Pick a time': 'Elige una hora',
+            'Your details': 'Tus datos',
+            'Product Demo': 'Demo del Producto',
+            'Dental Practice Consultation': 'Consulta para Consultorio Dental',
+            'Follow-Up Call': 'Llamada de Seguimiento',
+            'Checking availability…': 'Verificando disponibilidad…',
+            'No open times that day — try another date.': 'No hay horarios disponibles ese día — prueba otra fecha.',
+            'You’re booked!': '¡Tu cita está confirmada!',
+            "You're booked!": '¡Tu cita está confirmada!',
+            "We'll reach out to confirm. If anything changes, just contact us.": 'Te enviaremos la confirmación. Si algo cambia, contáctanos.',
+            'Loading…': 'Cargando…',
+            'Online booking is unavailable right now. Please contact us instead.': 'La reserva en línea no está disponible en este momento. Contáctanos directamente.'
+          };
+          var placeholderMap = {
+            'Full name *': 'Nombre completo *',
+            'Email *': 'Correo electrónico *',
+            'Phone': 'Teléfono',
+            'Notes (optional)': 'Notas (opcional)'
+          };
+          function translateNode(root) {
+            var walker = document.createTreeWalker(root || document.body, NodeFilter.SHOW_TEXT);
+            var nodes = [];
+            while (walker.nextNode()) nodes.push(walker.currentNode);
+            nodes.forEach(function (node) {
+              var raw = node.nodeValue || '';
+              var trimmed = raw.trim();
+              if (textMap[trimmed]) node.nodeValue = raw.replace(trimmed, textMap[trimmed]);
+            });
+            document.querySelectorAll('input[placeholder], textarea[placeholder]').forEach(function (el) {
+              var p = el.getAttribute('placeholder') || '';
+              if (placeholderMap[p]) el.setAttribute('placeholder', placeholderMap[p]);
+            });
+            document.querySelectorAll('button').forEach(function (button) {
+              var t = (button.textContent || '').trim();
+              if (t === 'Book appointment') button.textContent = 'Reservar cita';
+              if (t === 'Book now') button.textContent = 'Reservar ahora';
+              if (t === 'Try again') button.textContent = 'Intentar de nuevo';
+            });
+          }
+          window.addEventListener('DOMContentLoaded', function () {
+            translateNode(document.body);
+            var observer = new MutationObserver(function () { translateNode(document.body); });
+            observer.observe(document.getElementById('root') || document.body, { childList: true, subtree: true });
+          });
+        }
+      })();
+    </script>
     <meta name="theme-color" content="#0f2150" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-      <script type="text/javascript">
-      (function(c,l,a,r,i,t,y){
-        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-      })(window, document, "clarity", "script", "xyck7g2mfl");
-    </script>
-      <!-- Google tag (gtag.js) -->
+    <script type="text/javascript">(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a]||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window, document, "clarity", "script", "xyck7g2mfl");</script>
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-M6J80B65LG"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-M6J80B65LG');
-    </script>
-    <script type="module" crossorigin src="/assets/index-DrFZ_8n7.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DVq7vtti.css">
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-M6J80B65LG');</script>
+    <script defer src="/romylabs-admin-hotfix.js?v=ea28033e"></script>
+    <script type="module" crossorigin src="/assets/index-BanzC7g0.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/react-vendor-c6vpYEMA.js">
+    <link rel="modulepreload" crossorigin href="/assets/supabase-C8W5_S3P.js">
+    <link rel="modulepreload" crossorigin href="/assets/signalwire-BNVsRDC1.js">
+    <link rel="modulepreload" crossorigin href="/assets/react-router-C82kOaEo.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-Bh4JSYqK.css">
   </head>
   <body>
     <div id="root"></div>

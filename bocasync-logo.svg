@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="shield" x1="12" y1="7" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F5D79"/>
+      <stop offset=".55" stop-color="#1596A6"/>
+      <stop offset="1" stop-color="#22C7D3"/>
+    </linearGradient>
+    <linearGradient id="pulse" x1="7" y1="38" x2="57" y2="25" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0EA5E9"/>
+      <stop offset=".55" stop-color="#1ED6C8"/>
+      <stop offset="1" stop-color="#52E2D2"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="#F5FBFC"/>
+  <path d="M32 5 52 11v16c0 13.8-7.9 24.2-20 30-12.1-5.8-20-16.2-20-30V11L32 5Z" fill="#12313D" stroke="url(#shield)" stroke-width="3.2" stroke-linejoin="round"/>
+  <path d="M22.2 17.1c3.6-2 7-.8 9.8 1.2 2.8-2 6.2-3.2 9.8-1.2 4.9 2.7 4 9 2.5 13.2-1.7 4.6-3.6 11.8-7 11.8-2.5 0-2-8.2-5.3-8.2s-2.8 8.2-5.3 8.2c-3.4 0-5.3-7.2-7-11.8-1.5-4.2-2.4-10.5 2.5-13.2Z" fill="#F9FDFE" stroke="#DDF7FA" stroke-width="1.2" stroke-linejoin="round"/>
+  <path d="M8 35h9l4-5.7 4.6 11.4 6.4-18 4.8 13.6 3.4-5.3H56" fill="none" stroke="url(#pulse)" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
