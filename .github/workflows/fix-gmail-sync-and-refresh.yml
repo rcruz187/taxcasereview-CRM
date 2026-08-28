@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/fix-gmail-sync-and-refresh.yml'
-      - 'scripts/fix-gmail-sync-refresh.py'
+      - 'scripts/add-email-refresh-button.py'
 
 permissions:
   contents: write
@@ -18,9 +18,9 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-      - name: Apply repair
-        run: python scripts/fix-gmail-sync-refresh.py
-      - name: Verify repair
+      - name: Add visible Refresh Email button
+        run: python scripts/add-email-refresh-button.py
+      - name: Verify Gmail backend remains tenant scoped
         run: |
           grep -q "settingsByTenant" supabase/functions/gmail-sync-cron/index.ts
           grep -q "tenantByEmail" supabase/functions/gmail-sync-cron/index.ts
@@ -29,10 +29,10 @@ jobs:
         run: |
           npm ci
           npm run build
-      - name: Commit repaired source
+      - name: Commit frontend repair
         run: |
           git config user.name RomyLabs
           git config user.email rcruz187@gmail.com
-          git add supabase/functions/gmail-sync-cron/index.ts src/pages/Email.jsx
-          git commit -m "fix(email): tenant-scope Gmail sync and add refresh button"
+          git add src/pages/Email.jsx
+          git commit -m "fix(email): expose visible Refresh Email button"
           git push origin main
