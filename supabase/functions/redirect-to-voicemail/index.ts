@@ -1,110 +1,70 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Called BY THE BROWSER (CallContext.jsx) when an inbound call has been
-// held too long without anyone answering, or when staff clicks "Decline".
-// Holding a caller in a <Conference> doesn't have a built-in "give up
-// after N seconds" the way dialing a destination did, so we trigger the
-// fallback manually: use the SignalWire REST API to redirect the LIVE
-// call over to the voicemail prompt.
-//
-// CORS is enabled because this is called directly from the browser.
-
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
+const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-
   try {
+    const authHeader = req.headers.get('authorization') || ''
+    if (!authHeader.toLowerCase().startsWith('bearer ')) return json({ error: 'Unauthorized' }, 401)
+    const token = authHeader.slice(7).trim()
+    const authClient = createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: `Bearer ${token}` } } })
+    const { data: { user }, error: userErr } = await authClient.auth.getUser(token)
+    if (userErr || !user?.email) return json({ error: 'Unauthorized' }, 401)
+
     const { callsid } = await req.json()
-    if (!callsid) {
-      return new Response(JSON.stringify({ error: 'callsid required' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+    if (!callsid) return json({ error: 'callsid required' }, 400)
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
+    const db = createClient(SUPABASE_URL, SERVICE_KEY)
+    const { data: employee } = await db.from('employees')
+      .select('tenant_id,status').ilike('email', user.email).limit(1).maybeSingle()
+    if (!employee?.tenant_id || String(employee.status || 'Active').toLowerCase() !== 'active') return json({ error: 'Unauthorized' }, 403)
 
-    // ── Atomic claim BEFORE touching the live call ──
-    // Multiple agents' browsers each run their own give-up timer for the
-    // same ringing call, and Decline also lands here. Without this guard,
-    // a timer/decline firing AFTER a colleague answered would redirect the
-    // LIVE, in-progress call into voicemail mid-conversation. The
-    // conditional update below only succeeds while the row is still
-    // 'ringing' — if someone answered (or it already went to voicemail),
-    // zero rows match and we do nothing at all.
-    const { data: claimed, error: claimErr } = await supabase
-      .from('incoming_calls')
+    const { data: claimed, error: claimErr } = await db.from('incoming_calls')
       .update({ status: 'missed' })
+      .eq('tenant_id', employee.tenant_id)
       .eq('callsid', callsid)
       .eq('status', 'ringing')
       .select('callsid')
+    if (claimErr) return json({ error: 'Unable to claim ringing call.' }, 500)
+    if (!claimed?.length) return json({ ok: true, skipped: true })
 
-    if (claimErr) console.error('redirect-to-voicemail: claim error', claimErr)
-
-    if (!claimed || claimed.length === 0) {
-      console.log('redirect-to-voicemail: call', callsid, 'is no longer ringing (answered or already resolved) — skipping redirect')
-      return new Response(JSON.stringify({ ok: true, skipped: true }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    const { data: settings, error: sErr } = await supabase
-      .from('settings')
+    const { data: settings, error: sErr } = await db.from('settings')
       .select('sw_space_url,sw_project_id,sw_api_token')
-      .limit(1)
-      .maybeSingle()
-
+      .eq('tenant_id', employee.tenant_id).limit(1).maybeSingle()
     if (sErr || !settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token) {
-      console.error('redirect-to-voicemail: missing SignalWire credentials in settings', sErr)
-      return new Response(JSON.stringify({ error: 'SignalWire credentials missing in Settings' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      // Put the row back so another attempt can safely handle it once config is corrected.
+      await db.from('incoming_calls').update({ status: 'ringing' })
+        .eq('tenant_id', employee.tenant_id).eq('callsid', callsid).eq('status', 'missed')
+      return json({ error: 'SignalWire credentials missing for this office.' }, 400)
     }
 
     const spaceDomain = settings.sw_space_url.replace(/^https?:\/\//, '')
-    const auth = 'Basic ' + btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
-
-    const resp = await fetch(
-      `https://${spaceDomain}/api/laml/2010-04-01/Accounts/${settings.sw_project_id}/Calls/${callsid}.json`,
-      {
-        method: 'POST',
-        headers: { Authorization: auth, 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          Url: 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/voicemail-prompt',
-          Method: 'POST',
-        }),
-      }
-    )
-
+    const providerAuth = 'Basic ' + btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
+    const resp = await fetch(`https://${spaceDomain}/api/laml/2010-04-01/Accounts/${settings.sw_project_id}/Calls/${callsid}.json`, {
+      method: 'POST',
+      headers: { Authorization: providerAuth, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ Url: `${SUPABASE_URL}/functions/v1/voicemail-prompt`, Method: 'POST' }),
+    })
     const text = await resp.text()
     if (!resp.ok) {
-      console.error('redirect-to-voicemail: SignalWire rejected the redirect', resp.status, text)
-      return new Response(JSON.stringify({ error: text }), {
-        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      await db.from('incoming_calls').update({ status: 'ringing' })
+        .eq('tenant_id', employee.tenant_id).eq('callsid', callsid).eq('status', 'missed')
+      console.error('redirect-to-voicemail: provider rejected redirect', resp.status, text)
+      return json({ error: 'Could not redirect the call to voicemail.' }, 502)
     }
 
-    const { error: updErr } = await supabase
-      .from('incoming_calls')
-      .update({ status: 'missed' })
-      .eq('callsid', callsid)
-    if (updErr) console.error('incoming_calls status update error:', updErr)
-
-    return new Response(JSON.stringify({ ok: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-
+    return json({ ok: true })
   } catch (err) {
     console.error('redirect-to-voicemail error:', err)
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return json({ error: 'Unable to redirect call to voicemail.' }, 500)
   }
 })
