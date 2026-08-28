@@ -17,24 +17,28 @@ jobs:
           const fs = require('fs')
           const p = 'src/pages/AdminPortal.jsx'
           let s = fs.readFileSync(p,'utf8')
-          const from = "            ]}.map(k => <KPICard key={k.label} {...k} />)}"
-          const to   = "            ]).map(k => <KPICard key={k.label} {...k} />)}"
-          const n = s.split(from).length - 1
-          if (n !== 1) throw new Error(`Expected exactly one malformed CRM KPI expression, found ${n}`)
-          s = s.replace(from,to)
+          const openFrom = "            {activeTenant ? ["
+          const openTo   = "            {(activeTenant ? ["
+          const closeFrom = "            ]}.map(k => <KPICard key={k.label} {...k} />)}"
+          const closeTo   = "            ]).map(k => <KPICard key={k.label} {...k} />)}"
+          const opens = s.split(openFrom).length - 1
+          const closes = s.split(closeFrom).length - 1
+          if (opens !== 1 || closes !== 1) throw new Error(`Expected one malformed CRM KPI expression; opens=${opens}, closes=${closes}`)
+          s = s.replace(openFrom, openTo).replace(closeFrom, closeTo)
           fs.writeFileSync(p,s)
           NODE
       - run: npm ci
-      - name: Production build with CRM warning treated as failure
+      - name: Production build with JSX warnings treated as failure
         run: |
           set -o pipefail
           npm run build 2>&1 | tee /tmp/build.log
-          if grep -q 'AdminPortal.jsx:.*character .* not valid inside a JSX element' /tmp/build.log; then
-            echo 'CRM JSX parser warning still present'
+          if grep -q 'AdminPortal.jsx:.*not valid inside a JSX element' /tmp/build.log; then
+            echo 'AdminPortal JSX parser warning still present'
             exit 1
           fi
       - name: Verify exact CRM expression
         run: |
+          grep -Fq "{(activeTenant ? [" src/pages/AdminPortal.jsx
           grep -Fq "]).map(k => <KPICard key={k.label} {...k} />)}" src/pages/AdminPortal.jsx
           ! grep -Fq "]}.map(k => <KPICard key={k.label} {...k} />)}" src/pages/AdminPortal.jsx
       - name: Commit repair
