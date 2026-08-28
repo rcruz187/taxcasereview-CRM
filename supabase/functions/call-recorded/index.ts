@@ -1,6 +1,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
+
 async function validateSWSignature(signingKey: string, url: string, params: Record<string, string>, signature: string): Promise<boolean> {
   if (!signingKey || !signature) return false
   const sortedKeys = Object.keys(params).sort()
@@ -26,8 +28,7 @@ serve(async (req) => {
 
     let parsedRecording: URL
     try { parsedRecording = new URL(recordingUrl) } catch { return new Response('Bad Request', { status: 400 }) }
-    if (parsedRecording.protocol !== 'https:' || !parsedRecording.hostname.endsWith('.signalwire.com')) {
-      console.warn('[call-recorded] rejected non-SignalWire recording URL')
+    if (parsedRecording.protocol !== 'https:' || !(parsedRecording.hostname === 'signalwire.com' || parsedRecording.hostname.endsWith('.signalwire.com'))) {
       return new Response('Bad Request', { status: 400 })
     }
 
@@ -36,61 +37,68 @@ serve(async (req) => {
     if (swSecret) {
       const paramMap: Record<string,string> = {}
       for (const [k,v] of form) paramMap[k] = v
-      if (!await validateSWSignature(swSecret, req.url, paramMap, swSignature)) {
-        console.warn('[call-recorded] Invalid SignalWire signature — rejected')
-        return new Response('Unauthorized', { status: 403 })
-      }
-    } else {
-      console.warn('[call-recorded] SW_SIGNING_SECRET absent; validating callback structure and SignalWire media host')
-    }
+      if (!await validateSWSignature(swSecret, req.url, paramMap, swSignature)) return new Response('Unauthorized', { status: 403 })
+    } else console.warn('[call-recorded] SW_SIGNING_SECRET absent; structural provider validation only')
 
     const duration = form.get('RecordingDuration')?.toString() || null
     const from = form.get('From')?.toString() || ''
     const to = form.get('To')?.toString() || ''
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+    const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
-    let tenant_id = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
-    if (to) {
-      const toClean = to.replace(/\D/g, '').slice(-10)
-      const { data: setting } = await supabase.from('settings').select('tenant_id').ilike('signalwire_phone', `%${toClean}%`).limit(1).maybeSingle()
-      if (setting?.tenant_id) tenant_id = setting.tenant_id
+    const { data: settingsRows } = await db.from('settings')
+      .select('tenant_id,sw_inbound_did,sw_project_id,sw_api_token')
+      .not('sw_inbound_did', 'is', null)
+    const fromDigits = from.replace(/\D/g, '').slice(-10)
+    const toDigits = to.replace(/\D/g, '').slice(-10)
+    const matched = (settingsRows || []).find(r => {
+      const did = String(r.sw_inbound_did || '').replace(/\D/g, '').slice(-10)
+      return !!did && (did === fromDigits || did === toDigits)
+    }) || (settingsRows || []).find(r => r.tenant_id === '61a89aef-0e7e-4ea2-b222-44ab2024655a')
+    const tenant_id = matched?.tenant_id || '61a89aef-0e7e-4ea2-b222-44ab2024655a'
+
+    const triggerAi = (url: string) => {
+      const p = fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/call-ai-summary`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-internal-call-secret': Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '' },
+        body: JSON.stringify({ recording_url: url, call_sid: callSid, from_number: from, to_number: to, tenant_id, duration_seconds: duration ? Number(duration) : null }),
+      }).then(async r => { if (!r.ok) console.error('call-recorded: ai-summary HTTP', r.status, await r.text()) })
+        .catch(e => console.error('call-recorded: ai-summary trigger failed', e))
+      try { EdgeRuntime.waitUntil(p) } catch { void p }
     }
 
-    // Provider retries must not create duplicate recording/AI rows.
-    const { data: existing } = await supabase.from('call_recordings').select('id,recording_url').eq('call_sid', callSid).eq('tenant_id', tenant_id).limit(1).maybeSingle()
-    if (existing) return new Response('ok', { status: 200 })
+    const { data: existing } = await db.from('call_recordings')
+      .select('id,recording_url').eq('call_sid', callSid).eq('tenant_id', tenant_id).limit(1).maybeSingle()
+    if (existing) {
+      const { data: summary } = await db.from('call_ai_summaries').select('id').eq('call_sid', callSid).eq('tenant_id', tenant_id).limit(1).maybeSingle()
+      if (!summary && existing.recording_url) triggerAi(existing.recording_url)
+      return new Response('ok', { status: 200 })
+    }
 
     let storedUrl = recordingUrl
     try {
       const audioUrl = recordingUrl.endsWith('.mp3') ? recordingUrl : `${recordingUrl}.mp3`
-      const audioRes = await fetch(audioUrl)
+      const headers: Record<string,string> = {}
+      if (matched?.sw_project_id && matched?.sw_api_token) headers.Authorization = 'Basic ' + btoa(`${matched.sw_project_id}:${matched.sw_api_token}`)
+      const audioRes = await fetch(audioUrl, { headers })
       if (audioRes.ok) {
         const blob = await audioRes.arrayBuffer()
         const path = `call-recordings/${tenant_id}/${callSid}.mp3`
-        const { error: upErr } = await supabase.storage.from('documents').upload(path, blob, { contentType: 'audio/mpeg', upsert: true })
+        const { error: upErr } = await db.storage.from('documents').upload(path, blob, { contentType: 'audio/mpeg', upsert: true })
         if (!upErr) {
-          // Stored URLs are part of the call history, so use the archival signed
-          // URL lifetime used by other persisted private-document references.
-          const { data: signed } = await supabase.storage.from('documents').createSignedUrl(path, 94608000)
+          const { data: signed } = await db.storage.from('documents').createSignedUrl(path, 94608000)
           if (signed?.signedUrl) storedUrl = signed.signedUrl
-        }
-      }
+        } else console.error('call-recorded: storage upload failed', upErr.message)
+      } else console.error('call-recorded: provider audio fetch failed', audioRes.status)
     } catch (e) {
-      console.error('call-recorded: re-host failed, falling back to SignalWire URL', e)
+      console.error('call-recorded: re-host failed', e)
     }
 
-    const { error: insertErr } = await supabase.from('call_recordings').insert({
+    const { error: insertErr } = await db.from('call_recordings').insert({
       call_sid: callSid, from_number: from, to_number: to, recording_url: storedUrl,
       duration_seconds: duration ? Number(duration) : null, created_at: new Date().toISOString(), tenant_id,
     })
     if (insertErr) throw insertErr
-
-    fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/call-ai-summary`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-internal-call-secret': Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '' },
-      body: JSON.stringify({ recording_url: storedUrl, call_sid: callSid, from_number: from, to_number: to, tenant_id, duration_seconds: duration ? Number(duration) : null }),
-    }).catch(e => console.error('call-recorded: failed to trigger ai-summary', e))
-
+    triggerAi(storedUrl)
     return new Response('ok', { status: 200 })
   } catch (err) {
     console.error('call-recorded error:', err)
