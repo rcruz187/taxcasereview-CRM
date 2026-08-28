@@ -1,8 +1,12 @@
 /* RomyLabs admin production guard — canonical admin host + legacy product-link cleanup. */
 /* CC_HIDE_FIX_20260827: never hide Command Center containers by textContent. */
+/* IMPERSONATION_FIX_20260828: allow the secured Jump In route and active imp session. */
 (function () {
   var host = window.location.hostname.toLowerCase();
   var path = window.location.pathname;
+  var params = new URLSearchParams(window.location.search || '');
+  var isImpersonationRoute = path === '/impersonate';
+  var isActiveImpersonation = params.get('imp') === '1';
 
   /* TaxRes is the CRM host. If a stale /crm-admin URL is opened there,
    * recover back to the CRM instead of sending the user to RomyLabs Admin. */
@@ -13,10 +17,10 @@
 
   if (host !== 'admin.romylabs.com') return;
 
-  /* admin.romylabs.com is a dedicated control-plane host. Never allow an
-   * authenticated owner session to fall through to the TaxRes demo CRM shell.
-   * Deep admin routes are preserved; root/CRM-shell routes return to portal. */
-  if (path.indexOf('/crm-admin') !== 0 && path !== '/login' && path.indexOf('/auth/') !== 0) {
+  /* admin.romylabs.com is a dedicated control-plane host. The only allowed
+   * non-admin CRM-shell paths are the secured impersonation entry route and
+   * the active ?imp=1 session created after a token is validated. */
+  if (path.indexOf('/crm-admin') !== 0 && path !== '/login' && path.indexOf('/auth/') !== 0 && !isImpersonationRoute && !isActiveImpersonation) {
     window.location.replace('/crm-admin');
     return;
   }
