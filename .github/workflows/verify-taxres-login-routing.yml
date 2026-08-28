@@ -6,7 +6,9 @@ on:
     paths:
       - '.github/workflows/verify-taxres-login-routing.yml'
       - 'public/romylabs-admin-hotfix.js'
+      - 'public/tcr-routing-fingerprint.txt'
       - 'src/pages/Login.jsx'
+      - 'src/App.jsx'
 
 jobs:
   verify:
@@ -14,28 +16,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify source routing rules
+      - name: Verify all source routing layers
         shell: bash
         run: |
           set -euo pipefail
           grep -q "window.location.hostname === 'admin.romylabs.com'" src/pages/Login.jsx
           grep -q "window.location.replace('/')" public/romylabs-admin-hotfix.js
           ! grep -q "window.location.replace('https://admin.romylabs.com' + path" public/romylabs-admin-hotfix.js
+          grep -q "const isAdminHost = window.location.hostname.toLowerCase() === 'admin.romylabs.com'" src/App.jsx
+          grep -q "if (!isAdminHost) return <Shell />" src/App.jsx
+          grep -q "window.location.hostname.toLowerCase() === 'admin.romylabs.com' ? (" src/App.jsx
 
-      - name: Wait for TaxRes production routing guard
+      - name: Build exact production source
+        run: |
+          npm ci
+          npm run build
+
+      - name: Wait for exact TaxRes production deployment
         shell: bash
         run: |
           set -euo pipefail
-          url="https://taxrescrm.app/romylabs-admin-hotfix.js"
-          for i in {1..36}; do
-            body="$(curl -fsSL --max-time 15 -H 'Cache-Control: no-cache' "${url}?verify=$(date +%s)" || true)"
-            if printf '%s' "$body" | grep -q "window.location.replace('/')" && \
+          fingerprint="https://taxrescrm.app/tcr-routing-fingerprint.txt"
+          guard="https://taxrescrm.app/romylabs-admin-hotfix.js"
+          for i in {1..48}; do
+            fp="$(curl -fsSL --max-time 15 -H 'Cache-Control: no-cache' "${fingerprint}?verify=$(date +%s)" || true)"
+            body="$(curl -fsSL --max-time 15 -H 'Cache-Control: no-cache' "${guard}?verify=$(date +%s)" || true)"
+            if printf '%s' "$fp" | grep -q 'TCR_OWNER_ROUTING_HOST_SCOPED_20260828' && \
+               printf '%s' "$body" | grep -q "window.location.replace('/')" && \
                ! printf '%s' "$body" | grep -q "window.location.replace('https://admin.romylabs.com' + path"; then
-              echo "PASS: TaxRes production is serving the corrected CRM routing guard."
+              echo "PASS: live TaxRes deployment contains the host-scoped owner routing fix tree."
               exit 0
             fi
-            echo "Attempt $i/36: TaxRes production has not updated yet; waiting 10s..."
+            echo "Attempt $i/48: waiting for corrected TaxRes deployment..."
             sleep 10
           done
-          echo "ERROR: TaxRes production is still serving stale routing code"
+          echo "ERROR: corrected TaxRes deployment never reached production"
           exit 1
