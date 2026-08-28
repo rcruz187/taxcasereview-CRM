@@ -7,8 +7,10 @@ on:
       - '.github/workflows/verify-taxres-login-routing.yml'
       - 'public/romylabs-admin-hotfix.js'
       - 'public/tcr-routing-fingerprint.txt'
+      - 'public/email-refresh-deploy-marker.txt'
       - 'src/pages/Login.jsx'
       - 'src/App.jsx'
+      - 'src/pages/Email.jsx'
 
 jobs:
   verify:
@@ -16,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify all source routing layers
+      - name: Verify source routing and Email refresh layers
         shell: bash
         run: |
           set -euo pipefail
@@ -26,6 +28,9 @@ jobs:
           grep -q "const isAdminHost = window.location.hostname.toLowerCase() === 'admin.romylabs.com'" src/App.jsx
           grep -q "if (!isAdminHost) return <Shell />" src/App.jsx
           grep -q "window.location.hostname.toLowerCase() === 'admin.romylabs.com' ? (" src/App.jsx
+          grep -q "Refresh Email" src/pages/Email.jsx
+          grep -q "await syncNow()" src/pages/Email.jsx
+          grep -q "TCR_EMAIL_REFRESH_BUTTON_DEPLOY_2026-08-28T04:25Z" public/email-refresh-deploy-marker.txt
 
       - name: Build exact production source
         run: |
@@ -38,17 +43,20 @@ jobs:
           set -euo pipefail
           fingerprint="https://taxrescrm.app/tcr-routing-fingerprint.txt"
           guard="https://taxrescrm.app/romylabs-admin-hotfix.js"
+          email_marker="https://taxrescrm.app/email-refresh-deploy-marker.txt"
           for i in {1..48}; do
             fp="$(curl -fsSL --max-time 15 -H 'Cache-Control: no-cache' "${fingerprint}?verify=$(date +%s)" || true)"
             body="$(curl -fsSL --max-time 15 -H 'Cache-Control: no-cache' "${guard}?verify=$(date +%s)" || true)"
+            em="$(curl -fsSL --max-time 15 -H 'Cache-Control: no-cache' "${email_marker}?verify=$(date +%s)" || true)"
             if printf '%s' "$fp" | grep -q 'TCR_OWNER_ROUTING_HOST_SCOPED_20260828' && \
                printf '%s' "$body" | grep -q "window.location.replace('/')" && \
-               ! printf '%s' "$body" | grep -q "window.location.replace('https://admin.romylabs.com' + path"; then
-              echo "PASS: live TaxRes deployment contains the host-scoped owner routing fix tree."
+               ! printf '%s' "$body" | grep -q "window.location.replace('https://admin.romylabs.com' + path" && \
+               printf '%s' "$em" | grep -q 'TCR_EMAIL_REFRESH_BUTTON_DEPLOY_2026-08-28T04:25Z'; then
+              echo "PASS: live TaxRes deployment contains routing fix and Refresh Email deployment marker."
               exit 0
             fi
-            echo "Attempt $i/48: waiting for corrected TaxRes deployment..."
+            echo "Attempt $i/48: waiting for latest TaxRes deployment..."
             sleep 10
           done
-          echo "ERROR: corrected TaxRes deployment never reached production"
+          echo "ERROR: latest TaxRes deployment never reached production"
           exit 1
