@@ -1,0 +1,28 @@
+name: Verify Admin Full Deploy
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/admin-portal-build.txt'
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - run: npm run build
+      - name: Wait for exact audited production build
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://admin.romylabs.com/admin-portal-build.txt'
+          for i in {1..30}; do
+            body="$(curl -fsSL --max-time 15 -H 'Cache-Control: no-cache' "${url}?v=$(date +%s)" || true)"
+            if printf '%s' "$body" | grep -q 'ADMIN_PORTAL_FULL_AUDIT_20260827_2015'; then
+              echo 'Audited admin portal build is live.'
+              exit 0
+            fi
+            sleep 10
+          done
+          echo 'Production did not publish audited admin portal build in time.'
+          exit 1
