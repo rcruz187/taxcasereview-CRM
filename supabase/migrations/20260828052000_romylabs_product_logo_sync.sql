@@ -2,7 +2,9 @@
 alter table public.romylabs_products
   add column if not exists logo_url text;
 
-create or replace function public.get_public_products()
+drop function if exists public.get_public_products();
+
+create function public.get_public_products()
 returns table(
   product_id text,
   name text,
