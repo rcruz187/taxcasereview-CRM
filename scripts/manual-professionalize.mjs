@@ -52,11 +52,19 @@ manual = manual.replaceAll(`<div key={i} style={{ overflowX:'auto', margin:'12px
 if (changed) fs.writeFileSync(manualPath, manual)
 
 let main = fs.readFileSync(mainPath, 'utf8')
+let mainChanged = false
 if (!main.includes(`./manual-premium.css`)) {
   const anchor = `import './index.css'`
   if (!main.includes(anchor)) throw new Error('main.jsx index.css import anchor missing')
   main = main.replace(anchor, `${anchor}\nimport './manual-premium.css'`)
-  fs.writeFileSync(mainPath, main)
+  mainChanged = true
 }
+if (!main.includes(`./lib/routePrefetch`)) {
+  const anchor = `import './manual-premium.css'`
+  if (!main.includes(anchor)) throw new Error('main.jsx manual CSS import anchor missing')
+  main = main.replace(anchor, `${anchor}\nimport './lib/routePrefetch'`)
+  mainChanged = true
+}
+if (mainChanged) fs.writeFileSync(mainPath, main)
 
-console.log(`Manual professional shell ${changed ? 'applied' : 'already current'}.`)
+console.log(`Manual professional shell ${changed ? 'applied' : 'already current'}; route prefetch installed.`)
