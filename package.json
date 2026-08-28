@@ -13,7 +13,8 @@
     "dashboard:glow": "node scripts/restore-dashboard-card-glow.mjs",
     "forms:state-esign-prefill": "node scripts/fix-state-esign-prefill.mjs",
     "reports:accuracy": "node scripts/fix-reporting-accuracy.mjs",
-    "prebuild": "npm run check-polling && npm run manual:style && npm run storage:fix-display && npm run email:state-sync && npm run email:count-sync && npm run dashboard:glow && npm run forms:state-esign-prefill && npm run reports:accuracy",
+    "accounting:oauth-state": "node scripts/fix-accounting-oauth-state.mjs",
+    "prebuild": "npm run check-polling && npm run manual:style && npm run storage:fix-display && npm run email:state-sync && npm run email:count-sync && npm run dashboard:glow && npm run forms:state-esign-prefill && npm run reports:accuracy && npm run accounting:oauth-state",
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "gh-pages -d dist --dotfiles"
