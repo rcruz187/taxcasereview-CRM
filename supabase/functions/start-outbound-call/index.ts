@@ -1,48 +1,68 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
+const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
+    const authHeader = req.headers.get('authorization') || ''
+    if (!authHeader.toLowerCase().startsWith('bearer ')) return json({ error: 'Unauthorized' }, 401)
+    const token = authHeader.slice(7).trim()
+    const authClient = createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: `Bearer ${token}` } } })
+    const { data: { user }, error: userErr } = await authClient.auth.getUser(token)
+    if (userErr || !user?.email) return json({ error: 'Unauthorized' }, 401)
+
     const { destinationNumber } = await req.json()
-    if (!destinationNumber) return new Response(JSON.stringify({ error: 'destinationNumber required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    const digits = String(destinationNumber || '').replace(/\D/g, '')
+    const e164 = digits.length === 10 ? `+1${digits}` : (digits.length === 11 && digits.startsWith('1') ? `+${digits}` : '')
+    if (!e164) return json({ error: 'Enter a valid 10-digit US phone number.' }, 400)
 
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
-    const { data: settings, error: sErr } = await supabase.from('settings')
+    const db = createClient(SUPABASE_URL, SERVICE_KEY)
+    const { data: employee } = await db.from('employees')
+      .select('tenant_id,name,extension,status')
+      .ilike('email', user.email).limit(1).maybeSingle()
+    if (!employee?.tenant_id || String(employee.status || 'Active').toLowerCase() !== 'active') return json({ error: 'Employee phone access is inactive.' }, 403)
+
+    const { data: settings, error: sErr } = await db.from('settings')
       .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did,tenant_id')
-      .not('sw_api_token', 'is', null).not('sw_space_url', 'is', null).not('sw_inbound_did', 'is', null)
-      .order('updated_at', { ascending: true }).limit(1).maybeSingle()
-
+      .eq('tenant_id', employee.tenant_id).limit(1).maybeSingle()
     if (sErr || !settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token || !settings?.sw_inbound_did) {
-      return new Response(JSON.stringify({ error: 'SignalWire credentials or caller ID missing in Settings' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      return json({ error: 'SignalWire credentials or caller ID missing for this office.' }, 400)
     }
 
-    const conferenceName = `outbound-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    const { error: insErr } = await supabase.from('outbound_calls').insert({ conference_name: conferenceName, destination_number: destinationNumber, status: 'pending', tenant_id: settings.tenant_id })
-    if (insErr) return new Response(JSON.stringify({ error: insErr.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    const conferenceName = `outbound-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`
+    const { error: insErr } = await db.from('outbound_calls').insert({
+      conference_name: conferenceName,
+      destination_number: e164,
+      status: 'pending',
+      tenant_id: employee.tenant_id,
+      agent_name: employee.name || user.email,
+      agent_extension: employee.extension || null,
+    })
+    if (insErr) return json({ error: insErr.message }, 500)
 
     const spaceDomain = settings.sw_space_url.replace(/^https?:\/\//, '')
-    const auth = 'Basic ' + btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
-    const outboundLegUrl = `https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/outbound-leg?conf=${encodeURIComponent(conferenceName)}`
-    const statusCallbackUrl = `https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/outbound-call-status?conf=${encodeURIComponent(conferenceName)}`
+    const providerAuth = 'Basic ' + btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
+    const outboundLegUrl = `${SUPABASE_URL}/functions/v1/outbound-leg?conf=${encodeURIComponent(conferenceName)}&tenant=${encodeURIComponent(employee.tenant_id)}`
+    const statusCallbackUrl = `${SUPABASE_URL}/functions/v1/outbound-call-status?conf=${encodeURIComponent(conferenceName)}&tenant=${encodeURIComponent(employee.tenant_id)}`
 
     const resp = await fetch(`https://${spaceDomain}/api/laml/2010-04-01/Accounts/${settings.sw_project_id}/Calls.json`, {
       method: 'POST',
-      headers: { Authorization: auth, 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: { Authorization: providerAuth, 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        To: destinationNumber,
+        To: e164,
         From: settings.sw_inbound_did,
         Url: outboundLegUrl,
         Method: 'POST',
         StatusCallback: statusCallbackUrl,
-        // We need answered as well as terminal state. Previously only
-        // completed was requested, so the CRM could never know when the
-        // destination actually picked up.
         StatusCallbackEvent: 'initiated ringing answered completed',
         StatusCallbackMethod: 'POST',
       }),
@@ -50,16 +70,16 @@ serve(async (req) => {
 
     const text = await resp.text()
     if (!resp.ok) {
+      await db.from('outbound_calls').update({ status: 'failed' }).eq('tenant_id', employee.tenant_id).eq('conference_name', conferenceName)
       console.error('start-outbound-call: SignalWire rejected call', resp.status, text)
-      await supabase.from('outbound_calls').update({ status: 'failed' }).eq('conference_name', conferenceName)
-      return new Response(JSON.stringify({ error: text }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      return json({ error: 'SignalWire could not start the call.' }, 502)
     }
 
     let clientCallsid = null
-    try { clientCallsid = JSON.parse(text)?.sid || null } catch { /* non-fatal */ }
-    return new Response(JSON.stringify({ ok: true, conferenceName, clientCallsid }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    try { clientCallsid = JSON.parse(text)?.sid || null } catch {}
+    return json({ ok: true, conferenceName, clientCallsid })
   } catch (err) {
     console.error('start-outbound-call error:', err)
-    return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    return json({ error: 'Unable to start call.' }, 500)
   }
 })
