@@ -42,13 +42,36 @@ body {
 .ch,.card-header { min-height:34px !important;padding-bottom:9px !important;margin-bottom:4px !important;border-bottom:1px solid rgba(120,170,220,.13) !important; }
 .ct,.card-title { font-weight:850 !important;letter-spacing:-.015em; }
 
-[data-card-idx] { background:var(--polish-panel-soft) !important;border:1px solid rgba(120,170,220,.18) !important;border-radius:14px !important;min-height:112px !important;padding:20px 20px 17px !important;box-shadow:0 10px 24px rgba(0,0,0,.18) !important; }
-[data-card-idx]:hover { transform:translateY(-4px) !important;border-color:rgba(90,165,235,.42) !important;box-shadow:var(--polish-shadow-hover) !important; }
-[data-card-idx] > div:first-child { height:3px !important;left:14px !important;right:14px !important;top:0 !important;border-radius:0 0 5px 5px !important; }
+/* Dashboard KPI cards: restore the premium ambient glow that was lost during
+   the rail/readability cleanup. The glow is intentionally subtle at rest and
+   brightens on hover so the dashboard feels alive without becoming noisy. */
+[data-card-idx] {
+  background:
+    radial-gradient(circle at 78% 18%, rgba(26,127,212,.19), transparent 42%),
+    radial-gradient(circle at 8% 105%, rgba(59,130,246,.08), transparent 38%),
+    var(--polish-panel-soft) !important;
+  border:1px solid rgba(120,170,220,.24) !important;
+  border-radius:14px !important;
+  min-height:112px !important;
+  padding:20px 20px 17px !important;
+  box-shadow:
+    0 0 30px rgba(26,127,212,.10),
+    0 10px 24px rgba(0,0,0,.20),
+    inset 0 1px 0 rgba(255,255,255,.025) !important;
+}
+[data-card-idx]:hover {
+  transform:translateY(-4px) !important;
+  border-color:rgba(90,165,235,.52) !important;
+  box-shadow:
+    0 0 42px rgba(26,127,212,.20),
+    0 18px 44px rgba(0,0,0,.34),
+    inset 0 1px 0 rgba(255,255,255,.04) !important;
+}
+[data-card-idx] > div:first-child { height:3px !important;left:14px !important;right:14px !important;top:0 !important;border-radius:0 0 5px 5px !important;box-shadow:0 0 12px currentColor; }
 [data-card-idx] > div:nth-child(3) { padding-top:5px !important; }
 [data-card-idx] > div:nth-child(3) > div:first-child > div:first-child { font-size:10.5px !important;letter-spacing:.11em !important;color:#9bbbd5 !important; }
-[data-card-idx] > div:nth-child(3) > div:first-child > div:nth-child(2) { font-size:31px !important;letter-spacing:-.035em !important;text-shadow:0 3px 16px rgba(0,0,0,.22); }
-[data-card-idx] > div:nth-child(3) > div:last-child { opacity:.28 !important;transform:scale(1.08); }
+[data-card-idx] > div:nth-child(3) > div:first-child > div:nth-child(2) { font-size:31px !important;letter-spacing:-.035em !important;text-shadow:0 3px 16px rgba(0,0,0,.22),0 0 18px rgba(26,127,212,.12); }
+[data-card-idx] > div:nth-child(3) > div:last-child { opacity:.28 !important;transform:scale(1.08);filter:drop-shadow(0 0 10px rgba(26,127,212,.18)); }
 
 /* Improve dashboard record readability without changing data or click targets */
 .card > div[style*="borderBottom"] { border-bottom-color:rgba(120,170,220,.12) !important;border-radius:8px;padding-left:8px !important;padding-right:8px !important; }
