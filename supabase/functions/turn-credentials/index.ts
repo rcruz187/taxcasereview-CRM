@@ -1,5 +1,5 @@
 // turn-credentials
-// Returns ICE servers for WebRTC. Authenticated staff may receive tenant/platform
+// Returns ICE servers for WebRTC. Authenticated active staff may receive tenant/platform
 // Metered short-lived TURN credentials. Anonymous screen-share guests receive
 // only public TURN/STUN so paid Metered quota cannot be harvested anonymously.
 
@@ -48,9 +48,9 @@ serve(async (req) => {
       return new Response(JSON.stringify(FREE_TURN), { headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
     }
 
-    const { data: emp } = await admin.from('employees').select('tenant_id').ilike('email', user.email).maybeSingle()
+    const { data: emp } = await admin.from('employees').select('tenant_id,status').ilike('email', user.email).maybeSingle()
     const tenantId = emp?.tenant_id || null
-    if (!tenantId) {
+    if (!tenantId || String(emp?.status || '').toLowerCase() !== 'active') {
       return new Response(JSON.stringify(FREE_TURN), { headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
     }
 
@@ -65,7 +65,7 @@ serve(async (req) => {
       if (creds) return new Response(JSON.stringify(creds), { headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
     }
 
-    // Authenticated staff only may use the platform fallback paid TURN account.
+    // Authenticated active staff only may use the platform fallback paid TURN account.
     const { data: platformSettings } = await admin
       .from('settings')
       .select('metered_app_name,metered_api_key')
