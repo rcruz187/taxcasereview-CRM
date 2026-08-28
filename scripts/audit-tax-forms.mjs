@@ -116,5 +116,4 @@ if (hardFailures.length) {
   console.log('\nNo hard asset/IRS mapped-field failures.')
 }
 
-// This audit is intentionally permanent: any future template replacement must
-// continue to match the field map used by the e-sign prefill flow.
+// Permanent regression guard: rerun whenever IRS/state templates or signing code changes.
