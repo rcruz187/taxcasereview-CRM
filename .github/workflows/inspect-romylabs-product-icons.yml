@@ -1,0 +1,22 @@
+name: Inspect RomyLabs Product Icons
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/inspect-romylabs-product-icons.yml']
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: mpxgxfqdbquzkrvvejkh
+    steps:
+      - name: Read non-secret registry logo refs
+        shell: bash
+        run: |
+          python3 - <<'PY' >/tmp/q.json
+          import json
+          print(json.dumps({'query':"select product_id,name,icon_ref,public,active from public.romylabs_products order by sort_order nulls last,name"}))
+          PY
+          curl --fail-with-body -sS -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" -H 'Content-Type: application/json' --data-binary @/tmp/q.json
