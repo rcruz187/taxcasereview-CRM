@@ -1,317 +1,318 @@
-// gmail-sync-cron
-// Runs on a schedule (Supabase Cron), once, no matter how many employees
-// are logged into the CRM — but now loops through EVERY employee's own
-// connected Gmail account and syncs each one separately (previously this
-// synced one single shared firm account, and every employee saw the exact
-// same inbox regardless of who they were — a real data-exposure bug, not
-// just a UX quirk). Each employee's backfill progress, sync status, and
-// tokens now live in `employee_gmail_accounts`, one row per employee.
-//
-// JWT Verification must be OFF — Supabase Cron calls this with no user
-// auth token.
-//
-// Schedule this to run every 1 minute via Database → Cron Jobs.
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Content-Type': 'application/json',
 }
-
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const LIST_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/messages'
 const RETENTION_DAYS = 365
-const BACKFILL_MONTHS = 12
+const ACTIONS = new Set(['archive', 'trash', 'read', 'unread', 'inbox'])
 
-function monthsAgoGmailDate(months: number) {
-  const d = new Date()
-  d.setMonth(d.getMonth() - months)
-  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: corsHeaders })
 }
-
-function base64UrlDecodeToString(b64url: string) {
-  const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/')
-  const binary = atob(b64)
+function b64urlDecode(v = '') {
+  if (!v) return ''
+  const b64 = v.replace(/-/g, '+').replace(/_/g, '/')
+  const pad = '='.repeat((4 - (b64.length % 4)) % 4)
+  const binary = atob(b64 + pad)
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
   return new TextDecoder('utf-8').decode(bytes)
 }
-function headerValue(headers: any[], name: string) {
-  return headers?.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || ''
+function header(headers: any[], name: string) {
+  return headers?.find((h: any) => String(h.name).toLowerCase() === name.toLowerCase())?.value || ''
 }
-function extractAddress(headerVal: string) {
-  const m = headerVal.match(/<([^>]+)>/)
-  return (m ? m[1] : headerVal).trim()
+function address(v = '') {
+  const m = v.match(/<([^>]+)>/)
+  return (m ? m[1] : v).trim()
 }
-function extractDisplayName(headerVal: string) {
-  const m = headerVal.match(/^"?([^"<]*)"?\s*<[^>]+>$/)
-  return m && m[1].trim() ? m[1].trim() : extractAddress(headerVal)
+function displayName(v = '') {
+  const m = v.match(/^"?([^"<]*)"?\s*<[^>]+>$/)
+  return m && m[1].trim() ? m[1].trim() : address(v)
 }
-function findBodyPart(payload: any, mimeType: string): string | null {
+function bodyPart(payload: any, mime: string): string | null {
   if (!payload) return null
-  if (payload.mimeType === mimeType && payload.body?.data) return payload.body.data
-  for (const part of payload.parts || []) {
-    const found = findBodyPart(part, mimeType)
+  if (payload.mimeType === mime && payload.body?.data) return payload.body.data
+  for (const p of payload.parts || []) {
+    const found = bodyPart(p, mime)
     if (found) return found
   }
   return null
 }
-function stripHtml(html: string) {
-  const noStyle = html.replace(new RegExp('<style[^]*?<' + '/style>', 'gi'), '')
-  return noStyle.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
+function stripHtml(html = '') {
+  return html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
 }
-function findAttachments(payload: any, out: any[] = []) {
+function attachments(payload: any, out: any[] = []) {
   if (!payload) return out
-  if (payload.filename && payload.body?.attachmentId) {
-    out.push({
-      filename: payload.filename,
-      mimeType: payload.mimeType || 'application/octet-stream',
-      size: payload.body.size || 0,
-      attachmentId: payload.body.attachmentId,
-    })
-  }
-  for (const part of payload.parts || []) findAttachments(part, out)
+  if (payload.filename && payload.body?.attachmentId) out.push({
+    filename: payload.filename,
+    mimeType: payload.mimeType || 'application/octet-stream',
+    size: payload.body.size || 0,
+    attachmentId: payload.body.attachmentId,
+  })
+  for (const p of payload.parts || []) attachments(p, out)
   return out
 }
 
-// Refreshes THIS employee's own access token, using the shared app
-// credentials (client_id/secret — the app's identity, not a personal
-// secret) but this account's own refresh token.
-async function getValidGmailToken(supabase: any, acct: any, appCreds: any) {
+async function validToken(sb: any, acct: any, creds: any) {
   const expiry = acct.gmail_token_expiry ? new Date(acct.gmail_token_expiry).getTime() : 0
-  if (acct.gmail_access_token && expiry > Date.now() + 60000) {
-    return acct.gmail_access_token
-  }
+  if (acct.gmail_access_token && expiry > Date.now() + 60000) return acct.gmail_access_token
   const body = new URLSearchParams({
     refresh_token: acct.gmail_refresh_token,
-    client_id: appCreds.gmail_client_id,
-    client_secret: appCreds.gmail_client_secret,
+    client_id: creds.gmail_client_id,
+    client_secret: creds.gmail_client_secret,
     grant_type: 'refresh_token',
   })
   const res = await fetch(TOKEN_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body })
   const data = await res.json()
-  if (!res.ok) throw new Error(data.error_description || data.error || 'Token refresh failed')
-  const expiresAt = new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString()
-  await supabase.from('employee_gmail_accounts').update({ gmail_access_token: data.access_token, gmail_token_expiry: expiresAt }).eq('employee_email', acct.employee_email)
+  if (!res.ok) throw new Error(data.error_description || data.error || `Token refresh failed (${res.status})`)
+  const expiresAt = new Date(Date.now() + Number(data.expires_in || 3600) * 1000).toISOString()
+  await sb.from('employee_gmail_accounts').update({ gmail_access_token: data.access_token, gmail_token_expiry: expiresAt }).eq('employee_email', acct.employee_email)
   return data.access_token
 }
 
-async function listGmailMessages(token: string, { labelIds, query, pageToken, maxResults = 25 }: any) {
-  const params = new URLSearchParams({ maxResults: String(maxResults) })
-  if (labelIds) params.set('labelIds', labelIds)
-  if (query) params.set('q', query)
-  if (pageToken) params.set('pageToken', pageToken)
-  const res = await fetch(`${LIST_URL}?${params.toString()}`, { headers: { Authorization: `Bearer ${token}` } })
+async function listIds(token: string, label: string, maxResults = 100) {
+  const qs = new URLSearchParams({ maxResults: String(maxResults), labelIds: label })
+  const res = await fetch(`${LIST_URL}?${qs}`, { headers: { Authorization: `Bearer ${token}` } })
   const data = await res.json()
-  if (!res.ok) throw new Error(data.error?.message || 'Gmail list failed')
-  return { ids: (data.messages || []).map((m: any) => m.id), nextPageToken: data.nextPageToken || null }
+  if (!res.ok) throw new Error(data.error?.message || `Gmail list failed (${res.status})`)
+  return (data.messages || []).map((m: any) => m.id)
 }
 
-async function getAndParseGmailMessage(token: string, id: string, clients: any[], leads: any[]) {
+async function listAllIds(token: string, label: string, maxPages = 10) {
+  const out: string[] = []
+  let pageToken = ''
+  for (let page = 0; page < maxPages; page++) {
+    const qs = new URLSearchParams({ maxResults: '500', labelIds: label })
+    if (pageToken) qs.set('pageToken', pageToken)
+    const res = await fetch(`${LIST_URL}?${qs}`, { headers: { Authorization: `Bearer ${token}` } })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error?.message || `Gmail list failed (${res.status})`)
+    out.push(...(data.messages || []).map((m: any) => m.id))
+    pageToken = data.nextPageToken || ''
+    if (!pageToken) break
+  }
+  return out
+}
+
+async function parseMessage(token: string, id: string, clients: any[], leads: any[]) {
   const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`, { headers: { Authorization: `Bearer ${token}` } })
   const msg = await res.json()
-  if (!res.ok) throw new Error(msg.error?.message || 'Gmail get failed')
-
+  if (!res.ok) throw new Error(msg.error?.message || `Gmail get failed (${res.status})`)
   const labels = msg.labelIds || []
   const isSent = labels.includes('SENT')
   const isInbox = labels.includes('INBOX')
   if (!isSent && !isInbox) return null
-
-  const headers = msg.payload?.headers || []
-  const fromHeader = headerValue(headers, 'From')
-  const toHeader = headerValue(headers, 'To')
-  const subject = headerValue(headers, 'Subject') || '(no subject)'
-  const dateHeader = headerValue(headers, 'Date')
-  const receivedAt = dateHeader ? new Date(dateHeader).toISOString() : new Date(Number(msg.internalDate || Date.now())).toISOString()
-
-  const plainData = findBodyPart(msg.payload, 'text/plain')
-  const htmlData = findBodyPart(msg.payload, 'text/html')
-  let body = msg.snippet || ''
-  if (plainData) body = base64UrlDecodeToString(plainData)
-  else if (htmlData) body = stripHtml(base64UrlDecodeToString(htmlData))
-  const bodyHtmlRaw = htmlData ? base64UrlDecodeToString(htmlData) : null
-
-  const counterpartHeader = isSent ? toHeader : fromHeader
-  const counterpartAddress = extractAddress(counterpartHeader)
-  const counterpartName = extractDisplayName(counterpartHeader)
-  const matchedClient = clients.find((c) => c.email && c.email.toLowerCase() === counterpartAddress.toLowerCase())
-  const matchedLead = matchedClient ? null : leads.find((l) => l.email && l.email.toLowerCase() === counterpartAddress.toLowerCase())
-  const attachments = findAttachments(msg.payload)
-
+  const hs = msg.payload?.headers || []
+  const fromH = header(hs, 'From')
+  const toH = header(hs, 'To')
+  const subject = header(hs, 'Subject') || '(no subject)'
+  const dateH = header(hs, 'Date')
+  const receivedAt = dateH && !Number.isNaN(Date.parse(dateH)) ? new Date(dateH).toISOString() : new Date(Number(msg.internalDate || Date.now())).toISOString()
+  const plain = bodyPart(msg.payload, 'text/plain')
+  const html = bodyPart(msg.payload, 'text/html')
+  const htmlRaw = html ? b64urlDecode(html) : null
+  const body = plain ? b64urlDecode(plain) : htmlRaw ? stripHtml(htmlRaw) : (msg.snippet || '')
+  const counterpartH = isSent ? toH : fromH
+  const counterpart = address(counterpartH)
+  const client = clients.find((c: any) => c.email && String(c.email).toLowerCase() === counterpart.toLowerCase())
+  const lead = client ? null : leads.find((l: any) => l.email && String(l.email).toLowerCase() === counterpart.toLowerCase())
   return {
-    matched_kind: matchedClient ? 'client' : matchedLead ? 'lead' : null,
-    matched_lead_id: matchedLead?.id ?? null,
-    matched_name: matchedClient?.name || matchedLead?.name || null,
-    recipient: isSent ? counterpartAddress : extractAddress(fromHeader),
-    clientName: matchedClient?.name || matchedLead?.name || counterpartName || counterpartAddress,
-    subject, body, body_html: bodyHtmlRaw,
-    triage: isSent ? 'Sent' : 'Inbox',
-    status: isSent ? 'Sent' : 'Received',
-    gmail_message_id: msg.id,
-    gmail_thread_id: msg.threadId,
-    from_address: extractAddress(fromHeader),
-    received_at: receivedAt, created_at: receivedAt,
-    is_read: isSent,
-    attachments,
+    row: {
+      recipient: isSent ? counterpart : address(fromH),
+      clientName: client?.name || lead?.name || displayName(counterpartH) || counterpart,
+      subject,
+      body,
+      body_html: htmlRaw,
+      triage: isSent ? 'Sent' : 'Inbox',
+      status: isSent ? 'Sent' : 'Received',
+      gmail_message_id: msg.id,
+      gmail_thread_id: msg.threadId,
+      from_address: address(fromH),
+      received_at: receivedAt,
+      created_at: receivedAt,
+      is_read: isSent || !labels.includes('UNREAD'),
+      attachments: attachments(msg.payload),
+    },
+    match: client ? { kind: 'client', id: client.id, name: client.name } : lead ? { kind: 'lead', id: lead.id, name: lead.name } : null,
   }
 }
 
-async function filterUnknownIds(supabase: any, ids: string[]) {
-  if (!ids.length) return []
-  const { data } = await supabase.from('emails').select('gmail_message_id').in('gmail_message_id', ids)
-  const known = new Set((data || []).map((r: any) => r.gmail_message_id))
-  return ids.filter((id) => !known.has(id))
+async function reconcileUnread(sb: any, token: string, mailboxOwner: string) {
+  const unreadIds = await listAllIds(token, 'UNREAD')
+  const unread = new Set(unreadIds)
+  const { data: rows } = await sb.from('emails')
+    .select('id,gmail_message_id,is_read')
+    .eq('mailbox_owner', mailboxOwner)
+    .is('deleted_at', null)
+    .not('gmail_message_id', 'is', null)
+    .limit(1000)
+  if (!rows?.length) return { unread: 0, changed: 0 }
+  const toUnread = rows.filter((r: any) => unread.has(r.gmail_message_id) && r.is_read !== false).map((r: any) => r.id)
+  const toRead = rows.filter((r: any) => !unread.has(r.gmail_message_id) && r.is_read !== true).map((r: any) => r.id)
+  if (toUnread.length) await sb.from('emails').update({ is_read: false }).in('id', toUnread)
+  if (toRead.length) await sb.from('emails').update({ is_read: true }).in('id', toRead)
+  return { unread: unreadIds.length, changed: toUnread.length + toRead.length }
 }
 
-async function importIds(supabase: any, token: string, ids: string[], clients: any[], leads: any[], tenantId: string, mailboxOwner: string) {
-  for (const id of ids) {
-    try {
-      const parsed = await getAndParseGmailMessage(token, id, clients, leads)
-      if (parsed) {
-        const { matched_kind, matched_lead_id, matched_name, ...emailRow } = parsed
-        const { error: insertError } = await supabase.from('emails').insert([{ ...emailRow, tenant_id: tenantId, mailbox_owner: mailboxOwner }])
-        if (insertError) console.error('Gmail emails insert error for', id, insertError)
-        // Note ONLY when the email row actually inserted — writing notes for
-        // failed inserts breaks gmail_message_id dedup and re-notes every
-        // sweep (the duplicate factory found on the Romy Cruz test client).
-        if (!insertError && matched_kind && matched_name) {
-          const direction = parsed.triage === 'Sent' ? 'Sent' : 'Received'
-          const preview = (parsed.body || '').slice(0, 120).replace(/\n/g, ' ').trim()
-          const noteContent = `📧 Email ${direction} — "${parsed.subject}"${preview ? `\n${preview}${parsed.body?.length > 120 ? '…' : ''}` : ''}`
-          if (matched_kind === 'client') {
-            const { error: noteError } = await supabase.from('client_notes').insert({
-              clientname: matched_name, text: noteContent, note_type: 'Email',
-              author: direction === 'Sent' ? mailboxOwner : matched_name,
-              created_at: parsed.created_at || new Date().toISOString(),
-              tenant_id: tenantId,
-            })
-            if (noteError) console.error('Gmail client_notes insert error for', id, noteError)
-          } else {
-            const { error: noteError } = await supabase.from('lead_notes').insert({
-              lead_id: matched_lead_id, lead_name: matched_name, text: noteContent, type: 'Email',
-              author: direction === 'Sent' ? mailboxOwner : matched_name,
-              created_at: parsed.created_at || new Date().toISOString(),
-              tenant_id: tenantId,
-            })
-            if (noteError) console.error('Gmail lead_notes insert error for', id, noteError)
-          }
+async function syncAccount(sb: any, acct: any, tenantId: string, creds: any) {
+  const token = await validToken(sb, acct, creds)
+  const [{ data: clients }, { data: leads }] = await Promise.all([
+    sb.from('clients').select('id,name,email').eq('tenant_id', tenantId),
+    sb.from('leads').select('id,name,email').eq('tenant_id', tenantId),
+  ])
+  let inserted = 0
+  for (const label of ['INBOX', 'SENT']) {
+    const ids = await listIds(token, label, 100)
+    if (!ids.length) continue
+    const { data: knownRows } = await sb.from('emails').select('gmail_message_id').eq('mailbox_owner', acct.employee_email).in('gmail_message_id', ids)
+    const known = new Set((knownRows || []).map((r: any) => r.gmail_message_id))
+    for (const id of ids.filter((x: string) => !known.has(x))) {
+      try {
+        const parsed = await parseMessage(token, id, clients || [], leads || [])
+        if (!parsed) continue
+        const { error } = await sb.from('emails').insert({ ...parsed.row, tenant_id: tenantId, mailbox_owner: acct.employee_email })
+        if (error) { console.error('email insert', id, error); continue }
+        inserted++
+        const m = parsed.match
+        if (m) {
+          const direction = parsed.row.triage === 'Sent' ? 'Sent' : 'Received'
+          const preview = String(parsed.row.body || '').slice(0, 120).replace(/\n/g, ' ').trim()
+          const text = `📧 Email ${direction} — "${parsed.row.subject}"${preview ? `\n${preview}${String(parsed.row.body || '').length > 120 ? '…' : ''}` : ''}`
+          if (m.kind === 'client') await sb.from('client_notes').insert({ clientname: m.name, text, note_type: 'Email', author: direction === 'Sent' ? acct.employee_email : m.name, created_at: parsed.row.created_at, tenant_id: tenantId })
+          else await sb.from('lead_notes').insert({ lead_id: m.id, lead_name: m.name, text, type: 'Email', author: direction === 'Sent' ? acct.employee_email : m.name, created_at: parsed.row.created_at, tenant_id: tenantId })
         }
-      }
-    } catch (e) {
-      console.error('Gmail import error for', id, e)
+      } catch (e) { console.error('message import', id, e) }
     }
   }
+  const unreadResult = await reconcileUnread(sb, token, acct.employee_email)
+  const now = new Date().toISOString()
+  await sb.from('employee_gmail_accounts').update({ gmail_last_sync_at: now, gmail_last_error: null, gmail_backfill_phase: 'done', gmail_backfill_page_token: null }).eq('employee_email', acct.employee_email)
+  const cutoff = new Date(Date.now() - RETENTION_DAYS * 86400000).toISOString()
+  await sb.from('emails').delete().lt('created_at', cutoff).eq('mailbox_owner', acct.employee_email)
+  return { inserted, unreadChanged: unreadResult.changed }
 }
 
-// Runs the full sync (backfill-or-steady-state, plus retention cleanup)
-// for ONE employee's connected mailbox. Isolated in its own try/catch so
-// one broken/revoked connection can't stop everyone else's sync from
-// running in the same pass.
-async function syncOneAccount(supabase: any, acct: any, appCreds: any, tenantId: string, clients: any[], leads: any[]) {
-  try {
-    const token = await getValidGmailToken(supabase, acct, appCreds)
+async function handleMessageAction(req: Request, sb: any, payload: any) {
+  const authHeader = req.headers.get('authorization') || ''
+  if (!authHeader.toLowerCase().startsWith('bearer ')) return json({ ok: false, error: 'Unauthorized' }, 401)
+  const userClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authHeader } } })
+  const { data: { user }, error: userErr } = await userClient.auth.getUser()
+  if (userErr || !user?.email) return json({ ok: false, error: 'Unauthorized' }, 401)
+  const action = String(payload.action || '')
+  if (!ACTIONS.has(action)) return json({ ok: false, error: 'Invalid email action' }, 400)
+  const requested = Array.isArray(payload.email_ids) ? payload.email_ids : [payload.email_id]
+  const ids = [...new Set(requested.filter(Boolean))].slice(0, 100)
+  if (!ids.length) return json({ ok: false, error: 'No emails selected' }, 400)
 
-    const phase = acct.gmail_backfill_phase || 'inbox'
-    if (phase !== 'done') {
-      const label = phase === 'inbox' ? 'INBOX' : 'SENT'
-      const { ids, nextPageToken } = await listGmailMessages(token, {
-        labelIds: label,
-        query: `after:${monthsAgoGmailDate(BACKFILL_MONTHS)}`,
-        pageToken: acct.gmail_backfill_page_token || undefined,
-        maxResults: 25,
-      })
-      const newIds = await filterUnknownIds(supabase, ids)
-      await importIds(supabase, token, newIds, clients, leads, tenantId, acct.employee_email)
+  const owner = String(user.email).toLowerCase()
+  const { data: rows, error: rowErr } = await sb.from('emails')
+    .select('id,gmail_message_id,mailbox_owner,tenant_id,is_read,triage,deleted_at')
+    .in('id', ids)
+  if (rowErr) throw rowErr
+  const owned = (rows || []).filter((r: any) => String(r.mailbox_owner || '').toLowerCase() === owner)
+  if (owned.length !== ids.length) return json({ ok: false, error: 'One or more emails are not available for this mailbox' }, 403)
 
-      if (nextPageToken) {
-        await supabase.from('employee_gmail_accounts').update({ gmail_backfill_page_token: nextPageToken, gmail_last_sync_at: new Date().toISOString(), gmail_last_error: null }).eq('employee_email', acct.employee_email)
-      } else if (phase === 'inbox') {
-        await supabase.from('employee_gmail_accounts').update({ gmail_backfill_phase: 'sent', gmail_backfill_page_token: null, gmail_last_sync_at: new Date().toISOString(), gmail_last_error: null }).eq('employee_email', acct.employee_email)
-      } else {
-        await supabase.from('employee_gmail_accounts').update({ gmail_backfill_phase: 'done', gmail_backfill_page_token: null, gmail_last_sync_at: new Date().toISOString(), gmail_last_error: null }).eq('employee_email', acct.employee_email)
-      }
-    } else {
-      for (const label of ['INBOX', 'SENT']) {
-        const { ids } = await listGmailMessages(token, { labelIds: label, maxResults: 20 })
-        const newIds = await filterUnknownIds(supabase, ids)
-        await importIds(supabase, token, newIds.slice(0, 15), clients, leads, tenantId, acct.employee_email)
-      }
-      await supabase.from('employee_gmail_accounts').update({ gmail_last_sync_at: new Date().toISOString(), gmail_last_error: null }).eq('employee_email', acct.employee_email)
+  const { data: emp } = await sb.from('employees').select('tenant_id').ilike('email', user.email).limit(1).maybeSingle()
+  const tenantId = owned[0]?.tenant_id || emp?.tenant_id
+  if (!tenantId) return json({ ok: false, error: 'Employee tenant not found' }, 400)
+  if (owned.some((r: any) => r.tenant_id && r.tenant_id !== tenantId)) return json({ ok: false, error: 'Cross-tenant email action blocked' }, 403)
 
-      const last = acct.gmail_last_cleanup_at ? new Date(acct.gmail_last_cleanup_at).getTime() : 0
-      if (Date.now() - last >= 24 * 60 * 60 * 1000) {
-        const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString()
-        await supabase.from('emails').delete().lt('created_at', cutoff).eq('mailbox_owner', acct.employee_email)
-        await supabase.from('employee_gmail_accounts').update({ gmail_last_cleanup_at: new Date().toISOString() }).eq('employee_email', acct.employee_email)
-      }
-    }
-    return { ok: true }
-  } catch (e) {
-    console.error('gmail-sync-cron error for', acct.employee_email, e)
-    await supabase.from('employee_gmail_accounts').update({ gmail_last_error: String((e as Error).message || e) }).eq('employee_email', acct.employee_email)
-    return { ok: false, error: String((e as Error).message || e) }
+  const { data: acct } = await sb.from('employee_gmail_accounts')
+    .select('employee_email,gmail_refresh_token,gmail_access_token,gmail_token_expiry')
+    .ilike('employee_email', user.email).limit(1).maybeSingle()
+  const gmailRows = owned.filter((r: any) => r.gmail_message_id)
+  let token = ''
+  if (gmailRows.length) {
+    if (!acct?.gmail_refresh_token) return json({ ok: false, error: 'Gmail is not connected for this employee' }, 409)
+    const { data: creds } = await sb.from('settings').select('gmail_client_id,gmail_client_secret').eq('tenant_id', tenantId).limit(1).maybeSingle()
+    if (!creds?.gmail_client_id || !creds?.gmail_client_secret) return json({ ok: false, error: 'Gmail OAuth settings missing for this office' }, 500)
+    token = await validToken(sb, acct, creds)
   }
+
+  const succeeded: any[] = []
+  const failures: any[] = []
+  for (const row of owned) {
+    try {
+      if (row.gmail_message_id) {
+        const id = encodeURIComponent(row.gmail_message_id)
+        let endpoint = `${LIST_URL}/${id}/modify`
+        let requestBody: any = null
+        if (action === 'archive') requestBody = { removeLabelIds: ['INBOX'] }
+        else if (action === 'inbox') requestBody = { addLabelIds: ['INBOX'] }
+        else if (action === 'read') requestBody = { removeLabelIds: ['UNREAD'] }
+        else if (action === 'unread') requestBody = { addLabelIds: ['UNREAD'] }
+        else if (action === 'trash') endpoint = `${LIST_URL}/${id}/trash`
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          ...(requestBody ? { body: JSON.stringify(requestBody) } : {}),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data?.error?.message || `Gmail ${action} failed (${res.status})`)
+      }
+
+      const patch: any = action === 'trash' ? { deleted_at: new Date().toISOString(), triage: 'Archive' }
+        : action === 'archive' ? { triage: 'Archive' }
+        : action === 'inbox' ? { triage: 'Inbox', deleted_at: null }
+        : action === 'read' ? { is_read: true }
+        : { is_read: false }
+      const { error: updateErr } = await sb.from('emails').update(patch).eq('id', row.id).eq('mailbox_owner', row.mailbox_owner)
+      if (updateErr) throw updateErr
+      succeeded.push(row.id)
+    } catch (e) {
+      failures.push({ id: row.id, error: String((e as Error).message || e) })
+    }
+  }
+  return json({ ok: failures.length === 0, action, succeeded, failures }, failures.length ? 207 : 200)
 }
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-
-  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
-
+  const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   try {
-    // OAuth refresh tokens are bound to the OAuth client that issued them.
-    // Resolve credentials by the employee's tenant instead of using an arbitrary settings row.
-    const { data: settingsRows } = await supabase.from('settings')
-      .select('tenant_id, gmail_client_id, gmail_client_secret')
-      .not('gmail_client_id', 'is', null)
+    let payload: any = {}
+    const ct = req.headers.get('content-type') || ''
+    if (req.method === 'POST' && ct.includes('application/json')) payload = await req.json().catch(() => ({}))
+    if (payload?.mode === 'message_action') return await handleMessageAction(req, sb, payload)
 
-    const settingsByTenant = new Map((settingsRows || [])
-      .filter((r: any) => r.tenant_id && r.gmail_client_id && r.gmail_client_secret)
-      .map((r: any) => [r.tenant_id, r]))
-
-    const { data: accounts } = await supabase.from('employee_gmail_accounts')
-      .select('employee_email, gmail_refresh_token, gmail_access_token, gmail_token_expiry, gmail_backfill_phase, gmail_backfill_page_token, gmail_last_cleanup_at')
-      .not('gmail_refresh_token', 'is', null)
-
-    if (!accounts || accounts.length === 0) {
-      return new Response(JSON.stringify({ ok: true, skipped: 'No employees have connected Gmail yet', synced: 0, failed: 0 }), { status: 200, headers: corsHeaders })
-    }
-
-    const employeeEmails = accounts.map((a: any) => a.employee_email).filter(Boolean)
-    const { data: employeeRows } = await supabase.from('employees').select('email,tenant_id').in('email', employeeEmails)
-    const tenantByEmail = new Map((employeeRows || []).map((r: any) => [String(r.email || '').toLowerCase(), r.tenant_id]))
-
-    const { data: clients } = await supabase.from('clients').select('id,name,email')
-    const { data: leads } = await supabase.from('leads').select('id,name,email')
-
-    let synced = 0
-    let failed = 0
+    const [{ data: settingsRows }, { data: accounts }] = await Promise.all([
+      sb.from('settings').select('tenant_id,gmail_client_id,gmail_client_secret').not('gmail_client_id', 'is', null),
+      sb.from('employee_gmail_accounts').select('employee_email,gmail_refresh_token,gmail_access_token,gmail_token_expiry').not('gmail_refresh_token', 'is', null),
+    ])
+    if (!accounts?.length) return json({ ok: true, synced: 0, failed: 0, inserted: 0, unreadChanged: 0 })
+    const tenantCreds = new Map((settingsRows || []).filter((r: any) => r.tenant_id && r.gmail_client_id && r.gmail_client_secret).map((r: any) => [r.tenant_id, r]))
+    const employeeEmails = accounts.map((a: any) => a.employee_email)
+    const { data: employees } = await sb.from('employees').select('email,tenant_id').in('email', employeeEmails)
+    const tenantByEmail = new Map((employees || []).map((e: any) => [String(e.email).toLowerCase(), e.tenant_id]))
+    let synced = 0, failed = 0, inserted = 0, unreadChanged = 0
     const errors: any[] = []
-
     for (const acct of accounts) {
-      const tenantId = tenantByEmail.get(String(acct.employee_email || '').toLowerCase())
-      const appCreds = tenantId ? settingsByTenant.get(tenantId) : null
-      if (!tenantId || !appCreds) {
-        const message = !tenantId ? 'Employee tenant not found' : 'Gmail OAuth credentials not configured for employee tenant'
-        failed++
-        errors.push({ employee_email: acct.employee_email, error: message })
-        await supabase.from('employee_gmail_accounts').update({ gmail_last_error: message }).eq('employee_email', acct.employee_email)
+      const tenantId = tenantByEmail.get(String(acct.employee_email).toLowerCase())
+      const creds = tenantId ? tenantCreds.get(tenantId) : null
+      if (!tenantId || !creds) {
+        const msg = !tenantId ? 'Employee tenant not found' : 'Gmail OAuth credentials not configured for employee tenant'
+        failed++; errors.push({ employee_email: acct.employee_email, error: msg })
+        await sb.from('employee_gmail_accounts').update({ gmail_last_error: msg }).eq('employee_email', acct.employee_email)
         continue
       }
-
-      const result = await syncOneAccount(supabase, acct, appCreds, tenantId, clients || [], leads || [])
-      if (result?.ok) synced++
-      else {
-        failed++
-        errors.push({ employee_email: acct.employee_email, error: result?.error || 'Unknown sync error' })
+      try {
+        const result = await syncAccount(sb, acct, tenantId, creds)
+        inserted += result.inserted
+        unreadChanged += result.unreadChanged
+        synced++
+      } catch (e) {
+        const msg = String((e as Error).message || e)
+        failed++; errors.push({ employee_email: acct.employee_email, error: msg })
+        await sb.from('employee_gmail_accounts').update({ gmail_last_error: msg }).eq('employee_email', acct.employee_email)
       }
     }
-
-    return new Response(JSON.stringify({ ok: failed === 0, synced, failed, errors }), { status: failed === 0 ? 200 : 207, headers: corsHeaders })
+    return json({ ok: failed === 0, synced, failed, inserted, unreadChanged, errors }, failed === 0 ? 200 : 207)
   } catch (e) {
-    console.error('gmail-sync-cron error:', e)
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: corsHeaders })
+    return json({ ok: false, error: String((e as Error).message || e) }, 500)
   }
 })
