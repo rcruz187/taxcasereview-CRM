@@ -1,0 +1,24 @@
+name: Audit Tax Forms
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/audit-tax-forms.mjs'
+      - 'src/lib/irsFormUtils.js'
+      - 'src/pages/StateForms.jsx'
+      - 'src/pages/SignPage.jsx'
+      - 'public/irs-forms/**'
+      - 'public/state-forms/**'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Audit IRS/state PDF field mappings and e-sign path
+        run: node scripts/audit-tax-forms.mjs
