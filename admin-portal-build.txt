@@ -5,3 +5,4 @@ command-center=source-fixed
 dom-hiding=removed
 route-audit=passed
 crm-tab-fix=ADMIN_CRM_TAB_FIX_20260827_2037
+crm-demo-storage-fix=COMMAND_CENTER_CRM_SCOPE_20260828
