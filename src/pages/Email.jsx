@@ -482,7 +482,18 @@ export default function Email() {
               <span>
                 {syncing ? '🔄 Syncing…' : lastSyncAt ? `Synced ${Math.max(0, Math.round((Date.now() - lastSyncAt.getTime()) / 1000))}s ago` : 'Starting sync…'}
               </span>
-              <span onClick={syncNow} style={{ cursor: 'pointer', textDecoration: 'underline' }}>Sync now</span>
+              <button
+                className="btn"
+                disabled={syncing}
+                onClick={async () => {
+                  await syncNow()
+                  await load()
+                  showToast(lastError ? 'Email sync error: ' + lastError : '✅ Email refreshed')
+                }}
+                style={{ padding:'4px 8px', fontSize:10, fontWeight:700, whiteSpace:'nowrap' }}
+              >
+                {syncing ? '⟳ Refreshing…' : '↻ Refresh Email'}
+              </button>
             </div>
             {lastError && (
               <div style={{ marginTop: 4, fontSize: 10, color: 'var(--bad)' }}>⚠️ {lastError}</div>
