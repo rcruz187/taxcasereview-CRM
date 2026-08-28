@@ -3,17 +3,18 @@
 // acting as Super Admin inside another office.
 
 import { useApp } from '../context/AppContext'
-import { useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 
 export default function ImpersonationBanner() {
   const { impersonation } = useApp()
-  const navigate = useNavigate()
 
   if (!impersonation) return null
 
-  function exitSession() {
+  async function exitSession() {
+    try {
+      await supabase.rpc('set_admin_tenant_override', { p_tenant_id: null })
+    } catch (_) {}
     sessionStorage.removeItem('admin_impersonation')
-    // Navigate back to admin portal
     window.location.href = '/crm-admin'
   }
 
