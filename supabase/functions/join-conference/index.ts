@@ -1,36 +1,4 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-
-// LaML endpoint hit by SignalWire when a conferenced-in third party
-// answers (see call-add-participant). Returns the <Dial><Conference>
-// instruction that drops them into the existing call's conference.
-//
-// startConferenceOnEnter="false": if the agent has already hung up by the
-// time this person answers, they must not spin up a fresh empty
-// conference by themselves — they'd just hear hold music briefly and the
-// call ends when they hang up.
-// endConferenceOnExit="false": a conferenced-in guest leaving must never
-// tear down the call for the agent and the original caller.
-
-serve(async (req) => {
-  const url = new URL(req.url)
-  let conf = url.searchParams.get('conf') || ''
-
-  // Also accept LaML POST body just in case the query param is stripped.
-  if (!conf && req.method === 'POST') {
-    try {
-      const body = await req.text()
-      const params = new URLSearchParams(body)
-      conf = params.get('conf') || ''
-    } catch { /* fall through */ }
-  }
-
-  if (!conf || !/^[A-Za-z0-9_-]+$/.test(conf)) {
-    console.error('join-conference: missing/invalid conf param:', conf)
-    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">We are sorry, this call is no longer available.</Say><Hangup/></Response>`
-    return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
-  }
-
-  console.log('join-conference: joining leg into', conf)
-  const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Conference startConferenceOnEnter="false" endConferenceOnExit="false">${conf}</Conference></Dial></Response>`
-  return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
-})
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+const xml=(s:string,status=200)=>new Response(`<?xml version="1.0" encoding="UTF-8"?><Response>${s}</Response>`,{status,headers:{'Content-Type':'text/xml'}})
+serve(async req=>{if(!['GET','POST'].includes(req.method))return xml('<Hangup/>',405);const u=new URL(req.url);let conf=u.searchParams.get('conf')||'';if(!conf&&req.method==='POST'){const raw=await req.text();conf=new URLSearchParams(raw).get('conf')||''}if(!/^[A-Za-z0-9_-]{1,160}$/.test(conf))return xml('<Say voice="Polly.Joanna-Neural">We are sorry, this call is no longer available.</Say><Hangup/>',400);try{const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);const [{data:incoming},{data:outbound}]=await Promise.all([db.from('incoming_calls').select('tenant_id,status').eq('conference_name',conf).in('status',['ringing','answered']).limit(1).maybeSingle(),db.from('outbound_calls').select('tenant_id,status').eq('conference_name',conf).in('status',['pending','ringing','answered','connected']).limit(1).maybeSingle()]);if(!incoming&&!outbound){console.warn('[join-conference] rejected unknown/inactive conference',conf);return xml('<Say voice="Polly.Joanna-Neural">We are sorry, this call is no longer available.</Say><Hangup/>',404)}return xml(`<Dial><Conference startConferenceOnEnter="false" endConferenceOnExit="false">${conf}</Conference></Dial>`)}catch(e){console.error('[join-conference]',e);return xml('<Hangup/>',500)}})
