@@ -2229,7 +2229,7 @@ function ArcvenaOfficeOnboarding({ supabase, onCreated }) {
         )}
         <button type="submit" disabled={saving}
           style={{ marginTop:12, background:'#8b5cf6', color:'#fff', border:'none', borderRadius:8,
-            padding:'9px 16px', fontSize:12, fontWeight:800, cursor:saving?'wait':'pointer', opacity:saving?.65:1 }}>
+            padding:'9px 16px', fontSize:12, fontWeight:800, cursor:saving?'wait':'pointer', opacity:saving ? .65 : 1 }}>
           {saving ? 'Creating isolated office…' : 'Create Office & Send Owner Invite'}
         </button>
       </form>
