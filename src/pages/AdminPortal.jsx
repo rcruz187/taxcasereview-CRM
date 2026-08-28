@@ -2141,6 +2141,7 @@ function ArcvenaOfficeOnboarding({ supabase, onCreated }) {
     timezone: 'America/New_York',
     subscription_status: 'TRIALING',
     trial_days: 14,
+    monthly_rate_dollars: 0,
   })
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState(null)
@@ -2163,7 +2164,10 @@ function ArcvenaOfficeOnboarding({ supabase, onCreated }) {
           'Content-Type': 'application/json',
           'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1weGd4ZnFkYnF1emtydnZlamtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTkwMDE4OTIsImV4cCI6MjAzNDU3Nzg5Mn0.zr0F_sV9-TJxO1wOST3VHr_n-5jPTpLY_AzEfKR1hSo',
         },
-        body: JSON.stringify({ action: 'onboard_arcvena', payload: form }),
+        body: JSON.stringify({
+          action: 'onboard_arcvena',
+          payload: { ...form, monthly_rate_cents: Math.round(Number(form.monthly_rate_dollars || 0) * 100) },
+        }),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Unable to create office')
@@ -2220,6 +2224,9 @@ function ArcvenaOfficeOnboarding({ supabase, onCreated }) {
           <input type="number" min="0" max="90" value={form.trial_days}
             disabled={form.subscription_status === 'ACTIVE'}
             onChange={e=>field('trial_days',Number(e.target.value))} placeholder="Trial days" style={inputStyle} />
+          <input type="number" min="0" step="0.01" value={form.monthly_rate_dollars}
+            onChange={e=>field('monthly_rate_dollars',Number(e.target.value))}
+            placeholder="Monthly price ($)" style={inputStyle} />
         </div>
         {error && <div style={{ color:'#f87171', fontSize:11, marginTop:10 }}>{error}</div>}
         {result && (
