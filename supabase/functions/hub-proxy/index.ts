@@ -92,13 +92,46 @@ Deno.serve(async (req) => {
   }
 
   // ── Step 3: Parse product key from request body ──────────────────────────
-  let body: { product?: string }
+  let body: { product?: string; action?: string; payload?: Record<string, unknown> }
   try {
     body = await req.json()
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid request body' }), {
       status: 400, headers: { ...cors, 'Content-Type': 'application/json' }
     })
+  }
+
+  if (body.action === 'onboard_arcvena') {
+    const entitlementSecret = Deno.env.get('ROMYLABS_ENTITLEMENT_SECRET')
+    if (!entitlementSecret) {
+      return new Response(JSON.stringify({ error: 'Arcvena onboarding is not configured' }), {
+        status: 503, headers: { ...cors, 'Content-Type': 'application/json' }
+      })
+    }
+
+    try {
+      const onboardingRes = await fetch(
+        'https://wzalqfxovxxszojfbnis.supabase.co/functions/v1/platform-onboard-office',
+        {
+          method: 'POST',
+          headers: {
+            'x-entitlement-secret': entitlementSecret,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body.payload ?? {}),
+        },
+      )
+      const onboardingData = await onboardingRes.json()
+      return new Response(JSON.stringify(onboardingData), {
+        status: onboardingRes.status,
+        headers: { ...cors, 'Content-Type': 'application/json' },
+      })
+    } catch (err) {
+      console.error('hub-proxy: Arcvena onboarding failed', err)
+      return new Response(JSON.stringify({ error: 'Arcvena onboarding service unavailable' }), {
+        status: 502, headers: { ...cors, 'Content-Type': 'application/json' },
+      })
+    }
   }
 
   const productKey = body.product
