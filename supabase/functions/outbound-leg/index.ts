@@ -1,22 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-
-// Called BY SignalWire once the outbound call leg created in
-// start-outbound-call is answered by the destination number. Drops that
-// leg into the conference start-outbound-call already wrote a row for,
-// with recording on -- mirrors ivr-route's inbound conference join.
-// JWT verification must be OFF -- SignalWire calls this directly.
-
-const CALL_RECORDED_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/call-recorded'
-
-serve(async (req) => {
-  const url = new URL(req.url)
-  const conf = url.searchParams.get('conf') || ''
-
-  if (!conf) {
-    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`
-    return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
-  }
-
-  const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Conference startConferenceOnEnter="true" endConferenceOnExit="true" record="record-from-start" recordingStatusCallback="${CALL_RECORDED_URL}">${conf}</Conference></Dial></Response>`
-  return new Response(xml, { headers: { 'Content-Type': 'text/xml' } })
-})
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+const REC='https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/call-recorded'
+const xml=(s:string,status=200)=>new Response(`<?xml version="1.0" encoding="UTF-8"?><Response>${s}</Response>`,{status,headers:{'Content-Type':'text/xml'}})
+serve(async req=>{if(!['GET','POST'].includes(req.method))return xml('<Hangup/>',405);const u=new URL(req.url),conf=u.searchParams.get('conf')||'';if(!/^[A-Za-z0-9_-]{1,160}$/.test(conf))return xml('<Hangup/>',400);try{const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);const {data:row}=await db.from('outbound_calls').select('id,tenant_id,status').eq('conference_name',conf).in('status',['pending','ringing','answered','connected']).limit(1).maybeSingle();if(!row){console.warn('[outbound-leg] rejected unknown/inactive conference',conf);return xml('<Hangup/>',404)}return xml(`<Dial><Conference startConferenceOnEnter="true" endConferenceOnExit="true" record="record-from-start" recordingStatusCallback="${REC}">${conf}</Conference></Dial>`)}catch(e){console.error('[outbound-leg]',e);return xml('<Hangup/>',500)}})
