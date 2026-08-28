@@ -15,6 +15,21 @@ function replaceBetween(start, end, replacement) {
   changed = true
 }
 
+function replaceBetweenAny(start, ends, replacement, label) {
+  const a = s.indexOf(start)
+  if (a < 0) throw new Error(`${label} start anchor missing: ${start.slice(0, 80)}`)
+  let best = -1
+  for (const end of ends) {
+    const idx = s.indexOf(end, a)
+    if (idx >= 0 && (best < 0 || idx < best)) best = idx
+  }
+  if (best < 0) throw new Error(`${label} end anchor missing`)
+  const current = s.slice(a, best)
+  if (current === replacement) return
+  s = s.slice(0, a) + replacement + s.slice(best)
+  changed = true
+}
+
 // Once Gmail mutations are awaited, the database is the source of truth.
 // The old localRead preservation masked real unread changes after Refresh.
 const oldLoad = `    if (e) {
@@ -50,9 +65,6 @@ const actionBlock = `  async function runMailboxAction(emailIds, action) {
         }
         return data
       } catch (e) {
-        // A large Gmail action previously held one Edge invocation open for ~56s
-        // and the next browser preflight hit a transient 503. Retry a small
-        // chunk once after a short backoff instead of failing the entire bulk job.
         if (attempt < 1) {
           await new Promise(resolve => setTimeout(resolve, 700))
           return invokeChunk(chunk, attempt + 1)
@@ -63,8 +75,6 @@ const actionBlock = `  async function runMailboxAction(emailIds, action) {
 
     const succeeded = []
     const failures = []
-    // Run at most three small chunks at a time. This keeps each Edge request
-    // short without flooding Gmail or Supabase with dozens of simultaneous calls.
     for (let i = 0; i < chunks.length; i += 3) {
       const wave = chunks.slice(i, i + 3)
       const results = await Promise.allSettled(wave.map(chunk => invokeChunk(chunk)))
@@ -87,9 +97,12 @@ if (s.includes('  async function runMailboxAction(')) {
   changed = true
 }
 
-replaceBetween(
+replaceBetweenAny(
   `  async function moveTriage(id, triage) {`,
-  `  // The trash icon archives instead of permanently deleting.`,
+  [
+    `  // The trash icon archives instead of permanently deleting.`,
+    `  async function archiveEmail(id) {`,
+  ],
 `  async function moveTriage(id, triage) {
     const current = emails.find(e => e.id === id)
     if (selected?.id === id) setSelected(prev => ({ ...prev, triage }))
@@ -98,9 +111,6 @@ replaceBetween(
       if (triage === 'Archive') {
         await runMailboxAction(id, 'archive')
       } else {
-        // Moving a previously archived Gmail message back into an active CRM
-        // folder restores Gmail's INBOX label first, then preserves the CRM's
-        // richer Action Needed / Waiting classification locally.
         if (current?.triage === 'Archive' && triage !== 'Sent') await runMailboxAction(id, 'inbox')
         const { error } = await supabase.from('emails').update({ triage }).eq('id', id)
         if (error) throw error
@@ -112,14 +122,14 @@ replaceBetween(
     }
   }
 
-`)
+`,
+  'moveTriage patch'
+)
 
-replaceBetween(
-  `  // The trash icon archives instead of permanently deleting.`,
-  `  function openEmail(email, index) {`,
-`  // Archive/delete/read state must be written to Gmail and TCR together.
-  // All operations are awaited so Refresh can never race an unfinished write.
-  async function archiveEmail(id) {
+replaceBetweenAny(
+  `  async function archiveEmail(id) {`,
+  [`  function openEmail(email, index) {`],
+`  async function archiveEmail(id) {
     const previous = emails
     setEmails(es => es.map(e => e.id === id ? { ...e, triage: 'Archive' } : e))
     if (selected?.id === id) setSelected(null)
@@ -157,8 +167,6 @@ replaceBetween(
     if (selected?.id === id) setSelected(null)
     setCheckedIds(set => { const next = new Set(set); next.delete(id); return next })
     try {
-      // Gmail's Trash is the safe provider-side delete operation. The CRM
-      // soft-deletes its row so the sync dedupe key remains and cannot re-import.
       await runMailboxAction(id, 'trash')
       showToast('Deleted')
     } catch (e) {
@@ -209,10 +217,10 @@ replaceBetween(
     }
   }
 
-`)
+`,
+  'mailbox action patch'
+)
 
-// Don't claim Gmail is permanently deleting mail; Gmail Trash retains its own
-// provider retention semantics. The visible CRM behavior is still deletion.
 s = s.replaceAll('🗑 Delete Permanently', '🗑 Delete')
 
 if (changed) fs.writeFileSync(path, s)
