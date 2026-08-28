@@ -10,7 +10,8 @@
     "storage:fix-display": "node scripts/fix-storage-usage-display.mjs",
     "email:state-sync": "node scripts/fix-email-state-sync.mjs",
     "email:count-sync": "node scripts/fix-email-bulk-counts.mjs",
-    "prebuild": "npm run check-polling && npm run manual:style && npm run storage:fix-display && npm run email:state-sync && npm run email:count-sync",
+    "dashboard:glow": "node scripts/restore-dashboard-card-glow.mjs",
+    "prebuild": "npm run check-polling && npm run manual:style && npm run storage:fix-display && npm run email:state-sync && npm run email:count-sync && npm run dashboard:glow",
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "gh-pages -d dist --dotfiles"
