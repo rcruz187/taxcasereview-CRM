@@ -1,0 +1,76 @@
+name: Final Acceptance Source Fix
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/final-acceptance-source-fix.yml
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch Employee Portal SMS
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/pages/EmployeePortal.jsx')
+          s=p.read_text()
+          old="""  async function loadSmsThread(phone) {
+    if (!phone) return
+    const clean = phone.replace(/\\D/g, '').slice(-10)
+    const { data } = await supabase
+      .from('sms_messages')
+      .select('*')
+      .or(`from_number.ilike.%${clean}%,to_number.ilike.%${clean}%`)
+      .order('created_at', { ascending: true })
+      .limit(50)
+    setSmsMessages(data || [])
+  }
+
+  async function sendSms(client) {
+    if (!smsBody.trim() || !client?.phone) return
+    setSmsSending(true)
+    await supabase.functions.invoke('send-sms', {
+      body: { to: client.phone, body: smsBody, client_id: client.client_id, tenant_id: emp.tenant_id }
+    })
+    setSmsBody('')
+    await loadSmsThread(client.phone)
+    setSmsSending(false)
+  }
+"""
+          new="""  async function loadSmsThread(phone) {
+    if (!phone || !empToken) return
+    const { data, error } = await supabase.rpc('emp_sms_messages', { p_token: empToken, p_phone: phone })
+    setSmsMessages(error ? [] : (Array.isArray(data) ? data : []))
+  }
+
+  async function sendSms(client) {
+    if (!smsBody.trim() || !client?.phone || !empToken || !client?.id) return
+    setSmsSending(true)
+    const { error } = await supabase.functions.invoke('send-sms', {
+      body: { to: client.phone, body: smsBody, client_id: client.id, employee_portal_token: empToken }
+    })
+    if (!error) {
+      setSmsBody('')
+      await loadSmsThread(client.phone)
+    }
+    setSmsSending(false)
+  }
+"""
+          if old not in s:
+              raise SystemExit('EmployeePortal SMS block changed; refusing broad rewrite')
+          p.write_text(s.replace(old,new))
+          PY
+      - run: npm ci
+      - run: npm run build
+      - name: Commit source fix
+        run: |
+          git config user.name 'RomyLabs Audit Bot'
+          git config user.email 'rcruz187@gmail.com'
+          git add src/pages/EmployeePortal.jsx
+          git rm .github/workflows/final-acceptance-source-fix.yml
+          git commit -m 'fix(employee-portal): finish scoped SMS integration'
+          git push origin HEAD:main
