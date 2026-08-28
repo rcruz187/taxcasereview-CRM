@@ -24,7 +24,11 @@ replaceBetween("  // ─── Form 911", "  // ─── Form SS-4", `  // ─�
 replaceBetween("  // ─── Form SS-4", "  // ─── Form 2553", `  // ─── Form SS-4 (Apply for EIN) ────────────────────────────────────────────\n  'ss4': {\n    bizName: 'topmostSubform[0].Page1[0].PgHeader[0].f1_1[0]',\n    tradeName: 'topmostSubform[0].Page1[0].f1_2[0]',\n    careOf: 'topmostSubform[0].Page1[0].f1_3[0]',\n    street: 'topmostSubform[0].Page1[0].Line4ReadOrder[0].f1_5[0]',\n    cityStateZip: 'topmostSubform[0].Page1[0].Line4ReadOrder[0].f1_6[0]',\n    idType: 'ein',\n  },\n\n`)
 replaceBetween("  // ─── Form 2553", "  // ─── Form 12661", `  // ─── Form 2553 (S-Corp Election) ─────────────────────────────────────────\n  '2553': {\n    bizName: 'topmostSubform[0].Page1[0].NameAddress[0].f1_01[0]',\n    street: 'topmostSubform[0].Page1[0].NameAddress[0].f1_02[0]',\n    cityStateZip: 'topmostSubform[0].Page1[0].NameAddress[0].f1_03[0]',\n    ein: 'topmostSubform[0].Page1[0].f1_04[0]',\n    idType: 'ein',\n  },\n\n`)
 replaceBetween("  // ─── Form 12661", "  // ─── Form 1128", `  // ─── Form 12661 (Disputed Issue Verification) ─────────────────────────────\n  '12661': {\n    name: 'form1[0].page_1[0].taxpayer_name[0]',\n    ssn: 'form1[0].page_1[0].social_security[0]',\n    idType: 'ssn',\n  },\n\n`)
-replaceBetween("  // ─── Form 1128", "};\n\n// Map form type", `  // ─── Form 1128 (Adopt/Change Tax Year) ───────────────────────────────────\n  '1128': {\n    bizName: 'topmostSubform[0].Page1[0].p1-01[0]',\n    ein: 'topmostSubform[0].Page1[0].p1-02[0]',\n    street: 'topmostSubform[0].Page1[0].p1-03[0]',\n    cityStateZip: 'topmostSubform[0].Page1[0].p1-05[0]',\n    idType: 'ein',\n  },\n`)
+
+// End FIELD_MAPS at the first object terminator after Form 1128. Do not depend
+// on what comments or generated safety blocks happen to sit between FIELD_MAPS
+// and TEMPLATE_PATHS after a prior prebuild run.
+replaceBetween("  // ─── Form 1128", "\n};", `  // ─── Form 1128 (Adopt/Change Tax Year) ───────────────────────────────────\n  '1128': {\n    bizName: 'topmostSubform[0].Page1[0].p1-01[0]',\n    ein: 'topmostSubform[0].Page1[0].p1-02[0]',\n    street: 'topmostSubform[0].Page1[0].p1-03[0]',\n    cityStateZip: 'topmostSubform[0].Page1[0].p1-05[0]',\n    idType: 'ein',\n  },`)
 
 if(!s.includes('export const MANUAL_ONLY_FORM_TYPES')){
   const anchor='// Map form type → which blank template filename to fetch'
