@@ -17,103 +17,18 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-
-      - name: Patch demo mailbox behavior and reset seed
-        shell: python
-        run: |
-          from pathlib import Path
-
-          p = Path('src/pages/Email.jsx')
-          s = p.read_text()
-
-          old = "  const { user } = useApp()\n"
-          new = "  const { user } = useApp()\n  const isDemoMailbox = user?.email?.toLowerCase() === 'demo@taxrescrm.net'\n  const DEMO_TENANT_ID = 'a0000000-0000-0000-0000-000000000001'\n"
-          if 'const isDemoMailbox' not in s:
-              if old not in s: raise SystemExit('Email user anchor not found')
-              s = s.replace(old, new, 1)
-
-          old = """      setGmailConnected(!!acct?.gmail_refresh_token)\n      setGmailConnectedEmail(acct?.gmail_connected_email || '')\n"""
-          new = """      // The sales-demo account intentionally uses a sandbox mailbox instead of\n      // a real external Gmail token. It still behaves like a connected inbox\n      // so prospects can see the complete email workflow without sending live mail.\n      setGmailConnected(isDemoMailbox || !!acct?.gmail_refresh_token)\n      setGmailConnectedEmail(isDemoMailbox ? 'demo@taxrescrm.net' : (acct?.gmail_connected_email || ''))\n"""
-          if old in s:
-              s = s.replace(old, new, 1)
-
-          old = """      try {\n        await sendGmailEmail(supabase, { to: form.recipient, subject: form.subject, body: form.body, senderEmployeeEmail: user?.email })\n        status = 'Sent'\n      } catch (e) {\n        setSaving(false)\n        showToast('Gmail send failed: ' + e.message)\n        return\n      }\n"""
-          new = """      if (isDemoMailbox) {\n        // Demo-safe send: write the message into the sandbox Sent folder but\n        // never deliver it outside TaxRes CRM.\n        status = 'Sent'\n      } else {\n        try {\n          await sendGmailEmail(supabase, { to: form.recipient, subject: form.subject, body: form.body, senderEmployeeEmail: user?.email })\n          status = 'Sent'\n        } catch (e) {\n          setSaving(false)\n          showToast('Gmail send failed: ' + e.message)\n          return\n        }\n      }\n"""
-          if old in s:
-              s = s.replace(old, new, 1)
-
-          old = """    const { error } = await supabase.from('emails').insert([{ ...form, status, created_at: new Date().toISOString() }])\n"""
-          new = """    const emailRow = { ...form, status, created_at: new Date().toISOString(), mailbox_owner: user?.email || null }\n    if (isDemoMailbox) {\n      emailRow.tenant_id = DEMO_TENANT_ID\n      emailRow.from_address = 'demo@taxrescrm.net'\n      emailRow.direction = 'outbound'\n      emailRow.received_at = emailRow.created_at\n      emailRow.is_read = true\n    }\n    const { error } = await supabase.from('emails').insert([emailRow])\n"""
-          if old in s:
-              s = s.replace(old, new, 1)
-
-          old = """    showToast(status === 'Sent' ? '✅ Email sent via Gmail!' : '⚠️ Gmail is not connected — this was only saved as a log entry, nothing was emailed')\n"""
-          new = """    showToast(isDemoMailbox && status === 'Sent' ? '✅ Demo email sent — sandbox only' : status === 'Sent' ? '✅ Email sent via Gmail!' : '⚠️ Gmail is not connected — this was only saved as a log entry, nothing was emailed')\n"""
-          if old in s:
-              s = s.replace(old, new, 1)
-
-          old = """            ✅ Gmail Connected{gmailConnectedEmail ? ` — ${gmailConnectedEmail}` : ''}\n"""
-          new = """            {isDemoMailbox ? '✅ Demo Mailbox' : '✅ Gmail Connected'}{gmailConnectedEmail ? ` — ${gmailConnectedEmail}` : ''}\n"""
-          if old in s:
-              s = s.replace(old, new, 1)
-
-          old = """                {syncing ? '🔄 Syncing…' : lastSyncAt ? `Synced ${Math.max(0, Math.round((Date.now() - lastSyncAt.getTime()) / 1000))}s ago` : 'Starting sync…'}\n"""
-          new = """                {isDemoMailbox ? 'Sandbox inbox ready' : syncing ? '🔄 Syncing…' : lastSyncAt ? `Synced ${Math.max(0, Math.round((Date.now() - lastSyncAt.getTime()) / 1000))}s ago` : 'Starting sync…'}\n"""
-          if old in s:
-              s = s.replace(old, new, 1)
-
-          old = """                disabled={syncing}\n                onClick={async () => {\n                  await syncNow()\n                  await load()\n                  showToast(lastError ? 'Email sync error: ' + lastError : '✅ Email refreshed')\n                }}\n"""
-          new = """                disabled={!isDemoMailbox && syncing}\n                onClick={async () => {\n                  if (!isDemoMailbox) await syncNow()\n                  await load()\n                  showToast(isDemoMailbox ? '✅ Demo inbox refreshed' : lastError ? 'Email sync error: ' + lastError : '✅ Email refreshed')\n                }}\n"""
-          if old in s:
-              s = s.replace(old, new, 1)
-
-          p.write_text(s)
-
-          p = Path('supabase/migrations/demo_reset_seed.sql')
-          s = p.read_text()
-          marker = "  RAISE NOTICE 'Demo tenant reset complete. Tenant: %', v_tenant;\n"
-          block = r'''
-  -- ── DEMO LOGIN + SALES MAILBOX ──────────────────────────────────────────
-  -- Keep the public sales-demo login permanently attached to the protected
-  -- demo tenant, with full access and a realistic sandbox inbox.
-  INSERT INTO employees (id,name,email,role,access,tenant_id,status,created_at)
-  VALUES ('emp1784643023','Demo Admin','demo@taxrescrm.net','Super Admin','Super Admin',v_tenant,'Active',now())
-  ON CONFLICT (email) DO UPDATE SET
-    name='Demo Admin', role='Super Admin', access='Super Admin', tenant_id=v_tenant, status='Active';
-
-  UPDATE settings SET
-    name='TaxRes CRM', firmname='TaxRes CRM', logourl='/taxrescrm-logo.png',
-    email='demo@taxrescrm.net', firmemail='demo@taxrescrm.net', website='https://taxrescrm.app'
-  WHERE tenant_id=v_tenant;
-
-  INSERT INTO emails (recipient,"clientName",subject,body,triage,status,created_at,received_at,is_read,tenant_id,mailbox_owner,from_address,direction,gmail_message_id,gmail_thread_id)
-  VALUES
-    ('demo@taxrescrm.net','Robert Chen','IRS requested additional OIC documents','Hi Sarah, I received the IRS letter asking for updated bank statements and proof of household expenses. I can upload everything this afternoon. Please let me know if you need anything else from me.','Inbox','Received',now()-interval '18 minutes',now()-interval '18 minutes',false,v_tenant,'demo@taxrescrm.net','rchen@demomail.example','inbound','demo-msg-001','demo-thread-001'),
-    ('demo@taxrescrm.net','Teresa Morales','Payment posted — thank you','Hi team, I made this month’s installment agreement payment and attached my confirmation for my records. Thank you for keeping me updated.','Inbox','Received',now()-interval '2 hours',now()-interval '2 hours',true,v_tenant,'demo@taxrescrm.net','tmorales@demomail.example','inbound','demo-msg-002','demo-thread-002'),
-    ('demo@taxrescrm.net','Sandra Adams','Re: Urgent levy consultation','Yes, 11:00 AM works for me. I have the levy notice and my last two pay stubs ready for the consultation.','Action Needed','Received',now()-interval '5 hours',now()-interval '5 hours',false,v_tenant,'demo@taxrescrm.net','sadams@demomail.example','inbound','demo-msg-003','demo-thread-003'),
-    ('kpark@demomail.example','Kevin Park','Your TaxRes CRM consultation is confirmed','Hi Kevin, your consultation is confirmed for tomorrow at 10:00 AM Eastern. We’ll review your IRS balance, income, and CNC eligibility.','Sent','Sent',now()-interval '1 day',now()-interval '1 day',true,v_tenant,'demo@taxrescrm.net','demo@taxrescrm.net','outbound','demo-msg-004','demo-thread-004'),
-    ('jhoffman@demomail.example','James Hoffman','Next steps after transcript review','Hi James, we completed the transcript review and are preparing your resolution strategy. I’ll follow up with the documents needed for the next phase.','Sent','Sent',now()-interval '2 days',now()-interval '2 days',true,v_tenant,'demo@taxrescrm.net','demo@taxrescrm.net','outbound','demo-msg-005','demo-thread-005'),
-    ('demo@taxrescrm.net','Maria De Luca','Documents uploaded','Good morning, I uploaded the requested tax returns and bank statements to my file. Please confirm that everything came through.','Waiting','Received',now()-interval '3 days',now()-interval '3 days',true,v_tenant,'demo@taxrescrm.net','mdeluca@demomail.example','inbound','demo-msg-006','demo-thread-006');
-
-'''
-          if '-- ── DEMO LOGIN + SALES MAILBOX' not in s:
-              if marker not in s: raise SystemExit('Demo seed end marker not found')
-              s = s.replace(marker, block + marker, 1)
-          p.write_text(s)
-
-      - name: Verify demo hardening source
+      - name: Apply demo hardening
+        run: python scripts/harden-taxres-demo.py
+      - name: Verify demo hardening
         run: |
           grep -q "isDemoMailbox" src/pages/Email.jsx
           grep -q "Demo Mailbox" src/pages/Email.jsx
           grep -q "sandbox only" src/pages/Email.jsx
-          grep -q "demo@taxrescrm.net" supabase/migrations/demo_reset_seed.sql
           grep -q "DEMO LOGIN + SALES MAILBOX" supabase/migrations/demo_reset_seed.sql
-
       - name: Build frontend
         run: |
           npm ci
           npm run build
-
       - name: Commit hardened demo source
         run: |
           git config user.name RomyLabs
