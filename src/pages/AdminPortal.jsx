@@ -3447,16 +3447,19 @@ function CommandCenter() {
           promise,
           new Promise((_, reject) => setTimeout(() => reject(new Error(label + ' timed out after ' + ms + 'ms')), ms)),
         ])
-        const [statsRes, tenantsRes, storageRes] = await Promise.all([
+        const [statsRes, tenantsRes, storageRes, taxresDemoRes] = await Promise.all([
           withTimeout(supabase.rpc('admin_command_center_stats'), 'admin_command_center_stats'),
           withTimeout(supabase.rpc('admin_tenant_overview'), 'admin_tenant_overview'),
           withTimeout(supabase.rpc('admin_storage_stats'), 'admin_storage_stats'),
+          withTimeout(supabase.rpc('admin_taxres_demo_stats'), 'admin_taxres_demo_stats'),
         ])
 
         const stats   = statsRes.data
         const tenants = tenantsRes.data || []
 
         if (statsRes.error) throw new Error('RPC error: ' + JSON.stringify(statsRes.error))
+        if (storageRes.error) throw new Error('Storage RPC error: ' + JSON.stringify(storageRes.error))
+        if (taxresDemoRes.error) throw new Error('TaxRes demo RPC error: ' + JSON.stringify(taxresDemoRes.error))
         if (!stats || stats.error) throw new Error('Stats unavailable: ' + JSON.stringify(stats))
 
       const activeTenants = (tenants||[]).filter(r=>r.status==='active')
@@ -3503,12 +3506,12 @@ function CommandCenter() {
           realStorageBytes:   Number(storageRes?.data?.total_bytes || 0),
           realStorageObjects: Number(storageRes?.data?.total_objects || 0),
           pendingEsigns: Number(stats.pending_esigns||0),
-          todayDemos:    Number(stats.today_demos||0),
+          todayDemos:    Number(taxresDemoRes?.data?.today_count || 0),
         },
         changes,
         upcomingDl:   (stats.upcoming_deadlines||[]).slice(0,5),
         todaySchedule:(stats.today_schedule||[]).slice(0,6),
-        upcomingDemos:(stats.today_schedule||[]).filter(e=>new Date(e.start)>new Date()).slice(0,5),
+        upcomingDemos:(taxresDemoRes?.data?.upcoming || []).slice(0,5),
         // Marketing mock data (live when GA4 is connected)
         marketing: {
           visitorsToday: 247,  visitorsChange: 18,
@@ -4364,7 +4367,7 @@ function CommandCenter() {
             <div style={CC.card({padding:'22px 24px'})}>
               <div style={CC.sectionLabel}>Upcoming demos</div>
               {data.upcomingDemos.length===0
-                ? <div style={{ fontSize:13, color:'#475569' }}>No demos scheduled — all product bookings appear here.</div>
+                ? <div style={{ fontSize:13, color:'#475569' }}>No TaxRes demos scheduled.</div>
                 : data.upcomingDemos.map((e,i) => (
                 <div key={i} style={{ display:'flex', gap:10, padding:'9px 0',
                   borderBottom: i<data.upcomingDemos.length-1?'1px solid rgba(99,102,241,.1)':'none' }}>
