@@ -1,0 +1,72 @@
+name: Audit Nashville Live Admin Data
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/audit-nashville-live.yml'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: mpxgxfqdbquzkrvvejkh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect Nashville across live central records
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, json, urllib.request, urllib.error
+          token=os.environ['SUPABASE_ACCESS_TOKEN']; ref=os.environ['PROJECT_REF']
+          sql=r'''
+          select 'TENANTS' as section, coalesce(json_agg(x),'[]'::json) as data
+          from (
+            select id, firm_name, tenant_code, plan_tier, status, monthly_rate, per_seat_rate, created_at
+            from public.tenants
+            where lower(coalesce(firm_name,'')) like '%nashville%'
+               or lower(coalesce(tenant_code,'')) like '%nashville%'
+            order by created_at
+          ) x;
+
+          select 'PROSPECTS' as section, coalesce(json_agg(x),'[]'::json) as data
+          from (
+            select *
+            from public.prospects
+            where lower(coalesce(company_name,'')) like '%nashville%'
+               or lower(coalesce(contact_name,'')) like '%nashville%'
+               or lower(coalesce(notes,'')) like '%nashville%'
+            order by created_at desc
+            limit 20
+          ) x;
+
+          select 'ALL_TENANTS' as section, coalesce(json_agg(x),'[]'::json) as data
+          from (
+            select id, firm_name, tenant_code, plan_tier, status, monthly_rate, per_seat_rate, created_at
+            from public.tenants
+            order by created_at
+          ) x;
+
+          select 'RELATED_TABLES' as section, coalesce(json_agg(x),'[]'::json) as data
+          from (
+            select table_name
+            from information_schema.tables
+            where table_schema='public'
+              and (table_name ilike '%customer%' or table_name ilike '%billing%' or table_name ilike '%tenant%' or table_name ilike '%account%')
+            order by table_name
+          ) x;
+          '''
+          req=urllib.request.Request(
+            f'https://api.supabase.com/v1/projects/{ref}/database/query',
+            data=json.dumps({'query':sql}).encode(),
+            headers={'Authorization':f'Bearer {token}','Content-Type':'application/json'},
+            method='POST')
+          try:
+            with urllib.request.urlopen(req,timeout=60) as r:
+              print(r.read().decode())
+          except urllib.error.HTTPError as e:
+            print(e.read().decode())
+            raise
+          PY
