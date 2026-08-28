@@ -12,7 +12,8 @@
     "email:count-sync": "node scripts/fix-email-bulk-counts.mjs",
     "dashboard:glow": "node scripts/restore-dashboard-card-glow.mjs",
     "forms:state-esign-prefill": "node scripts/fix-state-esign-prefill.mjs",
-    "prebuild": "npm run check-polling && npm run manual:style && npm run storage:fix-display && npm run email:state-sync && npm run email:count-sync && npm run dashboard:glow && npm run forms:state-esign-prefill",
+    "reports:accuracy": "node scripts/fix-reporting-accuracy.mjs",
+    "prebuild": "npm run check-polling && npm run manual:style && npm run storage:fix-display && npm run email:state-sync && npm run email:count-sync && npm run dashboard:glow && npm run forms:state-esign-prefill && npm run reports:accuracy",
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "gh-pages -d dist --dotfiles"
