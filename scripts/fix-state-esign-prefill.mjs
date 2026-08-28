@@ -3,6 +3,13 @@ const p='src/pages/StateForms.jsx'
 let s=fs.readFileSync(p,'utf8')
 let changed=false
 
+// Alabama's former local asset was missing. Keep the registry usable by pointing
+// to the official Alabama Department of Revenue Form 2848A. Alabama remains
+// manual-only until its exact PDF mapping is separately verified.
+const oldAl="url: `${BASE}/state-forms/AL_POA.pdf`"
+const newAl="url: 'https://www.revenue.alabama.gov/wp-content/uploads/2018/09/Form_2848A_rev918.pdf'"
+if (s.includes(oldAl)) { s=s.replace(oldAl,newAl); changed=true }
+
 // Only Florida DR-835 currently has a field/coordinate mapping that has been
 // verified against its exact official PDF. Never reuse those coordinates on a
 // different state's form.
@@ -49,5 +56,6 @@ for (const fn of ['downloadPrefilledStatePOA','sendStatePOA']) {
   if(!part.includes("form.state !== 'FL'")) throw new Error(`${fn} state form safety guard missing`)
 }
 if(!s.includes("const mergedBytes = await generateStatePOAWithCover(selectedClient, rawBytes)")) throw new Error('Verified Florida e-sign prefill guard missing')
+if(!s.includes('https://www.revenue.alabama.gov/wp-content/uploads/2018/09/Form_2848A_rev918.pdf')) throw new Error('Official Alabama POA URL missing')
 if(changed) fs.writeFileSync(p,s)
-console.log(`State e-sign safety ${changed?'patched':'already current'}: FL verified path only; unverified state autofill blocked.`)
+console.log(`State e-sign safety ${changed?'patched':'already current'}: FL verified path only; unverified state autofill blocked; Alabama official POA wired.`)
