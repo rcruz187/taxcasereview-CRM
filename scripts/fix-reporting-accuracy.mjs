@@ -1,13 +1,16 @@
 import fs from 'node:fs'
 
 const file = 'src/pages/Reports.jsx'
-let src = fs.readFileSync(file, 'utf8')
+let src = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n')
+let changed = false
 
 function replaceExact(from, to, label) {
+  if (src.includes(to)) return
   if (!src.includes(from)) throw new Error(`Reporting audit patch anchor missing: ${label}`)
   // Function replacer is intentional: replacement strings containing currency
   // text like '$' must never be interpreted as String.replace $-patterns.
   src = src.replace(from, () => to)
+  changed = true
 }
 
 replaceExact(
@@ -39,8 +42,10 @@ replaceExact(
 `...monthBuckets.map((b,i)=>[b.label,'$'+Math.round(revByMonth[i])])`,
 'Excel month labels')
 
+const beforeLabels = src
 src = src.replace(/MONTHS\[Number\(m\)\]/g, () => 'monthBuckets[Number(m)]?.label || m')
 src = src.replace(/MONTHS\[i\]/g, () => 'monthBuckets[i]?.label || MONTHS[i]')
+if (src !== beforeLabels) changed = true
 
-fs.writeFileSync(file, src)
-console.log('✓ Reporting accuracy patch applied: exhaustive paging, settled payments, derived AR, lead conversion, tenant-safe rep attribution, year-aware monthly revenue')
+if (changed) fs.writeFileSync(file, src)
+console.log(`✓ Reporting accuracy patch ${changed ? 'applied' : 'already current'}: exhaustive paging, settled payments, derived AR, lead conversion, tenant-safe rep attribution, year-aware monthly revenue`)
