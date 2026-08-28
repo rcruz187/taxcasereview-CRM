@@ -1,0 +1,27 @@
+name: Inspect Live Tenant Override
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/inspect-live-tenant-override.yml']
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: mpxgxfqdbquzkrvvejkh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect override functions
+        shell: bash
+        run: |
+          for FN in set_admin_tenant_override current_tenant_id; do
+            python3 - "$FN" <<'PY' >/tmp/q.json
+          import json,sys
+          fn=sys.argv[1]
+          print(json.dumps({'query':f"select pg_get_functiondef(p.oid) as def from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='{fn}'"}))
+          PY
+            curl --fail-with-body -sS -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" -H 'Content-Type: application/json' --data-binary @/tmp/q.json
+            echo
+          done
