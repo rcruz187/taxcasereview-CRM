@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite --port 5173",
     "check-polling": "node scripts/check-polling-intervals.cjs",
-    "prebuild": "npm run check-polling",
+    "manual:style": "node scripts/manual-professionalize.mjs",
+    "storage:fix-display": "node scripts/fix-storage-usage-display.mjs",
+    "prebuild": "npm run check-polling && npm run manual:style && npm run storage:fix-display",
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "gh-pages -d dist --dotfiles"
