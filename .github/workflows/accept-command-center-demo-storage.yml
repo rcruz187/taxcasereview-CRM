@@ -1,0 +1,127 @@
+name: Accept Command Center Demo Storage
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/accept-command-center-demo-storage.yml']
+permissions:
+  contents: write
+jobs:
+  accept:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: mpxgxfqdbquzkrvvejkh
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Verify storage RPC equals raw storage metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >/tmp/q.json
+          import json
+          q=r'''
+          with ctx as (
+            select set_config('request.jwt.claims','{"role":"service_role","email":"info@romylabs.com"}',true)
+          ), raw as (
+            select coalesce(sum(coalesce((metadata->>'size')::bigint,0)),0)::bigint raw_bytes,
+                   count(*)::int raw_objects
+            from storage.objects, ctx
+          ), rpc as (
+            select public.admin_storage_stats() value from ctx
+          )
+          select jsonb_build_object(
+            'rpc',rpc.value,
+            'raw_bytes',raw.raw_bytes,
+            'raw_objects',raw.raw_objects,
+            'bytes_match',(rpc.value->>'total_bytes')::bigint=raw.raw_bytes,
+            'objects_match',(rpc.value->>'total_objects')::int=raw.raw_objects
+          ) as result
+          from rpc,raw;
+          '''
+          print(json.dumps({'query':q}))
+          PY
+          OUT=$(curl --fail-with-body -sS -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" -H 'Content-Type: application/json' --data-binary @/tmp/q.json)
+          echo "$OUT"
+          echo "$OUT" | grep -q '"bytes_match":true'
+          echo "$OUT" | grep -q '"objects_match":true'
+          echo "$OUT" > /tmp/storage.json
+      - name: Verify TaxRes demo RPC excludes current Arcvena event
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >/tmp/q.json
+          import json
+          q=r'''
+          with ctx as (
+            select set_config('request.jwt.claims','{"role":"service_role","email":"info@romylabs.com"}',true)
+          ), rpc as (
+            select public.admin_taxres_demo_stats() value from ctx
+          ), raw as (
+            select
+              count(*) filter (where product_id='taxres_crm' and date::date=current_date)::int taxres_today,
+              count(*) filter (where product_id='arcvena' and date::date=current_date)::int arcvena_today,
+              count(*) filter (where product_id is null and date::date>=current_date)::int future_or_today_null_product
+            from public.calevents, ctx
+          )
+          select jsonb_build_object(
+            'rpc',rpc.value,
+            'taxres_today_raw',raw.taxres_today,
+            'arcvena_today_raw',raw.arcvena_today,
+            'null_product_future_or_today',raw.future_or_today_null_product,
+            'today_match',(rpc.value->>'today_count')::int=raw.taxres_today,
+            'upcoming_has_non_taxres',exists(
+              select 1 from jsonb_array_elements(coalesce(rpc.value->'upcoming','[]'::jsonb)) e
+              where coalesce(e->>'product_id','') <> 'taxres_crm'
+            )
+          ) as result
+          from rpc,raw;
+          '''
+          print(json.dumps({'query':q}))
+          PY
+          OUT=$(curl --fail-with-body -sS -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" -H 'Content-Type: application/json' --data-binary @/tmp/q.json)
+          echo "$OUT"
+          echo "$OUT" | grep -q '"today_match":true'
+          echo "$OUT" | grep -q '"upcoming_has_non_taxres":false'
+          echo "$OUT" > /tmp/demos.json
+      - name: Patch source and add production fingerprint
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/pages/AdminPortal.jsx')
+          s=p.read_text()
+          if "admin_taxres_demo_stats" not in s:
+            old="""        const [statsRes, tenantsRes, storageRes] = await Promise.all([\n          withTimeout(supabase.rpc('admin_command_center_stats'), 'admin_command_center_stats'),\n          withTimeout(supabase.rpc('admin_tenant_overview'), 'admin_tenant_overview'),\n          withTimeout(supabase.rpc('admin_storage_stats'), 'admin_storage_stats'),\n        ])"""
+            new="""        const [statsRes, tenantsRes, storageRes, taxresDemoRes] = await Promise.all([\n          withTimeout(supabase.rpc('admin_command_center_stats'), 'admin_command_center_stats'),\n          withTimeout(supabase.rpc('admin_tenant_overview'), 'admin_tenant_overview'),\n          withTimeout(supabase.rpc('admin_storage_stats'), 'admin_storage_stats'),\n          withTimeout(supabase.rpc('admin_taxres_demo_stats'), 'admin_taxres_demo_stats'),\n        ])"""
+            if old not in s: raise SystemExit('Promise.all target not found')
+            s=s.replace(old,new,1)
+            old2="""        if (statsRes.error) throw new Error('RPC error: ' + JSON.stringify(statsRes.error))\n        if (!stats || stats.error) throw new Error('Stats unavailable: ' + JSON.stringify(stats))"""
+            new2="""        if (statsRes.error) throw new Error('RPC error: ' + JSON.stringify(statsRes.error))\n        if (storageRes.error) throw new Error('Storage RPC error: ' + JSON.stringify(storageRes.error))\n        if (taxresDemoRes.error) throw new Error('TaxRes demo RPC error: ' + JSON.stringify(taxresDemoRes.error))\n        if (!stats || stats.error) throw new Error('Stats unavailable: ' + JSON.stringify(stats))"""
+            if old2 not in s: raise SystemExit('error target not found')
+            s=s.replace(old2,new2,1)
+            s=s.replace("          todayDemos:    Number(stats.today_demos||0),","          todayDemos:    Number(taxresDemoRes?.data?.today_count || 0),",1)
+            s=s.replace("        upcomingDemos:(stats.today_schedule||[]).filter(e=>new Date(e.start)>new Date()).slice(0,5),","        upcomingDemos:(taxresDemoRes?.data?.upcoming || []).slice(0,5),",1)
+            s=s.replace("No demos scheduled — all product bookings appear here.","No TaxRes demos scheduled.",1)
+            p.write_text(s)
+          marker=Path('public/admin-portal-build.txt')
+          existing=marker.read_text() if marker.exists() else ''
+          line='crm-demo-storage-fix=COMMAND_CENTER_CRM_SCOPE_20260828\n'
+          if line not in existing:
+            marker.write_text(existing + ('' if not existing or existing.endswith('\n') else '\n') + line)
+          PY
+      - name: Build fixed source
+        run: |
+          npm ci
+          npm run build
+          grep -q "admin_taxres_demo_stats" src/pages/AdminPortal.jsx
+          grep -q "Storage RPC error" src/pages/AdminPortal.jsx
+          grep -q "No TaxRes demos scheduled." src/pages/AdminPortal.jsx
+          grep -q "COMMAND_CENTER_CRM_SCOPE_20260828" public/admin-portal-build.txt
+      - name: Commit accepted fix
+        run: |
+          git config user.name 'RomyLabs Fix Bot'
+          git config user.email 'romy@romylabs.com'
+          git add src/pages/AdminPortal.jsx public/admin-portal-build.txt
+          git diff --cached --quiet || git commit -m 'fix(admin): correct TaxRes demos and storage reporting'
+          git push origin HEAD:main
