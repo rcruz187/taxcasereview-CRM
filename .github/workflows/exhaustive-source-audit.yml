@@ -95,7 +95,7 @@ jobs:
           echo '=== tracked source stats ==='
           git ls-files 'src/**' 'supabase/functions/**' 'supabase/migrations/**' 'scripts/**' '.github/workflows/**' | wc -l
           echo '=== merge markers ==='
-          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- ':!package-lock.json'; then exit 3; else echo none; fi
+          if git grep -nE '^(<<<<<<< .+|=======|>>>>>>> .+)$' -- ':!package-lock.json'; then exit 3; else echo none; fi
           echo '=== public URL calls requiring bucket review ==='
           git grep -n 'getPublicUrl' -- 'src/**' 'supabase/functions/**' || true
           echo '=== suspicious TODO/FIXME markers ==='
