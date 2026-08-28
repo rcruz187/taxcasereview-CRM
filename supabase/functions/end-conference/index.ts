@@ -1,122 +1,47 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Called BY THE BROWSER when staff clicks "End" on an active call.
-// Hanging up the browser's own RELAY call object (liveCallRef.current)
-// only ends THAT leg -- if it's ever in a stuck/half-connected state (as
-// turned out to happen with the outbound conference bridge), .hangup()
-// can be a no-op and the other party is left connected with no way to
-// end it from our side. This forces the issue server-side: tell
-// SignalWire directly to end the whole conference, which disconnects
-// everyone in it regardless of what state any single leg is in.
-//
-// CORS is enabled because this is called directly from the browser.
+const SUPABASE_URL=Deno.env.get('SUPABASE_URL')!
+const SERVICE_KEY=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const ANON_KEY=Deno.env.get('SUPABASE_ANON_KEY')!
+const corsHeaders={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type'}
+const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...corsHeaders,'Content-Type':'application/json'}})
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+serve(async(req)=>{
+  if(req.method==='OPTIONS') return new Response('ok',{headers:corsHeaders})
+  try{
+    const authHeader=req.headers.get('authorization')||''
+    if(!authHeader.toLowerCase().startsWith('bearer ')) return json({error:'Unauthorized'},401)
+    const token=authHeader.slice(7).trim()
+    const authClient=createClient(SUPABASE_URL,ANON_KEY,{global:{headers:{Authorization:`Bearer ${token}`}}})
+    const {data:{user},error:userErr}=await authClient.auth.getUser(token)
+    if(userErr||!user?.email) return json({error:'Unauthorized'},401)
+    const {conferenceName}=await req.json()
+    if(!conferenceName||!/^[A-Za-z0-9_-]+$/.test(conferenceName)) return json({error:'valid conferenceName required'},400)
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+    const db=createClient(SUPABASE_URL,SERVICE_KEY)
+    const {data:emp}=await db.from('employees').select('tenant_id,status').ilike('email',user.email).limit(1).maybeSingle()
+    if(!emp?.tenant_id||String(emp.status||'Active').toLowerCase()!=='active') return json({error:'Unauthorized'},403)
+    const {data:settings,error:sErr}=await db.from('settings').select('sw_space_url,sw_project_id,sw_api_token').eq('tenant_id',emp.tenant_id).limit(1).maybeSingle()
+    if(sErr||!settings?.sw_space_url||!settings?.sw_project_id||!settings?.sw_api_token) return json({error:'SignalWire credentials missing for this office.'},400)
 
-  try {
-    const { conferenceName } = await req.json()
-    if (!conferenceName) {
-      return new Response(JSON.stringify({ error: 'conferenceName required' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+    const spaceDomain=settings.sw_space_url.replace(/^https?:\/\//,'')
+    const providerAuth='Basic '+btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
+    const base=`https://${spaceDomain}/api/laml/2010-04-01/Accounts/${settings.sw_project_id}`
+    const confResp=await fetch(`${base}/Conferences.json?FriendlyName=${encodeURIComponent(conferenceName)}&Status=in-progress`,{headers:{Authorization:providerAuth}})
+    const confData=await confResp.json();const conferenceSid=confData?.conferences?.[0]?.sid
+    if(!conferenceSid) return json({ok:true,note:'Conference already ended'})
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
+    try{
+      const partResp=await fetch(`${base}/Conferences/${conferenceSid}/Participants.json`,{headers:{Authorization:providerAuth}})
+      const partData=await partResp.json()
+      for(const p of partData?.participants||[]){if(!p.call_sid)continue;const kill=await fetch(`${base}/Calls/${p.call_sid}.json`,{method:'POST',headers:{Authorization:providerAuth,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({Status:'completed'})});if(!kill.ok)console.error('end-conference participant hangup failed',p.call_sid,kill.status,await kill.text())}
+    }catch(e){console.error('end-conference participant sweep error',e)}
 
-    const { data: settings, error: sErr } = await supabase
-      .from('settings')
-      .select('sw_space_url,sw_project_id,sw_api_token')
-      .limit(1)
-      .maybeSingle()
-
-    if (sErr || !settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token) {
-      return new Response(JSON.stringify({ error: 'SignalWire credentials missing in Settings' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    const spaceDomain = settings.sw_space_url.replace(/^https?:\/\//, '')
-    const auth = 'Basic ' + btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
-    const base = `https://${spaceDomain}/api/laml/2010-04-01/Accounts/${settings.sw_project_id}`
-
-    // Find the live conference by its friendly name.
-    const confResp = await fetch(
-      `${base}/Conferences.json?FriendlyName=${encodeURIComponent(conferenceName)}&Status=in-progress`,
-      { headers: { Authorization: auth } }
-    )
-    const confData = await confResp.json()
-    const conferenceSid = confData?.conferences?.[0]?.sid
-    console.log('end-conference: lookup for', conferenceName, '-> found', confData?.conferences?.length ?? 0, 'in-progress, sid:', conferenceSid)
-
-    if (!conferenceSid) {
-      // Already ended on SignalWire's side -- nothing to do, not an error.
-      return new Response(JSON.stringify({ ok: true, note: 'Conference already ended' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    // ── Explicitly hang up every participant leg ──
-    // Terminating the conference container alone has proven unreliable at
-    // actually ending the participant CALLS (observed: client cell stays
-    // connected after the agent ends, and outbound_calls rows sit in
-    // 'connected' forever because the leg's completed statusCallback never
-    // fires). Hanging up each leg directly is unambiguous.
-    try {
-      const partResp = await fetch(`${base}/Conferences/${conferenceSid}/Participants.json`, {
-        headers: { Authorization: auth },
-      })
-      const partData = await partResp.json()
-      const participants = partData?.participants || []
-      for (const p of participants) {
-        if (!p.call_sid) continue
-        const kill = await fetch(`${base}/Calls/${p.call_sid}.json`, {
-          method: 'POST',
-          headers: { Authorization: auth, 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ Status: 'completed' }),
-        })
-        if (!kill.ok) {
-          console.error('end-conference: participant hangup failed', p.call_sid, kill.status, await kill.text())
-        } else {
-          console.log('end-conference: hung up participant leg', p.call_sid)
-        }
-      }
-    } catch (e) {
-      console.error('end-conference: participant hangup sweep error (continuing to conference terminate)', e)
-    }
-
-    const updResp = await fetch(`${base}/Conferences/${conferenceSid}.json`, {
-      method: 'POST',
-      headers: { Authorization: auth, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ Status: 'completed' }),
-    })
-
-    if (!updResp.ok) {
-      const text = await updResp.text()
-      console.error('end-conference: SignalWire rejected the terminate request', updResp.status, text)
-      return new Response(JSON.stringify({ error: text }), {
-        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    console.log('end-conference: terminate request accepted for sid', conferenceSid)
-    return new Response(JSON.stringify({ ok: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-
-  } catch (err) {
-    console.error('end-conference error:', err)
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
+    const updResp=await fetch(`${base}/Conferences/${conferenceSid}.json`,{method:'POST',headers:{Authorization:providerAuth,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({Status:'completed'})})
+    if(!updResp.ok) return json({error:'SignalWire rejected conference termination.'},502)
+    await db.from('outbound_calls').update({status:'completed'}).eq('tenant_id',emp.tenant_id).eq('conference_name',conferenceName).neq('status','completed')
+    await db.from('incoming_calls').update({status:'completed'}).eq('tenant_id',emp.tenant_id).eq('conference_name',conferenceName).eq('status','answered')
+    return json({ok:true})
+  }catch(err){console.error('end-conference error:',err);return json({error:'Unable to end conference.'},500)}
 })
