@@ -9,4 +9,14 @@ const newX=`  async function connectXero() {\n    if (!myTenantId) { showToast('
 if(src.includes(oldQ))src=src.replace(oldQ,newQ);else if(!src.includes("p_provider: 'quickbooks'"))throw new Error('QuickBooks OAuth patch anchor missing')
 if(src.includes(oldX))src=src.replace(oldX,newX);else if(!src.includes("p_provider: 'xero'"))throw new Error('Xero OAuth patch anchor missing')
 fs.writeFileSync(file,src)
-console.log('✓ Accounting OAuth now uses one-time server-side state tokens')
+
+const appFile='src/App.jsx'
+let app=fs.readFileSync(appFile,'utf8')
+if(!app.includes("const XeroCallback")){
+  app=app.replace("const QuickBooksCallback  = lazy(() => import('./pages/QuickBooksCallback'))", "const QuickBooksCallback  = lazy(() => import('./pages/QuickBooksCallback'))\nconst XeroCallback = lazy(() => import('./pages/XeroCallback'))")
+}
+if(!app.includes('path="/auth/xero-callback"')){
+  app=app.replace('<Route path="/auth/quickbooks-callback" element={<QuickBooksCallback />} />', '<Route path="/auth/quickbooks-callback" element={<QuickBooksCallback />} />\n      <Route path="/auth/xero-callback" element={<XeroCallback />} />')
+}
+fs.writeFileSync(appFile,app)
+console.log('✓ Accounting OAuth uses one-time server-side state tokens and both callback routes are wired')
