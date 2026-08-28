@@ -360,6 +360,26 @@ BEGIN
      '{"description":"E and O Insurance Premium","amount":450,"type":"Expense","category":"Insurance","reconciled":false}'::jsonb,
      NULL,'Checking',v_tenant);
 
+  -- ── DEMO LOGIN + SALES MAILBOX ──────────────────────────────────────────
+  INSERT INTO employees (id,name,email,role,access,tenant_id,status,created_at)
+  VALUES ('emp1784643023','Demo Admin','demo@taxrescrm.net','Super Admin','Super Admin',v_tenant,'Active',now())
+  ON CONFLICT (email) DO UPDATE SET
+    name='Demo Admin', role='Super Admin', access='Super Admin', tenant_id=v_tenant, status='Active';
+
+  UPDATE settings SET
+    name='TaxRes CRM', firmname='TaxRes CRM', logourl='/taxrescrm-logo.png',
+    email='demo@taxrescrm.net', firmemail='demo@taxrescrm.net', website='https://taxrescrm.app'
+  WHERE tenant_id=v_tenant;
+
+  INSERT INTO emails (recipient,"clientName",subject,body,triage,status,created_at,received_at,is_read,tenant_id,mailbox_owner,from_address,direction,gmail_message_id,gmail_thread_id)
+  VALUES
+    ('demo@taxrescrm.net','Robert Chen','IRS requested additional OIC documents','Hi Sarah, I received the IRS letter asking for updated bank statements and proof of household expenses. I can upload everything this afternoon. Please let me know if you need anything else from me.','Inbox','Received',now()-interval '18 minutes',now()-interval '18 minutes',false,v_tenant,'demo@taxrescrm.net','rchen@demomail.example','inbound','demo-msg-001','demo-thread-001'),
+    ('demo@taxrescrm.net','Teresa Morales','Payment posted — thank you','Hi team, I made this month’s installment agreement payment and attached my confirmation for my records. Thank you for keeping me updated.','Inbox','Received',now()-interval '2 hours',now()-interval '2 hours',true,v_tenant,'demo@taxrescrm.net','tmorales@demomail.example','inbound','demo-msg-002','demo-thread-002'),
+    ('demo@taxrescrm.net','Sandra Adams','Re: Urgent levy consultation','Yes, 11:00 AM works for me. I have the levy notice and my last two pay stubs ready for the consultation.','Action Needed','Received',now()-interval '5 hours',now()-interval '5 hours',false,v_tenant,'demo@taxrescrm.net','sadams@demomail.example','inbound','demo-msg-003','demo-thread-003'),
+    ('kpark@demomail.example','Kevin Park','Your TaxRes CRM consultation is confirmed','Hi Kevin, your consultation is confirmed for tomorrow at 10:00 AM Eastern. We’ll review your IRS balance, income, and CNC eligibility.','Sent','Sent',now()-interval '1 day',now()-interval '1 day',true,v_tenant,'demo@taxrescrm.net','demo@taxrescrm.net','outbound','demo-msg-004','demo-thread-004'),
+    ('jhoffman@demomail.example','James Hoffman','Next steps after transcript review','Hi James, we completed the transcript review and are preparing your resolution strategy. I’ll follow up with the documents needed for the next phase.','Sent','Sent',now()-interval '2 days',now()-interval '2 days',true,v_tenant,'demo@taxrescrm.net','demo@taxrescrm.net','outbound','demo-msg-005','demo-thread-005'),
+    ('demo@taxrescrm.net','Maria De Luca','Documents uploaded','Good morning, I uploaded the requested tax returns and bank statements to my file. Please confirm that everything came through.','Waiting','Received',now()-interval '3 days',now()-interval '3 days',true,v_tenant,'demo@taxrescrm.net','mdeluca@demomail.example','inbound','demo-msg-006','demo-thread-006');
+
   RAISE NOTICE 'Demo tenant reset complete. Tenant: %', v_tenant;
 
 END $$;

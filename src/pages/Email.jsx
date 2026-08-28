@@ -47,6 +47,8 @@ export default function Email() {
   const [signature, setSignature] = useState({ text: '', logoUrl: '' })
   const { lastSyncAt, syncing, lastError, syncNow } = useGmailSync()
   const { user } = useApp()
+  const isDemoMailbox = user?.email?.toLowerCase() === 'demo@taxrescrm.net'
+  const DEMO_TENANT_ID = 'a0000000-0000-0000-0000-000000000001'
   // Display-only tick — re-renders the "Synced Xs ago" text once a
   // second so it doesn't look frozen between real sync updates. Purely
   // local state, no Supabase calls.
@@ -148,8 +150,11 @@ export default function Email() {
     if (user?.email) {
       const { data: acct } = await supabase.from('employee_gmail_accounts')
         .select('gmail_refresh_token,gmail_connected_email').eq('employee_email', user.email).maybeSingle()
-      setGmailConnected(!!acct?.gmail_refresh_token)
-      setGmailConnectedEmail(acct?.gmail_connected_email || '')
+      // The sales-demo account intentionally uses a sandbox mailbox instead of
+      // a real external Gmail token. It still behaves like a connected inbox
+      // so prospects can see the complete email workflow without sending live mail.
+      setGmailConnected(isDemoMailbox || !!acct?.gmail_refresh_token)
+      setGmailConnectedEmail(isDemoMailbox ? 'demo@taxrescrm.net' : (acct?.gmail_connected_email || ''))
       // Check M365 connection
       const { data: m365Acct } = await supabase.from('employee_m365_accounts')
         .select('m365_refresh_token,m365_email').eq('employee_email', user.email).maybeSingle()
@@ -302,16 +307,30 @@ export default function Email() {
       if (!form.recipient) {
         setSaving(false); showToast('Recipient email address required to send'); return
       }
-      try {
-        await sendGmailEmail(supabase, { to: form.recipient, subject: form.subject, body: form.body, senderEmployeeEmail: user?.email })
+      if (isDemoMailbox) {
+        // Demo-safe send: write the message into the sandbox Sent folder but
+        // never deliver it outside TaxRes CRM.
         status = 'Sent'
-      } catch (e) {
-        setSaving(false)
-        showToast('Gmail send failed: ' + e.message)
-        return
+      } else {
+        try {
+          await sendGmailEmail(supabase, { to: form.recipient, subject: form.subject, body: form.body, senderEmployeeEmail: user?.email })
+          status = 'Sent'
+        } catch (e) {
+          setSaving(false)
+          showToast('Gmail send failed: ' + e.message)
+          return
+        }
       }
     }
-    const { error } = await supabase.from('emails').insert([{ ...form, status, created_at: new Date().toISOString() }])
+    const emailRow = { ...form, status, created_at: new Date().toISOString(), mailbox_owner: user?.email || null }
+    if (isDemoMailbox) {
+      emailRow.tenant_id = DEMO_TENANT_ID
+      emailRow.from_address = 'demo@taxrescrm.net'
+      emailRow.direction = 'outbound'
+      emailRow.received_at = emailRow.created_at
+      emailRow.is_read = true
+    }
+    const { error } = await supabase.from('emails').insert([emailRow])
     setSaving(false)
     if (error) { showToast('Error: ' + error.message); return }
 
@@ -332,7 +351,7 @@ export default function Email() {
       })
     }
 
-    showToast(status === 'Sent' ? '✅ Email sent via Gmail!' : '⚠️ Gmail is not connected — this was only saved as a log entry, nothing was emailed')
+    showToast(isDemoMailbox && status === 'Sent' ? '✅ Demo email sent — sandbox only' : status === 'Sent' ? '✅ Email sent via Gmail!' : '⚠️ Gmail is not connected — this was only saved as a log entry, nothing was emailed')
     setForm(BLANK); setView('inbox'); load()
   }
 
@@ -477,18 +496,18 @@ export default function Email() {
         {/* Gmail connect banner */}
         {gmailConnected ? (
           <div style={{ margin: '0 10px 10px', padding: '8px 12px', background: 'rgba(34,197,94,.12)', borderRadius: 8, border: '1px solid rgba(34,197,94,.3)', fontSize: 11, fontWeight: 700, color: 'var(--ok)' }}>
-            ✅ Gmail Connected{gmailConnectedEmail ? ` — ${gmailConnectedEmail}` : ''}
+            {isDemoMailbox ? '✅ Demo Mailbox' : '✅ Gmail Connected'}{gmailConnectedEmail ? ` — ${gmailConnectedEmail}` : ''}
             <div style={{ marginTop: 4, fontSize: 10, fontWeight: 400, color: 'var(--t3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
               <span>
-                {syncing ? '🔄 Syncing…' : lastSyncAt ? `Synced ${Math.max(0, Math.round((Date.now() - lastSyncAt.getTime()) / 1000))}s ago` : 'Starting sync…'}
+                {isDemoMailbox ? 'Sandbox inbox ready' : syncing ? '🔄 Syncing…' : lastSyncAt ? `Synced ${Math.max(0, Math.round((Date.now() - lastSyncAt.getTime()) / 1000))}s ago` : 'Starting sync…'}
               </span>
               <button
                 className="btn"
-                disabled={syncing}
+                disabled={!isDemoMailbox && syncing}
                 onClick={async () => {
-                  await syncNow()
+                  if (!isDemoMailbox) await syncNow()
                   await load()
-                  showToast(lastError ? 'Email sync error: ' + lastError : '✅ Email refreshed')
+                  showToast(isDemoMailbox ? '✅ Demo inbox refreshed' : lastError ? 'Email sync error: ' + lastError : '✅ Email refreshed')
                 }}
                 style={{ padding:'4px 8px', fontSize:10, fontWeight:700, whiteSpace:'nowrap' }}
               >
