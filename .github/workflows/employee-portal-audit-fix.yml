@@ -1,0 +1,50 @@
+name: Employee Portal Audit Fix
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/employee-portal-audit-fix.yml']
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch Employee Portal SMS
+        run: |
+          node <<'NODE'
+          const fs=require('fs'); const p='src/pages/EmployeePortal.jsx'; let s=fs.readFileSync(p,'utf8')
+          const oldLoad=`  async function loadSmsThread(phone) {
+    if (!phone) return
+    const clean = phone.replace(/\\D/g, '').slice(-10)
+    const { data } = await supabase
+      .from('sms_messages')
+      .select('*')
+      .or(\`from_number.ilike.%\${clean}%,to_number.ilike.%\${clean}%\`)
+      .order('created_at', { ascending: true })
+      .limit(50)
+    setSmsMessages(data || [])
+  }`
+          const newLoad=`  async function loadSmsThread(phone) {
+    if (!phone || !empToken) return
+    const { data, error } = await supabase.rpc('emp_sms_messages', { p_token: empToken, p_phone: phone })
+    setSmsMessages(error ? [] : (Array.isArray(data) ? data : []))
+  }`
+          if(!s.includes(oldLoad)) throw new Error('loadSmsThread pattern changed')
+          s=s.replace(oldLoad,newLoad)
+          const oldBody=`body: { to: client.phone, body: smsBody, client_id: client.client_id, tenant_id: emp.tenant_id }`
+          const newBody=`body: { to: client.phone, body: smsBody, client_id: client.client_id || client.id, employee_portal_token: empToken }`
+          if(!s.includes(oldBody)) throw new Error('sendSms body pattern changed')
+          s=s.replace(oldBody,newBody)
+          fs.writeFileSync(p,s)
+          NODE
+      - run: npm ci
+      - run: npm run build
+      - name: Commit and self-clean
+        run: |
+          git config user.name 'RomyLabs Audit Bot'
+          git config user.email 'rcruz187@gmail.com'
+          git add src/pages/EmployeePortal.jsx
+          git rm .github/workflows/employee-portal-audit-fix.yml
+          git commit -m 'fix(employee-portal): repair scoped client SMS workflow'
+          git push origin HEAD:main
