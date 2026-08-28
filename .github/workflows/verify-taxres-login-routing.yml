@@ -1,0 +1,41 @@
+name: Verify TaxRes Login Routing
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/verify-taxres-login-routing.yml'
+      - 'public/romylabs-admin-hotfix.js'
+      - 'src/pages/Login.jsx'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify source routing rules
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q "window.location.hostname === 'admin.romylabs.com'" src/pages/Login.jsx
+          grep -q "window.location.replace('/')" public/romylabs-admin-hotfix.js
+          ! grep -q "window.location.replace('https://admin.romylabs.com' + path" public/romylabs-admin-hotfix.js
+
+      - name: Wait for TaxRes production routing guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://taxrescrm.app/romylabs-admin-hotfix.js"
+          for i in {1..36}; do
+            body="$(curl -fsSL --max-time 15 -H 'Cache-Control: no-cache' "${url}?verify=$(date +%s)" || true)"
+            if printf '%s' "$body" | grep -q "window.location.replace('/')" && \
+               ! printf '%s' "$body" | grep -q "window.location.replace('https://admin.romylabs.com' + path"; then
+              echo "PASS: TaxRes production is serving the corrected CRM routing guard."
+              exit 0
+            fi
+            echo "Attempt $i/36: TaxRes production has not updated yet; waiting 10s..."
+            sleep 10
+          done
+          echo "ERROR: TaxRes production is still serving stale routing code"
+          exit 1
