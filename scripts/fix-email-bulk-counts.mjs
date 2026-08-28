@@ -22,18 +22,16 @@ function patchEmailPage() {
   if (!s.includes('async function loadFolderCounts()')) {
     const anchor = `  async function load() {`
     if (!s.includes(anchor)) throw new Error('Email.jsx: load() anchor missing')
-    const helper = `  async function loadFolderCounts() {\n    if (!user?.email) return\n    // Count on the server instead of fetching rows into JS. Supabase/PostgREST\n    // caps ordinary row queries, which made counts wrong once a mailbox grew\n    // past that ceiling. \"IS NOT TRUE\" intentionally treats legacy NULL\n    // is_read values as unread, matching the historical UI behavior.\n    const queries = TRIAGE.map(t => {\n      let q = supabase.from('emails')\n        .select('id', { count: 'exact', head: true })\n        .eq('mailbox_owner', user.email)\n        .is('deleted_at', null)\n        .not('is_read', 'is', true)\n      if (t === 'Inbox') q = q.or('triage.eq.Inbox,triage.is.null')\n      else q = q.eq('triage', t)\n      return q\n    })\n    const results = await Promise.all(queries)\n    const next = {}\n    TRIAGE.forEach((t, i) => {\n      if (results[i]?.error) console.error(`[email-count] ${t} count failed:`, results[i].error.message)\n      next[t] = results[i]?.count || 0\n    })\n    setFolderCounts(next)\n  }\n\n  function scheduleFolderCountsRefresh() {\n    if (countRefreshTimerRef.current) clearTimeout(countRefreshTimerRef.current)\n    countRefreshTimerRef.current = setTimeout(() => { loadFolderCounts() }, 120)\n  }\n\n`
+    const helper = `  async function loadFolderCounts() {\n    if (!user?.email) return\n    // Count on the server instead of fetching rows into JS. Supabase/PostgREST\n    // caps ordinary row queries, which made counts wrong once a mailbox grew\n    // past that ceiling. \"IS NOT TRUE\" intentionally treats legacy NULL\n    // is_read values as unread, matching the historical UI behavior.\n    const queries = TRIAGE.map(t => {\n      let q = supabase.from('emails')\n        .select('id', { count: 'exact', head: true })\n        .eq('mailbox_owner', user.email)\n        .is('deleted_at', null)\n        .not('is_read', 'is', true)\n      if (t === 'Inbox') q = q.or('triage.eq.Inbox,triage.is.null')\n      else q = q.eq('triage', t)\n      return q\n    })\n    const results = await Promise.all(queries)\n    const next = {}\n    TRIAGE.forEach((t, i) => {\n      if (results[i]?.error) console.error('[email-count] ' + t + ' count failed:', results[i].error.message)\n      next[t] = results[i]?.count || 0\n    })\n    setFolderCounts(next)\n  }\n\n  function scheduleFolderCountsRefresh() {\n    if (countRefreshTimerRef.current) clearTimeout(countRefreshTimerRef.current)\n    countRefreshTimerRef.current = setTimeout(() => { loadFolderCounts() }, 120)\n  }\n\n`
     s = s.replace(anchor, helper + anchor)
   }
 
-  // Initial page load and every Gmail sync refresh both refresh the authoritative counts.
   s = s.replace('    load(); loadGmailConfig()', '    load(); loadFolderCounts(); loadGmailConfig()')
   s = s.replace(
     `  useEffect(() => { if (lastSyncAt) load() }, [lastSyncAt])`,
     `  useEffect(() => { if (lastSyncAt) { load(); loadFolderCounts() } }, [lastSyncAt])`
   )
 
-  // Soft-deleted mail must never reappear in Nashville/older forks after refresh.
   s = s.replace(
     `.eq('mailbox_owner', user.email).order('created_at', { ascending: false }).limit(300)`,
     `.eq('mailbox_owner', user.email).is('deleted_at', null).order('created_at', { ascending: false }).limit(300)`
