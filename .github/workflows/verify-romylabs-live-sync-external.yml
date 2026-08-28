@@ -1,0 +1,27 @@
+name: Verify RomyLabs Live Product Sync External
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/verify-romylabs-live-sync-external.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for live RomyLabs registry sync assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 36); do
+            TS=$(date +%s)
+            SCRIPT=$(curl -fsSL --max-time 15 "https://romylabs.com/product-sync.js?v=$TS" || true)
+            HOME=$(curl -fsSL --max-time 15 "https://romylabs.com/?v=$TS" || true)
+            if printf '%s' "$SCRIPT" | grep -q 'romylabs-product-sync-styles' && printf '%s' "$HOME" | grep -q '/product-sync.js'; then
+              echo 'ROMYLABS_LIVE_PRODUCT_SYNC_VERIFIED'
+              exit 0
+            fi
+            echo "waiting $i/36"
+            sleep 10
+          done
+          exit 1
