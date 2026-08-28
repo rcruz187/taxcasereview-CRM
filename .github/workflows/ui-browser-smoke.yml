@@ -11,6 +11,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/ui-browser-smoke.yml'
+      - '.github/workflows/exhaustive-source-audit.yml'
   workflow_dispatch:
 
 permissions:
