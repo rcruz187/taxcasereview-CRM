@@ -66,7 +66,7 @@ const QuickBooksCallback  = lazy(() => import('./pages/QuickBooksCallback'))
 const NewOffice = lazy(() => import('./pages/NewOffice'))
 const AdminConsole = lazy(() => import('./pages/AdminConsole'))
 const ImpersonateGate = lazy(() => import('./pages/ImpersonateGate'))
-const AdminPortal = lazy(() => import('./pages/AdminPortal'))
+const AdminPortalGuard = lazy(() => import('./pages/AdminPortalGuard'))
 const Training = lazy(() => import('./pages/Training'))
 const Manual   = lazy(() => import('./pages/Manual'))
 const Support = lazy(() => import('./pages/Support'))
@@ -356,9 +356,9 @@ function AuthRouter() {
       <Route path="/organizer/:id" element={<OrganizerPage />} />
       <Route path="/financial-intake/:id" element={<FinancialIntakePage />} />
       <Route path="/crm-admin/*" element={
-        <RequireAuth adminOnly>
+        <RequireAuth>
           <Suspense fallback={<div style={{minHeight:'100vh',background:'#0d0c1a'}}/>}>
-            <AdminPortal />
+            <AdminPortalGuard />
           </Suspense>
         </RequireAuth>
       } />

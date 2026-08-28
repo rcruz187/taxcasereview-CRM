@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase'
 import { FIRM, loadFirmBranding, loadFirmBrandingPublic } from '../lib/firmBranding'
 import { useApp } from '../context/AppContext'
 import AIAssistant from '../components/AIAssistant'
+import RomyLabsBilling from '../components/admin/RomyLabsBilling'
 const AdminChatPage = lazy(() => import('./AdminChat'))
 
 const NewOffice    = lazy(() => import('./NewOffice'))
@@ -5929,7 +5930,7 @@ export default function AdminPortal() {
             <Route path="/offices"        element={<OfficesList/>}/>
             <Route path="/offices/:id"    element={<OfficePage/>}/>
             <Route path="/provision"      element={<div style={{padding:8}}><NewOffice/></div>}/>
-            <Route path="/billing"        element={<Billing/>}/>
+            <Route path="/billing"        element={<AdminRouteErrorBoundary><RomyLabsBilling/></AdminRouteErrorBoundary>}/>
             <Route path="/search"         element={<Search/>}/>
             <Route path="/demo"           element={<AdminRouteErrorBoundary><DemoMgmt/></AdminRouteErrorBoundary>}/>
             <Route path="/demo-setup"     element={<AdminRouteErrorBoundary><DemoSetup/></AdminRouteErrorBoundary>}/>
