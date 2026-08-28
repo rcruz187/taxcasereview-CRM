@@ -8,10 +8,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Wire current admin source
+        run: node scripts/wire-admin-billing.cjs
       - run: npm ci
       - name: Production build
         run: npm run build
-      - name: Verify admin route ownership and tab wiring
+      - name: Verify admin route ownership and every sidebar route
         run: |
           grep -q "AdminPortalGuard" src/App.jsx
           grep -q 'path="/crm-admin/\*"' src/App.jsx
@@ -26,5 +28,8 @@ jobs:
           grep -q 'path="/email"' src/pages/AdminPortal.jsx
           grep -q 'path="/calendar"' src/pages/AdminPortal.jsx
           grep -q 'path="/chat"' src/pages/AdminPortal.jsx
+          grep -q "RomyLabsBilling" src/pages/AdminPortal.jsx
+          grep -q "info@romylabs.com" supabase/migrations/20260828001500_platform_owner_admin_access.sql
+          grep -q "romy@romylabs.com" supabase/migrations/20260828001500_platform_owner_admin_access.sql
           grep -q "const \[crmAccount, setCrmAccount\] = useState('all')" src/pages/AdminPortal.jsx
           ! grep -q "removeResolvedAlert" public/romylabs-admin-hotfix.js
