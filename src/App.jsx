@@ -294,19 +294,21 @@ const isPlatformOwner = (email) => ADMIN_EMAILS.has((email || '').toLowerCase())
 function AdminGate() {
   const { user } = useApp()
   const navigate = useNavigate()
+  const isAdminHost = window.location.hostname.toLowerCase() === 'admin.romylabs.com'
 
   // Check for active impersonation session
   const isImpersonating = !!sessionStorage.getItem('admin_impersonation')
   const impParam = new URLSearchParams(window.location.search).get('imp')
 
   useEffect(() => {
-    // Only redirect to admin portal if NOT in an impersonation session
-    if (isPlatformOwner(user?.email) && !isImpersonating && !impParam) {
+    // Admin routing is host-scoped. Owner credentials on TaxRes must stay in CRM.
+    if (isAdminHost && isPlatformOwner(user?.email) && !isImpersonating && !impParam) {
       navigate('/crm-admin', { replace: true })
     }
-  }, [user])
+  }, [user, isAdminHost, isImpersonating, impParam, navigate])
 
-  // If impersonating, always show the CRM shell regardless of email
+  // Product hosts always render their CRM, including for RomyLabs owners.
+  if (!isAdminHost) return <Shell />
   if (isImpersonating || impParam) return <Shell />
   if (isPlatformOwner(user?.email) && !isImpersonating) return null
   return <Shell />
@@ -357,15 +359,17 @@ function AuthRouter() {
       <Route path="/organizer/:id" element={<OrganizerPage />} />
       <Route path="/financial-intake/:id" element={<FinancialIntakePage />} />
       <Route path="/crm-admin/*" element={
-        <RequireAuth>
-          <Suspense fallback={<div style={{minHeight:'100vh',background:'#0d0c1a'}}/>}>
-            <AdminPortalGuard />
-          </Suspense>
-        </RequireAuth>
+        window.location.hostname.toLowerCase() === 'admin.romylabs.com' ? (
+          <RequireAuth>
+            <Suspense fallback={<div style={{minHeight:'100vh',background:'#0d0c1a'}}/>}>
+              <AdminPortalGuard />
+            </Suspense>
+          </RequireAuth>
+        ) : <Navigate to="/" replace />
       } />
       <Route path="*" element={publicHrPage || (
         <RequireAuth>
-          {/* romy@taxrescrm.net always goes to the admin portal */}
+          {/* Owner routing is host-scoped: product hosts remain in CRM. */}
           <AdminGate />
         </RequireAuth>
       )} />
