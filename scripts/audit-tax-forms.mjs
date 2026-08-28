@@ -60,8 +60,9 @@ async function loadTemplateBytes(rawPath) {
   const rel = raw.replace(/^\//,'')
   const candidates = [
     path.join(root,'public',rel),
-    path.join(root,rel),
+    path.join(root,'public','templates',path.basename(rel)),
     path.join(root,'public','irs-forms',path.basename(rel)),
+    path.join(root,rel),
   ]
   const file = candidates.find(fs.existsSync)
   if (!file) throw new Error(`missing local template ${raw}`)
@@ -80,12 +81,16 @@ for (const [type,map] of Object.entries(fieldMaps)) {
   try {
     const bytes = await loadTemplateBytes(relRaw)
     const pdf=await PDFDocument.load(bytes,{ignoreEncryption:true})
-    const names=new Set(pdf.getForm().getFields().map(f=>f.getName()))
+    const actual=pdf.getForm().getFields().map(f=>f.getName())
+    const names=new Set(actual)
     const mapped=Object.entries(map).filter(([k,v])=>k!=='idType' && typeof v==='string')
     const missing=mapped.filter(([,v])=>!names.has(v))
     console.log(`${type}: template=OK fields=${names.size} mapped=${mapped.length} missing=${missing.length}`)
     for (const [k,v] of missing) console.log(`  MISSING ${k} -> ${v}`)
-    if (missing.length) hardFailures.push(`IRS ${type}: ${missing.length} mapped PDF fields missing`)
+    if (missing.length) {
+      console.log(`  ACTUAL_FIELDS ${JSON.stringify(actual)}`)
+      hardFailures.push(`IRS ${type}: ${missing.length} mapped PDF fields missing`)
+    }
   } catch(e) { hardFailures.push(`IRS ${type}: ${e.message}`) }
 }
 
