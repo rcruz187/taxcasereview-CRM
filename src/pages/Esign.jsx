@@ -38,7 +38,7 @@ function signingUrl(id) {
 }
 
 export default function Esign() {
-  const { showToast } = useApp()
+  const { showToast, user } = useApp()
   const [items, setItems] = useState([])
   const [clients, setClients] = useState([])
   const location = useLocation()
@@ -97,7 +97,6 @@ export default function Esign() {
     const { sendVia, clientEmail, clientPhone, clientName } = item || form
     const msg = `Hi ${clientName}, ${FIRM.name || 'Tax Case Review'} sent you a Tax Service Agreement to sign. Please review and sign here: ${url}`
     let smsSent = false, emailSent = false
-    const { data: cfg } = await supabase.from('settings').select('signalwire_backend,smtp_host,smtp_email').limit(1).maybeSingle()
     if ((sendVia === 'sms' || sendVia === 'both') && clientPhone) {
       try {
         const { error } = await supabase.functions.invoke('send-sms', {
@@ -250,122 +249,51 @@ export default function Esign() {
           </div>
         ) : (
           <div className="ovx">
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+            <table style={{ width:'100%', borderCollapse:'collapse' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--br)', background: 'var(--s2)' }}>
-                  {['Client', 'Document', 'Sent', 'Opened', 'Reminders', 'Pending', 'Status', 'Signed By', 'Actions'].map(h => (
-                    <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{h}</th>
-                  ))}
+                <tr style={{ background:'var(--s2)' }}>
+                  {['Client','Document','Sent','Status','Actions'].map(h => <th key={h} style={{ textAlign:'left', padding:'10px 14px', fontSize:10, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.06em', borderBottom:'1px solid var(--br)' }}>{h}</th>)}
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(item => {
-                  const isSigned = item.status === 'Signed'
-                  const dp = daysPending(item)
-                  const needsReminder = item.status === 'Awaiting' && dp >= 1
+                {filtered.map((item, idx) => {
+                  const pending = daysPending(item)
                   const isExpanded = expandedRow === item.id
-
-                  return (
-                    <>
-                      <tr key={item.id}
-                        style={{ borderBottom: '1px solid var(--br)', background: needsReminder ? 'rgba(245,158,11,.04)' : '' }}
-                        onMouseEnter={e => e.currentTarget.style.background = needsReminder ? 'rgba(245,158,11,.08)' : 'var(--s2)'}
-                        onMouseLeave={e => e.currentTarget.style.background = needsReminder ? 'rgba(245,158,11,.04)' : ''}>
-
-                        {/* Client */}
-                        <td style={{ padding: '13px 14px' }}>
-                          <div style={{ fontWeight: 700, fontSize: 14 }}><ClientLink name={item.client_name} /></div>
-                          {item.client_email && <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>{item.client_email}</div>}
-                          {item.investigation_fee && <div style={{ fontSize: 11, color: 'var(--ok)', fontWeight: 700, marginTop: 2 }}>Fee: ${item.investigation_fee}</div>}
-                        </td>
-
-                        {/* Document */}
-                        <td style={{ padding: '13px 14px', fontSize: 13, color: 'var(--t2)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {item.doc_type}
-                        </td>
-
-                        {/* Sent */}
-                        <td style={{ padding: '13px 14px', fontSize: 12, color: 'var(--t3)', whiteSpace: 'nowrap' }}>
-                          {item.sent_at ? new Date(item.sent_at).toLocaleDateString() : '—'}
-                        </td>
-
-                        {/* Opened */}
-                        <td style={{ padding: '13px 14px', fontSize: 12, whiteSpace: 'nowrap' }}>
-                          {item.opened_at ? (
-                            <span style={{ color: 'var(--ok)', fontWeight: 600 }}>
-                              👁 {new Date(item.opened_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                            </span>
-                          ) : <span style={{ color: 'var(--t3)' }}>Not opened</span>}
-                        </td>
-
-                        {/* Reminders */}
-                        <td style={{ padding: '13px 14px', fontSize: 12, whiteSpace: 'nowrap' }}>
-                          {item.reminder_count > 0 ? (
-                            <span style={{ color: item.reminder_count >= 3 ? 'var(--bad)' : 'var(--warn)', fontWeight: 600 }}>
-                              {item.reminder_count}/3 sent
-                            </span>
-                          ) : item.status === 'Awaiting' ? (
-                            <span style={{ color: 'var(--t3)' }}>None yet</span>
-                          ) : <span style={{ color: 'var(--t3)' }}>—</span>}
-                        </td>
-
-                        {/* Pending */}
-                        <td style={{ padding: '13px 14px', whiteSpace: 'nowrap' }}>
-                          {item.status === 'Awaiting' ? (
-                            <span style={{ fontSize: 12, fontWeight: 700, color: dp > 5 ? 'var(--bad)' : dp > 2 ? 'var(--warn)' : 'var(--t3)' }}>
-                              {dp > 0 ? `${dp}d` : 'Today'}
-                            </span>
-                          ) : <span style={{ color: 'var(--t3)', fontSize: 12 }}>—</span>}
-                        </td>
-
-                        {/* Status */}
-                        <td style={{ padding: '13px 14px' }}>
-                          <span className={`bdg ${isSigned ? 'bg' : item.status === 'Declined' ? 'br' : item.status === 'Expired' ? 'bw' : 'ba'}`}
-                            style={{ fontSize: 12, padding: '3px 10px', fontWeight: 700 }}>
-                            {item.status}
-                          </span>
-                        </td>
-
-                        {/* Signed By */}
-                        <td style={{ padding: '13px 14px' }}>
-                          {isSigned && item.signed_name ? (
-                            <span style={{ fontFamily: 'Georgia,serif', fontSize: 14, color: 'var(--ok)', fontWeight: 600 }}>{item.signed_name}</span>
-                          ) : <span style={{ color: 'var(--t3)', fontSize: 12 }}>—</span>}
-                        </td>
-
-                        {/* Actions */}
-                        <td style={{ padding: '13px 14px' }}>
-                          <div style={{ display: 'flex', gap: 5, flexWrap: 'nowrap', alignItems: 'center' }}>
-                            {item.status === 'Awaiting' && (
-                              <>
-                                <button className="btn sec" style={{ fontSize: 11, padding: '4px 10px', whiteSpace: 'nowrap' }} onClick={() => resendLink(item)}>📨 Resend</button>
-                                <button className="btn sec" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => openSigningPage(item)}>👁</button>
-                                <button className="btn" style={{ fontSize: 11, padding: '4px 10px', background: 'var(--ok)', color: '#fff', border: 'none', borderRadius: 5, cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => updateStatus(item.id, 'Signed')}>✓</button>
-                              </>
-                            )}
-                            {isSigned && (
-                              <button className="btn sec" style={{ fontSize: 11, padding: '4px 10px', whiteSpace: 'nowrap' }} onClick={() => setViewCert(item)}>🔐 Cert</button>
-                            )}
-                            {!isSigned && item.status !== 'Awaiting' && (
-                              <button className="btn sec" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => resendLink(item)}>↻</button>
-                            )}
-                            <button className="btn del" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setConfirmDel(item.id)}>Del</button>
-                          </div>
-                        </td>
-                      </tr>
-
-                      {/* Expanded row for signed details */}
-                      {isSigned && isExpanded && (
-                        <tr key={item.id + '-exp'} style={{ background: 'var(--s2)', borderBottom: '1px solid var(--br)' }}>
-                          <td colSpan={7} style={{ padding: '10px 14px' }}>
-                            <div style={{ fontSize: 12, color: 'var(--t3)' }}>
-                              IP: {item.signer_ip || '—'} · Signed: {item.signed_at ? new Date(item.signed_at).toLocaleString() : '—'}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </>
-                  )
+                  return <>
+                    <tr key={item.id} style={{ borderBottom:'1px solid var(--br)', background: idx%2===0?'transparent':'rgba(255,255,255,.01)' }}>
+                      <td style={{ padding:'12px 14px' }}>
+                        <div style={{ fontWeight:700, fontSize:13 }}><ClientLink name={item.client_name}/></div>
+                        {item.client_email && <div style={{ fontSize:11, color:'var(--t3)', marginTop:2 }}>{item.client_email}</div>}
+                      </td>
+                      <td style={{ padding:'12px 14px', fontSize:12, color:'var(--t2)' }}>{item.doc_type}</td>
+                      <td style={{ padding:'12px 14px', fontSize:11, color:'var(--t3)' }}>
+                        {item.sent_at ? new Date(item.sent_at).toLocaleDateString() : '—'}
+                        {item.status === 'Awaiting' && pending > 0 && <div style={{ color:pending>=3?'var(--bad)':'var(--warn)', fontSize:10, marginTop:2 }}>{pending}d pending</div>}
+                      </td>
+                      <td style={{ padding:'12px 14px' }}>
+                        <span className={`badge ${item.status==='Signed'?'green':item.status==='Awaiting'?'amber':item.status==='Declined'?'red':'gray'}`} style={{ fontSize:10 }}>{item.status}</span>
+                      </td>
+                      <td style={{ padding:'10px 14px' }}>
+                        <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+                          {item.status !== 'Signed' && <>
+                            <button className="btn sec" style={{ fontSize:10, padding:'4px 8px' }} onClick={() => openSigningPage(item)}>Open</button>
+                            <button className="btn sec" style={{ fontSize:10, padding:'4px 8px' }} onClick={() => resendLink(item)}>Resend</button>
+                          </>}
+                          {item.status === 'Signed' && <button className="btn sec" style={{ fontSize:10, padding:'4px 8px' }} onClick={() => setExpandedRow(isExpanded ? null : item.id)}>{isExpanded?'Hide':'View'} Details</button>}
+                          {item.status === 'Awaiting' && <button className="btn sec" style={{ fontSize:10, padding:'4px 8px', color:'var(--bad)' }} onClick={() => updateStatus(item.id,'Declined')}>Decline</button>}
+                          <button className="btn sec" style={{ fontSize:10, padding:'4px 8px', color:'var(--bad)' }} onClick={() => setConfirmDel(item)}>Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                    {isExpanded && <tr key={item.id+'-detail'}><td colSpan={5} style={{ padding:'16px 20px', background:'rgba(34,197,94,.03)', borderBottom:'1px solid var(--br)' }}>
+                      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:14, fontSize:12 }}>
+                        <div><span style={{color:'var(--t3)'}}>Signed by</span><br/><strong>{item.signer_full_name || item.signed_name || '—'}</strong></div>
+                        <div><span style={{color:'var(--t3)'}}>Signed date</span><br/><strong>{item.signed_at ? new Date(item.signed_at).toLocaleString() : '—'}</strong></div>
+                        <div><span style={{color:'var(--t3)'}}>IP Address</span><br/><strong>{item.signer_ip || '—'}</strong></div>
+                        <div><span style={{color:'var(--t3)'}}>Certificate</span><br/><button className="btn sec" style={{fontSize:10,padding:'3px 8px',marginTop:3}} onClick={()=>setViewCert(item)}>View Certificate</button></div>
+                      </div>
+                    </td></tr>}
+                  </>
                 })}
               </tbody>
             </table>
@@ -373,131 +301,29 @@ export default function Esign() {
         )}
       </div>
 
-      {/* Certificate Modal */}
-      {viewCert && (
-        <div className="modal-bg open" onClick={e => e.target === e.currentTarget && setViewCert(null)}>
-          <div className="modal" style={{ maxWidth: 520 }}>
-            <div className="mh"><span className="mt">🔐 Signature Certificate</span><button className="xbtn" onClick={() => setViewCert(null)}>&times;</button></div>
-            <div style={{ background: 'var(--s2)', borderRadius: 8, padding: 16, fontSize: 13, lineHeight: 1.9 }}>
-              <div style={{ textAlign: 'center', marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid var(--br)' }}>
-                <div style={{ fontSize: 32, marginBottom: 4 }}>✅</div>
-                <div style={{ fontWeight: 700, fontSize: 15 }}>Legally Signed Document</div>
-              </div>
-              {[
-                ['Document',         viewCert.doc_type],
-                ['Client',           viewCert.client_name],
-                ['Email',            viewCert.client_email || '—'],
-                ['Fee',              viewCert.investigation_fee ? `$${viewCert.investigation_fee}` : '—'],
-                ['Signed Name',      <span style={{ fontFamily: 'Georgia,serif', fontSize: 16, color: 'var(--ok)' }}>{viewCert.signed_name || '—'}</span>],
-                ['Full Name Entered',viewCert.signer_full_name || '—'],
-                ['IP Address',       viewCert.signer_ip || 'Not captured'],
-                ['Signed At',        viewCert.signed_at ? new Date(viewCert.signed_at).toLocaleString() : '—'],
-                ['Sent At',          viewCert.sent_at ? new Date(viewCert.sent_at).toLocaleString() : '—'],
-                ['Device',           viewCert.signed_user_agent ? viewCert.signed_user_agent.slice(0, 60) + '…' : '—'],
-              ].map(([l, v]) => (
-                <div key={l} style={{ display: 'flex', borderBottom: '1px solid var(--br)', padding: '5px 0', gap: 12 }}>
-                  <span style={{ color: 'var(--t3)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', minWidth: 130, paddingTop: 2 }}>{l}</span>
-                  <span style={{ flex: 1, fontSize: 13 }}>{v}</span>
-                </div>
-              ))}
+      {modal && <div className="modal-bg" onMouseDown={e => { if (e.target===e.currentTarget) setModal(false) }}>
+        <div className="modal" style={{ maxWidth:560 }}>
+          <div className="modal-head"><span>New Signing Request</span><button className="x" onClick={() => setModal(false)}>×</button></div>
+          <div className="modal-body" style={{ display:'grid', gap:12 }}>
+            <label className="field"><span>Document Type</span><select value={form.docType} onChange={e=>fld('docType',e.target.value)}>{DOC_TYPES.map(d=><option key={d}>{d}</option>)}</select></label>
+            <div style={{ position:'relative' }}>
+              <label className="field"><span>Client Name *</span><input value={form.clientName} onChange={e=>searchClient(e.target.value)} autoComplete="off" /></label>
+              {showSug && <div style={{position:'absolute',zIndex:20,top:'100%',left:0,right:0,background:'var(--s2)',border:'1px solid var(--br)',borderRadius:8,maxHeight:180,overflowY:'auto'}}>{suggestions.map(c=><div key={c.id} onClick={()=>selectClient(c)} style={{padding:'9px 12px',cursor:'pointer',borderBottom:'1px solid var(--br)',fontSize:12}}>{c.name}<span style={{color:'var(--t3)',marginLeft:8}}>{c.email}</span></div>)}</div>}
             </div>
-            <button className="btn sec" style={{ width: '100%', marginTop: 12, justifyContent: 'center' }} onClick={() => {
-              const text = `SIGNATURE CERTIFICATE\nDocument: ${viewCert.doc_type}\nClient: ${viewCert.client_name}\nFee: ${viewCert.investigation_fee ? '$' + viewCert.investigation_fee : '—'}\nSigned Name: ${viewCert.signed_name}\nIP Address: ${viewCert.signer_ip}\nSigned At: ${new Date(viewCert.signed_at).toLocaleString()}`
-              navigator.clipboard.writeText(text)
-              showToast('Certificate copied!')
-            }}>📋 Copy Certificate</button>
+            <div className="grid2"><label className="field"><span>Client Email</span><input value={form.clientEmail} onChange={e=>fld('clientEmail',e.target.value)} type="email" /></label><label className="field"><span>Client Phone</span><input value={form.clientPhone} onChange={e=>fld('clientPhone',e.target.value)} /></label></div>
+            <div className="grid2"><label className="field"><span>Investigation Fee</span><input value={form.investigationFee} onChange={e=>fld('investigationFee',e.target.value)} placeholder="$0.00" /></label><label className="field"><span>Tax Years</span><input value={form.taxYears} onChange={e=>fld('taxYears',e.target.value)} placeholder="2020–2024" /></label></div>
+            <label className="field"><span>Representative</span><input value={form.repName} onChange={e=>fld('repName',e.target.value)} /></label>
+            <label className="field"><span>Message</span><textarea value={form.message} onChange={e=>fld('message',e.target.value)} rows={3} /></label>
+            <div className="grid2"><label className="field"><span>Send Via</span><select value={form.sendVia} onChange={e=>fld('sendVia',e.target.value)}><option value="both">Email & SMS</option><option value="email">Email Only</option><option value="sms">SMS Only</option></select></label><label className="field"><span>Priority</span><select value={form.priority} onChange={e=>fld('priority',e.target.value)}><option>Normal</option><option>High</option><option>Urgent</option></select></label></div>
+            <label className="field"><span>Due Date</span><input type="date" value={form.dueDate} onChange={e=>fld('dueDate',e.target.value)} /></label>
           </div>
+          <div className="modal-foot"><button className="btn sec" onClick={()=>setModal(false)}>Cancel</button><button className="btn pri" onClick={save} disabled={saving}>{saving?'Sending…':'Create & Send'}</button></div>
         </div>
-      )}
+      </div>}
 
-      <DeleteConfirmModal open={!!confirmDel} label="signing request" onConfirm={() => del(confirmDel)} onCancel={() => setConfirmDel(null)} />
+      {viewCert && <div className="modal-bg" onMouseDown={e=>{if(e.target===e.currentTarget)setViewCert(null)}}><div className="modal" style={{maxWidth:620}}><div className="modal-head"><span>Certificate of Completion</span><button className="x" onClick={()=>setViewCert(null)}>×</button></div><div className="modal-body"><div style={{border:'1px solid var(--br)',borderRadius:8,padding:22,fontSize:12,lineHeight:2}}><div style={{fontSize:16,fontWeight:800,marginBottom:12}}>CERTIFICATE OF COMPLETION</div><div>Document: <strong>{viewCert.doc_type}</strong></div><div>Client: <strong>{viewCert.client_name}</strong></div><div>Signed By: <strong>{viewCert.signer_full_name||viewCert.signed_name||'—'}</strong></div><div>Date: <strong>{viewCert.signed_at?new Date(viewCert.signed_at).toLocaleString():'—'}</strong></div><div>IP: <strong>{viewCert.signer_ip||'—'}</strong></div><div style={{marginTop:12,color:'var(--t3)'}}>This certificate is generated from the immutable signature audit record maintained by TaxRes CRM.</div></div></div></div></div>}
 
-      {/* New Request Modal */}
-      {modal && (
-        <div className="modal-bg open" onClick={e => e.target === e.currentTarget && setModal(false)}>
-          <div className="modal" style={{ width: 580 }}>
-            <div className="mh">
-              <span className="mt">New Signing Request</span>
-              <button className="xbtn" onClick={() => setModal(false)}>&times;</button>
-            </div>
-
-            <div className="field"><label>Document Type</label>
-              <select value={form.docType} onChange={e => fld('docType', e.target.value)}>
-                {DOC_TYPES.map(o => <option key={o}>{o}</option>)}
-              </select>
-            </div>
-
-            <div style={{ position: 'relative' }} className="field"><label>Client *</label>
-              <input value={form.clientName} onChange={e => searchClient(e.target.value)} placeholder="Search client…" />
-              {showSug && suggestions.length > 0 && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--sf)', border: '1px solid var(--br)', borderRadius: 6, zIndex: 50, maxHeight: 180, overflowY: 'auto' }}>
-                  {suggestions.map(c => (
-                    <div key={c.id} onClick={() => selectClient(c)} style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13 }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--s2)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                      {c.name} {c.email && <span style={{ color: 'var(--t3)', fontSize: 11 }}>· {c.email}</span>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="fg2">
-              <div className="field"><label>Client Email</label>
-                <input type="email" value={form.clientEmail} onChange={e => fld('clientEmail', e.target.value)} placeholder="client@email.com" />
-              </div>
-              <div className="field"><label>Client Phone</label>
-                <input type="tel" value={form.clientPhone} onChange={e => fld('clientPhone', e.target.value)} placeholder="(305) 555-0000" />
-              </div>
-            </div>
-
-            <div className="fg2">
-              <div className="field"><label>Investigation Fee ($)</label>
-                <input type="text" inputMode="decimal" value={formatMoneyInput(form.investigationFee)} onChange={e => fld('investigationFee', parseMoney(e.target.value))} placeholder="399" min="399" max="599" />
-              </div>
-              <div className="field"><label>Tax Years</label>
-                <input value={form.taxYears} onChange={e => fld('taxYears', e.target.value)} placeholder="2022, 2023, 2024" />
-              </div>
-            </div>
-
-            <div className="field"><label>Case Rep Name</label>
-              <input value={form.repName} onChange={e => fld('repName', e.target.value)} placeholder="Dana Richard" />
-            </div>
-
-            <div className="field"><label>Send Agreement Via</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {[['email', '📧 Email Only'], ['sms', '💬 SMS Only'], ['both', '📧💬 Both']].map(([v, l]) => (
-                  <button key={v} type="button"
-                    style={{ flex: 1, padding: '8px 6px', borderRadius: 7, border: '1px solid', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all .15s',
-                      borderColor: form.sendVia === v ? 'var(--blue)' : 'var(--br)',
-                      background: form.sendVia === v ? 'var(--blue)22' : 'var(--s2)',
-                      color: form.sendVia === v ? 'var(--blue)' : 'var(--t2)' }}
-                    onClick={() => fld('sendVia', v)}>{l}</button>
-                ))}
-              </div>
-            </div>
-
-            <div className="fg2">
-              <div className="field"><label>Priority</label>
-                <select value={form.priority} onChange={e => fld('priority', e.target.value)}>
-                  {['Normal', 'High', 'Urgent'].map(o => <option key={o}>{o}</option>)}
-                </select>
-              </div>
-              <div className="field"><label>Due Date</label>
-                <input type="date" value={form.dueDate} onChange={e => fld('dueDate', e.target.value)} />
-              </div>
-            </div>
-
-            <div style={{ background: 'var(--s2)', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 12, color: 'var(--t3)', lineHeight: 1.6 }}>
-              💡 Reminders show automatically on unsigned agreements at 1, 3, and 5 days.
-            </div>
-            <button className="btn pri" style={{ width: '100%', justifyContent: 'center', padding: 12, fontSize: 15, fontWeight: 700 }} onClick={save} disabled={saving}>
-              {saving ? 'Sending…' : '✅ Send Signing Request'}
-            </button>
-          </div>
-        </div>
-      )}
+      {confirmDel && <DeleteConfirmModal itemName={confirmDel.client_name || 'this signing request'} onConfirm={()=>del(confirmDel.id)} onCancel={()=>setConfirmDel(null)} />}
     </div>
   )
 }
-
