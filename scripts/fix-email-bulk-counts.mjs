@@ -14,9 +14,12 @@ function patchEmailPage() {
   const original = s
 
   if (!s.includes('const [folderCounts, setFolderCounts]')) {
-    const anchor = `  const [emails, setEmails]     = useState([])\n`
-    if (!s.includes(anchor)) throw new Error('Email.jsx: emails state anchor missing')
-    s = s.replace(anchor, anchor + `  // Authoritative unread counts are loaded separately from the visible 300-row\n  // message window so large mailboxes never show truncated/stale folder totals.\n  const [folderCounts, setFolderCounts] = useState(() => Object.fromEntries(TRIAGE.map(t => [t, 0])))\n  const countRefreshTimerRef = useRef(null)\n`)
+    // Match the state declaration semantically instead of depending on its exact
+    // spacing. Prebuild scripts must remain idempotent as source formatting evolves.
+    const match = s.match(/^\s*const \[emails, setEmails\]\s*=\s*useState\(\[\]\)\s*$/m)
+    if (!match) throw new Error('Email.jsx: emails state declaration missing')
+    const addition = `${match[0]}\n  // Authoritative unread counts are loaded separately from the visible 300-row\n  // message window so large mailboxes never show truncated/stale folder totals.\n  const [folderCounts, setFolderCounts] = useState(() => Object.fromEntries(TRIAGE.map(t => [t, 0])))\n  const countRefreshTimerRef = useRef(null)`
+    s = s.replace(match[0], addition)
   }
 
   if (!s.includes('async function loadFolderCounts()')) {
