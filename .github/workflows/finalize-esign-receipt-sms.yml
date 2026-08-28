@@ -1,0 +1,49 @@
+name: Finalize ESign Receipt SMS
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/finalize-esign-receipt-sms.yml'
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch SignPage receipt SMS
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/pages/SignPage.jsx')
+          s=p.read_text()
+          start=s.index("      let cfg = null\n")
+          end=s.index("      // Fire workflow trigger — esign_signed with doc_type as value", start)
+          new="""      if (doc.client_email) {
+        // Public signing pages never choose recipients or email content. The
+        // server binds delivery to this signed e-sign request, rebuilds any
+        // legacy private-document links, and prevents replay sends.
+        await supabase.functions.invoke('send-email', {
+          body: { kind: 'esign_signed_copy', esign_id: id }
+        }).catch(() => {})
+      }
+      if (doc.client_phone) {
+        // Same rule for SMS: the browser supplies only the signed request ID.
+        // The server derives tenant, phone number and receipt text.
+        await supabase.functions.invoke('send-sms', {
+          body: { kind: 'esign_signed_receipt', esign_id: id }
+        }).catch(() => {})
+      }
+"""
+          p.write_text(s[:start]+new+s[end:])
+          PY
+      - run: npm ci
+      - run: npm run build
+      - name: Commit source fix
+        run: |
+          git config user.name 'RomyLabs Audit Bot'
+          git config user.email 'rcruz187@gmail.com'
+          git add src/pages/SignPage.jsx
+          git rm .github/workflows/finalize-esign-receipt-sms.yml
+          git commit -m 'security(esign): bind signed receipt SMS to request'
+          git push origin HEAD:main
