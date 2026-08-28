@@ -3,6 +3,7 @@ on:
   push:
     branches: [main]
     paths:
+      - 'index.html'
       - 'src/**'
       - 'scripts/**'
       - 'e2e/**'
