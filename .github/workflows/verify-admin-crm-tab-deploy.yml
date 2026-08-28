@@ -1,0 +1,28 @@
+name: Verify Admin CRM Tab Deploy
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/verify-admin-crm-tab-deploy.yml'
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - run: npm run build
+      - name: Verify source repair
+        run: |
+          grep -Fq "{(activeTenant ? [" src/pages/AdminPortal.jsx
+          grep -Fq "]).map(k => <KPICard key={k.label} {...k} />)}" src/pages/AdminPortal.jsx
+      - name: Wait for CRM fix fingerprint
+        run: |
+          for i in {1..30}; do
+            BODY=$(curl -fsSL --max-time 15 "https://admin.romylabs.com/admin-portal-build.txt?v=$i" || true)
+            if echo "$BODY" | grep -q 'ADMIN_CRM_TAB_FIX_20260827_2037'; then
+              echo 'CRM tab fix is live in production.'
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
