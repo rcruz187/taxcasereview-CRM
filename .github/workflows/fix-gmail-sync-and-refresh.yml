@@ -1,0 +1,211 @@
+name: Fix Gmail Sync and Refresh
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-gmail-sync-and-refresh.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair-deploy-verify:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: mpxgxfqdbquzkrvvejkh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Patch Gmail tenant routing and refresh UI
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          # ---- Backend: gmail-sync-cron ----
+          p = Path('supabase/functions/gmail-sync-cron/index.ts')
+          s = p.read_text()
+
+          old = """async function syncOneAccount(supabase: any, acct: any, appCreds: any, tenantId: string, clients: any[], leads: any[]) {
+  try {
+"""
+          new = """async function syncOneAccount(supabase: any, acct: any, appCreds: any, tenantId: string, clients: any[], leads: any[]) {
+  try {
+"""
+          if old not in s:
+              raise SystemExit('syncOneAccount start not found')
+
+          old_catch = """  } catch (e) {
+    console.error('gmail-sync-cron error for', acct.employee_email, e)
+    await supabase.from('employee_gmail_accounts').update({ gmail_last_error: String((e as Error).message || e) }).eq('employee_email', acct.employee_email)
+  }
+}
+"""
+          new_catch = """    return { ok: true }
+  } catch (e) {
+    console.error('gmail-sync-cron error for', acct.employee_email, e)
+    await supabase.from('employee_gmail_accounts').update({ gmail_last_error: String((e as Error).message || e) }).eq('employee_email', acct.employee_email)
+    return { ok: false, error: String((e as Error).message || e) }
+  }
+}
+"""
+          if old_catch not in s:
+              raise SystemExit('syncOneAccount catch not found')
+          s = s.replace(old_catch, new_catch, 1)
+
+          old_main = """    const { data: settings } = await supabase.from('settings')
+      .select('tenant_id, gmail_client_id, gmail_client_secret').not('gmail_client_id', 'is', null).limit(1).maybeSingle()
+
+    if (!settings?.gmail_client_id || !settings?.gmail_client_secret) {
+      return new Response(JSON.stringify({ ok: true, skipped: 'Gmail app credentials not configured' }), { status: 200, headers: corsHeaders })
+    }
+
+    const { data: accounts } = await supabase.from('employee_gmail_accounts')
+      .select('employee_email, gmail_refresh_token, gmail_access_token, gmail_token_expiry, gmail_backfill_phase, gmail_backfill_page_token, gmail_last_cleanup_at')
+      .not('gmail_refresh_token', 'is', null)
+
+    if (!accounts || accounts.length === 0) {
+      return new Response(JSON.stringify({ ok: true, skipped: 'No employees have connected Gmail yet' }), { status: 200, headers: corsHeaders })
+    }
+
+    const { data: clients } = await supabase.from('clients').select('id,name,email')
+    const { data: leads } = await supabase.from('leads').select('id,name,email')
+
+    // Sequential, not parallel — these all share the same Gmail API rate
+    // limits, and running N employees' syncs at once would just make all
+    // of them more likely to hit rate-limit errors together.
+    for (const acct of accounts) {
+      await syncOneAccount(supabase, acct, settings, settings.tenant_id, clients || [], leads || [])
+    }
+
+    return new Response(JSON.stringify({ ok: true, synced: accounts.length }), { status: 200, headers: corsHeaders })
+"""
+          new_main = """    // Gmail OAuth credentials are tenant-specific. Never use an arbitrary
+    // settings row for every mailbox: refresh tokens are bound to the OAuth
+    // client that issued them.
+    const { data: settingsRows } = await supabase.from('settings')
+      .select('tenant_id, gmail_client_id, gmail_client_secret')
+      .not('gmail_client_id', 'is', null)
+
+    const settingsByTenant = new Map((settingsRows || [])
+      .filter((r: any) => r.tenant_id && r.gmail_client_id && r.gmail_client_secret)
+      .map((r: any) => [r.tenant_id, r]))
+
+    const { data: accounts } = await supabase.from('employee_gmail_accounts')
+      .select('employee_email, gmail_refresh_token, gmail_access_token, gmail_token_expiry, gmail_backfill_phase, gmail_backfill_page_token, gmail_last_cleanup_at')
+      .not('gmail_refresh_token', 'is', null)
+
+    if (!accounts || accounts.length === 0) {
+      return new Response(JSON.stringify({ ok: true, skipped: 'No employees have connected Gmail yet', synced: 0, failed: 0 }), { status: 200, headers: corsHeaders })
+    }
+
+    const emails = accounts.map((a: any) => a.employee_email).filter(Boolean)
+    const { data: employeeRows } = await supabase.from('employees').select('email,tenant_id').in('email', emails)
+    const tenantByEmail = new Map((employeeRows || []).map((r: any) => [String(r.email || '').toLowerCase(), r.tenant_id]))
+
+    const { data: clients } = await supabase.from('clients').select('id,name,email')
+    const { data: leads } = await supabase.from('leads').select('id,name,email')
+
+    let synced = 0
+    let failed = 0
+    const errors: any[] = []
+
+    // Sequential, not parallel — Gmail API rate limits are shared.
+    for (const acct of accounts) {
+      const tenantId = tenantByEmail.get(String(acct.employee_email || '').toLowerCase())
+      const appCreds = tenantId ? settingsByTenant.get(tenantId) : null
+      if (!tenantId || !appCreds) {
+        const message = !tenantId ? 'Employee tenant not found' : 'Gmail OAuth credentials not configured for employee tenant'
+        failed++
+        errors.push({ employee_email: acct.employee_email, error: message })
+        await supabase.from('employee_gmail_accounts').update({ gmail_last_error: message }).eq('employee_email', acct.employee_email)
+        continue
+      }
+
+      const result = await syncOneAccount(supabase, acct, appCreds, tenantId, clients || [], leads || [])
+      if (result?.ok) synced++
+      else {
+        failed++
+        errors.push({ employee_email: acct.employee_email, error: result?.error || 'Unknown sync error' })
+      }
+    }
+
+    return new Response(JSON.stringify({ ok: failed === 0, synced, failed, errors }), { status: failed === 0 ? 200 : 207, headers: corsHeaders })
+"""
+          if old_main not in s:
+              raise SystemExit('gmail main block not found')
+          s = s.replace(old_main, new_main, 1)
+          p.write_text(s)
+
+          # ---- Frontend: visible Refresh Email button ----
+          p = Path('src/pages/Email.jsx')
+          s = p.read_text()
+          old_ui = """        <div style={{ padding: '16px 14px 10px' }}>
+          <button className=\"btn pri\" style={{ width: '100%', justifyContent: 'center', fontWeight: 700 }} onClick={() => { setForm(BLANK); setView('compose') }}>
+            ✏️ Compose
+          </button>
+        </div>
+"""
+          new_ui = """        <div style={{ padding: '16px 14px 10px', display:'grid', gap:8 }}>
+          <button className=\"btn pri\" style={{ width: '100%', justifyContent: 'center', fontWeight: 700 }} onClick={() => { setForm(BLANK); setView('compose') }}>
+            ✏️ Compose
+          </button>
+          <button
+            className=\"btn\"
+            style={{ width:'100%', justifyContent:'center', fontWeight:700 }}
+            disabled={syncing || !gmailConnected}
+            title={!gmailConnected ? 'Connect Gmail to refresh' : 'Sync new Gmail messages now'}
+            onClick={async () => {
+              await syncNow()
+              await load()
+              if (lastError) showToast('Email sync error: ' + lastError)
+              else showToast('✅ Email refreshed')
+            }}
+          >
+            {syncing ? '⟳ Refreshing…' : '↻ Refresh Email'}
+          </button>
+        </div>
+"""
+          if old_ui not in s:
+              raise SystemExit('Email Compose block not found')
+          s = s.replace(old_ui, new_ui, 1)
+          p.write_text(s)
+          PY
+
+      - name: Assert fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q "settingsByTenant" supabase/functions/gmail-sync-cron/index.ts
+          grep -q "tenantByEmail" supabase/functions/gmail-sync-cron/index.ts
+          grep -q "failed === 0" supabase/functions/gmail-sync-cron/index.ts
+          ! grep -q "limit(1).maybeSingle()" supabase/functions/gmail-sync-cron/index.ts
+          grep -q "Refresh Email" src/pages/Email.jsx
+          grep -q "await syncNow()" src/pages/Email.jsx
+
+      - name: Build frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy gmail-sync-cron
+        run: supabase functions deploy gmail-sync-cron --project-ref "$PROJECT_REF" --no-verify-jwt
+
+      - name: Commit repaired source
+        shell: bash
+        run: |
+          git config user.name 'RomyLabs'
+          git config user.email 'rcruz187@gmail.com'
+          git add supabase/functions/gmail-sync-cron/index.ts src/pages/Email.jsx
+          git commit -m 'fix(email): tenant-scope Gmail sync and expose refresh control'
+          git push origin main
