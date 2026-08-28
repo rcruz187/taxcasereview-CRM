@@ -1330,8 +1330,6 @@ export default function Chat() {
           </MenuItem>
           <MenuItem onClick={() => { setRepMenu(null); promptMoveToSection(repMenu.rep.id, 'dm') }}>Move to new section</MenuItem>
           <MenuDivider/>
-          <MenuItem disabled title="Coming soon">Summarize conversation</MenuItem>
-          <MenuDivider/>
           <MenuItem onClick={() => toggleRepPref(repMenu.rep.name, 'vip')}>
             {repPrefs[repMenu.rep.name]?.vip ? '★ Remove from VIP' : '☆ Add to VIP'}
           </MenuItem>
@@ -1351,8 +1349,6 @@ export default function Chat() {
             {convPrefs[chanMenu.conv.id]?.starred ? '★ Unstar channel' : '☆ Star channel'}
           </MenuItem>
           <MenuItem onClick={() => { setChanMenu(null); promptMoveToSection(chanMenu.conv.id, 'channel') }}>Move to new section</MenuItem>
-          <MenuDivider/>
-          <MenuItem disabled title="Coming soon">Summarize channel</MenuItem>
           <MenuDivider/>
           <MenuItem onClick={() => toggleConvPref(chanMenu.conv.id, 'channel', 'muted')}>
             {convPrefs[chanMenu.conv.id]?.muted ? '🔔 Notify: All new posts' : '🔕 Mute and hide'}
