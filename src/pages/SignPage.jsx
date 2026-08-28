@@ -305,19 +305,12 @@ export default function SignPage() {
         `<li><a href="${a.clientUrl || a.url}" style="color:#3b82f6">${a.label} — Your Signed Copy</a></li>`
       ).join('')
       if (doc.client_email) {
-        await supabase.functions.invoke('send-email', { body: {
-          to: doc.client_email,
-          tenant_id: FIRM.tenantId,
-          subject: `Signed Copy: ${doc.doc_type} — ${FIRM.name}`,
-          // Attach the actual signed client-copy PDFs (send-email fetches each
-          // url and embeds it as a multipart/mixed attachment); the links in
-          // the body stay as a fallback if an attachment fetch fails.
-          attachments: signedAttachments.map(a => ({
-            url: a.clientUrl || a.url,
-            filename: `${String(a.label || a.formType || 'Document').replace(/[\\/:*?"<>|]+/g, '')} - Signed.pdf`,
-          })),
-          html: `<!DOCTYPE html><html><body style=\"margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f1f5f9;padding:32px 16px\"><tr><td align=\"center\"><table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)\"><tr><td style=\"background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 100%);padding:32px 40px;text-align:center\"><img src=\"${FIRM.logoUrl}\" alt=\"${FIRM.name}\" style=\"max-height:60px;max-width:240px;object-fit:contain\" onerror=\"this.style.display='none'\"/><div style=\"font-size:22px;font-weight:800;color:#ffffff;margin-top:12px;letter-spacing:-.02em\">${FIRM.name}</div><div style=\"font-size:12px;color:#93c5fd;margin-top:4px;letter-spacing:.08em;text-transform:uppercase\">IRS Resolution Services</div></td></tr><tr><td style=\"padding:40px 40px 32px;color:#334155;font-size:15px;line-height:1.7\"><p style=\"margin:0 0 16px;font-size:16px;color:#0f172a\">Dear <strong>${doc.client_name}</strong>,</p><p style=\"margin:0 0 16px\">Thank you — your signed <strong>${doc.doc_type}</strong> came through on ${signedDate}, and everything below is now on file with us.</p><p style=\"margin:0 0 16px\">Here is what happens next. Your case has been assigned to a dedicated representative, and we will file your authorization forms with the taxing authorities so we can pull your full account transcripts. That gives us the complete picture of what has been assessed, what has been paid, and where the real exposure is — before we recommend a resolution path.</p><p style=\"margin:0 0 16px\">You do not need to do anything right now. If the IRS or your state contacts you in the meantime, you can direct them to us. We will reach out as soon as the transcripts are in.</p>${attachmentLinks ? `<div style=\"background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:20px 24px;margin:0 0 20px\"><p style=\"margin:0 0 10px;font-size:13px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.06em\">📄 Your Signed Copies</p><ul style=\"margin:0;padding-left:20px\">${attachmentLinks}</ul></div>` : ''}<p style=\"margin:0 0 16px\">If anything above looks wrong, just reply to this email and we will correct it right away.</p><p style=\"margin:20px 0 0\">Sincerely,<br/><strong>${FIRM.name}</strong></p></td></tr><tr><td style=\"background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;font-size:11px;color:#94a3b8;line-height:1.6\">${FIRM.name} · ${FIRM.address}<br/>This message and any attachments are confidential and intended only for the addressee.</td></tr></table></td></tr></table></body></html>`
-        }}).catch(() => {})
+        // Public signing pages never choose recipients or email content. The
+        // server binds delivery to this signed e-sign request, rebuilds any
+        // legacy private-document links, and prevents replay sends.
+        await supabase.functions.invoke('send-email', {
+          body: { kind: 'esign_signed_copy', esign_id: id }
+        }).catch(() => {})
       }
       if (doc.client_phone && cfg?.signalwire_backend) {
         await fetch(cfg.signalwire_backend + '/sms/send', {
