@@ -323,25 +323,20 @@ export default function EmployeePortal() {
     setTasks(prev => prev.filter(x => x.id !== t.id))
   }
 
-  // Best-effort notification to Super Admin/Admin users — never blocks the
-  // request from going through. Recipients now come back from the
-  // emp_timeoff_submit RPC (employees is RLS-locked to anon); if send-email
-  // isn't configured this silently no-ops and the request is still saved.
-  async function notifyTimeOffSubmitted(recipients, tenantId, e, type, start, end, days) {
+  // Best-effort server-bound notification. The browser supplies only the
+  // employee session and request facts; send-email re-validates the session,
+  // matches the saved pending request, and derives admin recipients server-side.
+  async function notifyTimeOffSubmitted(token, type, start, end, days) {
     try {
-      const toList = [...new Set((recipients || []).filter(Boolean))]
-      if (toList.length === 0) return
-      const subject = `Time off request — ${e.name}`
-      const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">` +
-        `<div style="font-size:18px;font-weight:800;color:#1d4ed8;margin-bottom:16px">${brand.name}</div>` +
-        `<p><strong>${e.name}</strong> (${e.employee_id}) requested ${type.toUpperCase()} time off.</p>` +
-        `<p>${start} to ${end} (${days} day${days === 1 ? '' : 's'})</p>` +
-        `<p style="font-size:12px;color:#64748b">Review and approve/deny in the CRM under Time Off.</p></div>`
-      await Promise.all(toList.map(to =>
-        supabase.functions.invoke('send-email', { body: { tenant_id: tenantId || undefined, to, subject, html } }).catch(() => {})
-      ))
+      await supabase.functions.invoke('send-email', {
+        body: {
+          kind: 'employee_timeoff_notification',
+          employee_portal_token: token,
+          request_type: type, start_date: start, end_date: end, days,
+        },
+      })
     } catch {
-      // Never let a notification failure block the employee's request.
+      // Never let a notification failure block the employee's saved request.
     }
   }
 
@@ -360,7 +355,7 @@ export default function EmployeePortal() {
       setReqMsg('❌ ' + error.message)
     } else {
       setReqMsg('✅ Request submitted — waiting on approval.')
-      notifyTimeOffSubmitted(data?.admin_emails, data?.tenant_id, emp, reqType, reqStart, reqEnd, days)
+      notifyTimeOffSubmitted(empToken, reqType, reqStart, reqEnd, days)
       setReqStart(''); setReqEnd(''); setReqReason(''); setShowRequestForm(false)
       await loadTimeOff(empToken)
     }
