@@ -1,57 +1,46 @@
 name: Fix Registry Product Selectors
 'on':
   push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/fix-registry-product-selectors.yml
+    branches: [main]
+    paths: [.github/workflows/fix-registry-product-selectors.yml]
 permissions:
   contents: write
 jobs:
   repair:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Patch registry loader
+      - name: Patch
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('src/pages/AdminPortal.jsx')
-          s = p.read_text()
-          old = "supabase.from('romylabs_products').select('product_id,name,active')"
-          new = "supabase.from('romylabs_products').select('product_id,name,active,lifecycle,public')"
-          if old not in s:
-              raise SystemExit('registry select target missing')
-          s = s.replace(old, new, 1)
-          old2 = "const active = (data || []).filter(p => p.active)"
-          new2 = "const active = (data || []).filter(p => p.active && p.product_id !== 'phl' && !/^PHL(?:\\s|$)/i.test(p.name || '') && String(p.lifecycle || '').toLowerCase() !== 'internal')"
-          if old2 not in s:
-              raise SystemExit('registry filter target missing')
-          s = s.replace(old2, new2, 1)
-          p.write_text(s)
+          p=Path('src/pages/AdminPortal.jsx'); s=p.read_text()
+          a="supabase.from('romylabs_products').select('product_id,name,active')"
+          b="supabase.from('romylabs_products').select('product_id,name,active,lifecycle,public')"
+          c="const active = (data || []).filter(p => p.active)"
+          d="const active = (data || []).filter(p => p.active && p.product_id !== 'phl' && !/^PHL(?:\\s|$)/i.test(p.name || '') && String(p.lifecycle || '').toLowerCase() !== 'internal')"
+          if a not in s or c not in s: raise SystemExit('targets missing')
+          p.write_text(s.replace(a,b,1).replace(c,d,1))
           PY
-      - name: Build
+      - name: Build and verify
         shell: bash
         run: |
           npm ci
           npm run build
-      - name: Verify contract
-        shell: bash
-        run: |
           grep -Fq "product_id,name,active,lifecycle,public" src/pages/AdminPortal.jsx
           grep -Fq "p.product_id !== 'phl'" src/pages/AdminPortal.jsx
           grep -Fq "String(p.lifecycle || '').toLowerCase() !== 'internal'" src/pages/AdminPortal.jsx
           if grep -Fq "PHL Land Care CRM" src/pages/AdminPortal.jsx; then exit 1; fi
-      - name: Commit
+      - name: Commit and push
         shell: bash
         run: |
           git config user.name 'RomyLabs Fix Bot'
           git config user.email 'romy@romylabs.com'
           git add src/pages/AdminPortal.jsx
           git commit -m 'fix(admin): make product selectors registry-driven'
+          git restore .
           git pull --rebase origin main
           git push origin HEAD:main
