@@ -29,14 +29,6 @@ jobs:
         run: |
           npm ci
           npm run build
-      - name: Install Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
-      - name: Deploy Gmail sync
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: supabase functions deploy gmail-sync-cron --project-ref mpxgxfqdbquzkrvvejkh --no-verify-jwt
       - name: Commit repaired source
         run: |
           git config user.name RomyLabs
