@@ -115,3 +115,6 @@ if (hardFailures.length) {
 } else {
   console.log('\nNo hard asset/IRS mapped-field failures.')
 }
+
+// This audit is intentionally permanent: any future template replacement must
+// continue to match the field map used by the e-sign prefill flow.
