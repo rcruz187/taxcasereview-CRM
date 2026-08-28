@@ -122,7 +122,15 @@ export default function Login() {
       if (error) throw error
       login(data.user)
       showToast(lang === 'es' ? '¡Bienvenido de nuevo!' : 'Welcome back!')
-      if (ROMYLABS_OWNERS.includes(data.user?.email?.toLowerCase())) window.location.href = '/crm-admin'
+      // Route by the site being used, not merely by the user's email address.
+      // A RomyLabs owner signing in on TaxRes stays in the CRM; the dedicated
+      // RomyLabs admin host can still send that same owner to /crm-admin.
+      if (
+        ROMYLABS_OWNERS.includes(data.user?.email?.toLowerCase()) &&
+        window.location.hostname === 'admin.romylabs.com'
+      ) {
+        window.location.href = '/crm-admin'
+      }
     } catch (err) {
       setError(err.message)
     } finally {
