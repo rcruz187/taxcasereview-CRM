@@ -4,9 +4,10 @@
   var host = window.location.hostname.toLowerCase();
   var path = window.location.pathname;
 
-  /* /crm-admin belongs to the RomyLabs admin host. Repair stale TaxRes links. */
+  /* TaxRes is the CRM host. If a stale /crm-admin URL is opened there,
+   * recover back to the CRM instead of sending the user to RomyLabs Admin. */
   if ((host === 'taxrescrm.app' || host === 'www.taxrescrm.app') && path.indexOf('/crm-admin') === 0) {
-    window.location.replace('https://admin.romylabs.com' + path + window.location.search + window.location.hash);
+    window.location.replace('/');
     return;
   }
 
