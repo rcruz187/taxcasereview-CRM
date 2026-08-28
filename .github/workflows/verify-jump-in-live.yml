@@ -1,0 +1,102 @@
+name: Verify Live Admin Jump In
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/verify-jump-in-live.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: mpxgxfqdbquzkrvvejkh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24', cache: npm }
+      - name: Apply persistent impersonation migration to production
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >/tmp/apply.json
+          import json
+          sql=open('supabase/migrations/20260828043000_persistent_admin_impersonation.sql').read()
+          print(json.dumps({'query':sql}))
+          PY
+          curl --fail-with-body -sS -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" -H 'Content-Type: application/json' \
+            --data-binary @/tmp/apply.json
+      - name: Live token + tenant override round trip
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >/tmp/test.json
+          import json
+          sql=r'''
+          begin;
+          set local role authenticated;
+          select set_config('request.jwt.claims','{"role":"authenticated","email":"info@romylabs.com"}',true);
+          do $$
+          declare
+            v_tid uuid;
+            v_tok uuid;
+            v_val jsonb;
+            v_again jsonb;
+          begin
+            select id into v_tid from public.tenants order by created_at limit 1;
+            if v_tid is null then raise exception 'No tenant available for acceptance test'; end if;
+            v_tok := public.create_impersonation_token(v_tid);
+            if v_tok is null then raise exception 'Token creation failed'; end if;
+            v_val := public.validate_impersonation_token(v_tok);
+            if coalesce((v_val->>'valid')::boolean,false) is not true then
+              raise exception 'Token validation failed: %',v_val;
+            end if;
+            if (v_val->>'tenant_id')::uuid is distinct from v_tid then
+              raise exception 'Validated wrong tenant';
+            end if;
+            perform public.set_admin_tenant_override(v_tid);
+            if public.current_tenant_id() is distinct from v_tid then
+              raise exception 'Persistent tenant override failed';
+            end if;
+            v_again := public.validate_impersonation_token(v_tok);
+            if coalesce((v_again->>'valid')::boolean,false) is true then
+              raise exception 'Token was reusable';
+            end if;
+            perform public.set_admin_tenant_override(null);
+          end $$;
+          rollback;
+          select 'LIVE_JUMP_IN_DB_ROUNDTRIP_PASSED' as result;
+          '''
+          print(json.dumps({'query':sql}))
+          PY
+          OUT=$(curl --fail-with-body -sS -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" -H 'Content-Type: application/json' \
+            --data-binary @/tmp/test.json)
+          echo "$OUT"
+          echo "$OUT" | grep -q 'LIVE_JUMP_IN_DB_ROUNDTRIP_PASSED'
+      - run: npm ci
+      - name: Production build
+        run: npm run build
+      - name: Verify source chain
+        run: |
+          grep -q 'IMPERSONATION_FIX_20260828' public/romylabs-admin-hotfix.js
+          grep -q "path === '/impersonate'" public/romylabs-admin-hotfix.js
+          grep -q "params.get('imp') === '1'" public/romylabs-admin-hotfix.js
+          grep -q "set_admin_tenant_override" src/context/AppContext.jsx
+          grep -q "set_admin_tenant_override" src/components/ImpersonationBanner.jsx
+          grep -q 'admin_tenant_overrides' supabase/migrations/20260828043000_persistent_admin_impersonation.sql
+      - name: Wait for production hotfix marker
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 36); do
+            BODY=$(curl -fsSL --max-time 15 "https://admin.romylabs.com/romylabs-admin-hotfix.js?jumpin=${GITHUB_SHA}" || true)
+            if echo "$BODY" | grep -q 'IMPERSONATION_FIX_20260828'; then
+              echo 'LIVE_JUMP_IN_FRONTEND_DEPLOY_VERIFIED'
+              exit 0
+            fi
+            sleep 10
+          done
+          echo 'Production marker not found in time' >&2
+          exit 1
