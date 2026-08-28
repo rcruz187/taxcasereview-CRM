@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type'}
 const TOKEN_URL='https://oauth2.googleapis.com/token', SEND_URL='https://gmail.googleapis.com/gmail/v1/users/me/messages/send'
-const PUBLIC_KINDS=new Set(['booking_confirmation','booking_firm_notification'])
+const PUBLIC_KINDS=new Set(['booking_confirmation','booking_firm_notification','booking_cancel_confirmation','booking_cancel_firm_notification','booking_reschedule_firm_notification'])
 const PRODUCT_BRANDS:any={
   romylabs:{name:'RomyLabs',email:'romy@romylabs.com'}, camvella:{name:'Camvella',email:'romy@camvella.com'},
   arcvena:{name:'Arcvena',email:'romy@arcvena.com'}, bocasync:{name:'BocaSync',email:'romy@bocasync.com'}
@@ -30,19 +30,26 @@ serve(async(req)=>{
   let {to,subject,html,text,attachments,tenant_id,from_email,from_name}=body
   if(!authenticated){
    if(!PUBLIC_KINDS.has(body.kind)||!body.booking_token)return new Response(JSON.stringify({error:'Unauthorized'}),{status:401,headers:{...corsHeaders,'Content-Type':'application/json'}})
-   const{data:ev,error:evErr}=await admin.from('calevents').select('booking_token,clientName,eventType,date,time,contact_email,tenant_id,product_id').eq('booking_token',String(body.booking_token)).maybeSingle()
+   const{data:ev,error:evErr}=await admin.from('calevents').select('booking_token,clientName,eventType,date,time,contact_email,tenant_id,product_id,status').eq('booking_token',String(body.booking_token)).maybeSingle()
    if(evErr||!ev)return new Response(JSON.stringify({error:'Invalid booking token'}),{status:403,headers:{...corsHeaders,'Content-Type':'application/json'}})
    tenant_id=ev.tenant_id;attachments=[]
    const{data:ts}=await admin.from('settings').select('name,firmname,email,firmemail,smtp_email,tenant_id').eq('tenant_id',tenant_id).maybeSingle()
    const product=String(ev.product_id||'taxres_crm'), pb=PRODUCT_BRANDS[product]
    const brandName=pb?.name||ts?.name||ts?.firmname||'TaxRes CRM', reply=pb?.email||ts?.email||ts?.firmemail||ts?.smtp_email||'romy@taxrescrm.net'
    from_name=brandName;from_email=reply
-   const n=esc(ev.clientName||'there'), typ=esc(ev.eventType||'Appointment'), d=String(ev.date), t=String(ev.time).slice(0,5)
+   const n=esc(ev.clientName||'there'), typ=esc(ev.eventType||'Appointment'), d=String(ev.date), t=String(ev.time).slice(0,5), when=esc(whenLong(d,t))
    if(body.kind==='booking_confirmation'){
     if(!ev.contact_email)return new Response(JSON.stringify({error:'Booking has no email'}),{status:422,headers:{...corsHeaders,'Content-Type':'application/json'}})
-    to=ev.contact_email;subject=`Appointment Confirmed — ${safe(ev.eventType||'Appointment')}, ${whenShort(d,t)}`;html=`<p>Hi <strong>${n}</strong>,</p><p>Your appointment is confirmed:</p><p><strong>${typ}</strong><br>${esc(whenLong(d,t))}</p><p>Need to make a change? Reply to this email and we’ll take care of it.</p><p>Talk soon,<br><strong>${esc(brandName)}</strong></p>`
+    to=ev.contact_email;subject=`Appointment Confirmed — ${safe(ev.eventType||'Appointment')}, ${whenShort(d,t)}`;html=`<p>Hi <strong>${n}</strong>,</p><p>Your appointment is confirmed:</p><p><strong>${typ}</strong><br>${when}</p><p>Need to make a change? Reply to this email and we’ll take care of it.</p><p>Talk soon,<br><strong>${esc(brandName)}</strong></p>`
+   }else if(body.kind==='booking_cancel_confirmation'){
+    if(!ev.contact_email)return new Response(JSON.stringify({error:'Booking has no email'}),{status:422,headers:{...corsHeaders,'Content-Type':'application/json'}})
+    to=ev.contact_email;subject=`Appointment Canceled — ${safe(ev.eventType||'Appointment')}, ${whenShort(d,t)}`;html=`<p>Hi <strong>${n}</strong>,</p><p>Your <strong>${typ}</strong> on ${when} has been canceled.</p><p>If you need a new time, reply to this email and we’ll help.</p><p><strong>${esc(brandName)}</strong></p>`
+   }else if(body.kind==='booking_cancel_firm_notification'){
+    to=reply;subject=`Booking canceled: ${safe(ev.clientName||'Client')} — ${whenShort(d,t)}`;html=`<p><strong>${n}</strong> canceled their <strong>${typ}</strong> on ${when}. The slot is open again.</p>`
+   }else if(body.kind==='booking_reschedule_firm_notification'){
+    to=reply;subject=`Booking rescheduled: ${safe(ev.clientName||'Client')} — ${whenShort(d,t)}`;html=`<p><strong>${n}</strong> rescheduled their <strong>${typ}</strong> to ${when}. The calendar is already updated.</p>`
    }else{
-    to=reply;subject=`New booking: ${safe(ev.clientName||'Client')} — ${whenShort(d,t)}`;html=`<p><strong>${n}</strong> just booked online:</p><p><strong>${typ}</strong><br>${esc(whenLong(d,t))}<br>Email: ${esc(ev.contact_email||'—')}</p><p>The appointment is on the CRM calendar.</p>`
+    to=reply;subject=`New booking: ${safe(ev.clientName||'Client')} — ${whenShort(d,t)}`;html=`<p><strong>${n}</strong> just booked online:</p><p><strong>${typ}</strong><br>${when}<br>Email: ${esc(ev.contact_email||'—')}</p><p>The appointment is on the CRM calendar.</p>`
    }
   }
   if(!to||!subject||(!html&&!text))return new Response(JSON.stringify({error:'Missing required fields'}),{status:400,headers:{...corsHeaders,'Content-Type':'application/json'}})
