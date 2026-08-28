@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
         supabase.from('leads').select('*', { count: 'exact', head: true }).eq('tenant_id', TCR_TENANT_ID),
         supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('tenant_id', TCR_TENANT_ID).eq('status', 'pending'),
         supabase.from('documents').select('file_size').eq('tenant_id', TCR_TENANT_ID),
-        supabase.from('notes').select('body,created_at,author_email').eq('tenant_id', TCR_TENANT_ID)
+        supabase.from('activity_log').select('description,created_at,employee_email').eq('tenant_id', TCR_TENANT_ID)
           .order('created_at', { ascending: false }).limit(5),
       ])
 
@@ -73,9 +73,9 @@ Deno.serve(async (req) => {
         },
         offices: [{ id: TCR_TENANT_ID, name: 'Tax Case Review', is_active: true, mrr: 0, since: '2025-01-01' }],
         recent_activity: (recentActivity || []).map((n: any) => ({
-          text: (n.body || '').slice(0, 120),
+          text: (n.description || '').slice(0, 120),
           at:   n.created_at,
-          by:   n.author_email,
+          by:   n.employee_email,
         })),
       }), { headers: { ...cors, 'Content-Type': 'application/json' } })
     }
@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
         supabase.from('leads').select('*', { count: 'exact', head: true }).eq('tenant_id', NASH_TENANT_ID),
         supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('tenant_id', NASH_TENANT_ID).eq('status', 'pending'),
         supabase.from('documents').select('file_size').eq('tenant_id', NASH_TENANT_ID),
-        supabase.from('notes').select('body,created_at,author_email').eq('tenant_id', NASH_TENANT_ID)
+        supabase.from('activity_log').select('description,created_at,employee_email').eq('tenant_id', NASH_TENANT_ID)
           .order('created_at', { ascending: false }).limit(5),
         supabase.from('employees').select('id').eq('tenant_id', NASH_TENANT_ID).eq('is_active', true),
       ])
@@ -120,9 +120,9 @@ Deno.serve(async (req) => {
         },
         offices: [{ id: NASH_TENANT_ID, name: 'Nashville Tax Solutions', is_active: true, mrr: 1625, since: '2025-01-01' }],
         recent_activity: (recentActivity || []).map((n: any) => ({
-          text: (n.body || '').slice(0, 120),
+          text: (n.description || '').slice(0, 120),
           at:   n.created_at,
-          by:   n.author_email,
+          by:   n.employee_email,
         })),
       }), { headers: { ...cors, 'Content-Type': 'application/json' } })
     }
@@ -142,7 +142,7 @@ Deno.serve(async (req) => {
         supabase.from('leads').select('*', { count: 'exact', head: true }).eq('tenant_id', CLOUDCPA_TENANT_ID),
         supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('tenant_id', CLOUDCPA_TENANT_ID).eq('status', 'pending'),
         supabase.from('documents').select('file_size').eq('tenant_id', CLOUDCPA_TENANT_ID),
-        supabase.from('notes').select('body,created_at,author_email').eq('tenant_id', CLOUDCPA_TENANT_ID)
+        supabase.from('activity_log').select('description,created_at,employee_email').eq('tenant_id', CLOUDCPA_TENANT_ID)
           .order('created_at', { ascending: false }).limit(5),
         supabase.from('employees').select('id').eq('tenant_id', CLOUDCPA_TENANT_ID),
       ])
@@ -167,9 +167,9 @@ Deno.serve(async (req) => {
         },
         offices: [{ id: CLOUDCPA_TENANT_ID, name: 'CloudCPA Inc', is_active: true, mrr: 0, since: '2026-08-18' }],
         recent_activity: (recentActivity || []).map((n: any) => ({
-          text: (n.body || '').slice(0, 120),
+          text: (n.description || '').slice(0, 120),
           at:   n.created_at,
-          by:   n.author_email,
+          by:   n.employee_email,
         })),
       }), { headers: { ...cors, 'Content-Type': 'application/json' } })
     }
@@ -191,7 +191,7 @@ Deno.serve(async (req) => {
       supabase.from('leads').select('*', { count: 'exact', head: true }),
       supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       supabase.from('documents').select('file_size'),
-      supabase.from('notes').select('body,created_at,author_email')
+      supabase.from('activity_log').select('description,created_at,employee_email')
         .order('created_at', { ascending: false }).limit(5),
       supabase.from('employees').select('id').not('role', 'eq', 'admin').limit(200),
     ])
@@ -223,9 +223,9 @@ Deno.serve(async (req) => {
         since:     t.created_at?.slice(0, 10),
       })),
       recent_activity: (recentActivity || []).map((n: any) => ({
-        text: (n.body || '').slice(0, 120),
+        text: (n.description || '').slice(0, 120),
         at:   n.created_at,
-        by:   n.author_email,
+        by:   n.employee_email,
       })),
     }), { headers: { ...cors, 'Content-Type': 'application/json' } })
 

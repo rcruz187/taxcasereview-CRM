@@ -54,7 +54,8 @@ verify_jwt = true
 [functions.stripe-create-subscription]
 verify_jwt = true
 [functions.run-autopay-batch]
-verify_jwt = true
+# Server-to-server cron; function validates x-cron-secret itself.
+verify_jwt = false
 
 # Client Portal payment endpoints use an opaque portal session token when the
 # browser is anonymous and validate authenticated staff server-side otherwise.
@@ -135,7 +136,8 @@ verify_jwt = false
 [functions.daily-briefing]
 verify_jwt = false
 [functions.gsc-data]
-verify_jwt = false
+# Admin Portal reporting; require an authenticated Supabase user.
+verify_jwt = true
 [functions.bing-data]
 verify_jwt = false
 [functions.content-generator]

@@ -69,16 +69,16 @@ export default function TranscriptPull({ clientNames = [], poas = [], onGoToPoa,
         const received = (t.status || '').includes('Received')
         const years = Array.isArray(t.taxYears) ? t.taxYears.join(', ') : (t.taxYears || t.taxYearsCustom || null)
         const payload = {
-          client_name: t.clientName || 'Unknown',
-          transcript_types: t.transcriptType ? [t.transcriptType] : [],
+          client_name: t.clientname || 'Unknown',
+          transcript_types: t.type ? [t.type] : [],
           tax_years: years,
           provider: 'manual',
           status: received ? 'Completed' : ((t.status || '').includes('Error') || t.status === 'On Hold') ? 'Canceled' : 'In Progress',
           poa_record_id: null,
-          requested_by: t.assignedTo || null,
+          requested_by: null,
           notes: `[Migrated from Transcripts tab] ${t.notes || ''}`.trim(),
-          requested_at: t.requestDate || t.created_at || new Date().toISOString(),
-          completed_at: received ? (t.receivedDate || null) : null,
+          requested_at: t.requesteddate || t.created_at || new Date().toISOString(),
+          completed_at: received ? (null) : null,
         }
         const { error: insErr } = await supabase.from('transcript_pull_requests').insert([payload])
         if (!insErr) {
