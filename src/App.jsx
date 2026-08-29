@@ -371,7 +371,9 @@ function AuthRouter() {
     <Routes>
       <Route path="/impersonate" element={<ImpersonateGate />} />
       <Route path="/login" element={
-        user && (window.location.hostname.toLowerCase() !== 'admin.romylabs.com' || isPlatformOwner(user?.email))
+        user &&
+        new URLSearchParams(window.location.search).get('switch') !== '1' &&
+        (window.location.hostname.toLowerCase() !== 'admin.romylabs.com' || isPlatformOwner(user?.email))
           ? <Navigate to="/" replace />
           : <Login />
       } />

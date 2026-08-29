@@ -85,6 +85,20 @@ export default function Login() {
   const t = COPY[lang]
 
   useEffect(() => {
+    const switchRequested = new URLSearchParams(window.location.search).get('switch') === '1'
+    const isAdminHost = window.location.hostname.toLowerCase() === 'admin.romylabs.com'
+    if (!switchRequested || isAdminHost) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        await supabase.auth.signOut()
+        if (!cancelled) window.history.replaceState({}, '', '/login')
+      } catch (_) {}
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
     if (document.getElementById('tcr-login-bilingual-css')) return
     const style = document.createElement('style')
     style.id = 'tcr-login-bilingual-css'
