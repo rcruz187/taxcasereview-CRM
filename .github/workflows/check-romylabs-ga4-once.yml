@@ -39,8 +39,10 @@ jobs:
             const r = JSON.parse(process.argv[2] || '{}')
             out.ok = r.ok === true
             out.product_id = r.product_id || 'romylabs'
-            if (typeof r.rows_upserted === 'number') out.rows_upserted = r.rows_upserted
-            if (r.error) out.error = String(r.error).slice(0, 1000)
+            if (typeof r.rows === 'number') out.rows = r.rows
+            if (typeof r.pages === 'number') out.pages = r.pages
+            if (r.property_id) out.property_id = r.property_id
+            if (r.error) out.error = typeof r.error === 'string' ? r.error.slice(0,1000) : JSON.stringify(r.error).slice(0,1000)
           } catch (e) {
             out.error = 'Non-JSON response from ga4-sync'
           }
