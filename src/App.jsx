@@ -63,6 +63,7 @@ const OrganizerPage = lazy(() => import('./pages/OrganizerPage'))
 const FinancialIntakePage = lazy(() => import('./pages/FinancialIntakePage'))
 const AuthCallback = lazy(() => import('./pages/AuthCallback'))
 const QuickBooksCallback  = lazy(() => import('./pages/QuickBooksCallback'))
+const XeroCallback = lazy(() => import('./pages/XeroCallback'))
 const NewOffice = lazy(() => import('./pages/NewOffice'))
 const AdminConsole = lazy(() => import('./pages/AdminConsole'))
 const ImpersonateGate = lazy(() => import('./pages/ImpersonateGate'))
@@ -296,21 +297,33 @@ function AdminGate() {
   const navigate = useNavigate()
   const isAdminHost = window.location.hostname.toLowerCase() === 'admin.romylabs.com'
 
-  // Check for active impersonation session
-  const isImpersonating = !!sessionStorage.getItem('admin_impersonation')
+  // Impersonation is intentional only when the current URL explicitly carries
+  // the impersonation marker. A stale sessionStorage flag from a prior Jump In
+  // must never strand a platform owner in the tenant CRM on admin.romylabs.com.
   const impParam = new URLSearchParams(window.location.search).get('imp')
+  const hasExplicitImpersonationIntent = impParam === '1' || impParam === 'true'
+  const storedImpersonation = !!sessionStorage.getItem('admin_impersonation')
+  const isImpersonating = hasExplicitImpersonationIntent && storedImpersonation
 
   useEffect(() => {
     // Admin routing is host-scoped. Owner credentials on TaxRes must stay in CRM.
-    if (isAdminHost && isPlatformOwner(user?.email) && !isImpersonating && !impParam) {
+    if (!isAdminHost || !isPlatformOwner(user?.email)) return
+
+    // Clear stale Jump In state when the owner arrives normally at the admin host.
+    if (!hasExplicitImpersonationIntent && storedImpersonation) {
+      sessionStorage.removeItem('admin_impersonation')
+      supabase.rpc('set_admin_tenant_override', { p_tenant_id: null }).catch(() => {})
+    }
+
+    if (!hasExplicitImpersonationIntent) {
       navigate('/crm-admin', { replace: true })
     }
-  }, [user, isAdminHost, isImpersonating, impParam, navigate])
+  }, [user, isAdminHost, hasExplicitImpersonationIntent, storedImpersonation, navigate])
 
   // Product hosts always render their CRM, including for RomyLabs owners.
   if (!isAdminHost) return <Shell />
-  if (isImpersonating || impParam) return <Shell />
-  if (isPlatformOwner(user?.email) && !isImpersonating) return null
+  if (isImpersonating) return <Shell />
+  if (isPlatformOwner(user?.email)) return null
   return <Shell />
 }
 
@@ -348,6 +361,7 @@ function AuthRouter() {
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/auth/quickbooks-callback" element={<QuickBooksCallback />} />
+      <Route path="/auth/xero-callback" element={<XeroCallback />} />
       <Route path="/book" element={<BookAppointment />} />
       <Route path="/book/manage/:token" element={<ManageBooking />} />
       <Route path="/clockin" element={<ClockIn />} />
