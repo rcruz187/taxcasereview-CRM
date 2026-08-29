@@ -120,15 +120,23 @@ export default function Login() {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
+
+      const isAdminLogin =
+        ROMYLABS_OWNERS.includes(data.user?.email?.toLowerCase()) &&
+        window.location.hostname.toLowerCase() === 'admin.romylabs.com'
+
+      // Defense in depth: the Admin Portal must always start with NO tenant
+      // context. A previous Jump In can leave both a browser marker and a
+      // durable DB override behind, so clear both before routing to /crm-admin.
+      if (isAdminLogin) {
+        try { sessionStorage.removeItem('admin_impersonation') } catch (_) {}
+        try { await supabase.rpc('set_admin_tenant_override', { p_tenant_id: null }) } catch (_) {}
+      }
+
       login(data.user)
       showToast(lang === 'es' ? '¡Bienvenido de nuevo!' : 'Welcome back!')
-      // Route by the site being used, not merely by the user's email address.
-      // A RomyLabs owner signing in on TaxRes stays in the CRM; the dedicated
-      // RomyLabs admin host can still send that same owner to /crm-admin.
-      if (
-        ROMYLABS_OWNERS.includes(data.user?.email?.toLowerCase()) &&
-        window.location.hostname === 'admin.romylabs.com'
-      ) {
+
+      if (isAdminLogin) {
         window.location.href = '/crm-admin'
       }
     } catch (err) {
