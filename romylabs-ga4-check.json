@@ -1,6 +1,8 @@
 {
-  "checked_at": "2026-08-29T18:19:29.626Z",
+  "checked_at": "2026-08-29T18:22:20.279Z",
   "product_id": "romylabs",
-  "ok": false,
-  "error": "[object Object]"
+  "ok": true,
+  "rows": 15,
+  "pages": 6,
+  "property_id": "550818722"
 }
