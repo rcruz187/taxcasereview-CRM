@@ -1833,7 +1833,7 @@ function ProductReportingSetup({ productKey, channel, registryProduct }) {
 // Products tab — hub for all CRMs. Each card opens a live dashboard panel.
 const PRODUCT_REGISTRY = [
   // ── ARCHITECTURE NOTE ────────────────────────────────────────────────────
-  // PRODUCTS: TaxRes CRM (platform), Camvella, Arcvena, BocaSync, GroundIVO, + planned verticals
+  // PRODUCTS: TaxRes CRM (platform), Camvella, Arcvena, BocaSync, GroundIVO, Oculivo, + planned verticals
   // CUSTOMERS/TENANTS: Tax Case Review, Nashville, CloudCPA (live TaxRes tenants — not products)
   // connection: 'connected' | 'partial' | 'not_connected'
   // lifecycleStage: 'live' | 'available' | 'building' | 'research' | 'internal'
@@ -1931,6 +1931,24 @@ const PRODUCT_REGISTRY = [
     nextMilestone: 'LinkedIn auth + marketing site launch',
   },
 
+  {
+    key:        'oculivo',
+    label:      'Oculivo',
+    icon:       '👁️',
+    color:      '#7C3AED',
+    industry:   'Eye Care',
+    url:        'https://app.oculivo.com',
+    appUrl:     'https://app.oculivo.com',
+    websiteUrl: 'https://oculivo.com',
+    lifecycleStage: 'building',
+    connection:     'partial',
+    brandStatus:    'branded',
+    publicOnRomyLabs: true,
+    commerciallyAvailable: false,
+    desc:      'Eye-care CRM and practice operating system for optometry, ophthalmology, optical retail, and multi-location groups.',
+    metricsUrl: null,
+    nextMilestone: 'Finish product build, deploy platform metrics, and verify analytics reporting',
+  },
   // ── TENANTS (not products — operational data, not product counts) ─────────
   {
     key:       'tax_case_review',
