@@ -29,6 +29,34 @@ globalThis.React = React
 globalThis.getModel = getModel
 globalThis.useMemo = React.useMemo
 
+// A user can keep TCR open while a new GitHub Pages deploy replaces the hashed
+// lazy-page chunks underneath that already-running tab. The old shell then asks
+// for a chunk filename that no longer exists, which makes the clicked page fail
+// and can make subsequent lazy routes look broken until a hard refresh.
+// Detect only dynamic-import/chunk-load failures and perform ONE normal reload
+// per 60 seconds. The current URL is preserved, so React Router returns the user
+// to the page they clicked instead of leaving the shell poisoned.
+;(function installStaleChunkRecovery() {
+  const KEY = 'tcr_last_chunk_recovery'
+  const WINDOW_MS = 60_000
+  const matchesChunkFailure = value => {
+    const msg = String(value?.message || value?.reason?.message || value?.reason || value || '')
+    return /Failed to fetch dynamically imported module|Importing a module script failed|ChunkLoadError|Loading chunk|dynamically imported module/i.test(msg)
+  }
+  const recover = value => {
+    if (!matchesChunkFailure(value)) return
+    try {
+      const last = Number(sessionStorage.getItem(KEY) || 0)
+      const now = Date.now()
+      if (now - last < WINDOW_MS) return
+      sessionStorage.setItem(KEY, String(now))
+    } catch {}
+    window.location.reload()
+  }
+  window.addEventListener('unhandledrejection', event => recover(event.reason))
+  window.addEventListener('error', event => recover(event.error || event.message))
+})()
+
 // Apply saved brand color instantly — before React renders (no flash)
 ;(function() {
   const hex = localStorage.getItem('tcr_brand_color')
