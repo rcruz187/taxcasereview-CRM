@@ -1,0 +1,12 @@
+const fs = require('fs');
+const path = 'src/pages/AdminPortal.jsx';
+let s = fs.readFileSync(path, 'utf8');
+const old1 = `  const corporateSeo = channel === 'seo' ? [{\n    key:       'romylabs',\n    label:     'RomyLabs Corporate',\n    icon:      '◆',\n    color:     '#C6FF00',\n    seo:       'implemented',\n    marketing: 'pending',\n  }] : []\n  const mapped = [...corporateSeo, ...registryProducts.map(r => ({`;
+const new1 = `  const corporateReporting = ['seo','marketing'].includes(channel) ? [{\n    key:       'romylabs',\n    label:     'RomyLabs Corporate',\n    icon:      '◆',\n    color:     '#C6FF00',\n    seo:       'implemented',\n    marketing: 'implemented',\n  }] : []\n  const mapped = [...corporateReporting, ...registryProducts.map(r => ({`;
+if (!s.includes(old1)) throw new Error('Corporate reporting selector anchor not found');
+s = s.replace(old1, new1);
+const old2 = `            {isGscLive && status === 'implemented' && (\n              <div style={{ fontSize:9, color:'#a78bfa', marginTop:2 }}>SEO implemented · GA4 reporting pending</div>\n            )}`;
+if (!s.includes(old2)) throw new Error('Misleading GA4-in-SEO status anchor not found');
+s = s.replace(old2, '');
+fs.writeFileSync(path, s);
+console.log('Separated RomyLabs SEO and GA4 reporting status');
