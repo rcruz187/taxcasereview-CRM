@@ -3768,14 +3768,14 @@ function CommandCenter() {
     setGa4Loading(true)
     try {
       // Trigger a fresh sync first (no-op if fn not yet deployed)
-      await supabase.functions.invoke('ga4-sync').catch(() => {})
+      await supabase.functions.invoke('ga4-sync', { body: { product_id: marketingProduct } }).catch(() => {})
 
       // Read results from cache tables
       const today = new Date().toISOString().slice(0,10)
       const [{ data: traffic }, { data: pages }, { data: syncLog }] = await Promise.all([
-        supabase.from('marketing_ga4_traffic').select('*').gte('date', new Date(Date.now()-7*86400000).toISOString().slice(0,10)).order('date',{ascending:false}),
-        supabase.from('marketing_ga4_pages').select('*').eq('date', today).order('sessions',{ascending:false}).limit(10),
-        supabase.from('marketing_sync_log').select('*').eq('source','ga4').order('synced_at',{ascending:false}).limit(1),
+        supabase.from('marketing_ga4_traffic').select('*').eq('product_id', marketingProduct).gte('date', new Date(Date.now()-7*86400000).toISOString().slice(0,10)).order('date',{ascending:false}),
+        supabase.from('marketing_ga4_pages').select('*').eq('product_id', marketingProduct).eq('date', today).order('sessions',{ascending:false}).limit(10),
+        supabase.from('marketing_sync_log').select('*').eq('product_id', marketingProduct).eq('source','ga4').order('synced_at',{ascending:false}).limit(1),
       ])
 
       // Aggregate totals for today
@@ -3828,7 +3828,10 @@ function CommandCenter() {
     setGa4Loading(false)
   }
 
-  useEffect(() => { if (tab==='marketing' && marketingProduct==='taxres_crm') loadGA4() }, [tab, marketingProduct])
+  useEffect(() => {
+    setGa4Data(null)
+    if (tab==='marketing' && ['taxres_crm','romylabs'].includes(marketingProduct)) loadGA4()
+  }, [tab, marketingProduct])
 
   // Poll activity every 30s
   useEffect(() => {
@@ -4215,7 +4218,7 @@ function CommandCenter() {
         {tab==='marketing' && (<>
           <ProductReportingSelector value={marketingProduct} onChange={setMarketingProduct} channel="marketing"
             registryProducts={reportingProducts} />
-          {marketingProduct==='taxres_crm' ? <>
+          {['taxres_crm','romylabs'].includes(marketingProduct) ? <>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
             <div style={{ fontSize:11, color:'#475569' }}>
               {ga4Data ? `Last synced: ${ga4Data.lastSync}` : 'Loading GA4 data…'}
