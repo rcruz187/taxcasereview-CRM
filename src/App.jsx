@@ -306,8 +306,19 @@ function AdminGate() {
   const isImpersonating = hasExplicitImpersonationIntent && storedImpersonation
 
   useEffect(() => {
-    // Admin routing is host-scoped. Owner credentials on TaxRes must stay in CRM.
-    if (!isAdminHost || !isPlatformOwner(user?.email)) return
+    // Admin routing is host-scoped. Product hosts always remain normal CRMs.
+    if (!isAdminHost) return
+
+    // SECURITY BOUNDARY: admin.romylabs.com must never render a tenant/demo CRM
+    // merely because the browser still has a valid non-owner Supabase session.
+    // Purge that stale session and force the dedicated admin login instead.
+    if (user && !isPlatformOwner(user.email)) {
+      try { sessionStorage.removeItem('admin_impersonation') } catch (_) {}
+      supabase.auth.signOut().finally(() => navigate('/login', { replace: true }))
+      return
+    }
+
+    if (!isPlatformOwner(user?.email)) return
 
     // Clear stale Jump In state when the owner arrives normally at the admin host.
     if (!hasExplicitImpersonationIntent && storedImpersonation) {
@@ -324,7 +335,8 @@ function AdminGate() {
   if (!isAdminHost) return <Shell />
   if (isImpersonating) return <Shell />
   if (isPlatformOwner(user?.email)) return null
-  return <Shell />
+  // Never expose a tenant/demo shell on the RomyLabs admin hostname.
+  return null
 }
 
 function AuthRouter() {
@@ -358,7 +370,11 @@ function AuthRouter() {
   return (
     <Routes>
       <Route path="/impersonate" element={<ImpersonateGate />} />
-      <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
+      <Route path="/login" element={
+        user && (window.location.hostname.toLowerCase() !== 'admin.romylabs.com' || isPlatformOwner(user?.email))
+          ? <Navigate to="/" replace />
+          : <Login />
+      } />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/auth/quickbooks-callback" element={<QuickBooksCallback />} />
       <Route path="/auth/xero-callback" element={<XeroCallback />} />
