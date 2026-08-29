@@ -3621,7 +3621,15 @@ function CommandCenter() {
   }, [])
 
   // ── Reporting registry — dynamic product list from romylabs_products ──
+  React.useEffect(() => {
+    supabase.from('product_traffic_channels').select('product_id,status,tracking_id').eq('channel_key','ga4').then(({ data, error }) => {
+      if (error) { setGa4EnabledProducts([]); return }
+      setGa4EnabledProducts((data || []).filter(r => r.tracking_id && ['configured','live'].includes(r.status)).map(r => r.product_id))
+    })
+  }, [])
+
   const [reportingProducts, setReportingProducts] = React.useState([])
+  const [ga4EnabledProducts, setGa4EnabledProducts] = React.useState([])
   React.useEffect(() => {
     supabase.from('romylabs_products')
       .select('product_id,name,accent_color,icon_ref,sort_order,lifecycle,app_url,marketing_url')
@@ -3830,7 +3838,7 @@ function CommandCenter() {
 
   useEffect(() => {
     setGa4Data(null)
-    if (tab==='marketing' && ['taxres_crm','romylabs'].includes(marketingProduct)) loadGA4()
+    if (tab==='marketing' && ga4EnabledProducts.includes(marketingProduct)) loadGA4()
   }, [tab, marketingProduct])
 
   // Poll activity every 30s
@@ -4218,7 +4226,7 @@ function CommandCenter() {
         {tab==='marketing' && (<>
           <ProductReportingSelector value={marketingProduct} onChange={setMarketingProduct} channel="marketing"
             registryProducts={reportingProducts} />
-          {['taxres_crm','romylabs'].includes(marketingProduct) ? <>
+          {ga4EnabledProducts.includes(marketingProduct) ? <>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
             <div style={{ fontSize:11, color:'#475569' }}>
               {ga4Data ? `Last synced: ${ga4Data.lastSync}` : 'Loading GA4 data…'}
