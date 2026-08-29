@@ -1,6 +1,6 @@
 /* RomyLabs admin production guard — canonical admin host + legacy product-link cleanup. */
 /* CC_HIDE_FIX_20260827: never hide Command Center containers by textContent. */
-/* IMPERSONATION_FIX_20260828: allow the secured Jump In route and active imp session. */
+/* IMPERSONATION_FIX_20260829: stale browser impersonation state must never lock owner out. */
 (function () {
   var host = window.location.hostname.toLowerCase();
   var path = window.location.pathname;
@@ -17,9 +17,14 @@
 
   if (host !== 'admin.romylabs.com') return;
 
-  /* admin.romylabs.com is a dedicated control-plane host. The only allowed
-   * non-admin CRM-shell paths are the secured impersonation entry route and
-   * the active ?imp=1 session created after a token is validated. */
+  /* admin.romylabs.com is the dedicated control plane. A stale Jump In marker
+   * in sessionStorage is NOT authority to remain in the CRM shell. Only the
+   * validated /impersonate entry route or an explicit ?imp=1 session may do so.
+   * Clear stale browser state before React boots so AdminGate cannot read it. */
+  if (!isImpersonationRoute && !isActiveImpersonation) {
+    try { sessionStorage.removeItem('admin_impersonation'); } catch (_) {}
+  }
+
   if (path.indexOf('/crm-admin') !== 0 && path !== '/login' && path.indexOf('/auth/') !== 0 && !isImpersonationRoute && !isActiveImpersonation) {
     window.location.replace('/crm-admin');
     return;
@@ -74,11 +79,8 @@
   }, true);
 
   /* IMPORTANT: this guard must never hide or mutate rendered Command Center
-   * containers based on textContent. Previous alert-cleanup code walked every
-   * div/span/p/li and set display:none on matching ancestors; because Overview
-   * contains the old alert phrases inside its own text tree, that could hide the
-   * entire Command Center shortly after render. Product-link normalization is
-   * intentionally limited to anchor hrefs only. */
+   * containers based on textContent. Product-link normalization is intentionally
+   * limited to anchor hrefs only. */
   function rewriteLinks() {
     var anchors = document.querySelectorAll('a[href]');
     for (var i = 0; i < anchors.length; i++) {
