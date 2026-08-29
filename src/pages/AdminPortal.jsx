@@ -1754,15 +1754,15 @@ function ProductReportingSelector({ value, onChange, channel, gscConnected, acti
   if (!registryProducts || registryProducts.length === 0) {
     return <div style={{ fontSize:12, color:'#475569', marginBottom:22 }}>Loading products…</div>
   }
-  const corporateSeo = channel === 'seo' ? [{
+  const corporateReporting = ['seo','marketing'].includes(channel) ? [{
     key:       'romylabs',
     label:     'RomyLabs Corporate',
     icon:      '◆',
     color:     '#C6FF00',
     seo:       'implemented',
-    marketing: 'pending',
+    marketing: 'implemented',
   }] : []
-  const mapped = [...corporateSeo, ...registryProducts.map(r => ({
+  const mapped = [...corporateReporting, ...registryProducts.map(r => ({
     key:       r.product_id,
     label:     r.name,
     icon:      r.icon_ref || '📦',
@@ -1795,9 +1795,7 @@ function ProductReportingSelector({ value, onChange, channel, gscConnected, acti
               <span>{p.icon}</span><span style={{ fontSize:13, fontWeight:800 }}>{p.label}</span>
             </div>
             <div style={{ fontSize:10, color:statusColor }}>● {statusLabel}</div>
-            {isGscLive && status === 'implemented' && (
-              <div style={{ fontSize:9, color:'#a78bfa', marginTop:2 }}>SEO implemented · GA4 reporting pending</div>
-            )}
+
           </button>
         )
       })}
