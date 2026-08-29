@@ -3,8 +3,15 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+}
 
 serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
   let productId = 'taxres_crm'
 
@@ -94,12 +101,12 @@ serve(async (req) => {
     await supabase.from('marketing_sync_log').insert({ product_id:productId, source:'ga4', status:'success', rows_upserted:rows.length + pageRows.length, synced_at:new Date().toISOString() })
     await supabase.from('product_traffic_channels').update({ status:'live', last_verified_at:new Date().toISOString(), updated_at:new Date().toISOString() }).eq('product_id', productId).eq('channel_key','ga4')
 
-    return Response.json({ ok:true, product_id:productId, property_id:propertyId, rows:rows.length, pages:pageRows.length })
+    return Response.json({ ok:true, product_id:productId, property_id:propertyId, rows:rows.length, pages:pageRows.length }, { headers: corsHeaders })
   } catch (err) {
     console.error('GA4 sync error:', err)
     const errorText = err instanceof Error ? err.message : JSON.stringify(err)
     await supabase.from('marketing_sync_log').insert({ product_id:productId, source:'ga4', status:'error', error_msg:errorText, synced_at:new Date().toISOString() })
-    return Response.json({ ok:false, product_id:productId, error:errorText }, { status:500 })
+    return Response.json({ ok:false, product_id:productId, error:errorText }, { status:500, headers: corsHeaders })
   }
 })
 
