@@ -1754,14 +1754,22 @@ function ProductReportingSelector({ value, onChange, channel, gscConnected, acti
   if (!registryProducts || registryProducts.length === 0) {
     return <div style={{ fontSize:12, color:'#475569', marginBottom:22 }}>Loading products…</div>
   }
-  const mapped = registryProducts.map(r => ({
+  const corporateSeo = channel === 'seo' ? [{
+    key:       'romylabs',
+    label:     'RomyLabs Corporate',
+    icon:      '◆',
+    color:     '#C6FF00',
+    seo:       'implemented',
+    marketing: 'pending',
+  }] : []
+  const mapped = [...corporateSeo, ...registryProducts.map(r => ({
     key:       r.product_id,
     label:     r.name,
     icon:      r.icon_ref || '📦',
     color:     r.accent_color || '#6366f1',
     seo:       'pending',
     marketing: 'pending',
-  }))
+  }))]
   return (
     <div style={{ display:'flex', gap:10, flexWrap:'wrap', marginBottom:22 }}>
       {mapped.map(p => {
@@ -3607,12 +3615,19 @@ function CommandCenter() {
       })
   }, [])
 
-  const fetchCrmMetricsUrl = React.useCallback(async (url) => {
-    if (!url) return null
+  const fetchCrmProductMetrics = React.useCallback(async (productKey) => {
+    if (!productKey) return null
     const { data: sessionData } = await supabase.auth.getSession()
     const token = sessionData?.session?.access_token
     if (!token) throw new Error('Admin session unavailable')
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    const res = await fetch('https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/hub-proxy', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ product: productKey }),
+    })
     const body = await res.json().catch(() => ({}))
     if (!res.ok || body?.ok === false) throw new Error(body?.error || `Metrics request failed (${res.status})`)
     return body
@@ -3627,12 +3642,12 @@ function CommandCenter() {
     if (!product?.metricsUrl) { setCrmRemoteData(null); return }
     let cancelled = false
     setCrmRemoteLoading(true)
-    fetchCrmMetricsUrl(product.metricsUrl)
+    fetchCrmProductMetrics(crmProduct)
       .then(body => { if (!cancelled) setCrmRemoteData(body) })
       .catch(err => { if (!cancelled) { setCrmRemoteData(null); setCrmRemoteError(String(err?.message || err)) } })
       .finally(() => { if (!cancelled) setCrmRemoteLoading(false) })
     return () => { cancelled = true }
-  }, [crmProduct, fetchCrmMetricsUrl])
+  }, [crmProduct, fetchCrmProductMetrics])
 
   React.useEffect(() => {
     setCrmAccountMetrics(null)
@@ -3641,11 +3656,11 @@ function CommandCenter() {
     const tenantProduct = PRODUCT_REGISTRY.find(p => p.isTenant && p.key === key)
     if (!tenantProduct?.metricsUrl) return
     let cancelled = false
-    fetchCrmMetricsUrl(tenantProduct.metricsUrl)
+    fetchCrmProductMetrics(key)
       .then(body => { if (!cancelled) setCrmAccountMetrics(body) })
       .catch(err => { if (!cancelled) setCrmRemoteError(String(err?.message || err)) })
     return () => { cancelled = true }
-  }, [crmProduct, crmAccount, fetchCrmMetricsUrl])
+  }, [crmProduct, crmAccount, fetchCrmProductMetrics])
 
   // ── GSC state + fetch ──
   const [gscData, setGscData]         = useState(null)

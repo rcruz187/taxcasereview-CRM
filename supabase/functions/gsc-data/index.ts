@@ -9,6 +9,7 @@ const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const GSC_BASE  = 'https://searchconsole.googleapis.com'
 
 const GSC_SITE_CANDIDATES: Record<string, string[]> = {
+  romylabs: ['sc-domain:romylabs.com', 'https://romylabs.com/', 'https://www.romylabs.com/'],
   taxres_crm: ['sc-domain:taxrescrm.net', 'https://taxrescrm.net/', 'https://www.taxrescrm.net/'],
   camvella: ['sc-domain:camvella.com', 'https://camvella.com/', 'https://www.camvella.com/'],
   arcvena: ['sc-domain:arcvena.com', 'https://arcvena.com/', 'https://www.arcvena.com/'],
