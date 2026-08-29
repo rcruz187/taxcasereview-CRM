@@ -5765,16 +5765,6 @@ function LinkedInPublisher({ embeddedMode = false }) {
                   </button>
                 </div>
               </div>
-            ) : selectedPid === 'arcvena' ? (
-              <div style={{ ...CC2.card, padding:'12px', marginBottom:10 }}>
-                <div style={{ fontSize:11, color:'#f59e0b', fontWeight:700, marginBottom:4 }}>
-                  🔐 LinkedIn Page: Authorization Pending
-                </div>
-                <div style={{ fontSize:10, color:'#64748b' }}>
-                  Arcvena LinkedIn Company Page publishing is pending LinkedIn API approval.
-                  Connection will be available once approved.
-                </div>
-              </div>
             ) : (
               <div style={{ ...CC2.card, padding:'12px', marginBottom:10 }}>
                 <div style={{ fontSize:11, color:'#94a3b8', marginBottom:8 }}>
