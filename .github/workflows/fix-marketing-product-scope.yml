@@ -1,0 +1,92 @@
+name: Fix Marketing Product Scope
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-marketing-product-scope.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Patch Marketing product isolation
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/pages/AdminPortal.jsx')
+          s = p.read_text()
+
+          replacements = [
+            (
+              "await supabase.functions.invoke('ga4-sync').catch(() => {})",
+              "await supabase.functions.invoke('ga4-sync', { body: { product_id: marketingProduct } }).catch(() => {})"
+            ),
+            (
+              "supabase.from('marketing_ga4_traffic').select('*').gte('date', new Date(Date.now()-7*86400000).toISOString().slice(0,10)).order('date',{ascending:false})",
+              "supabase.from('marketing_ga4_traffic').select('*').eq('product_id', marketingProduct).gte('date', new Date(Date.now()-7*86400000).toISOString().slice(0,10)).order('date',{ascending:false})"
+            ),
+            (
+              "supabase.from('marketing_ga4_pages').select('*').eq('date', today).order('sessions',{ascending:false}).limit(10)",
+              "supabase.from('marketing_ga4_pages').select('*').eq('product_id', marketingProduct).eq('date', today).order('sessions',{ascending:false}).limit(10)"
+            ),
+            (
+              "supabase.from('marketing_sync_log').select('*').eq('source','ga4').order('synced_at',{ascending:false}).limit(1)",
+              "supabase.from('marketing_sync_log').select('*').eq('product_id', marketingProduct).eq('source','ga4').order('synced_at',{ascending:false}).limit(1)"
+            ),
+            (
+              "useEffect(() => { if (tab==='marketing' && marketingProduct==='taxres_crm') loadGA4() }, [tab, marketingProduct])",
+              "useEffect(() => {\n    setGa4Data(null)\n    if (tab==='marketing' && ['taxres_crm','romylabs'].includes(marketingProduct)) loadGA4()\n  }, [tab, marketingProduct])"
+            ),
+            (
+              "{marketingProduct==='taxres_crm' ? <>",
+              "{['taxres_crm','romylabs'].includes(marketingProduct) ? <>"
+            ),
+          ]
+
+          for old, new in replacements:
+            if old not in s:
+              raise SystemExit(f'anchor not found: {old[:100]}')
+            s = s.replace(old, new, 1)
+
+          p.write_text(s)
+          PY
+      - name: Verify Marketing isolation and admin auth gate
+        run: |
+          grep -F "invoke('ga4-sync', { body: { product_id: marketingProduct } })" src/pages/AdminPortal.jsx
+          grep -F ".eq('product_id', marketingProduct).gte('date'" src/pages/AdminPortal.jsx
+          grep -F ".eq('product_id', marketingProduct).eq('date', today)" src/pages/AdminPortal.jsx
+          grep -F ".eq('product_id', marketingProduct).eq('source','ga4')" src/pages/AdminPortal.jsx
+          grep -F "['taxres_crm','romylabs'].includes(marketingProduct)" src/pages/AdminPortal.jsx
+          grep -F "SECURITY BOUNDARY: admin.romylabs.com must never render a tenant/demo CRM" src/App.jsx
+          grep -F "if (!isAdminHost) return <Shell />" src/App.jsx
+          grep -F "if (isPlatformOwner(user?.email)) return null" src/App.jsx
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Commit source fix
+        run: |
+          git config user.name "RomyLabs"
+          git config user.email "rcruz187@gmail.com"
+          git add src/pages/AdminPortal.jsx
+          git commit -m "fix(marketing): isolate GA4 by selected product" || true
+          git push
+      - name: Publish verified build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          npx gh-pages -d dist --dotfiles -u "GitHub Actions <actions@github.com>"
