@@ -137,3 +137,43 @@ test('authenticated shell and all global New actions render and navigate', async
   const fatalConsole = consoleErrors.filter(x => !/favicon|ResizeObserver|Failed to load resource/i.test(x))
   expect(fatalConsole, `console errors: ${fatalConsole.join(' | ')}`).toEqual([])
 })
+
+test('Communications pages survive sequential sidebar navigation without refresh', async ({ page }) => {
+  const consoleErrors = []
+  const pageErrors = []
+  page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()) })
+  page.on('pageerror', err => pageErrors.push(err.message))
+  await mockSupabase(page)
+  await login(page)
+
+  const communicationsHeader = page.getByText('Communications', { exact:true })
+  await expect(communicationsHeader).toBeVisible()
+  await communicationsHeader.click()
+
+  const sequence = [
+    ['SMS', '/sms'],
+    ['Fax', '/fax'],
+    ['Documents', '/documents'],
+    ['E-Signatures', '/esign'],
+    ['SMS', '/sms'],
+    ['Documents', '/documents'],
+    ['Fax', '/fax'],
+    ['E-Signatures', '/esign'],
+  ]
+
+  for (const [label, target] of sequence) {
+    const link = page.getByRole('link', { name: label, exact:true })
+    await expect(link).toBeVisible()
+    await link.click()
+    await expect(page).toHaveURL(new RegExp(`${target}$`))
+    await expect(page.locator('.page-content')).toBeVisible()
+    await expect(page.locator('body')).not.toContainText('This page encountered an error')
+    const box = await page.locator('.page-content').boundingBox()
+    expect(box?.width || 0).toBeGreaterThan(200)
+    expect(box?.height || 0).toBeGreaterThan(200)
+  }
+
+  expect(pageErrors, `communications page errors: ${pageErrors.join(' | ')}`).toEqual([])
+  const fatalConsole = consoleErrors.filter(x => !/favicon|ResizeObserver|Failed to load resource/i.test(x))
+  expect(fatalConsole, `communications console errors: ${fatalConsole.join(' | ')}`).toEqual([])
+})
