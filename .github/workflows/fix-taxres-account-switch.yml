@@ -28,20 +28,21 @@ jobs:
           from pathlib import Path
           p=Path('src/App.jsx')
           s=p.read_text()
-          old='''      <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />'''
-          new='''      <Route path="/login" element={\n        user && new URLSearchParams(window.location.search).get('switch') !== '1'\n          ? <Navigate to="/" />\n          : <Login />\n      } />'''
+          old='''      <Route path="/login" element={\n        user && (window.location.hostname.toLowerCase() !== 'admin.romylabs.com' || isPlatformOwner(user?.email))\n          ? <Navigate to="/" replace />\n          : <Login />\n      } />'''
+          new='''      <Route path="/login" element={\n        user &&\n        new URLSearchParams(window.location.search).get('switch') !== '1' &&\n        (window.location.hostname.toLowerCase() !== 'admin.romylabs.com' || isPlatformOwner(user?.email))\n          ? <Navigate to="/" replace />\n          : <Login />\n      } />'''
           if old not in s:
-              raise SystemExit('login route anchor not found')
+              raise SystemExit('current login route anchor not found')
           s=s.replace(old,new,1)
           p.write_text(s)
 
           p=Path('src/pages/Login.jsx')
           s=p.read_text()
-          anchor='''  useEffect(() => {\n    if (document.getElementById('tcr-login-bilingual-css')) return'''
-          block='''  useEffect(() => {\n    const switchRequested = new URLSearchParams(window.location.search).get('switch') === '1'\n    const isAdminHost = window.location.hostname.toLowerCase() === 'admin.romylabs.com'\n    if (!switchRequested || isAdminHost) return\n    let cancelled = false\n    ;(async () => {\n      try {\n        await supabase.auth.signOut()\n        if (!cancelled) window.history.replaceState({}, '', '/login')\n      } catch (_) {}\n    })()\n    return () => { cancelled = true }\n  }, [])\n\n  useEffect(() => {\n    if (document.getElementById('tcr-login-bilingual-css')) return'''
-          if anchor not in s:
-              raise SystemExit('Login useEffect anchor not found')
-          s=s.replace(anchor,block,1)
+          if "const switchRequested = new URLSearchParams(window.location.search).get('switch') === '1'" not in s:
+              anchor='''  useEffect(() => {\n    if (document.getElementById('tcr-login-bilingual-css')) return'''
+              block='''  useEffect(() => {\n    const switchRequested = new URLSearchParams(window.location.search).get('switch') === '1'\n    const isAdminHost = window.location.hostname.toLowerCase() === 'admin.romylabs.com'\n    if (!switchRequested || isAdminHost) return\n    let cancelled = false\n    ;(async () => {\n      try {\n        await supabase.auth.signOut()\n        if (!cancelled) window.history.replaceState({}, '', '/login')\n      } catch (_) {}\n    })()\n    return () => { cancelled = true }\n  }, [])\n\n  useEffect(() => {\n    if (document.getElementById('tcr-login-bilingual-css')) return'''
+              if anchor not in s:
+                  raise SystemExit('Login useEffect anchor not found')
+              s=s.replace(anchor,block,1)
           p.write_text(s)
           PY
       - name: Verify targeted source changes
