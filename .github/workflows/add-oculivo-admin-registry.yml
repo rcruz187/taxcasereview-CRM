@@ -26,36 +26,35 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          p=Path('src/pages/AdminPortal.jsx')
-          s=p.read_text()
-          if "key:        'oculivo'" in s or "key:       'oculivo'" in s:
-              print('Oculivo already present')
-          else:
-              marker="""  // ── TENANTS (not products — operational data, not product counts) ─────────"""
+          p = Path('src/pages/AdminPortal.jsx')
+          s = p.read_text()
+          if "key:        'oculivo'" not in s and "key:       'oculivo'" not in s:
+              marker = "  // ── TENANTS (not products — operational data, not product counts) ─────────"
               if marker not in s:
                   raise SystemExit('tenant marker not found')
-              block="""  {
-    key:        'oculivo',
-    label:      'Oculivo',
-    icon:       '👁️',
-    color:      '#7C3AED',
-    industry:   'Eye Care',
-    url:        'https://app.oculivo.com',
-    appUrl:     'https://app.oculivo.com',
-    websiteUrl: 'https://oculivo.com',
-    lifecycleStage: 'building',
-    connection:     'partial',
-    brandStatus:    'branded',
-    publicOnRomyLabs: true,
-    commerciallyAvailable: false,
-    desc:      'Eye-care CRM and practice operating system for optometry, ophthalmology, optical retail, and multi-location groups.',
-    metricsUrl: null,
-    nextMilestone: 'Finish product build, deploy platform metrics, and verify analytics reporting',
-  },
-
-"""
-              s=s.replace(marker, block+marker, 1)
-              s=s.replace('TaxRes CRM (platform), Camvella, Arcvena, BocaSync, GroundIVO, + planned verticals', 'TaxRes CRM (platform), Camvella, Arcvena, BocaSync, GroundIVO, Oculivo, + planned verticals', 1)
+              lines = [
+                  "  {",
+                  "    key:        'oculivo',",
+                  "    label:      'Oculivo',",
+                  "    icon:       '👁️',",
+                  "    color:      '#7C3AED',",
+                  "    industry:   'Eye Care',",
+                  "    url:        'https://app.oculivo.com',",
+                  "    appUrl:     'https://app.oculivo.com',",
+                  "    websiteUrl: 'https://oculivo.com',",
+                  "    lifecycleStage: 'building',",
+                  "    connection:     'partial',",
+                  "    brandStatus:    'branded',",
+                  "    publicOnRomyLabs: true,",
+                  "    commerciallyAvailable: false,",
+                  "    desc:      'Eye-care CRM and practice operating system for optometry, ophthalmology, optical retail, and multi-location groups.',",
+                  "    metricsUrl: null,",
+                  "    nextMilestone: 'Finish product build, deploy platform metrics, and verify analytics reporting',",
+                  "  },",
+                  "",
+              ]
+              s = s.replace(marker, "\n".join(lines) + marker, 1)
+              s = s.replace('TaxRes CRM (platform), Camvella, Arcvena, BocaSync, GroundIVO, + planned verticals', 'TaxRes CRM (platform), Camvella, Arcvena, BocaSync, GroundIVO, Oculivo, + planned verticals', 1)
               p.write_text(s)
           PY
       - name: Verify registry and admin auth regression gate
