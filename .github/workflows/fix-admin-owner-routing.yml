@@ -1,0 +1,69 @@
+name: Fix Admin Owner Routing
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-admin-owner-routing.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch stale impersonation routing bug
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/App.jsx')
+          s = p.read_text()
+          old = """  // Check for active impersonation session
+  const isImpersonating = !!sessionStorage.getItem('admin_impersonation')
+  const impParam = new URLSearchParams(window.location.search).get('imp')
+
+  useEffect(() => {
+    // Admin routing is host-scoped. Owner credentials on TaxRes must stay in CRM.
+    if (isAdminHost && isPlatformOwner(user?.email) && !isImpersonating && !impParam) {
+      navigate('/crm-admin', { replace: true })
+    }
+  }, [user, isAdminHost, isImpersonating, impParam, navigate])
+
+  // Product hosts always render their CRM, including for RomyLabs owners.
+  if (!isAdminHost) return <Shell />
+  if (isImpersonating || impParam) return <Shell />
+  if (isPlatformOwner(user?.email) && !isImpersonating) return null
+  return <Shell />
+"""
+          new = """  // Only an explicit ?imp=1 URL keeps an owner in a Jump In CRM session.
+  // A stale sessionStorage flag must never lock the platform owner out of admin.romylabs.com.
+  const impParam = new URLSearchParams(window.location.search).get('imp')
+
+  useEffect(() => {
+    // Admin routing is host-scoped. Owner credentials on TaxRes must stay in CRM.
+    if (isAdminHost && isPlatformOwner(user?.email) && !impParam) {
+      try { sessionStorage.removeItem('admin_impersonation') } catch (_) {}
+      navigate('/crm-admin', { replace: true })
+    }
+  }, [user, isAdminHost, impParam, navigate])
+
+  // Product hosts always render their CRM, including for RomyLabs owners.
+  if (!isAdminHost) return <Shell />
+  if (impParam) return <Shell />
+  if (isPlatformOwner(user?.email)) return null
+  return <Shell />
+"""
+          if old not in s:
+              raise SystemExit('Expected AdminGate block not found; refusing broad edit')
+          p.write_text(s.replace(old, new, 1))
+          PY
+      - name: Commit routing fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.jsx
+          git diff --cached --check
+          git commit -m "fix(admin): stale impersonation cannot block owner portal"
+          git push
