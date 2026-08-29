@@ -5418,7 +5418,11 @@ function LinkedInPublisher({ embeddedMode = false }) {
   React.useEffect(() => {
     supabase.from('romylabs_products').select('product_id,name,active,lifecycle,public')
       .order('name').then(({ data }) => {
-        const active = (data || []).filter(p => p.active && p.product_id !== 'phl' && !/^PHL(?:\s|$)/i.test(p.name || '') && String(p.lifecycle || '').toLowerCase() !== 'internal')
+        const registryActive = (data || []).filter(p => p.active && p.product_id !== 'phl' && !/^PHL(?:\s|$)/i.test(p.name || '') && String(p.lifecycle || '').toLowerCase() !== 'internal')
+        // RomyLabs is the corporate parent, not a romylabs_products row. Keep it
+        // as a first-class LinkedIn workspace without polluting the product registry.
+        const corporate = { product_id:'romylabs', name:'RomyLabs Corporate', active:true, lifecycle:'corporate', public:true }
+        const active = [corporate, ...registryActive.filter(p => p.product_id !== 'romylabs')]
         setProducts(active)
         // Validate stored pid against active products
         if (active.length && !active.find(p => p.product_id === selectedPid)) {
