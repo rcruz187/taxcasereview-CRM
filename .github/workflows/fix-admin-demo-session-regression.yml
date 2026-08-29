@@ -1,0 +1,79 @@
+name: Fix Admin Demo Session Regression
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-admin-demo-session-regression.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix-build-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Patch admin host auth boundary
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('src/App.jsx')
+          s = p.read_text()
+
+          old = '''  useEffect(() => {\n    // Admin routing is host-scoped. Owner credentials on TaxRes must stay in CRM.\n    if (!isAdminHost || !isPlatformOwner(user?.email)) return\n\n    // Clear stale Jump In state when the owner arrives normally at the admin host.\n    if (!hasExplicitImpersonationIntent && storedImpersonation) {\n      sessionStorage.removeItem('admin_impersonation')\n      supabase.rpc('set_admin_tenant_override', { p_tenant_id: null }).catch(() => {})\n    }\n\n    if (!hasExplicitImpersonationIntent) {\n      navigate('/crm-admin', { replace: true })\n    }\n  }, [user, isAdminHost, hasExplicitImpersonationIntent, storedImpersonation, navigate])\n\n  // Product hosts always render their CRM, including for RomyLabs owners.\n  if (!isAdminHost) return <Shell />\n  if (isImpersonating) return <Shell />\n  if (isPlatformOwner(user?.email)) return null\n  return <Shell />\n}'''
+
+          new = '''  useEffect(() => {\n    // Admin routing is host-scoped. Product hosts always remain normal CRMs.\n    if (!isAdminHost) return\n\n    // SECURITY BOUNDARY: admin.romylabs.com must never render a tenant/demo CRM\n    // merely because the browser still has a valid non-owner Supabase session.\n    // Purge that stale session and force the dedicated admin login instead.\n    if (user && !isPlatformOwner(user.email)) {\n      try { sessionStorage.removeItem('admin_impersonation') } catch (_) {}\n      supabase.auth.signOut().finally(() => navigate('/login', { replace: true }))\n      return\n    }\n\n    if (!isPlatformOwner(user?.email)) return\n\n    // Clear stale Jump In state when the owner arrives normally at the admin host.\n    if (!hasExplicitImpersonationIntent && storedImpersonation) {\n      sessionStorage.removeItem('admin_impersonation')\n      supabase.rpc('set_admin_tenant_override', { p_tenant_id: null }).catch(() => {})\n    }\n\n    if (!hasExplicitImpersonationIntent) {\n      navigate('/crm-admin', { replace: true })\n    }\n  }, [user, isAdminHost, hasExplicitImpersonationIntent, storedImpersonation, navigate])\n\n  // Product hosts always render their CRM, including for RomyLabs owners.\n  if (!isAdminHost) return <Shell />\n  if (isImpersonating) return <Shell />\n  if (isPlatformOwner(user?.email)) return null\n  // Never expose a tenant/demo shell on the RomyLabs admin hostname.\n  return null\n}'''
+
+          if old not in s:
+              raise SystemExit('AdminGate source block not found; refusing broad patch')
+          s = s.replace(old, new, 1)
+
+          old_login = '''      <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />'''
+          new_login = '''      <Route path="/login" element={\n        user && (window.location.hostname.toLowerCase() !== 'admin.romylabs.com' || isPlatformOwner(user?.email))\n          ? <Navigate to="/" replace />\n          : <Login />\n      } />'''
+          if old_login not in s:
+              raise SystemExit('Login route source block not found; refusing broad patch')
+          s = s.replace(old_login, new_login, 1)
+          p.write_text(s)
+
+      - name: Verify targeted source changes
+        run: |
+          grep -q "admin.romylabs.com must never render a tenant/demo CRM" src/App.jsx
+          grep -q "Never expose a tenant/demo shell" src/App.jsx
+          grep -q "window.location.hostname.toLowerCase() !== 'admin.romylabs.com'" src/App.jsx
+          if grep -A55 'function AdminGate' src/App.jsx | grep -q 'return <Shell />' ; then
+            # Shell is valid for product hosts and explicit impersonation only; ensure final fallback is null.
+            grep -A65 'function AdminGate' src/App.jsx | grep -q 'return null'
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Commit fix
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "RomyLabs"
+          git config user.email "rcruz187@gmail.com"
+          git add src/App.jsx
+          git commit -m "fix(admin): reject stale tenant sessions on admin host"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin HEAD:main
+
+      - name: Publish verified build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npx gh-pages -d dist --dotfiles -u "GitHub Actions <actions@github.com>"
