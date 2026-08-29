@@ -1,0 +1,35 @@
+name: Verify RomyLabs GA4
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/verify-romylabs-ga4.yml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Invoke RomyLabs GA4 sync
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEY=$(node - <<'NODE'
+          const fs = require('fs')
+          const s = fs.readFileSync('src/lib/supabase.js','utf8')
+          const m = s.match(/SUPABASE_ANON_KEY[^\n]*\|\|\s*'([^']+)'/)
+          if (!m) process.exit(1)
+          process.stdout.write(m[1])
+          NODE
+          )
+          RESP=$(curl -fsS --max-time 60 \
+            -H "Authorization: Bearer ${KEY}" \
+            -H "apikey: ${KEY}" \
+            -H 'Content-Type: application/json' \
+            -d '{"product_id":"romylabs"}' \
+            'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/ga4-sync')
+          echo "$RESP"
+          node -e "const r=JSON.parse(process.argv[1]); if(!r.ok) process.exit(1); if(r.product_id!=='romylabs') process.exit(1);" "$RESP"
