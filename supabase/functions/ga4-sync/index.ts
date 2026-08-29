@@ -40,15 +40,17 @@ serve(async (req) => {
     ]
 
     const results = await Promise.all(ranges.map(r => fetchGA4Report(token, propertyId, r)))
-    const rows:any[] = []
+    const trafficByKey = new Map<string, any>()
     for (const result of results) {
       for (const row of result?.rows || []) {
         const dims = row.dimensionValues || []
         const mets = row.metricValues || []
-        rows.push({
+        const date = dims[0]?.value || new Date().toISOString().slice(0,10)
+        const channelName = dims[1]?.value || 'Direct'
+        trafficByKey.set(`${productId}|${date}|${channelName}`, {
           product_id: productId,
-          date: dims[0]?.value || new Date().toISOString().slice(0,10),
-          channel: dims[1]?.value || 'Direct',
+          date,
+          channel: channelName,
           sessions: Number(mets[0]?.value || 0),
           users: Number(mets[1]?.value || 0),
           new_users: Number(mets[2]?.value || 0),
@@ -61,6 +63,7 @@ serve(async (req) => {
         })
       }
     }
+    const rows = Array.from(trafficByKey.values())
 
     if (rows.length) {
       const { error } = await supabase.from('marketing_ga4_traffic').upsert(rows, { onConflict:'product_id,date,channel' })
@@ -94,8 +97,9 @@ serve(async (req) => {
     return Response.json({ ok:true, product_id:productId, property_id:propertyId, rows:rows.length, pages:pageRows.length })
   } catch (err) {
     console.error('GA4 sync error:', err)
-    await supabase.from('marketing_sync_log').insert({ product_id:productId, source:'ga4', status:'error', error_msg:String(err), synced_at:new Date().toISOString() })
-    return Response.json({ ok:false, product_id:productId, error:String(err) }, { status:500 })
+    const errorText = err instanceof Error ? err.message : JSON.stringify(err)
+    await supabase.from('marketing_sync_log').insert({ product_id:productId, source:'ga4', status:'error', error_msg:errorText, synced_at:new Date().toISOString() })
+    return Response.json({ ok:false, product_id:productId, error:errorText }, { status:500 })
   }
 })
 
