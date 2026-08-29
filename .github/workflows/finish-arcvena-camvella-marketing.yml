@@ -1,0 +1,103 @@
+name: Finish Arcvena Camvella Marketing
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/finish-arcvena-camvella-marketing.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build-deploy-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Make Marketing GA4 capability registry-driven
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/pages/AdminPortal.jsx')
+          s=p.read_text()
+          state="  const [ga4EnabledProducts, setGa4EnabledProducts] = React.useState([])\n"
+          anchor="  const [reportingProducts, setReportingProducts] = React.useState([])\n"
+          if state not in s:
+              if anchor not in s: raise SystemExit('reportingProducts state anchor missing')
+              s=s.replace(anchor, anchor+state, 1)
+          effect="""  React.useEffect(() => {
+    supabase.from('product_traffic_channels')
+      .select('product_id,status,tracking_id')
+      .eq('channel_key','ga4')
+      .then(({ data, error }) => {
+        if (error) { console.error('GA4 capability registry load failed:', error); setGa4EnabledProducts([]); return }
+        setGa4EnabledProducts((data || [])
+          .filter(r => r.tracking_id && ['configured','live'].includes(r.status))
+          .map(r => r.product_id))
+      })
+  }, [])
+
+"""
+          effect_anchor="  // ── Reporting registry — dynamic product list from romylabs_products ──\n"
+          if effect not in s:
+              if effect_anchor not in s: raise SystemExit('reporting registry anchor missing')
+              s=s.replace(effect_anchor, effect_anchor+effect, 1)
+          old="if (tab==='marketing' && ['taxres_crm','romylabs'].includes(marketingProduct)) loadGA4()"
+          new="if (tab==='marketing' && ga4EnabledProducts.includes(marketingProduct)) loadGA4()"
+          if old in s: s=s.replace(old,new,1)
+          old2="{['taxres_crm','romylabs'].includes(marketingProduct) ? <>"
+          new2="{ga4EnabledProducts.includes(marketingProduct) ? <>"
+          if old2 in s: s=s.replace(old2,new2,1)
+          p.write_text(s)
+          PY
+      - name: Verify Marketing registry and admin auth gate
+        run: |
+          grep -F "const [ga4EnabledProducts, setGa4EnabledProducts]" src/pages/AdminPortal.jsx
+          grep -F "from('product_traffic_channels')" src/pages/AdminPortal.jsx
+          grep -F "ga4EnabledProducts.includes(marketingProduct)" src/pages/AdminPortal.jsx
+          grep -F "invoke('ga4-sync', { body: { product_id: marketingProduct } })" src/pages/AdminPortal.jsx
+          grep -F "SECURITY BOUNDARY: admin.romylabs.com must never render a tenant/demo CRM" src/App.jsx
+          grep -F "if (!isAdminHost) return <Shell />" src/App.jsx
+          grep -F "if (isPlatformOwner(user?.email)) return null" src/App.jsx
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Commit source fix
+        run: |
+          git config user.name "RomyLabs"
+          git config user.email "rcruz187@gmail.com"
+          git add src/pages/AdminPortal.jsx
+          git commit -m "fix(marketing): derive GA4 products from traffic registry" || true
+          git push
+      - name: Publish verified build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          npx gh-pages -d dist --dotfiles -u "GitHub Actions <actions@github.com>"
+      - name: Live GA4 checks (non-failing diagnostic)
+        shell: bash
+        run: |
+          python - <<'PY'
+          import re, pathlib, subprocess, json
+          text=pathlib.Path('src/lib/supabase.js').read_text()
+          m=re.search(r"SUPABASE_ANON_KEY = .*?\|\| '([^']+)'", text)
+          if not m:
+              print('ANON_KEY_NOT_FOUND'); raise SystemExit(0)
+          key=m.group(1)
+          url='https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/ga4-sync'
+          for product in ('camvella','arcvena'):
+              cmd=['curl','-sS','-X','POST',url,'-H',f'Authorization: Bearer {key}','-H',f'apikey: {key}','-H','Content-Type: application/json','--data',json.dumps({'product_id':product})]
+              p=subprocess.run(cmd,capture_output=True,text=True)
+              body=(p.stdout or p.stderr).strip().replace('\n',' ')
+              print(f'{product.upper()}_GA4_RESULT={body[:1200]}')
+          PY
