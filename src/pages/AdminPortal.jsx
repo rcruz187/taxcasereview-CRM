@@ -1746,7 +1746,7 @@ function StatusDot({ ok }) {
 
 
 
-function ProductReportingSelector({ value, onChange, channel, gscConnected, activeGscProduct, registryProducts }) {
+function ProductReportingSelector({ value, onChange, channel, gscConnected, activeGscProduct, registryProducts, marketingConnectedProducts=[] }) {
   // Derives entirely from romylabs_products registry — no hardcoded product list.
   // Integration status starts as 'pending' (setup needed) for all products.
   // Live GSC connection overrides the SEO badge when gscConnected===true for the active product.
@@ -1776,12 +1776,15 @@ function ProductReportingSelector({ value, onChange, channel, gscConnected, acti
         const status = p[channel]
         // Live GSC connection overrides static label for the active product on the SEO channel
         const isGscLive = channel === 'seo' && gscConnected && p.key === activeGscProduct
-        const statusLabel = isGscLive
+        const isMarketingLive = channel === 'marketing' && marketingConnectedProducts.includes(p.key)
+        const statusLabel = isMarketingLive
+          ? 'GA4 Connected'
+          : isGscLive
           ? 'GSC Connected'
           : status === 'connected' ? 'Connected'
           : status === 'implemented' ? `${channel === 'seo' ? 'SEO' : 'Marketing'} implemented · reporting pending`
           : 'Setup needed'
-        const statusColor = (status === 'connected' || isGscLive) ? '#10b981'
+        const statusColor = (status === 'connected' || isGscLive || isMarketingLive) ? '#10b981'
           : status === 'implemented' ? '#a78bfa'
           : '#f59e0b'
         return (
@@ -3621,13 +3624,16 @@ function CommandCenter() {
   // ── Reporting registry — dynamic product list from romylabs_products ──
   React.useEffect(() => {
     supabase.from('product_traffic_channels').select('product_id,status,tracking_id').eq('channel_key','ga4').then(({ data, error }) => {
-      if (error) { setGa4EnabledProducts([]); return }
-      setGa4EnabledProducts((data || []).filter(r => r.tracking_id && ['configured','live'].includes(r.status)).map(r => r.product_id))
+      if (error) { setGa4EnabledProducts([]); setGa4LiveProducts([]); return }
+      const rows = data || []
+      setGa4EnabledProducts(rows.filter(r => r.tracking_id && ['configured','live'].includes(r.status)).map(r => r.product_id))
+      setGa4LiveProducts(rows.filter(r => r.tracking_id && r.status === 'live').map(r => r.product_id))
     })
   }, [])
 
   const [reportingProducts, setReportingProducts] = React.useState([])
   const [ga4EnabledProducts, setGa4EnabledProducts] = React.useState([])
+  const [ga4LiveProducts, setGa4LiveProducts] = React.useState([])
   React.useEffect(() => {
     supabase.from('romylabs_products')
       .select('product_id,name,accent_color,icon_ref,sort_order,lifecycle,app_url,marketing_url')
@@ -3777,15 +3783,19 @@ function CommandCenter() {
       await supabase.functions.invoke('ga4-sync', { body: { product_id: marketingProduct } }).catch(() => {})
 
       // Read results from cache tables
-      const today = new Date().toISOString().slice(0,10)
+      const utcToday = new Date().toISOString().slice(0,10)
       const [{ data: traffic }, { data: pages }, { data: syncLog }] = await Promise.all([
         supabase.from('marketing_ga4_traffic').select('*').eq('product_id', marketingProduct).gte('date', new Date(Date.now()-7*86400000).toISOString().slice(0,10)).order('date',{ascending:false}),
-        supabase.from('marketing_ga4_pages').select('*').eq('product_id', marketingProduct).eq('date', today).order('sessions',{ascending:false}).limit(10),
+        supabase.from('marketing_ga4_pages').select('*').eq('product_id', marketingProduct).gte('date', new Date(Date.now()-8*86400000).toISOString().slice(0,10)).order('date',{ascending:false}).order('sessions',{ascending:false}).limit(100),
         supabase.from('marketing_sync_log').select('*').eq('product_id', marketingProduct).eq('source','ga4').order('synced_at',{ascending:false}).limit(1),
       ])
 
-      // Aggregate totals for today
-      const todayRows = (traffic||[]).filter(r=>r.date===today)
+      // GA4 report dates follow each property's configured timezone, which may differ from UTC.
+      // Always use the latest date actually returned by GA4 instead of filtering against UTC "today".
+      const reportingDate = (traffic || []).reduce((latest, r) => (!latest || r.date > latest ? r.date : latest), '') || utcToday
+      const latestPageDate = (pages || []).reduce((latest, r) => (!latest || r.date > latest ? r.date : latest), '')
+      const latestPages = (pages || []).filter(r => !latestPageDate || r.date === latestPageDate).slice(0, 10)
+      const todayRows = (traffic||[]).filter(r=>r.date===reportingDate)
       const totalSessions   = todayRows.reduce((s,r)=>s+Number(r.sessions||0),0)
       const totalUsers      = todayRows.reduce((s,r)=>s+Number(r.users||0),0)
       const totalNewUsers   = todayRows.reduce((s,r)=>s+Number(r.new_users||0),0)
@@ -3824,7 +3834,7 @@ function CommandCenter() {
         pagesPerSession: avgPages.toFixed(1),
         sessionChange,
         channels: channels.length ? channels : [{ label:'No data yet', pct:100, color:'#334155' }],
-        topPages: (pages||[]).map(p=>({ path:p.page_path, views:p.sessions, avgTime: Math.round(p.avg_time_sec||0)+'s' })),
+        topPages: latestPages.map(p=>({ path:p.page_path, views:p.sessions, avgTime: Math.round(p.avg_time_sec||0)+'s' })),
         lastSync: lastSync ? new Date(lastSync.synced_at).toLocaleTimeString() : 'never',
         status: lastSync?.status || 'pending',
       })
@@ -4223,7 +4233,7 @@ function CommandCenter() {
         {/* ═══ MARKETING TAB ═══ */}
         {tab==='marketing' && (<>
           <ProductReportingSelector value={marketingProduct} onChange={setMarketingProduct} channel="marketing"
-            registryProducts={reportingProducts} />
+            registryProducts={reportingProducts} marketingConnectedProducts={ga4LiveProducts} />
           {ga4EnabledProducts.includes(marketingProduct) ? <>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
             <div style={{ fontSize:11, color:'#475569' }}>
