@@ -3,11 +3,79 @@ import Training from './Training'
 import { supabase } from '../lib/supabase'
 
 const ROMYLABS_TENANT = 'a0000000-0000-0000-0000-000000000001'
+const ROMYLABS_FROM_NAME = 'RomyLabs'
+const ROMYLABS_FROM_EMAIL = 'info@romylabs.com'
 
 function makeRoomId() {
   const bytes = new Uint8Array(6)
   crypto.getRandomValues(bytes)
   return Array.from(bytes, b => b.toString(36).padStart(2, '0')).join('').slice(0, 10).toUpperCase()
+}
+
+function EmailInvite({ url, kind, disabled = false }) {
+  const [open, setOpen] = useState(false)
+  const [to, setTo] = useState('')
+  const [sending, setSending] = useState(false)
+  const [status, setStatus] = useState('')
+
+  async function send() {
+    const recipients = to.split(',').map(v => v.trim()).filter(Boolean)
+    if (!recipients.length || !url) return
+    const invalid = recipients.find(v => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))
+    if (invalid) { setStatus(`Invalid email: ${invalid}`); return }
+
+    setSending(true)
+    setStatus('')
+    try {
+      const subject = kind === 'training' ? 'RomyLabs live training invitation' : 'RomyLabs video meeting invitation'
+      const heading = kind === 'training' ? 'Join our live training' : 'Join our video meeting'
+      const button = kind === 'training' ? 'Join Live Training' : 'Join Video Meeting'
+      for (const recipient of recipients) {
+        const { data, error } = await supabase.functions.invoke('send-email', {
+          body: {
+            from_name: ROMYLABS_FROM_NAME,
+            from_email: ROMYLABS_FROM_EMAIL,
+            to: recipient,
+            subject,
+            html: `<div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;padding:28px;color:#0f172a">
+              <div style="font-size:24px;font-weight:800;margin-bottom:8px">${heading}</div>
+              <p style="font-size:15px;line-height:1.6;color:#475569">RomyLabs has invited you to ${kind === 'training' ? 'a live training session' : 'a secure video meeting'}.</p>
+              <p style="text-align:center;margin:28px 0"><a href="${url}" style="display:inline-block;background:#6d28d9;color:#fff;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:800">${button}</a></p>
+              <p style="font-size:12px;line-height:1.6;color:#64748b">No download is required. Open the secure link in your browser:</p>
+              <p style="font-size:11px;line-height:1.5;color:#64748b;word-break:break-all">${url}</p>
+              <div style="border-top:1px solid #e2e8f0;margin-top:26px;padding-top:16px;font-size:12px;color:#64748b">
+                Best Regards,<br><br>
+                <strong>Romy Cruz</strong><br>
+                Founder &amp; CEO | RomyLabs<br>
+                ${ROMYLABS_FROM_EMAIL} · romylabs.com
+              </div>
+            </div>`,
+          }
+        })
+        if (error || data?.error) throw new Error(data?.error || error?.message || 'Email failed')
+      }
+      setStatus(`✓ Sent from ${ROMYLABS_FROM_EMAIL} to ${recipients.length} recipient${recipients.length === 1 ? '' : 's'}`)
+      setTo('')
+    } catch (e) {
+      setStatus(e?.message || 'Could not send invite')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  if (!open) return <button onClick={() => setOpen(true)} disabled={disabled || !url} style={{ ...secondaryBtn, opacity: disabled || !url ? .45 : 1 }}>✉ Email Invite</button>
+
+  return (
+    <div style={{ width:'100%', marginTop:10, padding:12, borderRadius:10, border:'1px solid rgba(99,102,241,.24)', background:'rgba(2,6,23,.42)' }}>
+      <div style={{ fontSize:10, fontWeight:800, color:'#94a3b8', marginBottom:6 }}>SEND FROM {ROMYLABS_FROM_EMAIL}</div>
+      <div style={{ display:'flex', gap:7, flexWrap:'wrap' }}>
+        <input value={to} onChange={e => setTo(e.target.value)} onKeyDown={e => e.key === 'Enter' && send()} placeholder="email@example.com, another@example.com" style={emailInput} />
+        <button onClick={send} disabled={sending || !to.trim()} style={primaryBtn}>{sending ? 'Sending…' : 'Send Invite'}</button>
+        <button onClick={() => { setOpen(false); setStatus('') }} style={ghostBtn}>Cancel</button>
+      </div>
+      {status && <div style={{ marginTop:8, fontSize:11, color:status.startsWith('✓') ? '#86efac' : '#fca5a5' }}>{status}</div>}
+    </div>
+  )
 }
 
 export default function MeetTrainingHub() {
@@ -82,6 +150,7 @@ export default function MeetTrainingHub() {
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
             <button onClick={startMeeting} style={primaryBtn}>Start Video Meeting</button>
             <button onClick={copyInvite} style={secondaryBtn}>{copied ? '✓ Copied' : 'Copy Invite'}</button>
+            <EmailInvite url={meetingUrl} kind="meeting" />
             <button onClick={newRoom} style={ghostBtn}>New Room</button>
           </div>
         </section>
@@ -95,6 +164,7 @@ export default function MeetTrainingHub() {
             {!trainingInvite ? <button onClick={createLargeTraining} disabled={trainingBusy} style={limeBtn}>{trainingBusy ? 'Creating…' : 'Create Large Training'}</button> : <>
               <button onClick={launchLargeTraining} style={limeBtn}>Start as Host</button>
               <button onClick={copyTrainingInvite} style={secondaryBtn}>{trainingCopied ? '✓ Copied' : 'Copy Audience Invite'}</button>
+              <EmailInvite url={trainingUrl} kind="training" />
               <button onClick={createLargeTraining} disabled={trainingBusy} style={ghostBtn}>New Training</button>
             </>}
           </div>
@@ -116,6 +186,7 @@ const badge = color => ({ fontSize:9, fontWeight:900, color, background:'rgba(15
 const urlBox = { background:'rgba(2,6,23,.45)', border:'1px solid rgba(148,163,184,.14)', borderRadius:10, padding:'11px 12px', marginBottom:12, minHeight:42 }
 const urlLabel = { fontSize:9, color:'#64748b', fontWeight:800, textTransform:'uppercase', letterSpacing:'.05em', marginBottom:5 }
 const urlText = { fontSize:10, color:'#cbd5e1', overflowWrap:'anywhere', fontFamily:'ui-monospace,SFMono-Regular,Menlo,monospace' }
+const emailInput = { flex:'1 1 240px', minWidth:0, background:'#0b1220', border:'1px solid #334155', borderRadius:8, padding:'9px 10px', color:'#f8fafc', fontSize:11, outline:'none' }
 const primaryBtn = { background:'linear-gradient(135deg,#6366f1,#8b5cf6)', color:'#fff', border:'none', borderRadius:8, padding:'9px 14px', fontSize:11, fontWeight:800, cursor:'pointer' }
 const limeBtn = { ...primaryBtn, background:'linear-gradient(135deg,#65a30d,#16a34a)' }
 const secondaryBtn = { background:'rgba(255,255,255,.05)', color:'#cbd5e1', border:'1px solid rgba(148,163,184,.2)', borderRadius:8, padding:'9px 12px', fontSize:11, fontWeight:700, cursor:'pointer' }
