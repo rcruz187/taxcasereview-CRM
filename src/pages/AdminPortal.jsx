@@ -1746,7 +1746,7 @@ function StatusDot({ ok }) {
 
 
 
-function ProductReportingSelector({ value, onChange, channel, gscConnected, activeGscProduct, registryProducts, marketingConnectedProducts=[] }) {
+function ProductReportingSelector({ value, onChange, channel, gscConnected, activeGscProduct, registryProducts, marketingConnectedProducts=[], seoConnectedProducts=[] }) {
   // Derives entirely from romylabs_products registry — no hardcoded product list.
   // Integration status starts as 'pending' (setup needed) for all products.
   // Live GSC connection overrides the SEO badge when gscConnected===true for the active product.
@@ -1775,7 +1775,7 @@ function ProductReportingSelector({ value, onChange, channel, gscConnected, acti
       {mapped.map(p => {
         const status = p[channel]
         // Live GSC connection overrides static label for the active product on the SEO channel
-        const isGscLive = channel === 'seo' && gscConnected && p.key === activeGscProduct
+        const isGscLive = channel === 'seo' && (seoConnectedProducts.includes(p.key) || (gscConnected && p.key === activeGscProduct))
         const isMarketingLive = channel === 'marketing' && marketingConnectedProducts.includes(p.key)
         const statusLabel = isMarketingLive
           ? 'GA4 Connected'
@@ -3623,6 +3623,10 @@ function CommandCenter() {
 
   // ── Reporting registry — dynamic product list from romylabs_products ──
   React.useEffect(() => {
+    supabase.from('product_traffic_channels').select('product_id,status').eq('channel_key','search_console').then(({ data, error }) => {
+      if (error) { setGscLiveProducts([]); return }
+      setGscLiveProducts((data || []).filter(r => r.status === 'live').map(r => r.product_id))
+    })
     supabase.from('product_traffic_channels').select('product_id,status,tracking_id').eq('channel_key','ga4').then(({ data, error }) => {
       if (error) { setGa4EnabledProducts([]); setGa4LiveProducts([]); return }
       const rows = data || []
@@ -3634,6 +3638,7 @@ function CommandCenter() {
   const [reportingProducts, setReportingProducts] = React.useState([])
   const [ga4EnabledProducts, setGa4EnabledProducts] = React.useState([])
   const [ga4LiveProducts, setGa4LiveProducts] = React.useState([])
+  const [gscLiveProducts, setGscLiveProducts] = React.useState([])
   React.useEffect(() => {
     supabase.from('romylabs_products')
       .select('product_id,name,accent_color,icon_ref,sort_order,lifecycle,app_url,marketing_url')
@@ -4299,7 +4304,7 @@ function CommandCenter() {
         {tab==='search' && (<>
           <ProductReportingSelector value={seoProduct} onChange={setSeoProduct} channel="seo"
             gscConnected={gscConnected} activeGscProduct={seoProduct}
-            registryProducts={reportingProducts} />
+            registryProducts={reportingProducts} seoConnectedProducts={gscLiveProducts} />
           <>
 
           {/* ── Google Search Console ── */}
