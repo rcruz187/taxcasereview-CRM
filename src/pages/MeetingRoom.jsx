@@ -31,7 +31,7 @@ function StandardMeetingRoom() {
   useEffect(() => {
     if (window.location.hostname.toLowerCase() === 'admin.romylabs.com') {
       FIRM.name = 'RomyLabs'
-      FIRM.logoUrl = '/romylabs-logo.png'
+      FIRM.logoUrl = '/romylabs-logo.svg'
       FIRM.email = 'info@romylabs.com'
       FIRM.tenantId = 'a0000000-0000-0000-0000-000000000001'
       FIRM.loaded = true

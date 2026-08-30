@@ -10,13 +10,12 @@ import { FIRM, firmFooterLine } from '../lib/firmBranding'
 
 const BASE = ''
 
-// Admin portal uses this tenant prefix — when training is sent from the
-// Admin Portal, we always brand as "TaxRes CRM" (the product), not as
-// whatever tenant happens to be loaded into FIRM.
+// RomyLabs Admin Portal always uses the RomyLabs platform identity.
+// Tenant-launched training continues to use that tenant's own branding.
 const ADMIN_TENANT_PREFIX = 'a0000000'
-const PRODUCT_NAME  = 'TaxRes CRM'
-const PRODUCT_LOGO  = 'https://taxrescrm.app/taxrescrm-logo.png'
-const PRODUCT_EMAIL = 'romy@taxrescrm.net'
+const PRODUCT_NAME  = 'RomyLabs'
+const PRODUCT_LOGO  = `${window.location.origin}/romylabs-logo.svg`
+const PRODUCT_EMAIL = 'info@romylabs.com'
 
 function isAdminContext(tenantId) {
   if (!tenantId) return false
@@ -145,14 +144,14 @@ export default function Training() {
     if (!sResult.ok) showToast(sResult.reason || 'Use the Share screen button below')
   }
 
-  // Resolved branding — Admin Portal always uses TaxRes CRM product identity.
+  // Resolved branding — RomyLabs Admin uses RomyLabs identity.
   // Per-tenant training uses that tenant's own branding.
   const resolvedTenantId = FIRM.tenantId || firmTenantId
   const isAdmin  = isAdminContext(resolvedTenantId)
   const dispName = isAdmin ? PRODUCT_NAME  : (FIRM.name  || firmName  || PRODUCT_NAME)
   const dispEmail= isAdmin ? PRODUCT_EMAIL : (FIRM.email || firmEmail || PRODUCT_EMAIL)
 
-  // Logo: Admin → product logo. Tenant → their logo if https, else build absolute URL.
+  // Logo: RomyLabs Admin → canonical RomyLabs logo. Tenant → their own logo.
   const rawLogo  = isAdmin ? PRODUCT_LOGO : (FIRM.logoUrl || firmLogo || '')
   const safeLogo = rawLogo.startsWith('https://')
     ? rawLogo
@@ -231,7 +230,7 @@ ${safeLogo ? `<img src="${safeLogo}" alt="${dispName}" style="max-height:56px;ma
     const h    = Math.min(900,  window.screen.availHeight - 80)
     const left = Math.round((window.screen.availWidth  - w) / 2)
     const top  = Math.max(30, Math.round((window.screen.availHeight - h) / 2))
-    window.open(url, `tcr-training-${ss.roomId}`, `width=${w},height=${h},left=${left},top=${top},resizable=yes`)
+    window.open(url, `romylabs-training-${ss.roomId}`, `width=${w},height=${h},left=${left},top=${top},resizable=yes`)
   }
 
   const joinUrl      = buildJoinUrl()
