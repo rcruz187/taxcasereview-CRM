@@ -2,33 +2,6 @@ name: Deploy RomyLabs Admin to Cloudflare
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      # Admin portal surfaces
-      - 'src/pages/AdminPortal.jsx'
-      - 'src/pages/AdminPortalGuard.jsx'
-      - 'src/pages/AdminChat.jsx'
-      - 'src/pages/AdminConsole.jsx'
-      - 'src/components/admin/**'
-      # Shared shell/auth modules that can change the admin build itself
-      - 'src/App.jsx'
-      - 'src/main.jsx'
-      - 'src/context/AppContext.jsx'
-      - 'src/context/ScreenShareContext.jsx'
-      - 'src/lib/supabase.js'
-      - 'src/lib/firmBranding.js'
-      - 'src/index.css'
-      - 'src/polish.css'
-      - 'src/taxres-mobile.css'
-      # Admin-specific public/build inputs
-      - 'public/admin-portal-build.txt'
-      - 'public/romylabs-logo.png'
-      - 'index.html'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'vite.config.*'
-      - '.github/workflows/deploy-romylabs-admin-cloudflare.yml'
 
 permissions:
   contents: read
