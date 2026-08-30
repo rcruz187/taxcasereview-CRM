@@ -32,6 +32,11 @@ verify_jwt = false
 [functions.redirect-to-voicemail]
 verify_jwt = false
 
+# Staff-only Stalwart DATA-stage webhook. Supabase JWT verification is off only
+# here; the function validates STALWART_MTA_HOOK_TOKEN before touching data.
+[functions.romylabs-inbound-email]
+verify_jwt = false
+
 # Browser phone-control endpoints — authenticated CRM staff only.
 [functions.signalwire-relay-token]
 verify_jwt = true
