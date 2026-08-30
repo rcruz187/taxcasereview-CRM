@@ -3,8 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { PRODUCT_BADGE_COLORS } from '../../lib/productBookingConfig'
 
 const PRODUCTS = [
-  { id:'romylabs', label:'RomyLabs' },
-  { id:'all', label:'All Products' },
+  { id:'all', label:'RomyLabs — All Products' },
   { id:'taxres_crm', label:'TaxRes CRM' },
   { id:'camvella', label:'Camvella' },
   { id:'arcvena', label:'Arcvena' },
@@ -28,7 +27,7 @@ const isoDate = (d) => {
 }
 
 export default function RomyLabsCalendar(){
-  const [product,setProduct] = useState('romylabs')
+  const [product,setProduct] = useState('all')
   const [events,setEvents] = useState([])
   const [loading,setLoading] = useState(true)
   const [error,setError] = useState('')
@@ -81,7 +80,7 @@ export default function RomyLabsCalendar(){
         .rl-cal-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
         .rl-cal-title{font-size:24px;font-weight:900;color:#fff}
         .rl-cal-sub{font-size:12px;color:#64748b;margin-top:4px}
-        .rl-cal-filter{background:#111827;color:#e2e8f0;border:1px solid rgba(99,102,241,.28);border-radius:9px;padding:9px 12px;font-size:13px;min-width:170px}
+        .rl-cal-filter{background:#111827;color:#e2e8f0;border:1px solid rgba(99,102,241,.28);border-radius:9px;padding:9px 12px;font-size:13px;min-width:210px}
         .rl-cal-grid-wrap{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
         .rl-cal-card{background:rgba(255,255,255,.03);border:1px solid rgba(99,102,241,.18);border-radius:14px;overflow:hidden}
         .rl-cal-monthbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid rgba(99,102,241,.14)}
@@ -116,7 +115,7 @@ export default function RomyLabsCalendar(){
       <div className="rl-cal-toolbar">
         <div>
           <div className="rl-cal-title">📅 RomyLabs Calendar</div>
-          <div className="rl-cal-sub">Real product bookings only — no demo or sample calendar data.</div>
+          <div className="rl-cal-sub">Live master calendar across RomyLabs products — no demo or sample calendar data.</div>
         </div>
         <select className="rl-cal-filter" value={product} onChange={e=>setProduct(e.target.value)}>
           {PRODUCTS.map(p=><option key={p.id} value={p.id}>{p.label}</option>)}
@@ -158,7 +157,7 @@ export default function RomyLabsCalendar(){
               <div className="rl-cal-event-title">{e.title}</div>
               <div className="rl-cal-meta">{fmtTime(e.event_time)}{e.client_name?` · ${e.client_name}`:''}{e.contact_email?<><br/>{e.contact_email}</>:null}{e.event_type?<><br/>{e.event_type}</>:null}</div>
             </div>
-          }) : <div className="rl-cal-empty">No real {product==='all'?'product':PRODUCTS.find(p=>p.id===product)?.label} events on this day.</div>}
+          }) : <div className="rl-cal-empty">No real {product==='all'?'RomyLabs product':PRODUCTS.find(p=>p.id===product)?.label} events on this day.</div>}
 
           <h3 style={{marginTop:20}}>Upcoming</h3>
           {loading ? null : upcoming.length ? upcoming.map(e=>{
