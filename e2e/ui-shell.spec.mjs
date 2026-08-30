@@ -32,6 +32,13 @@ async function mockSupabase(page) {
     }),
   }))
 
+  // SMS opens a Supabase Realtime channel. The smoke test uses a fake JWT and
+  // mocked REST responses, so allowing that one websocket to hit the real
+  // Supabase Realtime service creates an external teardown/reconnect race when
+  // this test rapidly navigates away from and back to SMS. Keep the socket
+  // local to Playwright; real application/page errors remain fatal below.
+  await page.routeWebSocket(`wss://${projectRef}.supabase.co/**`, () => {})
+
   await page.route(`${supabaseHost}/**`, async route => {
     const req = route.request()
     const url = new URL(req.url())
