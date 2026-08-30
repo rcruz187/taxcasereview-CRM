@@ -27,7 +27,8 @@ export default function MeetTrainingHub() {
 
   const trainingUrl = useMemo(() => {
     if (!trainingInvite) return ''
-    const url = new URL(`/training-room/${trainingId}`, window.location.origin)
+    const url = new URL(`/meet/${trainingId}`, window.location.origin)
+    url.searchParams.set('large', '1')
     url.searchParams.set('invite', trainingInvite)
     return url.toString()
   }, [trainingInvite, trainingId])
@@ -58,7 +59,7 @@ export default function MeetTrainingHub() {
 
   function launchLargeTraining() {
     if (!trainingInvite) return
-    window.open(`/training-room/${trainingId}`, '_blank')
+    window.open(`/meet/${trainingId}?large=1`, '_blank')
   }
 
   async function copyTrainingInvite() {
