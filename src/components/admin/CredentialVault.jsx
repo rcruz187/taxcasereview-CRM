@@ -38,9 +38,7 @@ function securePassword(length=24, useSymbols=true) {
   return chars.join('')
 }
 
-function maskSecret(secret='') {
-  return secret ? '•'.repeat(Math.min(Math.max(secret.length, 12), 24)) : '••••••••••••••••'
-}
+function maskSecret() { return '••••••••••••••••' }
 
 export default function CredentialVault() {
   const [entries, setEntries] = useState([])
@@ -52,17 +50,17 @@ export default function CredentialVault() {
   const [query, setQuery] = useState('')
   const [revealed, setRevealed] = useState({})
   const revealTimers = useRef({})
-  const [unlockUntil, setUnlockUntil] = useState(0)
-  const [showUnlock, setShowUnlock] = useState(false)
-  const [unlockPassword, setUnlockPassword] = useState('')
-  const [pendingReveal, setPendingReveal] = useState(null)
-  const [busy, setBusy] = useState(false)
+  const [busyId, setBusyId] = useState(null)
+  const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
   const [form, setForm] = useState({ product_id:'romylabs', service:'', account_label:'', username:'', login_url:'', notes:'', secret_type:'password', secret:'' })
   const [generatorLength, setGeneratorLength] = useState(24)
   const [generatorSymbols, setGeneratorSymbols] = useState(true)
 
-  function notify(msg) { setToast(msg); setTimeout(() => setToast(''), 2400) }
+  function notify(msg) {
+    setToast(msg)
+    setTimeout(() => setToast(''), 2600)
+  }
 
   async function load() {
     setLoading(true)
@@ -107,8 +105,12 @@ export default function CredentialVault() {
   }
 
   async function copy(text, label='Copied') {
-    await navigator.clipboard.writeText(text || '')
-    notify(label)
+    try {
+      await navigator.clipboard.writeText(text || '')
+      notify(label)
+    } catch (_) {
+      notify('Copy failed — select the value manually')
+    }
   }
 
   async function save() {
@@ -116,7 +118,7 @@ export default function CredentialVault() {
       notify('Product, service, and password/secret are required')
       return
     }
-    setBusy(true)
+    setSaving(true)
     const { error } = await supabase.rpc('credential_vault_save', {
       p_id: editing?.id || null,
       p_product_id: form.product_id,
@@ -128,42 +130,30 @@ export default function CredentialVault() {
       p_secret_type: form.secret_type,
       p_secret: form.secret || null,
     })
-    setBusy(false)
+    setSaving(false)
     if (error) { notify(error.message); return }
     notify(editing ? 'Credential updated securely' : 'Credential encrypted and saved')
     resetForm()
     await load()
   }
 
-  async function unlockAndReveal() {
-    if (!pendingReveal || !unlockPassword) return
-    setBusy(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user?.email) { setBusy(false); notify('Unable to verify account'); return }
-    const { error } = await supabase.auth.signInWithPassword({ email:user.email, password:unlockPassword })
-    setBusy(false)
-    if (error) { notify('Password verification failed'); return }
-    setUnlockUntil(Date.now() + 5*60*1000)
-    setShowUnlock(false)
-    setUnlockPassword('')
-    const id = pendingReveal
-    setPendingReveal(null)
-    await reveal(id, true)
-  }
-
-  async function reveal(id, skipUnlock=false) {
-    if (!skipUnlock && Date.now() >= unlockUntil) {
-      setPendingReveal(id)
-      setShowUnlock(true)
-      return
-    }
-    setBusy(true)
+  async function reveal(id) {
+    setBusyId(id)
     const { data, error } = await supabase.rpc('credential_vault_reveal', { p_id:id })
-    setBusy(false)
+    setBusyId(null)
     if (error) { notify(error.message); return }
+    if (typeof data !== 'string' || !data.length) { notify('Credential could not be revealed'); return }
     setRevealed(r => ({ ...r, [id]:data }))
     clearTimeout(revealTimers.current[id])
-    revealTimers.current[id] = setTimeout(() => setRevealed(r => { const n={...r}; delete n[id]; return n }), 45000)
+    revealTimers.current[id] = setTimeout(() => {
+      setRevealed(r => { const n={...r}; delete n[id]; return n })
+    }, 45000)
+    notify('Credential revealed for 45 seconds')
+  }
+
+  function hide(id) {
+    clearTimeout(revealTimers.current[id])
+    setRevealed(r => { const n={...r}; delete n[id]; return n })
   }
 
   async function remove(entry) {
@@ -182,7 +172,7 @@ export default function CredentialVault() {
         <div>
           <div style={{ fontSize:24, fontWeight:900, color:'#fff' }}>🔐 Credential Vault</div>
           <div style={{ color:'#64748b', fontSize:12, marginTop:5 }}>RomyLabs owner-only encrypted password, API key, and account store.</div>
-          <div style={{ color:'#475569', fontSize:11, marginTop:4 }}>Secrets are encrypted with Supabase Vault. Reveals auto-hide after 45 seconds.</div>
+          <div style={{ color:'#475569', fontSize:11, marginTop:4 }}>Secrets are encrypted with Supabase Vault. Revealed values auto-hide after 45 seconds.</div>
         </div>
         <button onClick={() => { resetForm(); setShowForm(true) }} style={BTN('primary')}>+ Add Credential</button>
       </div>
@@ -228,7 +218,7 @@ export default function CredentialVault() {
           </div>
 
           <label style={{ display:'block', fontSize:10, color:'#64748b', marginTop:12 }}>NOTES<textarea value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} rows={3} placeholder="Production project, recovery notes, MFA location…" style={{...INPUT,marginTop:5,resize:'vertical'}}/></label>
-          <div style={{ display:'flex', justifyContent:'flex-end', gap:8, marginTop:14 }}><button onClick={resetForm} style={BTN('ghost')}>Cancel</button><button onClick={save} disabled={busy} style={BTN('primary')}>{busy?'Saving…':editing?'Save Changes':'Encrypt & Save'}</button></div>
+          <div style={{ display:'flex', justifyContent:'flex-end', gap:8, marginTop:14 }}><button onClick={resetForm} style={BTN('ghost')}>Cancel</button><button onClick={save} disabled={saving} style={BTN('primary')}>{saving?'Saving…':editing?'Save Changes':'Encrypt & Save'}</button></div>
         </div>
       )}
 
@@ -245,7 +235,7 @@ export default function CredentialVault() {
               </div>
               <div style={{ marginTop:13, display:'grid', gap:8 }}>
                 <div><div style={{fontSize:9,color:'#475569',textTransform:'uppercase'}}>Username / Email</div><div style={{display:'flex',gap:6,alignItems:'center',marginTop:2}}><span style={{color:'#cbd5e1',fontSize:12,overflow:'hidden',textOverflow:'ellipsis'}}>{e.username||'—'}</span>{e.username&&<button onClick={()=>copy(e.username,'Username copied')} style={{...BTN('ghost'),padding:'3px 7px',fontSize:10}}>Copy</button>}</div></div>
-                <div><div style={{fontSize:9,color:'#475569',textTransform:'uppercase'}}>Secret</div><div style={{display:'flex',gap:6,alignItems:'center',marginTop:2}}><span style={{color:value?'#e2e8f0':'#64748b',fontSize:12,fontFamily:'ui-monospace,SFMono-Regular,Menlo,monospace',overflow:'hidden',textOverflow:'ellipsis'}}>{value||maskSecret()}</span><button onClick={()=>value?setRevealed(r=>{const n={...r};delete n[e.id];return n}):reveal(e.id)} disabled={busy} style={{...BTN('ghost'),padding:'3px 7px',fontSize:10}}>{value?'Hide':'Reveal'}</button>{value&&<button onClick={()=>copy(value,'Secret copied')} style={{...BTN('ghost'),padding:'3px 7px',fontSize:10}}>Copy</button>}</div></div>
+                <div><div style={{fontSize:9,color:'#475569',textTransform:'uppercase'}}>Secret</div><div style={{display:'flex',gap:6,alignItems:'center',marginTop:2,flexWrap:'wrap'}}><span style={{color:value?'#e2e8f0':'#64748b',fontSize:12,fontFamily:'ui-monospace,SFMono-Regular,Menlo,monospace',overflowWrap:'anywhere'}}>{value||maskSecret()}</span><button onClick={()=>value?hide(e.id):reveal(e.id)} disabled={busyId===e.id} style={{...BTN('ghost'),padding:'3px 7px',fontSize:10}}>{busyId===e.id?'Loading…':value?'Hide':'Reveal'}</button>{value&&<button onClick={()=>copy(value,'Secret copied')} style={{...BTN('ghost'),padding:'3px 7px',fontSize:10}}>Copy</button>}</div></div>
                 {e.login_url && <a href={e.login_url} target="_blank" rel="noreferrer" style={{color:'#818cf8',fontSize:11,textDecoration:'none'}}>Open login ↗</a>}
                 {e.notes && <div style={{fontSize:11,color:'#64748b',lineHeight:1.45}}>{e.notes}</div>}
               </div>
@@ -254,15 +244,6 @@ export default function CredentialVault() {
           })}
         </div>
       )}
-
-      {showUnlock && <div style={{ position:'fixed', inset:0, zIndex:10000, background:'rgba(4,6,18,.82)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
-        <div style={{ ...CARD, width:'100%', maxWidth:390, padding:22, background:'#111021' }}>
-          <div style={{ fontSize:16, fontWeight:900, color:'#fff' }}>🔓 Unlock Credential Vault</div>
-          <div style={{ fontSize:11, color:'#64748b', lineHeight:1.5, marginTop:6 }}>Confirm your RomyLabs Admin password before revealing secrets. The vault stays unlocked for 5 minutes in this browser tab only.</div>
-          <input type="password" value={unlockPassword} onChange={e=>setUnlockPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&unlockAndReveal()} autoFocus placeholder="Your Admin Portal password" style={{...INPUT,marginTop:15}}/>
-          <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:14 }}><button onClick={()=>{setShowUnlock(false);setUnlockPassword('');setPendingReveal(null)}} style={BTN('ghost')}>Cancel</button><button onClick={unlockAndReveal} disabled={busy||!unlockPassword} style={BTN('primary')}>{busy?'Checking…':'Unlock & Reveal'}</button></div>
-        </div>
-      </div>}
     </div>
   )
 }
