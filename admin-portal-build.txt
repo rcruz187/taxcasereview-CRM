@@ -15,3 +15,4 @@ mobile-admin-imp-fix=20260830-v3
 live-v3-trace=20260830-1942
 mobile-responsive-shell=20260830-v1
 mobile-admin-ios-session=20260830-v5
+mobile-ui-polish=20260830-v1
