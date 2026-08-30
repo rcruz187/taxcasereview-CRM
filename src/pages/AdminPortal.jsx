@@ -18,7 +18,7 @@ const AdminChatPage = lazy(() => import('./AdminChat'))
 const NewOffice    = lazy(() => import('./NewOffice'))
 const Support      = lazy(() => import('./Support'))
 const CalendarPage = lazy(() => import('./Calendar'))
-const TrainingPage = lazy(() => import('./Training'))
+const TrainingPage = lazy(() => import('./MeetTrainingHub'))
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const TCR_TENANT      = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
@@ -104,6 +104,7 @@ const NAV = [
   { path:'/crm-admin/vault',          label:'Credential Vault', icon:'🔐' },
   { path:'/crm-admin/email',          label:'Email',          icon:'📧' },
   { path:'/crm-admin/calendar',       label:'Calendar',       icon:'📅' },
+  { path:'/crm-admin/meet',           label:'Meet & Training', icon:'🎥' },
   { path:'/crm-admin/chat',           label:'Chat (All)',      icon:'💬' },
   { path:'/crm-admin',                label:'Overview',        icon:'📊' },
   { path:'/crm-admin/provision',      label:'+ New Office',   icon:'➕' },
@@ -6221,6 +6222,7 @@ export default function AdminPortal() {
             <Route path="/support"        element={<div style={{padding:8}}><Support/></div>}/>
             <Route path="/email"          element={<div/>}/>
             <Route path="/calendar"       element={<AdminRouteErrorBoundary><AdminCalendar/></AdminRouteErrorBoundary>}/>
+            <Route path="/meet"           element={<AdminRouteErrorBoundary><AdminTraining/></AdminRouteErrorBoundary>}/>
             <Route path="/training"       element={<AdminRouteErrorBoundary><AdminTraining/></AdminRouteErrorBoundary>}/>
             <Route path="/chat"           element={<AdminRouteErrorBoundary><AdminChatPage/></AdminRouteErrorBoundary>}/>
             <Route path="*"               element={<Overview key={window.location.pathname + window.location.search + "_fallback"}/>}/>

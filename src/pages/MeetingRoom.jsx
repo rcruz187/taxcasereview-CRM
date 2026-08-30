@@ -23,9 +23,20 @@ export default function MeetingRoom() {
   const rawRef  = useRef(null)  // original camera stream
 
   useEffect(() => {
-    // Meeting links generated inside the app carry ?t=<tenant uuid> so the
-    // public join screen renders the sender firm's logo + name. Absent → the
-    // RPC falls back to the legacy first-row (TCR), same as before.
+    // Meetings launched from the RomyLabs Admin Portal always use the platform
+    // identity. Product/tenant meeting links continue to load their own branding.
+    if (window.location.hostname.toLowerCase() === 'admin.romylabs.com') {
+      FIRM.name = 'RomyLabs'
+      FIRM.logoUrl = '/romylabs-logo.png'
+      FIRM.email = 'info@romylabs.com'
+      FIRM.tenantId = 'a0000000-0000-0000-0000-000000000001'
+      FIRM.loaded = true
+      setBrandingReady(true)
+      return
+    }
+
+    // Meeting links generated inside a product carry ?t=<tenant uuid> so the
+    // public join screen renders the sender firm's logo + name.
     const t = (params.get('t') || '').trim()
     loadFirmBrandingPublic(t || undefined).finally(() => setBrandingReady(true))
   }, [params])
