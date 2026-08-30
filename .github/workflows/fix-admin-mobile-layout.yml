@@ -13,8 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -24,7 +22,6 @@ jobs:
           from pathlib import Path
           p=Path('src/pages/AdminPortal.jsx')
           s=p.read_text()
-
           old="""function Sidebar({ onSignOut }) {
   const location = useLocation()
   return (
@@ -37,14 +34,12 @@ jobs:
       borderRight:'1px solid rgba(99,102,241,.2)', display:'flex', flexDirection:'column' }}>"""
           if old not in s: raise SystemExit('sidebar signature pattern missing')
           s=s.replace(old,new,1)
-
           old="""<NavLink key={item.path} to={item.path}
               style={{ display:'flex', alignItems:'center', gap:9, padding:'8px 11px',"""
           new="""<NavLink key={item.path} to={item.path} onClick={mobile ? onClose : undefined}
               style={{ display:'flex', alignItems:'center', gap:9, padding:mobile ? '11px 12px' : '8px 11px',"""
           if old not in s: raise SystemExit('navlink pattern missing')
           s=s.replace(old,new,1)
-
           old="""export default function AdminPortal() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -56,7 +51,6 @@ jobs:
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)"""
           if old not in s: raise SystemExit('admin function pattern missing')
           s=s.replace(old,new,1)
-
           old="""  return (
     <ScreenShareProvider>
     <div style={{display:'flex',minHeight:'100vh',background:'#0d0c1a',fontFamily:'system-ui,Arial,sans-serif'}}>
@@ -65,30 +59,7 @@ jobs:
           new="""  return (
     <ScreenShareProvider>
     <div className=\"rl-admin-shell\" style={{display:'flex',minHeight:'100vh',background:'#0d0c1a',fontFamily:'system-ui,Arial,sans-serif',width:'100%',overflowX:'hidden'}}>
-      <style>{`
-        .rl-admin-mobile-bar,.rl-admin-mobile-overlay{display:none}
-        .rl-admin-desktop-sidebar{display:flex;flex-shrink:0}
-        .rl-admin-main{min-width:0;width:100%}
-        @media (max-width: 768px){
-          .rl-admin-shell{display:block!important;min-height:100dvh!important}
-          .rl-admin-desktop-sidebar{display:none!important}
-          .rl-admin-mobile-bar{display:flex!important;position:sticky;top:0;z-index:9000;height:58px;align-items:center;gap:12px;padding:0 14px;background:#0f0e1a;border-bottom:1px solid rgba(99,102,241,.22);padding-top:env(safe-area-inset-top)}
-          .rl-admin-mobile-menu-btn{width:40px;height:40px;border-radius:10px;border:1px solid rgba(99,102,241,.28);background:rgba(99,102,241,.10);color:#e2e8f0;font-size:21px;display:flex;align-items:center;justify-content:center}
-          .rl-admin-mobile-overlay{display:flex!important;position:fixed;inset:0;z-index:9500;background:rgba(2,6,23,.72);backdrop-filter:blur(3px)}
-          .rl-admin-mobile-drawer{height:100%;overflow-y:auto;box-shadow:16px 0 40px rgba(0,0,0,.45)}
-          .rl-admin-mobile-scrim{flex:1;height:100%}
-          .rl-admin-main{height:calc(100dvh - 58px)!important;overflow-y:auto!important;overflow-x:hidden!important;-webkit-overflow-scrolling:touch}
-          .rl-admin-main table{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap}
-          .rl-admin-main input,.rl-admin-main select,.rl-admin-main textarea{max-width:100%;box-sizing:border-box}
-          .rl-admin-main button,.rl-admin-main a{touch-action:manipulation}
-          .rl-admin-main [style*=\"grid-template-columns: repeat(6\"]{grid-template-columns:repeat(2,minmax(0,1fr))!important}
-          .rl-admin-main [style*=\"grid-template-columns: repeat(3\"]{grid-template-columns:1fr!important}
-          .rl-admin-main [style*=\"grid-template-columns: repeat(4\"]{grid-template-columns:repeat(2,minmax(0,1fr))!important}
-        }
-        @media (max-width: 430px){
-          .rl-admin-main [style*=\"grid-template-columns: repeat(2\"]{grid-template-columns:1fr!important}
-        }
-      `}</style>
+      <style>{`\n        .rl-admin-mobile-bar,.rl-admin-mobile-overlay{display:none}\n        .rl-admin-desktop-sidebar{display:flex;flex-shrink:0}\n        .rl-admin-main{min-width:0;width:100%}\n        @media (max-width:768px){\n          .rl-admin-shell{display:block!important;min-height:100dvh!important}\n          .rl-admin-desktop-sidebar{display:none!important}\n          .rl-admin-mobile-bar{display:flex!important;position:sticky;top:0;z-index:9000;height:58px;align-items:center;gap:12px;padding:env(safe-area-inset-top) 14px 0;background:#0f0e1a;border-bottom:1px solid rgba(99,102,241,.22)}\n          .rl-admin-mobile-menu-btn{width:40px;height:40px;border-radius:10px;border:1px solid rgba(99,102,241,.28);background:rgba(99,102,241,.10);color:#e2e8f0;font-size:21px;display:flex;align-items:center;justify-content:center}\n          .rl-admin-mobile-overlay{display:flex!important;position:fixed;inset:0;z-index:9500;background:rgba(2,6,23,.72);backdrop-filter:blur(3px)}\n          .rl-admin-mobile-drawer{height:100%;overflow-y:auto;box-shadow:16px 0 40px rgba(0,0,0,.45)}\n          .rl-admin-mobile-scrim{flex:1;height:100%}\n          .rl-admin-main{height:calc(100dvh - 58px)!important;overflow-y:auto!important;overflow-x:hidden!important;-webkit-overflow-scrolling:touch}\n          .rl-admin-main table{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap}\n          .rl-admin-main input,.rl-admin-main select,.rl-admin-main textarea{max-width:100%;box-sizing:border-box}\n          .rl-admin-main button,.rl-admin-main a{touch-action:manipulation}\n        }\n      `}</style>
       <div className=\"rl-admin-desktop-sidebar\"><Sidebar onSignOut={handleSignOut} /></div>
       <div className=\"rl-admin-mobile-bar\">
         <button className=\"rl-admin-mobile-menu-btn\" onClick={()=>setMobileMenuOpen(true)} aria-label=\"Open navigation\">☰</button>
@@ -102,7 +73,6 @@ jobs:
       <div className=\"rl-admin-main\" style={{flex:1,position:'relative',height:'100vh',overflowY:'auto'}}>"""
           if old not in s: raise SystemExit('shell pattern missing')
           s=s.replace(old,new,1)
-
           p.write_text(s)
           PY
       - name: Verify patch
