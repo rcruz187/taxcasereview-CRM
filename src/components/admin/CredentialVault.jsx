@@ -165,10 +165,28 @@ export default function CredentialVault() {
   }
 
   return (
-    <div style={{ padding:'28px 32px', maxWidth:1200 }}>
+    <div className="rl-vault" style={{ padding:'28px 32px', maxWidth:1200 }}>
+      <style>{`
+        /* VAULT_MOBILE_POLISH_V1_20260830 */
+        @media (max-width:768px){
+          .rl-vault{padding:18px 14px!important;max-width:none!important}
+          .rl-vault-header{flex-direction:column!important;align-items:stretch!important;gap:12px!important;margin-bottom:16px!important}
+          .rl-vault-header button{width:100%!important;min-height:44px!important}
+          .rl-vault-filters{padding:12px!important}
+          .rl-vault-filters>div{display:grid!important;grid-template-columns:1fr!important;gap:9px!important}
+          .rl-vault-filters select,.rl-vault-filters input{width:100%!important;min-width:0!important;font-size:16px!important}
+          .rl-vault-form{padding:14px!important}
+          .rl-vault-form-grid{grid-template-columns:1fr!important;gap:10px!important}
+          .rl-vault-form input,.rl-vault-form select,.rl-vault-form textarea{font-size:16px!important}
+          .rl-vault-grid{grid-template-columns:1fr!important;gap:9px!important}
+          .rl-vault-card{padding:11px 12px!important;border-radius:12px!important}
+          .rl-vault-card button{min-height:38px!important;padding:7px 10px!important}
+          .rl-vault-actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px!important}
+        }
+      `}</style>
       {toast && <div style={{ position:'fixed', right:24, bottom:24, zIndex:9999, background:'#14532d', color:'#fff', borderRadius:9, padding:'10px 16px', fontSize:12, fontWeight:700 }}>{toast}</div>}
 
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:16, marginBottom:22 }}>
+      <div className="rl-vault-header" style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:16, marginBottom:22 }}>
         <div>
           <div style={{ fontSize:24, fontWeight:900, color:'#fff' }}>🔐 Credential Vault</div>
           <div style={{ color:'#64748b', fontSize:12, marginTop:5 }}>RomyLabs owner-only encrypted password, API key, and account store.</div>
@@ -177,7 +195,7 @@ export default function CredentialVault() {
         <button onClick={() => { resetForm(); setShowForm(true) }} style={BTN('primary')}>+ Add Credential</button>
       </div>
 
-      <div style={{ ...CARD, padding:16, marginBottom:18 }}>
+      <div className="rl-vault-filters" style={{ ...CARD, padding:16, marginBottom:18 }}>
         <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'center' }}>
           <select value={filter} onChange={e=>setFilter(e.target.value)} style={{ ...INPUT, width:190 }}>
             <option value="all">All Products</option>
@@ -189,12 +207,12 @@ export default function CredentialVault() {
       </div>
 
       {showForm && (
-        <div style={{ ...CARD, padding:18, marginBottom:18, border:'1px solid rgba(99,102,241,.38)' }}>
+        <div className="rl-vault-form" style={{ ...CARD, padding:18, marginBottom:18, border:'1px solid rgba(99,102,241,.38)' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
             <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{editing ? 'Edit Credential' : 'Add Credential'}</div>
             <button onClick={resetForm} style={BTN('ghost')}>× Close</button>
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:12 }}>
+          <div className="rl-vault-form-grid" style={{ display:'grid', gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:12 }}>
             <label style={{ fontSize:10, color:'#64748b' }}>PRODUCT<select value={form.product_id} onChange={e=>setForm(f=>({...f,product_id:e.target.value}))} style={{...INPUT,marginTop:5}}>{products.map(p=><option key={p.product_id} value={p.product_id}>{p.name}</option>)}</select></label>
             <label style={{ fontSize:10, color:'#64748b' }}>SERVICE<input value={form.service} onChange={e=>setForm(f=>({...f,service:e.target.value}))} placeholder="Supabase, Stalwart, Cloudflare…" style={{...INPUT,marginTop:5}}/></label>
             <label style={{ fontSize:10, color:'#64748b' }}>ACCOUNT LABEL<input value={form.account_label} onChange={e=>setForm(f=>({...f,account_label:e.target.value}))} placeholder="Production / Admin / Main" style={{...INPUT,marginTop:5}}/></label>
@@ -225,10 +243,10 @@ export default function CredentialVault() {
       {loading ? <div style={{ color:'#64748b', padding:30 }}>Loading vault…</div> : filtered.length===0 ? (
         <div style={{ ...CARD, padding:38, textAlign:'center', color:'#64748b' }}>No credentials yet. Click <b style={{color:'#a5b4fc'}}>+ Add Credential</b> to store the first one.</div>
       ) : (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,280px))', gap:8, alignItems:'start' }}>
+        <div className="rl-vault-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,280px))', gap:8, alignItems:'start' }}>
           {filtered.map(e => {
             const value = revealed[e.id]
-            return <div key={e.id} style={{ ...CARD, padding:'8px 9px', minWidth:0, borderRadius:10 }}>
+            return <div className="rl-vault-card" key={e.id} style={{ ...CARD, padding:'8px 9px', minWidth:0, borderRadius:10 }}>
               <div style={{ display:'flex', justifyContent:'space-between', gap:6, alignItems:'flex-start' }}>
                 <div style={{minWidth:0}}>
                   <div style={{ color:'#fff', fontSize:12, fontWeight:800, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.service}</div>
