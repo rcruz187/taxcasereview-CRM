@@ -7,3 +7,4 @@ if (!s.includes(oldText)) throw new Error('GA4 load effect anchor missing; sourc
 s = s.replace(oldText, newText);
 fs.writeFileSync(p, s);
 console.log('Patched GA4 load effect to rerun after registry initialization');
+// one-shot trigger
