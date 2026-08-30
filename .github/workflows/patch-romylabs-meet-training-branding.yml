@@ -1,0 +1,54 @@
+name: Patch RomyLabs Meet Training Branding
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/patch-romylabs-meet-training-branding.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply canonical RomyLabs branding
+        shell: python
+        run: |
+          from pathlib import Path
+
+          meeting = Path('src/pages/MeetingRoom.jsx')
+          text = meeting.read_text()
+          text = text.replace("FIRM.logoUrl = '/romylabs-logo.png'", "FIRM.logoUrl = '/romylabs-logo.svg'")
+          meeting.write_text(text)
+
+          training = Path('src/pages/Training.jsx')
+          text = training.read_text()
+          text = text.replace('// Admin portal uses this tenant prefix — when training is sent from the\n// Admin Portal, we always brand as "TaxRes CRM" (the product), not as\n// whatever tenant happens to be loaded into FIRM.', '// RomyLabs Admin Portal always uses the RomyLabs platform identity.\n// Tenant-launched training continues to use that tenant\'s own branding.')
+          text = text.replace("const PRODUCT_NAME  = 'TaxRes CRM'", "const PRODUCT_NAME  = 'RomyLabs'")
+          text = text.replace("const PRODUCT_LOGO  = 'https://taxrescrm.app/taxrescrm-logo.png'", "const PRODUCT_LOGO  = `${window.location.origin}/romylabs-logo.svg`")
+          text = text.replace("const PRODUCT_EMAIL = 'romy@taxrescrm.net'", "const PRODUCT_EMAIL = 'info@romylabs.com'")
+          text = text.replace('// Resolved branding — Admin Portal always uses TaxRes CRM product identity.\n  // Per-tenant training uses that tenant\'s own branding.', '// Resolved branding — RomyLabs Admin uses RomyLabs identity.\n  // Per-tenant training uses that tenant\'s own branding.')
+          text = text.replace('// Logo: Admin → product logo. Tenant → their logo if https, else build absolute URL.', '// Logo: RomyLabs Admin → canonical RomyLabs logo. Tenant → their own logo.')
+          text = text.replace('window.open(url, `tcr-training-${ss.roomId}`', 'window.open(url, `romylabs-training-${ss.roomId}`')
+          training.write_text(text)
+
+          wf = Path('.github/workflows/patch-romylabs-meet-training-branding.yml')
+          if wf.exists(): wf.unlink()
+      - name: Verify no TaxRes admin branding remains in Training
+        shell: bash
+        run: |
+          grep -q "const PRODUCT_NAME  = 'RomyLabs'" src/pages/Training.jsx
+          grep -q "const PRODUCT_EMAIL = 'info@romylabs.com'" src/pages/Training.jsx
+          grep -q "romylabs-logo.svg" src/pages/MeetingRoom.jsx
+          if grep -q "const PRODUCT_NAME  = 'TaxRes CRM'" src/pages/Training.jsx; then exit 1; fi
+      - name: Commit branding fix
+        shell: bash
+        run: |
+          git config user.name 'RomyLabs'
+          git config user.email 'rcruz187@gmail.com'
+          git add src/pages/MeetingRoom.jsx src/pages/Training.jsx .github/workflows/patch-romylabs-meet-training-branding.yml
+          git commit -m 'fix: use RomyLabs branding across Meet and Training'
+          git push origin main
