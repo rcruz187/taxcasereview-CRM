@@ -28,6 +28,39 @@
 
   if (host !== 'admin.romylabs.com') return;
 
+  /* IOS_CHROME_BFCACHE_FIX_V5_20260830: Chrome on iPhone may restore a fully
+   * rendered tenant/demo page from WebKit's back-forward cache without a normal
+   * application boot. Force the dedicated admin control-plane route to evaluate
+   * again whenever such a page is restored, except during validated Jump In. */
+  window.addEventListener('pageshow', function (event) {
+    if (!event.persisted) return;
+    var livePath = window.location.pathname;
+    var liveParams = new URLSearchParams(window.location.search || '');
+    var liveStoredImp = false;
+    try { liveStoredImp = !!sessionStorage.getItem('admin_impersonation'); } catch (_) {}
+    var liveActiveImp = livePath === '/' && liveParams.get('imp') === '1' && liveStoredImp;
+    if (livePath.indexOf('/meet/') === 0 || livePath === '/impersonate' || liveActiveImp) return;
+    window.location.replace('/crm-admin?fresh=' + Date.now());
+  });
+
+  function storedSessionEmail(raw) {
+    if (!raw) return '';
+    try {
+      var parsed = JSON.parse(raw);
+      var direct = parsed && parsed.user && parsed.user.email ? parsed.user.email : '';
+      if (direct) return String(direct).toLowerCase();
+      var token = parsed && parsed.access_token ? parsed.access_token : '';
+      if (!token && Array.isArray(parsed) && parsed[0] && parsed[0].access_token) token = parsed[0].access_token;
+      if (token && token.split('.').length >= 2) {
+        var payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        while (payload.length % 4) payload += '=';
+        var decoded = JSON.parse(atob(payload));
+        return decoded && decoded.email ? String(decoded.email).toLowerCase() : '';
+      }
+    } catch (_) {}
+    return '';
+  }
+
   /* Public meeting/training/invite routes intentionally run on the RomyLabs host
    * without entering the authenticated control plane. Never rewrite them. */
   if (isPublicRoute) return;
@@ -73,24 +106,20 @@
       'romy@taxcasereview.org': true
     };
     var removedTenantAuth = false;
-    try {
-      for (var storageIndex = localStorage.length - 1; storageIndex >= 0; storageIndex--) {
-        var storageKey = localStorage.key(storageIndex);
-        if (!storageKey || storageKey.indexOf('sb-') !== 0 || storageKey.indexOf('-auth-token') === -1) continue;
-        var rawSession = localStorage.getItem(storageKey);
-        if (!rawSession) continue;
-        try {
-          var parsedSession = JSON.parse(rawSession);
-          var storedEmail = parsedSession && parsedSession.user && parsedSession.user.email
-            ? String(parsedSession.user.email).toLowerCase()
-            : '';
+    [localStorage, sessionStorage].forEach(function (store) {
+      try {
+        for (var storageIndex = store.length - 1; storageIndex >= 0; storageIndex--) {
+          var storageKey = store.key(storageIndex);
+          if (!storageKey || storageKey.indexOf('sb-') !== 0 || storageKey.indexOf('-auth-token') === -1) continue;
+          var rawSession = store.getItem(storageKey);
+          var storedEmail = storedSessionEmail(rawSession);
           if (storedEmail && !ownerEmails[storedEmail]) {
-            localStorage.removeItem(storageKey);
+            store.removeItem(storageKey);
             removedTenantAuth = true;
           }
-        } catch (_) {}
-      }
-    } catch (_) {}
+        }
+      } catch (_) {}
+    });
     if (removedTenantAuth) {
       try { sessionStorage.removeItem('admin_impersonation'); } catch (_) {}
       if (path !== '/login') window.location.replace('/login?admin=1');
