@@ -1,7 +1,7 @@
 name: UI Browser Smoke
 on:
   push:
-    branches: [main]
+    branches: [main, diag-ui-sequence]
     paths:
       - 'index.html'
       - 'src/**'
@@ -47,7 +47,7 @@ jobs:
       - name: Click through authenticated shell and global create actions
         env:
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:4173
-        run: npx playwright test e2e/ui-shell.spec.mjs --browser=chromium --reporter=line
+        run: npx playwright test e2e/ui-shell.spec.mjs e2e/ui-sequence-diagnostic.spec.mjs --browser=chromium --reporter=line
       - name: Show preview log on failure
         if: failure()
         run: cat /tmp/tcr-preview.log || true
