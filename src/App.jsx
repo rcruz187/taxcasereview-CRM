@@ -343,6 +343,17 @@ function AuthRouter() {
   const { user, checking } = useApp()
   const path = window.location.pathname
 
+  // HARD PUBLIC BOUNDARY: meeting tabs on admin.romylabs.com must never enter
+  // AdminGate/RequireAuth. Render the meeting room immediately from the URL,
+  // regardless of the owner's existing admin session.
+  if (/^\/meet\/[^/]+/.test(path)) {
+    return (
+      <Suspense fallback={<div style={{minHeight:'100vh',background:'#080b14'}} />}>
+        <MeetingRoom />
+      </Suspense>
+    )
+  }
+
   // Public routes must render immediately — never block them on the auth check.
   // /book, /sign, /portal etc are anonymous; showing a spinner loses prospects.
   const publicPaths = ['/book', '/sign', '/portal', '/clockin', '/kiosk',
