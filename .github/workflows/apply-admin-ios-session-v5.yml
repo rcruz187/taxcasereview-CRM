@@ -1,0 +1,28 @@
+name: Apply Admin iOS Session V5
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-admin-ios-session-v5.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply patch
+        run: python3 .github/scripts/patch_admin_ios_session_v5.py
+      - name: Verify
+        run: |
+          grep -q 'IOS_CHROME_BFCACHE_FIX_V5_20260830' public/romylabs-admin-hotfix.js
+          grep -q 'storedSessionEmail' public/romylabs-admin-hotfix.js
+      - name: Commit
+        run: |
+          git config user.name 'RomyLabs Bot'
+          git config user.email 'actions@github.com'
+          git add public/romylabs-admin-hotfix.js
+          git commit -m 'fix(admin): harden iPhone Chrome session lifecycle'
+          git push
