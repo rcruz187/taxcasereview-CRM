@@ -18,7 +18,7 @@ const AdminChatPage = lazy(() => import('./AdminChat'))
 const NewOffice    = lazy(() => import('./NewOffice'))
 const Support      = lazy(() => import('./Support'))
 const CalendarPage = lazy(() => import('./Calendar'))
-const TrainingPage = lazy(() => import('./Training'))
+const TrainingPage = lazy(() => import('./MeetTrainingHub'))
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const TCR_TENANT      = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
