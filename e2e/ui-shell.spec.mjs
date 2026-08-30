@@ -48,8 +48,6 @@ async function mockSupabase(page) {
       return route.fulfill({ status:200, contentType:'application/json', headers:{'content-range':'0-0/1'}, body:JSON.stringify(wantsObject ? tenant : [tenant]) })
     }
 
-    // Exact-count fixtures reproduce PostgREST HEAD semantics used by Sidebar.
-    // Inbox=1 + Action Needed=1 gives the visible Email badge total of 2.
     if (pathname.includes('/rest/v1/emails')) {
       const triage = url.searchParams.get('triage') || ''
       const count = triage === 'eq.Inbox' || triage === 'eq.Action Needed' ? 1 : 0
@@ -79,6 +77,7 @@ async function mockSupabase(page) {
       const rpc = pathname.split('/').pop(); let body = []
       if (rpc === 'get_branding_by_email_domain') body = { firm_name:'Tax Case Review', logo_url:null, sub:'IRS Resolution Platform' }
       else if (rpc === 'current_tenant_id') body = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
+      else if (rpc === 'get_sidebar_badge_counts') body = { email:2, tasks:5, leads:4, clients:0, cases:3, deadlines:0, calendar:0, esign:0, voicemails:0, fax:0 }
       else if (rpc.includes('tenant') || rpc.includes('branding')) body = { tenant_id:'61a89aef-0e7e-4ea2-b222-44ab2024655a' }
       return route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify(body) })
     }
