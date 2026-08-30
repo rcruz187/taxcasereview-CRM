@@ -12,6 +12,7 @@ import { useApp } from '../context/AppContext'
 import AIAssistant from '../components/AIAssistant'
 import RomyLabsBilling from '../components/admin/RomyLabsBilling'
 import TrafficCoverage from '../components/admin/TrafficCoverage'
+import CredentialVault from '../components/admin/CredentialVault'
 const AdminChatPage = lazy(() => import('./AdminChat'))
 
 const NewOffice    = lazy(() => import('./NewOffice'))
@@ -100,6 +101,7 @@ function Spinner() {
 const NAV = [
   { path:'/crm-admin/command-center', label:'Command Center', icon:'⚡' },
   { path:'/crm-admin/traffic',        label:'Traffic Coverage', icon:'🌐' },
+  { path:'/crm-admin/vault',          label:'Credential Vault', icon:'🔐' },
   { path:'/crm-admin/email',          label:'Email',          icon:'📧' },
   { path:'/crm-admin/calendar',       label:'Calendar',       icon:'📅' },
   { path:'/crm-admin/chat',           label:'Chat (All)',      icon:'💬' },
@@ -6200,6 +6202,7 @@ export default function AdminPortal() {
           <Routes>
             <Route path="/command-center" element={<AdminRouteErrorBoundary><CommandCenter/></AdminRouteErrorBoundary>}/>
             <Route path="/traffic"        element={<AdminRouteErrorBoundary><TrafficCoverage/></AdminRouteErrorBoundary>}/>
+            <Route path="/vault"          element={<AdminRouteErrorBoundary><CredentialVault/></AdminRouteErrorBoundary>}/>
             <Route path="/content"         element={<AdminRouteErrorBoundary><ContentCenter/></AdminRouteErrorBoundary>}/>
             <Route path="/linkedin"          element={<AdminRouteErrorBoundary><LinkedInPublisher/></AdminRouteErrorBoundary>}/>
             <Route path="/linkedin/callback" element={<AdminRouteErrorBoundary><LinkedInPublisher/></AdminRouteErrorBoundary>}/>
