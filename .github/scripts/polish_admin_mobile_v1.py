@@ -5,7 +5,7 @@ p = Path('src/pages/AdminPortal.jsx')
 s = p.read_text()
 marker = '/* MOBILE_POLISH_V1_20260830 */'
 if marker not in s:
-    needle = "        @media (max-width: 430px){"
+    needle = "        @media (max-width:430px){"
     if needle not in s:
         raise SystemExit('Admin mobile media marker not found')
     css = r'''        /* MOBILE_POLISH_V1_20260830 */
@@ -56,7 +56,6 @@ if 'VAULT_MOBILE_POLISH_V1_20260830' not in s:
     s = s.replace("<div style={{ display:'grid', gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:12 }}>", "<div className=\"rl-vault-form-grid\" style={{ display:'grid', gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:12 }}>", 1)
     s = s.replace("<div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,280px))', gap:8, alignItems:'start' }}>", "<div className=\"rl-vault-grid\" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,280px))', gap:8, alignItems:'start' }}>", 1)
     s = s.replace("return <div key={e.id} style={{ ...CARD, padding:'8px 9px', minWidth:0, borderRadius:10 }}>", "return <div className=\"rl-vault-card\" key={e.id} style={{ ...CARD, padding:'8px 9px', minWidth:0, borderRadius:10 }}>", 1)
-    # Add class to the card action row if exact compact row is present.
     s = s.replace("<div style={{ display:'flex', gap:5, marginTop:7, flexWrap:'wrap' }}>", "<div className=\"rl-vault-actions\" style={{ display:'flex', gap:5, marginTop:7, flexWrap:'wrap' }}>", 1)
     p.write_text(s)
 
