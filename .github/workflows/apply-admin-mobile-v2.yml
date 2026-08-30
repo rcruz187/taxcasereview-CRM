@@ -1,0 +1,33 @@
+name: Apply Admin Mobile V2
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-admin-mobile-v2.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Apply patch
+        run: python3 .github/scripts/patch_admin_mobile_v2.py
+      - name: Verify build
+        run: |
+          grep -q 'rl-admin-mobile-bar' src/pages/AdminPortal.jsx
+          grep -q 'Sidebar mobile' src/pages/AdminPortal.jsx
+          npm ci
+          npm run build
+      - name: Commit
+        run: |
+          git config user.name 'RomyLabs Bot'
+          git config user.email 'actions@github.com'
+          git add src/pages/AdminPortal.jsx
+          git commit -m 'fix(admin): make portal mobile responsive'
+          git push
