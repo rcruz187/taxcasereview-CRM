@@ -24,7 +24,9 @@
         var params = new URLSearchParams(window.location.search);
         var product = (params.get('product') || '').toLowerCase();
         var lang = (params.get('lang') || '').toLowerCase();
-        if (product === 'arcvena') {
+        var isAdminHost = window.location.hostname.toLowerCase() === 'admin.romylabs.com';
+
+        if (!isAdminHost && product === 'arcvena') {
           document.title = 'Schedule an Arcvena Demo';
           var arcvenaFavicon = document.getElementById('app-favicon');
           var arcvenaApple = document.getElementById('app-apple-touch-icon');
@@ -35,7 +37,7 @@
           if (arcvenaApple) arcvenaApple.href = '/arcvena-favicon-64.png?v=20260827-1';
         }
 
-        if (product === 'bocasync') {
+        if (!isAdminHost && product === 'bocasync') {
           document.title = lang === 'es' ? 'Agendar una Demo de BocaSync' : 'Schedule a BocaSync Demo';
           document.documentElement.lang = lang === 'es' ? 'es' : 'en';
           var favicon = document.getElementById('app-favicon');
@@ -47,7 +49,7 @@
           if (apple) apple.href = '/bocasync-logo.svg?v=1';
         }
 
-        if (product === 'bocasync' && lang === 'es') {
+        if (!isAdminHost && product === 'bocasync' && lang === 'es') {
           var textMap = {
             'Schedule a BocaSync Demo': 'Agendar una Demo de BocaSync',
             'What is this about?': '¿De qué se trata?',
@@ -96,6 +98,17 @@
             var observer = new MutationObserver(function () { translateNode(document.body); });
             observer.observe(document.getElementById('root') || document.body, { childList: true, subtree: true });
           });
+        }
+
+        if (isAdminHost) {
+          document.title = 'RomyLabs Admin';
+          var adminFavicon = document.getElementById('app-favicon');
+          var adminApple = document.getElementById('app-apple-touch-icon');
+          if (adminFavicon) {
+            adminFavicon.type = 'image/png';
+            adminFavicon.href = 'https://romylabs.com/romylabs-favicon.png?v=20260830-1';
+          }
+          if (adminApple) adminApple.href = 'https://romylabs.com/romylabs-favicon.png?v=20260830-1';
         }
       })();
     </script>
