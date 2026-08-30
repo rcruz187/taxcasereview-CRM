@@ -46,11 +46,12 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   },
 })
 
-// Credential Vault re-auth must never mutate the active Admin Portal session.
-// The vault UI intentionally calls supabase.auth.signInWithPassword() to confirm
-// the owner's password before a reveal. On the vault route only, verify those
-// credentials with a non-persistent client so the main auth listener never gets
-// a second SIGNED_IN event and cannot reroute or reset the admin session.
+// Credential Vault re-auth must never mutate, refresh, sign out, or broadcast
+// changes to the active Admin Portal session. The vault UI calls the normal
+// signInWithPassword method to confirm the owner's password before revealing a
+// secret; on the vault route only, perform a one-shot GoTrue password request
+// directly and discard the returned access/refresh tokens immediately. The
+// existing main Supabase client/session remains completely untouched.
 const liveSignInWithPassword = supabase.auth.signInWithPassword.bind(supabase.auth)
 supabase.auth.signInWithPassword = async credentials => {
   const isVaultReauth = typeof window !== 'undefined'
@@ -59,14 +60,32 @@ supabase.auth.signInWithPassword = async credentials => {
 
   if (!isVaultReauth) return liveSignInWithPassword(credentials)
 
-  const verifier = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  })
-  const result = await verifier.auth.signInWithPassword(credentials)
-  try { await verifier.auth.signOut() } catch (_) {}
-  return result
+  try {
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: credentials?.email || '',
+        password: credentials?.password || '',
+      }),
+    })
+
+    if (!response.ok) {
+      let message = 'Password verification failed'
+      try {
+        const payload = await response.json()
+        message = payload?.msg || payload?.message || payload?.error_description || message
+      } catch (_) {}
+      return { data: { user: null, session: null }, error: new Error(message) }
+    }
+
+    // Intentionally do not persist or expose the returned auth session. A 2xx
+    // response is sufficient proof that the supplied owner credentials are valid.
+    return { data: { user: null, session: null }, error: null }
+  } catch (error) {
+    return { data: { user: null, session: null }, error }
+  }
 }
