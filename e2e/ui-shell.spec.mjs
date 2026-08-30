@@ -4,20 +4,16 @@ const projectRef = 'mpxgxfqdbquzkrvvejkh'
 const supabaseHost = `https://${projectRef}.supabase.co`
 const user = {
   id: '00000000-0000-4000-8000-000000000111',
-  aud: 'authenticated',
-  role: 'authenticated',
-  email: 'qa-ui@taxrescrm.test',
+  aud: 'authenticated', role: 'authenticated', email: 'qa-ui@taxrescrm.test',
   email_confirmed_at: new Date().toISOString(),
   app_metadata: { provider: 'email', providers: ['email'] },
   user_metadata: { name: 'QA UI Admin' },
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
+  created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
 }
 
-function b64url(obj) {
-  return Buffer.from(JSON.stringify(obj)).toString('base64url')
-}
+function b64url(obj) { return Buffer.from(JSON.stringify(obj)).toString('base64url') }
 const jwt = `${b64url({alg:'none',typ:'JWT'})}.${b64url({sub:user.id,email:user.email,role:'authenticated',aud:'authenticated',exp:Math.floor(Date.now()/1000)+3600})}.x`
+const rangeFor = n => n > 0 ? `0-${n - 1}/${n}` : '*/0'
 
 async function mockSupabase(page) {
   await page.route('https://api.allorigins.win/**', route => route.fulfill({
@@ -25,11 +21,17 @@ async function mockSupabase(page) {
     body: JSON.stringify({ contents: '<?xml version="1.0"?><rss version="2.0"><channel><title>Taxpayer Advocate</title></channel></rss>', status: { http_code: 200 } }),
   }))
   await page.routeWebSocket(`wss://${projectRef}.supabase.co/**`, () => {})
+
   await page.route(`${supabaseHost}/**`, async route => {
-    const req = route.request(); const url = new URL(req.url()); const pathname = url.pathname; const accept = req.headers()['accept'] || ''
+    const req = route.request()
+    const url = new URL(req.url())
+    const pathname = url.pathname
+    const accept = req.headers()['accept'] || ''
+
     if (pathname.startsWith('/auth/v1/token')) return route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({ access_token:jwt, token_type:'bearer', expires_in:3600, expires_at:Math.floor(Date.now()/1000)+3600, refresh_token:'mock', user }) })
     if (pathname === '/auth/v1/user') return route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify(user) })
     if (pathname.startsWith('/auth/v1/logout')) return route.fulfill({ status:204, body:'' })
+
     if (pathname.includes('/rest/v1/employees')) {
       const employee = { id:'00000000-0000-4000-8000-000000000222', tenant_id:'61a89aef-0e7e-4ea2-b222-44ab2024655a', email:user.email, name:'QA UI Admin', role:'Admin', status:'active', access_level:'Admin', perm_leads:3, perm_clients:3, perm_billing:3, perm_schedule:3, perm_documents:3, perm_irs:3, perm_reports:3, perm_hr:3, perm_comms:3, perm_settings:3 }
       const wantsObject = accept.includes('application/vnd.pgrst.object+json')
@@ -45,26 +47,33 @@ async function mockSupabase(page) {
       const wantsObject = accept.includes('application/vnd.pgrst.object+json')
       return route.fulfill({ status:200, contentType:'application/json', headers:{'content-range':'0-0/1'}, body:JSON.stringify(wantsObject ? tenant : [tenant]) })
     }
-    // Non-zero sidebar fixtures: badge regressions must be visible to the browser
-    // suite instead of every table being mocked empty.
+
+    // Exact-count fixtures reproduce PostgREST HEAD semantics used by Sidebar.
+    // Inbox=1 + Action Needed=1 gives the visible Email badge total of 2.
     if (pathname.includes('/rest/v1/emails')) {
+      const triage = url.searchParams.get('triage') || ''
+      const count = triage === 'eq.Inbox' || triage === 'eq.Action Needed' ? 1 : 0
+      if (req.method() === 'HEAD') return route.fulfill({ status:200, headers:{'content-range':rangeFor(count)} })
       const rows = [
         { id:'email-1', mailbox_owner:user.email, is_read:false, triage:'Inbox', deleted_at:null, created_at:new Date().toISOString(), subject:'QA unread one', clientName:'QA Client', recipient:'qa@example.test', status:'Received' },
         { id:'email-2', mailbox_owner:user.email, is_read:false, triage:'Action Needed', deleted_at:null, created_at:new Date().toISOString(), subject:'QA unread two', clientName:'QA Client', recipient:'qa@example.test', status:'Received' },
       ]
-      return route.fulfill({ status:200, contentType:'application/json', headers:{'content-range':'0-1/2'}, body:req.method()==='HEAD' ? '' : JSON.stringify(rows) })
+      return route.fulfill({ status:200, contentType:'application/json', headers:{'content-range':'0-1/2'}, body:JSON.stringify(rows) })
     }
     if (pathname.includes('/rest/v1/tasks')) {
       const rows = Array.from({length:5},(_,i)=>({id:`task-${i}`,done:false,deleted:false,created_at:new Date().toISOString()}))
-      return route.fulfill({ status:200, contentType:'application/json', headers:{'content-range':'0-4/5'}, body:req.method()==='HEAD' ? '' : JSON.stringify(rows) })
+      if (req.method() === 'HEAD') return route.fulfill({ status:200, headers:{'content-range':rangeFor(5)} })
+      return route.fulfill({ status:200, contentType:'application/json', headers:{'content-range':'0-4/5'}, body:JSON.stringify(rows) })
     }
     if (pathname.includes('/rest/v1/leads')) {
       const rows = Array.from({length:4},(_,i)=>({id:`lead-${i}`,name:`QA Lead ${i}`,status:'New Lead',created_at:new Date().toISOString()}))
-      return route.fulfill({ status:200, contentType:'application/json', headers:{'content-range':'0-3/4'}, body:req.method()==='HEAD' ? '' : JSON.stringify(rows) })
+      if (req.method() === 'HEAD') return route.fulfill({ status:200, headers:{'content-range':rangeFor(4)} })
+      return route.fulfill({ status:200, contentType:'application/json', headers:{'content-range':'0-3/4'}, body:JSON.stringify(rows) })
     }
     if (pathname.includes('/rest/v1/cases')) {
       const rows = Array.from({length:3},(_,i)=>({id:`case-${i}`,caseNum:`QA-${i}`,clientName:`QA Client ${i}`,status:'Active',created_at:new Date().toISOString()}))
-      return route.fulfill({ status:200, contentType:'application/json', headers:{'content-range':'0-2/3'}, body:req.method()==='HEAD' ? '' : JSON.stringify(rows) })
+      if (req.method() === 'HEAD') return route.fulfill({ status:200, headers:{'content-range':rangeFor(3)} })
+      return route.fulfill({ status:200, contentType:'application/json', headers:{'content-range':'0-2/3'}, body:JSON.stringify(rows) })
     }
     if (pathname.includes('/rest/v1/rpc/')) {
       const rpc = pathname.split('/').pop(); let body = []
@@ -117,9 +126,8 @@ test('sidebar renders non-zero notification badges', async ({ page }) => {
   await expect(email.locator('.nav-badge')).toHaveText('2')
   await expect(tasks.locator('.nav-badge')).toHaveText('5')
 
-  const clientWork = page.getByText('Client Work',{exact:true})
-  await clientWork.click()
   const leads = page.getByRole('link',{name:/Leads/}).first()
+  if (!(await leads.isVisible().catch(()=>false))) await page.getByText('Client Work',{exact:true}).click()
   const cases = page.getByRole('link',{name:/Cases/}).first()
   await expect(leads.locator('.nav-badge')).toHaveText('4')
   await expect(cases.locator('.nav-badge')).toHaveText('3')
@@ -154,31 +162,24 @@ for (const viewport of [{ name:'phone', width:390, height:844 }, { name:'tablet'
 
     const hamburger=page.getByRole('button',{name:'Open menu'})
     await expect(hamburger).toBeVisible()
-    const shellOverflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)
-    expect(shellOverflow).toBeLessThanOrEqual(2)
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(2)
 
     await hamburger.click()
     const sidebar=page.locator('.sidebar.mobile-open')
-    await expect(sidebar).toBeVisible()
-    await expect(page.locator('.sidebar-backdrop')).toBeVisible()
+    await expect(sidebar).toBeVisible(); await expect(page.locator('.sidebar-backdrop')).toBeVisible()
 
-    const clientWork=sidebar.getByText('Client Work',{exact:true})
-    if (await clientWork.isVisible()) await clientWork.click()
-    const clients=sidebar.getByRole('link',{name:'Clients',exact:true})
+    let clients=sidebar.getByRole('link',{name:'Clients',exact:true})
+    if (!(await clients.isVisible().catch(()=>false))) {
+      await sidebar.getByText('Client Work',{exact:true}).click()
+      clients=sidebar.getByRole('link',{name:'Clients',exact:true})
+    }
     await expect(clients).toBeVisible(); await clients.click()
-    await expect(page).toHaveURL(/\/clients$/)
-    await expect(page.locator('.sidebar.mobile-open')).toHaveCount(0)
+    await expect(page).toHaveURL(/\/clients$/); await expect(page.locator('.sidebar.mobile-open')).toHaveCount(0)
 
-    await expect(page.getByRole('button',{name:/New$/})).toBeVisible()
-    await page.getByRole('button',{name:/New$/}).click()
-    const drawer=page.getByRole('dialog',{name:'Create New'})
-    await expect(drawer).toBeVisible()
-    const box=await drawer.boundingBox()
-    expect(box?.width||0).toBeLessThanOrEqual(viewport.width)
-    expect(box?.height||0).toBeLessThanOrEqual(viewport.height)
-
-    const finalOverflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)
-    expect(finalOverflow).toBeLessThanOrEqual(2)
+    await expect(page.getByRole('button',{name:/New$/})).toBeVisible(); await page.getByRole('button',{name:/New$/}).click()
+    const drawer=page.getByRole('dialog',{name:'Create New'}); await expect(drawer).toBeVisible()
+    const box=await drawer.boundingBox(); expect(box?.width||0).toBeLessThanOrEqual(viewport.width); expect(box?.height||0).toBeLessThanOrEqual(viewport.height)
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(2)
     expect(pageErrors,`mobile page errors: ${pageErrors.join(' | ')}`).toEqual([])
   })
 }
