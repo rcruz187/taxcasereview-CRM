@@ -225,41 +225,41 @@ export default function CredentialVault() {
       {loading ? <div style={{ color:'#64748b', padding:30 }}>Loading vault…</div> : filtered.length===0 ? (
         <div style={{ ...CARD, padding:38, textAlign:'center', color:'#64748b' }}>No credentials yet. Click <b style={{color:'#a5b4fc'}}>+ Add Credential</b> to store the first one.</div>
       ) : (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,360px))', gap:10, alignItems:'start' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,280px))', gap:8, alignItems:'start' }}>
           {filtered.map(e => {
             const value = revealed[e.id]
-            return <div key={e.id} style={{ ...CARD, padding:'11px 12px', minWidth:0 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', gap:8, alignItems:'flex-start' }}>
+            return <div key={e.id} style={{ ...CARD, padding:'8px 9px', minWidth:0, borderRadius:10 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', gap:6, alignItems:'flex-start' }}>
                 <div style={{minWidth:0}}>
-                  <div style={{ color:'#fff', fontSize:13, fontWeight:800, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.service}</div>
-                  <div style={{ color:'#6366f1', fontSize:10, fontWeight:700, marginTop:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{productName(e.product_id)}{e.account_label?` · ${e.account_label}`:''}</div>
+                  <div style={{ color:'#fff', fontSize:12, fontWeight:800, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.service}</div>
+                  <div style={{ color:'#6366f1', fontSize:9, fontWeight:700, marginTop:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{productName(e.product_id)}{e.account_label?` · ${e.account_label}`:''}</div>
                 </div>
-                <span style={{ flexShrink:0, fontSize:8, color:'#64748b', textTransform:'uppercase', border:'1px solid rgba(99,102,241,.2)', borderRadius:20, padding:'2px 6px' }}>{(e.secret_type||'password').replace('_',' ')}</span>
+                <span style={{ flexShrink:0, fontSize:7, color:'#64748b', textTransform:'uppercase', border:'1px solid rgba(99,102,241,.2)', borderRadius:20, padding:'1px 5px' }}>{(e.secret_type||'password').replace('_',' ')}</span>
               </div>
 
-              <div style={{ marginTop:9, display:'grid', gap:6 }}>
-                <div style={{display:'flex',alignItems:'center',gap:5,minWidth:0}}>
-                  <span style={{fontSize:8,color:'#475569',textTransform:'uppercase',width:48,flexShrink:0}}>User</span>
-                  <span title={e.username||''} style={{color:'#cbd5e1',fontSize:11,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',minWidth:0,flex:1}}>{e.username||'—'}</span>
-                  {e.username&&<button onClick={()=>copy(e.username,'Username copied')} style={{...BTN('ghost'),padding:'2px 6px',fontSize:9}}>Copy</button>}
+              <div style={{ marginTop:6, display:'grid', gap:4 }}>
+                <div style={{display:'flex',alignItems:'center',gap:4,minWidth:0}}>
+                  <span style={{fontSize:7,color:'#475569',textTransform:'uppercase',width:34,flexShrink:0}}>User</span>
+                  <span title={e.username||''} style={{color:'#cbd5e1',fontSize:10,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',minWidth:0,flex:1}}>{e.username||'—'}</span>
+                  {e.username&&<button onClick={()=>copy(e.username,'Username copied')} style={{...BTN('ghost'),padding:'1px 5px',fontSize:8,borderRadius:6}}>Copy</button>}
                 </div>
 
-                <div style={{display:'flex',alignItems:'center',gap:5,minWidth:0}}>
-                  <span style={{fontSize:8,color:'#475569',textTransform:'uppercase',width:48,flexShrink:0}}>Secret</span>
-                  <span title={value||''} style={{color:value?'#e2e8f0':'#64748b',fontSize:10,fontFamily:'ui-monospace,SFMono-Regular,Menlo,monospace',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',minWidth:0,flex:1}}>{value||maskSecret()}</span>
-                  <button onClick={()=>value?hide(e.id):reveal(e.id)} disabled={busyId===e.id} style={{...BTN('ghost'),padding:'2px 6px',fontSize:9}}>{busyId===e.id?'…':value?'Hide':'Reveal'}</button>
-                  {value&&<button onClick={()=>copy(value,'Secret copied')} style={{...BTN('ghost'),padding:'2px 6px',fontSize:9}}>Copy</button>}
+                <div style={{display:'flex',alignItems:'center',gap:4,minWidth:0}}>
+                  <span style={{fontSize:7,color:'#475569',textTransform:'uppercase',width:34,flexShrink:0}}>Secret</span>
+                  <span title={value||''} style={{color:value?'#e2e8f0':'#64748b',fontSize:9,fontFamily:'ui-monospace,SFMono-Regular,Menlo,monospace',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',minWidth:0,flex:1}}>{value||maskSecret()}</span>
+                  <button onClick={()=>value?hide(e.id):reveal(e.id)} disabled={busyId===e.id} style={{...BTN('ghost'),padding:'1px 5px',fontSize:8,borderRadius:6}}>{busyId===e.id?'…':value?'Hide':'Reveal'}</button>
+                  {value&&<button onClick={()=>copy(value,'Secret copied')} style={{...BTN('ghost'),padding:'1px 5px',fontSize:8,borderRadius:6}}>Copy</button>}
                 </div>
 
-                {(e.login_url || e.notes) && <div style={{display:'flex',alignItems:'center',gap:8,minWidth:0,minHeight:16}}>
-                  {e.login_url && <a href={e.login_url} target="_blank" rel="noreferrer" style={{color:'#818cf8',fontSize:10,textDecoration:'none',flexShrink:0}}>Open login ↗</a>}
-                  {e.notes && <span title={e.notes} style={{fontSize:10,color:'#64748b',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',minWidth:0}}>{e.notes}</span>}
+                {(e.login_url || e.notes) && <div style={{display:'flex',alignItems:'center',gap:6,minWidth:0,minHeight:13}}>
+                  {e.login_url && <a href={e.login_url} target="_blank" rel="noreferrer" style={{color:'#818cf8',fontSize:9,textDecoration:'none',flexShrink:0}}>Open ↗</a>}
+                  {e.notes && <span title={e.notes} style={{fontSize:9,color:'#64748b',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',minWidth:0}}>{e.notes}</span>}
                 </div>}
               </div>
 
-              <div style={{ display:'flex', gap:5, borderTop:'1px solid rgba(99,102,241,.1)', marginTop:8, paddingTop:7 }}>
-                <button onClick={()=>editEntry(e)} style={{...BTN('ghost'),padding:'3px 7px',fontSize:9}}>Edit</button>
-                <button onClick={()=>remove(e)} style={{...BTN('danger'),padding:'3px 7px',fontSize:9,marginLeft:'auto'}}>Delete</button>
+              <div style={{ display:'flex', gap:4, borderTop:'1px solid rgba(99,102,241,.1)', marginTop:5, paddingTop:5 }}>
+                <button onClick={()=>editEntry(e)} style={{...BTN('ghost'),padding:'2px 6px',fontSize:8,borderRadius:6}}>Edit</button>
+                <button onClick={()=>remove(e)} style={{...BTN('danger'),padding:'2px 6px',fontSize:8,borderRadius:6,marginLeft:'auto'}}>Delete</button>
               </div>
             </div>
           })}
