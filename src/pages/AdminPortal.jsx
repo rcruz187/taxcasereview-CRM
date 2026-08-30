@@ -194,11 +194,9 @@ function Overview() {
   return (
     <div style={{ padding:'32px 36px', maxWidth:1100 }}>
       <div style={{ marginBottom:28 }}>
-        {FIRM.logoUrl && (
-          <img src={FIRM.logoUrl} alt={FIRM.name || 'TaxRes CRM'}
-            style={{ height:44, objectFit:'contain', display:'block', marginBottom:16 }}
-            onError={e=>{e.target.style.display='none'}} />
-        )}
+        <img src="/romylabs-logo.png" alt="RomyLabs"
+          style={{ height:44, objectFit:'contain', display:'block', marginBottom:16 }}
+          onError={e=>{e.target.style.display='none'}} />
         <div style={{ fontSize:26, fontWeight:800, color:'#fff', marginBottom:4 }}>
           {h<12?'Good morning':h<17?'Good afternoon':'Good evening'}, Romy 👋
         </div>
