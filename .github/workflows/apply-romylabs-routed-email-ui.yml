@@ -1,0 +1,41 @@
+name: Apply RomyLabs Routed Email UI
+
+on:
+  push:
+    paths:
+      - scripts/patch-romylabs-routed-email-ui.py
+      - .github/workflows/apply-romylabs-routed-email-ui.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Patch Email UI
+        run: python scripts/patch-romylabs-routed-email-ui.py
+      - name: Verify routed email markers
+        run: |
+          grep -q "routeId" src/pages/Email.jsx
+          grep -q "smtp-send" src/pages/Email.jsx
+          grep -q "replyFrom" src/pages/Email.jsx
+          grep -q "centralMailboxOwner" src/pages/Email.jsx
+      - name: Commit patch
+        run: |
+          if git diff --quiet -- src/pages/Email.jsx; then
+            echo "No changes needed"
+            exit 0
+          fi
+          git config user.name "RomyLabs"
+          git config user.email "rcruz187@gmail.com"
+          git add src/pages/Email.jsx
+          git commit -m "feat(email): route RomyLabs replies from original mailbox"
+          git push origin HEAD:main
