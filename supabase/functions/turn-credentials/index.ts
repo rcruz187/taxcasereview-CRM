@@ -1,8 +1,8 @@
 // turn-credentials
 // Returns ICE servers for WebRTC. Authenticated active staff may receive tenant/platform
 // Metered short-lived TURN credentials. Anonymous screen-share guests receive only public
-// TURN/STUN. This function also mints secure SignalWire large-training room tokens so we
-// can reuse the existing RTC function slot instead of adding another Edge Function.
+// TURN/STUN. This function also provisions and mints secure SignalWire large-training rooms
+// so we can reuse the existing RTC function slot instead of adding another Edge Function.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -75,11 +75,42 @@ async function loadSignalWire(admin: any) {
   return data
 }
 
+function signalWireAuth(settings: any) {
+  return 'Basic ' + btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
+}
+
+async function ensureTrainingRoom(settings: any, room: string) {
+  const resp = await fetch(`https://${settings.sw_space_url}/api/video/rooms`, {
+    method: 'POST',
+    headers: { Authorization: signalWireAuth(settings), 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      name: room,
+      display_name: 'RomyLabs Live Training',
+      description: 'RomyLabs multi-office training room',
+      max_members: 300,
+      quality: '720p',
+      layout: 'grid-responsive',
+      record_on_start: false,
+      meta: { platform: 'RomyLabs', type: 'large-training' },
+    }),
+  })
+  const text = await resp.text()
+  if (resp.ok) return JSON.parse(text)
+  // A duplicate room name can occur only if the creator retries the same generated room id.
+  // Treat an already-existing room as usable; all other errors must fail closed.
+  if (resp.status === 409 || resp.status === 422) {
+    const listResp = await fetch(`https://${settings.sw_space_url}/api/video/rooms?name=${encodeURIComponent(room)}`, {
+      headers: { Authorization: signalWireAuth(settings), Accept: 'application/json' },
+    })
+    if (listResp.ok) return { name: room, max_members: 300, existing: true }
+  }
+  throw new Error(`SignalWire room provisioning failed (${resp.status}): ${text}`)
+}
+
 async function createVideoToken(settings: any, body: Record<string, unknown>) {
-  const auth = 'Basic ' + btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
   const resp = await fetch(`https://${settings.sw_space_url}/api/video/room_tokens`, {
     method: 'POST',
-    headers: { Authorization: auth, 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: { Authorization: signalWireAuth(settings), 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify(body),
   })
   const text = await resp.text()
@@ -116,12 +147,12 @@ serve(async (req) => {
       const exp = Date.now() + 12 * 60 * 60 * 1000
       const invite = await signInvite({ room, exp }, serviceKey)
       const sw = await loadSignalWire(admin)
+      await ensureTrainingRoom(sw, room)
       const hostToken = await createVideoToken(sw, {
         room_name: room,
-        room_display_name: 'RomyLabs Live Training',
         user_name: hostName,
         join_as: 'member',
-        auto_create_room: true,
+        auto_create_room: false,
         join_audio_muted: false,
         join_video_muted: false,
         permissions: [
@@ -132,7 +163,7 @@ serve(async (req) => {
         ],
         meta: { role: 'host', platform: 'RomyLabs' },
       })
-      return json({ room, host_token: hostToken, invite, expires_at: new Date(exp).toISOString() })
+      return json({ room, host_token: hostToken, invite, expires_at: new Date(exp).toISOString(), max_members: 300 })
     }
 
     if (action === 'training-join') {
