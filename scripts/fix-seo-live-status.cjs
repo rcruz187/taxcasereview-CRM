@@ -27,3 +27,4 @@ replaceOnce(
 'SEO selector props');
 fs.writeFileSync(p, s);
 console.log('Patched SEO selector to reflect all live Search Console products from central registry');
+// one-shot trigger
