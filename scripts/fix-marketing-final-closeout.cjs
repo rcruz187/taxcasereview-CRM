@@ -54,3 +54,4 @@ replaceOnce(
 
 fs.writeFileSync(p, s);
 console.log('Patched Marketing GA4 timezone handling, live labels, and latest page batch');
+// one-shot trigger
