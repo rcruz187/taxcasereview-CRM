@@ -1,12 +1,17 @@
 /* RomyLabs admin production guard — canonical admin host + legacy product-link cleanup. */
 /* CC_HIDE_FIX_20260827: never hide Command Center containers by textContent. */
 /* IMPERSONATION_FIX_20260829: stale browser impersonation state must never lock owner out. */
+/* MEET_PUBLIC_ROUTE_FIX_20260830: public meeting/training routes must bypass admin redirect. */
 (function () {
   var host = window.location.hostname.toLowerCase();
   var path = window.location.pathname;
   var params = new URLSearchParams(window.location.search || '');
   var isImpersonationRoute = path === '/impersonate';
   var isActiveImpersonation = params.get('imp') === '1';
+  var publicPrefixes = ['/meet/', '/screenshare', '/screenshare-host', '/book', '/sign/', '/portal/', '/clockin', '/kiosk', '/employee', '/financial-intake/', '/organizer/'];
+  var isPublicRoute = publicPrefixes.some(function (prefix) {
+    return prefix.endsWith('/') ? path.indexOf(prefix) === 0 : (path === prefix || path.indexOf(prefix + '/') === 0);
+  });
 
   /* TaxRes is the CRM host. If a stale /crm-admin URL is opened there,
    * recover back to the CRM instead of sending the user to RomyLabs Admin. */
@@ -16,6 +21,10 @@
   }
 
   if (host !== 'admin.romylabs.com') return;
+
+  /* Public meeting/training/invite routes intentionally run on the RomyLabs host
+   * without entering the authenticated control plane. Never rewrite them. */
+  if (isPublicRoute) return;
 
   /* admin.romylabs.com is the dedicated control plane. A stale Jump In marker
    * in sessionStorage is NOT authority to remain in the CRM shell. Only the
