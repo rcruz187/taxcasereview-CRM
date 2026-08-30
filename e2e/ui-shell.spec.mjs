@@ -20,59 +20,25 @@ function b64url(obj) {
 const jwt = `${b64url({alg:'none',typ:'JWT'})}.${b64url({sub:user.id,email:user.email,role:'authenticated',aud:'authenticated',exp:Math.floor(Date.now()/1000)+3600})}.x`
 
 async function mockSupabase(page) {
-  // The dashboard's Taxpayer Advocate RSS feed is optional external content.
-  // Keep this smoke test deterministic and focused on our UI instead of the
-  // availability/CORS behavior of the third-party AllOrigins proxy.
   await page.route('https://api.allorigins.win/**', route => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify({
-      contents: '<?xml version="1.0"?><rss version="2.0"><channel><title>Taxpayer Advocate</title></channel></rss>',
-      status: { http_code: 200 },
-    }),
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ contents: '<?xml version="1.0"?><rss version="2.0"><channel><title>Taxpayer Advocate</title></channel></rss>', status: { http_code: 200 } }),
   }))
-
-  // SMS opens a Supabase Realtime channel. The smoke test uses a fake JWT and
-  // mocked REST responses, so allowing that one websocket to hit the real
-  // Supabase Realtime service creates an external teardown/reconnect race when
-  // this test rapidly navigates away from and back to SMS. Keep the socket
-  // local to Playwright; real application/page errors remain fatal below.
   await page.routeWebSocket(`wss://${projectRef}.supabase.co/**`, () => {})
-
   await page.route(`${supabaseHost}/**`, async route => {
-    const req = route.request()
-    const url = new URL(req.url())
-    const pathname = url.pathname
-    const accept = req.headers()['accept'] || ''
-
-    if (pathname.startsWith('/auth/v1/token')) {
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
-        access_token: jwt, token_type: 'bearer', expires_in: 3600,
-        expires_at: Math.floor(Date.now()/1000)+3600,
-        refresh_token: 'mock', user,
-      }) })
-    }
-    if (pathname === '/auth/v1/user') {
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(user) })
-    }
-    if (pathname.startsWith('/auth/v1/logout')) {
-      return route.fulfill({ status: 204, body: '' })
-    }
-
+    const req = route.request(); const url = new URL(req.url()); const pathname = url.pathname; const accept = req.headers()['accept'] || ''
+    if (pathname.startsWith('/auth/v1/token')) return route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({ access_token:jwt, token_type:'bearer', expires_in:3600, expires_at:Math.floor(Date.now()/1000)+3600, refresh_token:'mock', user }) })
+    if (pathname === '/auth/v1/user') return route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify(user) })
+    if (pathname.startsWith('/auth/v1/logout')) return route.fulfill({ status:204, body:'' })
     if (pathname.includes('/rest/v1/employees')) {
-      const employee = {
-        id: '00000000-0000-4000-8000-000000000222', tenant_id: '61a89aef-0e7e-4ea2-b222-44ab2024655a',
-        email: user.email, name: 'QA UI Admin', role: 'Admin', status: 'active', access_level: 'Admin',
-        perm_leads:3, perm_clients:3, perm_billing:3, perm_schedule:3, perm_documents:3,
-        perm_irs:3, perm_reports:3, perm_hr:3, perm_comms:3, perm_settings:3,
-      }
+      const employee = { id:'00000000-0000-4000-8000-000000000222', tenant_id:'61a89aef-0e7e-4ea2-b222-44ab2024655a', email:user.email, name:'QA UI Admin', role:'Admin', status:'active', access_level:'Admin', perm_leads:3, perm_clients:3, perm_billing:3, perm_schedule:3, perm_documents:3, perm_irs:3, perm_reports:3, perm_hr:3, perm_comms:3, perm_settings:3 }
       const wantsObject = accept.includes('application/vnd.pgrst.object+json')
-      return route.fulfill({ status: 200, contentType: 'application/json', headers:{'content-range':'0-0/1'}, body: JSON.stringify(wantsObject ? employee : [employee]) })
+      return route.fulfill({ status:200, contentType:'application/json', headers:{'content-range':'0-0/1'}, body:JSON.stringify(wantsObject ? employee : [employee]) })
     }
     if (pathname.includes('/rest/v1/settings')) {
       const settings = { id:'settings-qa', tenant_id:'61a89aef-0e7e-4ea2-b222-44ab2024655a', firm_name:'Tax Case Review', primary_color:'#1A7FD4', lead_workflow_model:'investigation-resolution' }
       const wantsObject = accept.includes('application/vnd.pgrst.object+json')
-      return route.fulfill({ status: 200, contentType:'application/json', headers:{'content-range':'0-0/1'}, body: JSON.stringify(wantsObject ? settings : [settings]) })
+      return route.fulfill({ status:200, contentType:'application/json', headers:{'content-range':'0-0/1'}, body:JSON.stringify(wantsObject ? settings : [settings]) })
     }
     if (pathname.includes('/rest/v1/tenants')) {
       const tenant = { id:'61a89aef-0e7e-4ea2-b222-44ab2024655a', status:'active', plan_tier:'pro', firm_name:'Tax Case Review' }
@@ -80,19 +46,14 @@ async function mockSupabase(page) {
       return route.fulfill({ status:200, contentType:'application/json', headers:{'content-range':'0-0/1'}, body:JSON.stringify(wantsObject ? tenant : [tenant]) })
     }
     if (pathname.includes('/rest/v1/rpc/')) {
-      const rpc = pathname.split('/').pop()
-      let body = []
+      const rpc = pathname.split('/').pop(); let body = []
       if (rpc === 'get_branding_by_email_domain') body = { firm_name:'Tax Case Review', logo_url:null, sub:'IRS Resolution Platform' }
       else if (rpc === 'current_tenant_id') body = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
       else if (rpc.includes('tenant') || rpc.includes('branding')) body = { tenant_id:'61a89aef-0e7e-4ea2-b222-44ab2024655a' }
       return route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify(body) })
     }
-    if (pathname.includes('/functions/v1/')) {
-      return route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({ ok:true, data:[] }) })
-    }
-    if (pathname.includes('/storage/v1/')) {
-      return route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify([]) })
-    }
+    if (pathname.includes('/functions/v1/')) return route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({ok:true,data:[]}) })
+    if (pathname.includes('/storage/v1/')) return route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify([]) })
     if (pathname.includes('/rest/v1/')) {
       const wantsObject = accept.includes('application/vnd.pgrst.object+json')
       return route.fulfill({ status:200, contentType:'application/json', headers:{'content-range':'*/0'}, body:JSON.stringify(wantsObject ? null : []) })
@@ -110,89 +71,71 @@ async function login(page) {
 }
 
 const flows = [
-  ['New Case', '/cases?new=1'],
-  ['New Client', '/clients?new=1'],
-  ['New Corp', '/formacorp?new=1'],
-  ['New Document', '/documents?new=1'],
-  ['New E-Sign', '/esign?new=1'],
-  ['New Email', '/email?new=1'],
-  ['New Entry', '/books?new=1'],
-  ['New Event', '/calendar?new=1'],
-  ['New Fax', '/fax?new=1'],
-  ['New Invoice', '/invoices?new=1'],
-  ['New Lead', '/leads?new=1'],
-  ['New Payment', '/payments?new=1'],
-  ['New Task', '/tasks?new=1'],
-  ['New Transcript', '/irsportal?new=1'],
+  ['New Case','/cases?new=1'],['New Client','/clients?new=1'],['New Corp','/formacorp?new=1'],['New Document','/documents?new=1'],['New E-Sign','/esign?new=1'],['New Email','/email?new=1'],['New Entry','/books?new=1'],['New Event','/calendar?new=1'],['New Fax','/fax?new=1'],['New Invoice','/invoices?new=1'],['New Lead','/leads?new=1'],['New Payment','/payments?new=1'],['New Task','/tasks?new=1'],['New Transcript','/irsportal?new=1'],
 ]
 
 test('authenticated shell and all global New actions render and navigate', async ({ page }) => {
-  const consoleErrors = []
-  const pageErrors = []
-  page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()) })
-  page.on('pageerror', err => pageErrors.push(err.message))
-  await mockSupabase(page)
-  await login(page)
-
-  for (const [label, target] of flows) {
-    await page.goto('/')
-    await expect(page.getByRole('button', {name:/New$/})).toBeVisible()
-    await page.getByRole('button', {name:/New$/}).click()
-    const dialog = page.getByRole('dialog', {name:'Create New'})
-    await expect(dialog).toBeVisible()
-    await expect(dialog.getByText('What would you like to add?')).toBeVisible()
-    const action = dialog.locator('button').filter({ hasText: label }).first()
-    await expect(action).toBeVisible()
-    await action.click()
-    await expect(page).toHaveURL(new RegExp(target.replace(/[?]/g,'\\?') + '$'))
-    await expect(page.locator('body')).not.toContainText('This page encountered an error')
-    await expect(page.locator('.page-content')).toBeVisible()
-    const box = await page.locator('.page-content').boundingBox()
-    expect(box?.width || 0).toBeGreaterThan(200)
-    expect(box?.height || 0).toBeGreaterThan(200)
+  const consoleErrors=[]; const pageErrors=[]
+  page.on('console', msg => { if (msg.type()==='error') consoleErrors.push(msg.text()) }); page.on('pageerror', err=>pageErrors.push(err.message))
+  await mockSupabase(page); await login(page)
+  for (const [label,target] of flows) {
+    await page.goto('/'); await expect(page.getByRole('button',{name:/New$/})).toBeVisible(); await page.getByRole('button',{name:/New$/}).click()
+    const dialog=page.getByRole('dialog',{name:'Create New'}); await expect(dialog).toBeVisible(); await expect(dialog.getByText('What would you like to add?')).toBeVisible()
+    const action=dialog.locator('button').filter({hasText:label}).first(); await expect(action).toBeVisible(); await action.click()
+    await expect(page).toHaveURL(new RegExp(target.replace(/[?]/g,'\\?')+'$')); await expect(page.locator('body')).not.toContainText('This page encountered an error'); await expect(page.locator('.page-content')).toBeVisible()
+    const box=await page.locator('.page-content').boundingBox(); expect(box?.width||0).toBeGreaterThan(200); expect(box?.height||0).toBeGreaterThan(200)
   }
-
-  expect(pageErrors, `page errors: ${pageErrors.join(' | ')}`).toEqual([])
-  const fatalConsole = consoleErrors.filter(x => !/favicon|ResizeObserver|Failed to load resource/i.test(x))
-  expect(fatalConsole, `console errors: ${fatalConsole.join(' | ')}`).toEqual([])
+  expect(pageErrors,`page errors: ${pageErrors.join(' | ')}`).toEqual([])
+  expect(consoleErrors.filter(x=>!/favicon|ResizeObserver|Failed to load resource/i.test(x)),`console errors: ${consoleErrors.join(' | ')}`).toEqual([])
 })
 
 test('Communications pages survive sequential sidebar navigation without refresh', async ({ page }) => {
-  const consoleErrors = []
-  const pageErrors = []
-  page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()) })
-  page.on('pageerror', err => pageErrors.push(err.message))
-  await mockSupabase(page)
-  await login(page)
-
-  const communicationsHeader = page.getByText('Communications', { exact:true })
-  await expect(communicationsHeader).toBeVisible()
-  await communicationsHeader.click()
-
-  const sequence = [
-    ['SMS', '/sms'],
-    ['Fax', '/fax'],
-    ['Documents', '/documents'],
-    ['E-Signatures', '/esign'],
-    ['SMS', '/sms'],
-    ['Documents', '/documents'],
-    ['Fax', '/fax'],
-    ['E-Signatures', '/esign'],
-  ]
-
-  for (const [label, target] of sequence) {
-    const link = page.getByRole('link', { name: label, exact:true })
-    await expect(link).toBeVisible()
-    await link.click()
-    await expect(page).toHaveURL(new RegExp(`${target}$`))
-    await expect(page.locator('.page-content')).toBeVisible()
-    await expect(page.locator('body')).not.toContainText('This page encountered an error')
-    const box = await page.locator('.page-content').boundingBox()
-    expect(box?.width || 0).toBeGreaterThan(200)
-    expect(box?.height || 0).toBeGreaterThan(200)
+  const consoleErrors=[]; const pageErrors=[]
+  page.on('console', msg=>{if(msg.type()==='error')consoleErrors.push(msg.text())}); page.on('pageerror',err=>pageErrors.push(err.message))
+  await mockSupabase(page); await login(page)
+  const communicationsHeader=page.getByText('Communications',{exact:true}); await expect(communicationsHeader).toBeVisible(); await communicationsHeader.click()
+  const sequence=[['SMS','/sms'],['Fax','/fax'],['Documents','/documents'],['E-Signatures','/esign'],['SMS','/sms'],['Documents','/documents'],['Fax','/fax'],['E-Signatures','/esign']]
+  for (const [label,target] of sequence) {
+    const link=page.getByRole('link',{name:label,exact:true}); await expect(link).toBeVisible(); await link.click(); await expect(page).toHaveURL(new RegExp(`${target}$`)); await expect(page.locator('.page-content')).toBeVisible(); await expect(page.locator('body')).not.toContainText('This page encountered an error')
+    const box=await page.locator('.page-content').boundingBox(); expect(box?.width||0).toBeGreaterThan(200); expect(box?.height||0).toBeGreaterThan(200)
   }
-
-  expect(pageErrors, `communications page errors: ${pageErrors.join(' | ')}`).toEqual([])
-  const fatalConsole = consoleErrors.filter(x => !/favicon|ResizeObserver|Failed to load resource/i.test(x))
-  expect(fatalConsole, `communications console errors: ${fatalConsole.join(' | ')}`).toEqual([])
+  expect(pageErrors,`communications page errors: ${pageErrors.join(' | ')}`).toEqual([])
+  expect(consoleErrors.filter(x=>!/favicon|ResizeObserver|Failed to load resource/i.test(x)),`communications console errors: ${consoleErrors.join(' | ')}`).toEqual([])
 })
+
+for (const viewport of [{ name:'phone', width:390, height:844 }, { name:'tablet', width:820, height:1180 }]) {
+  test(`TaxRes mobile shell works at ${viewport.name} width`, async ({ page }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height })
+    const pageErrors=[]; page.on('pageerror', err=>pageErrors.push(err.message))
+    await mockSupabase(page); await login(page)
+
+    const hamburger=page.getByRole('button',{name:'Open menu'})
+    await expect(hamburger).toBeVisible()
+    const shellOverflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)
+    expect(shellOverflow).toBeLessThanOrEqual(2)
+
+    await hamburger.click()
+    const sidebar=page.locator('.sidebar.mobile-open')
+    await expect(sidebar).toBeVisible()
+    await expect(page.locator('.sidebar-backdrop')).toBeVisible()
+
+    const clientWork=sidebar.getByText('Client Work',{exact:true})
+    if (await clientWork.isVisible()) await clientWork.click()
+    const clients=sidebar.getByRole('link',{name:'Clients',exact:true})
+    await expect(clients).toBeVisible(); await clients.click()
+    await expect(page).toHaveURL(/\/clients$/)
+    await expect(page.locator('.sidebar.mobile-open')).toHaveCount(0)
+
+    await expect(page.getByRole('button',{name:/New$/})).toBeVisible()
+    await page.getByRole('button',{name:/New$/}).click()
+    const drawer=page.getByRole('dialog',{name:'Create New'})
+    await expect(drawer).toBeVisible()
+    const box=await drawer.boundingBox()
+    expect(box?.width||0).toBeLessThanOrEqual(viewport.width)
+    expect(box?.height||0).toBeLessThanOrEqual(viewport.height)
+
+    const finalOverflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)
+    expect(finalOverflow).toBeLessThanOrEqual(2)
+    expect(pageErrors,`mobile page errors: ${pageErrors.join(' | ')}`).toEqual([])
+  })
+}
