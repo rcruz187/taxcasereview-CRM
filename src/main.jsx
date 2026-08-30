@@ -18,6 +18,7 @@ import ReactDOM from 'react-dom/client'
 import './index.css'
 import './polish.css'
 import './theme-scrollbars.css'
+import './taxres-mobile.css'
 import App from './App.jsx'
 import { getModel } from './lib/leadStatus'
 
