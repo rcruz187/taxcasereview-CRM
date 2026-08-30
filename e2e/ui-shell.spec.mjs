@@ -45,6 +45,27 @@ async function mockSupabase(page) {
       const wantsObject = accept.includes('application/vnd.pgrst.object+json')
       return route.fulfill({ status:200, contentType:'application/json', headers:{'content-range':'0-0/1'}, body:JSON.stringify(wantsObject ? tenant : [tenant]) })
     }
+    // Non-zero sidebar fixtures: badge regressions must be visible to the browser
+    // suite instead of every table being mocked empty.
+    if (pathname.includes('/rest/v1/emails')) {
+      const rows = [
+        { id:'email-1', mailbox_owner:user.email, is_read:false, triage:'Inbox', deleted_at:null, created_at:new Date().toISOString(), subject:'QA unread one', clientName:'QA Client', recipient:'qa@example.test', status:'Received' },
+        { id:'email-2', mailbox_owner:user.email, is_read:false, triage:'Action Needed', deleted_at:null, created_at:new Date().toISOString(), subject:'QA unread two', clientName:'QA Client', recipient:'qa@example.test', status:'Received' },
+      ]
+      return route.fulfill({ status:200, contentType:'application/json', headers:{'content-range':'0-1/2'}, body:req.method()==='HEAD' ? '' : JSON.stringify(rows) })
+    }
+    if (pathname.includes('/rest/v1/tasks')) {
+      const rows = Array.from({length:5},(_,i)=>({id:`task-${i}`,done:false,deleted:false,created_at:new Date().toISOString()}))
+      return route.fulfill({ status:200, contentType:'application/json', headers:{'content-range':'0-4/5'}, body:req.method()==='HEAD' ? '' : JSON.stringify(rows) })
+    }
+    if (pathname.includes('/rest/v1/leads')) {
+      const rows = Array.from({length:4},(_,i)=>({id:`lead-${i}`,name:`QA Lead ${i}`,status:'New Lead',created_at:new Date().toISOString()}))
+      return route.fulfill({ status:200, contentType:'application/json', headers:{'content-range':'0-3/4'}, body:req.method()==='HEAD' ? '' : JSON.stringify(rows) })
+    }
+    if (pathname.includes('/rest/v1/cases')) {
+      const rows = Array.from({length:3},(_,i)=>({id:`case-${i}`,caseNum:`QA-${i}`,clientName:`QA Client ${i}`,status:'Active',created_at:new Date().toISOString()}))
+      return route.fulfill({ status:200, contentType:'application/json', headers:{'content-range':'0-2/3'}, body:req.method()==='HEAD' ? '' : JSON.stringify(rows) })
+    }
     if (pathname.includes('/rest/v1/rpc/')) {
       const rpc = pathname.split('/').pop(); let body = []
       if (rpc === 'get_branding_by_email_domain') body = { firm_name:'Tax Case Review', logo_url:null, sub:'IRS Resolution Platform' }
@@ -87,6 +108,28 @@ test('authenticated shell and all global New actions render and navigate', async
   }
   expect(pageErrors,`page errors: ${pageErrors.join(' | ')}`).toEqual([])
   expect(consoleErrors.filter(x=>!/favicon|ResizeObserver|Failed to load resource/i.test(x)),`console errors: ${consoleErrors.join(' | ')}`).toEqual([])
+})
+
+test('sidebar renders non-zero notification badges', async ({ page }) => {
+  await mockSupabase(page); await login(page)
+  const email = page.getByRole('link',{name:/Email/}).first()
+  const tasks = page.getByRole('link',{name:/Tasks/}).first()
+  await expect(email.locator('.nav-badge')).toHaveText('2')
+  await expect(tasks.locator('.nav-badge')).toHaveText('5')
+
+  const clientWork = page.getByText('Client Work',{exact:true})
+  await clientWork.click()
+  const leads = page.getByRole('link',{name:/Leads/}).first()
+  const cases = page.getByRole('link',{name:/Cases/}).first()
+  await expect(leads.locator('.nav-badge')).toHaveText('4')
+  await expect(cases.locator('.nav-badge')).toHaveText('3')
+
+  for (const badge of [email.locator('.nav-badge'),tasks.locator('.nav-badge'),leads.locator('.nav-badge'),cases.locator('.nav-badge')]) {
+    await expect(badge).toBeVisible()
+    const box = await badge.boundingBox()
+    expect(box?.width||0).toBeGreaterThanOrEqual(18)
+    expect(box?.height||0).toBeGreaterThanOrEqual(14)
+  }
 })
 
 test('Communications pages survive sequential sidebar navigation without refresh', async ({ page }) => {
