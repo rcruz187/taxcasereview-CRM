@@ -3,11 +3,17 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { FIRM, loadFirmBrandingPublic } from '../lib/firmBranding'
 import { useWebRTCRoom } from '../lib/webrtcRoom'
 import { useVideoBackground } from '../lib/videoBackground'
-// MediaPipe Selfie Segmentation loaded dynamically in videoBackground.js
 import VirtualBackground from '../components/VirtualBackground'
 import VideoTile from '../components/VideoTile'
+import LargeTrainingRoom from './LargeTrainingRoom'
 
 export default function MeetingRoom() {
+  const [params] = useSearchParams()
+  if (params.get('large') === '1') return <LargeTrainingRoom />
+  return <StandardMeetingRoom />
+}
+
+function StandardMeetingRoom() {
   const { id } = useParams()
   const [params]                    = useSearchParams()
   const [brandingReady, setBrandingReady] = useState(false)
@@ -20,11 +26,9 @@ export default function MeetingRoom() {
   const webrtc  = useWebRTCRoom('meet')
   const peerConnsRef = webrtc.peerConnsRef
   const vbg = useVideoBackground()
-  const rawRef  = useRef(null)  // original camera stream
+  const rawRef  = useRef(null)
 
   useEffect(() => {
-    // Meetings launched from the RomyLabs Admin Portal always use the platform
-    // identity. Product/tenant meeting links continue to load their own branding.
     if (window.location.hostname.toLowerCase() === 'admin.romylabs.com') {
       FIRM.name = 'RomyLabs'
       FIRM.logoUrl = '/romylabs-logo.png'
@@ -34,9 +38,6 @@ export default function MeetingRoom() {
       setBrandingReady(true)
       return
     }
-
-    // Meeting links generated inside a product carry ?t=<tenant uuid> so the
-    // public join screen renders the sender firm's logo + name.
     const t = (params.get('t') || '').trim()
     loadFirmBrandingPublic(t || undefined).finally(() => setBrandingReady(true))
   }, [params])
@@ -68,22 +69,16 @@ export default function MeetingRoom() {
   async function handleBgSelect(mode, presetId, customUrl) {
     const raw = rawRef.current
     if (!raw) return
-
     if (mode === 'none') {
       vbg.stopLoop()
       setProcessedStream(null)
       webrtc.localStreamRef.current = raw
       return
     }
-
     const out = await vbg.changeBackground(raw, mode, presetId, customUrl)
-    if (!out) return // failed silently
-
-    // Directly set the processed stream — VideoTile will pick it up via useEffect
+    if (!out) return
     webrtc.localStreamRef.current = out
-    setProcessedStream(new MediaStream(out.getTracks())) // new ref forces VideoTile re-render
-
-    // Also replace track in any active peer connections
+    setProcessedStream(new MediaStream(out.getTracks()))
     try {
       const newTrack = out.getVideoTracks()[0]
       if (newTrack) {
@@ -108,21 +103,10 @@ export default function MeetingRoom() {
             <div style={{ fontSize: 13, color: '#94a3b8' }}>{FIRM.name || 'Tax Case Review'} — secure video meeting</div>
           </div>
           <label style={S.label}>Your name</label>
-          <input
-            style={S.textInput}
-            value={name}
-            onChange={e => setName(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleJoin() }}
-            placeholder="Enter your name"
-            autoFocus
-          />
+          <input style={S.textInput} value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleJoin() }} placeholder="Enter your name" autoFocus />
           {webrtc.error && <div style={{ color: '#fdba74', fontSize: 12, marginTop: 10 }}>{webrtc.error}</div>}
-          <button style={S.bigBtn} disabled={!name.trim() || joining} onClick={handleJoin}>
-            {joining ? 'Joining…' : 'Join Meeting'}
-          </button>
-          <div style={{ fontSize: 11, color: '#64748b', marginTop: 14, textAlign: 'center' }}>
-            Your browser will ask for camera and microphone access.
-          </div>
+          <button style={S.bigBtn} disabled={!name.trim() || joining} onClick={handleJoin}>{joining ? 'Joining…' : 'Join Meeting'}</button>
+          <div style={{ fontSize: 11, color: '#64748b', marginTop: 14, textAlign: 'center' }}>Your browser will ask for camera and microphone access.</div>
         </div>
       </div>
     )
@@ -130,100 +114,33 @@ export default function MeetingRoom() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0f1a', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
       <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #1e293b' }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9' }}>{FIRM.name || 'Tax Case Review'} — Meeting</div>
         <div style={{ fontSize: 12, color: '#86efac' }}>{webrtc.members.length} in the call</div>
       </div>
-
-      {webrtc.error && (
-        <div style={{ background: '#451a03', color: '#fdba74', fontSize: 12, padding: '8px 20px' }}>{webrtc.error}</div>
-      )}
-
-      {/* Video grid */}
+      {webrtc.error && <div style={{ background: '#451a03', color: '#fdba74', fontSize: 12, padding: '8px 20px' }}>{webrtc.error}</div>}
       <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', alignContent: 'flex-start', gap: 14, padding: 20, overflowY: 'auto' }}>
         <div style={{ width: 440, flexShrink: 0 }}>
-          <VideoTile
-            stream={displayStream}
-            name={name}
-            label={`${name} (you)${vbg.bgMode !== 'none' ? ' 🖼️' : ''}`}
-            muted
-            mirror={vbg.bgMode === 'none'}
-            videoEnabled={webrtc.cameraOn}
-          />
+          <VideoTile stream={displayStream} name={name} label={`${name} (you)${vbg.bgMode !== 'none' ? ' 🖼️' : ''}`} muted mirror={vbg.bgMode === 'none'} videoEnabled={webrtc.cameraOn} />
         </div>
-        {webrtc.members.filter(n => n !== name).map(n => (
-          <div key={n} style={{ width: 440, flexShrink: 0 }}>
-            <VideoTile stream={webrtc.remoteStreams[n]} name={n} />
-          </div>
-        ))}
+        {webrtc.members.filter(n => n !== name).map(n => <div key={n} style={{ width: 440, flexShrink: 0 }}><VideoTile stream={webrtc.remoteStreams[n]} name={n} /></div>)}
       </div>
-
-      {/* Virtual background panel */}
-      {showBgPanel && (
-        <VirtualBackground
-          bgMode={vbg.bgMode}
-          bgPreset={vbg.bgPreset}
-          segStatus={vbg.segStatus}
-          onSelect={handleBgSelect}
-        />
-      )}
-
-      {/* Controls */}
+      {showBgPanel && <VirtualBackground bgMode={vbg.bgMode} bgPreset={vbg.bgPreset} segStatus={vbg.segStatus} onSelect={handleBgSelect} />}
       <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'center', gap: 10, borderTop: '1px solid #1e293b', flexWrap: 'wrap' }}>
-        <button onClick={webrtc.toggleMic} style={S.ctrlBtn(webrtc.micOn)}>
-          {webrtc.micOn ? '🎤 Mic On' : '🔇 Muted'}
-        </button>
-        <button onClick={webrtc.toggleCamera} style={S.ctrlBtn(webrtc.cameraOn)}>
-          {webrtc.cameraOn ? '📹 Camera On' : '📷 Off'}
-        </button>
-        <button
-          onClick={() => setShowBgPanel(p => !p)}
-          style={{
-            ...S.ctrlBtn(showBgPanel),
-            background: showBgPanel ? 'rgba(59,130,246,.2)' : S.ctrlBtn(false).background,
-            border: `1px solid ${showBgPanel ? '#3b82f6' : '#334155'}`,
-            color: showBgPanel ? '#93c5fd' : '#e2e8f0',
-          }}
-        >
-          🖼️ Background{vbg.bgMode !== 'none' ? ' ●' : ''}
-        </button>
-        <button onClick={handleLeave} style={{ padding: '10px 22px', borderRadius: 8, background: '#dc2626', border: 'none', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
-          Leave Meeting
-        </button>
+        <button onClick={webrtc.toggleMic} style={S.ctrlBtn(webrtc.micOn)}>{webrtc.micOn ? '🎤 Mic On' : '🔇 Muted'}</button>
+        <button onClick={webrtc.toggleCamera} style={S.ctrlBtn(webrtc.cameraOn)}>{webrtc.cameraOn ? '📹 Camera On' : '📷 Off'}</button>
+        <button onClick={() => setShowBgPanel(p => !p)} style={{ ...S.ctrlBtn(showBgPanel), background: showBgPanel ? 'rgba(59,130,246,.2)' : S.ctrlBtn(false).background, border: `1px solid ${showBgPanel ? '#3b82f6' : '#334155'}`, color: showBgPanel ? '#93c5fd' : '#e2e8f0' }}>🖼️ Background{vbg.bgMode !== 'none' ? ' ●' : ''}</button>
+        <button onClick={handleLeave} style={{ padding: '10px 22px', borderRadius: 8, background: '#dc2626', border: 'none', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>Leave Meeting</button>
       </div>
     </div>
   )
 }
 
 const S = {
-  page: {
-    minHeight: '100vh',
-    background: 'linear-gradient(160deg,#071c30 0%,#0a2f4e 55%,#0a3f60 100%)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    padding: '32px 16px',
-  },
-  card: {
-    background: 'rgba(255,255,255,.06)',
-    border: '1px solid rgba(255,255,255,.12)',
-    borderRadius: 18, padding: '24px 26px',
-    width: '100%', maxWidth: 420,
-  },
+  page: { minHeight: '100vh', background: 'linear-gradient(160deg,#071c30 0%,#0a2f4e 55%,#0a3f60 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 16px' },
+  card: { background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 18, padding: '24px 26px', width: '100%', maxWidth: 420 },
   label: { fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6, display: 'block' },
-  textInput: {
-    width: '100%', padding: '11px 14px', fontSize: 14,
-    background: '#0a1628', border: '1px solid #1e3a5f', borderRadius: 10,
-    color: '#f1f5f9', outline: 'none', boxSizing: 'border-box',
-  },
-  bigBtn: {
-    marginTop: 16, width: '100%', padding: 13,
-    background: '#3b82f6', border: 'none', borderRadius: 10,
-    color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer',
-  },
-  ctrlBtn: (on) => ({
-    padding: '10px 18px', borderRadius: 8,
-    background: on ? '#1e293b' : 'rgba(248,113,113,.15)',
-    border: `1px solid ${on ? '#334155' : '#f87171'}`,
-    color: on ? '#e2e8f0' : '#fca5a5', fontWeight: 600, cursor: 'pointer', fontSize: 13,
-  }),
+  textInput: { width: '100%', padding: '11px 14px', fontSize: 14, background: '#0a1628', border: '1px solid #1e3a5f', borderRadius: 10, color: '#f1f5f9', outline: 'none', boxSizing: 'border-box' },
+  bigBtn: { marginTop: 16, width: '100%', padding: 13, background: '#3b82f6', border: 'none', borderRadius: 10, color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' },
+  ctrlBtn: (on) => ({ padding: '10px 18px', borderRadius: 8, background: on ? '#1e293b' : 'rgba(248,113,113,.15)', border: `1px solid ${on ? '#334155' : '#f87171'}`, color: on ? '#e2e8f0' : '#fca5a5', fontWeight: 600, cursor: 'pointer', fontSize: 13 }),
 }
