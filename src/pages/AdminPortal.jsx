@@ -3839,7 +3839,7 @@ function CommandCenter() {
   useEffect(() => {
     setGa4Data(null)
     if (tab==='marketing' && ga4EnabledProducts.includes(marketingProduct)) loadGA4()
-  }, [tab, marketingProduct])
+  }, [tab, marketingProduct, ga4EnabledProducts])
 
   // Poll activity every 30s
   useEffect(() => {
