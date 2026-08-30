@@ -12,6 +12,23 @@
 
 import { supabase } from './supabase'
 
+const ROMYLABS_ADMIN_HOST = 'admin.romylabs.com'
+const ROMYLABS_ADMIN_FAVICON = '/romylabs-favicon.svg?v=20260830-3'
+
+function isRomyLabsAdminHost() {
+  try {
+    return typeof window !== 'undefined' && window.location.hostname.toLowerCase() === ROMYLABS_ADMIN_HOST
+  } catch (_) {
+    return false
+  }
+}
+
+function setBrowserTitle(title) {
+  try {
+    document.title = isRomyLabsAdminHost() ? 'RomyLabs Admin' : title
+  } catch (_) {}
+}
+
 // Slug for per-tenant asset folders (blank IRS/state form templates carrying
 // that firm's representative details). Derived from the firm name rather than a
 // tenant id so it needs no schema change and stays readable on disk.
@@ -46,9 +63,11 @@ export const FIRM = {
   labels:         _cached?.labels         || {},
   paymentProvider: _cached?.paymentProvider || 'stripe',
 }
-// Apply cached branding immediately (title only) before any async fetch
+// Apply cached branding immediately (title only) before any async fetch.
+// The RomyLabs Admin host is a hard browser-branding boundary and must never
+// inherit cached tenant/demo branding.
 if (_cached?.name) {
-  try { document.title = `${_cached.name} — IRS Resolution CRM` } catch (_) {}
+  setBrowserTitle(`${_cached.name} — IRS Resolution CRM`)
 }
 
 // Resolve a UI label — falls back to the default if the tenant hasn't overridden it
@@ -69,7 +88,7 @@ export async function loadFirmBranding() {
         if (firm_name) FIRM.slug = firmSlug(firm_name)
         FIRM.logoUrl = logo_url || ''
         FIRM.loaded = true
-        try { document.title = `${FIRM.name} — IRS Resolution CRM` } catch (_) {}
+        setBrowserTitle(`${FIRM.name} — IRS Resolution CRM`)
         setFavicon('', FIRM.name) // impersonation = non-TCR tenant → taxrescrm favicon
         return FIRM
       }
@@ -92,8 +111,9 @@ export async function loadFirmBranding() {
     FIRM.tenantId = s.tenant_id || ''
     // The browser tab is part of the product's face — a prospect signed into
     // their demo should not see another firm's name above their own CRM. The
-    // static index.html title remains the pre-login fallback.
-    try { document.title = `${name} — IRS Resolution CRM` } catch (_) {}
+    // static index.html title remains the pre-login fallback. Admin Portal is
+    // explicitly excluded from tenant browser branding.
+    setBrowserTitle(`${name} — IRS Resolution CRM`)
     setFavicon(s.tenant_id, name)
     FIRM.logoUrl = s.logourl || ''
     FIRM.address = address
@@ -139,7 +159,7 @@ export async function loadFirmBrandingPublic(tenantHint) {
       if (data.phone) FIRM.phone = data.phone
       FIRM.loaded = true
       setFavicon(FIRM.tenantId, FIRM.name)
-      try { document.title = `${FIRM.name} — IRS Resolution CRM` } catch (_) {}
+      setBrowserTitle(`${FIRM.name} — IRS Resolution CRM`)
     }
   } catch (_) { /* keep defaults */ }
   return FIRM
@@ -148,8 +168,18 @@ export async function loadFirmBrandingPublic(tenantHint) {
 // Dynamically swap the browser favicon to match the current tenant.
 // TCR keeps its own favicon; other tenants use their own logo URL as favicon
 // (set when the logo is uploaded in Settings). Falls back to taxrescrm favicon.
+// SECURITY/BRANDING BOUNDARY: tenant/demo branding must never overwrite the
+// RomyLabs Admin browser identity on admin.romylabs.com.
 function setFavicon(tenantId, name) {
   try {
+    if (isRomyLabsAdminHost()) {
+      document.querySelectorAll('link[rel*="icon"]').forEach(el => {
+        el.setAttribute('type', 'image/svg+xml')
+        el.setAttribute('href', ROMYLABS_ADMIN_FAVICON)
+      })
+      return
+    }
+
     const BASE = '/'
     const TCR_TENANT = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
     let href
@@ -169,4 +199,3 @@ function setFavicon(tenantId, name) {
 export function firmFooterLine() {
   return [FIRM.name, FIRM.address, FIRM.phone].filter(Boolean).join(' · ')
 }
-
