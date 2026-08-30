@@ -2,6 +2,7 @@
 /* CC_HIDE_FIX_20260827: never hide Command Center containers by textContent. */
 /* IMPERSONATION_FIX_20260829: stale browser impersonation state must never lock owner out. */
 /* MEET_PUBLIC_ROUTE_FIX_20260830: public meeting/training routes must bypass admin redirect. */
+/* MOBILE_ADMIN_SESSION_FIX_20260830: stale tenant/demo auth must never boot on admin host. */
 (function () {
   var host = window.location.hostname.toLowerCase();
   var path = window.location.pathname;
@@ -25,6 +26,44 @@
   /* Public meeting/training/invite routes intentionally run on the RomyLabs host
    * without entering the authenticated control plane. Never rewrite them. */
   if (isPublicRoute) return;
+
+  /* Mobile browsers can preserve a valid TaxRes/demo Supabase session from a
+   * different visit. Before React boots on the dedicated admin hostname, inspect
+   * Supabase auth storage. If the stored user is explicitly a non-owner, remove
+   * only that auth record and send the browser to the RomyLabs login. Never do
+   * this during an intentional Jump In session. */
+  if (!isImpersonationRoute && !isActiveImpersonation) {
+    var ownerEmails = {
+      'info@romylabs.com': true,
+      'romy@romylabs.com': true,
+      'romy@taxrescrm.net': true,
+      'romy@taxcasereview.org': true
+    };
+    var removedTenantAuth = false;
+    try {
+      for (var storageIndex = localStorage.length - 1; storageIndex >= 0; storageIndex--) {
+        var storageKey = localStorage.key(storageIndex);
+        if (!storageKey || storageKey.indexOf('sb-') !== 0 || storageKey.indexOf('-auth-token') === -1) continue;
+        var rawSession = localStorage.getItem(storageKey);
+        if (!rawSession) continue;
+        try {
+          var parsedSession = JSON.parse(rawSession);
+          var storedEmail = parsedSession && parsedSession.user && parsedSession.user.email
+            ? String(parsedSession.user.email).toLowerCase()
+            : '';
+          if (storedEmail && !ownerEmails[storedEmail]) {
+            localStorage.removeItem(storageKey);
+            removedTenantAuth = true;
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+    if (removedTenantAuth) {
+      try { sessionStorage.removeItem('admin_impersonation'); } catch (_) {}
+      if (path !== '/login') window.location.replace('/login?admin=1');
+      return;
+    }
+  }
 
   /* admin.romylabs.com is the dedicated control plane. A stale Jump In marker
    * in sessionStorage is NOT authority to remain in the CRM shell. Only the
