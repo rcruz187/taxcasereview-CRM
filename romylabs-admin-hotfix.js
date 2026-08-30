@@ -3,6 +3,7 @@
 /* IMPERSONATION_FIX_20260829: stale browser impersonation state must never lock owner out. */
 /* MEET_PUBLIC_ROUTE_FIX_20260830: public meeting/training routes must bypass admin redirect. */
 /* MOBILE_ADMIN_SESSION_FIX_20260830: stale tenant/demo auth must never boot on admin host. */
+/* MOBILE_ADMIN_LOGIN_RESET_V4_20260830: /login always starts with zero inherited auth. */
 (function () {
   var host = window.location.hostname.toLowerCase();
   var path = window.location.pathname;
@@ -30,6 +31,34 @@
   /* Public meeting/training/invite routes intentionally run on the RomyLabs host
    * without entering the authenticated control plane. Never rewrite them. */
   if (isPublicRoute) return;
+
+  /* HARD LOGIN BOUNDARY: the dedicated RomyLabs admin login page must never
+   * inherit any prior Supabase session from TaxRes, Demo, or a previous Jump In.
+   * Chrome on iOS can restore stale page/session state aggressively, so do not
+   * try to classify the old session here — remove every Supabase auth token
+   * before React/Supabase boots. This is scoped only to admin.romylabs.com/login. */
+  if (path === '/login') {
+    try {
+      for (var loginStorageIndex = localStorage.length - 1; loginStorageIndex >= 0; loginStorageIndex--) {
+        var loginStorageKey = localStorage.key(loginStorageIndex);
+        if (loginStorageKey && loginStorageKey.indexOf('sb-') === 0 && loginStorageKey.indexOf('-auth-token') !== -1) {
+          localStorage.removeItem(loginStorageKey);
+        }
+      }
+    } catch (_) {}
+    try {
+      for (var loginSessionIndex = sessionStorage.length - 1; loginSessionIndex >= 0; loginSessionIndex--) {
+        var loginSessionKey = sessionStorage.key(loginSessionIndex);
+        if (loginSessionKey && loginSessionKey.indexOf('sb-') === 0 && loginSessionKey.indexOf('-auth-token') !== -1) {
+          sessionStorage.removeItem(loginSessionKey);
+        }
+      }
+      sessionStorage.removeItem('admin_impersonation');
+    } catch (_) {}
+    if (params.get('imp') || params.get('switch')) {
+      try { window.history.replaceState({}, '', '/login?admin=1'); } catch (_) {}
+    }
+  }
 
   /* Mobile browsers can preserve a valid TaxRes/demo Supabase session from a
    * different visit. Before React boots on the dedicated admin hostname, inspect
