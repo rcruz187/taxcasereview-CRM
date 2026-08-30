@@ -1,0 +1,53 @@
+name: Trace RomyLabs Admin Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/admin-portal-build.txt'
+      - '.github/workflows/trace-romylabs-admin-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trace-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Trace admin.romylabs.com against current build
+        shell: bash
+        run: |
+          set -euo pipefail
+          marker='ROMYLABS_MEET_EMAIL_20260830_0545'
+          base='https://admin.romylabs.com'
+          ts=$(date +%s)
+
+          echo '=== LIVE BUILD MARKER ==='
+          live_marker=$(curl -fsSL --max-time 20 -H 'Cache-Control: no-cache' "$base/admin-portal-build.txt?v=$ts" || true)
+          printf '%s\n' "$live_marker"
+
+          echo '=== LIVE HTML ==='
+          html=$(curl -fsSL --max-time 20 -H 'Cache-Control: no-cache' "$base/?v=$ts" || true)
+          printf '%s\n' "$html" | head -c 6000
+          echo
+
+          js=$(printf '%s' "$html" | grep -oE 'src="[^"]+\.js[^"]*"' | head -1 | sed -E 's/^src="//;s/"$//' || true)
+          echo "main_js=$js"
+
+          if [[ -n "$js" ]]; then
+            [[ "$js" == http* ]] || js="$base${js}"
+            bundle=$(curl -fsSL --max-time 20 -H 'Cache-Control: no-cache' "$js?v=$ts" || true)
+            echo "bundle_has_public_meet=$(printf '%s' "$bundle" | grep -q '/meet/:id' && echo yes || echo no)"
+          fi
+
+          echo '=== RESULT ==='
+          if printf '%s' "$live_marker" | grep -q "$marker"; then
+            echo 'LIVE_MARKER_MATCH=yes'
+            exit 0
+          fi
+
+          echo 'LIVE_MARKER_MATCH=no'
+          echo 'admin.romylabs.com is not serving the current repository build fingerprint.'
+          exit 1
