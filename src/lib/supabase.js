@@ -45,3 +45,28 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     reconnectAfterMs: (attempts) => Math.min(1000 * Math.pow(2, attempts), 30000),
   },
 })
+
+// Credential Vault re-auth must never mutate the active Admin Portal session.
+// The vault UI intentionally calls supabase.auth.signInWithPassword() to confirm
+// the owner's password before a reveal. On the vault route only, verify those
+// credentials with a non-persistent client so the main auth listener never gets
+// a second SIGNED_IN event and cannot reroute or reset the admin session.
+const liveSignInWithPassword = supabase.auth.signInWithPassword.bind(supabase.auth)
+supabase.auth.signInWithPassword = async credentials => {
+  const isVaultReauth = typeof window !== 'undefined'
+    && window.location.hostname.toLowerCase() === 'admin.romylabs.com'
+    && window.location.pathname.startsWith('/crm-admin/vault')
+
+  if (!isVaultReauth) return liveSignInWithPassword(credentials)
+
+  const verifier = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  })
+  const result = await verifier.auth.signInWithPassword(credentials)
+  try { await verifier.auth.signOut() } catch (_) {}
+  return result
+}
