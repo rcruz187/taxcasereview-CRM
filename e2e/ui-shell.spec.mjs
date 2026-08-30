@@ -20,6 +20,18 @@ function b64url(obj) {
 const jwt = `${b64url({alg:'none',typ:'JWT'})}.${b64url({sub:user.id,email:user.email,role:'authenticated',aud:'authenticated',exp:Math.floor(Date.now()/1000)+3600})}.x`
 
 async function mockSupabase(page) {
+  // The dashboard's Taxpayer Advocate RSS feed is optional external content.
+  // Keep this smoke test deterministic and focused on our UI instead of the
+  // availability/CORS behavior of the third-party AllOrigins proxy.
+  await page.route('https://api.allorigins.win/**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      contents: '<?xml version="1.0"?><rss version="2.0"><channel><title>Taxpayer Advocate</title></channel></rss>',
+      status: { http_code: 200 },
+    }),
+  }))
+
   await page.route(`${supabaseHost}/**`, async route => {
     const req = route.request()
     const url = new URL(req.url())
