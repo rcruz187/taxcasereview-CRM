@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import { supabase } from '../lib/supabase'
 
-const ROMYLABS_OWNERS = ['romy@romylabs.com', 'info@romylabs.com']
+const ROMYLABS_OWNERS = ['romy@romylabs.com', 'info@romylabs.com', 'romy@taxrescrm.net', 'romy@taxcasereview.org']
+const ROMYLABS_ADMIN_HOST = 'admin.romylabs.com'
 
 const COPY = {
   en: {
@@ -81,12 +82,12 @@ export default function Login() {
   const [branding, setBranding] = useState(null)
   const [lang, setLang] = useState('en')
   const debounceRef = useRef(null)
+  const isAdminHost = window.location.hostname.toLowerCase() === ROMYLABS_ADMIN_HOST
   const isRomyLabsOwner = ROMYLABS_OWNERS.includes(email.trim().toLowerCase())
   const t = COPY[lang]
 
   useEffect(() => {
     const switchRequested = new URLSearchParams(window.location.search).get('switch') === '1'
-    const isAdminHost = window.location.hostname.toLowerCase() === 'admin.romylabs.com'
     if (!switchRequested || isAdminHost) return
     let cancelled = false
     ;(async () => {
@@ -96,7 +97,7 @@ export default function Login() {
       } catch (_) {}
     })()
     return () => { cancelled = true }
-  }, [])
+  }, [isAdminHost])
 
   useEffect(() => {
     if (document.getElementById('tcr-login-bilingual-css')) return
@@ -108,7 +109,9 @@ export default function Login() {
   }, [])
 
   useEffect(() => {
-    if (ROMYLABS_OWNERS.includes(email.trim().toLowerCase())) {
+    // admin.romylabs.com is always RomyLabs-branded, regardless of autofill or
+    // a stale tenant/demo email sitting in the mobile browser.
+    if (isAdminHost || ROMYLABS_OWNERS.includes(email.trim().toLowerCase())) {
       setBranding({ firm_name: 'RomyLabs', logo_url: '/romylabs-logo.png', sub: 'Platform Administration' })
       return
     }
@@ -124,7 +127,7 @@ export default function Login() {
       } catch (_) { setBranding(null) }
     }, 400)
     return () => clearTimeout(debounceRef.current)
-  }, [email])
+  }, [email, isAdminHost])
 
   async function submit(e) {
     e.preventDefault()
@@ -135,9 +138,21 @@ export default function Login() {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
 
-      const isAdminLogin =
-        ROMYLABS_OWNERS.includes(data.user?.email?.toLowerCase()) &&
-        window.location.hostname.toLowerCase() === 'admin.romylabs.com'
+      const signedInEmail = data.user?.email?.toLowerCase() || ''
+      const ownerLogin = ROMYLABS_OWNERS.includes(signedInEmail)
+
+      // SECURITY BOUNDARY: admin.romylabs.com accepts platform-owner sessions
+      // only. Never allow a valid tenant/demo credential to become app state on
+      // the Admin Portal, even if a mobile browser autofills it.
+      if (isAdminHost && !ownerLogin) {
+        try { sessionStorage.removeItem('admin_impersonation') } catch (_) {}
+        await supabase.auth.signOut()
+        setPassword('')
+        setError('RomyLabs Admin access only. Use an authorized RomyLabs owner account.')
+        return
+      }
+
+      const isAdminLogin = isAdminHost && ownerLogin
 
       // Defense in depth: the Admin Portal must always start with NO tenant
       // context. A previous Jump In can leave both a browser marker and a
@@ -160,8 +175,8 @@ export default function Login() {
     }
   }
 
-  const firmName = branding?.firm_name || 'Tax Case Review'
-  const logoUrl = branding?.logo_url || '/taxrescrm-logo.png'
+  const firmName = branding?.firm_name || (isAdminHost ? 'RomyLabs' : 'Tax Case Review')
+  const logoUrl = branding?.logo_url || (isAdminHost ? '/romylabs-logo.png' : '/taxrescrm-logo.png')
 
   return (
     <div className="tcr-login-page">
@@ -200,7 +215,7 @@ export default function Login() {
               <button type="submit" disabled={loading} className="tcr-login-btn2">{loading ? t.signingIn : t.signIn}</button>
             </form>
 
-            <div className="tcr-login-footer2">{isRomyLabsOwner ? t.platform : t.powered}</div>
+            <div className="tcr-login-footer2">{isAdminHost || isRomyLabsOwner ? t.platform : t.powered}</div>
           </div>
         </div>
       </div>
