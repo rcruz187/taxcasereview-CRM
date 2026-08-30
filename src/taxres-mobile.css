@@ -1,0 +1,132 @@
+/* TaxRes CRM mobile baseline
+   This file is intentionally product-agnostic and should be carried into every
+   current/future TaxRes office. Keep it imported AFTER office polish CSS so the
+   responsive rules win without changing desktop branding. */
+
+html, body, #root { max-width: 100%; overflow-x: hidden; }
+.main-area, .page-content { min-width: 0; max-width: 100%; }
+.page-content > * { max-width: 100%; }
+img, video, canvas, iframe { max-width: 100%; }
+
+/* Tablet and below: use the real mobile navigation shell instead of squeezing
+   a permanent desktop rail next to the workspace. */
+@media (max-width: 900px) {
+  :root { --nav-w: 0px !important; }
+
+  .sidebar {
+    display: flex !important;
+    position: fixed !important;
+    top: 0 !important; left: 0 !important; bottom: 0 !important;
+    width: min(86vw, 320px) !important;
+    max-width: 320px !important;
+    height: 100dvh !important;
+    z-index: 5000 !important;
+    transform: translateX(-105%) !important;
+    transition: transform .22s ease !important;
+    box-shadow: 12px 0 38px rgba(0,0,0,.48) !important;
+  }
+  .sidebar.mobile-open { transform: translateX(0) !important; }
+  .sidebar-backdrop { position: fixed !important; inset: 0 !important; z-index: 4990 !important; background: rgba(0,0,0,.58) !important; }
+  .sidebar-close-btn { display: flex !important; }
+  .hamburger-btn { display: flex !important; min-width: 38px; min-height: 38px; border-radius: 9px; }
+
+  .topbar {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 56px !important;
+    padding: 0 10px !important;
+    gap: 7px !important;
+    overflow: hidden !important;
+  }
+  .topbar > div:first-of-type { min-width: 0 !important; gap: 8px !important; }
+  /* Direct second div is the desktop phone/fax/utility strip in both TCR/Nashville. */
+  .topbar > div:nth-of-type(2) { display: none !important; }
+  .topbar .search-input { display: none !important; }
+  .topbar .topbar-clock, .topbar .topbar-datestr { display: none !important; }
+  .page-title {
+    min-width: 0 !important;
+    max-width: 46vw !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    font-size: 14px !important;
+  }
+
+  .page-content { padding: 12px !important; overflow-x: hidden !important; }
+  .g2, .g3, .g3c, .fg2, .fg3, .form-grid2, .detail-2col { grid-template-columns: 1fr !important; }
+
+  .page-header, .card-header, .ch, .back-bar {
+    flex-wrap: wrap !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+  .page-header > *, .card-header > * { min-width: 0 !important; }
+
+  .card, .dp, .modal, .info-box {
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+  .modal-overlay, .modal-bg { padding: 10px !important; align-items: flex-start !important; overflow-y: auto !important; }
+  .modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: calc(100dvh - 20px) !important;
+    margin: 0 !important;
+    padding: 16px !important;
+    border-radius: 12px !important;
+  }
+
+  input, select, textarea, button { max-width: 100%; }
+  .field input, .field select, .field textarea, .input, .select { font-size: 16px !important; }
+  .btn { min-height: 40px !important; }
+
+  .ovx, .client-roster-scroll { max-width: 100% !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  table { max-width: 100% !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  .dr { grid-template-columns: 1fr !important; gap: 2px !important; }
+
+  .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  [data-card-idx] { min-width: 0 !important; }
+
+  .bubble { max-width: 86% !important; }
+  .clock-big { font-size: clamp(30px, 10vw, 42px) !important; }
+}
+
+@media (max-width: 640px) {
+  .page-content { padding: 10px !important; }
+  .topbar { min-height: 54px !important; }
+  .page-title { max-width: 40vw !important; font-size: 13px !important; }
+
+  /* Preserve the two essential topbar controls: navigation and + New.
+     Hide desktop utility buttons that are available elsewhere in the app. */
+  .topbar > button[title*="Notification"],
+  .topbar > button[title*="Switch to light"],
+  .topbar > button[title*="Switch to dark"],
+  .topbar > button[title*="support ticket"] { display: none !important; }
+  .topbar > .btn.pri, .topbar > button.btn.pri {
+    min-width: 62px !important;
+    min-height: 38px !important;
+    padding: 6px 9px !important;
+    font-size: 12px !important;
+    margin-left: auto !important;
+  }
+
+  .metrics { grid-template-columns: 1fr !important; }
+  .card { padding: 12px !important; }
+  .modal { padding: 14px !important; }
+  .toast { left: 10px !important; right: 10px !important; bottom: 10px !important; max-width: none !important; }
+
+  /* Touch-friendly controls */
+  .nav-item { min-height: 44px !important; }
+  .chip { min-height: 36px; align-items: center; }
+  .task-cb { width: 22px !important; height: 22px !important; }
+
+  /* Calendar stays useful rather than becoming seven unreadable slivers. */
+  .cal-grid { min-width: 700px; }
+  .cal-grid-scroll { overflow-x: auto !important; max-width: 100% !important; -webkit-overflow-scrolling: touch; }
+
+  .email-sidebar { display: none !important; }
+  .dialer-layout { flex-direction: column !important; }
+  .dialer-dialpad-card { width: 100% !important; }
+  .employees-level-grid { grid-template-columns: 1fr !important; }
+  .fp-expfield, .fp-oic-grid { grid-template-columns: 1fr !important; }
+}
