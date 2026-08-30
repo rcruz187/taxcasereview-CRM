@@ -60,20 +60,48 @@ function adminKey() {
   return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 }
 
+async function sha256Hex(value: string) {
+  const bytes = new TextEncoder().encode(value)
+  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))
+  return [...hash].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+function constantTimeEqual(a: string, b: string) {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
+
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
-
-  // Supabase JWT verification is intentionally disabled for this provider webhook.
-  // Stalwart must authenticate with this dedicated bearer secret instead.
-  const expectedToken = Deno.env.get('STALWART_MTA_HOOK_TOKEN') || ''
-  const suppliedToken = req.headers.get('authorization') || ''
-  if (!expectedToken || suppliedToken !== `Bearer ${expectedToken}`) {
-    return json({ error: 'Unauthorized' }, 401)
-  }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
   const secretKey = adminKey()
   if (!supabaseUrl || !secretKey) return json({ error: 'Server configuration missing' }, 500)
+  const admin = createClient(supabaseUrl, secretKey, { auth: { persistSession: false } })
+
+  // Supabase JWT verification is intentionally disabled for this provider webhook.
+  // Stalwart authenticates with a dedicated bearer secret. The raw secret is not
+  // stored in Postgres; only its SHA-256 digest is kept in the locked credential table.
+  const supplied = req.headers.get('authorization') || ''
+  const bearer = supplied.startsWith('Bearer ') ? supplied.slice(7).trim() : ''
+  if (!bearer) return json({ error: 'Unauthorized' }, 401)
+
+  const expectedEnv = Deno.env.get('STALWART_MTA_HOOK_TOKEN') || ''
+  let authorized = expectedEnv ? constantTimeEqual(bearer, expectedEnv) : false
+  if (!authorized) {
+    const bearerHash = await sha256Hex(bearer)
+    const { data: credential, error: credentialError } = await admin
+      .from('romylabs_webhook_credentials')
+      .select('token_sha256')
+      .eq('purpose', 'stalwart_mta_hook')
+      .eq('active', true)
+      .maybeSingle()
+    if (credentialError) return json({ error: 'Webhook authorization unavailable' }, 500)
+    authorized = !!credential?.token_sha256 && constantTimeEqual(bearerHash, String(credential.token_sha256))
+  }
+  if (!authorized) return json({ error: 'Unauthorized' }, 401)
 
   const payload = await req.json().catch(() => null) as HookRequest | null
   if (!payload) return json({ error: 'Invalid JSON' }, 400)
@@ -93,10 +121,8 @@ Deno.serve(async (req) => {
   const deliveredTo = normalizeEmail(headerValue(allHeaders, 'Delivered-To'))
   const recipients = [...new Set([...envelopeRecipients, ...(deliveredTo ? [deliveredTo] : [])])]
 
-  // If the message is not for a RomyLabs-managed address, do not interfere with mail delivery.
+  // If the message is not for a RomyLabs-managed address, do not interfere with delivery.
   if (!fromAddress || recipients.length === 0) return mtaAccept()
-
-  const admin = createClient(supabaseUrl, secretKey, { auth: { persistSession: false } })
 
   let route: MailboxRoute | null = null
   for (const recipient of recipients.slice(0, 25)) {
