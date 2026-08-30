@@ -5,8 +5,25 @@ on:
   push:
     branches: [main]
     paths:
-      - 'src/**'
-      - 'public/**'
+      # Admin portal surfaces
+      - 'src/pages/AdminPortal.jsx'
+      - 'src/pages/AdminPortalGuard.jsx'
+      - 'src/pages/AdminChat.jsx'
+      - 'src/pages/AdminConsole.jsx'
+      - 'src/components/admin/**'
+      # Shared shell/auth modules that can change the admin build itself
+      - 'src/App.jsx'
+      - 'src/main.jsx'
+      - 'src/context/AppContext.jsx'
+      - 'src/context/ScreenShareContext.jsx'
+      - 'src/lib/supabase.js'
+      - 'src/lib/firmBranding.js'
+      - 'src/index.css'
+      - 'src/polish.css'
+      - 'src/taxres-mobile.css'
+      # Admin-specific public/build inputs
+      - 'public/admin-portal-build.txt'
+      - 'public/romylabs-logo.png'
       - 'index.html'
       - 'package.json'
       - 'package-lock.json'
@@ -15,6 +32,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: romylabs-admin-production
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -27,7 +48,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
       - name: Verify Cloudflare credentials are available
         shell: bash
