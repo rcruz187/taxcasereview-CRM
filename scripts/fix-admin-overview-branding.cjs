@@ -7,3 +7,4 @@ if (!s.includes(oldText)) throw new Error('Overview branding anchor missing; sou
 s = s.replace(oldText, newText);
 fs.writeFileSync(p, s);
 console.log('Replaced TaxRes tenant branding on Admin Overview with RomyLabs logo');
+// one-shot trigger
