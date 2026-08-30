@@ -25,7 +25,10 @@ function replaceFunctionBody(source, fnName, replacement) {
 const loadCounts = `    async function loadCounts() {
       const { data, error } = await supabase.rpc('get_sidebar_badge_counts')
       if (error) {
-        console.error('[badge] sidebar count RPC failed:', error.message)
+        // Badge refreshes can be aborted during rapid route changes. Preserve the
+        // last known counts and keep navigation clean; the visibility/poll/realtime
+        // refresh paths will retry automatically.
+        console.warn('[badge] sidebar count refresh skipped:', error.message)
         return
       }
       const b = data || {}
@@ -39,14 +42,14 @@ const loadEmailTaskCounts = `    async function loadEmailTaskCounts() {
       if (!user?.email) return
       const { data, error } = await supabase.rpc('get_sidebar_badge_counts')
       if (error) {
-        console.error('[badge] email/task count RPC failed:', error.message)
+        // A navigation-aborted fetch is not an application error. Keep the last
+        // successful badge values and let the next realtime/poll/visibility pass retry.
+        console.warn('[badge] email/task count refresh skipped:', error.message)
         return
       }
       const b = data || {}
       setUnreadInbox(Number(b.email) || 0)
       setOpenTasks(Number(b.tasks) || 0)
-      // Folder-specific mini-counts remain optional; the sidebar's primary
-      // notification badge is the authoritative combined unread total.
       setEmailActionNeeded(0)
       setEmailWaiting(0)
     }`
