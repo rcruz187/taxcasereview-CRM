@@ -1,0 +1,27 @@
+name: RomyLabs Large Training Build Check
+
+on:
+  push:
+    branches:
+      - feature/romylabs-large-training
+    paths:
+      - '.github/workflows/romylabs-large-training-build.yml'
+      - 'src/pages/LargeTrainingRoom.jsx'
+      - 'src/pages/MeetingRoom.jsx'
+      - 'src/pages/MeetTrainingHub.jsx'
+      - 'supabase/functions/turn-credentials/index.ts'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx vite build
