@@ -43,7 +43,10 @@ jobs:
         run: |
           git config user.name 'RomyLabs'
           git config user.email 'actions@github.com'
+          git pull --rebase origin main
           git rm -f .github/workflows/restore-admin-calendar-once.yml
-          git add src/pages/AdminPortal.jsx src/components/admin/RomyLabsCalendar.jsx || true
+          git rm -f .github/workflows/restore-original-admin-calendar-once.yml || true
+          git add src/pages/AdminPortal.jsx
+          git add -u src/components/admin/RomyLabsCalendar.jsx || true
           git commit -m 'fix(admin): restore original calendar UI and remove replacement'
           git push
