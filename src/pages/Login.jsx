@@ -83,7 +83,6 @@ export default function Login() {
   const [lang, setLang] = useState('en')
   const debounceRef = useRef(null)
   const isAdminHost = window.location.hostname.toLowerCase() === ROMYLABS_ADMIN_HOST
-  const isRomyLabsOwner = ROMYLABS_OWNERS.includes(email.trim().toLowerCase())
   const t = COPY[lang]
 
   useEffect(() => {
@@ -109,9 +108,10 @@ export default function Login() {
   }, [])
 
   useEffect(() => {
-    // admin.romylabs.com is always RomyLabs-branded, regardless of autofill or
-    // a stale tenant/demo email sitting in the mobile browser.
-    if (isAdminHost || ROMYLABS_OWNERS.includes(email.trim().toLowerCase())) {
+    // Branding follows the host/tenant, not the privilege level of the email.
+    // Owner credentials such as romy@taxcasereview.org remain TCR-branded on
+    // the TCR login; only admin.romylabs.com is allowed to show RomyLabs.
+    if (isAdminHost) {
       setBranding({ firm_name: 'RomyLabs', logo_url: '/romylabs-logo.png', sub: 'Platform Administration' })
       return
     }
@@ -215,7 +215,7 @@ export default function Login() {
               <button type="submit" disabled={loading} className="tcr-login-btn2">{loading ? t.signingIn : t.signIn}</button>
             </form>
 
-            <div className="tcr-login-footer2">{isAdminHost || isRomyLabsOwner ? t.platform : t.powered}</div>
+            <div className="tcr-login-footer2">{isAdminHost ? t.platform : t.powered}</div>
           </div>
         </div>
       </div>
