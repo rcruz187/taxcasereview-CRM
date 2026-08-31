@@ -13,6 +13,9 @@ const GSC_SITE_CANDIDATES: Record<string, string[]> = {
   taxres_crm: ['sc-domain:taxrescrm.net', 'https://taxrescrm.net/', 'https://www.taxrescrm.net/'],
   camvella: ['sc-domain:camvella.com', 'https://camvella.com/', 'https://www.camvella.com/'],
   arcvena: ['sc-domain:arcvena.com', 'https://arcvena.com/', 'https://www.arcvena.com/'],
+  bocasync: ['sc-domain:bocasync.com', 'https://bocasync.com/', 'https://www.bocasync.com/'],
+  groundivo: ['sc-domain:groundivo.com', 'https://groundivo.com/', 'https://www.groundivo.com/'],
+  oculivo: ['sc-domain:oculivo.com', 'https://oculivo.com/', 'https://www.oculivo.com/'],
 }
 
 function siteHost(siteUrl: string): string {
