@@ -1788,8 +1788,8 @@ function ProductReportingSetup({ productKey, channel, registryProduct }) {
   // Registry-driven: no hardcoded REPORTING_PRODUCTS lookup.
   const label = registryProduct?.name || productKey
   const icon  = registryProduct?.icon_ref || '📦'
-  const title = channel === 'marketing' ? 'Marketing analytics' : 'SEO reporting'
-  const details = `${label} does not have a dedicated ${channel === 'marketing' ? 'GA4 Data API connection' : 'Search Console data connection'} in the RomyLabs reporting hub yet.`
+  const title = channel === 'marketing' ? 'Product usage analytics' : 'SEO reporting'
+  const details = `${label} does not have a dedicated ${channel === 'marketing' ? 'GA4 product-usage connection' : 'Search Console data connection'} in the RomyLabs reporting hub yet.`
   return (
     <div style={{ ...CC.card(), padding:'30px', maxWidth:780 }}>
       <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
@@ -3862,7 +3862,7 @@ function CommandCenter() {
     { key:'overview',  label:'Overview'  },
     { key:'support',   label:'Support'   },
     { key:'products',  label:'Products'  },
-    { key:'marketing', label:'Marketing' },
+    { key:'marketing', label:'Product Usage' },
     { key:'search',    label:'SEO'       },
     { key:'linkedin',  label:'LinkedIn'  },
     { key:'content',   label:'Content'   },
@@ -4213,8 +4213,12 @@ function CommandCenter() {
 
         </>)}
 
-        {/* ═══ MARKETING TAB ═══ */}
+        {/* ═══ PRODUCT USAGE TAB ═══ */}
         {tab==='marketing' && (<>
+          <div style={{ marginBottom:16, padding:'12px 16px', borderRadius:10, background:'rgba(14,165,233,.07)', border:'1px solid rgba(14,165,233,.18)' }}>
+            <div style={{ fontSize:12, fontWeight:800, color:'#7dd3fc', marginBottom:4 }}>Product Usage · GA4 tracked activity</div>
+            <div style={{ fontSize:11, color:'#64748b', lineHeight:1.5 }}>These metrics show tracked website/app sessions and route activity. They are not the same as marketing leads or SEO performance. Use SEO for organic search visibility and Sales for lead/demo conversion.</div>
+          </div>
           <ProductReportingSelector value={marketingProduct} onChange={setMarketingProduct} channel="marketing"
             registryProducts={reportingProducts} marketingConnectedProducts={ga4LiveProducts} />
           {ga4EnabledProducts.includes(marketingProduct) ? <>
@@ -4235,8 +4239,8 @@ function CommandCenter() {
           ) : ga4Data ? (<>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24 }}>
               {[
-                { label:'Sessions Today',    value: ga4Data.sessions.toLocaleString(), sub: ga4Data.sessionChange!==0 ? `${ga4Data.sessionChange>0?'↑':'↓'} ${Math.abs(ga4Data.sessionChange)}% vs yesterday` : 'vs yesterday', icon:'📊', color:'#6366f1' },
-                { label:'Users Today',       value: ga4Data.users.toLocaleString(),    sub:`${ga4Data.newUsers.toLocaleString()} new`,   icon:'👥', color:'#0ea5e9' },
+                { label:'Tracked Sessions Today',    value: ga4Data.sessions.toLocaleString(), sub: ga4Data.sessionChange!==0 ? `${ga4Data.sessionChange>0?'↑':'↓'} ${Math.abs(ga4Data.sessionChange)}% vs yesterday` : 'vs yesterday', icon:'📊', color:'#6366f1' },
+                { label:'Active Users Today',       value: ga4Data.users.toLocaleString(),    sub:`${ga4Data.newUsers.toLocaleString()} new`,   icon:'👥', color:'#0ea5e9' },
                 { label:'Bounce Rate',       value:`${ga4Data.bounceRate}%`,            sub:'avg today',     icon:'↩️', color:'#10b981' },
                 { label:'Pages / Session',   value: ga4Data.pagesPerSession,            sub:'avg today',     icon:'📄', color:'#f59e0b' },
               ].map(k => <KPICard key={k.label} {...k} />)}
@@ -4244,7 +4248,7 @@ function CommandCenter() {
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18, marginBottom:24 }}>
               <div style={CC.card({padding:'22px 24px'})}>
-                <div style={CC.sectionLabel}>Traffic sources — today</div>
+                <div style={CC.sectionLabel}>Session sources — today</div>
                 {ga4Data.channels.map((s,i) => (
                   <div key={i} style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
                     <div style={{ fontSize:12, color:'#94a3b8', width:130, flexShrink:0 }}>{s.label}</div>
@@ -4255,7 +4259,7 @@ function CommandCenter() {
               </div>
 
               <div style={CC.card({padding:'22px 24px'})}>
-                <div style={CC.sectionLabel}>Top pages — last 7 days</div>
+                <div style={CC.sectionLabel}>Most-used routes — last 7 days</div>
                 {ga4Data.topPages.length===0
                   ? <div style={{ fontSize:13, color:'#475569' }}>No page data yet.</div>
                   : ga4Data.topPages.map((p,i) => (
@@ -4263,7 +4267,7 @@ function CommandCenter() {
                     padding:'9px 0', borderBottom: i<ga4Data.topPages.length-1?'1px solid rgba(99,102,241,.1)':'none' }}>
                     <div style={{ fontSize:12, color:'#e2e8f0', fontFamily:'monospace', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:240 }}>{p.path}</div>
                     <div style={{ display:'flex', gap:12, flexShrink:0 }}>
-                      <span style={{ fontSize:12, color:'#94a3b8' }}>{p.views} sessions</span>
+                      <span style={{ fontSize:12, color:'#94a3b8' }}>{p.views} tracked sessions</span>
                       <span style={{ fontSize:11, color:'#475569' }}>{p.avgTime}</span>
                     </div>
                   </div>
