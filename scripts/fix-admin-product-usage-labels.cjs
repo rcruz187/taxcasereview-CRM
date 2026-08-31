@@ -21,3 +21,4 @@ if (!s.includes(anchor)) throw new Error('Missing Product Usage tab anchor');
 s = s.replace(anchor, `{tab==='marketing' && (<>\n          <div style={{ marginBottom:16, padding:'12px 16px', borderRadius:10, background:'rgba(14,165,233,.07)', border:'1px solid rgba(14,165,233,.18)' }}>\n            <div style={{ fontSize:12, fontWeight:800, color:'#7dd3fc', marginBottom:4 }}>Product Usage · GA4 tracked activity</div>\n            <div style={{ fontSize:11, color:'#64748b', lineHeight:1.5 }}>These metrics show tracked website/app sessions and route activity. They are not the same as marketing leads or SEO performance. Use SEO for organic search visibility and Sales for lead/demo conversion.</div>\n          </div>\n          <ProductReportingSelector value={marketingProduct}`);
 fs.writeFileSync(path, s);
 console.log('Admin Product Usage labels patched successfully');
+// trigger: 2026-08-30 product-usage relabel
