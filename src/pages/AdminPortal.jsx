@@ -13,7 +13,6 @@ import AIAssistant from '../components/AIAssistant'
 import RomyLabsBilling from '../components/admin/RomyLabsBilling'
 import TrafficCoverage from '../components/admin/TrafficCoverage'
 import CredentialVault from '../components/admin/CredentialVault'
-import RomyLabsCalendar from '../components/admin/RomyLabsCalendar'
 const AdminChatPage = lazy(() => import('./AdminChat'))
 
 const NewOffice    = lazy(() => import('./NewOffice'))
@@ -1231,7 +1230,32 @@ function AdminTraining(){
 // current_tenant_id() resolves TCR automatically, but if a demo impersonation
 // was active in the same session this ensures the DB context is correct.
 function AdminCalendar(){
-  return <RomyLabsCalendar />
+  const [ready, setReady] = useState(false)
+
+  useEffect(()=>{
+    const prev = sessionStorage.getItem('admin_impersonation')
+    sessionStorage.removeItem('admin_impersonation')
+    // No override — current_tenant_id() resolves naturally from Romy's login (TCR)
+    setReady(true)
+    return ()=>{
+      if (prev) sessionStorage.setItem('admin_impersonation', prev)
+    }
+  },[])
+  if (!ready) return null
+  // Wrap in a div with className="page-content" so Calendar's useEffect
+  // escape hatch can find it and set overflow:hidden + padding:0.
+  // Pre-set those values so there's no flash before the effect runs.
+  // key="taxrescrm" forces a fresh mount so CalendarPage queries after the
+  // tenant override is set — STABLE fn caching can otherwise return stale results.
+  return (
+    <div
+      key="taxrescrm-calendar"
+      className="page-content"
+      style={{ position:'relative', overflow:'hidden', padding:0, height:'100%', flex:1 }}
+    >
+      <CalendarPage />
+    </div>
+  )
 }
 
 // ── Live Demo Launcher ───────────────────────────────────────────────────────
