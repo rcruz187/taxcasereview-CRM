@@ -1,91 +1,82 @@
 // receive-fax
 // Receives inbound faxes via SignalWire Compatibility (cXML) API.
-// The phone number in SignalWire must have its webhook set to this URL
-// and "Accept Incoming Calls As" set to Fax, using cXML/Compatibility mode.
-//
-// Flow:
-//   1. Fax arrives → SignalWire calls this URL → we return cXML <Receive> tag
-//   2. Fax finishes → SignalWire POSTs result to /receive-fax?done=1 → we log it
-//
-// JWT Verification must be OFF (SignalWire calls this with no auth token).
+// JWT verification is OFF because SignalWire invokes this endpoint directly.
+// Tenant routing is fail-closed: the dialed DID must resolve to exactly one tenant.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SELF_URL = 'https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/receive-fax'
+const digits10 = (value: string) => String(value || '').replace(/\D/g, '').slice(-10)
 
-function xmlResponse(xml: string) {
+function xmlResponse(xml: string, status = 200) {
   return new Response(xml, {
+    status,
     headers: { 'Content-Type': 'text/xml; charset=utf-8' }
   })
 }
 
 serve(async (req) => {
+  if (req.method !== 'POST') return xmlResponse('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', 405)
   try {
     const url = new URL(req.url)
     const isDone = url.searchParams.get('done') === '1'
-
-    // Parse form body (SignalWire posts application/x-www-form-urlencoded)
     const text = await req.text()
     const params = new URLSearchParams(text)
+    const to = params.get('To') || ''
+    const toDigits = digits10(to)
+    if (toDigits.length !== 10) return xmlResponse('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', 400)
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    )
+
+    const { data: rows, error: settingsError } = await supabase
+      .from('settings')
+      .select('tenant_id,sw_inbound_did')
+      .not('tenant_id', 'is', null)
+      .not('sw_inbound_did', 'is', null)
+    if (settingsError) throw settingsError
+    const matches = (rows || []).filter((r: any) => digits10(r.sw_inbound_did) === toDigits)
+    if (matches.length !== 1) {
+      console.error('[receive-fax] inbound DID did not resolve uniquely', { toDigits, matches: matches.length })
+      return xmlResponse('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', 403)
+    }
+    const tenantId = matches[0].tenant_id
 
     if (isDone) {
-      // Fax finished — log the result
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-      )
-
+      const faxSid = String(params.get('FaxSid') || '').trim()
+      if (!faxSid) return new Response('', { status: 400 })
       const status = params.get('FaxStatus') || 'unknown'
-
-      // Stamp the tenant that owns the fax number that was dialed (fallback to
-      // the single settings row — single-tenant behaves identically).
-      const DEFAULT_TENANT = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
-      let tenantId = DEFAULT_TENANT
-      const toDigits = (params.get('To') || '').replace(/\D/g, '').slice(-10)
-      try {
-        const { data: rows } = await supabase.from('settings').select('tenant_id,sw_inbound_did')
-        const match = (rows || []).find(
-          r => (r.sw_inbound_did || '').replace(/\D/g, '').slice(-10) === toDigits
-        )
-        if (match?.tenant_id) tenantId = match.tenant_id
-        else if ((rows || []).length === 1 && rows[0].tenant_id) tenantId = rows[0].tenant_id
-      } catch (_) { /* keep default */ }
-
+      const mediaUrl = String(params.get('MediaUrl') || '').trim()
+      const safeMediaUrl = /^https:\/\//i.test(mediaUrl) ? mediaUrl : null
       const insertPayload = {
         tenant_id: tenantId,
-        from_number:        params.get('From') || '',
-        to_number:          params.get('To') || '',
-        file_url:           params.get('MediaUrl') || null,
-        status:             status === 'received' ? 'Received' : 'Failed',
-        direction:          'inbound',
-        signalwire_fax_id:  params.get('FaxSid') || null,
-        error_msg:          status !== 'received' ? (params.get('ErrorCode') || null) : null,
-        pages:              parseInt(params.get('NumPages') || '0') || null,
-        created_at:         new Date().toISOString(),
+        from_number: params.get('From') || '',
+        to_number: to,
+        file_url: safeMediaUrl,
+        status: status === 'received' ? 'Received' : 'Failed',
+        direction: 'inbound',
+        signalwire_fax_id: faxSid,
+        error_msg: status !== 'received' ? (params.get('ErrorCode') || null) : null,
+        pages: parseInt(params.get('NumPages') || '0') || null,
+        created_at: new Date().toISOString(),
       }
       const { error: insertError } = await supabase.from('fax_logs').insert(insertPayload)
-      if (insertError) {
-        // This insert was previously unchecked — if it fails here, the fax
-        // never lands in fax_logs at all, which would explain the badge/sound
-        // never firing even though the frontend realtime/query side is fine.
-        console.error('[receive-fax] fax_logs insert FAILED:', insertError.message, JSON.stringify(insertPayload))
-      } else {
-        console.log('[receive-fax] fax_logs insert OK:', insertPayload.from_number, '->', insertPayload.to_number, insertPayload.status)
+      if (insertError && insertError.code !== '23505') {
+        console.error('[receive-fax] fax_logs insert FAILED:', insertError.message)
+        return new Response('', { status: 500 })
       }
-
-      // Return empty response — SignalWire doesn't need anything back
       return new Response('', { status: 200 })
     }
 
-    // First hit — tell SignalWire to receive the fax and call us back when done
     return xmlResponse(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Receive action="${SELF_URL}?done=1" storeMedia="true"/>
 </Response>`)
-
   } catch (err) {
     console.error('receive-fax error:', err)
-    return xmlResponse(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`)
+    return xmlResponse('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', 500)
   }
 })
