@@ -1,0 +1,78 @@
+name: Wire Sale Office Handoff
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/20260901_romylabs_sale_to_office_handoff.sql'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Patch signed-sale office handoff
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          # Agreement panel: signed sale launches office creation.
+          p=Path('src/components/admin/RomyLabsAgreementPanel.jsx')
+          s=p.read_text()
+          old="""  const latest=rows[0]\n  const active=useMemo(()=>rows.find(r=>['draft','sent','viewed'].includes(r.status)),[rows])\n"""
+          new="""  function startOffice(row){\n    const q=new URLSearchParams({prospect_id:prospect.id,agreement_id:row.id})\n    window.location.assign(`/crm-admin/provision?${q.toString()}`)\n  }\n\n  const latest=rows[0]\n  const active=useMemo(()=>rows.find(r=>['draft','sent','viewed'].includes(r.status)),[rows])\n"""
+          assert old in s, 'AgreementPanel insertion marker missing'
+          s=s.replace(old,new,1)
+          old2="""        {row.signed_name&&<div style={{fontSize:10,color:'#10b981',marginTop:3}}>✓ Signed by {row.signed_name}</div>}\n        {!['signed','declined','void'].includes(row.status)&&<div style={{display:'flex',gap:6,marginTop:7}}><button disabled={working} onClick={()=>resend(row)} style={{fontSize:9,padding:'4px 8px',borderRadius:6,border:'1px solid rgba(99,102,241,.25)',background:'rgba(99,102,241,.08)',color:'#a5b4fc',cursor:'pointer'}}>Resend Fresh Link</button><button disabled={working} onClick={()=>voidAgreement(row)} style={{fontSize:9,padding:'4px 8px',borderRadius:6,border:'1px solid rgba(239,68,68,.2)',background:'rgba(239,68,68,.06)',color:'#f87171',cursor:'pointer'}}>Void</button></div>}\n"""
+          new2="""        {row.signed_name&&<div style={{fontSize:10,color:'#10b981',marginTop:3}}>✓ Signed by {row.signed_name}</div>}\n        {row.status==='signed'&&!row.tenant_id&&<div style={{marginTop:8}}><button onClick={()=>startOffice(row)} style={{fontSize:10,padding:'6px 10px',borderRadius:7,border:'none',background:'#10b981',color:'#052e16',fontWeight:900,cursor:'pointer'}}>🏢 Create New Office from Sale</button></div>}\n        {row.status==='signed'&&row.tenant_id&&<div style={{fontSize:10,color:'#10b981',marginTop:6}}>✓ Office created and agreement filed to office documents</div>}\n        {!['signed','declined','void'].includes(row.status)&&<div style={{display:'flex',gap:6,marginTop:7}}><button disabled={working} onClick={()=>resend(row)} style={{fontSize:9,padding:'4px 8px',borderRadius:6,border:'1px solid rgba(99,102,241,.25)',background:'rgba(99,102,241,.08)',color:'#a5b4fc',cursor:'pointer'}}>Resend Fresh Link</button><button disabled={working} onClick={()=>voidAgreement(row)} style={{fontSize:9,padding:'4px 8px',borderRadius:6,border:'1px solid rgba(239,68,68,.2)',background:'rgba(239,68,68,.06)',color:'#f87171',cursor:'pointer'}}>Void</button></div>}\n"""
+          assert old2 in s, 'AgreementPanel signed-row marker missing'
+          s=s.replace(old2,new2,1)
+          s=s.replace("Signed agreement is locked. Sales stage is updated to Won and next action is provisioning/payment.","Signed agreement is locked. Click Create New Office from Sale to begin onboarding.")
+          p.write_text(s)
+
+          # NewOffice: consume prospect/agreement handoff and link signed document after provisioning.
+          p=Path('src/pages/NewOffice.jsx')
+          s=p.read_text()
+          s=s.replace("import { useState, useEffect } from 'react'","import { useState, useEffect } from 'react'\nimport { useSearchParams } from 'react-router-dom'",1)
+          old="""  const { user, showToast } = useApp()\n  const allowed = PLATFORM_ADMIN_EMAILS.includes((user?.email || '').toLowerCase())\n  const [offices, setOffices]   = useState(null) // null = not loaded yet\n"""
+          new="""  const { user, showToast } = useApp()\n  const [searchParams] = useSearchParams()\n  const allowed = PLATFORM_ADMIN_EMAILS.includes((user?.email || '').toLowerCase())\n  const [saleHandoff, setSaleHandoff] = useState(null)\n  const [offices, setOffices]   = useState(null) // null = not loaded yet\n"""
+          assert old in s, 'NewOffice state marker missing'
+          s=s.replace(old,new,1)
+          marker="""  useEffect(() => {\n    if (allowed) loadOffices()\n  }, [allowed])\n\n"""
+          insert="""  useEffect(() => {\n    if (allowed) loadOffices()\n  }, [allowed])\n\n  useEffect(() => {\n    if (!allowed) return\n    const prospectId=searchParams.get('prospect_id')\n    const agreementId=searchParams.get('agreement_id')\n    if (!prospectId || !agreementId) return\n    ;(async()=>{\n      const [{data:prospect,error:pe},{data:agreement,error:ae}] = await Promise.all([\n        supabase.from('prospects').select('*').eq('id',prospectId).maybeSingle(),\n        supabase.from('romylabs_sales_agreements').select('*').eq('id',agreementId).eq('prospect_id',prospectId).maybeSingle(),\n      ])\n      if (pe || ae || !prospect || !agreement) { showToast('❌ Could not load the signed sale'); return }\n      if (agreement.status !== 'signed') { showToast('❌ Agreement must be signed before creating the office'); return }\n      if (agreement.tenant_id) { showToast('This signed sale is already linked to an office'); return }\n      setSaleHandoff({prospect,agreement})\n      setView('form')\n    })()\n  }, [allowed, searchParams])\n\n"""
+          assert marker in s, 'NewOffice effect marker missing'
+          s=s.replace(marker,insert,1)
+          s=s.replace("if (view === 'form') return <NewOfficeForm onDone={backToList} onCancel={() => setView('list')} showToast={showToast} />","if (view === 'form') return <NewOfficeForm onDone={backToList} onCancel={() => setView('list')} showToast={showToast} prefill={saleHandoff} />",1)
+          old="""function NewOfficeForm({ onDone, onCancel, showToast }) {\n  const [form, setForm]     = useState(BLANK)\n"""
+          new="""function NewOfficeForm({ onDone, onCancel, showToast, prefill }) {\n  const saleName = prefill?.prospect?.firm_name || ''\n  const initialForm = prefill ? {\n    ...BLANK,\n    firm_name:saleName,\n    tenant_code:saleName.toUpperCase().replace(/[^A-Z0-9]+/g,'').slice(0,12),\n    admin_name:prefill.prospect?.contact_name || prefill.agreement?.signer_name || '',\n    admin_email:prefill.prospect?.contact_email || prefill.agreement?.signer_email || '',\n    firm_phone:prefill.prospect?.contact_phone || '',\n  } : BLANK\n  const [form, setForm]     = useState(initialForm)\n"""
+          assert old in s, 'NewOfficeForm marker missing'
+          s=s.replace(old,new,1)
+          old="""    if (error || data?.error) { showToast('❌ ' + (data?.error || error.message)); return }\n    setResult(data)\n"""
+          new="""    if (error || data?.error) { showToast('❌ ' + (data?.error || error.message)); return }\n    if (prefill?.agreement?.id && data?.tenant_id) {\n      const {error:linkErr}=await supabase.rpc('admin_romylabs_attach_signed_agreement',{p_agreement_id:prefill.agreement.id,p_tenant_id:data.tenant_id})\n      if (linkErr) showToast('⚠️ Office created, but agreement filing needs attention: ' + linkErr.message)\n      else showToast('✅ Office created from signed sale — agreement filed to Documents')\n    }\n    setResult(data)\n"""
+          assert old in s, 'NewOffice submit marker missing'
+          s=s.replace(old,new,1)
+          desc="""      <div style={{color:'var(--t3)',fontSize:13,margin:'8px 0 24px'}}>Stand up a brand-new office on its own isolated tenant.</div>\n\n"""
+          banner="""      <div style={{color:'var(--t3)',fontSize:13,margin:'8px 0 24px'}}>Stand up a brand-new office on its own isolated tenant.</div>\n      {prefill&&<div style={{margin:'0 0 18px',padding:'12px 14px',borderRadius:9,background:'rgba(16,185,129,.08)',border:'1px solid rgba(16,185,129,.28)',color:'#a7f3d0',fontSize:12,lineHeight:1.6}}><strong>Signed sale handoff</strong><br/>{prefill.prospect?.firm_name} · {prefill.agreement?.seats||1} seats · ${Number(prefill.agreement?.monthly_amount||0).toLocaleString()}/mo · signed by {prefill.agreement?.signed_name||prefill.agreement?.signer_name||'customer'}. Creating this office will permanently link the signed agreement to the office Documents record.</div>}\n\n"""
+          assert desc in s, 'NewOffice description marker missing'
+          s=s.replace(desc,banner,1)
+
+          old="""  async function viewAgreement(filePath) {\n    const { data, error } = await supabase.functions.invoke('office-agreement-file', { body: { action: 'geturl', file_path: filePath } })\n    if (error || data?.error) { showToast('❌ ' + (data?.error || error.message)); return }\n    window.open(data.url, '_blank')\n  }\n"""
+          new="""  async function viewAgreement(filePath) {\n    if (String(filePath||'').startsWith('sales-agreement:')) {\n      const id=String(filePath).split(':')[1]\n      const {data,error}=await supabase.rpc('admin_romylabs_signed_agreement_html',{p_agreement_id:id})\n      if (error || !data?.html) { showToast('❌ ' + (error?.message || 'Could not open signed agreement')); return }\n      const signed=`<div style=\"font-family:Arial,sans-serif;max-width:850px;margin:40px auto;color:#111\">${data.html}<hr style=\"margin:36px 0\"><h3>Electronic Signature Certificate</h3><p><strong>Signed by:</strong> ${data.signed_name||'—'}<br><strong>Email:</strong> ${data.signer_email||'—'}<br><strong>Signed:</strong> ${data.signed_at?new Date(data.signed_at).toLocaleString():'—'}</p></div>`\n      const url=URL.createObjectURL(new Blob([signed],{type:'text/html'}))\n      window.open(url,'_blank','noopener,noreferrer')\n      setTimeout(()=>URL.revokeObjectURL(url),60000)\n      return\n    }\n    const { data, error } = await supabase.functions.invoke('office-agreement-file', { body: { action: 'geturl', file_path: filePath } })\n    if (error || data?.error) { showToast('❌ ' + (data?.error || error.message)); return }\n    window.open(data.url, '_blank')\n  }\n"""
+          assert old in s, 'viewAgreement marker missing'
+          s=s.replace(old,new,1)
+          p.write_text(s)
+          PY
+      - name: Build
+        run: npm ci && npm run build
+      - name: Commit handoff wiring
+        run: |
+          git config user.name 'RomyLabs'
+          git config user.email 'rcruz187@gmail.com'
+          git add src/pages/NewOffice.jsx src/components/admin/RomyLabsAgreementPanel.jsx
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'feat(sales): launch office onboarding from signed agreement'
+          git push
