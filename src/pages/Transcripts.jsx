@@ -1,5 +1,6 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const YEARS = Array.from({length:21},(_,i)=>2026-i)
@@ -14,6 +15,7 @@ const REQUEST_METHODS = ['IRS e-Services','CAF Unit (Fax)','IRS Online Portal','
 const STATUSES = ['Pending','Requested — Waiting','Received — Partial','Received — Complete','Error / Rejected','On Hold']
 
 export default function Transcripts() {
+  const location = useLocation()
   const [items,     setItems]    = useState([])
   const [clients,   setClients]  = useState([])
   const [employees, setEmployees]= useState([])
@@ -28,6 +30,14 @@ export default function Transcripts() {
   const [suggestions, setSug]    = useState([])
   const [showSug,   setShowSug]  = useState(false)
   const [expandedId, setExpandedId] = useState(null)
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('new') === '1') {
+      setForm(BLANK)
+      setEditId(null)
+      setModal(true)
+    }
+  }, [location.search])
+
 
   useEffect(() => { load() }, [])
 

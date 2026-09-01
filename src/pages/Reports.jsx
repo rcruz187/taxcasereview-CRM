@@ -35,29 +35,45 @@ export default function Reports() {
   // Guard: wait for auth — prevents TCR data showing in Nashville
   useEffect(() => { if (user) loadAll() }, [user?.id])
 
+  async function fetchAllRows(table, { orderBy, ascending=true, filter } = {}) {
+    const pageSize = 1000
+    const rows = []
+    for (let from = 0; ; from += pageSize) {
+      let query = supabase.from(table).select('*')
+      if (filter) query = filter(query)
+      if (orderBy) query = query.order(orderBy, { ascending })
+      const { data: page, error } = await query.range(from, from + pageSize - 1)
+      if (error) throw new Error(`${table} report load failed: ${error.message}`)
+      rows.push(...(page || []))
+      if (!page || page.length < pageSize) break
+    }
+    return rows
+  }
+
   async function loadAll() {
     setLoading(true)
-    const [c,l,ca,t,inv,pay,dl,emp,tr,es,fc,bk] = await Promise.all([
-      supabase.from('clients').select('*').order('created_at',{ascending:true}),
-      supabase.from('leads').select('*').order('created_at',{ascending:true}),
-      supabase.from('cases').select('*').order('created_at',{ascending:true}),
-      supabase.from('tasks').select('*').not('deleted','is',true).order('created_at',{ascending:true}),
-      supabase.from('invoices').select('*').order('created_at',{ascending:true}),
-      supabase.from('payments').select('*').order('created_at',{ascending:true}),
-      supabase.from('deadlines').select('*'),
-      supabase.from('employees').select('*'),
-      supabase.from('tax_returns').select('*').order('created_at',{ascending:false}),
-      supabase.from('esigns').select('*').order('created_at',{ascending:false}),
-      supabase.from('formacorp').select('*').order('created_at',{ascending:false}),
-      supabase.from('bookkeeping').select('*').order('date',{ascending:false}),
-    ])
-    setData({
-      clients:c.data||[], leads:l.data||[], cases:ca.data||[], tasks:t.data||[],
-      invoices:inv.data||[], payments:pay.data||[], deadlines:dl.data||[],
-      employees:emp.data||[], taxReturns:tr.data||[], esigns:es.data||[],
-      formacorp:fc.data||[], bookkeeping:bk.data||[]
-    })
-    setLoading(false)
+    try {
+      const [clients,leads,cases,tasks,invoices,payments,deadlines,employees,taxReturns,esigns,formacorp,bookkeeping] = await Promise.all([
+        fetchAllRows('clients',{orderBy:'created_at'}),
+        fetchAllRows('leads',{orderBy:'created_at'}),
+        fetchAllRows('cases',{orderBy:'created_at'}),
+        fetchAllRows('tasks',{orderBy:'created_at',filter:q=>q.not('deleted','is',true)}),
+        fetchAllRows('invoices',{orderBy:'created_at'}),
+        fetchAllRows('payments',{orderBy:'created_at'}),
+        fetchAllRows('deadlines'),
+        fetchAllRows('employees'),
+        fetchAllRows('tax_returns',{orderBy:'created_at',ascending:false}),
+        fetchAllRows('esigns',{orderBy:'created_at',ascending:false}),
+        fetchAllRows('formacorp',{orderBy:'created_at',ascending:false}),
+        fetchAllRows('bookkeeping',{orderBy:'date',ascending:false}),
+      ])
+      setData({ clients,leads,cases,tasks,invoices,payments,deadlines,employees,taxReturns,esigns,formacorp,bookkeeping })
+    } catch (err) {
+      console.error('Reports exhaustive load failed:', err)
+      setData({ clients:[], leads:[], cases:[], tasks:[], invoices:[], payments:[], deadlines:[], employees:[], taxReturns:[], esigns:[], formacorp:[], bookkeeping:[] })
+    } finally {
+      setLoading(false)
+    }
   }
 
   function filterByRange(arr, field='created_at') {
@@ -88,17 +104,29 @@ export default function Reports() {
   const { clients, leads, cases, tasks, invoices, payments, deadlines, employees, taxReturns, esigns, formacorp, bookkeeping } = data
 
   // ── SHARED COMPUTATIONS ──
-  const fPayments = filterByRange(payments)
+  const normalizeStatus = (v) => String(v || '').trim().toLowerCase()
+  const settledStatuses = new Set(['succeeded','cleared','paid','posted','completed','success'])
+  const isSettledPayment = (p) => settledStatuses.has(normalizeStatus(p.status)) || settledStatuses.has(normalizeStatus(p.payment_status))
+  const paymentDate = (p) => p.date || p.created_at
+  const invoiceAmountDue = (i) => {
+    const balance = parseFloat(i.balance)
+    if (Number.isFinite(balance)) return Math.max(0, balance)
+    return Math.max(0, parseFloat(i.total || i.amount || 0) - parseFloat(i.paid || 0))
+  }
+  const isConvertedLead = (l) => ['converted to client','converted','closed won'].includes(normalizeStatus(l.status))
+
+  const fPayments = dateRange === 'all' ? payments : filterByRange(payments.map(p=>({...p,__reportDate:paymentDate(p)})), '__reportDate')
   const fInvoices = filterByRange(invoices)
   const fClients  = filterByRange(clients)
-  const fLeads    = filterByRange(leads)
+  const fLeads    = filterByRange(leads).filter(l=>!l.deleted_at)
   const fCases    = filterByRange(cases)
 
-  const totalRevenue    = fPayments.filter(p=>p.status==='Cleared').reduce((s,p)=>s+parseFloat(p.amount||0),0)
-  const pendingRevenue  = fInvoices.filter(i=>i.status!=='Paid').reduce((s,i)=>s+parseFloat(i.total||0),0)
-  const openCases       = cases.filter(c=>OPEN_STATUSES.includes(c.status)).length
+  const settledPayments = fPayments.filter(isSettledPayment)
+  const totalRevenue    = settledPayments.reduce((s,p)=>s+parseFloat(p.amount||0),0)
+  const pendingRevenue  = fInvoices.reduce((s,i)=>s+invoiceAmountDue(i),0)
+  const openCases       = fCases.filter(c=>OPEN_STATUSES.includes(c.status)).length
   const overdueDl       = deadlines.filter(d=>d.dueDate&&new Date(d.dueDate)<new Date()&&d.status!=='Completed').length
-  const conversionRate  = leads.length ? Math.round((clients.length/leads.length)*100) : 0
+  const conversionRate  = fLeads.length ? Math.round((fLeads.filter(isConvertedLead).length/fLeads.length)*100) : 0
 
   // Pipeline
   const pipelineCount = {}
@@ -106,12 +134,23 @@ export default function Reports() {
   clients.forEach(c=>{ const s=c.pipelineStage||DEFAULT_PIPELINE_STAGE; if(pipelineCount[s]!==undefined) pipelineCount[s]++ })
   const maxPipeline = Math.max(...Object.values(pipelineCount),1)
 
-  // Revenue by month
-  const revByMonth = {}
-  for(let i=0;i<12;i++) revByMonth[i]=0
-  payments.filter(p=>p.status==='Cleared').forEach(p=>{
-    if(!p.created_at) return
-    revByMonth[new Date(p.created_at).getMonth()] += parseFloat(p.amount||0)
+  // Revenue by month — chronological rolling 12 months; never collapse different years together.
+  const monthBuckets = Array.from({length:12}, (_,offset) => {
+    const d = new Date()
+    d.setDate(1)
+    d.setHours(0,0,0,0)
+    d.setMonth(d.getMonth() - (11 - offset))
+    return { key: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, label: `${MONTHS[d.getMonth()]} '${String(d.getFullYear()).slice(-2)}` }
+  })
+  const revByMonth = Object.fromEntries(monthBuckets.map((_,i)=>[i,0]))
+  const bucketIndex = new Map(monthBuckets.map((b,i)=>[b.key,i]))
+  settledPayments.forEach(p=>{
+    const raw = paymentDate(p)
+    if(!raw) return
+    const d = new Date(raw)
+    if(Number.isNaN(d.getTime())) return
+    const idx = bucketIndex.get(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`)
+    if(idx !== undefined) revByMonth[idx] += parseFloat(p.amount||0)
   })
   const maxRev = Math.max(...Object.values(revByMonth),1)
 
@@ -120,7 +159,8 @@ export default function Reports() {
   const repStats = reps.map(rep => {
     const repClients  = clients.filter(c=>c.assignedTo===rep)
     const repCases    = cases.filter(c=>c.assignedTo===rep)
-    const repPayments = payments.filter(p=>p.status==='Cleared'&&repClients.some(c=>c.name===p.clientName))
+    const repClientIds = new Set(repClients.map(c=>String(c.id)))
+    const repPayments = settledPayments.filter(p=>p.client_id && repClientIds.has(String(p.client_id)))
     const repTasks    = tasks.filter(t=>t.assignedTo===rep)
     const repLeads    = leads.filter(l=>l.assignedTo===rep)
     const repTR       = taxReturns.filter(r=>r.assigned_to===rep||r.preparer===rep)
@@ -192,11 +232,11 @@ export default function Reports() {
         <h2 style={{fontSize:15,fontWeight:700,margin:0}}>📊 Reports & Analytics</h2>
         <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
           <button className="btn sec" style={{fontSize:11,padding:'5px 12px'}}
-            onClick={()=>exportPDF(`Reports — ${FIRM.name || 'Tax Case Review'}`,[{heading:'Revenue Summary',headers:['Month','Revenue'],rows:MONTHS.map((m,i)=>[m,'$'+Math.round(revByMonth[i])])}])}>
+            onClick={()=>exportPDF(`Reports — ${FIRM.name || 'Tax Case Review'}`,[{heading:'Revenue Summary',headers:['Month','Revenue'],rows:monthBuckets.map((b,i)=>[b.label,'$'+Math.round(revByMonth[i])])}])}>
             🖨️ PDF
           </button>
           <button className="btn sec" style={{fontSize:11,padding:'5px 12px'}}
-            onClick={()=>exportExcel([['Month','Revenue'],...MONTHS.map((m,i)=>[m,'$'+Math.round(revByMonth[i])])],'Reports')}>
+            onClick={()=>exportExcel([['Month','Revenue'],...monthBuckets.map((b,i)=>[b.label,'$'+Math.round(revByMonth[i])])],'Reports')}>
             📊 Excel
           </button>
           <span style={{fontSize:11,color:'var(--t3)'}}>Range:</span>

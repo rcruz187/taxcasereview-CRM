@@ -42,6 +42,14 @@ export default function Fax() {
   const [attachSearch, setAttachSearch] = useState('')
   const [attachFolder, setAttachFolder] = useState('Correspondence')
   const [attaching, setAttaching] = useState(null)
+  useEffect(() => {
+    if (qp.get('new') === '1') {
+      setForm(prev => ({ ...BLANK, from_number: prev.from_number || '', client_name: qp.get('client') || '', to_number: (qp.get('phone') || '').replace(/\D/g,'') }))
+      setFile(null)
+      setModal(true)
+    }
+  }, [location.search])
+
 
   useEffect(() => {
     load()

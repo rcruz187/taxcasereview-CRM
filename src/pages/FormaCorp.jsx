@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { formatMoneyInput, parseMoney } from '../lib/money'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
@@ -27,6 +28,7 @@ const WIZ_BLANK = {
 
 export default function FormaCorp() {
   const { showToast } = useApp()
+  const location = useLocation()
   const [cases,    setCases]    = useState([])
   const [clients,  setClients]  = useState([])
   const [modal,    setModal]    = useState(false)
@@ -115,6 +117,14 @@ export default function FormaCorp() {
       setPdfBusy(false)
     }
   }
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('new') === '1') {
+      setDetail(null)
+      setForm(BLANK)
+      setModal('new')
+    }
+  }, [location.search])
+
 
   useEffect(() => { load() }, [])
 

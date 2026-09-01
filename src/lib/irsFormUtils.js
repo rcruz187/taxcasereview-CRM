@@ -186,54 +186,46 @@ export const FIELD_MAPS = {
 
   // ─── Form 8822-B (Change of Address — Business) ───────────────────────────
   '8822b': {
-    bizName:      'topmostSubform[0].Page1[0].f1_1[0]',
-    ein:          'topmostSubform[0].Page1[0].f1_2[0]',
-    newStreet:    'topmostSubform[0].Page1[0].f1_9[0]',
+    bizName: 'topmostSubform[0].Page1[0].Line4aReadOrder[0].f1_1[0]',
+    ein: 'topmostSubform[0].Page1[0].Line4bReadOrder[0].f1_2[0]',
+    newStreet: 'topmostSubform[0].Page1[0].f1_9[0]',
     newCityState: 'topmostSubform[0].Page1[0].f1_10[0]',
-    newZip:       'topmostSubform[0].Page1[0].f1_11[0]',
-    idType:       'ein',
+    newZip: 'topmostSubform[0].Page1[0].f1_11[0]',
+    idType: 'ein',
   },
 
   // ─── Form 4506-T (Request for Transcript) ────────────────────────────────
-  // Line 1a=name, 1b=SSN, 2a=spouse/biz name, 3a=current address
   '4506t': {
-    name:    'topmostSubform[0].Page1[0].f1_1[0]',
-    ssn:     'topmostSubform[0].Page1[0].f1_2[0]',
-    street:  'topmostSubform[0].Page1[0].f1_6[0]',
-    city:    'topmostSubform[0].Page1[0].f1_7[0]',
-    state:   'topmostSubform[0].Page1[0].f1_8[0]',
-    zip:     'topmostSubform[0].Page1[0].f1_9[0]',
-    phone:   'topmostSubform[0].Page1[0].f1_20[0]',
-    idType:  'ssn',
+    name: 'topmostSubform[0].Page1[0].f1_1[0]',
+    ssn: 'topmostSubform[0].Page1[0].f1_2[0]',
+    currentAddress: 'topmostSubform[0].Page1[0].f1_5[0]',
+    phone: 'topmostSubform[0].Page1[0].f1_20[0]',
+    idType: 'ssn',
   },
 
   // ─── Form 12153 (CDP Hearing Request) ────────────────────────────────────
-  // Name, SSN/EIN, address, phone
   '12153': {
-    name:    'topmostSubform[0].Page1[0].f1_1[0]',
-    ssn:     'topmostSubform[0].Page1[0].f1_2[0]',
-    ein:     'topmostSubform[0].Page1[0].f1_3[0]',
-    street:  'topmostSubform[0].Page1[0].f1_4[0]',
-    cityStateZip: 'topmostSubform[0].Page1[0].f1_5[0]',
-    phone:   'topmostSubform[0].Page1[0].f1_6[0]',
-    idType:  'ssn',
+    name: 'topmostSubform[0].Page1[0].TaxpayerName1[0]',
+    tin: 'topmostSubform[0].Page1[0].TIN_1[0]',
+    street: 'topmostSubform[0].Page1[0].CurrentAddress1[0]',
+    city: 'topmostSubform[0].Page1[0].City1[0]',
+    state: 'topmostSubform[0].Page1[0].State1[0]',
+    zip: 'topmostSubform[0].Page1[0].ZIPCode1[0]',
+    phone: 'topmostSubform[0].Page1[0].TelephoneNumberBestTime1[0].TelephoneNumber[0]',
+    idType: 'ssn',
   },
 
   // ─── Form 656 (Offer in Compromise) ──────────────────────────────────────
-  // Taxpayer section similar to 656-L but on page 2
   '656': {
-    name:    'topmostSubform[0].Page_2[0].Your_First_Middle_Last_Name[0]',
-    ssn1:    'topmostSubform[0].Page_2[0].YourSSN[0].Your_SSN_1[0]',
-    ssn2:    'topmostSubform[0].Page_2[0].YourSSN[0].Your_SSN_2[0]',
-    ssn3:    'topmostSubform[0].Page_2[0].YourSSN[0].Your_SSN_3[0]',
-    street:  'topmostSubform[0].Page_2[0].Your_Home_Address[0]',
-    bizName: 'topmostSubform[0].Page_2[0].Business_Name[0]',
-    ein1:    'topmostSubform[0].Page_2[0].BusinessEIN[0].Business_EIN_1[0]',
-    ein2:    'topmostSubform[0].Page_2[0].BusinessEIN[0].Business_EIN_2[0]',
-    phone1:  'topmostSubform[0].Page_2[0].Phone[0].Area_Code[0]',
-    phone2:  'topmostSubform[0].Page_2[0].Phone[0].Phone1[0]',
-    phone3:  'topmostSubform[0].Page_2[0].Phone[0].Phone2[0]',
-    idType:  'ssn',
+    name: 'topmostSubform[0].F656_Page1[0].Your_First_Middle_Last_Name[0]',
+    ssn: 'topmostSubform[0].F656_Page1[0].YourSocialSecurityNumber[0]',
+    street: 'topmostSubform[0].F656_Page1[0].Your_Home_Address[0]',
+    bizName: 'topmostSubform[0].F656_Page2[0].Business_Name[0]',
+    bizAddr: 'topmostSubform[0].F656_Page2[0].BusinessPhysicalAddress[0]',
+    ein: 'topmostSubform[0].F656_Page2[0].BusinessEIN[0]',
+    contact: 'topmostSubform[0].F656_Page2[0].Name_Title_Primary_Contact[0]',
+    phone: 'topmostSubform[0].F656_Page2[0].BusinessPhone[0]',
+    idType: 'ssn',
   },
 
   // ─── Form 4549 (Exam Changes) ─────────────────────────────────────────────
@@ -247,64 +239,64 @@ export const FIELD_MAPS = {
 
   // ─── Form 8832 (Entity Classification) ───────────────────────────────────
   '8832': {
-    bizName: 'topmostSubform[0].Page1[0].f1_1[0]',
-    ein:     'topmostSubform[0].Page1[0].f1_2[0]',
-    street:  'topmostSubform[0].Page1[0].f1_3[0]',
-    cityStateZip: 'topmostSubform[0].Page1[0].f1_4[0]',
-    idType:  'ein',
+    bizName: 'topmostSubform[0].Page1[0].p1-t1[0]',
+    ein: 'topmostSubform[0].Page1[0].p1-t2[0]',
+    street: 'topmostSubform[0].Page1[0].p1-t4[0]',
+    cityStateZip: 'topmostSubform[0].Page1[0].p1-t5[0]',
+    idType: 'ein',
   },
 
   // ─── Form 911 (Taxpayer Advocate) ────────────────────────────────────────
   '911': {
-    name:    'topmostSubform[0].Page1[0].f1_1[0]',
-    ssn:     'topmostSubform[0].Page1[0].f1_2[0]',
-    street:  'topmostSubform[0].Page1[0].f1_3[0]',
-    cityStateZip: 'topmostSubform[0].Page1[0].f1_4[0]',
-    phone:   'topmostSubform[0].Page1[0].f1_5[0]',
-    idType:  'ssn',
+    name: 'topmostSubform[0].page1[0].taxpayerName[0]',
+    ssn: 'topmostSubform[0].page1[0].taxpayerTIN[0]',
+    street: 'topmostSubform[0].page1[0].taxpayerAddressStreet[0]',
+    city: 'topmostSubform[0].page1[0].taxpayerAddressCity[0]',
+    state: 'topmostSubform[0].page1[0].taxpayerAddressState[0]',
+    zip: 'topmostSubform[0].page1[0].taxpayerAddressZIPCode[0]',
+    phone: 'topmostSubform[0].page1[0].taxpayerDaytimePhone[0]',
+    idType: 'ssn',
   },
 
   // ─── Form SS-4 (Apply for EIN) ────────────────────────────────────────────
-  // Line 1=legal name, 2=trade name, 3=responsible party, 4=mailing address
   'ss4': {
-    bizName:  'topmostSubform[0].Page1[0].f1_1[0]',
-    tradeName:'topmostSubform[0].Page1[0].f1_2[0]',
-    contact:  'topmostSubform[0].Page1[0].f1_3[0]',
-    street:   'topmostSubform[0].Page1[0].f1_4[0]',
-    city:     'topmostSubform[0].Page1[0].f1_6[0]',
-    state:    'topmostSubform[0].Page1[0].f1_7[0]',
-    zip:      'topmostSubform[0].Page1[0].f1_8[0]',
-    phone:    'topmostSubform[0].Page1[0].f1_11[0]',
-    idType:   'ein',
+    bizName: 'topmostSubform[0].Page1[0].PgHeader[0].f1_1[0]',
+    tradeName: 'topmostSubform[0].Page1[0].f1_2[0]',
+    careOf: 'topmostSubform[0].Page1[0].f1_3[0]',
+    street: 'topmostSubform[0].Page1[0].Line4ReadOrder[0].f1_5[0]',
+    cityStateZip: 'topmostSubform[0].Page1[0].Line4ReadOrder[0].f1_6[0]',
+    idType: 'ein',
   },
 
   // ─── Form 2553 (S-Corp Election) ─────────────────────────────────────────
   '2553': {
-    bizName: 'topmostSubform[0].Page1[0].f1_1[0]',
-    ein:     'topmostSubform[0].Page1[0].f1_2[0]',
-    street:  'topmostSubform[0].Page1[0].f1_4[0]',
-    cityStateZip: 'topmostSubform[0].Page1[0].f1_5[0]',
-    phone:   'topmostSubform[0].Page1[0].f1_7[0]',
-    idType:  'ein',
+    bizName: 'topmostSubform[0].Page1[0].NameAddress[0].f1_01[0]',
+    street: 'topmostSubform[0].Page1[0].NameAddress[0].f1_02[0]',
+    cityStateZip: 'topmostSubform[0].Page1[0].NameAddress[0].f1_03[0]',
+    ein: 'topmostSubform[0].Page1[0].f1_04[0]',
+    idType: 'ein',
   },
 
   // ─── Form 12661 (Disputed Issue Verification) ─────────────────────────────
   '12661': {
-    name:  'topmostSubform[0].Page1[0].f1_1[0]',
-    ssn:   'topmostSubform[0].Page1[0].f1_2[0]',
-    phone: 'topmostSubform[0].Page1[0].f1_3[0]',
+    name: 'form1[0].page_1[0].taxpayer_name[0]',
+    ssn: 'form1[0].page_1[0].social_security[0]',
     idType: 'ssn',
   },
 
   // ─── Form 1128 (Adopt/Change Tax Year) ───────────────────────────────────
   '1128': {
-    bizName: 'topmostSubform[0].Page1[0].f1_1[0]',
-    ein:     'topmostSubform[0].Page1[0].f1_2[0]',
-    street:  'topmostSubform[0].Page1[0].f1_3[0]',
-    cityStateZip: 'topmostSubform[0].Page1[0].f1_4[0]',
-    idType:  'ein',
+    bizName: 'topmostSubform[0].Page1[0].p1-01[0]',
+    ein: 'topmostSubform[0].Page1[0].p1-02[0]',
+    street: 'topmostSubform[0].Page1[0].p1-03[0]',
+    cityStateZip: 'topmostSubform[0].Page1[0].p1-05[0]',
+    idType: 'ein',
   },
 };
+
+// Form 4549 is an IRS examination report. IRS.gov does not publish a current
+// standalone f4549.pdf. Never synthesize or fetch the obsolete dead URL.
+export const MANUAL_ONLY_FORM_TYPES = ['4549'];
 
 // Map form type → which blank template filename to fetch
 export const TEMPLATE_PATHS = {
@@ -511,6 +503,9 @@ export async function fetchTemplate(filename) {
 // resulting PDF bytes (Uint8Array). Does NOT touch the signature line.
 export async function fillForm(formType, client, useEin = false) {
   const map = FIELD_MAPS[formType];
+  if (MANUAL_ONLY_FORM_TYPES.includes(formType)) {
+    throw new Error('Form 4549 is an IRS-generated examination report with no current public standalone IRS PDF. Attach the examiner-provided Form 4549 manually.');
+  }
   const templateBytes = await fetchTemplate(TEMPLATE_PATHS[formType]);
   const pdfDoc = await PDFDocument.load(templateBytes, { ignoreEncryption: true });
   const form = pdfDoc.getForm();
@@ -787,47 +782,25 @@ export async function fillForm(formType, client, useEin = false) {
 
   // ─── Form 4506-T (Request for Transcript) ────────────────────────────────
   else if (formType === '4506t') {
-    const m = FIELD_MAPS['4506t'];
-    setText(m.name,   client.name || '');
-    setText(m.ssn,    client.ssn || client.tin || '');
-    setText(m.street, client.address || client.street || '');
-    setText(m.city,   client.city  || '');
-    setText(m.state,  client.state || '');
-    setText(m.zip,    client.zip   || '');
-    setText(m.phone,  client.phone || '');
+    const m=FIELD_MAPS['4506t'];
+    setText(m.name,client.name||''); setText(m.ssn,client.ssn||client.tin||client.ein||'');
+    const address=[client.address||client.street,[client.city,client.state].filter(Boolean).join(', '),client.zip].filter(Boolean).join('  ');
+    setText(m.currentAddress,address); setText(m.phone,client.phone||'');
   }
 
   // ─── Form 12153 (CDP Hearing Request) ────────────────────────────────────
   else if (formType === '12153') {
-    const m = FIELD_MAPS['12153'];
-    setText(m.name,   client.name || '');
-    setText(m.ssn,    client.ssn || client.tin || '');
-    if (client.ein) setText(m.ein, client.ein);
-    setText(m.street, client.address || client.street || '');
-    const csz = [client.city, client.state].filter(Boolean).join(', ') + (client.zip ? '  ' + client.zip : '');
-    setText(m.cityStateZip, csz);
-    setText(m.phone, client.phone || '');
+    const m=FIELD_MAPS['12153'];
+    setText(m.name,client.name||client.business_name||''); setText(m.tin,client.ssn||client.tin||client.ein||'');
+    setText(m.street,client.address||client.street||''); setText(m.city,client.city||''); setText(m.state,client.state||''); setText(m.zip,client.zip||''); setText(m.phone,client.phone||'');
   }
 
   // ─── Form 656 (Offer in Compromise) ──────────────────────────────────────
   else if (formType === '656') {
-    const m = FIELD_MAPS['656'];
-    setText(m.name, client.name || '');
-    const ssnDigits = (client.ssn || client.tin || '').replace(/\D/g,'');
-    setText(m.ssn1, ssnDigits.slice(0,3));
-    setText(m.ssn2, ssnDigits.slice(3,5));
-    setText(m.ssn3, ssnDigits.slice(5,9));
-    setText(m.street, [client.address||client.street, client.city, client.state, client.zip].filter(Boolean).join(', '));
-    if (client.business_name) {
-      setText(m.bizName, client.business_name);
-      const einDigits = (client.ein||'').replace(/\D/g,'');
-      setText(m.ein1, einDigits.slice(0,2));
-      setText(m.ein2, einDigits.slice(2));
-    }
-    const phoneDigits = (client.phone||'').replace(/\D/g,'');
-    setText(m.phone1, phoneDigits.slice(0,3));
-    setText(m.phone2, phoneDigits.slice(3,6));
-    setText(m.phone3, phoneDigits.slice(6,10));
+    const m=FIELD_MAPS['656'];
+    setText(m.name,client.name||''); setText(m.ssn,client.ssn||client.tin||'');
+    setText(m.street,[client.address||client.street,client.city,client.state,client.zip].filter(Boolean).join(', '));
+    if(client.business_name||client.ein){ setText(m.bizName,client.business_name||client.name||''); setText(m.bizAddr,[client.biz_street||client.address||client.street,client.biz_city||client.city,client.biz_state||client.state,client.biz_zip||client.zip].filter(Boolean).join(', ')); setText(m.ein,client.ein||''); setText(m.contact,client.name||''); setText(m.phone,client.phone||''); }
   }
 
   // ─── Form 4549 (Exam Changes) ─────────────────────────────────────────────
@@ -853,46 +826,27 @@ export async function fillForm(formType, client, useEin = false) {
 
   // ─── Form 911 (Taxpayer Advocate) ────────────────────────────────────────
   else if (formType === '911') {
-    const m = FIELD_MAPS['911'];
-    setText(m.name, client.name || '');
-    setText(m.ssn,  client.ssn || client.tin || '');
-    setText(m.street, client.address || client.street || '');
-    const csz = [client.city, client.state].filter(Boolean).join(', ') + (client.zip ? '  ' + client.zip : '');
-    setText(m.cityStateZip, csz);
-    setText(m.phone, client.phone || '');
+    const m=FIELD_MAPS['911'];
+    setText(m.name,client.name||''); setText(m.ssn,client.ssn||client.tin||client.ein||''); setText(m.street,client.address||client.street||''); setText(m.city,client.city||''); setText(m.state,client.state||''); setText(m.zip,client.zip||''); setText(m.phone,client.phone||'');
   }
 
   // ─── Form SS-4 (Apply for EIN) ────────────────────────────────────────────
   else if (formType === 'ss4') {
-    const m = FIELD_MAPS['ss4'];
-    setText(m.bizName,   client.business_name || client.name || '');
-    setText(m.contact,   client.name || '');
-    const bizStreet = client.biz_street || client.address || client.street || '';
-    setText(m.street, bizStreet);
-    setText(m.city,   client.biz_city  || client.city  || '');
-    setText(m.state,  client.biz_state || client.state || '');
-    setText(m.zip,    client.biz_zip   || client.zip   || '');
-    setText(m.phone,  client.phone || '');
+    const m=FIELD_MAPS['ss4'];
+    setText(m.bizName,client.business_name||client.name||''); setText(m.tradeName,client.trade_name||client.dba||''); setText(m.careOf,client.name||''); setText(m.street,client.biz_street||client.address||client.street||'');
+    const csz=[client.biz_city||client.city,client.biz_state||client.state].filter(Boolean).join(', ')+(client.biz_zip||client.zip?' '+(client.biz_zip||client.zip):''); setText(m.cityStateZip,csz);
   }
 
   // ─── Form 2553 (S-Corp Election) ─────────────────────────────────────────
   else if (formType === '2553') {
-    const m = FIELD_MAPS['2553'];
-    setText(m.bizName, client.business_name || client.name || '');
-    setText(m.ein, client.ein || '');
-    const bizStreet = client.biz_street || client.address || client.street || '';
-    setText(m.street, bizStreet);
-    const csz = [client.biz_city||client.city, client.biz_state||client.state].filter(Boolean).join(', ') + (client.biz_zip||client.zip ? '  '+(client.biz_zip||client.zip) : '');
-    setText(m.cityStateZip, csz);
-    setText(m.phone, client.phone || '');
+    const m=FIELD_MAPS['2553'];
+    setText(m.bizName,client.business_name||client.name||''); setText(m.street,client.biz_street||client.address||client.street||'');
+    const csz=[client.biz_city||client.city,client.biz_state||client.state].filter(Boolean).join(', ')+(client.biz_zip||client.zip?' '+(client.biz_zip||client.zip):''); setText(m.cityStateZip,csz); setText(m.ein,client.ein||'');
   }
 
   // ─── Form 12661 (Disputed Issue Verification) ─────────────────────────────
   else if (formType === '12661') {
-    const m = FIELD_MAPS['12661'];
-    setText(m.name,  client.name || '');
-    setText(m.ssn,   client.ssn || client.tin || '');
-    setText(m.phone, client.phone || '');
+    const m=FIELD_MAPS['12661']; setText(m.name,client.name||''); setText(m.ssn,client.ssn||client.tin||'');
   }
 
   // ─── Form 1128 (Adopt/Change Tax Year) ───────────────────────────────────

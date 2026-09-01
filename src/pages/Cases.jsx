@@ -586,7 +586,7 @@ function CaseModal({ form, fld, reps, saving, onSave, onClose, title, sug, searc
           <div className="field"><label>Para</label>
             <select value={form.taxAssociate||''} onChange={e => fld('taxAssociate', e.target.value)}>
               <option value="">— None —</option>
-              {employees.map(e=><option key={e.id||e.name} value={e.name}>{e.name}</option>)}
+              {reps.map(r=><option key={r} value={r}>{r}</option>)}
             </select>
           </div>
         </div>

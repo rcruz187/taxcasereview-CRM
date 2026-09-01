@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { FIRM } from '../lib/firmBranding'
 
 const MANUAL_SECTIONS = [
   // ─── GETTING STARTED ────────────────────────────────────────────────────────
@@ -1046,7 +1047,7 @@ function ManualPage({ standalone }) {
   function renderBlock(block, i) {
     switch (block.type) {
       case 'lead':  return <p key={i} style={S.lead}>{block.text}</p>
-      case 'h3':    return <div key={i} style={S.h3}>{block.text}</div>
+      case 'h3':    return <div key={i} className="manual-h3" style={S.h3}>{block.text}</div>
       case 'tip':   return <div key={i} style={S.callout('tip')}><span style={{flexShrink:0}}>💡</span><span>{block.text}</span></div>
       case 'warn':  return <div key={i} style={S.callout('warn')}><span style={{flexShrink:0}}>⚠️</span><span>{block.text}</span></div>
       case 'info':  return <div key={i} style={S.callout('info')}><span style={{flexShrink:0}}>ℹ️</span><span>{block.text}</span></div>
@@ -1066,7 +1067,7 @@ function ManualPage({ standalone }) {
       case 'cards': return (
         <div key={i} style={{ display:'flex', flexWrap:'wrap', gap:10, margin:'12px 0 20px' }}>
           {block.items.map((c, j) => (
-            <div key={j} style={S.card}>
+            <div key={j} className="manual-card" style={S.card}>
               <div style={{ fontSize:18, marginBottom:6 }}>{c.icon}</div>
               <div style={{ fontSize:12, fontWeight:700, color:'var(--tx)', marginBottom:4 }}>{c.title}</div>
               <div style={{ fontSize:11, color:'var(--t2)', lineHeight:1.55 }}>{c.body}</div>
@@ -1088,7 +1089,7 @@ function ManualPage({ standalone }) {
         </div>
       )
       case 'table': return (
-        <div key={i} style={{ overflowX:'auto', margin:'12px 0 20px' }}>
+        <div key={i} className="manual-table-wrap" style={{ overflowX:'auto', margin:'12px 0 20px' }}>
           <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
             <thead><tr>{block.headers.map((h, j) => <th key={j} style={S.th}>{h}</th>)}</tr></thead>
             <tbody>{block.rows.map((row, j) => (
@@ -1102,8 +1103,8 @@ function ManualPage({ standalone }) {
   }
 
   return (
-    <div style={{ display:'flex', height: sidebarH, overflow:'hidden', ...(standalone ? {} : { margin:'0 -32px', padding:'0 0 0 32px' }) }}>
-      <div style={S.sidebar}>
+    <div className="manual-shell" style={{ display:'flex', height: sidebarH, overflow:'hidden', ...(standalone ? {} : { margin:'0 -32px', padding:'0 0 0 32px' }) }}>
+      <div className="manual-sidebar" style={S.sidebar}>
         <div style={{ padding:'10px 10px 6px' }}>
           <div style={{ position:'relative' }}>
             <span style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', fontSize:11, color:'var(--t3)' }}>🔍</span>
@@ -1116,7 +1117,7 @@ function ManualPage({ standalone }) {
             filtered.length === 0
               ? <div style={{ padding:'12px 8px', fontSize:11, color:'var(--t3)' }}>No results</div>
               : filtered.map(s => (
-                <div key={s.id} onClick={() => { setSelected(s.id); setSearch('') }} style={S.navItem(selected === s.id)}>
+                <div key={s.id} onClick={() => { setSelected(s.id); setSearch('') }} className="manual-nav-item" style={S.navItem(selected === s.id)}>
                   <span style={{ fontSize:13 }}>{s.icon}</span>{s.label}
                 </div>
               ))
@@ -1128,7 +1129,7 @@ function ManualPage({ standalone }) {
                 <div key={cat}>
                   <div style={{ fontSize:9, fontWeight:800, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.08em', padding:'10px 8px 4px' }}>{cat}</div>
                   {items.map(s => (
-                    <div key={s.id} onClick={() => setSelected(s.id)} style={S.navItem(selected === s.id)}>
+                    <div key={s.id} onClick={() => setSelected(s.id)} className="manual-nav-item" style={S.navItem(selected === s.id)}>
                       <span style={{ fontSize:13 }}>{s.icon}</span>{s.label}
                     </div>
                   ))}
@@ -1139,8 +1140,30 @@ function ManualPage({ standalone }) {
         </div>
       </div>
 
-      <div style={S.content}>
-        <div style={{ paddingTop:4, marginBottom:20, paddingBottom:16, borderBottom:'1px solid var(--br)' }}>
+      <div className="manual-content" style={S.content}>
+        <section className="manual-hero">
+          <div className="manual-kicker">▣ {FIRM.name || 'TaxRes CRM'} Help Center</div>
+          <h1>Know the system. Run the office faster.</h1>
+          <p>Search the current operating guide, jump into the workflows your team uses most, or browse by the part of the office you’re working in.</p>
+          <div className="manual-hero-search">
+            <span>⌕</span>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search leads, payroll, email, IRS forms, reports…" />
+          </div>
+        </section>
+
+        <section className="manual-popular">
+          <div className="manual-popular-head">
+            <div><div className="manual-popular-eyebrow">Popular workflows</div><div className="manual-popular-title">Jump right in</div></div>
+            <div className="manual-popular-note">Built for the current CRM release</div>
+          </div>
+          <div className="manual-popular-grid">
+            <button className="manual-jump" onClick={() => setSelected('leads')}><span className="manual-jump-icon">🎯</span><div className="manual-jump-title">New lead → active client</div><div className="manual-jump-body">Capture, qualify, send the package, collect payment and convert.</div></button>
+            <button className="manual-jump" onClick={() => setSelected('esign')}><span className="manual-jump-icon">✍️</span><div className="manual-jump-title">Send & track signatures</div><div className="manual-jump-body">Full package, IRS authorizations and client agreements.</div></button>
+            <button className="manual-jump" onClick={() => setSelected('dashboard')}><span className="manual-jump-icon">📊</span><div className="manual-jump-title">Run the daily dashboard</div><div className="manual-jump-body">Cases, tasks, deadlines, AR and production at a glance.</div></button>
+            <button className="manual-jump" onClick={() => setSelected('reports')}><span className="manual-jump-icon">⚡</span><div className="manual-jump-title">Reports & office controls</div><div className="manual-jump-body">Production, billing, activity, employees and operational health.</div></button>
+          </div>
+        </section>
+        <div className="manual-section-head" style={{ paddingTop:4, marginBottom:20, paddingBottom:16, borderBottom:'1px solid var(--br)' }}>
           <div style={{ fontSize:22, fontWeight:800, color:'var(--tx)', marginBottom:4 }}>{sec.title}</div>
           <div style={{ fontSize:10, fontWeight:700, color:'#6366f1', textTransform:'uppercase', letterSpacing:'.07em' }}>
             {sec.category} · {MANUAL_SECTIONS.findIndex(s => s.id === sec.id) + 1} of {MANUAL_SECTIONS.length}
