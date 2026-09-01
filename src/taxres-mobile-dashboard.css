@@ -1,0 +1,113 @@
+/* TaxRes dashboard mobile hardening
+   Shared contract for Nashville, TCR, and future TaxRes offices.
+   Keep imported AFTER taxres-dashboard.css so these responsive overrides win. */
+
+@media (max-width: 900px) {
+  /* Dashboard root currently uses a desktop-only flex row with extra inner padding. */
+  .page-content > div[style*="gap: 20px"][style*="padding: 20px 24px"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    gap: 14px !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .page-content > div[style*="gap: 20px"][style*="padding: 20px 24px"] > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+  }
+
+  /* Greeting + timezone strip become a vertical header instead of competing for width. */
+  .page-content > div[style*="gap: 20px"][style*="padding: 20px 24px"]
+    > div:first-child > div:first-child {
+    width: 100% !important;
+    align-items: stretch !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+
+  .page-content > div[style*="gap: 20px"][style*="padding: 20px 24px"]
+    > div:first-child > div:first-child > div:last-child {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 10px 12px !important;
+  }
+
+  .page-content > div[style*="gap: 20px"][style*="padding: 20px 24px"]
+    > div:first-child > div:first-child > div:last-child > div {
+    width: 100% !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
+  }
+
+  .page-content > div[style*="gap: 20px"][style*="padding: 20px 24px"]
+    > div:first-child > div:first-child > div:last-child > div > div {
+    flex: 1 1 72px !important;
+    min-width: 68px !important;
+    max-width: none !important;
+  }
+
+  /* The dashboard stat grid is inline-styled as five columns on desktop. */
+  .page-content div[style*="display: grid"]:has(> [data-card-idx]) {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+
+  [data-card-idx] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    min-height: 94px !important;
+    padding: 14px 15px !important;
+  }
+
+  [data-card-idx] * {
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+  }
+
+  /* Fixed 230px dashboard side widgets become normal full-width mobile cards. */
+  .page-content > div[style*="gap: 20px"][style*="padding: 20px 24px"] > div:last-child {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex-shrink: 1 !important;
+  }
+
+  /* Prevent flex children anywhere in the dashboard rail from creating horizontal bleed. */
+  .page-content > div[style*="gap: 20px"][style*="padding: 20px 24px"] [style*="display: flex"] {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 540px) {
+  .page-content div[style*="display: grid"]:has(> [data-card-idx]) {
+    grid-template-columns: 1fr !important;
+  }
+
+  [data-card-idx] {
+    min-height: 90px !important;
+    padding: 13px 14px !important;
+  }
+
+  .page-content > div[style*="gap: 20px"][style*="padding: 20px 24px"]
+    > div:first-child > div:first-child > div:last-child > div > div {
+    flex-basis: 44% !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .page-content > div[style*="gap: 20px"][style*="padding: 20px 24px"]
+    > div:first-child > div:first-child > div:last-child > div > div {
+    flex-basis: 100% !important;
+  }
+}
