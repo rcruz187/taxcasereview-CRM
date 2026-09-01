@@ -1,3 +1,4 @@
+-- RomyLabs office-first sales/e-sign handoff: Sales creates the office; agreements live with the office Documents record.
 create or replace function public.admin_romylabs_link_prospect_office(p_prospect_id uuid,p_tenant_id uuid)
 returns jsonb
 language plpgsql security definer set search_path=public,pg_temp
