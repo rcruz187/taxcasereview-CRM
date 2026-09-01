@@ -16,20 +16,20 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v4
         with: { node-version: '22', cache: npm }
-      - name: Wire route
+      - name: Wire route and sender safeguards
         run: node scripts/wire-office-document-sign-route.mjs
-      - name: Stage local route commit for clean-source build
+      - name: Stage local e-sign source commit for clean-source build
         run: |
-          if git diff --quiet -- src/App.jsx; then exit 0; fi
+          if git diff --quiet -- src/App.jsx src/components/admin/UniversalOfficeESign.jsx; then exit 0; fi
           git config user.name "RomyLabs"
           git config user.email "rcruz187@gmail.com"
-          git add src/App.jsx
-          git commit -m "feat(esign): expose office document signing route"
+          git add src/App.jsx src/components/admin/UniversalOfficeESign.jsx
+          git commit -m "feat(esign): expose secure office document signing flow"
       - name: Install
         run: npm ci
       - name: Build
         run: npm run build
-      - name: Push validated route wiring
+      - name: Push validated e-sign source
         run: |
           if [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ]; then exit 0; fi
           git push origin HEAD:main
