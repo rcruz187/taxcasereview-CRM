@@ -4,6 +4,26 @@ import { supabase } from '../lib/supabase'
 
 const money = v => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(Number(v||0))
 
+const sanitizeAgreementHtml = value => {
+  const html = String(value || '')
+  if (!html) return ''
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const allowed = new Set(['H1','H2','H3','H4','P','STRONG','EM','B','I','U','UL','OL','LI','BR','DIV','SPAN','HR'])
+  const dangerous = new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','SVG','MATH','FORM','INPUT','BUTTON','TEXTAREA','SELECT','OPTION','LINK','META','BASE'])
+  for (const el of [...doc.body.querySelectorAll('*')]) {
+    if (dangerous.has(el.tagName)) {
+      el.remove()
+      continue
+    }
+    if (!allowed.has(el.tagName)) {
+      el.replaceWith(...el.childNodes)
+      continue
+    }
+    for (const attr of [...el.attributes]) el.removeAttribute(attr.name)
+  }
+  return doc.body.innerHTML
+}
+
 export default function RomyLabsAgreementSign(){
   const { token } = useParams()
   const [agreement,setAgreement] = useState(null)
@@ -26,6 +46,7 @@ export default function RomyLabsAgreementSign(){
   useEffect(()=>{ if(token) load() },[token])
 
   const canSign = useMemo(()=>agreement && !['signed','declined','void','expired'].includes(agreement.status),[agreement])
+  const sanitizedAgreementHtml = useMemo(()=>sanitizeAgreementHtml(agreement?.html),[agreement?.html])
 
   async function sign(){
     if(!accepted || signedName.trim().length<2 || !canSign) return
@@ -64,7 +85,7 @@ export default function RomyLabsAgreementSign(){
             ].map(([l,v])=><div key={l} style={{background:'rgba(255,255,255,.03)',borderRadius:9,padding:'10px 12px'}}><div style={{fontSize:9,color:'#64748b',textTransform:'uppercase',fontWeight:800}}>{l}</div><div style={{fontSize:13,color:'#e2e8f0',fontWeight:700,marginTop:4}}>{v}</div></div>)}
           </div>
         </div>
-        <div style={{padding:'28px 30px',lineHeight:1.65,color:'#cbd5e1'}} className="romylabs-agreement-copy" dangerouslySetInnerHTML={{__html:agreement.html}} />
+        <div style={{padding:'28px 30px',lineHeight:1.65,color:'#cbd5e1'}} className="romylabs-agreement-copy" dangerouslySetInnerHTML={{__html:sanitizedAgreementHtml}} />
       </div>
 
       {done ? <div style={{marginTop:20,padding:22,borderRadius:14,background:'rgba(16,185,129,.08)',border:'1px solid rgba(16,185,129,.25)'}}>
