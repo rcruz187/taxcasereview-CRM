@@ -54,6 +54,7 @@ const BookAppointment = lazy(() => import('./pages/BookAppointment'))
 const ManageBooking = lazy(() => import('./pages/ManageBooking'))
 const SignPage = lazy(() => import('./pages/SignPage'))
 const RomyLabsAgreementSign = lazy(() => import('./pages/RomyLabsAgreementSign'))
+const OfficeDocumentSign = lazy(() => import('./pages/OfficeDocumentSign'))
 const MeetingRoom = lazy(() => import('./pages/MeetingRoom'))
 const ScreenShareJoin = lazy(() => import('./pages/ScreenShareJoin'))
 const ScreenShareHost = lazy(() => import('./pages/ScreenShareHost'))
@@ -397,6 +398,7 @@ function AuthRouter() {
       <Route path="/clockin" element={<ClockIn />} />
       <Route path="/sign/:id" element={<SignPage />} />
       <Route path="/agreement/:token" element={<RomyLabsAgreementSign />} />
+      <Route path="/office-sign/:token" element={<OfficeDocumentSign />} />
       <Route path="/meet/:id"          element={<MeetingRoom />} />
       <Route path="/screenshare"       element={<ScreenShareJoin />} />
       <Route path="/screenshare-host"  element={<ScreenShareHost />} />
