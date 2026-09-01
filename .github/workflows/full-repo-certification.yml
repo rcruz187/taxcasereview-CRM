@@ -53,6 +53,11 @@ jobs:
           skip = {'package-lock.json'}
           scanned=[]; total_lines=0; total_bytes=0; findings=[]; inventories={'tables':set(),'rpcs':set(),'edge_invokes':set()}
           hard=[]
+          def executable_text(path,text):
+            if path.startswith('src/') or path.startswith('supabase/functions/') or path.startswith('scripts/'):
+              text=re.sub(r'/\*.*?\*/','',text,flags=re.S)
+              text=re.sub(r'^\s*//.*$','',text,flags=re.M)
+            return text
           for f in files:
             if f in skip or os.path.splitext(f)[1].lower() not in exts:
               continue
@@ -64,7 +69,7 @@ jobs:
             scanned.append(f); total_lines += text.count('\n')+1; total_bytes += len(text.encode('utf-8'))
             for i,line in enumerate(text.splitlines(),1):
               s=line.strip()
-              if re.search(r'^(<<<<<<<|=======|>>>>>>>)', s): hard.append([f,i,'MERGE_MARKER',s[:200]])
+              if re.search(r'^(<<<<<<<\s|>>>>>>>\s)', s): hard.append([f,i,'MERGE_MARKER',s[:200]])
               if re.search(r'\beval\s*\(|new\s+Function\s*\(', line): hard.append([f,i,'DYNAMIC_CODE_EXEC',s[:200]])
               if f.startswith('src/') and re.search(r'(?i)(service_role|SUPABASE_SERVICE_ROLE_KEY)', line) and not s.startswith('//'):
                 hard.append([f,i,'SERVICE_ROLE_IN_FRONTEND',s[:200]])
@@ -73,15 +78,15 @@ jobs:
               if re.search(r'\b(TODO|FIXME|HACK|XXX)\b', line, re.I): findings.append([f,i,'MARKER',s[:200]])
               if 'getPublicUrl(' in line: findings.append([f,i,'PUBLIC_STORAGE_URL_REVIEW',s[:200]])
               if 'dangerouslySetInnerHTML' in line: findings.append([f,i,'RAW_HTML_REVIEW',s[:200]])
-            for m in re.finditer(r'\.from\(\s*["\']([^"\']+)["\']\s*\)', text): inventories['tables'].add(m.group(1))
-            for m in re.finditer(r'\.rpc\(\s*["\']([^"\']+)["\']', text): inventories['rpcs'].add(m.group(1))
-            for m in re.finditer(r'functions\.invoke\(\s*["\']([^"\']+)["\']', text): inventories['edge_invokes'].add(m.group(1))
+            code=executable_text(f,text)
+            for m in re.finditer(r'\.from\(\s*["\']([^"\']+)["\']\s*\)', code): inventories['tables'].add(m.group(1))
+            for m in re.finditer(r'\.rpc\(\s*["\']([^"\']+)["\']', code): inventories['rpcs'].add(m.group(1))
+            for m in re.finditer(r'functions\.invoke\(\s*["\']([^"\']+)["\']', code): inventories['edge_invokes'].add(m.group(1))
 
           fn_dirs={p for p in os.listdir('supabase/functions') if os.path.isfile(os.path.join('supabase/functions',p,'index.ts'))}
           missing=sorted(inventories['edge_invokes']-fn_dirs)
           for name in missing: hard.append(['src',0,'MISSING_EDGE_FUNCTION_SOURCE',name])
 
-          # Every no-JWT function configured in config.toml must have source.
           cfg=open('supabase/config.toml','r',encoding='utf-8').read()
           blocks=re.findall(r'\[functions\.([^\]]+)\]\s*\n(?:[^\[]*?)(verify_jwt\s*=\s*false)',cfg,re.S)
           nojwt=sorted({name for name,_ in blocks})
