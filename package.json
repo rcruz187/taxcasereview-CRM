@@ -3,6 +3,6 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "build": "node -e \"console.log('Static gh-pages output already built; no rebuild required.')\""
+    "build": "rm -rf dist && mkdir -p dist && find . -mindepth 1 -maxdepth 1 ! -name dist ! -name node_modules ! -name .git ! -name package.json ! -name package-lock.json -exec cp -R {} dist/ \\; && echo 'Staged static gh-pages output into dist.'"
   }
 }
