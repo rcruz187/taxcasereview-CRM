@@ -159,12 +159,24 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const productHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+    if (productKey === 'arcvena') {
+      const arcvenaSupportSecret = Deno.env.get('ARCVENA_SUPPORT_SECRET')
+      if (!arcvenaSupportSecret) {
+        return new Response(JSON.stringify({ ok: false, error: 'Arcvena proxy credential not configured' }), {
+          status: 503, headers: { ...cors, 'Content-Type': 'application/json' }
+        })
+      }
+      productHeaders['x-arcvena-support-secret'] = arcvenaSupportSecret
+    } else {
+      productHeaders['x-hub-secret'] = hubSecret
+    }
+
     const productRes = await fetch(targetUrl, {
       method: 'GET',
-      headers: {
-        'x-hub-secret':  hubSecret,
-        'Content-Type':  'application/json',
-      },
+      headers: productHeaders,
     })
 
     const productData = await productRes.json()
