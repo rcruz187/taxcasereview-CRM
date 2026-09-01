@@ -190,23 +190,32 @@ export default function Sidebar() {
   // for good regardless of which page you're on.
   useEffect(() => {
     async function loadCounts() {
-      const [leadsRes, clientsRes, casesRes, deadlinesRes] = await Promise.all([
-        supabase.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'New Lead'),
-        supabase.from('clients').select('id', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString()),
-        supabase.from('cases').select('id', { count: 'exact', head: true }).in('status', OPEN_STATUSES),
-        supabase.from('deadlines').select('dueDate,status'),
+      const seenAt = section => localStorage.getItem(`tcr_sidebar_seen_${section}`) || new Date(0).toISOString()
+      const [summaryRes, leadsRes, clientsRes, casesRes] = await Promise.all([
+        supabase.rpc('get_sidebar_badge_counts'),
+        supabase.from('leads').select('id', { count: 'exact', head: true }).gt('created_at', seenAt('leads')),
+        supabase.from('clients').select('id', { count: 'exact', head: true }).gt('created_at', seenAt('clients')),
+        supabase.from('cases').select('id', { count: 'exact', head: true }).gt('created_at', seenAt('cases')),
       ])
-      setNewLeads(leadsRes.count || 0)
-      setNewClients(clientsRes.count || 0)
-      setOpenCases(casesRes.count || 0)
-      const today = new Date()
-      const dueSoon = (deadlinesRes.data || []).filter(d => {
-        if ((d.status || 'Tracking') === 'Completed') return false
-        if (!d.dueDate) return false
-        const dy = Math.ceil((new Date(d.dueDate) - today) / 86400000)
-        return dy <= 7 && dy >= -1
-      }).length
-      setDueSoonDeadlines(dueSoon)
+
+      if (summaryRes.error) console.warn('[badge] sidebar summary refresh skipped:', summaryRes.error.message)
+      if (leadsRes.error) console.warn('[badge] unseen leads refresh skipped:', leadsRes.error.message)
+      if (clientsRes.error) console.warn('[badge] unseen clients refresh skipped:', clientsRes.error.message)
+      if (casesRes.error) console.warn('[badge] unseen cases refresh skipped:', casesRes.error.message)
+
+      const path = window.location.pathname
+      const viewing = section => path === `/${section}` || path.startsWith(`/${section}/`)
+
+      // Entity badges are notifications, not KPIs: only records created since
+      // that user last opened the section should light up the sidebar.
+      setNewLeads(viewing('leads') ? 0 : (leadsRes.count || 0))
+      setNewClients(viewing('clients') ? 0 : (clientsRes.count || 0))
+      setOpenCases(viewing('cases') ? 0 : (casesRes.count || 0))
+
+      const b = summaryRes.data || {}
+      // Deadlines remain an action alert because an older deadline can become
+      // urgent as its due date approaches; it is intentionally not a record total.
+      setDueSoonDeadlines(Number(b.deadlines) || 0)
     }
     if (!user) return
     loadCounts()
@@ -223,6 +232,21 @@ export default function Sidebar() {
   }, [user])
 
   const BADGE_COUNTS = { leads: newLeads, clients: newClients, cases: openCases, deadlines: dueSoonDeadlines, fax: unreadFax, sms: unreadSms, voicemails: unreadVoicemails, esign: pendingEsign, email: unreadInbox, tasks: openTasks, chat: unreadChat, calendar: upcomingEvents }
+
+  // SIDEBAR_UNSEEN_ACK_V1
+  useEffect(() => {
+    const path = location.pathname
+    const section = path === '/leads' || path.startsWith('/leads/') ? 'leads'
+      : path === '/clients' || path.startsWith('/clients/') ? 'clients'
+      : path === '/cases' || path.startsWith('/cases/') ? 'cases'
+      : null
+    if (!section) return
+
+    localStorage.setItem(`tcr_sidebar_seen_${section}`, new Date().toISOString())
+    if (section === 'leads') setNewLeads(0)
+    if (section === 'clients') setNewClients(0)
+    if (section === 'cases') setOpenCases(0)
+  }, [location.pathname])
 
   useEffect(() => {
     async function loadCommsCounts() {
@@ -315,21 +339,19 @@ export default function Sidebar() {
 
   useEffect(() => {
     async function loadEmailTaskCounts() {
-      // Fetch rows in JS and count with !e.is_read — identical to Email.jsx line 272
-      // so badge always matches inbox count exactly. DB count queries miss NULL is_read.
-      // Scoped to the logged-in user's own mailbox (mailbox_owner), same as
-      // Email.jsx — otherwise every user sees everyone's unread count.
-      const [emailsRes, tasksRes] = await Promise.all([
-        supabase.from('emails').select('id,is_read,triage').eq('mailbox_owner', user.email),
-        supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('done', false).not('deleted','is',true),
-      ])
-      const emails = emailsRes.data || []
-      const inboxTriages = ['Inbox', 'Action Needed', 'Waiting']
-      const inboxEmails = emails.filter(e => inboxTriages.includes(e.triage || 'Inbox'))
-      setUnreadInbox(inboxEmails.filter(e => !e.is_read).length)
-      setEmailActionNeeded(emails.filter(e => e.triage === 'Action Needed' && !e.is_read).length)
-      setEmailWaiting(emails.filter(e => e.triage === 'Waiting' && !e.is_read).length)
-      setOpenTasks(tasksRes.count || 0)
+      if (!user?.email) return
+      const { data, error } = await supabase.rpc('get_sidebar_badge_counts')
+      if (error) {
+        // A navigation-aborted fetch is not an application error. Keep the last
+        // successful badge values and let the next realtime/poll/visibility pass retry.
+        console.warn('[badge] email/task count refresh skipped:', error.message)
+        return
+      }
+      const b = data || {}
+      setUnreadInbox(Number(b.email) || 0)
+      setOpenTasks(Number(b.tasks) || 0)
+      setEmailActionNeeded(0)
+      setEmailWaiting(0)
     }
     if (!user) return
     loadEmailTaskCounts()

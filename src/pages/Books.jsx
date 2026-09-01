@@ -30,6 +30,10 @@ export default function Books() {
   const [form, setForm]         = useState({ date: new Date().toISOString().slice(0,10), description:'', amount:'', type:'Income', category:'Revenue', client_id:'', notes:'', reconciled: false, payee:'', account:'Checking' })
   const [saving, setSaving]     = useState(false)
   const [clients, setClients]   = useState([])
+  useEffect(() => {
+    if (params.get('new') === '1') setShowForm(true)
+  }, [location.search])
+
 
   useEffect(() => { loadAll() }, [year, clientFilter])
   useEffect(() => { loadClients() }, [])

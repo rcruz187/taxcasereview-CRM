@@ -39,7 +39,7 @@ const NEW_ITEMS = [
   { icon: '👥', label: 'New Lead',       sub: 'Add a prospect',        path: '/leads',       color: '#a855f7' },
   { icon: '💳', label: 'New Payment',    sub: 'Record a payment',      path: '/payments',    color: '#22c55e' },
   { icon: '✅', label: 'New Task',       sub: 'Assign work',           path: '/tasks',       color: '#06b6d4' },
-  { icon: '📝', label: 'New Transcript', sub: 'Add transcript',        path: '/transcripts', color: '#14b8a6' },
+  { icon: '📝', label: 'New Transcript', sub: 'Pull or add transcript', path: '/irsportal',   color: '#14b8a6' },
 ]
 
 export default function TopBar({ onNew }) {
@@ -88,7 +88,7 @@ export default function TopBar({ onNew }) {
 
   useEffect(() => { setOpen(false) }, [location.pathname])
 
-  const MODAL_PATHS = new Set(['/leads','/clients','/cases','/tasks','/invoices','/payments','/documents','/calendar','/email','/esign','/fax'])
+  const MODAL_PATHS = new Set(['/leads','/clients','/cases','/tasks','/invoices','/payments','/documents','/calendar','/email','/esign','/fax','/formacorp','/books','/transcripts','/irsportal'])
   function go(path) {
     setOpen(false)
     navigate(MODAL_PATHS.has(path) ? path + '?new=1' : path)

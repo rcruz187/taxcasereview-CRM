@@ -31,19 +31,21 @@ export default function Settings() {
     if (data) setAcctStatus(data)
   }
 
-  function connectQuickBooks() {
+  async function connectQuickBooks() {
     if (!myTenantId) { showToast('Still loading your account — try again in a moment'); return }
     if (!firm.qb_client_id) { showToast('Save your QuickBooks Client ID/Secret first'); return }
-    const state = btoa(myTenantId)
+    const { data: state, error } = await supabase.rpc('create_accounting_oauth_state', { p_provider: 'quickbooks' })
+    if (error || !state) { showToast('Could not start secure QuickBooks connection'); return }
     const redirectUri = window.location.origin + '/auth/quickbooks-callback'
     const authorizeUrl = `https://appcenter.intuit.com/connect/oauth2?client_id=${encodeURIComponent(firm.qb_client_id)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=com.intuit.quickbooks.accounting&state=${encodeURIComponent(state)}`
     window.location.href = authorizeUrl
   }
 
-  function connectXero() {
+  async function connectXero() {
     if (!myTenantId) { showToast('Still loading your account — try again in a moment'); return }
     if (!firm.xero_client_id) { showToast('Save your Xero Client ID/Secret first'); return }
-    const state = btoa(myTenantId)
+    const { data: state, error } = await supabase.rpc('create_accounting_oauth_state', { p_provider: 'xero' })
+    if (error || !state) { showToast('Could not start secure Xero connection'); return }
     const redirectUri = window.location.origin + '/auth/xero-callback'
     const authorizeUrl = `https://login.xero.com/identity/connect/authorize?response_type=code&client_id=${encodeURIComponent(firm.xero_client_id)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent('accounting.transactions accounting.contacts offline_access')}&state=${encodeURIComponent(state)}`
     window.location.href = authorizeUrl
@@ -1317,6 +1319,7 @@ function StorageTab({ tenantId }) {
   const [loading, setLoading] = useState(true)
   const [usage,   setUsage]   = useState(null)
   const [usageLoading, setUsageLoading] = useState(true)
+  const [projectStorage, setProjectStorage] = useState(null)
 
   useEffect(() => {
     const tid = tenantId
@@ -1344,12 +1347,15 @@ function StorageTab({ tenantId }) {
 
       const tid = tenantId
       if (!tid) { setUsageLoading(false); return }
-      const [{ count: callCount }, { count: smsCount }, { count: faxCount }, { count: emailCount }] = await Promise.all([
+      const [{ count: callCount }, { count: smsCount }, { count: faxCount }, { count: emailCount }, storageRes] = await Promise.all([
         supabase.from('calllog').select('id', { count: 'exact', head: true }).eq('tenant_id', tid).gte('created_at', monthStart),
         supabase.from('sms_messages').select('id', { count: 'exact', head: true }).eq('tenant_id', tid).gte('created_at', monthStart),
         supabase.from('fax_logs').select('id', { count: 'exact', head: true }).eq('tenant_id', tid).gte('created_at', monthStart),
         supabase.from('emails').select('id', { count: 'exact', head: true }).eq('tenant_id', tid).gte('created_at', monthStart),
+        supabase.rpc('get_project_storage_usage'),
       ])
+      if (storageRes.error) console.error('Storage Usage: exact project usage RPC failed —', storageRes.error.message)
+      else setProjectStorage(storageRes.data)
 
       setUsage({
         period: now.toLocaleString('en-US', { month: 'long', year: 'numeric' }),
@@ -1363,16 +1369,20 @@ function StorageTab({ tenantId }) {
     loadUsage()
   }, [tenantId])
 
-  const FREE_LIMIT = 1024 * 1024 * 1024  // 1 GB Supabase free tier
-  const totalBytes  = docs.reduce((s, d) => s + (d.file_size || 0), 0)
-  const pct         = Math.min(100, (totalBytes / FREE_LIMIT) * 100)
-  const barColor    = pct > 80 ? 'var(--bad)' : pct > 60 ? 'var(--warn)' : 'var(--green)'
+  // Exact project storage comes from storage.objects metadata via a protected RPC.
+  // documents.file_size remains useful for tenant/document-type detail, but it is
+  // not complete enough to represent actual disk usage (generated e-sign/package
+  // files and other buckets are not guaranteed to have matching documents rows).
+  const trackedDocumentBytes = docs.reduce((sum, d) => sum + (Number(d.file_size) || 0), 0)
+  const projectBytes = Number(projectStorage?.total_bytes || 0)
+  const totalBytes = projectBytes || trackedDocumentBytes
 
   function fmt(bytes) {
     if (!bytes) return '—'
     if (bytes < 1024)        return bytes + ' B'
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+    return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB'
   }
 
   // Group by docType
@@ -1433,29 +1443,35 @@ function StorageTab({ tenantId }) {
         </div>
       )}
 
-      {/* Usage bar */}
+      {/* Exact Supabase project storage */}
       <div className="card">
         <div className="card-header"><span className="card-title">💾 Storage Usage</span></div>
         <div style={{ padding: '0 20px 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-            <span style={{ fontSize: 28, fontWeight: 900, color: barColor }}>{fmt(totalBytes)}</span>
-            <span style={{ fontSize: 13, color: 'var(--t3)' }}>of 1 GB free tier used</span>
-          </div>
-          <div style={{ height: 10, background: 'var(--s2)', borderRadius: 99, overflow: 'hidden', marginBottom: 8 }}>
-            <div style={{ height: '100%', width: pct + '%', background: barColor, borderRadius: 99, transition: 'width .4s' }} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--t3)' }}>
-            <span>{pct.toFixed(1)}% used</span>
-            <span>{fmt(FREE_LIMIT - totalBytes)} remaining</span>
-          </div>
-          {pct > 70 && (
-            <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, fontSize: 13, color: 'var(--bad)' }}>
-              ⚠️ Storage is {pct.toFixed(0)}% full. Consider archiving old documents or upgrading to Supabase Pro ($25/mo) for 100 GB.
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,minmax(0,1fr))', gap:10, marginBottom:14 }}>
+            <div style={{background:'var(--s2)',borderRadius:10,padding:'12px 14px'}}>
+              <div style={{fontSize:25,fontWeight:900,color:'var(--tx)'}}>{fmt(totalBytes)}</div>
+              <div style={{fontSize:11,color:'var(--t3)',marginTop:3}}>Actual project storage used</div>
             </div>
-          )}
-          <div style={{ marginTop: 12, fontSize: 12, color: 'var(--t3)', lineHeight: 1.7 }}>
-            <strong style={{ color: 'var(--tx)' }}>Upload limits enforced:</strong> 10 MB max per file · Images auto-compressed before upload · File size tracked per document
+            <div style={{background:'var(--s2)',borderRadius:10,padding:'12px 14px'}}>
+              <div style={{fontSize:25,fontWeight:900,color:'var(--tx)'}}>{projectStorage?.total_objects ?? '—'}</div>
+              <div style={{fontSize:11,color:'var(--t3)',marginTop:3}}>Stored objects</div>
+            </div>
+            <div style={{background:'var(--s2)',borderRadius:10,padding:'12px 14px'}}>
+              <div style={{fontSize:25,fontWeight:900,color:'var(--tx)'}}>{fmt(trackedDocumentBytes)}</div>
+              <div style={{fontSize:11,color:'var(--t3)',marginTop:3}}>Tenant document rows with size metadata</div>
+            </div>
           </div>
+          <div style={{background:'rgba(26,127,212,.08)',border:'1px solid rgba(26,127,212,.22)',borderRadius:9,padding:'10px 13px',fontSize:12,color:'var(--t2)',lineHeight:1.65,marginBottom:14}}>
+            <strong style={{color:'var(--tx)'}}>Measured from Supabase Storage itself.</strong> This includes generated packages, signed copies, firm assets, avatars and every storage bucket — not only rows in the CRM documents table. Your plan quota is intentionally not hardcoded because it changes with the Supabase plan.
+          </div>
+          {(projectStorage?.buckets || []).map(b => (
+            <div key={b.bucket_id} style={{display:'flex',alignItems:'center',gap:12,padding:'8px 0',borderBottom:'1px solid var(--br)'}}>
+              <div style={{flex:1,fontSize:13,fontWeight:650}}>{b.bucket_id}</div>
+              <div style={{fontSize:11,color:'var(--t3)'}}>{b.objects} object{Number(b.objects)===1?'':'s'}</div>
+              <div style={{width:90,textAlign:'right',fontSize:12,fontWeight:700,color:'var(--t2)'}}>{fmt(Number(b.bytes)||0)}</div>
+            </div>
+          ))}
+          {!projectStorage && <div style={{fontSize:12,color:'var(--warn)',marginTop:10}}>Exact project usage is unavailable for this login; showing tracked document metadata only.</div>}
         </div>
       </div>
 

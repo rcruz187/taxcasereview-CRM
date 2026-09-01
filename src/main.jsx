@@ -16,6 +16,8 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'
+import './manual-premium.css'
+import './lib/routePrefetch'
 import './polish.css'
 import './theme-scrollbars.css'
 import './taxres-mobile.css'
