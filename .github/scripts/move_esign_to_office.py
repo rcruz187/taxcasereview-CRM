@@ -25,6 +25,8 @@ elif 'Create New Office from Sale' not in s:
     marker = '            {/* Activity log */}'
     assert marker in s, 'Sales activity marker missing'
     s = s.replace(marker, cta + marker, 1)
+# Sales must never render office onboarding/e-sign controls.
+s = s.replace(cta, '')
 p.write_text(s)
 
 # Office page: create office first, then manage e-sign inside that office.
