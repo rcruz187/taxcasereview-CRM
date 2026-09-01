@@ -1,0 +1,1 @@
+Internal load-test harness. The public smoke scenario stages 30, 50, and 100 concurrent virtual users against production public routes and fails on elevated error rate or latency thresholds.
