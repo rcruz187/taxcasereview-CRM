@@ -1,0 +1,71 @@
+name: Apply RomyLabs Sales Agreements
+on:
+  push:
+    paths:
+      - 'src/pages/RomyLabsAgreementSign.jsx'
+      - 'src/components/admin/RomyLabsAgreementPanel.jsx'
+      - '.github/workflows/apply-romylabs-agreements.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Wire agreement routes and sales panel
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          admin = Path('src/pages/AdminPortal.jsx')
+          s = admin.read_text()
+          imp = "import RomyLabsAgreementPanel from '../components/admin/RomyLabsAgreementPanel'"
+          if imp not in s:
+              anchor = "import RomyLabsBilling from '../components/admin/RomyLabsBilling'"
+              if anchor not in s:
+                  raise SystemExit('AdminPortal import anchor not found')
+              s = s.replace(anchor, anchor + "\n" + imp, 1)
+          panel = """            <RomyLabsAgreementPanel\n              prospect={selected}\n              supabase={supabase}\n              onChanged={async()=>{ await reload(); if(selected) await loadActivities(selected.id) }}\n            />\n\n"""
+          marker = "            {/* Activity log */}"
+          if 'RomyLabsAgreementPanel\n              prospect={selected}' not in s:
+              if marker not in s:
+                  raise SystemExit('Sales activity marker not found')
+              s = s.replace(marker, panel + marker, 1)
+          admin.write_text(s)
+
+          app = Path('src/App.jsx')
+          a = app.read_text()
+          lazy = "const RomyLabsAgreementSign = lazy(() => import('./pages/RomyLabsAgreementSign'))"
+          if lazy not in a:
+              anchor = "const SignPage = lazy(() => import('./pages/SignPage'))"
+              if anchor not in a:
+                  raise SystemExit('App SignPage anchor not found')
+              a = a.replace(anchor, anchor + "\n" + lazy, 1)
+          if "'/agreement'" not in a:
+              old = "const publicPaths = ['/book', '/sign', '/portal', '/clockin', '/kiosk',"
+              new = "const publicPaths = ['/book', '/sign', '/agreement', '/portal', '/clockin', '/kiosk',"
+              if old not in a:
+                  raise SystemExit('publicPaths anchor not found')
+              a = a.replace(old, new, 1)
+          route = '      <Route path="/agreement/:token" element={<RomyLabsAgreementSign />} />'
+          if route not in a:
+              anchor = '      <Route path="/sign/:id" element={<SignPage />} />'
+              if anchor not in a:
+                  raise SystemExit('sign route anchor not found')
+              a = a.replace(anchor, anchor + "\n" + route, 1)
+          app.write_text(a)
+          PY
+      - name: Commit wiring
+        run: |
+          if git diff --quiet; then
+            echo 'Agreement UI already wired.'
+            exit 0
+          fi
+          git config user.name 'RomyLabs'
+          git config user.email 'rcruz187@gmail.com'
+          git add src/App.jsx src/pages/AdminPortal.jsx
+          git commit -m 'feat(agreements): wire prospect e-sign workflow'
+          git push
