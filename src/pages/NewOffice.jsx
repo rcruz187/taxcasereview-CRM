@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Papa from 'papaparse'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
@@ -111,7 +112,9 @@ function SlackImport({ tenantId, onBack, showToast }) {
 
 export default function NewOffice() {
   const { user, showToast } = useApp()
+  const [searchParams] = useSearchParams()
   const allowed = PLATFORM_ADMIN_EMAILS.includes((user?.email || '').toLowerCase())
+  const [saleHandoff, setSaleHandoff] = useState(null)
   const [offices, setOffices]   = useState(null) // null = not loaded yet
   const [view, setView]         = useState('list') // 'list' | 'form' | 'detail'
   const [selectedId, setSelectedId] = useState(null)
@@ -119,6 +122,24 @@ export default function NewOffice() {
   useEffect(() => {
     if (allowed) loadOffices()
   }, [allowed])
+
+  useEffect(() => {
+    if (!allowed) return
+    const prospectId=searchParams.get('prospect_id')
+    const agreementId=searchParams.get('agreement_id')
+    if (!prospectId || !agreementId) return
+    ;(async()=>{
+      const [{data:prospect,error:pe},{data:agreement,error:ae}] = await Promise.all([
+        supabase.from('prospects').select('*').eq('id',prospectId).maybeSingle(),
+        supabase.from('romylabs_sales_agreements').select('*').eq('id',agreementId).eq('prospect_id',prospectId).maybeSingle(),
+      ])
+      if (pe || ae || !prospect || !agreement) { showToast('❌ Could not load the signed sale'); return }
+      if (agreement.status !== 'signed') { showToast('❌ Agreement must be signed before creating the office'); return }
+      if (agreement.tenant_id) { showToast('This signed sale is already linked to an office'); return }
+      setSaleHandoff({prospect,agreement})
+      setView('form')
+    })()
+  }, [allowed, searchParams])
 
   async function loadOffices() {
     const { data, error } = await supabase.rpc('list_tenants')
@@ -136,7 +157,7 @@ export default function NewOffice() {
     </div>
   )
 
-  if (view === 'form') return <NewOfficeForm onDone={backToList} onCancel={() => setView('list')} showToast={showToast} />
+  if (view === 'form') return <NewOfficeForm onDone={backToList} onCancel={() => setView('list')} showToast={showToast} prefill={saleHandoff} />
   if (view === 'detail') return <OfficeDetail tenantId={selectedId} onBack={backToList} showToast={showToast} onImport={()=>setView('import')} onSlackImport={()=>setView('slack-import')} />
   if (view === 'import') return <DataImport tenantId={selectedId} onBack={()=>setView('detail')} showToast={showToast} />
   if (view === 'slack-import') return <SlackImport tenantId={selectedId} onBack={()=>setView('detail')} showToast={showToast} />
@@ -193,8 +214,17 @@ export default function NewOffice() {
 }
 
 // ── Create-office form (unchanged behavior, extracted as its own component) ─
-function NewOfficeForm({ onDone, onCancel, showToast }) {
-  const [form, setForm]     = useState(BLANK)
+function NewOfficeForm({ onDone, onCancel, showToast, prefill }) {
+  const saleName = prefill?.prospect?.firm_name || ''
+  const initialForm = prefill ? {
+    ...BLANK,
+    firm_name:saleName,
+    tenant_code:saleName.toUpperCase().replace(/[^A-Z0-9]+/g,'').slice(0,12),
+    admin_name:prefill.prospect?.contact_name || prefill.agreement?.signer_name || '',
+    admin_email:prefill.prospect?.contact_email || prefill.agreement?.signer_email || '',
+    firm_phone:prefill.prospect?.contact_phone || '',
+  } : BLANK
+  const [form, setForm]     = useState(initialForm)
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState(null)
   const [copied, setCopied] = useState(false)
@@ -217,6 +247,11 @@ function NewOfficeForm({ onDone, onCancel, showToast }) {
     })
     setSaving(false)
     if (error || data?.error) { showToast('❌ ' + (data?.error || error.message)); return }
+    if (prefill?.agreement?.id && data?.tenant_id) {
+      const {error:linkErr}=await supabase.rpc('admin_romylabs_attach_signed_agreement',{p_agreement_id:prefill.agreement.id,p_tenant_id:data.tenant_id})
+      if (linkErr) showToast('⚠️ Office created, but agreement filing needs attention: ' + linkErr.message)
+      else showToast('✅ Office created from signed sale — agreement filed to Documents')
+    }
     setResult(data)
   }
 
@@ -233,6 +268,7 @@ function NewOfficeForm({ onDone, onCancel, showToast }) {
         <div style={{fontSize:20,fontWeight:800,color:'var(--tx)'}}>New Office</div>
       </div>
       <div style={{color:'var(--t3)',fontSize:13,margin:'8px 0 24px'}}>Stand up a brand-new office on its own isolated tenant.</div>
+      {prefill&&<div style={{margin:'0 0 18px',padding:'12px 14px',borderRadius:9,background:'rgba(16,185,129,.08)',border:'1px solid rgba(16,185,129,.28)',color:'#a7f3d0',fontSize:12,lineHeight:1.6}}><strong>Signed sale handoff</strong><br/>{prefill.prospect?.firm_name} · {prefill.agreement?.seats||1} seats · ${Number(prefill.agreement?.monthly_amount||0).toLocaleString()}/mo · signed by {prefill.agreement?.signed_name||prefill.agreement?.signer_name||'customer'}. Creating this office will permanently link the signed agreement to the office Documents record.</div>}
 
       {result ? (
         <div style={{background:'var(--s2)',border:'1px solid var(--br)',borderRadius:10,padding:20}}>
@@ -363,6 +399,16 @@ function OfficeDetail({ tenantId, onBack, showToast, onImport, onSlackImport }) 
   }
 
   async function viewAgreement(filePath) {
+    if (String(filePath||'').startsWith('sales-agreement:')) {
+      const id=String(filePath).split(':')[1]
+      const {data,error}=await supabase.rpc('admin_romylabs_signed_agreement_html',{p_agreement_id:id})
+      if (error || !data?.html) { showToast('❌ ' + (error?.message || 'Could not open signed agreement')); return }
+      const signed=`<div style="font-family:Arial,sans-serif;max-width:850px;margin:40px auto;color:#111">${data.html}<hr style="margin:36px 0"><h3>Electronic Signature Certificate</h3><p><strong>Signed by:</strong> ${data.signed_name||'—'}<br><strong>Email:</strong> ${data.signer_email||'—'}<br><strong>Signed:</strong> ${data.signed_at?new Date(data.signed_at).toLocaleString():'—'}</p></div>`
+      const url=URL.createObjectURL(new Blob([signed],{type:'text/html'}))
+      window.open(url,'_blank','noopener,noreferrer')
+      setTimeout(()=>URL.revokeObjectURL(url),60000)
+      return
+    }
     const { data, error } = await supabase.functions.invoke('office-agreement-file', { body: { action: 'geturl', file_path: filePath } })
     if (error || data?.error) { showToast('❌ ' + (data?.error || error.message)); return }
     window.open(data.url, '_blank')

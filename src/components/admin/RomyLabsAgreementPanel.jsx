@@ -94,6 +94,11 @@ export default function RomyLabsAgreementPanel({prospect,supabase,onChanged}){
     setWorking(false)
   }
 
+  function startOffice(row){
+    const q=new URLSearchParams({prospect_id:prospect.id,agreement_id:row.id})
+    window.location.assign(`/crm-admin/provision?${q.toString()}`)
+  }
+
   const latest=rows[0]
   const active=useMemo(()=>rows.find(r=>['draft','sent','viewed'].includes(r.status)),[rows])
   const createDisabled = working || !!active || !prospect?.contact_email
@@ -115,12 +120,14 @@ export default function RomyLabsAgreementPanel({prospect,supabase,onChanged}){
         <div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontSize:9,fontWeight:800,textTransform:'uppercase',color:c,background:`${c}18`,padding:'2px 7px',borderRadius:12}}>{row.status}</span><span style={{fontSize:10,color:'#64748b'}}>{row.sent_at?`Sent ${dt(row.sent_at)}`:`Created ${dt(row.created_at)}`}</span>{row.signed_at&&<span style={{fontSize:10,color:'#10b981',marginLeft:'auto'}}>Signed {dt(row.signed_at)}</span>}</div>
         <div style={{fontSize:11,color:'#cbd5e1',marginTop:5}}>{row.agreement_title} · {row.seats||'—'} seats · {money(row.monthly_amount)}/mo</div>
         {row.signed_name&&<div style={{fontSize:10,color:'#10b981',marginTop:3}}>✓ Signed by {row.signed_name}</div>}
+        {row.status==='signed'&&!row.tenant_id&&<div style={{marginTop:8}}><button onClick={()=>startOffice(row)} style={{fontSize:10,padding:'6px 10px',borderRadius:7,border:'none',background:'#10b981',color:'#052e16',fontWeight:900,cursor:'pointer'}}>🏢 Create New Office from Sale</button></div>}
+        {row.status==='signed'&&row.tenant_id&&<div style={{fontSize:10,color:'#10b981',marginTop:6}}>✓ Office created and agreement filed to office documents</div>}
         {!['signed','declined','void'].includes(row.status)&&<div style={{display:'flex',gap:6,marginTop:7}}><button disabled={working} onClick={()=>resend(row)} style={{fontSize:9,padding:'4px 8px',borderRadius:6,border:'1px solid rgba(99,102,241,.25)',background:'rgba(99,102,241,.08)',color:'#a5b4fc',cursor:'pointer'}}>Resend Fresh Link</button><button disabled={working} onClick={()=>voidAgreement(row)} style={{fontSize:9,padding:'4px 8px',borderRadius:6,border:'1px solid rgba(239,68,68,.2)',background:'rgba(239,68,68,.06)',color:'#f87171',cursor:'pointer'}}>Void</button></div>}
       </div>
     })}
     {msg&&<div style={{fontSize:10,color:'#10b981',marginTop:7}}>{msg}</div>}
     {error&&<div style={{fontSize:10,color:'#f87171',marginTop:7,lineHeight:1.4}}>{error}</div>}
     {!prospect?.contact_email&&<div style={{fontSize:10,color:'#f59e0b',marginTop:7}}>Add the prospect's email before sending an agreement.</div>}
-    {latest?.status==='signed'&&<div style={{fontSize:10,color:'#64748b',marginTop:7}}>Signed agreement is locked. Sales stage is updated to Won and next action is provisioning/payment.</div>}
+    {latest?.status==='signed'&&<div style={{fontSize:10,color:'#64748b',marginTop:7}}>Signed agreement is locked. Click Create New Office from Sale to begin onboarding.</div>}
   </div>
 }
