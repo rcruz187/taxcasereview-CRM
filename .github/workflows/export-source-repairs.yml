@@ -7,13 +7,15 @@ on:
       - '.github/workflows/export-source-repairs.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   export:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -39,24 +41,17 @@ jobs:
           npm run cases:modal-scope
           npm run ui:quick-create
           npm run ui:navigation-audit
-      - name: Capture changed tracked source
+      - name: Commit materialized repairs to isolated audit branch
         shell: bash
         run: |
           set -euo pipefail
-          git diff --name-only --diff-filter=ACMRT > repaired-files.txt
-          mkdir -p repaired
-          while IFS= read -r f; do
-            [ -z "$f" ] && continue
-            mkdir -p "repaired/$(dirname "$f")"
-            cp "$f" "repaired/$f"
-          done < repaired-files.txt
-          echo 'Changed files:'
-          cat repaired-files.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: prebuild-source-repairs
-          path: |
-            repaired/
-            repaired-files.txt
-          if-no-files-found: error
-          retention-days: 1
+          git config user.name 'RomyLabs Audit Repair'
+          git config user.email 'actions@github.com'
+          git checkout -B audit/materialized-source-repairs
+          git add src
+          if git diff --cached --quiet; then
+            echo 'No source drift to materialize'
+            exit 0
+          fi
+          git commit -m 'fix: materialize deterministic prebuild source repairs'
+          git push --force-with-lease origin HEAD:audit/materialized-source-repairs
