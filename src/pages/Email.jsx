@@ -15,6 +15,10 @@ const BLANK = { recipient:'', clientName:'', subject:'', body:'', triage:'Sent',
 
 export default function Email() {
   const [emails, setEmails]     = useState([])
+  // Authoritative unread counts are loaded separately from the visible 300-row
+  // message window so large mailboxes never show truncated/stale folder totals.
+  const [folderCounts, setFolderCounts] = useState(() => Object.fromEntries(TRIAGE.map(t => [t, 0])))
+  const countRefreshTimerRef = useRef(null)
   const [clients, setClients]   = useState([])
   const [leads, setLeads]       = useState([])
   const [attachPickerFor, setAttachPickerFor] = useState(null) // attachmentId currently showing the manual picker
@@ -79,7 +83,7 @@ export default function Email() {
   }, [focusIndex])
 
   useEffect(() => {
-    load(); loadGmailConfig()
+    load(); loadFolderCounts(); loadGmailConfig()
     const onFocus = () => loadGmailConfig()
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
@@ -105,7 +109,7 @@ export default function Email() {
 
   // Refresh the visible list whenever the background sync (running
   // globally, not just on this page) picks up anything new.
-  useEffect(() => { if (lastSyncAt) load() }, [lastSyncAt])
+  useEffect(() => { if (lastSyncAt) { load(); loadFolderCounts() } }, [lastSyncAt])
 
   // Realtime subscription — fires immediately when a new inbound email arrives
   useEffect(() => {
@@ -142,6 +146,23 @@ export default function Email() {
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
+  }, [user?.email])
+
+  // Any local or provider-driven email UPDATE (read, unread, archive, delete,
+  // triage move) schedules one debounced count refresh. Bulk actions can emit
+  // dozens of row events; debouncing collapses them into one exact recount.
+  useEffect(() => {
+    if (!user?.email) return
+    const owner = user.email
+    const channel = supabase.channel(`email-folder-counts-rt-${owner}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'emails', filter: `mailbox_owner=eq.${owner}`,
+      }, () => scheduleFolderCountsRefresh())
+      .subscribe()
+    return () => {
+      if (countRefreshTimerRef.current) clearTimeout(countRefreshTimerRef.current)
+      supabase.removeChannel(channel)
+    }
   }, [user?.email])
 
   async function loadGmailConfig() {
@@ -185,6 +206,36 @@ export default function Email() {
     setSignature({ text: sigText, logoUrl: sigLogo || FIRM.logoUrl || '' })
   }
 
+  async function loadFolderCounts() {
+    if (!user?.email) return
+    // Count on the server instead of fetching rows into JS. Supabase/PostgREST
+    // caps ordinary row queries, which made counts wrong once a mailbox grew
+    // past that ceiling. "IS NOT TRUE" intentionally treats legacy NULL
+    // is_read values as unread, matching the historical UI behavior.
+    const queries = TRIAGE.map(t => {
+      let q = supabase.from('emails')
+        .select('id', { count: 'exact', head: true })
+        .eq('mailbox_owner', user.email)
+        .is('deleted_at', null)
+        .not('is_read', 'is', true)
+      if (t === 'Inbox') q = q.or('triage.eq.Inbox,triage.is.null')
+      else q = q.eq('triage', t)
+      return q
+    })
+    const results = await Promise.all(queries)
+    const next = {}
+    TRIAGE.forEach((t, i) => {
+      if (results[i]?.error) console.error('[email-count] ' + t + ' count failed:', results[i].error.message)
+      next[t] = results[i]?.count || 0
+    })
+    setFolderCounts(next)
+  }
+
+  function scheduleFolderCountsRefresh() {
+    if (countRefreshTimerRef.current) clearTimeout(countRefreshTimerRef.current)
+    countRefreshTimerRef.current = setTimeout(() => { loadFolderCounts() }, 120)
+  }
+
   async function load() {
     if (!user?.email) return
     const [{ data: e }, { data: c }, { data: l }] = await Promise.all([
@@ -199,16 +250,7 @@ export default function Email() {
       supabase.from('clients').select('id,name,email'),
       supabase.from('leads').select('id,name,email'),
     ])
-    if (e) {
-      // Preserve is_read=true for any email the user already opened this session.
-      // Without this, a background lastSyncAt reload resets the unread dot on
-      // emails the user just clicked — the DB write from markRead() can race
-      // with the reload and the fetch wins with the old value.
-      setEmails(prev => {
-        const localRead = new Set(prev.filter(x => x.is_read).map(x => x.id))
-        return e.map(row => localRead.has(row.id) ? { ...row, is_read: true } : row)
-      })
-    }
+    if (e) setEmails(e)
     if (c) setClients(c)
     if (l) setLeads(l)
   }
@@ -389,12 +431,62 @@ export default function Email() {
     setForm(BLANK); setView('inbox'); load()
   }
 
+  async function runMailboxAction(emailIds, action) {
+    const ids = Array.isArray(emailIds) ? emailIds : [emailIds]
+    const chunks = []
+    for (let i = 0; i < ids.length; i += 5) chunks.push(ids.slice(i, i + 5))
+
+    async function invokeChunk(chunk, attempt = 0) {
+      try {
+        const { data, error } = await supabase.functions.invoke('gmail-sync-cron', {
+          body: { mode: 'message_action', email_ids: chunk, action },
+        })
+        if (error) throw new Error(error.message || String(error))
+        if (!data?.ok) {
+          const detail = data?.failures?.[0]?.error || data?.error || 'Mailbox action failed'
+          throw new Error(detail)
+        }
+        return data
+      } catch (e) {
+        if (attempt < 1) {
+          await new Promise(resolve => setTimeout(resolve, 700))
+          return invokeChunk(chunk, attempt + 1)
+        }
+        throw e
+      }
+    }
+
+    const succeeded = []
+    const failures = []
+    for (let i = 0; i < chunks.length; i += 3) {
+      const wave = chunks.slice(i, i + 3)
+      const results = await Promise.allSettled(wave.map(chunk => invokeChunk(chunk)))
+      results.forEach((result, idx) => {
+        if (result.status === 'fulfilled') succeeded.push(...(result.value?.succeeded || wave[idx]))
+        else failures.push({ ids: wave[idx], error: result.reason?.message || String(result.reason) })
+      })
+    }
+    if (failures.length) throw new Error(failures[0].error || 'Mailbox action failed')
+    return { ok: true, action, succeeded, failures: [] }
+  }
+
   async function moveTriage(id, triage) {
+    const current = emails.find(e => e.id === id)
     if (selected?.id === id) setSelected(prev => ({ ...prev, triage }))
     setEmails(prev => prev.map(e => e.id === id ? { ...e, triage } : e))
-    await supabase.from('emails').update({ triage }).eq('id', id)
-    showToast(`Moved to ${triage}`)
-    load()
+    try {
+      if (triage === 'Archive') {
+        await runMailboxAction(id, 'archive')
+      } else {
+        if (current?.triage === 'Archive' && triage !== 'Sent') await runMailboxAction(id, 'inbox')
+        const { error } = await supabase.from('emails').update({ triage }).eq('id', id)
+        if (error) throw error
+      }
+      showToast(`Moved to ${triage}`)
+    } catch (e) {
+      await load()
+      showToast('Email move failed: ' + e.message)
+    }
   }
 
   // The trash icon archives instead of permanently deleting. Two reasons:
@@ -404,53 +496,91 @@ export default function Email() {
   // in. Archiving keeps the row (with its gmail_message_id) so sync never
   // re-imports it.
   async function archiveEmail(id) {
-    // Optimistic: update local state immediately, DB write in background
+    const previous = emails
     setEmails(es => es.map(e => e.id === id ? { ...e, triage: 'Archive' } : e))
     if (selected?.id === id) setSelected(null)
-    setCheckedIds(s => { const n = new Set(s); n.delete(id); return n })
-    supabase.from('emails').update({ triage: 'Archive' }).eq('id', id)
+    setCheckedIds(set => { const next = new Set(set); next.delete(id); return next })
+    try {
+      await runMailboxAction(id, 'archive')
+      showToast('Archived')
+    } catch (e) {
+      setEmails(previous)
+      await load()
+      showToast('Archive failed: ' + e.message)
+    }
   }
 
   async function archiveSelected() {
     if (checkedIds.size === 0) return
     const ids = [...checkedIds]
-    // Optimistic: update local state immediately, DB write in background
+    const previous = emails
     setEmails(es => es.map(e => ids.includes(e.id) ? { ...e, triage: 'Archive' } : e))
     if (selected && ids.includes(selected.id)) setSelected(null)
     setCheckedIds(new Set())
-    showToast(`Archived ${ids.length} email${ids.length === 1 ? '' : 's'}`)
-    supabase.from('emails').update({ triage: 'Archive' }).in('id', ids)
+    try {
+      await runMailboxAction(ids, 'archive')
+      showToast(`Archived ${ids.length} email${ids.length === 1 ? '' : 's'}`)
+    } catch (e) {
+      setEmails(previous)
+      await load()
+      showToast('Bulk archive failed: ' + e.message)
+    }
   }
 
   async function permanentlyDeleteEmail(id) {
-    // Soft delete — sets deleted_at so gmail-sync-cron won't re-import it
+    const previous = emails
     setEmails(es => es.filter(e => e.id !== id))
     if (selected?.id === id) setSelected(null)
-    setCheckedIds(s => { const n = new Set(s); n.delete(id); return n })
-    supabase.from('emails').update({ deleted_at: new Date().toISOString() }).eq('id', id)
+    setCheckedIds(set => { const next = new Set(set); next.delete(id); return next })
+    try {
+      await runMailboxAction(id, 'trash')
+      showToast('Deleted')
+    } catch (e) {
+      setEmails(previous)
+      await load()
+      showToast('Delete failed: ' + e.message)
+    }
   }
 
   async function permanentlyDeleteSelected() {
     if (checkedIds.size === 0) return
     const ids = [...checkedIds]
+    const previous = emails
     setEmails(es => es.filter(e => !ids.includes(e.id)))
     if (selected && ids.includes(selected.id)) setSelected(null)
     setCheckedIds(new Set())
-    showToast(`Deleted ${ids.length} email${ids.length === 1 ? '' : 's'}`)
-    supabase.from('emails').update({ deleted_at: new Date().toISOString() }).in('id', ids)
+    try {
+      await runMailboxAction(ids, 'trash')
+      showToast(`Deleted ${ids.length} email${ids.length === 1 ? '' : 's'}`)
+    } catch (e) {
+      setEmails(previous)
+      await load()
+      showToast('Bulk delete failed: ' + e.message)
+    }
   }
 
   async function markRead(email) {
     if (email.is_read) return
-    await supabase.from('emails').update({ is_read: true }).eq('id', email.id)
     setEmails(es => es.map(e => e.id === email.id ? { ...e, is_read: true } : e))
+    if (selected?.id === email.id) setSelected(prev => ({ ...prev, is_read: true }))
+    try {
+      await runMailboxAction(email.id, 'read')
+    } catch (e) {
+      await load()
+      showToast('Could not mark email read: ' + e.message)
+    }
   }
 
   async function markUnread(email) {
-    await supabase.from('emails').update({ is_read: false }).eq('id', email.id)
     setEmails(es => es.map(e => e.id === email.id ? { ...e, is_read: false } : e))
     if (selected?.id === email.id) setSelected(prev => ({ ...prev, is_read: false }))
-    showToast('Marked as new')
+    try {
+      await runMailboxAction(email.id, 'unread')
+      showToast('Marked as new')
+    } catch (e) {
+      await load()
+      showToast('Could not mark email unread: ' + e.message)
+    }
   }
 
   function openEmail(email, index) {
@@ -509,11 +639,9 @@ export default function Email() {
     return true
   })
 
-  // Badge counts reflect UNREAD mail in each folder (standard inbox
-  // behavior) — this is what makes the Inbox number actually go down as
-  // things get read, instead of just showing a static total forever.
-  const counts = {}
-  TRIAGE.forEach(t => { counts[t] = emails.filter(e => (e.triage || 'Inbox') === t && !e.is_read).length })
+  // These are exact mailbox-wide unread counts, not counts from the visible
+  // 300-message window. Realtime keeps them current after bulk operations.
+  const counts = folderCounts
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 52px)', margin: '-16px', overflow: 'hidden', background: 'var(--bg)', position: 'relative' }}>
@@ -712,7 +840,7 @@ export default function Email() {
                     </select>
                     <button className="btn sec" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => { setCheckedIds(new Set()); anchorIndexRef.current = -1 }}>Clear</button>
                     {triageFilter === 'Archive'
-                      ? <button className="btn del" style={{ fontSize: 11, padding: '4px 12px', fontWeight: 700 }} onClick={permanentlyDeleteSelected}>🗑 Delete Permanently</button>
+                      ? <button className="btn del" style={{ fontSize: 11, padding: '4px 12px', fontWeight: 700 }} onClick={permanentlyDeleteSelected}>🗑 Delete</button>
                       : <button className="btn del" style={{ fontSize: 11, padding: '4px 12px', fontWeight: 700 }} onClick={archiveSelected}>🗑 Archive Selected</button>
                     }
                   </div>
@@ -801,7 +929,7 @@ export default function Email() {
                       <button className="btn" style={{ fontSize: 12, padding: '6px 14px', fontWeight: 600 }} onClick={() => { const replyRecipient = selected.from_address || selected.sender || selected.recipient; const replySubject = String(selected.subject || '').toLowerCase().startsWith('re:') ? selected.subject : 'Re: ' + (selected.subject || ''); setForm({ ...BLANK, clientName: selected.clientName || selected.clientname || replyRecipient, recipient: replyRecipient || '', subject: replySubject, routeId: selected.route_id || '', replyFrom: selected.reply_from || selected.received_mailbox || '', threadId: selected.thread_id || '', inReplyTo: selected.message_id || '', references: selected.references_header || '', productId: selected.product_id || '' }); setView('compose') }}>↩ Reply</button>
                       <button className="btn" style={{ fontSize: 12, padding: '6px 14px', fontWeight: 600, background: 'var(--blue)', color: '#fff', border: 'none' }} onClick={() => markUnread(selected)}>● Mark as New</button>
                       {triageFilter === 'Archive'
-                        ? <button className="btn del" style={{ fontSize: 12, padding: '6px 14px', fontWeight: 600 }} onClick={() => permanentlyDeleteEmail(selected.id)}>🗑 Delete Permanently</button>
+                        ? <button className="btn del" style={{ fontSize: 12, padding: '6px 14px', fontWeight: 600 }} onClick={() => permanentlyDeleteEmail(selected.id)}>🗑 Delete</button>
                         : <button className="btn del" style={{ fontSize: 12, padding: '6px 14px', fontWeight: 600 }} onClick={() => archiveEmail(selected.id)}>🗑 Archive</button>
                       }
                     </div>

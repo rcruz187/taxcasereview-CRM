@@ -8,7 +8,7 @@ import { FIRM } from '../lib/firmBranding'
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '')
 
 const STATE_FORMS = [
-  { num: 'AL-2848A',       state: 'AL', label: 'Power of Attorney and Declaration of Representative', url: `${BASE}/state-forms/AL_POA.pdf` },
+  { num: 'AL-2848A',       state: 'AL', label: 'Power of Attorney and Declaration of Representative', url: 'https://www.revenue.alabama.gov/wp-content/uploads/2018/09/Form_2848A_rev918.pdf' },
   { num: 'AZ-285-I',       state: 'AZ', label: 'Individual Tax Disclosure / POA',                    url: `${BASE}/state-forms/AZ_POA.pdf` },
   { num: 'AR-POA',         state: 'AR', label: 'Power of Attorney',                                  url: `${BASE}/state-forms/AR_POA.pdf` },
   { num: 'CA-3520-PIT',    state: 'CA', label: 'Individual or Fiduciary POA Declaration',            url: `${BASE}/state-forms/CA_POA.pdf` },
@@ -132,6 +132,7 @@ export default function StateForms() {
   // "Pre-fill PDF" button on the IRS Forms tab.
   async function downloadPrefilledStatePOA(form) {
     if (!selectedClient) { showToast('Select a client first'); return }
+    if (form.state !== 'FL') { showToast(`Autofill for ${form.state} is disabled until that exact state form mapping is verified. Open the official PDF instead.`); return }
     setPrefilling(form.num)
     try {
       const pdfRes = await fetch(form.url)
@@ -154,6 +155,7 @@ export default function StateForms() {
 
   async function sendStatePOA(form) {
     if (!selectedClient) { showToast('Select a client first'); return }
+    if (form.state !== 'FL') { showToast(`E-sign autofill for ${form.state} is disabled until that exact state form mapping is verified. This prevents sending client data in the wrong fields.`); return }
     if (!form) { showToast('No state form available for this client\'s state'); return }
     const via = sendVia
     if (via !== 'sms' && !selectedClient.email) { showToast('Client has no email on file'); return }
@@ -166,7 +168,10 @@ export default function StateForms() {
       // Fetch the PDF bytes from the state form URL
       const pdfRes = await fetch(form.url)
       if (!pdfRes.ok) throw new Error('Could not load state form PDF')
-      const pdfBlob = await pdfRes.blob()
+      const rawBytes = new Uint8Array(await pdfRes.arrayBuffer())
+      const { generateStatePOAWithCover } = await import('../lib/irsFormUtils')
+      const mergedBytes = await generateStatePOAWithCover(selectedClient, rawBytes)
+      const pdfBlob = new Blob([mergedBytes], { type: 'application/pdf' })
 
       // Upload to Supabase storage
       const safeName = (selectedClient.name || 'client').replace(/[^a-zA-Z0-9]+/g, '-')
