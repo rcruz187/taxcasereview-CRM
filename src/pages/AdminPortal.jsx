@@ -244,7 +244,7 @@ function Overview() {
                 </td>
                 <td style={{ ...S.td, color:'#475569' }}>{fmtAgo(r.last_activity)}</td>
                 <td style={S.td}>
-                  <button onClick={e=>{e.stopPropagation();navigate(`/crm-admin/offices/${r.id}`)}}
+                  <button onClick={e=>{e.stopPropagation();openOffice(r)}}
                     style={{ ...S.btn('ghost'), padding:'5px 12px', fontSize:11 }}>View →</button>
                 </td>
               </tr>
@@ -684,10 +684,66 @@ function OfficesList() {
   const [rows, setRows] = useState(null)
   const [loadError, setLoadError] = useState('')
   const navigate = useNavigate()
-  useEffect(() => { supabase.rpc('admin_tenant_overview').then(({data,error})=>{
-    if(error){setLoadError(error.message);setRows([]);return}
-    setLoadError('');setRows(data||[])
-  }) }, [])
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const [{ data: taxresRows, error: taxresError }, { data: { session } }] = await Promise.all([
+          supabase.rpc('admin_tenant_overview'),
+          supabase.auth.getSession(),
+        ])
+        if (taxresError) throw taxresError
+        if (!session?.access_token) throw new Error('Admin session expired')
+
+        const arcvenaResponse = await fetch('https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/hub-proxy', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ product: 'arcvena' }),
+        })
+        const arcvenaData = await arcvenaResponse.json()
+        if (!arcvenaResponse.ok || arcvenaData?.ok === false) {
+          throw new Error(arcvenaData?.error || 'Unable to load Arcvena offices')
+        }
+
+        const arcvenaRows = (arcvenaData.offices || []).map(office => ({
+          id: `arcvena:${office.id}`,
+          source_id: office.id,
+          product: 'arcvena',
+          firm_name: office.name,
+          brand_color: '#00c2ff',
+          employee_count: 0,
+          client_count: 0,
+          storage_bytes: 0,
+          status: office.is_active ? 'active' : 'inactive',
+          plan_tier: 'Arcvena',
+          effective_monthly: Number(office.mrr || 0),
+          last_activity: office.since,
+        }))
+
+        if (!cancelled) {
+          setLoadError('')
+          setRows([...(taxresRows || []), ...arcvenaRows])
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setLoadError(error instanceof Error ? error.message : String(error))
+          setRows([])
+        }
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  function openOffice(row) {
+    if (row.product === 'arcvena') {
+      window.location.assign('https://app.arcvena.com/')
+      return
+    }
+    navigate(`/crm-admin/offices/${row.id}`)
+  }
   return (
     <div style={{ padding:'28px 36px', maxWidth:1050 }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
@@ -699,7 +755,7 @@ function OfficesList() {
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
           {rows.map(r => (
             <div key={r.id} style={{ ...S.card, padding:'18px 20px', display:'flex', alignItems:'center', gap:16, cursor:'pointer' }}
-              onClick={()=>navigate(`/crm-admin/offices/${r.id}`)}>
+              onClick={()=>openOffice(r)}>
               <div style={{ width:40,height:40,borderRadius:10,flexShrink:0,
                 background: r.brand_color ? r.brand_color+'33' : 'rgba(99,102,241,.15)',
                 border: `2px solid ${r.brand_color||'#6366f1'}44`,
