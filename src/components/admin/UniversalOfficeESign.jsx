@@ -105,6 +105,7 @@ export default function UniversalOfficeESign({supabase,productKey,externalOffice
     if(!window.confirm(`Send “${title}” to ${signer.email} for signature?`))return
     setWorking(true);setError('');setMsg('')
     let path=''
+    let createdRequest=false
     try{
       path=`${productKey}/${externalOfficeId}/${Date.now()}-${clean(file.name)}`
       const up=await supabase.storage.from('romylabs-esign').upload(path,file,{contentType:'application/pdf',upsert:false})
@@ -114,13 +115,14 @@ export default function UniversalOfficeESign({supabase,productKey,externalOffice
         p_source_filename:file.name,p_source_path:path,p_signer_name:signer.name||null,p_signer_email:signer.email,p_fields:fields,p_expires_days:14,
       })
       if(e||!data?.ok)throw new Error(e?.message||data?.error||'Could not create signing request')
+      createdRequest=true
       const signUrl=`${window.location.origin}${data.sign_url}`
       await sendMail(signUrl,signer,title.trim())
       setMsg(`Sent “${title}” to ${signer.email} for signature ✓`)
       setFile(null);setPdf(null);setFields([]);setTitle('');setPage(1)
       await load()
     }catch(e){
-      if(path&&!docs.some(d=>d.source_path===path))await supabase.storage.from('romylabs-esign').remove([path]).catch(()=>{})
+      if(path&&!createdRequest){ try{ await supabase.storage.from('romylabs-esign').remove([path]) }catch(_){} }
       setError(e.message||String(e))
     }
     setWorking(false)
