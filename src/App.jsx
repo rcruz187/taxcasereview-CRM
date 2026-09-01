@@ -53,6 +53,7 @@ const Kiosk = lazy(() => import('./pages/Kiosk'))
 const BookAppointment = lazy(() => import('./pages/BookAppointment'))
 const ManageBooking = lazy(() => import('./pages/ManageBooking'))
 const SignPage = lazy(() => import('./pages/SignPage'))
+const RomyLabsAgreementSign = lazy(() => import('./pages/RomyLabsAgreementSign'))
 const MeetingRoom = lazy(() => import('./pages/MeetingRoom'))
 const ScreenShareJoin = lazy(() => import('./pages/ScreenShareJoin'))
 const ScreenShareHost = lazy(() => import('./pages/ScreenShareHost'))
@@ -356,7 +357,7 @@ function AuthRouter() {
 
   // Public routes must render immediately — never block them on the auth check.
   // /book, /sign, /portal etc are anonymous; showing a spinner loses prospects.
-  const publicPaths = ['/book', '/sign', '/portal', '/clockin', '/kiosk',
+  const publicPaths = ['/book', '/sign', '/agreement', '/portal', '/clockin', '/kiosk',
     '/employee', '/meet', '/screenshare', '/screenshare-host', '/financial-intake', '/organizer']
   const isPublicPath = publicPaths.some(p => path.startsWith(p))
 
@@ -395,6 +396,7 @@ function AuthRouter() {
       <Route path="/book/manage/:token" element={<ManageBooking />} />
       <Route path="/clockin" element={<ClockIn />} />
       <Route path="/sign/:id" element={<SignPage />} />
+      <Route path="/agreement/:token" element={<RomyLabsAgreementSign />} />
       <Route path="/meet/:id"          element={<MeetingRoom />} />
       <Route path="/screenshare"       element={<ScreenShareJoin />} />
       <Route path="/screenshare-host"  element={<ScreenShareHost />} />

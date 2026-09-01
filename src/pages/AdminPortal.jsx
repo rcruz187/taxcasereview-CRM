@@ -11,6 +11,7 @@ import { FIRM, loadFirmBranding, loadFirmBrandingPublic } from '../lib/firmBrand
 import { useApp } from '../context/AppContext'
 import AIAssistant from '../components/AIAssistant'
 import RomyLabsBilling from '../components/admin/RomyLabsBilling'
+import RomyLabsAgreementPanel from '../components/admin/RomyLabsAgreementPanel'
 import TrafficCoverage from '../components/admin/TrafficCoverage'
 import CredentialVault from '../components/admin/CredentialVault'
 const AdminChatPage = lazy(() => import('./AdminChat'))
@@ -3337,6 +3338,12 @@ function SalesPipeline({ data, supabase, registryProducts }) {
               <button onClick={() => deleteProspect(selected.id)}
                 style={{ ...S.btn('ghost'), fontSize:10, padding:'5px 10px', color:'#ef4444', border:'1px solid rgba(239,68,68,.2)' }}>Delete</button>
             </div>
+
+            <RomyLabsAgreementPanel
+              prospect={selected}
+              supabase={supabase}
+              onChanged={async()=>{ await reload(); if(selected) await loadActivities(selected.id) }}
+            />
 
             {/* Activity log */}
             <div style={{ padding:'12px 18px', maxHeight:280, overflowY:'auto' }}>
