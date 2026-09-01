@@ -13,6 +13,7 @@ import AIAssistant from '../components/AIAssistant'
 import RomyLabsBilling from '../components/admin/RomyLabsBilling'
 import TrafficCoverage from '../components/admin/TrafficCoverage'
 import CredentialVault from '../components/admin/CredentialVault'
+import UniversalOfficeESign from '../components/admin/UniversalOfficeESign'
 const AdminChatPage = lazy(() => import('./AdminChat'))
 
 const NewOffice    = lazy(() => import('./NewOffice'))
@@ -300,10 +301,16 @@ function ArcvenaOfficePage() {
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12,marginBottom:22}}>
         {kv.map(([label,value])=><div key={label} style={{...S.card,padding:'16px 18px'}}><div style={{fontSize:10,fontWeight:800,color:'#475569',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6}}>{label}</div><div style={{fontSize:14,fontWeight:700,color:'#e2e8f0',wordBreak:'break-word'}}>{String(value??'—')}</div></div>)}
       </div>
-      <div style={{...S.card,padding:'20px 22px'}}>
-        <div style={{fontSize:13,fontWeight:800,color:'#e2e8f0',marginBottom:8}}>Office Workspace</div>
-        <div style={{fontSize:12,color:'#64748b',lineHeight:1.6}}>This is the isolated RomyLabs office view for this Arcvena tenant. It no longer redirects to the generic Arcvena app when you click the office.</div>
-      </div>
+      <UniversalOfficeESign
+        supabase={supabase}
+        productKey="arcvena"
+        externalOfficeId={office.id}
+        firmName={office.name||'Arcvena Office'}
+        contactName=""
+        contactEmail=""
+        seats={null}
+        monthlyAmount={null}
+      />
     </div>
   )
 }
@@ -639,6 +646,19 @@ function OfficePage() {
       {/* Actions tab — support tickets */}
       {tab==='documents' && (
         <div>
+          <div style={{marginBottom:18}}>
+            <UniversalOfficeESign
+              supabase={supabase}
+              productKey="taxres_crm"
+              externalOfficeId={t.id}
+              firmName={t.firm_name||'Office'}
+              contactName={t.primary_contact_name||''}
+              contactEmail={t.primary_contact_email||''}
+              contactPhone={t.firm_phone||''}
+              seats={t.billing_seats||employees.length||null}
+              monthlyAmount={t.monthly_rate||null}
+            />
+          </div>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
             <div style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.05em' }}>Firm Documents</div>
             <label style={{ ...S.btn('primary'), fontSize:12, padding:'7px 14px', cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
