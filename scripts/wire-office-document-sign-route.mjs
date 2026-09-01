@@ -12,6 +12,11 @@ if(!app.includes('path="/office-sign/:token"')){
   if(!app.includes(anchor))throw new Error('Public agreement route anchor not found')
   app=app.replace(anchor,anchor+'\n      <Route path="/office-sign/:token" element={<OfficeDocumentSign />} />')
 }
+if(!app.includes("'/office-sign'")){
+  const anchor="const publicPaths = ['/book', '/sign', '/agreement', '/portal', '/clockin', '/kiosk',"
+  if(!app.includes(anchor))throw new Error('Public path list anchor not found')
+  app=app.replace(anchor,"const publicPaths = ['/book', '/sign', '/agreement', '/office-sign', '/portal', '/clockin', '/kiosk',")
+}
 fs.writeFileSync(appPath,app)
 
 const senderPath='src/components/admin/UniversalOfficeESign.jsx'
