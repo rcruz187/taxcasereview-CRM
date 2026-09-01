@@ -1,3 +1,4 @@
+-- Sales-to-office handoff migration. The schema is also applied directly to production.
 alter table public.prospects add column if not exists tenant_id uuid references public.tenants(id) on delete set null;
 alter table public.prospects add column if not exists converted_at timestamptz;
 alter table public.romylabs_sales_agreements add column if not exists tenant_id uuid references public.tenants(id) on delete set null;
