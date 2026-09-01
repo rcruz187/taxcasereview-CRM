@@ -1,0 +1,140 @@
+name: Full Repository Certification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'src/**'
+      - 'supabase/**'
+      - 'scripts/**'
+      - 'e2e/**'
+      - 'playwright.config.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify build scripts do not mutate tracked source
+        run: |
+          npm run build
+          git diff --exit-code -- . ':!package-lock.json'
+
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=moderate
+
+      - name: Scan every tracked first-party code line
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os, re, subprocess, json, sys
+          files = subprocess.check_output(['git','ls-files'], text=True).splitlines()
+          exts = {'.js','.jsx','.ts','.tsx','.mjs','.cjs','.json','.sql','.yml','.yaml','.html','.css','.md','.toml','.py','.sh'}
+          skip = {'package-lock.json'}
+          scanned=[]; total_lines=0; total_bytes=0; findings=[]; inventories={'tables':set(),'rpcs':set(),'edge_invokes':set()}
+          hard=[]
+          for f in files:
+            if f in skip or os.path.splitext(f)[1].lower() not in exts:
+              continue
+            try:
+              text=open(f,'r',encoding='utf-8').read()
+            except Exception as e:
+              hard.append([f,0,'UNREADABLE_SOURCE',str(e)])
+              continue
+            scanned.append(f); total_lines += text.count('\n')+1; total_bytes += len(text.encode('utf-8'))
+            for i,line in enumerate(text.splitlines(),1):
+              s=line.strip()
+              if re.search(r'^(<<<<<<<|=======|>>>>>>>)', s): hard.append([f,i,'MERGE_MARKER',s[:200]])
+              if re.search(r'\beval\s*\(|new\s+Function\s*\(', line): hard.append([f,i,'DYNAMIC_CODE_EXEC',s[:200]])
+              if f.startswith('src/') and re.search(r'(?i)(service_role|SUPABASE_SERVICE_ROLE_KEY)', line) and not s.startswith('//'):
+                hard.append([f,i,'SERVICE_ROLE_IN_FRONTEND',s[:200]])
+              if re.search(r'(?i)(password|secret|service_role|api[_-]?key)\s*[:=]\s*["\'][A-Za-z0-9_\-\.]{24,}["\']', line) and not s.startswith(('//','/*','*','--','#')):
+                hard.append([f,i,'POSSIBLE_HARDCODED_SECRET',s[:200]])
+              if re.search(r'\b(TODO|FIXME|HACK|XXX)\b', line, re.I): findings.append([f,i,'MARKER',s[:200]])
+              if 'getPublicUrl(' in line: findings.append([f,i,'PUBLIC_STORAGE_URL_REVIEW',s[:200]])
+              if 'dangerouslySetInnerHTML' in line: findings.append([f,i,'RAW_HTML_REVIEW',s[:200]])
+            for m in re.finditer(r'\.from\(\s*["\']([^"\']+)["\']\s*\)', text): inventories['tables'].add(m.group(1))
+            for m in re.finditer(r'\.rpc\(\s*["\']([^"\']+)["\']', text): inventories['rpcs'].add(m.group(1))
+            for m in re.finditer(r'functions\.invoke\(\s*["\']([^"\']+)["\']', text): inventories['edge_invokes'].add(m.group(1))
+
+          fn_dirs={p for p in os.listdir('supabase/functions') if os.path.isfile(os.path.join('supabase/functions',p,'index.ts'))}
+          missing=sorted(inventories['edge_invokes']-fn_dirs)
+          for name in missing: hard.append(['src',0,'MISSING_EDGE_FUNCTION_SOURCE',name])
+
+          # Every no-JWT function configured in config.toml must have source.
+          cfg=open('supabase/config.toml','r',encoding='utf-8').read()
+          blocks=re.findall(r'\[functions\.([^\]]+)\]\s*\n(?:[^\[]*?)(verify_jwt\s*=\s*false)',cfg,re.S)
+          nojwt=sorted({name for name,_ in blocks})
+          for name in nojwt:
+            if name not in fn_dirs: hard.append(['supabase/config.toml',0,'NOJWT_FUNCTION_MISSING_SOURCE',name])
+
+          report={
+            'files_scanned':len(scanned),'lines_scanned':total_lines,'bytes_scanned':total_bytes,
+            'hard_failure_count':len(hard),'review_finding_count':len(findings),
+            'tables_referenced':sorted(inventories['tables']),'rpcs_referenced':sorted(inventories['rpcs']),
+            'edge_functions_invoked':sorted(inventories['edge_invokes']),'no_jwt_functions':nojwt,
+            'hard_failures':hard,'review_findings':findings[:2000]
+          }
+          open('full-repo-certification.json','w').write(json.dumps(report,indent=2))
+          print(json.dumps({k:v for k,v in report.items() if k not in ('hard_failures','review_findings','tables_referenced','rpcs_referenced','edge_functions_invoked','no_jwt_functions')},indent=2))
+          print('TABLES_REFERENCED='+str(len(report['tables_referenced'])))
+          print('RPCS_REFERENCED='+str(len(report['rpcs_referenced'])))
+          print('EDGE_INVOKES='+str(len(report['edge_functions_invoked'])))
+          print('NO_JWT_FUNCTIONS='+str(len(report['no_jwt_functions'])))
+          if hard:
+            print('HARD FAILURES:')
+            for x in hard: print(' | '.join(map(str,x)))
+            sys.exit(2)
+          PY
+
+      - name: Install Playwright browser
+        run: |
+          npm install --no-save @playwright/test@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Start production preview
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/tcr-preview.log 2>&1 &
+          echo $! > /tmp/tcr-preview.pid
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/tcr-preview.log
+          exit 1
+
+      - name: Full browser smoke suite
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:4173
+        run: npx playwright test --browser=chromium --reporter=line
+
+      - name: Upload certification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-repo-certification
+          path: |
+            full-repo-certification.json
+            playwright-report/**
+            test-results/**
+          if-no-files-found: warn
