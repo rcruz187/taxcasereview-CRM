@@ -1,3 +1,4 @@
+// Signed-sale handoff: signed agreements can launch office onboarding and remain linked to the office record.
 import React, { useEffect, useMemo, useState } from 'react'
 
 const money = v => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(Number(v||0))
