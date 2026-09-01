@@ -1,0 +1,32 @@
+name: Wire Office Document Sign Route
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/wire-office-document-sign-route.mjs'
+      - '.github/workflows/wire-office-document-sign-route.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: npm }
+      - name: Wire route
+        run: node scripts/wire-office-document-sign-route.mjs
+      - name: Install
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Commit route wiring
+        run: |
+          if git diff --quiet -- src/App.jsx; then exit 0; fi
+          git config user.name "RomyLabs"
+          git config user.email "rcruz187@gmail.com"
+          git add src/App.jsx
+          git commit -m "feat(esign): expose office document signing route"
+          git push origin main
