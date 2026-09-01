@@ -12,8 +12,7 @@ on:
       - 'playwright.config.mjs'
       - 'package.json'
       - 'package-lock.json'
-      - '.github/workflows/ui-browser-smoke.yml'
-      - '.github/workflows/exhaustive-source-audit.yml'
+      - '.github/workflows/**'
   workflow_dispatch:
 
 permissions:
@@ -27,6 +26,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+
+      - name: Reject self-pushing workflow launchers
+        shell: bash
+        run: |
+          set -euo pipefail
+          offenders="$(git grep -l -E 'git[[:space:]]+push([[:space:]]|$)' -- '.github/workflows/*.yml' '.github/workflows/*.yaml' 2>/dev/null || true)"
+          if [ -n "$offenders" ]; then
+            echo 'Forbidden workflow(s) can push commits from GitHub Actions:'
+            echo "$offenders"
+            echo 'Source-mutating/self-pushing workflows are prohibited. Commit source changes directly and let read-only CI/deploy workflows verify them.'
+            exit 1
+          fi
+          echo 'SELF_PUSHING_WORKFLOWS=0'
 
       - uses: actions/setup-node@v4
         with:
