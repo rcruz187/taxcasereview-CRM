@@ -13,6 +13,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/**'
+      - 'AUDIT_IN_PROGRESS.md'
   workflow_dispatch:
 
 permissions:
@@ -42,6 +43,9 @@ jobs:
 
       - name: Production dependency audit
         run: npm audit --omit=dev --audit-level=moderate
+
+      - name: Capture complete dependency audit
+        run: npm audit --json > full-npm-audit.json || true
 
       - name: Scan every tracked first-party code line
         shell: bash
@@ -133,6 +137,11 @@ jobs:
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:4173
         run: npx playwright test --browser=chromium --reporter=line
 
+      - name: Package exact audited source
+        if: always()
+        run: |
+          tar -czf audited-source.tgz --exclude=.git --exclude=node_modules --exclude=dist .
+
       - name: Upload certification evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -140,6 +149,8 @@ jobs:
           name: full-repo-certification
           path: |
             full-repo-certification.json
+            full-npm-audit.json
+            audited-source.tgz
             playwright-report/**
             test-results/**
           if-no-files-found: warn
