@@ -20,7 +20,6 @@ import './polish.css'
 import './theme-scrollbars.css'
 import './taxres-mobile.css'
 import './taxres-dashboard.css'
-import './taxres-mobile-dashboard.css'
 import App from './App.jsx'
 import { getModel } from './lib/leadStatus'
 
