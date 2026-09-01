@@ -102,8 +102,8 @@ Deno.serve(async (req) => {
   }
 
   if (body.action === 'onboard_arcvena') {
-    const entitlementSecret = Deno.env.get('ROMYLABS_ENTITLEMENT_SECRET')
-    if (!entitlementSecret) {
+    const hubSecret = Deno.env.get('HUB_METRICS_SECRET')
+    if (!hubSecret) {
       return new Response(JSON.stringify({ error: 'Arcvena onboarding is not configured' }), {
         status: 503, headers: { ...cors, 'Content-Type': 'application/json' }
       })
@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
         {
           method: 'POST',
           headers: {
-            'x-entitlement-secret': entitlementSecret,
+            'x-hub-secret': hubSecret,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(body.payload ?? {}),
