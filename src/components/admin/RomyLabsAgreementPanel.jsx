@@ -96,12 +96,13 @@ export default function RomyLabsAgreementPanel({prospect,supabase,onChanged}){
 
   const latest=rows[0]
   const active=useMemo(()=>rows.find(r=>['draft','sent','viewed'].includes(r.status)),[rows])
+  const createDisabled = working || !!active || !prospect?.contact_email
 
   return <div style={{padding:'12px 18px',borderBottom:'1px solid rgba(99,102,241,.08)'}}>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:10}}>
       <div><div style={{fontSize:9,fontWeight:800,color:'#334155',textTransform:'uppercase',letterSpacing:'.07em'}}>Agreement / E-Sign</div><div style={{fontSize:10,color:'#475569',marginTop:2}}>Prospect SaaS agreement · secure electronic signature</div></div>
-      <button onClick={createAndSend} disabled={working||!!active||!prospect.contact_email} title={active?'Void or complete the active agreement before creating another.':''}
-        style={{padding:'6px 10px',borderRadius:7,border:'none',background:'#6366f1',color:'#fff',fontSize:10,fontWeight:800,cursor:'pointer',opacity:working||active||!prospect.contact_email?.5:1}}>{working?'Working…':'+ Create & Email Agreement'}</button>
+      <button onClick={createAndSend} disabled={createDisabled} title={active?'Void or complete the active agreement before creating another.':''}
+        style={{padding:'6px 10px',borderRadius:7,border:'none',background:'#6366f1',color:'#fff',fontSize:10,fontWeight:800,cursor:createDisabled?'not-allowed':'pointer',opacity:createDisabled?.5:1}}>{working?'Working…':'+ Create & Email Agreement'}</button>
     </div>
 
     <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6,marginBottom:10}}>
@@ -119,7 +120,7 @@ export default function RomyLabsAgreementPanel({prospect,supabase,onChanged}){
     })}
     {msg&&<div style={{fontSize:10,color:'#10b981',marginTop:7}}>{msg}</div>}
     {error&&<div style={{fontSize:10,color:'#f87171',marginTop:7,lineHeight:1.4}}>{error}</div>}
-    {!prospect.contact_email&&<div style={{fontSize:10,color:'#f59e0b',marginTop:7}}>Add the prospect's email before sending an agreement.</div>}
+    {!prospect?.contact_email&&<div style={{fontSize:10,color:'#f59e0b',marginTop:7}}>Add the prospect's email before sending an agreement.</div>}
     {latest?.status==='signed'&&<div style={{fontSize:10,color:'#64748b',marginTop:7}}>Signed agreement is locked. Sales stage is updated to Won and next action is provisioning/payment.</div>}
   </div>
 }
