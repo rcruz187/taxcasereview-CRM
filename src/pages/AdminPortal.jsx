@@ -2204,7 +2204,7 @@ function ArcvenaOfficeOnboarding({ supabase, onCreated }) {
   async function createOffice(e) {
     e.preventDefault()
     const submitAction = e.nativeEvent?.submitter?.value
-    const action = submitAction === 'stage' ? 'stage' : submitAction === 'prepare' ? 'prepare' : 'invite'
+    const action = submitAction === 'stage' ? 'stage' : submitAction === 'prepare' ? 'prepare' : submitAction === 'send_access' ? 'send_access' : 'invite'
     setSaving(true)
     setError('')
     setResult(null)
@@ -2285,9 +2285,11 @@ function ArcvenaOfficeOnboarding({ supabase, onCreated }) {
         {error && <div style={{ color:'#f87171', fontSize:11, marginTop:10 }}>{error}</div>}
         {result && (
           <div style={{ color:'#34d399', fontSize:11, marginTop:10 }}>
-            {result.invitation_sent
-              ? `Office active. Owner invitation sent to ${result.owner_email}. Tenant: ${result.tenant_id}`
-              : result.owner_account_prepared
+            {result.prepared_owner_access_sent
+              ? `Prepared Owner access email sent to ${result.owner_email}. Tenant: ${result.tenant_id}`
+              : result.invitation_sent
+                ? `Office active. Owner invitation sent to ${result.owner_email}. Tenant: ${result.tenant_id}`
+                : result.owner_account_prepared
                 ? `Office fully provisioned. Owner account prepared without sending email. Tenant: ${result.tenant_id}`
                 : `Draft saved. No email sent and no trial started. Tenant: ${result.tenant_id}`}
           </div>
@@ -2302,6 +2304,11 @@ function ArcvenaOfficeOnboarding({ supabase, onCreated }) {
             style={{ background:'rgba(16,185,129,.12)', color:'#6ee7b7', border:'1px solid rgba(16,185,129,.35)', borderRadius:8,
               padding:'9px 16px', fontSize:12, fontWeight:800, cursor:saving?'wait':'pointer', opacity:(saving || !form.owner_name.trim() || !form.owner_email.trim()) ? .65 : 1 }}>
             {saving ? 'Working…' : 'Fully Provision — Send Email Later'}
+          </button>
+          <button type="submit" value="send_access" disabled={saving || !form.company_name.trim() || !form.owner_email.trim()}
+            style={{ background:'rgba(14,165,233,.12)', color:'#7dd3fc', border:'1px solid rgba(14,165,233,.35)', borderRadius:8,
+              padding:'9px 16px', fontSize:12, fontWeight:800, cursor:saving?'wait':'pointer', opacity:(saving || !form.company_name.trim() || !form.owner_email.trim()) ? .65 : 1 }}>
+            {saving ? 'Working…' : 'Send Prepared Owner Access'}
           </button>
           <button type="submit" value="invite" disabled={saving || !form.owner_name.trim() || !form.owner_email.trim()}
             style={{ background:'#8b5cf6', color:'#fff', border:'none', borderRadius:8,
