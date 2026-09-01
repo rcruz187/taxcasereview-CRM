@@ -139,8 +139,7 @@ jobs:
 
       - name: Package exact audited source
         if: always()
-        run: |
-          tar -czf audited-source.tgz --exclude=.git --exclude=node_modules --exclude=dist .
+        run: git archive --format=tar.gz --output=audited-source.tgz HEAD
 
       - name: Upload certification evidence
         if: always()
