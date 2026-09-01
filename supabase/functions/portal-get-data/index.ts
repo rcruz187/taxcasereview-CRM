@@ -1,12 +1,7 @@
 // portal-get-data
-// Returns everything the Client Portal needs to display, scoped to
-// whichever client the session token belongs to — verified server-side
-// via the service role, which is what actually makes this safe (the
-// service role bypasses RLS/grants entirely, so there is no dependency on
-// anon-role table access at all; the token check here is the only gate).
-//
-// JWT Verification must be OFF — clients have no CRM login/session, just
-// this portal's own token issued by portal-login.
+// Returns Client Portal data strictly scoped to the tenant and client bound
+// to the opaque portal session token. Service-role access is never used
+// without both tenant and client/session constraints.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -15,59 +10,79 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...corsHeaders,'Content-Type':'application/json'}})
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-
+  if (req.method !== 'POST') return json({error:'Method not allowed'},405)
   try {
     const { token } = await req.json()
-    if (!token) return new Response(JSON.stringify({ error: 'Missing token' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    if (!token || String(token).length > 256) return json({ error: 'Missing or invalid token' },400)
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
-
-    const { data: session } = await supabase.from('portal_sessions').select('*').eq('token', token).maybeSingle()
-    if (!session || new Date(session.expires_at).getTime() < Date.now()) {
-      return new Response(JSON.stringify({ error: 'Session expired — please log in again.' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    const { data: session } = await supabase.from('portal_sessions').select('token,client_id,is_lead,client_name,tenant_id,expires_at').eq('token', String(token)).maybeSingle()
+    if (!session || !session.tenant_id || new Date(session.expires_at).getTime() < Date.now()) {
+      return json({ error: 'Session expired — please log in again.' },401)
     }
 
-    const clientName = session.client_name
-    const clientId = session.client_id
-    const isLead = session.is_lead
+    const clientName = String(session.client_name||'')
+    const clientId = String(session.client_id||'')
+    const tenantId = String(session.tenant_id)
+    const isLead = !!session.is_lead
+    if(!clientId||!clientName)return json({error:'Invalid portal session'},401)
 
     const clientTable = isLead ? 'leads' : 'clients'
     const clientSelectFields = isLead
       ? 'id,name,email'
       : 'id,name,email,autopay_enabled,autopay_amount,autopay_frequency,autopay_next_charge,default_payment_method_id,payment_method_brand,payment_method_last4,payment_plan_changes'
 
-    const [
-      { data: clientRecord },
-      { data: comp }, { data: docsData }, { data: books }, { data: pays },
-      { data: notesData }, { data: orgs }, { data: invs }, { data: sms },
-      { data: fp }, { data: emailsData },
-    ] = await Promise.all([
-      supabase.from(clientTable).select(clientSelectFields).eq('id', clientId).maybeSingle(),
-      supabase.from('client_compliance_records').select('*').eq('client_name', clientName),
-      supabase.from('documents').select('*').eq('client', clientName).order('created_at', { ascending: false }),
-      supabase.from('bookkeeping').select('*').eq('client_name', clientName).order('date', { ascending: false }),
-      supabase.from('payments').select('*').eq('clientName', clientName).order('created_at', { ascending: false }),
-      supabase.from('client_notes').select('*').eq('clientname', clientName).eq('visible_to_client', true).order('created_at', { ascending: false }),
-      supabase.from('tax_organizer_responses').select('id,tax_year,status,updated_at').eq('client_name', clientName).order('tax_year', { ascending: false }),
-      supabase.from('invoices').select('*').eq('clientName', clientName).neq('status', 'Paid').order('created_at', { ascending: false }),
-      supabase.from('sms_messages').select('*').eq('clientName', clientName).order('created_at', { ascending: true }),
-      supabase.from('client_financial_profiles').select('*').eq('client_name', clientName).maybeSingle(),
-      supabase.from('emails').select('*').eq('clientName', clientName).order('created_at', { ascending: false }),
-    ])
+    const clientRecordQ=supabase.from(clientTable).select(clientSelectFields).eq('id',clientId).eq('tenant_id',tenantId).maybeSingle()
+    const complianceQ=(isLead
+      ? supabase.from('client_compliance_records').select('*').eq('tenant_id',tenantId).eq('client_name',clientName)
+      : supabase.from('client_compliance_records').select('*').eq('tenant_id',tenantId).eq('client_id',clientId))
+    const documentsQ=(isLead
+      ? supabase.from('documents').select('*').eq('tenant_id',tenantId).eq('client',clientName)
+      : supabase.from('documents').select('*').eq('tenant_id',tenantId).eq('client_id',clientId)).order('created_at',{ascending:false})
+    const bookkeepingQ=(isLead
+      ? supabase.from('bookkeeping').select('*').eq('tenant_id',tenantId).eq('client_name',clientName)
+      : supabase.from('bookkeeping').select('*').eq('tenant_id',tenantId).eq('client_id',clientId)).order('date',{ascending:false})
+    const paymentsQ=(isLead
+      ? supabase.from('payments').select('*').eq('tenant_id',tenantId).eq('clientName',clientName)
+      : supabase.from('payments').select('*').eq('tenant_id',tenantId).eq('client_id',clientId)).order('created_at',{ascending:false})
+    const notesQ=(isLead
+      ? supabase.from('client_notes').select('*').eq('tenant_id',tenantId).eq('clientname',clientName)
+      : supabase.from('client_notes').select('*').eq('tenant_id',tenantId).eq('client_id',clientId)).eq('visible_to_client',true).order('created_at',{ascending:false})
+    const organizersQ=(isLead
+      ? supabase.from('tax_organizer_responses').select('id,tax_year,status,updated_at').eq('tenant_id',tenantId).eq('client_name',clientName)
+      : supabase.from('tax_organizer_responses').select('id,tax_year,status,updated_at').eq('tenant_id',tenantId).eq('client_id',clientId)).order('tax_year',{ascending:false})
+    const invoicesQ=(isLead
+      ? supabase.from('invoices').select('*').eq('tenant_id',tenantId).eq('clientName',clientName)
+      : supabase.from('invoices').select('*').eq('tenant_id',tenantId).eq('client_id',clientId)).neq('status','Paid').order('created_at',{ascending:false})
+    const smsQ=(isLead
+      ? supabase.from('sms_messages').select('*').eq('tenant_id',tenantId).eq('clientName',clientName)
+      : supabase.from('sms_messages').select('*').eq('tenant_id',tenantId).eq('client_id',clientId)).order('created_at',{ascending:true})
+    const fpQ=(isLead
+      ? supabase.from('client_financial_profiles').select('*').eq('tenant_id',tenantId).eq('client_name',clientName)
+      : supabase.from('client_financial_profiles').select('*').eq('tenant_id',tenantId).eq('client_id',clientId)).maybeSingle()
+    const emailsQ=(isLead
+      ? supabase.from('emails').select('*').eq('tenant_id',tenantId).eq('clientName',clientName)
+      : supabase.from('emails').select('*').eq('tenant_id',tenantId).eq('client_id',clientId)).order('created_at',{ascending:false})
 
-    return new Response(JSON.stringify({
+    const results=await Promise.all([clientRecordQ,complianceQ,documentsQ,bookkeepingQ,paymentsQ,notesQ,organizersQ,invoicesQ,smsQ,fpQ,emailsQ])
+    const firstError=results.find((r:any)=>r.error)?.error
+    if(firstError){console.error('[portal-get-data] scoped query failed',firstError.message);return json({error:'Unable to load portal data'},500)}
+    const [clientRecord,comp,docsData,books,pays,notesData,orgs,invs,sms,fp,emailsData]=results.map((r:any)=>r.data)
+    if(!clientRecord)return json({error:'Portal record not found'},404)
+
+    return json({
       client: clientRecord, isLead,
       compliance: comp || [], documents: docsData || [], bookkeeping: books || [],
       payments: pays || [], notes: notesData || [], organizers: orgs || [],
       invoices: invs || [], sms: sms || [], financialProfile: fp || null,
       emails: emailsData || [],
-    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
-
+    })
   } catch (e) {
     console.error('portal-get-data error:', e)
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    return json({ error: 'Unable to load portal data' },500)
   }
 })
