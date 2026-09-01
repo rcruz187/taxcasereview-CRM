@@ -16,10 +16,15 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const { event, entity_type, entity_name, tenant_id, doc_type } = await req.json()
+    if (req.method !== 'POST') {
+      return new Response(JSON.stringify({ ok: false, error: 'Method not allowed' }), {
+        status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
-    if (!event || !entity_name || !tenant_id) {
-      return new Response(JSON.stringify({ ok: false, error: 'Missing required fields' }), {
+    const { event, esign_id } = await req.json()
+    if (event !== 'esign_signed' || !esign_id) {
+      return new Response(JSON.stringify({ ok: false, error: 'A signed e-sign request is required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
@@ -28,6 +33,24 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
+
+    // Anonymous callers never choose tenant/entity/template inputs. Bind the
+    // workflow trigger to an e-sign row that has actually been finalized.
+    const { data: signedDoc, error: signedErr } = await supabase
+      .from('esigns')
+      .select('id,tenant_id,client_name,doc_type,signed_at,status')
+      .eq('id', String(esign_id))
+      .maybeSingle()
+    if (signedErr || !signedDoc?.tenant_id || !signedDoc?.client_name || !signedDoc?.signed_at) {
+      return new Response(JSON.stringify({ ok: false, error: 'Signed document not found' }), {
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const entity_type = 'client'
+    const entity_name = String(signedDoc.client_name)
+    const tenant_id = String(signedDoc.tenant_id)
+    const doc_type = String(signedDoc.doc_type || '')
 
     // Find matching active templates for this tenant + event
     const { data: templates, error: tmplErr } = await supabase
@@ -44,12 +67,9 @@ serve(async (req) => {
       })
     }
 
-    // Filter by entity_type (support 'both') and trigger_value for esign events
     const matching = templates.filter(t => {
       const typeOk = t.entity_type === entity_type || t.entity_type === 'both'
-      const valueOk = event === 'esign_signed'
-        ? (!t.trigger_value || t.trigger_value === doc_type)
-        : true
+      const valueOk = !t.trigger_value || t.trigger_value === doc_type
       return typeOk && valueOk
     })
 
@@ -59,7 +79,6 @@ serve(async (req) => {
       })
     }
 
-    // Fetch steps
     const ids = matching.map(t => t.id)
     const { data: steps, error: stepsErr } = await supabase
       .from('workflow_steps')
@@ -73,7 +92,6 @@ serve(async (req) => {
       })
     }
 
-    // Look up advisor from clients table, then leads
     let advisorName: string | null = null
     const { data: cRows } = await supabase
       .from('clients').select('assignedTo').eq('name', entity_name)
@@ -87,7 +105,6 @@ serve(async (req) => {
       advisorName = lRows?.[0]?.assignedTo || null
     }
 
-    // Look up associate
     let associateName: string | null = null
     if (steps.some((s: any) => s.assigned_role === 'ASSOCIATE')) {
       const { data: cRows2 } = await supabase
@@ -108,7 +125,6 @@ serve(async (req) => {
       }
     }
 
-    // Build and insert tasks
     const now = new Date()
     const tasks = steps.map((s: any, idx: number) => {
       const due = new Date(now)
@@ -134,19 +150,19 @@ serve(async (req) => {
     const { error: insertErr } = await supabase.from('tasks').insert(tasks)
     if (insertErr) {
       console.error('[trigger-workflow] insert error:', insertErr.message)
-      return new Response(JSON.stringify({ ok: false, error: insertErr.message }), {
+      return new Response(JSON.stringify({ ok: false, error: 'Workflow task creation failed' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    console.log(`[trigger-workflow] "${event}" → ${tasks.length} tasks for "${entity_name}" (tenant ${tenant_id})`)
+    console.log(`[trigger-workflow] "${event}" → ${tasks.length} tasks for signed request ${esign_id}`)
     return new Response(JSON.stringify({ ok: true, tasks_created: tasks.length }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 
   } catch (e) {
-    console.error('[trigger-workflow] unexpected:', e?.message || String(e))
-    return new Response(JSON.stringify({ ok: false, error: e?.message || String(e) }), {
+    console.error('[trigger-workflow] unexpected:', e)
+    return new Response(JSON.stringify({ ok: false, error: 'Workflow trigger failed' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
