@@ -49,3 +49,5 @@ jobs:
           git config user.email "actions@github.com"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           npx gh-pages -d dist --dotfiles -u "GitHub Actions <actions@github.com>"
+
+# deploy trigger: office documents e-sign flow
