@@ -687,51 +687,46 @@ function OfficesList() {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      try {
-        const [{ data: taxresRows, error: taxresError }, { data: { session } }] = await Promise.all([
-          supabase.rpc('admin_tenant_overview'),
-          supabase.auth.getSession(),
-        ])
-        if (taxresError) throw taxresError
-        if (!session?.access_token) throw new Error('Admin session expired')
-
-        const arcvenaResponse = await fetch('https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/hub-proxy', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ product: 'arcvena' }),
-        })
-        const arcvenaData = await arcvenaResponse.json()
-        if (!arcvenaResponse.ok || arcvenaData?.ok === false) {
-          throw new Error(arcvenaData?.error || 'Unable to load Arcvena offices')
-        }
-
-        const arcvenaRows = (arcvenaData.offices || []).map(office => ({
-          id: `arcvena:${office.id}`,
-          source_id: office.id,
-          product: 'arcvena',
-          firm_name: office.name,
-          brand_color: '#00c2ff',
-          employee_count: 0,
-          client_count: 0,
-          storage_bytes: 0,
-          status: office.is_active ? 'active' : 'inactive',
-          plan_tier: 'Arcvena',
-          effective_monthly: Number(office.mrr || 0),
-          last_activity: office.since,
-        }))
-
+      const { data: taxresRows, error: taxresError } = await supabase.rpc('admin_tenant_overview')
+      if (taxresError) {
         if (!cancelled) {
-          setLoadError('')
-          setRows([...(taxresRows || []), ...arcvenaRows])
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setLoadError(error instanceof Error ? error.message : String(error))
+          setLoadError(taxresError.message)
           setRows([])
         }
+        return
+      }
+
+      const baseRows = taxresRows || []
+      if (!cancelled) setRows(baseRows)
+
+      const { data: arcvenaData, error: arcvenaError } = await supabase.functions.invoke('hub-proxy', {
+        body: { product: 'arcvena' },
+      })
+      if (arcvenaError || arcvenaData?.ok === false) {
+        if (!cancelled) {
+          setLoadError('Arcvena offices are temporarily unavailable; existing offices are still shown.')
+        }
+        return
+      }
+
+      const arcvenaRows = (arcvenaData?.offices || []).map(office => ({
+        id: `arcvena:${office.id}`,
+        source_id: office.id,
+        product: 'arcvena',
+        firm_name: office.name,
+        brand_color: '#00c2ff',
+        employee_count: 0,
+        client_count: 0,
+        storage_bytes: 0,
+        status: office.is_active ? 'active' : 'inactive',
+        plan_tier: 'Arcvena',
+        effective_monthly: Number(office.mrr || 0),
+        last_activity: office.since,
+      }))
+
+      if (!cancelled) {
+        setLoadError('')
+        setRows([...baseRows, ...arcvenaRows])
       }
     })()
     return () => { cancelled = true }
@@ -777,7 +772,7 @@ function OfficesList() {
                 </span>
                 <div style={{ fontSize:12, color:'#475569' }}>{fmtAgo(r.last_activity)}</div>
               </div>
-              <button onClick={e=>{e.stopPropagation();navigate(`/crm-admin/offices/${r.id}`)}}
+              <button onClick={e=>{e.stopPropagation();openOffice(r)}}
                 style={{ ...S.btn('ghost'), padding:'6px 14px', fontSize:12, flexShrink:0 }}>Open →</button>
             </div>
           ))}
