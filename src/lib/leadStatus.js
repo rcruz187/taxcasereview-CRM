@@ -1,12 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Lead Pipeline Model Definitions
 //
-// Two models are supported. The active model for a given tenant is stored in
-// settings.lead_workflow_model ('investigation-resolution' | 'direct-resolution').
-// Default for all existing tenants: 'investigation-resolution'.
-//
-// !! DO NOT add direct-resolution stage values here until the exact Nashville
-//    stage sequence has been confirmed and provided. !!
+// The production model is investigation-resolution. A direct-resolution key is
+// reserved for a future Nashville-specific business contract, but it is not an
+// active production pipeline until an exact stage sequence is formally defined.
+// Existing tenants therefore resolve to investigation-resolution.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Model A: Investigation → Resolution (TCR / existing behavior) ────────────
@@ -58,14 +56,16 @@ const INV_RES_CONVERSION_TRIGGER = 'Resolution Fee Paid'
 const INV_RES_CLIENT_PIPELINE_STAGE = 'analysis'
 
 
-// ── Model B: Direct Resolution (Nashville / future) ──────────────────────────
-// !! PLACEHOLDER — do not fill in until exact stage sequence is confirmed !!
-const DIR_RES_STAGES = []       // TODO: Nashville stages
-const DIR_RES_FLOW   = []       // TODO: Nashville UI flow with colors
-const DIR_RES_BADGE  = {}       // TODO: Nashville badge map
-const DIR_RES_CLOSED = ['Converted to Client', 'Dead', 'Do Not Contact']  // tentative
-const DIR_RES_CONVERSION_TRIGGER     = null   // TODO: Nashville trigger status
-const DIR_RES_CLIENT_PIPELINE_STAGE  = null   // TODO: Nashville starting stage
+// ── Reserved model key: Direct Resolution ────────────────────────────────────
+// This model is deliberately unavailable until its business-defined stage
+// contract exists. Empty definitions force getModel() to the production model,
+// preventing a partially defined pipeline from ever becoming active by accident.
+const DIR_RES_STAGES = []
+const DIR_RES_FLOW   = []
+const DIR_RES_BADGE  = {}
+const DIR_RES_CLOSED = ['Converted to Client', 'Dead', 'Do Not Contact']
+const DIR_RES_CONVERSION_TRIGGER     = null
+const DIR_RES_CLIENT_PIPELINE_STAGE  = null
 
 
 // ── Model registry ───────────────────────────────────────────────────────────
@@ -89,10 +89,9 @@ export const PIPELINE_MODELS = {
 }
 
 // Safe model resolver. Falls back to investigation-resolution if model is
-// unknown, null, or the direct-resolution stages haven't been populated yet.
+// unknown, null, or a reserved model does not have a production stage contract.
 export function getModel(modelKey) {
   const m = PIPELINE_MODELS[modelKey]
-  // If the model has no stages yet (placeholder), fall back to inv-res
   if (!m || !m.stages || m.stages.length === 0) {
     return PIPELINE_MODELS['investigation-resolution']
   }
