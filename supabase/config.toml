@@ -163,5 +163,3 @@ verify_jwt = false
 verify_jwt = false
 [functions.romylabs-billing-enforce]
 verify_jwt = false
-[functions.github-credential-check-temp]
-verify_jwt = false
