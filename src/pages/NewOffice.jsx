@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import Papa from 'papaparse'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
+import RomyLabsAgreementPanel from '../components/admin/RomyLabsAgreementPanel'
 
 const PLATFORM_ADMIN_EMAILS = ['romy@taxcasereview.org', 'romy@taxrescrm.net', 'romy@romylabs.com', 'info@romylabs.com']
 const TCR_TENANT = '61a89aef-0e7e-4ea2-b222-44ab2024655a'
@@ -127,15 +128,17 @@ export default function NewOffice() {
     if (!allowed) return
     const prospectId=searchParams.get('prospect_id')
     const agreementId=searchParams.get('agreement_id')
-    if (!prospectId || !agreementId) return
+    if (!prospectId) return
     ;(async()=>{
-      const [{data:prospect,error:pe},{data:agreement,error:ae}] = await Promise.all([
-        supabase.from('prospects').select('*').eq('id',prospectId).maybeSingle(),
-        supabase.from('romylabs_sales_agreements').select('*').eq('id',agreementId).eq('prospect_id',prospectId).maybeSingle(),
-      ])
-      if (pe || ae || !prospect || !agreement) { showToast('❌ Could not load the signed sale'); return }
-      if (agreement.status !== 'signed') { showToast('❌ Agreement must be signed before creating the office'); return }
-      if (agreement.tenant_id) { showToast('This signed sale is already linked to an office'); return }
+      const {data:prospect,error:pe}=await supabase.from('prospects').select('*').eq('id',prospectId).maybeSingle()
+      if (pe || !prospect) { showToast('❌ Could not load the sale'); return }
+      if (prospect.tenant_id) { showToast('This sale is already linked to an office'); return }
+      let agreement=null
+      if (agreementId) {
+        const {data:a,error:ae}=await supabase.from('romylabs_sales_agreements').select('*').eq('id',agreementId).eq('prospect_id',prospectId).maybeSingle()
+        if (ae) { showToast('❌ Could not load agreement'); return }
+        agreement=a
+      }
       setSaleHandoff({prospect,agreement})
       setView('form')
     })()
@@ -247,10 +250,14 @@ function NewOfficeForm({ onDone, onCancel, showToast, prefill }) {
     })
     setSaving(false)
     if (error || data?.error) { showToast('❌ ' + (data?.error || error.message)); return }
-    if (prefill?.agreement?.id && data?.tenant_id) {
-      const {error:linkErr}=await supabase.rpc('admin_romylabs_attach_signed_agreement',{p_agreement_id:prefill.agreement.id,p_tenant_id:data.tenant_id})
-      if (linkErr) showToast('⚠️ Office created, but agreement filing needs attention: ' + linkErr.message)
-      else showToast('✅ Office created from signed sale — agreement filed to Documents')
+    if (prefill?.prospect?.id && data?.tenant_id) {
+      const {error:linkErr}=await supabase.rpc('admin_romylabs_link_prospect_office',{p_prospect_id:prefill.prospect.id,p_tenant_id:data.tenant_id})
+      if (linkErr) showToast('⚠️ Office created, but sale linkage needs attention: ' + linkErr.message)
+      else showToast('✅ Office created from sale — manage agreement from Office Documents')
+    }
+    if (prefill?.agreement?.id && prefill.agreement.status==='signed' && data?.tenant_id) {
+      const {error:fileErr}=await supabase.rpc('admin_romylabs_attach_signed_agreement',{p_agreement_id:prefill.agreement.id,p_tenant_id:data.tenant_id})
+      if (fileErr) showToast('⚠️ Office created, but signed agreement filing needs attention: ' + fileErr.message)
     }
     setResult(data)
   }
@@ -268,7 +275,7 @@ function NewOfficeForm({ onDone, onCancel, showToast, prefill }) {
         <div style={{fontSize:20,fontWeight:800,color:'var(--tx)'}}>New Office</div>
       </div>
       <div style={{color:'var(--t3)',fontSize:13,margin:'8px 0 24px'}}>Stand up a brand-new office on its own isolated tenant.</div>
-      {prefill&&<div style={{margin:'0 0 18px',padding:'12px 14px',borderRadius:9,background:'rgba(16,185,129,.08)',border:'1px solid rgba(16,185,129,.28)',color:'#a7f3d0',fontSize:12,lineHeight:1.6}}><strong>Signed sale handoff</strong><br/>{prefill.prospect?.firm_name} · {prefill.agreement?.seats||1} seats · ${Number(prefill.agreement?.monthly_amount||0).toLocaleString()}/mo · signed by {prefill.agreement?.signed_name||prefill.agreement?.signer_name||'customer'}. Creating this office will permanently link the signed agreement to the office Documents record.</div>}
+      {prefill&&<div style={{margin:'0 0 18px',padding:'12px 14px',borderRadius:9,background:'rgba(16,185,129,.08)',border:'1px solid rgba(16,185,129,.28)',color:'#a7f3d0',fontSize:12,lineHeight:1.6}}><strong>Sale → Office handoff</strong><br/>{prefill.prospect?.firm_name} · {prefill.prospect?.seats||prefill.agreement?.seats||1} seats · ${Number(prefill.prospect?.mrr_potential||prefill.agreement?.monthly_amount||0).toLocaleString()}/mo. Create the office first; then send and manage the agreement from that office's Documents area.</div>}
 
       {result ? (
         <div style={{background:'var(--s2)',border:'1px solid var(--br)',borderRadius:10,padding:20}}>
@@ -333,6 +340,7 @@ function OfficeDetail({ tenantId, onBack, showToast, onImport, onSlackImport }) 
   const [edit, setEdit]     = useState(null) // draft patch while editing
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [officeProspect, setOfficeProspect] = useState(null)
   const [confirmDeactivate, setConfirmDeactivate] = useState(false)
   const [deactivateReason, setDeactivateReason] = useState('')
 
@@ -343,6 +351,9 @@ function OfficeDetail({ tenantId, onBack, showToast, onImport, onSlackImport }) 
     const { data, error } = await supabase.rpc('get_office_detail', { p_tenant_id: tenantId })
     if (error) { showToast('❌ ' + error.message); return }
     setDetail(data)
+    const {data:prospect,error:prospectError}=await supabase.rpc('admin_romylabs_prospect_for_tenant',{p_tenant_id:tenantId})
+    if (prospectError) console.error('Could not load linked sales record:',prospectError)
+    setOfficeProspect(prospect||null)
     setEdit(null)
   }
 
@@ -557,14 +568,21 @@ function OfficeDetail({ tenantId, onBack, showToast, onImport, onSlackImport }) 
         )}
       </Section>
 
-      <Section title="Agreement Files">
-        <div style={{marginBottom:12}}>
+      <Section title="Documents & E-Sign">
+        {officeProspect ? (
+          <div style={{margin:'-16px -16px 16px'}}>
+            <RomyLabsAgreementPanel prospect={officeProspect} supabase={supabase} onChanged={load} />
+          </div>
+        ) : (
+          <div style={{fontSize:12,color:'var(--t3)',marginBottom:14,lineHeight:1.5}}>No linked sales record for this office yet. Agreements created manually can still be uploaded below.</div>
+        )}
+        <div style={{marginBottom:12,paddingTop:12,borderTop:'1px solid var(--br)'}}>
           <label className="btn sec" style={{cursor:'pointer',display:'inline-block'}}>
-            {uploading ? 'Uploading…' : '📎 Upload Agreement'}
+            {uploading ? 'Uploading…' : '📎 Upload Document / Agreement'}
             <input type="file" onChange={handleUpload} disabled={uploading} style={{display:'none'}}/>
           </label>
         </div>
-        {detail.agreements.length === 0 ? <div style={{color:'var(--t3)',fontSize:13}}>No agreement files uploaded yet.</div> : (
+        {detail.agreements.length === 0 ? <div style={{color:'var(--t3)',fontSize:13}}>No office agreement documents yet.</div> : (
           <div style={{display:'flex',flexDirection:'column',gap:6}}>
             {detail.agreements.map(a => (
               <div key={a.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:13,padding:'8px 10px',background:'var(--s2)',borderRadius:6}}>

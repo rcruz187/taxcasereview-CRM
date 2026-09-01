@@ -11,7 +11,6 @@ import { FIRM, loadFirmBranding, loadFirmBrandingPublic } from '../lib/firmBrand
 import { useApp } from '../context/AppContext'
 import AIAssistant from '../components/AIAssistant'
 import RomyLabsBilling from '../components/admin/RomyLabsBilling'
-import RomyLabsAgreementPanel from '../components/admin/RomyLabsAgreementPanel'
 import TrafficCoverage from '../components/admin/TrafficCoverage'
 import CredentialVault from '../components/admin/CredentialVault'
 const AdminChatPage = lazy(() => import('./AdminChat'))
@@ -3339,11 +3338,12 @@ function SalesPipeline({ data, supabase, registryProducts }) {
                 style={{ ...S.btn('ghost'), fontSize:10, padding:'5px 10px', color:'#ef4444', border:'1px solid rgba(239,68,68,.2)' }}>Delete</button>
             </div>
 
-            <RomyLabsAgreementPanel
-              prospect={selected}
-              supabase={supabase}
-              onChanged={async()=>{ await reload(); if(selected) await loadActivities(selected.id) }}
-            />
+            <div style={{padding:'12px 18px',borderBottom:'1px solid rgba(99,102,241,.08)'}}>
+              <div style={{fontSize:9,fontWeight:800,color:'#334155',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:7}}>Office Onboarding</div>
+              {selected?.tenant_id
+                ? <div style={{fontSize:10,color:'#10b981',fontWeight:700}}>✓ Office created — agreements are managed from Offices → Documents</div>
+                : <button onClick={()=>window.location.assign(`/crm-admin/provision?prospect_id=${selected.id}`)} style={{padding:'7px 11px',borderRadius:7,border:'none',background:'#10b981',color:'#052e16',fontSize:10,fontWeight:900,cursor:'pointer'}}>🏢 Create New Office from Sale</button>}
+            </div>
 
             {/* Activity log */}
             <div style={{ padding:'12px 18px', maxHeight:280, overflowY:'auto' }}>
