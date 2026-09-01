@@ -3,7 +3,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
 const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY')!
+const OWNER_EMAILS=new Set(['romy@taxrescrm.net','romy@romylabs.com','romy@taxcasereview.org','info@romylabs.com'])
+const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}})
 
 const BRAND_VOICE = `You are writing content for TaxRes CRM — a purpose-built CRM for tax resolution firms.
 Audience: Licensed Enrolled Agents (EAs), CPAs, and tax attorneys who represent clients before the IRS.
@@ -34,7 +37,6 @@ const ARCHETYPES = [
   { name:'Keisha', trade:'freelance healthcare consultant', county:'Fulton County, GA', debt:'$38,000', problem:'W-2 to 1099 transition' },
   { name:'Carlos', trade:'solar installation owner', county:'Maricopa County, AZ', debt:'$62,000', problem:'1099 subs reclassified as W-2' },
 ]
-
 const LINKEDIN_ROTATIONS = [
   'Educational: IRS workflow tip practitioners rarely discuss',
   'Product walkthrough: a specific TaxRes CRM feature in a real use case',
@@ -44,63 +46,41 @@ const LINKEDIN_ROTATIONS = [
   'Case type breakdown: how to handle a specific IRS notice type',
 ]
 
+async function authorized(req:Request,sb:any){
+  const auth=req.headers.get('authorization')||''
+  if(SUPABASE_SERVICE_KEY&&auth===`Bearer ${SUPABASE_SERVICE_KEY}`)return true
+  const cron=req.headers.get('x-internal-cron-token')||''
+  if(cron){const{data,error}=await sb.rpc('verify_internal_cron_token',{provided:cron});if(!error&&data===true)return true}
+  if(!auth.toLowerCase().startsWith('bearer ')||!SUPABASE_ANON_KEY)return false
+  const uc=createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{global:{headers:{Authorization:auth}},auth:{persistSession:false}})
+  const{data:{user}}=await uc.auth.getUser()
+  return !!user?.email&&OWNER_EMAILS.has(user.email.toLowerCase())
+}
+
 async function callClaude(prompt: string, system: string = BRAND_VOICE, maxTokens = 800): Promise<string> {
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${GROQ_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
-      max_tokens: maxTokens,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: prompt },
-      ],
-    }),
-  })
-  const data = await res.json()
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', { method:'POST', headers:{'Authorization':`Bearer ${GROQ_API_KEY}`,'Content-Type':'application/json'}, body:JSON.stringify({model:'llama-3.3-70b-versatile',max_tokens:maxTokens,messages:[{role:'system',content:system},{role:'user',content:prompt}]}) })
+  const data = await res.json(); if(!res.ok)throw new Error(data?.error?.message||`Generation failed (${res.status})`)
   return data.choices?.[0]?.message?.content || ''
 }
 
 serve(async (req) => {
+  if(req.method!=='POST')return json({error:'Method not allowed'},405)
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+  if(!await authorized(req,supabase))return json({error:'Unauthorized'},401)
   const body = await req.json().catch(() => ({}))
   const { useCrmData, regenerateType, regenerateId, scoreOnly, contentType } = body
 
-  // ── Score-only mode ──────────────────────────────────────────────────────
   if (scoreOnly && body.body) {
-    const scoreText = await callClaude(`
-Score this ${contentType || 'content'} draft on four dimensions. Return ONLY valid JSON, no other text:
-{"Educational Value": <1-5>, "Engagement Potential": <1-5>, "SEO Potential": <1-5>, "Conversion Potential": <1-5>}
-
-Content to score:
-${body.body.slice(0, 1200)}
-`, BRAND_VOICE, 100)
-    try {
-      const scores = JSON.parse(scoreText.trim())
-      return new Response(JSON.stringify({ ok: true, scores }), { headers: { 'Content-Type': 'application/json' } })
-    } catch {
-      return new Response(JSON.stringify({ ok: true, scores: { 'Educational Value':4,'Engagement Potential':3,'SEO Potential':4,'Conversion Potential':3 } }), { headers: { 'Content-Type': 'application/json' } })
-    }
+    const scoreText = await callClaude(`Score this ${contentType || 'content'} draft on four dimensions. Return ONLY valid JSON, no other text:\n{"Educational Value": <1-5>, "Engagement Potential": <1-5>, "SEO Potential": <1-5>, "Conversion Potential": <1-5>}\n\nContent to score:\n${String(body.body).slice(0, 1200)}`, BRAND_VOICE, 100)
+    try { return json({ ok:true, scores:JSON.parse(scoreText.trim()) }) } catch { return json({ok:true,scores:{'Educational Value':4,'Engagement Potential':3,'SEO Potential':4,'Conversion Potential':3}}) }
   }
 
-  const weekOf = new Date()
-  weekOf.setDate(weekOf.getDate() - weekOf.getDay() + 1)
-  const weekOfStr = weekOf.toISOString().slice(0, 10)
-
-  // Check if already generated (unless force or regenerating one)
+  const weekOf = new Date(); weekOf.setDate(weekOf.getDate() - weekOf.getDay() + 1); const weekOfStr = weekOf.toISOString().slice(0, 10)
   if (!regenerateType && !req.headers.get('x-force-regenerate')) {
     const { data: existing } = await supabase.from('content_drafts').select('id').eq('week_of', weekOfStr).limit(1)
-    if (existing && existing.length > 0) {
-      return new Response(JSON.stringify({ ok: true, message: 'Already generated this week', weekOf: weekOfStr }), {
-        headers: { 'Content-Type': 'application/json' }
-      })
-    }
+    if (existing?.length) return json({ok:true,message:'Already generated this week',weekOf:weekOfStr})
   }
 
-  // ── CRM activity context ─────────────────────────────────────────────────
   let crmContext = ''
   if (useCrmData !== false) {
     const [{ data: recentCases }, { data: recentPayments }, { data: recentLeads }] = await Promise.all([
@@ -108,66 +88,30 @@ ${body.body.slice(0, 1200)}
       supabase.from('payments').select('amount, status, created_at').eq('status','succeeded').gte('created_at', new Date(Date.now()-30*86400000).toISOString()).limit(20),
       supabase.from('leads').select('status, created_at').gte('created_at', new Date(Date.now()-30*86400000).toISOString()).limit(30),
     ])
-
-    const statusCounts: Record<string,number> = {}
-    for (const c of recentCases || []) {
-      statusCounts[c.status] = (statusCounts[c.status]||0) + 1
-    }
-    const totalRevenue = (recentPayments||[]).reduce((s,p)=>s+Number(p.amount||0),0)
-    const topStatuses = Object.entries(statusCounts).sort((a,b)=>b[1]-a[1]).slice(0,5)
-
-    if (topStatuses.length > 0) {
-      crmContext = `\n\nRECENT CRM ACTIVITY (last 30 days, use to make content feel authentic — anonymize all):
-Cases by status: ${topStatuses.map(([s,n])=>`${n} ${s}`).join(', ')}
-New leads: ${(recentLeads||[]).length}
-Revenue collected: $${totalRevenue.toLocaleString('en-US',{maximumFractionDigits:0})}
-Use this data to write specific, authentic content. For example: "This month, firms using TaxRes CRM resolved X payment plans" — never name specific clients.`
-    }
+    const statusCounts: Record<string,number> = {}; for (const c of recentCases || []) statusCounts[c.status] = (statusCounts[c.status]||0)+1
+    const totalRevenue=(recentPayments||[]).reduce((s,p)=>s+Number(p.amount||0),0),topStatuses=Object.entries(statusCounts).sort((a,b)=>b[1]-a[1]).slice(0,5)
+    if(topStatuses.length)crmContext=`\n\nRECENT CRM ACTIVITY (last 30 days, anonymize all):\nCases by status: ${topStatuses.map(([s,n])=>`${n} ${s}`).join(', ')}\nNew leads: ${(recentLeads||[]).length}\nRevenue collected: $${totalRevenue.toLocaleString('en-US',{maximumFractionDigits:0})}`
   }
-
-  // ── Keyword/page context ─────────────────────────────────────────────────
   const { data: keywords } = await supabase.from('marketing_gsc_performance').select('query,clicks,position').not('query','is',null).order('clicks',{ascending:false}).limit(10)
-  const topKeywords = (keywords||[]).map(k=>k.query).join(', ') || 'tax resolution CRM, IRS case management software, Canopy alternative, tax resolution software'
+  const topKeywords=(keywords||[]).map(k=>k.query).join(', ')||'tax resolution CRM, IRS case management software, Canopy alternative, tax resolution software'
+  const weekNum=Math.floor(Date.now()/(7*86400000)),archetype=ARCHETYPES[weekNum%ARCHETYPES.length],rotation=LINKEDIN_ROTATIONS[weekNum%LINKEDIN_ROTATIONS.length]
+  const context=`Week of: ${weekOfStr}\nTop SEO keywords: ${topKeywords}\nArchetype for this week: ${archetype.name}, ${archetype.trade}, ${archetype.county}, owes ${archetype.debt}, issue: ${archetype.problem}\nLinkedIn rotation: ${rotation}${crmContext}`
 
-  const weekNum = Math.floor(Date.now() / (7 * 86400000))
-  const archetype = ARCHETYPES[weekNum % ARCHETYPES.length]
-  const rotation = LINKEDIN_ROTATIONS[weekNum % LINKEDIN_ROTATIONS.length]
-
-  const context = `Week of: ${weekOfStr}
-Top SEO keywords: ${topKeywords}
-Archetype for this week: ${archetype.name}, ${archetype.trade}, ${archetype.county}, owes ${archetype.debt}, issue: ${archetype.problem}
-LinkedIn rotation: ${rotation}${crmContext}`
-
-  // ── Single regenerate mode ───────────────────────────────────────────────
   if (regenerateType && regenerateId) {
-    let newBody = ''
-    if (regenerateType === 'linkedin') newBody = await generateLinkedIn(context, rotation)
-    else if (regenerateType === 'article_idea') newBody = await generateArticle(context, topKeywords)
-    else if (regenerateType === 'email') newBody = await generateEmail(context)
-    else if (regenerateType === 'edu_tip') newBody = await generateEduTip(context)
-    else if (regenerateType === 'outreach') newBody = await generateOutreach(context, OUTREACH_TARGETS[weekNum % 3])
-
-    if (newBody) {
-      await supabase.from('content_drafts').update({ body: newBody, status:'draft', updated_at: new Date().toISOString() }).eq('id', regenerateId)
-    }
-    return new Response(JSON.stringify({ ok: true, regenerated: true }), { headers: { 'Content-Type': 'application/json' } })
+    let newBody=''; if(regenerateType==='linkedin')newBody=await generateLinkedIn(context,rotation);else if(regenerateType==='article_idea')newBody=await generateArticle(context,topKeywords);else if(regenerateType==='email')newBody=await generateEmail(context);else if(regenerateType==='edu_tip')newBody=await generateEduTip(context);else if(regenerateType==='outreach')newBody=await generateOutreach(context,OUTREACH_TARGETS[weekNum%3])
+    if(newBody)await supabase.from('content_drafts').update({body:newBody,status:'draft',updated_at:new Date().toISOString()}).eq('id',regenerateId)
+    return json({ok:true,regenerated:true})
   }
 
-  // ── Full weekly generation ───────────────────────────────────────────────
-  const drafts = await Promise.all([
-    generateLinkedIn(context, rotation).then(body => ({ content_type:'linkedin', title:`LinkedIn Post — Week of ${weekOfStr}`, body, week_of:weekOfStr, status:'draft' })),
-    generateArticle(context, topKeywords).then(body => ({ content_type:'article_idea', title:`Article Idea — Week of ${weekOfStr}`, body, week_of:weekOfStr, status:'draft' })),
-    generateEmail(context).then(body => ({ content_type:'email', title:`Newsletter — Week of ${weekOfStr}`, body, week_of:weekOfStr, status:'draft' })),
-    generateEduTip(context).then(body => ({ content_type:'edu_tip', title:`Education Tip — Week of ${weekOfStr}`, body, week_of:weekOfStr, status:'draft' })),
-    ...OUTREACH_TARGETS.map((t,i) => generateOutreach(context, t).then(body => ({
-      content_type:'outreach', title:`Outreach — ${t.label}`, body, week_of:weekOfStr, status:'draft', metadata: { target:t.target, pain:t.pain }
-    }))),
+  const drafts=await Promise.all([
+    generateLinkedIn(context,rotation).then(body=>({content_type:'linkedin',title:`LinkedIn Post — Week of ${weekOfStr}`,body,week_of:weekOfStr,status:'draft'})),
+    generateArticle(context,topKeywords).then(body=>({content_type:'article_idea',title:`Article Idea — Week of ${weekOfStr}`,body,week_of:weekOfStr,status:'draft'})),
+    generateEmail(context).then(body=>({content_type:'email',title:`Newsletter — Week of ${weekOfStr}`,body,week_of:weekOfStr,status:'draft'})),
+    generateEduTip(context).then(body=>({content_type:'edu_tip',title:`Education Tip — Week of ${weekOfStr}`,body,week_of:weekOfStr,status:'draft'})),
+    ...OUTREACH_TARGETS.map(t=>generateOutreach(context,t).then(body=>({content_type:'outreach',title:`Outreach — ${t.label}`,body,week_of:weekOfStr,status:'draft',metadata:{target:t.target,pain:t.pain}})))
   ])
-
-  const { error } = await supabase.from('content_drafts').insert(drafts)
-  if (error) return new Response(JSON.stringify({ ok:false, error }), { status:500, headers: {'Content-Type':'application/json'} })
-
-  return new Response(JSON.stringify({ ok:true, weekOf:weekOfStr, drafts:drafts.length }), { headers: {'Content-Type':'application/json'} })
+  const{error}=await supabase.from('content_drafts').insert(drafts);if(error)return json({ok:false,error:'Draft storage failed'},500)
+  return json({ok:true,weekOf:weekOfStr,drafts:drafts.length})
 })
 
 const OUTREACH_TARGETS = [
@@ -175,23 +119,8 @@ const OUTREACH_TARGETS = [
   { label:'CPA firm with spreadsheets', target:'CPA firm with a resolution department using spreadsheets', pain:'no centralized case tracking, documents scattered across email' },
   { label:'Solo EA building practice', target:'Solo EA building a resolution practice after passing representation exam', pain:'no purpose-built tool, using generic CRM that does not understand IRS workflows' },
 ]
-
-async function generateLinkedIn(context: string, rotation: string): Promise<string> {
-  return callClaude(`${context}\n\nWrite a LinkedIn post for TaxRes CRM. This week's angle: ${rotation}\n\nRequirements:\n- 120-160 words\n- Open with a specific data point, practitioner scenario, or contrarian insight — NOT a generic opener\n- One concrete insight or workflow tip tied to a TaxRes CRM capability\n- End with a question inviting comments OR "Book a demo at taxrescrm.net"\n- 4 hashtags: #TaxResolution #EnrolledAgent #IRSHelp #TaxPro\n- Do NOT start with "I", "Are you", or "Did you know"\n- Peer-to-peer tone, not salesy`, 600)
-}
-
-async function generateArticle(context: string, keywords: string): Promise<string> {
-  return callClaude(`${context}\n\nGenerate ONE Resource Center article idea for taxrescrm.net/resources targeting tax resolution firm owners.\n\nReturn exactly:\nTITLE: [title]\nKEYWORD: [primary keyword]\nANGLE: [one sentence — what makes this useful that other articles miss]\nOUTLINE:\n- [section 1]\n- [section 2]\n- [section 3]\n- [section 4]\n- [section 5]\nCTA: [link page]\n\nTop keywords to consider: ${keywords}`, 500)
-}
-
-async function generateEmail(context: string): Promise<string> {
-  return callClaude(`${context}\n\nWrite a weekly email newsletter for TaxRes CRM subscribers (tax resolution practitioners).\n\nSUBJECT: [max 8 words, practitioner-focused]\nPREVIEW: [40-60 chars]\n\n---\n\n[200-280 word email body]\n- Opening: one specific thing this week (IRS update or product improvement)\n- Feature spotlight: one TaxRes CRM feature in concrete workflow terms\n- Quick tip: one IRS process tip usable today\n- Close: direct, not a hard sell\n- CTA: demo at taxrescrm.net OR reply with a question\n\nSign: Romy Cruz, EA | TaxRes CRM | taxrescrm.net`, 700)
-}
-
-async function generateEduTip(context: string): Promise<string> {
-  return callClaude(`${context}\n\nWrite ONE customer education tip for tax resolution practitioners using TaxRes CRM.\n\nTIP TITLE: [action-oriented, max 8 words]\nTIP BODY: [60-80 words — specific, actionable, tied to a real TaxRes CRM workflow or IRS process]\nUSE CASE: [one sentence — when to show this tip]`, 300)
-}
-
-async function generateOutreach(context: string, target: { target: string, pain: string, label: string }): Promise<string> {
-  return callClaude(`${context}\n\nWrite a cold outreach message for TaxRes CRM.\n\nTarget: ${target.target}\nPain point: ${target.pain}\n\n- 80-110 words\n- LinkedIn DM or cold email format\n- Open with their pain point or a scenario they immediately recognize\n- One sentence about TaxRes CRM — what it does, not what it "is"\n- CTA: offer a 20-minute demo or free trial\n- Sign: Romy, TaxRes CRM | taxrescrm.net\n\nDo NOT say: "I hope this message finds you well", "I wanted to reach out", "game-changer"`, 400)
-}
+async function generateLinkedIn(context:string,rotation:string){return callClaude(`${context}\n\nWrite a LinkedIn post for TaxRes CRM. This week's angle: ${rotation}\nRequirements: 120-160 words; specific opener; one concrete workflow insight; end with a question or Book a demo at taxrescrm.net; hashtags #TaxResolution #EnrolledAgent #IRSHelp #TaxPro.`,BRAND_VOICE,600)}
+async function generateArticle(context:string,keywords:string){return callClaude(`${context}\n\nGenerate ONE Resource Center article idea. Return TITLE, KEYWORD, ANGLE, five-section OUTLINE, CTA. Top keywords: ${keywords}`,BRAND_VOICE,500)}
+async function generateEmail(context:string){return callClaude(`${context}\n\nWrite a weekly email newsletter for TaxRes CRM subscribers, 200-280 words, specific practitioner content and a direct CTA. Sign Romy Cruz, EA | TaxRes CRM | taxrescrm.net`,BRAND_VOICE,700)}
+async function generateEduTip(context:string){return callClaude(`${context}\n\nWrite ONE customer education tip: TIP TITLE, 60-80 word TIP BODY, USE CASE.`,BRAND_VOICE,300)}
+async function generateOutreach(context:string,target:{target:string,pain:string,label:string}){return callClaude(`${context}\n\nWrite an 80-110 word cold outreach message for ${target.target}. Pain: ${target.pain}. Offer a 20-minute demo or free trial. Sign Romy, TaxRes CRM | taxrescrm.net.`,BRAND_VOICE,400)}
