@@ -1,0 +1,8 @@
+{
+  "name": "taxrescrm-static-output",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "node -e \"const fs=require('fs'),p=require('path');fs.rmSync('dist',{recursive:true,force:true});fs.mkdirSync('dist');for(const n of fs.readdirSync('.')){if(['dist','node_modules','.git','package-lock.json'].includes(n))continue;fs.cpSync(n,p.join('dist',n),{recursive:true})}console.log('Static site staged into dist for Cloudflare.')\""
+  }
+}
