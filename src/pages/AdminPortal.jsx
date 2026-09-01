@@ -256,6 +256,63 @@ function Overview() {
   )
 }
 
+function ArcvenaOfficePage() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const officeId = String(id || '').replace(/^arcvena:/, '')
+  const [office,setOffice] = useState(null)
+  const [loading,setLoading] = useState(true)
+  const [error,setError] = useState('')
+
+  useEffect(() => {
+    let cancelled=false
+    ;(async()=>{
+      setLoading(true); setError('')
+      const {data,error:invokeError}=await supabase.functions.invoke('hub-proxy',{body:{product:'arcvena'}})
+      if(cancelled) return
+      if(invokeError || data?.ok===false){
+        setError(invokeError?.message || data?.error || 'Unable to load Arcvena office')
+        setLoading(false)
+        return
+      }
+      const match=(data?.offices||[]).find(o=>String(o.id)===officeId)
+      if(!match){ setError('Arcvena office not found'); setLoading(false); return }
+      setOffice(match); setLoading(false)
+    })()
+    return()=>{cancelled=true}
+  },[officeId])
+
+  if(loading) return <Spinner/>
+  if(error) return <div style={{padding:32}}><button onClick={()=>navigate('/crm-admin/offices')} style={S.btn('ghost')}>← Offices</button><div style={{marginTop:18,color:'#fca5a5'}}>{error}</div></div>
+
+  const kv=[['Product','Arcvena'],['Status',office.status||'active'],['Office ID',office.id],['Created',office.since?fmtDate(office.since):'—']]
+  return (
+    <div style={{padding:'28px 36px',maxWidth:1100}}>
+      <button onClick={()=>navigate('/crm-admin/offices')} style={{...S.btn('ghost'),marginBottom:18}}>← All Offices</button>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,marginBottom:22}}>
+        <div>
+          <div style={{fontSize:11,color:'#8b5cf6',fontWeight:800,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:5}}>Arcvena Office</div>
+          <div style={{fontSize:28,fontWeight:900,color:'#fff'}}>{office.name||'Arcvena Office'}</div>
+          <div style={{fontSize:13,color:'#64748b',marginTop:4}}>You are inside this office only.</div>
+        </div>
+        <button onClick={()=>window.open('https://app.arcvena.com/','_blank','noopener,noreferrer')} style={S.btn('primary')}>Open Arcvena CRM ↗</button>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12,marginBottom:22}}>
+        {kv.map(([label,value])=><div key={label} style={{...S.card,padding:'16px 18px'}}><div style={{fontSize:10,fontWeight:800,color:'#475569',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6}}>{label}</div><div style={{fontSize:14,fontWeight:700,color:'#e2e8f0',wordBreak:'break-word'}}>{String(value??'—')}</div></div>)}
+      </div>
+      <div style={{...S.card,padding:'20px 22px'}}>
+        <div style={{fontSize:13,fontWeight:800,color:'#e2e8f0',marginBottom:8}}>Office Workspace</div>
+        <div style={{fontSize:12,color:'#64748b',lineHeight:1.6}}>This is the isolated RomyLabs office view for this Arcvena tenant. It no longer redirects to the generic Arcvena app when you click the office.</div>
+      </div>
+    </div>
+  )
+}
+
+function OfficePageRouter(){
+  const {id}=useParams()
+  return String(id||'').startsWith('arcvena:') ? <ArcvenaOfficePage/> : <OfficePage/>
+}
+
 // ── Per-Office Deep Dive ─────────────────────────────────────────────────────
 function OfficePage() {
   const { id } = useParams()
@@ -733,10 +790,6 @@ function OfficesList() {
   }, [])
 
   function openOffice(row) {
-    if (row.product === 'arcvena') {
-      window.location.assign('https://app.arcvena.com/')
-      return
-    }
     navigate(`/crm-admin/offices/${row.id}`)
   }
   return (
@@ -6365,7 +6418,7 @@ export default function AdminPortal() {
             <Route path="/linkedin/callback" element={<AdminRouteErrorBoundary><LinkedInPublisher/></AdminRouteErrorBoundary>}/>
             <Route index                   element={<Overview key={window.location.pathname + window.location.search}/>}/>
             <Route path="/offices"        element={<OfficesList/>}/>
-            <Route path="/offices/:id"    element={<OfficePage/>}/>
+            <Route path="/offices/:id"    element={<OfficePageRouter/>}/>
             <Route path="/provision"      element={<div style={{padding:8}}><NewOffice/></div>}/>
             <Route path="/billing"        element={<AdminRouteErrorBoundary><RomyLabsBilling/></AdminRouteErrorBoundary>}/>
             <Route path="/search"         element={<Search/>}/>
