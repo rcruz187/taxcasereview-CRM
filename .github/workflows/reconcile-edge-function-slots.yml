@@ -1,0 +1,59 @@
+name: Reconcile Edge Function Slots
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/reconcile-edge-function-slots.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: mpxgxfqdbquzkrvvejkh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Remove retired production aliases
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          for fn in smooth-function turn-credentials- portal-login-source nash-client-reconcile-temp github-credential-check-temp; do
+            code=$(curl -sS -o /tmp/delete.json -w '%{http_code}' -X DELETE \
+              -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+              "https://api.supabase.com/v1/projects/$PROJECT_REF/functions/$fn")
+            if [ "$code" != "200" ] && [ "$code" != "404" ]; then
+              echo "Delete failed for $fn: HTTP $code"
+              cat /tmp/delete.json
+              exit 1
+            fi
+            echo "Retired $fn (HTTP $code)"
+          done
+      - name: Deploy canonical inbound and billing functions
+        shell: bash
+        run: |
+          set -euo pipefail
+          for fn in romylabs-inbound-email romylabs-billing-cycle romylabs-billing-notify romylabs-billing-payment romylabs-billing-enforce; do
+            test -f "supabase/functions/$fn/index.ts"
+            supabase functions deploy "$fn" --project-ref "$PROJECT_REF" --no-verify-jwt --use-api
+          done
+      - name: Verify canonical functions exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase functions list --project-ref "$PROJECT_REF" > /tmp/functions.txt
+          for fn in romylabs-inbound-email romylabs-billing-cycle romylabs-billing-notify romylabs-billing-payment romylabs-billing-enforce; do
+            grep -q "$fn" /tmp/functions.txt || { echo "Missing $fn after deploy"; cat /tmp/functions.txt; exit 1; }
+          done
+          for fn in smooth-function turn-credentials- portal-login-source nash-client-reconcile-temp github-credential-check-temp; do
+            if grep -q "$fn" /tmp/functions.txt; then echo "Retired function still present: $fn"; exit 1; fi
+          done
