@@ -2203,6 +2203,7 @@ function ArcvenaOfficeOnboarding({ supabase, onCreated }) {
 
   async function createOffice(e) {
     e.preventDefault()
+    const action = e.nativeEvent?.submitter?.value === 'stage' ? 'stage' : 'invite'
     setSaving(true)
     setError('')
     setResult(null)
@@ -2218,7 +2219,7 @@ function ArcvenaOfficeOnboarding({ supabase, onCreated }) {
         },
         body: JSON.stringify({
           action: 'onboard_arcvena',
-          payload: { ...form, monthly_rate_cents: Math.round(Number(form.monthly_rate_dollars || 0) * 100) },
+          payload: { ...form, action, monthly_rate_cents: Math.round(Number(form.monthly_rate_dollars || 0) * 100) },
         }),
       })
       const data = await response.json()
@@ -2245,7 +2246,7 @@ function ArcvenaOfficeOnboarding({ supabase, onCreated }) {
         <div>
           <div style={{ fontSize:13, fontWeight:900, color:'#fff' }}>⚡ Create New Arcvena Office</div>
           <div style={{ fontSize:10, color:'#64748b', marginTop:3 }}>
-            Creates an isolated tenant, subscription, Owner membership, defaults, and invitation.
+            Save an inactive draft without email, or create the office and invite its Owner.
           </div>
         </div>
         <span style={{ fontSize:9, color:'#10b981', background:'rgba(16,185,129,.1)', padding:'4px 8px', borderRadius:10 }}>
@@ -2256,10 +2257,10 @@ function ArcvenaOfficeOnboarding({ supabase, onCreated }) {
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
           <input required value={form.company_name} onChange={e=>field('company_name',e.target.value)}
             placeholder="Company legal name" style={inputStyle} />
-          <input required value={form.owner_name} onChange={e=>field('owner_name',e.target.value)}
-            placeholder="Owner full name" style={inputStyle} />
-          <input required type="email" value={form.owner_email} onChange={e=>field('owner_email',e.target.value)}
-            placeholder="Owner business email" style={inputStyle} />
+          <input value={form.owner_name} onChange={e=>field('owner_name',e.target.value)}
+            placeholder="Owner full name (required to invite)" style={inputStyle} />
+          <input type="email" value={form.owner_email} onChange={e=>field('owner_email',e.target.value)}
+            placeholder="Owner business email (required to invite)" style={inputStyle} />
           <select value={form.timezone} onChange={e=>field('timezone',e.target.value)} style={inputStyle}>
             <option value="America/New_York">Eastern Time</option>
             <option value="America/Chicago">Central Time</option>
@@ -2283,14 +2284,23 @@ function ArcvenaOfficeOnboarding({ supabase, onCreated }) {
         {error && <div style={{ color:'#f87171', fontSize:11, marginTop:10 }}>{error}</div>}
         {result && (
           <div style={{ color:'#34d399', fontSize:11, marginTop:10 }}>
-            Office created. Owner invitation sent to {result.owner_email}. Tenant: {result.tenant_id}
+            {result.invitation_sent
+              ? `Office active. Owner invitation sent to ${result.owner_email}. Tenant: ${result.tenant_id}`
+              : `Draft saved. No email sent and no trial started. Tenant: ${result.tenant_id}`}
           </div>
         )}
-        <button type="submit" disabled={saving}
-          style={{ marginTop:12, background:'#8b5cf6', color:'#fff', border:'none', borderRadius:8,
-            padding:'9px 16px', fontSize:12, fontWeight:800, cursor:saving?'wait':'pointer', opacity:saving ? .65 : 1 }}>
-          {saving ? 'Creating isolated office…' : 'Create Office & Send Owner Invite'}
-        </button>
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:12 }}>
+          <button type="submit" value="stage" disabled={saving}
+            style={{ background:'rgba(139,92,246,.12)', color:'#c4b5fd', border:'1px solid rgba(139,92,246,.35)', borderRadius:8,
+              padding:'9px 16px', fontSize:12, fontWeight:800, cursor:saving?'wait':'pointer', opacity:saving ? .65 : 1 }}>
+            {saving ? 'Working…' : 'Save as Draft — No Email'}
+          </button>
+          <button type="submit" value="invite" disabled={saving || !form.owner_name.trim() || !form.owner_email.trim()}
+            style={{ background:'#8b5cf6', color:'#fff', border:'none', borderRadius:8,
+              padding:'9px 16px', fontSize:12, fontWeight:800, cursor:saving?'wait':'pointer', opacity:(saving || !form.owner_name.trim() || !form.owner_email.trim()) ? .65 : 1 }}>
+            {saving ? 'Working…' : 'Create Office & Send Owner Invite'}
+          </button>
+        </div>
       </form>
     </div>
   )
