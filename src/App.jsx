@@ -358,7 +358,7 @@ function AuthRouter() {
 
   // Public routes must render immediately — never block them on the auth check.
   // /book, /sign, /portal etc are anonymous; showing a spinner loses prospects.
-  const publicPaths = ['/book', '/sign', '/agreement', '/portal', '/clockin', '/kiosk',
+  const publicPaths = ['/book', '/sign', '/agreement', '/office-sign', '/portal', '/clockin', '/kiosk',
     '/employee', '/meet', '/screenshare', '/screenshare-host', '/financial-intake', '/organizer']
   const isPublicPath = publicPaths.some(p => path.startsWith(p))
 
