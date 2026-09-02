@@ -31,11 +31,29 @@ for (const path of ['src/pages/Leads.jsx', 'src/pages/Clients.jsx']) {
     "resData?.success",
     "Fax provider rejected the send",
     "faxDigits.length !== 10",
+    "telnyx_fax_id",
+    "signalwire_fax_id",
   ])
   if (src.includes("signalwire_backend+'/fax/send")) {
     console.error(`ERROR: ${path} reverted to legacy inline fax backend.`)
     process.exit(1)
   }
+  if (src.includes('provider_sid:')) {
+    console.error(`ERROR: ${path} writes non-existent fax_logs.provider_sid.`)
+    process.exit(1)
+  }
 }
+
+requireAll('supabase/functions/send-fax/index.ts', [
+  "return json({ success: true, provider, sid:",
+])
+
+requireAll('src/lib/i18n.js', [
+  "'+ New Event': '+ Nuevo evento'",
+  "'Save Event': 'Guardar evento'",
+  "'Track IRS deadlines, CSED dates, and compliance due dates.': 'Controle vencimientos del IRS, fechas CSED y fechas de cumplimiento.'",
+  "'Deadline Name *': 'Nombre del vencimiento *'",
+  "'faltan $1 d'",
+])
 
 console.log('Critical workflow invariants: PASS')
