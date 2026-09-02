@@ -31,6 +31,7 @@ on:
       - 'supabase/migrations/**'
       - 'scripts/certify-production-capacity.mjs'
       - 'scripts/certify-production-capacity-100.mjs'
+      - 'scripts/certify-three-tenant-isolation.mjs'
       - 'package.json'
       - 'package-lock.json'
       - 'vite.config.js'
@@ -92,11 +93,17 @@ jobs:
       - name: Run controlled 100 employee production certification
         run: node scripts/certify-production-capacity-100.mjs
 
+      - name: Prove Tax Case Review / Nashville / CloudCPA tenant isolation
+        if: success()
+        run: node scripts/certify-three-tenant-isolation.mjs
+
       - name: Upload certification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: tcr-100-employee-production-capacity-${{ github.sha }}
-          path: artifacts/production-capacity-certification.json
+          path: |
+            artifacts/production-capacity-certification.json
+            artifacts/three-tenant-isolation-certification.json
           if-no-files-found: warn
           retention-days: 30
