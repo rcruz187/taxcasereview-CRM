@@ -1,6 +1,7 @@
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useApp } from '../context/AppContext'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
 import TaxDocParser from '../components/TaxDocParser'
 import { generateTaxReturnPdf, downloadTaxReturnPdf } from '../lib/taxReturnPdf'
@@ -159,6 +160,7 @@ function fmt(n) {
 }
 
 export default function TaxReturns() {
+  const { user } = useApp()
   const [returns, setReturns]   = useState([])
   const [clients, setClients]   = useState([])
   const [employees, setEmployees] = useState([])

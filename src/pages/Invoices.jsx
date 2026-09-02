@@ -31,6 +31,7 @@ function SBdg({s}) {
 }
 
 export default function Invoices() {
+  const { user } = useApp()
   const [items,    setItems]    = useState([])
   const [clients,  setClients]  = useState([])
     const [modal,    setModal]    = useState(false)
@@ -182,16 +183,22 @@ Please contact our office with any questions.`
   }
 
   async function recordPayment(inv) {
-    const amount = prompt(`Record payment for Invoice #${inv.invNum||inv.id?.slice(-6)||''}.\nEnter amount received:`, inv.total)
+    const subtotal = parseFloat(inv.total || 0)
+    const taxRate = parseFloat(inv.taxRate || 0)
+    const invoiceTotal = subtotal + (subtotal * taxRate / 100)
+    const previouslyPaid = parseFloat(inv.paid || 0)
+    const remaining = Math.max(0, invoiceTotal - previouslyPaid)
+    const amount = prompt(`Record payment for Invoice #${inv.invNum||inv.id?.slice(-6)||''}.\nEnter amount received:`, remaining.toFixed(2))
     if (!amount) return
-    const paid = parseFloat(amount)
-    const total = parseFloat(inv.total || 0)
-    const status = paid >= total ? 'Paid' : 'Partial'
-    const { error } = await supabase.from('invoices').update({ paid: String(paid), status, updated_at: new Date().toISOString() }).eq('id', inv.id)
+    const paymentAmount = parseFloat(amount)
+    if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) { showToast('Enter a valid payment amount'); return }
+    const newPaid = previouslyPaid + paymentAmount
+    const status = newPaid >= invoiceTotal - 0.005 ? 'Paid' : 'Partial'
+    const { error } = await supabase.from('invoices').update({ paid: String(newPaid), status, updated_at: new Date().toISOString() }).eq('id', inv.id)
     if (!error) {
-      // Also create a payment record
-      await supabase.from('payments').insert([{ clientName: inv.clientName, amount: paid, method: 'Manual', invoiceId: inv.id, notes: `Payment for Invoice #${inv.invNum||''}`, created_at: new Date().toISOString() }])
-      showToast(`✅ Payment of $${paid.toLocaleString()} recorded`)
+      // Also create a payment record for this transaction only; invoice.paid is cumulative.
+      await supabase.from('payments').insert([{ clientName: inv.clientName, amount: paymentAmount, method: 'Manual', invoiceId: inv.id, notes: `Payment for Invoice #${inv.invNum||''}`, created_at: new Date().toISOString() }])
+      showToast(`✅ Payment of $${paymentAmount.toLocaleString()} recorded`)
       load()
     }
   }

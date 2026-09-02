@@ -4,6 +4,7 @@ import { logActivity, getActor } from '../lib/activityLog'
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useApp } from '../context/AppContext'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { applyPaymentToInvoice, reversePaymentFromInvoice } from '../lib/invoiceSync'
 import ClientLink from '../components/ClientLink'
@@ -13,6 +14,7 @@ const BLANK = { clientName:'', invNum:'', amount:'', method:'Credit Card', check
 const METHODS = ['Credit Card','ACH / Bank Transfer','Check','Cash','Zelle','Venmo','PayPal','Money Order','Wire Transfer','Other']
 
 export default function Payments() {
+  const { user } = useApp()
   const [items,    setItems]    = useState([])
   const [sortCol,  setSortCol]  = useState('date')
   const [sortDir,  setSortDir]  = useState('desc')

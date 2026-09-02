@@ -2,6 +2,7 @@ import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useApp } from '../context/AppContext'
 import { triggerWorkflow } from '../lib/triggerWorkflow'
 import { advanceLeadStatus } from '../lib/leadStatus'
 import { FIRM } from '../lib/firmBranding'
@@ -59,6 +60,7 @@ function scOf(ev) {
 }
 
 export default function Calendar() {
+  const { user } = useApp()
   const [events,        setEvents]        = useState([])
   const [clients,       setClients]       = useState([])
   const [employees,     setEmployees]     = useState([])
