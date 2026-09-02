@@ -1,7 +1,8 @@
 name: Deploy Supabase Edge Functions
 
-# Scoped production deploys only. Pushes are restricted to known function paths so
-# an unrelated change can never trigger a blanket Edge Function redeploy.
+# Scoped production deploys only. Every production-affecting function listed here
+# is deployed from the exact source commit that changed it. Multiple function
+# changes in one commit are all deployed; there is no first-match/elif gap.
 on:
   push:
     branches: [main]
@@ -10,11 +11,19 @@ on:
       - 'supabase/functions/support-api/**'
       - 'supabase/functions/linkedin-scheduler/**'
       - 'supabase/functions/linkedin-queue-replenisher/**'
+      - 'supabase/functions/send-email/**'
+      - 'supabase/functions/send-sms/**'
+      - 'supabase/functions/send-fax/**'
+      - 'supabase/functions/start-outbound-call/**'
+      - '.github/workflows/deploy-edge-functions.yml'
   workflow_dispatch:
     inputs:
       function:
         description: 'Function slug to deploy (or ALL_INTENTIONAL for a full redeploy)'
         required: true
+
+permissions:
+  contents: read
 
 jobs:
   deploy:
@@ -30,37 +39,60 @@ jobs:
         uses: supabase/setup-cli@v1
         with:
           version: latest
-      - name: Resolve scoped function
+      - name: Resolve scoped functions
         id: scope
         shell: bash
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "fn=${{ github.event.inputs.function }}" >> "$GITHUB_OUTPUT"
+            echo "fns=${{ github.event.inputs.function }}" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+
           CHANGED="$(git diff --name-only HEAD^ HEAD)"
-          if echo "$CHANGED" | grep -q '^supabase/functions/linkedin-queue-replenisher/'; then
-            echo "fn=linkedin-queue-replenisher" >> "$GITHUB_OUTPUT"
-          elif echo "$CHANGED" | grep -q '^supabase/functions/linkedin-scheduler/'; then
-            echo "fn=linkedin-scheduler" >> "$GITHUB_OUTPUT"
-          elif echo "$CHANGED" | grep -q '^supabase/functions/support-api/'; then
-            echo "fn=support-api" >> "$GITHUB_OUTPUT"
-          elif echo "$CHANGED" | grep -q '^supabase/functions/hub-proxy/'; then
-            echo "fn=hub-proxy" >> "$GITHUB_OUTPUT"
-          else
-            echo "No supported function path changed."
+          FNS=()
+          for FN in \
+            hub-proxy \
+            support-api \
+            linkedin-scheduler \
+            linkedin-queue-replenisher \
+            send-email \
+            send-sms \
+            send-fax \
+            start-outbound-call
+          do
+            if echo "$CHANGED" | grep -q "^supabase/functions/${FN}/"; then
+              FNS+=("$FN")
+            fi
+          done
+
+          # A change to this deploy workflow itself is a controlled opportunity
+          # to re-assert the four customer-communications functions that must stay
+          # aligned with the production certification harness.
+          if [ ${#FNS[@]} -eq 0 ] && echo "$CHANGED" | grep -q '^.github/workflows/deploy-edge-functions.yml$'; then
+            FNS=(send-email send-sms send-fax start-outbound-call)
+          fi
+
+          if [ ${#FNS[@]} -eq 0 ]; then
+            echo 'No supported function path changed.'
             exit 1
           fi
-      - name: Deploy edge function
+          echo "fns=${FNS[*]}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy edge functions
         shell: bash
         run: |
           set -euo pipefail
-          FN="${{ steps.scope.outputs.fn }}"
-          if [ "$FN" = "ALL_INTENTIONAL" ]; then
+          FNS="${{ steps.scope.outputs.fns }}"
+          if [ "$FNS" = "ALL_INTENTIONAL" ]; then
             supabase functions deploy --project-ref "$PROJECT_REF"
-          elif [ "$FN" = "linkedin-queue-replenisher" ] || [ "$FN" = "support-api" ]; then
-            supabase functions deploy "$FN" --project-ref "$PROJECT_REF" --no-verify-jwt
-          else
-            supabase functions deploy "$FN" --project-ref "$PROJECT_REF"
+            exit 0
           fi
+          for FN in $FNS; do
+            echo "Deploying $FN"
+            if [ "$FN" = "linkedin-queue-replenisher" ] || [ "$FN" = "linkedin-scheduler" ] || [ "$FN" = "support-api" ]; then
+              supabase functions deploy "$FN" --project-ref "$PROJECT_REF" --no-verify-jwt
+            else
+              supabase functions deploy "$FN" --project-ref "$PROJECT_REF"
+            fi
+          done
