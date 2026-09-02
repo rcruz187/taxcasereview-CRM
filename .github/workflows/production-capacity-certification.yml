@@ -20,6 +20,7 @@ on:
     paths:
       - 'scripts/certify-production-capacity.mjs'
       - '.github/workflows/production-capacity-certification.yml'
+      - 'supabase/migrations/**'
 
 permissions:
   contents: read
