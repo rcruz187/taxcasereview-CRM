@@ -57,7 +57,8 @@ export function publicFlow() {
   record(home, homeLatency);
 
   const login = http.get(`${BASE}/login`, { redirects: 0, tags: { route: 'login' } });
-  record(login, loginLatency, [200, 301, 302, 307, 308, 404]);
+  // A 404 is a real routing failure. Do not let the load harness hide it.
+  record(login, loginLatency);
 
   sleep(Math.random() * 2 + 1);
 }
