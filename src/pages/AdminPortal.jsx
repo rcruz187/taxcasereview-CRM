@@ -16,6 +16,7 @@ import CredentialVault from '../components/admin/CredentialVault'
 import UniversalOfficeESign from '../components/admin/UniversalOfficeESign'
 const AdminChatPage = lazy(() => import('./AdminChat'))
 
+const ESignaturesHub = lazy(() => import('./ESignaturesHub'))
 const NewOffice    = lazy(() => import('./NewOffice'))
 const Support      = lazy(() => import('./Support'))
 const CalendarPage = lazy(() => import('./Calendar'))
@@ -110,6 +111,7 @@ const NAV = [
   { path:'/crm-admin',                label:'Overview',        icon:'📊' },
   { path:'/crm-admin/provision',      label:'+ New Office',   icon:'➕' },
   { path:'/crm-admin/offices',        label:'Offices',         icon:'🏢' },
+  { path:'/crm-admin/esign',          label:'E-Signatures',    icon:'✍️' },
   { path:'/crm-admin/demo',           label:'Demo Mgmt',       icon:'🎭' },
   { path:'/crm-admin/employees',      label:'Employees',       icon:'👥' },
   { path:'/crm-admin/support',        label:'Support',         icon:'🎫' },
@@ -6459,6 +6461,7 @@ export default function AdminPortal() {
             <Route path="/linkedin/callback" element={<AdminRouteErrorBoundary><LinkedInPublisher/></AdminRouteErrorBoundary>}/>
             <Route index                   element={<Overview key={window.location.pathname + window.location.search}/>}/>
             <Route path="/offices"        element={<OfficesList/>}/>
+            <Route path="/esign"          element={<AdminRouteErrorBoundary><ESignaturesHub/></AdminRouteErrorBoundary>}/>
             <Route path="/offices/:id"    element={<OfficePageRouter/>}/>
             <Route path="/provision"      element={<div style={{padding:8}}><NewOffice/></div>}/>
             <Route path="/billing"        element={<AdminRouteErrorBoundary><RomyLabsBilling/></AdminRouteErrorBoundary>}/>
