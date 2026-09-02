@@ -1,0 +1,46 @@
+name: Wire Universal E-Sign Hub
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/pages/ESignaturesHub.jsx'
+      - 'src/pages/AdminPortal.jsx'
+      - 'scripts/wire-universal-esign-hub.mjs'
+      - '.github/workflows/wire-universal-esign-hub.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: wire-universal-esign-hub
+  cancel-in-progress: true
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Wire E-Signatures hub into Admin Portal
+        run: node scripts/wire-universal-esign-hub.mjs
+      - name: Install dependencies
+        run: npm ci
+      - name: Build production bundle
+        run: npm run build
+      - name: Verify E-Signature exposure
+        run: |
+          grep -q "label:'E-Signatures'" src/pages/AdminPortal.jsx
+          grep -q 'path="/esign"' src/pages/AdminPortal.jsx
+          grep -q "import('./ESignaturesHub')" src/pages/AdminPortal.jsx
+          grep -q 'Upload any PDF contract' src/pages/ESignaturesHub.jsx
+          grep -q 'UniversalOfficeESign' src/pages/ESignaturesHub.jsx
+      - name: Commit wiring
+        run: |
+          git config user.name 'RomyLabs E-Sign Bot'
+          git config user.email 'romy@romylabs.com'
+          git add src/pages/AdminPortal.jsx
+          git diff --cached --quiet || git commit -m 'feat(esign): expose universal office signing hub'
+          git push origin HEAD:main
