@@ -105,7 +105,26 @@ async function boundaryProbe(session, table, permKey, minRead, minWrite, mkRow){
   const level=session.role.perms[permKey] ?? 0
   const readExpected=level>=minRead?'success':'deny'
   const writeExpected=level>=minWrite?'success':'deny'
-  await timed(`boundary.${table}.read`,session.role.key,()=>session.client.from(table).select('id').eq('tenant_id',TENANT_ID).limit(1),readExpected)
+
+  const readStart=performance.now()
+  try{
+    const r=await session.client.from(table).select('id').eq('tenant_id',TENANT_ID).limit(1)
+    const ms=performance.now()-readStart
+    const visible=!r.error && Array.isArray(r.data) && r.data.length>0
+    // PostgreSQL RLS SELECT denial normally returns HTTP success with zero visible rows,
+    // not a permission error. Treat either an explicit error or an empty RLS-filtered
+    // result as denial. Seed targets guarantee authorized roles have at least one row.
+    const denied=Boolean(r.error) || (!r.error && Array.isArray(r.data) && r.data.length===0)
+    const ok=readExpected==='success' ? visible : denied
+    record(`boundary.${table}.read`,session.role.key,ok,ms,r.error?.message || (visible?'visible row':'RLS filtered to zero rows'))
+    if(!ok) fail(`${session.role.key} boundary.${table}.read: expected ${readExpected}, got ${r.error?.message || (visible?'visible row':'zero rows')}`)
+  }catch(e){
+    const ms=performance.now()-readStart
+    const ok=readExpected==='deny'
+    record(`boundary.${table}.read`,session.role.key,ok,ms,e?.message||String(e))
+    if(!ok) fail(`${session.role.key} boundary.${table}.read: ${e?.message||e}`)
+  }
+
   const row=mkRow()
   const w=await timed(`boundary.${table}.write`,session.role.key,()=>session.client.from(table).insert(row).select('id').maybeSingle(),writeExpected)
   if(writeExpected==='success'&&!w.error&&w.data?.id) track(table,w.data.id)
