@@ -27,7 +27,7 @@ if (calendar.includes('datalist id="cal-clients"')) {
 for (const path of ['src/pages/Leads.jsx', 'src/pages/Clients.jsx']) {
   const src = requireAll(path, [
     "supabase.functions.invoke('send-fax'",
-    "document_url:fileUrl",
+    "document_url",
     "resData?.success",
     "Fax provider rejected the send",
     "faxDigits.length !== 10",
