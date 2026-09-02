@@ -18,9 +18,14 @@ on:
   push:
     branches: [main]
     paths:
-      - 'scripts/certify-production-capacity.mjs'
-      - '.github/workflows/production-capacity-certification.yml'
+      - 'src/**'
+      - 'supabase/functions/**'
       - 'supabase/migrations/**'
+      - 'scripts/certify-production-capacity.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.js'
+      - '.github/workflows/production-capacity-certification.yml'
 
 permissions:
   contents: read
