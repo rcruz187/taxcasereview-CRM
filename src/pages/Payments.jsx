@@ -10,7 +10,7 @@ import { applyPaymentToInvoice, reversePaymentFromInvoice } from '../lib/invoice
 import ClientLink from '../components/ClientLink'
 import { FIRM } from '../lib/firmBranding'
 
-const BLANK = { clientName:'', invNum:'', amount:'', method:'Credit Card', checkNum:'', date:'', status:'Cleared', notes:'', reference:'' }
+const BLANK = { clientName:'', client_id:'', invNum:'', amount:'', method:'Credit Card', checkNum:'', date:'', status:'Cleared', notes:'', reference:'' }
 const METHODS = ['Credit Card','ACH / Bank Transfer','Check','Cash','Zelle','Venmo','PayPal','Money Order','Wire Transfer','Other']
 
 export default function Payments() {
@@ -42,7 +42,7 @@ export default function Payments() {
   async function load() {
     const [{ data:p },{ data:inv },{ data:cl }] = await Promise.all([
       supabase.from('payments').select('*').order('created_at',{ascending:false}),
-      supabase.from('invoices').select('id,invNum,clientName,total,paid,status'),
+      supabase.from('invoices').select('id,invNum,clientName,client_id,total,taxRate,paid,status'),
       supabase.from('clients').select('id,name,autopay_enabled,autopay_amount,autopay_frequency,autopay_next_charge,autopay_last_result,autopay_last_charged_at,default_payment_method_id,payment_method_brand,payment_method_last4'),
     ])
     if (p)   setItems(p)
@@ -100,6 +100,7 @@ export default function Payments() {
 
   function searchClient(val) {
     fld('clientName',val)
+    fld('client_id','')
     setSug(val.length<2?[]:clients.filter(c=>c.name.toLowerCase().includes(val.toLowerCase())).slice(0,6))
     setShowSug(true)
     // Update invoice suggestions
@@ -111,7 +112,10 @@ export default function Payments() {
   function selectInvoice(inv) {
     fld('invNum', inv.invNum)
     fld('clientName', inv.clientName)
-    const balance = parseFloat(inv.total||0) - parseFloat(inv.paid||0)
+    fld('client_id', inv.client_id || '')
+    const subtotal = parseFloat(inv.total||0)
+    const taxRate = parseFloat(inv.taxRate||0)
+    const balance = subtotal + (subtotal * taxRate / 100) - parseFloat(inv.paid||0)
     if (balance > 0) fld('amount', String(balance.toFixed(2)))
     setInvSug([])
     setSug([]); setShowSug(false)
@@ -426,7 +430,7 @@ export default function Payments() {
               {showSug&&suggestions.length>0&&(
                 <div style={{position:'absolute',top:'100%',left:0,right:0,background:'var(--s3)',border:'1px solid var(--b2c)',borderRadius:7,zIndex:500}}>
                   {suggestions.map(c=>(
-                    <div key={c.id} onClick={()=>{fld('clientName',c.name);setSug([]);setShowSug(false);setInvSug(invoices.filter(i=>i.clientName===c.name&&i.status!=='Paid').slice(0,4))}}
+                    <div key={c.id} onClick={()=>{fld('clientName',c.name);fld('client_id',c.id);setSug([]);setShowSug(false);setInvSug(invoices.filter(i=>(i.client_id?i.client_id===c.id:i.clientName===c.name)&&i.status!=='Paid').slice(0,4))}}
                       style={{padding:'8px 12px',cursor:'pointer',fontSize:13}}>{c.name}</div>
                   ))}
                 </div>
