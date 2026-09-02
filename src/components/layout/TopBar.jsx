@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { useFirm } from '../../lib/useFirm'
 import { isSoundEnabled, setSoundEnabled, playSound } from '../../lib/notifySound'
+import { applyDocumentLanguage, getStoredLanguage, storeLanguage } from '../../lib/i18n'
 import GlobalSearch from '../GlobalSearch'
 
 const PAGE_TITLES = {
@@ -49,6 +50,7 @@ export default function TopBar({ onNew }) {
   const [clock, setClock] = useState('')
   const [dateStr, setDateStr] = useState('')
   const [open, setOpen] = useState(false)
+  const [language, setLanguageState] = useState(getStoredLanguage)
   const { firm } = useFirm()
   const [soundOn, setSoundOnState] = useState(isSoundEnabled())
   const [dark, setDark] = useState(() => {
@@ -62,6 +64,10 @@ export default function TopBar({ onNew }) {
     localStorage.setItem('tcr-theme', dark ? 'dark' : 'light')
   }, [dark])
 
+  useEffect(() => {
+    applyDocumentLanguage(language)
+  }, [language, location.pathname])
+
   const panelRef = useRef(null)
   const btnRef = useRef(null)
   const title = PAGE_TITLES[location.pathname] || 'Tax Resolution CRM'
@@ -69,13 +75,14 @@ export default function TopBar({ onNew }) {
   useEffect(() => {
     const tick = () => {
       const d = new Date()
-      setClock(d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }))
-      setDateStr(d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }))
+      const locale = language === 'es' ? 'es-US' : 'en-US'
+      setClock(d.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: language !== 'es' }))
+      setDateStr(d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' }))
     }
     tick()
     const t = setInterval(tick, 1000)
     return () => clearInterval(t)
-  }, [])
+  }, [language])
 
   useEffect(() => {
     if (!open) return
@@ -92,6 +99,12 @@ export default function TopBar({ onNew }) {
   function go(path) {
     setOpen(false)
     navigate(MODAL_PATHS.has(path) ? path + '?new=1' : path)
+  }
+
+  function setLanguage(next) {
+    const stored = storeLanguage(next)
+    setLanguageState(stored)
+    applyDocumentLanguage(stored)
   }
 
   const newDrawer = open && typeof document !== 'undefined'
@@ -210,6 +223,10 @@ export default function TopBar({ onNew }) {
           <span style={{fontSize:13}}>📠</span>
           <span style={{fontWeight:700,letterSpacing:'.02em'}}>{firm?.firm_fax_number || '(561) 420-6999'}</span>
         </div>
+      </div>
+      <div role="group" aria-label="Language" style={{display:'flex',gap:2,padding:2,border:'1px solid var(--br)',borderRadius:7,background:'var(--s2)'}}>
+        <button type="button" onClick={() => setLanguage('en')} aria-pressed={language === 'en'} title="English" style={{border:0,borderRadius:5,padding:'3px 6px',fontSize:10,fontWeight:800,cursor:'pointer',background:language==='en'?'var(--blue)':'transparent',color:language==='en'?'#fff':'var(--t3)'}}>EN</button>
+        <button type="button" onClick={() => setLanguage('es')} aria-pressed={language === 'es'} title="Español" style={{border:0,borderRadius:5,padding:'3px 6px',fontSize:10,fontWeight:800,cursor:'pointer',background:language==='es'?'var(--blue)':'transparent',color:language==='es'?'#fff':'var(--t3)'}}>ES</button>
       </div>
       <button
         onClick={() => {
