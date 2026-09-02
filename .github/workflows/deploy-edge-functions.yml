@@ -15,6 +15,9 @@ on:
       - 'supabase/functions/send-sms/**'
       - 'supabase/functions/send-fax/**'
       - 'supabase/functions/start-outbound-call/**'
+      - 'supabase/functions/save-email-account/**'
+      - 'supabase/functions/imap-sync/**'
+      - 'supabase/functions/smtp-send/**'
       - '.github/workflows/deploy-edge-functions.yml'
   workflow_dispatch:
     inputs:
@@ -59,18 +62,20 @@ jobs:
             send-email \
             send-sms \
             send-fax \
-            start-outbound-call
+            start-outbound-call \
+            save-email-account \
+            imap-sync \
+            smtp-send
           do
             if echo "$CHANGED" | grep -q "^supabase/functions/${FN}/"; then
               FNS+=("$FN")
             fi
           done
 
-          # A change to this deploy workflow itself is a controlled opportunity
-          # to re-assert the four customer-communications functions that must stay
-          # aligned with the production certification harness.
+          # Reassert the production communications/mailbox boundary whenever the
+          # deployment contract itself changes, preventing repository/live drift.
           if [ ${#FNS[@]} -eq 0 ] && echo "$CHANGED" | grep -q '^.github/workflows/deploy-edge-functions.yml$'; then
-            FNS=(send-email send-sms send-fax start-outbound-call)
+            FNS=(send-email send-sms send-fax start-outbound-call save-email-account imap-sync smtp-send)
           fi
 
           if [ ${#FNS[@]} -eq 0 ]; then
