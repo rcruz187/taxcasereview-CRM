@@ -14,7 +14,7 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
-const ENCRYPT_KEY = Deno.env.get('EMAIL_ENCRYPT_KEY') || 'taxrescrm-email-key-change-in-prod'
+const ENCRYPT_KEY = Deno.env.get('EMAIL_ENCRYPT_KEY')
 const svc = createClient(SUPABASE_URL, SERVICE_KEY)
 const ROMYLABS_ADMINS = new Set(['info@romylabs.com', 'romy@romylabs.com'])
 
@@ -101,11 +101,19 @@ serve(async (req) => {
   if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
   try {
+    if (!SUPABASE_URL || !SERVICE_KEY || !ANON_KEY || !ENCRYPT_KEY) return new Response(JSON.stringify({ error:'Server email encryption is not configured' }), { status:500, headers:{...corsHeaders,'Content-Type':'application/json'} })
     const authHeader = req.headers.get('Authorization') || ''
     const userClient = createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: authHeader } } })
     const { data: { user } } = await userClient.auth.getUser()
     const callerEmail = String(user?.email || '').toLowerCase()
     if (!callerEmail) return new Response(JSON.stringify({ error: 'Not authenticated' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+
+    const {data:tenantId}=await userClient.rpc('current_tenant_id')
+    if(!tenantId) return new Response(JSON.stringify({error:'No active office context'}),{status:403,headers:{...corsHeaders,'Content-Type':'application/json'}})
+    const {data:employee}=await svc.from('employees').select('status,perm_comms,tenant_id').eq('tenant_id',tenantId).ilike('email',callerEmail).limit(1).maybeSingle()
+    const {data:isPlatformAdmin}=await userClient.rpc('_is_platform_admin')
+    const active=employee&&String(employee.status||'Active').toLowerCase()==='active'
+    if(!isPlatformAdmin&&(!active||Number(employee?.perm_comms||0)<2)) return new Response(JSON.stringify({error:'Email permission denied'}),{status:403,headers:{...corsHeaders,'Content-Type':'application/json'}})
 
     const {
       account_id, route_id, to, subject, text_body, html_body, from_name,
@@ -116,16 +124,16 @@ serve(async (req) => {
     if (!toList.length || !safeHeader(subject)) throw new Error('Recipient and subject are required')
 
     let route: any = null
-    let accountQuery = svc.from('email_accounts').select('*').eq('is_active', true)
+    let accountQuery = svc.from('email_accounts').select('*').eq('is_active', true).eq('tenant_id',tenantId)
 
     if (route_id) {
       if (!ROMYLABS_ADMINS.has(callerEmail)) return new Response(JSON.stringify({ error: 'Not authorized for RomyLabs routed email' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       const { data, error } = await svc.from('romylabs_mailboxes')
         .select('id,email_address,outbound_from,display_name,product_id,tenant_id,inbox_owner,active')
-        .eq('id', route_id).eq('active', true).maybeSingle()
+        .eq('id', route_id).eq('tenant_id',tenantId).eq('active', true).maybeSingle()
       if (error || !data) throw new Error('Mailbox route not found')
       route = data
-      accountQuery = accountQuery.eq('tenant_id', route.tenant_id).ilike('email_address', route.outbound_from)
+      accountQuery = accountQuery.ilike('email_address', route.outbound_from)
     } else if (account_id) {
       accountQuery = accountQuery.eq('id', account_id).ilike('employee_email', callerEmail)
     } else {
