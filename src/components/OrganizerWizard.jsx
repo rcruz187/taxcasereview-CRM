@@ -57,14 +57,24 @@ export default function OrganizerWizard({ organizerId, embedded = false, onCompl
     const key = entryIdx !== null ? `${questionId}_${entryIdx}` : questionId
     setUploadingKey(key)
     try {
-      const path = `organizer-docs/${organizerId}/${Date.now()}_${file.name}`
-      const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
-      if (upErr) throw upErr
-      const { data: urlData } = await supabase.storage.from('documents').createSignedUrl(path, 94608000)
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onerror = () => reject(reader.error || new Error('Could not read file'))
+        reader.onload = () => resolve(String(reader.result || ''))
+        reader.readAsDataURL(file)
+      })
+      const fileBase64 = String(dataUrl).split(',')[1] || ''
+      const { data, error: uploadErr } = await supabase.functions.invoke('organizer-action', {
+        body: {
+          type: 'upload_document', organizerId,
+          fileName: file.name, fileType: file.type || 'application/octet-stream', fileBase64,
+        },
+      })
+      if (uploadErr || !data?.ok) throw new Error(data?.error || uploadErr?.message || 'Upload failed')
       if (entryIdx !== null) {
-        updateEntry(questionId, entryIdx, '_uploadUrl', urlData?.signedUrl || '')
+        updateEntry(questionId, entryIdx, '_uploadUrl', data.url || '')
       } else {
-        setAnswer(questionId, urlData?.signedUrl || '')
+        setAnswer(questionId, data.url || '')
       }
     } catch (e) {
       setError('Upload failed: ' + e.message)

@@ -276,17 +276,22 @@ export default function ClientPortal() {
     if (!file) return
     setUploading(true)
     try {
-      const path = `docs/${client.name.replace(/\s+/g, '-')}/${Date.now()}_${file.name}`
-      const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
-      if (upErr) throw upErr
-      const { data: urlData } = await supabase.storage.from('documents').createSignedUrl(path, 94608000)
-      const { error } = await supabase.rpc('portal_action_upload_document', {
-        p_token: portalToken, p_file_name: file.name, p_doc_type: uploadFolder,
-        p_file_url: urlData?.signedUrl || '', p_file_size: file.size,
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onerror = () => reject(reader.error || new Error('Could not read file'))
+        reader.onload = () => resolve(String(reader.result || ''))
+        reader.readAsDataURL(file)
       })
-      if (error) throw error
-      const { data } = await supabase.rpc('portal_get_data', { p_token: portalToken })
-      setDocs(data?.documents || [])
+      const fileBase64 = String(dataUrl).split(',')[1] || ''
+      const { data, error } = await supabase.functions.invoke('portal-action', {
+        body: {
+          type: 'upload_document', token: portalToken,
+          fileName: file.name, fileType: file.type || 'application/octet-stream',
+          fileBase64, docType: uploadFolder,
+        },
+      })
+      if (error || !data?.ok) throw new Error(data?.error || error?.message || 'Upload failed')
+      setDocs(data.documents || [])
       if (fileRef.current) fileRef.current.value = ''
     } catch (e) {
       alert('Upload failed: ' + e.message)
