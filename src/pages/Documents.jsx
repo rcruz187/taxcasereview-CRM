@@ -12,24 +12,25 @@ import { DOC_FOLDERS as ROOT_FOLDERS } from './Clients'
 async function getDocumentUrl(supabase, storedUrl) {
   if (!storedUrl) return null
   try {
+    const rawUrl = String(storedUrl)
     // Extract the storage path from the stored URL
-    const match = storedUrl.match(/\/documents\/(.+)$/)
-    if (!match) return storedUrl // Not a storage URL, return as-is
+    const match = rawUrl.match(/\/documents\/(.+)$/)
+    if (!match) return rawUrl // Not a storage URL, return as-is
     const path = match[1]
     const { data, error } = await supabase.storage
       .from('documents')
       .createSignedUrl(path, 3600) // 1 hour expiry
-    if (error || !data?.signedUrl) return storedUrl
+    if (error || !data?.signedUrl) return rawUrl
     return data.signedUrl
   } catch {
-    return storedUrl
+    return typeof storedUrl === 'string' ? storedUrl : null
   }
 }
 
 const FILE_ICONS = { pdf:'📄', doc:'📝', docx:'📝', xls:'📊', xlsx:'📊', jpg:'🖼️', jpeg:'🖼️', png:'🖼️', mp3:'🎵', mp4:'🎬', default:'📎' }
-function fileIcon(name='') { const ext=(name.split('.').pop()||'').toLowerCase(); return FILE_ICONS[ext]||FILE_ICONS.default }
-function fmtSize(b) { if(!b)return ''; if(b<1024)return b+'B'; if(b<1048576)return (b/1024).toFixed(1)+'KB'; return (b/1048576).toFixed(1)+'MB' }
-function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '' }
+function fileIcon(name='') { const ext=(String(name || '').split('.').pop()||'').toLowerCase(); return FILE_ICONS[ext]||FILE_ICONS.default }
+function fmtSize(b) { const n=Number(b); if(!Number.isFinite(n)||n<=0)return ''; if(n<1024)return n+'B'; if(n<1048576)return (n/1024).toFixed(1)+'KB'; return (n/1048576).toFixed(1)+'MB' }
+function fmtDate(d) { if(!d)return ''; const date=new Date(d); return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) }
 
 export default function Documents() {
   const location = useLocation()
@@ -64,8 +65,8 @@ export default function Documents() {
   }
   function sortedDocs(arr) {
     return [...arr].sort((a, b) => {
-      let av = a[sortCol] || '', bv = b[sortCol] || ''
-      if (sortCol === 'file_size') { av = Number(av); bv = Number(bv) }
+      let av = a?.[sortCol] ?? '', bv = b?.[sortCol] ?? ''
+      if (sortCol === 'file_size') { av = Number(av) || 0; bv = Number(bv) || 0 }
       if (av < bv) return sortDir === 'asc' ? -1 : 1
       if (av > bv) return sortDir === 'asc' ? 1 : -1
       return 0
@@ -73,7 +74,7 @@ export default function Documents() {
   }
   const fileRef = useRef(null)
 
-  const ALL_FOLDERS = [...ROOT_FOLDERS, ...customFolders]
+  const ALL_FOLDERS = [...(Array.isArray(ROOT_FOLDERS) ? ROOT_FOLDERS : []), ...customFolders]
 
   useEffect(() => { loadAll() }, [clientFilter, folder])
 
@@ -83,27 +84,32 @@ export default function Documents() {
     if (clientFilter) q = q.ilike('client', `%${clientFilter}%`)
     if (folder !== 'All') q = q.eq('docType', folder)
     const { data: docsData } = await q
-    setDocs(docsData || [])
+    setDocs(Array.isArray(docsData) ? docsData : [])
 
     // Load clients + leads for autocomplete
     const [{ data: cl }, { data: ld }] = await Promise.all([
       supabase.from('clients').select('name').order('name'),
       supabase.from('leads').select('name').order('name'),
     ])
-    const names = [...new Set([...(cl||[]).map(c=>c.name), ...(ld||[]).map(l=>l.name)])].sort()
+    const names = [...new Set([...(cl||[]).map(c=>c?.name), ...(ld||[]).map(l=>l?.name)].filter(v => typeof v === 'string' && v.trim()))].sort()
     setPeople(names)
 
     // Load custom folders from settings
     const { data: s } = await supabase.from('settings').select('custom_doc_folders').limit(1).maybeSingle()
     if (s?.custom_doc_folders) {
-      try { setCustomFolders(JSON.parse(s.custom_doc_folders)) } catch {}
+      try {
+        const parsed = JSON.parse(s.custom_doc_folders)
+        setCustomFolders(Array.isArray(parsed) ? parsed.filter(v => typeof v === 'string' && v.trim()) : [])
+      } catch { setCustomFolders([]) }
+    } else {
+      setCustomFolders([])
     }
   }
 
-  function showToast(msg) { setToast(msg); setTimeout(()=>setToast(''),3000) }
+  function showToast(msg) { setToast(String(msg || '')); setTimeout(()=>setToast(''),3000) }
 
   async function saveCustomFolder() {
-    const name = newFolderName.trim()
+    const name = String(newFolderName || '').trim()
     if (!name) return
     if (ALL_FOLDERS.includes(name)) { showToast('Folder already exists'); return }
     const updated = [...customFolders, name]
@@ -118,20 +124,23 @@ export default function Documents() {
   }
 
   async function upload() {
-    if (!form.name || !form.docType) { showToast('Name and folder required'); return }
+    const docName = String(form.name || '').trim()
+    const docType = String(form.docType || '').trim()
+    if (!docName || !docType) { showToast('Name and folder required'); return }
     if (file) { const _v = validateFile(file); if (!_v.ok) { showToast('❌ ' + _v.error); return }; if (_v.warn) showToast('⚠️ ' + _v.warn) }
     setSaving(true)
-    let fileUrl = null, fileName = null, fileSize = null
+    let fileUrl = null, fileName = docName, fileSize = null
     if (file) {
-      const safeName = (form.client||'general').replace(/\s+/g,'-')
-      const path = `docs/${safeName}/${Date.now()}_${file.name}`
+      const safeName = String(form.client || 'general').trim().replace(/[^a-zA-Z0-9._-]+/g,'-') || 'general'
+      const originalName = String(file.name || 'document').replace(/[^a-zA-Z0-9._-]+/g,'-')
+      const path = `docs/${safeName}/${Date.now()}_${originalName}`
       const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
       if (upErr) { showToast('Upload error: '+upErr.message); setSaving(false); return }
       const { data: signedData } = await supabase.storage.from('documents').createSignedUrl(path, 3600)
-      fileUrl = signedData?.signedUrl || null; fileName = file.name; fileSize = file.size
+      fileUrl = signedData?.signedUrl || null; fileName = file.name || docName; fileSize = file.size
     }
     const { error } = await supabase.from('documents').insert([{
-      ...form, file_url: fileUrl, file_name: fileName, file_size: fileSize,
+      ...form, name: docName, docType, file_url: fileUrl, file_name: fileName, file_size: fileSize,
       created_at: new Date().toISOString()
     }])
     setSaving(false)
@@ -145,19 +154,22 @@ export default function Documents() {
       employeeEmail: actor.email,
       action: 'document_uploaded',
       category: 'document',
-      description: `Uploaded doc: ${form.name} — ${entityName || 'General'}`,
+      description: `Uploaded doc: ${docName} — ${entityName || 'General'}`,
       entityName: entityName || null,
-      meta: { docType: form.docType, fileName: fileName || form.name },
+      meta: { docType, fileName },
     }).catch(()=>{})
     setModal(false)
     setForm({ name:'', client:'', docType:'IRS Docs', notes:'' })
     setFile(null)
+    if (fileRef.current) fileRef.current.value = ''
     loadAll()
   }
 
   async function del(doc) {
-    if (doc.file_name) {
-      const path = doc.file_url?.split('/documents/')[1]
+    if (!doc?.id) return
+    if (doc.file_name && doc.file_url) {
+      const rawUrl = String(doc.file_url)
+      const path = rawUrl.split('/documents/')[1]
       if (path) await supabase.storage.from('documents').remove([path]).catch(()=>{})
     }
     const { error } = await supabase.from('documents').delete().eq('id', doc.id)
@@ -167,22 +179,25 @@ export default function Documents() {
   }
 
   async function addNote(doc) {
+    if (!doc?.id) return
     const note = prompt('Add note:')
     if (note === null) return
-    await supabase.from('documents').update({ notes: note }).eq('id', doc.id)
+    const { error } = await supabase.from('documents').update({ notes: String(note) }).eq('id', doc.id)
+    if (error) { showToast('Error: '+error.message); return }
     loadAll()
   }
 
   async function openDocument(doc) {
-    if (!doc.file_url) return
+    if (!doc?.file_url) return
     const url = await getDocumentUrl(supabase, doc.file_url)
     if (url) window.open(url, '_blank', 'noopener,noreferrer')
   }
 
+  const needle = search.toLowerCase()
   const filtered = sortedDocs(docs.filter(d =>
-    !search || (d.name||'').toLowerCase().includes(search.toLowerCase()) ||
-    (d.client||'').toLowerCase().includes(search.toLowerCase()) ||
-    (d.notes||'').toLowerCase().includes(search.toLowerCase())
+    !search || String(d?.name || '').toLowerCase().includes(needle) ||
+    String(d?.client || '').toLowerCase().includes(needle) ||
+    String(d?.notes || '').toLowerCase().includes(needle)
   ))
 
   return (
@@ -191,7 +206,7 @@ export default function Documents() {
       <DeleteConfirmModal
         open={!!confirmDel}
         title="Delete Document?"
-        message={confirmDel ? `Delete “${confirmDel.name}”? This cannot be undone.` : ''}
+        message={confirmDel ? `Delete “${confirmDel.name || 'this document'}”? This cannot be undone.` : ''}
         onCancel={()=>setConfirmDel(null)}
         onConfirm={()=>{ const d=confirmDel; setConfirmDel(null); del(d) }}
       />
@@ -246,8 +261,8 @@ export default function Documents() {
             <th>Actions</th>
           </tr></thead><tbody>
             {filtered.map(d=><tr key={d.id}>
-              <td><span style={{marginRight:8}}>{fileIcon(d.file_name)}</span><strong>{d.name}</strong></td>
-              <td>{d.client||'—'}</td><td>{d.docType}</td><td>{fmtSize(d.file_size)}</td><td>{fmtDate(d.created_at)}</td>
+              <td><span style={{marginRight:8}}>{fileIcon(d.file_name)}</span><strong>{d.name || 'Untitled document'}</strong></td>
+              <td>{d.client||'—'}</td><td>{d.docType||'—'}</td><td>{fmtSize(d.file_size)}</td><td>{fmtDate(d.created_at)}</td>
               <td><div style={{display:'flex',gap:5}}>{d.file_url&&<button className="btn sm" onClick={()=>openDocument(d)}>Open</button>}<button className="btn sm" onClick={()=>addNote(d)}>✏️</button>{isAdmin&&<button className="btn sm danger" onClick={()=>setConfirmDel(d)}>🗑</button>}</div></td>
             </tr>)}
           </tbody></table>
@@ -256,7 +271,7 @@ export default function Documents() {
         <div style={{display:'flex',flexDirection:'column',gap:6}}>
           {filtered.map(d=><div key={d.id} className="card" style={{padding:'10px 14px',display:'flex',alignItems:'center',gap:12}}>
             <span style={{fontSize:24}}>{fileIcon(d.file_name)}</span>
-            <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700,color:'var(--tx)'}}>{d.name}</div><div style={{fontSize:11,color:'var(--t3)'}}>{d.client||'General'} · {d.docType} · {fmtSize(d.file_size)} · {fmtDate(d.created_at)}</div></div>
+            <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700,color:'var(--tx)'}}>{d.name || 'Untitled document'}</div><div style={{fontSize:11,color:'var(--t3)'}}>{d.client||'General'} · {d.docType||'Unfiled'} · {fmtSize(d.file_size)} · {fmtDate(d.created_at)}</div></div>
             {d.file_url&&<button className="btn sm" onClick={()=>openDocument(d)}>Open</button>}
             <button className="btn sm" onClick={()=>addNote(d)}>✏️</button>
             {isAdmin&&<button className="btn sm danger" onClick={()=>setConfirmDel(d)}>🗑</button>}
@@ -266,9 +281,9 @@ export default function Documents() {
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:12}}>
           {filtered.map(d=><div key={d.id} className="card" style={{padding:16,position:'relative'}}>
             <div style={{fontSize:34,marginBottom:10}}>{fileIcon(d.file_name)}</div>
-            <div style={{fontWeight:700,color:'var(--tx)',fontSize:14,marginBottom:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={d.name}>{d.name}</div>
+            <div style={{fontWeight:700,color:'var(--tx)',fontSize:14,marginBottom:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={d.name || 'Untitled document'}>{d.name || 'Untitled document'}</div>
             <div style={{fontSize:11,color:'var(--t3)',marginBottom:3}}>{d.client||'General'}</div>
-            <span className="badge blue" style={{fontSize:9}}>{d.docType}</span>
+            <span className="badge blue" style={{fontSize:9}}>{d.docType||'Unfiled'}</span>
             {d.notes&&<div style={{fontSize:10,color:'var(--t3)',marginTop:8,fontStyle:'italic'}}>{d.notes}</div>}
             <div style={{fontSize:10,color:'var(--t3)',marginTop:10}}>{fmtSize(d.file_size)} · {fmtDate(d.created_at)}</div>
             <div style={{display:'flex',gap:5,marginTop:10}}>
@@ -285,7 +300,7 @@ export default function Documents() {
         <div className="form-group"><label>Document Name *</label><input className="input" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="e.g. 2024 Tax Return" /></div>
         <div className="form-group"><label>Client / Lead</label><input className="input" list="people-list" value={form.client} onChange={e=>setForm({...form,client:e.target.value})} placeholder="Start typing a name…" /><datalist id="people-list">{people.map(p=><option key={p} value={p}/>)}</datalist></div>
         <div className="form-group"><label>Folder *</label><select className="select" value={form.docType} onChange={e=>setForm({...form,docType:e.target.value})}>{ALL_FOLDERS.map(f=><option key={f}>{f}</option>)}</select></div>
-        <div className="form-group"><label>File</label><input ref={fileRef} type="file" onChange={async e=>{const f=e.target.files[0];if(!f)return;const v=validateFile(f);if(!v.ok){showToast('❌ '+v.error);e.target.value='';return}if(v.warn)showToast('⚠️ '+v.warn);const c=await maybeCompressImage(f);setFile(c)}} /></div>
+        <div className="form-group"><label>File</label><input ref={fileRef} type="file" onChange={async e=>{const f=e.target.files?.[0];if(!f)return;const v=validateFile(f);if(!v.ok){showToast('❌ '+v.error);e.target.value='';return}if(v.warn)showToast('⚠️ '+v.warn);const c=await maybeCompressImage(f);setFile(c)}} /></div>
         <div className="form-group"><label>Notes</label><textarea className="textarea" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} /></div>
         <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}><button className="btn" onClick={()=>setModal(false)}>Cancel</button><button className="btn primary" disabled={saving} onClick={upload}>{saving?'Saving…':'Upload'}</button></div>
       </div></div>}
