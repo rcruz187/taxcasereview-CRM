@@ -16,9 +16,10 @@ if(!s.includes("path:'/crm-admin/esign'")){
 
 if(!s.includes('path="/esign"')){
   const candidates=[
-    '        <Route path="/offices"        element={<Offices/>}/>',
-    '      <Route path="/offices"        element={<Offices/>}/>',
-    '<Route path="/offices"        element={<Offices/>}/>'
+    '            <Route path="/offices"        element={<OfficesList/>}/>',
+    '        <Route path="/offices"        element={<OfficesList/>}/>',
+    '      <Route path="/offices"        element={<OfficesList/>}/>',
+    '<Route path="/offices"        element={<OfficesList/>}/>'
   ]
   const anchor=candidates.find(x=>s.includes(x))
   if(!anchor) throw new Error('AdminPortal Offices route anchor missing')
