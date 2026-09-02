@@ -194,30 +194,45 @@ function LeadInlineFax({ lead, onClose, onLogged }) {
     }
   }
   async function send() {
+    const rawDigits = toNum.replace(/\D/g,'')
+    const faxDigits = rawDigits.length === 11 && rawDigits.startsWith('1') ? rawDigits.slice(1) : rawDigits
+    if (faxDigits.length !== 10) { alert('Enter a valid 10-digit fax number.'); return }
+    if (!file) { alert('Attach a document before sending the fax.'); return }
     set3(true)
-    const s = await getSettings()
-    let fileUrl=null
-    if(file){const path='fax/'+Date.now()+'_'+file.name;await supabase.storage.from('documents').upload(path,file,{upsert:true});const{data:u}=await supabase.storage.from('documents').createSignedUrl(path,3600);fileUrl=u?.signedUrl||null}
-    const toFull='+1'+toNum.slice(-10)
-    const fromNum=s?.sw_inbound_did||''
-    let sent=false
-    if(s?.signalwire_backend){
-      try{
-        const res=await fetch(s.signalwire_backend+'/fax/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:toFull,from:fromNum,...(fileUrl?{media_url:fileUrl}:{})})})
-        const d=await res.json()
-        sent=res.ok&&d?.success
-      }catch(e){}
+    let fileUrl = null
+    const toFull = '+1' + faxDigits
+    try {
+      const path = `fax/${lead?.id || 'lead'}/${Date.now()}_${file.name.replace(/[^A-Za-z0-9._-]/g,'_')}`
+      const { error: uploadErr } = await supabase.storage.from('documents').upload(path, file, { upsert:false, contentType:file.type || 'application/pdf' })
+      if (uploadErr) throw uploadErr
+      const { data:u, error: signErr } = await supabase.storage.from('documents').createSignedUrl(path, 3600)
+      if (signErr || !u?.signedUrl) throw signErr || new Error('Could not create secure fax document URL')
+      fileUrl = u.signedUrl
+
+      const { data: resData, error: invokeErr } = await supabase.functions.invoke('send-fax', {
+        body: { to: toFull, document_url: fileUrl }
+      })
+      if (invokeErr) throw invokeErr
+      if (!resData?.success) throw new Error(resData?.error || 'Fax provider rejected the send')
+
+      await supabase.from('fax_logs').insert([{
+        to_number:toFull, client_name:lead?.name, subject, file_url:fileUrl,
+        file_name:file?.name||null, status:'Sent', provider_sid:resData?.sid || null,
+        sent_at:new Date().toISOString(), created_at:new Date().toISOString()
+      }])
+
+      const { data: { user } } = await supabase.auth.getUser()
+      const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+      const noteContent = `📠 Fax sent to ${toFull}${subject?' — '+subject:''}${file?.name?' (' + file.name + ')':''}`
+      await supabase.from('lead_notes').insert([{ lead_id: lead.id, lead_name: lead?.name, text: noteContent, type:'System', author: actor, created_at: new Date().toISOString() }])
+
+      onLogged?.(); onClose()
+    } catch (e) {
+      console.error('[LeadInlineFax] send failed:', e)
+      alert('Fax failed: ' + (e?.message || 'Unknown provider error'))
+    } finally {
+      set3(false)
     }
-    await supabase.from('fax_logs').insert([{to_number:toFull,from_number:fromNum,client_name:lead?.name,subject,file_url:fileUrl,file_name:file?.name||null,status:sent?'Sent':(s?.signalwire_backend?'Failed':'Logged'),sent_at:new Date().toISOString(),created_at:new Date().toISOString()}])
-
-    // Auto-log to Notes -- every outbound fax shows in the lead's activity
-    // timeline, same pattern as the SMS tab, including what was actually faxed.
-    const { data: { user } } = await supabase.auth.getUser()
-    const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
-    const noteContent = `📠 Fax ${sent?'sent':'logged'} to ${toFull}${subject?' — '+subject:''}${file?.name?' (' + file.name + ')':''}`
-    await supabase.from('lead_notes').insert([{ lead_id: lead.id, lead_name: lead?.name, text: noteContent, type:'System', author: actor, created_at: new Date().toISOString() }])
-
-    set3(false);onLogged?.();onClose()
   }
   return <div style={{padding:'0 4px 4px'}}>
     <div className="field"><label>To Fax Number</label><input value={toNum} onChange={e=>set0(e.target.value.replace(/\D/g,''))} placeholder="10 digits"/></div>

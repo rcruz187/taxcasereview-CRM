@@ -220,51 +220,50 @@ function InlineFaxForm({ client, onClose, showToast, onLogged }) {
   }
 
   async function send() {
-    if (!toNum) { showToast('Fax number required','err'); return }
+    const rawDigits = toNum.replace(/\D/g,'')
+    const faxDigits = rawDigits.length === 11 && rawDigits.startsWith('1') ? rawDigits.slice(1) : rawDigits
+    if (faxDigits.length !== 10) { showToast('Enter a valid 10-digit fax number.','err'); return }
+    if (!file) { showToast('Attach a document before sending the fax.','err'); return }
     setSending(true)
-    const s = await getSettings()
     let fileUrl = null
-    if (file) {
-      const path = 'fax/'+Date.now()+'_'+file.name
-      await supabase.storage.from('documents').upload(path, file, {upsert:true})
-      const { data:u } = await supabase.storage.from('documents').createSignedUrl(path, 3600)
-      fileUrl = u?.signedUrl || null
-    }
-    const toFull = '+1'+toNum.slice(-10)
-    const fromNum = s?.sw_inbound_did || ''
-    let sent = false
-    if (s?.signalwire_backend) {
-      try {
-        const res = await fetch(s.signalwire_backend+'/fax/send', {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({to:toFull,from:fromNum,...(fileUrl?{media_url:fileUrl}:{})})
-        })
-        const d = await res.json()
-        sent = res.ok && d?.success
-      } catch(e) {}
-    }
-    await supabase.from('fax_logs').insert([{
-      to_number:toFull, from_number:fromNum, client_name:client?.name,
-      subject, notes, file_name:file?.name||null, file_url:fileUrl,
-      status: sent ? 'Sent' : (s?.signalwire_backend ? 'Failed' : 'Logged'),
-      sent_by:'CRM', sent_at:new Date().toISOString(), created_at:new Date().toISOString()
-    }])
+    const toFull = '+1' + faxDigits
+    try {
+      const path = `fax/${client?.id || 'client'}/${Date.now()}_${file.name.replace(/[^A-Za-z0-9._-]/g,'_')}`
+      const { error: uploadErr } = await supabase.storage.from('documents').upload(path, file, {upsert:false, contentType:file.type || 'application/pdf'})
+      if (uploadErr) throw uploadErr
+      const { data:u, error: signErr } = await supabase.storage.from('documents').createSignedUrl(path, 3600)
+      if (signErr || !u?.signedUrl) throw signErr || new Error('Could not create secure fax document URL')
+      fileUrl = u.signedUrl
 
-    // Auto-log to Notes -- every outbound fax shows in the client's activity
-    // timeline, same pattern as the SMS tab, including what was actually faxed.
-    const { data: { user } } = await supabase.auth.getUser()
-    const actor = resolveActorName(user, employees)
-    const noteContent = `📠 Fax ${sent?'sent':'logged'} to ${toFull}${subject?' — '+subject:''}${file?.name?' (' + file.name + ')':''}`
-    const { error: noteErr } = await supabase.from('client_notes').insert({ clientname: client?.name, text: noteContent, author: actor, created_at: new Date().toISOString() })
-    if (noteErr) console.error('[client_notes] insert failed (InlineFaxForm):', noteErr)
+      const { data: resData, error: invokeErr } = await supabase.functions.invoke('send-fax', {
+        body: { to:toFull, document_url:fileUrl }
+      })
+      if (invokeErr) throw invokeErr
+      if (!resData?.success) throw new Error(resData?.error || 'Fax provider rejected the send')
 
-    setSending(false)
-    showToast('📠 Fax '+(sent?'sent':'logged')+'!')
-    onLogged?.()
-    onClose()
+      await supabase.from('fax_logs').insert([{
+        to_number:toFull, client_name:client?.name, subject, notes,
+        file_name:file?.name||null, file_url:fileUrl, status:'Sent',
+        provider_sid:resData?.sid || null, sent_at:new Date().toISOString(), created_at:new Date().toISOString()
+      }])
+
+      const { data: { user } } = await supabase.auth.getUser()
+      const actor = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'
+      const noteContent = `📠 Fax sent to ${toFull}${subject?' — '+subject:''}${file?.name?' ('+file.name+')':''}${notes?' — '+notes:''}`
+      const { error: noteErr } = await supabase.from('client_notes').insert([{
+        clientname: client?.name, text: noteContent, author: actor, visible_to_client:false, created_at:new Date().toISOString()
+      }])
+      if (noteErr) console.error('[client_notes] insert failed (InlineFaxForm):', noteErr)
+
+      showToast('📠 Fax sent!')
+      onLogged?.(); onClose()
+    } catch (e) {
+      console.error('[InlineFaxForm] send failed:', e)
+      showToast('Fax failed: ' + (e?.message || 'Unknown provider error'),'err')
+    } finally {
+      setSending(false)
+    }
   }
-
   return (
     <div style={{padding:'0 4px 4px'}}>
       <div className="field"><label>To Fax Number</label>
