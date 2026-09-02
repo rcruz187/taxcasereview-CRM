@@ -145,6 +145,58 @@ const EN_ES = {
   'Switch to light mode': 'Cambiar a modo claro',
   'Switch to dark mode': 'Cambiar a modo oscuro',
 
+  // Dashboard workflow.
+  'Active Cases': 'Casos activos',
+  'Open Leads': 'Prospectos abiertos',
+  'MTD 1st Trades': '1ros cobros del mes',
+  'MTD 2nd Trades': '2dos cobros del mes',
+  'AR Outstanding': 'Cuentas por cobrar pendientes',
+  'Unpaid Invoices': 'Facturas sin pagar',
+  'Open Tasks': 'Tareas abiertas',
+  'Upcoming DL': 'Próximos vencimientos',
+  'Overdue DL': 'Vencimientos atrasados',
+  'Closed Leads': 'Prospectos cerrados',
+  'Team MTD 1st Trades': '1ros cobros del equipo este mes',
+  'TOTAL': 'TOTAL',
+  'TOTAL RESOLUTION FEES': 'TOTAL DE HONORARIOS DE RESOLUCIÓN',
+  'SCHEDULED': 'PROGRAMADO',
+  'PAST DUE': 'VENCIDO',
+  'UNPAID': 'SIN PAGAR',
+  'Recent Cases': 'Casos recientes',
+  'Recent Clients': 'Clientes recientes',
+  'Recent Leads': 'Prospectos recientes',
+  'Quick Add': 'Agregar rápido',
+  'Quick Actions': 'Acciones rápidas',
+  'Upcoming Deadlines': 'Próximos vencimientos',
+  'IRS Deadlines': 'Vencimientos del IRS',
+  'Taxpayer Advocate': 'Defensor del contribuyente',
+  'Taxpayer Advocate Service': 'Servicio del Defensor del Contribuyente',
+  'IRS.gov Updates': 'Actualizaciones de IRS.gov',
+  'Latest updates from TAS': 'Últimas actualizaciones de TAS',
+  'What’s Happening': 'Qué está pasando',
+  "What's Happening": 'Qué está pasando',
+  'News & updates': 'Noticias y actualizaciones',
+  'More tips ›': 'Más consejos ›',
+  'Read more →': 'Leer más →',
+  'View All →': 'Ver todos →',
+  'All Tasks →': 'Todas las tareas →',
+  'All Clients →': 'Todos los clientes →',
+  'All Leads →': 'Todos los prospectos →',
+  'Layout saved': 'Diseño guardado',
+  'Drag to rearrange': 'Arrastre para reorganizar',
+  'No cases yet': 'Aún no hay casos',
+  'No open tasks': 'No hay tareas abiertas',
+  'No upcoming deadlines': 'No hay próximos vencimientos',
+  'No clients yet': 'Aún no hay clientes',
+  'No leads yet': 'Aún no hay prospectos',
+  'OVERDUE': 'VENCIDO',
+  'TODAY': 'HOY',
+  'Schedule': 'Programar',
+  'Add Deadline': 'Agregar vencimiento',
+  'Transcript Pull': 'Obtener transcripción',
+  'In Progress': 'En progreso',
+  'Low': 'Baja',
+
   // E-Signature workflow.
   'New Signing Request': 'Nueva solicitud de firma',
   'Total Sent': 'Total enviado',
@@ -267,15 +319,37 @@ const EN_ES = {
 const ES_EN = Object.fromEntries(Object.entries(EN_ES).map(([en, es]) => [es, en]))
 const ATTRS = ['placeholder', 'title', 'aria-label']
 
+const DASHBOARD_PATTERNS = [
+  [/^Good morning,\s*/i, 'Buenos días, '],
+  [/^Good afternoon,\s*/i, 'Buenas tardes, '],
+  [/^Good evening,\s*/i, 'Buenas noches, '],
+  [/^Recent Leads\s*—\s*Yours$/i, 'Prospectos recientes — Suyos'],
+  [/^(\d+)\s+total$/i, '$1 en total'],
+  [/^(\d+)\s+overdue$/i, '$1 vencidas'],
+  [/^(\d+)\s+unpaid$/i, '$1 sin pagar'],
+  [/^(\d+)d$/i, '$1d'],
+]
+
 export function translateText(value, language = 'en') {
   if (typeof value !== 'string') return value
   const trimmed = value.trim()
   if (!trimmed) return value
   const map = language === 'es' ? EN_ES : ES_EN
   const translated = map[trimmed]
-  if (!translated) return value
-  const start = value.indexOf(trimmed)
-  return `${value.slice(0, start)}${translated}${value.slice(start + trimmed.length)}`
+  if (translated) {
+    const start = value.indexOf(trimmed)
+    return `${value.slice(0, start)}${translated}${value.slice(start + trimmed.length)}`
+  }
+  if (language === 'es') {
+    for (const [pattern, replacement] of DASHBOARD_PATTERNS) {
+      if (pattern.test(trimmed)) {
+        const next = trimmed.replace(pattern, replacement)
+        const start = value.indexOf(trimmed)
+        return `${value.slice(0, start)}${next}${value.slice(start + trimmed.length)}`
+      }
+    }
+  }
+  return value
 }
 
 function translateNode(node, language) {
