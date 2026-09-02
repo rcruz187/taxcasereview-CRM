@@ -6,7 +6,7 @@ import ClientLink from '../components/ClientLink'
 const TYPES    = ['ACS','Appeals','CDP','CSED','General','Installment Agreement','IRS Notice','Levy Release','OIC','Penalty Abatement','Return Filing']
 const STATUSES = ['Tracking','Action Required','Scheduled','Completed']
 
-const BLANK = { name:'', title:'', client:'', clientName:'', type:'General', dueDate:'', status:'Tracking', notes:'' }
+const BLANK = { name:'', title:'', client:'', clientName:'', client_id:'', type:'General', dueDate:'', status:'Tracking', notes:'' }
 
 export default function Deadlines() {
   const [items,   setItems]   = useState([])
@@ -23,7 +23,7 @@ export default function Deadlines() {
   async function load() {
     const [{ data },{ data:cl }] = await Promise.all([
       supabase.from('deadlines').select('*').order('dueDate',{ascending:true}),
-      supabase.from('clients').select('id,name')
+      supabase.from('clients').select('id,name,email')
     ])
     if (data) setItems(data)
     if (cl)   setClients(cl)
@@ -47,7 +47,7 @@ export default function Deadlines() {
   function daysText(dy)     { return dy<0?'OVERDUE':dy===0?'TODAY':dy+'d left' }
 
   function searchClient(val) {
-    fld('client',val); fld('clientName',val)
+    fld('client',val); fld('clientName',val); fld('client_id','')
     if (val.length<2){setSug([]);return}
     setSug(clients.filter(c=>c.name.toLowerCase().includes(val.toLowerCase())).slice(0,6))
   }
@@ -103,9 +103,17 @@ export default function Deadlines() {
 
   async function sendDeadlineReminder(d) {
     const clientName = getClient(d)
-    const { data: client } = await supabase.from('clients').select('email').eq('name', clientName).maybeSingle()
-    const { data: lead }   = await supabase.from('leads').select('email').eq('name', clientName).maybeSingle()
-    const to = client?.email || lead?.email
+    let client = null
+    if (d.client_id) {
+      const { data } = await supabase.from('clients').select('email').eq('id', d.client_id).maybeSingle()
+      client = data
+    }
+    if (!client) {
+      const { data } = await supabase.from('clients').select('email').eq('name', clientName).limit(1)
+      client = data?.[0] || null
+    }
+    const { data: leadRows } = client ? { data: [] } : await supabase.from('leads').select('email').eq('name', clientName).limit(1)
+    const to = client?.email || leadRows?.[0]?.email
     if (!to) { showToast('No email on file for ' + clientName); return }
     const dy = daysLeft(d)
     const subject = `Reminder: ${getName(d)} — ${d.dueDate||d.due_date}`
@@ -243,7 +251,7 @@ export default function Deadlines() {
                 <input value={form.client} onChange={e=>searchClient(e.target.value)} placeholder="Type client name..." autoComplete="off"/>
                 {sug.length>0&&(
                   <div style={{position:'absolute',top:'100%',left:0,right:0,background:'var(--s3)',border:'1px solid var(--b2c)',borderRadius:7,zIndex:500}}>
-                    {sug.map(c=><div key={c.id} onClick={()=>{fld('client',c.name);fld('clientName',c.name);setSug([])}} style={{padding:'7px 12px',cursor:'pointer',fontSize:13}}>{c.name}</div>)}
+                    {sug.map(c=><div key={c.id} onClick={()=>{fld('client',c.name);fld('clientName',c.name);fld('client_id',c.id);setSug([])}} style={{padding:'7px 12px',cursor:'pointer',fontSize:13}}>{c.name}</div>)}
                   </div>
                 )}
               </div>

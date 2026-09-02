@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { sendGmailEmail } from '../lib/gmailUtils'
 
-const BLANK = { clientName:'', service:'', description:'', amount:'', depositAmount:'', validUntil:'', status:'Draft', assignedTo:'', notes:'' }
+const BLANK = { clientName:'', client_id:'', service:'', description:'', amount:'', depositAmount:'', validUntil:'', status:'Draft', assignedTo:'', notes:'' }
 const SERVICES = ['OIC — Offer in Compromise','Installment Agreement (IA)','Currently Not Collectible (CNC)','Penalty Abatement','Audit Representation','Lien Release / Discharge','Wage Garnishment Release','IRS Appeals Representation','Tax Return Preparation','Transcript Analysis Package','CDP Hearing','Trust Fund Recovery Defense','Innocent Spouse Relief','Business Tax Resolution','Payroll Tax Representation']
 const EST_STATUSES = ['Draft','Sent','In Review','Accepted','Rejected','Expired']
 
@@ -28,7 +28,7 @@ export default function Estimates() {
   async function load() {
     const [{ data:e },{ data:c },{ data:emp }] = await Promise.all([
       supabase.from('estimates').select('*').order('created_at',{ascending:false}),
-      supabase.from('clients').select('id,name,issueType,assignedTo'),
+      supabase.from('clients').select('id,name,email,issueType,assignedTo'),
       supabase.from('employees').select('name'),
     ])
     if (e)   setItems(e)
@@ -41,6 +41,7 @@ export default function Estimates() {
 
   function searchClient(val) {
     fld('clientName',val)
+    fld('client_id','')
     if (val.length<2) { setSug([]); setShowSug(false); return }
     const matches = clients.filter(c=>c.name.toLowerCase().includes(val.toLowerCase())).slice(0,6)
     setSug(matches); setShowSug(matches.length>0)
@@ -48,6 +49,7 @@ export default function Estimates() {
 
   function selectClient(c) {
     fld('clientName', c.name)
+    fld('client_id', c.id)
     if (c.assignedTo) fld('assignedTo', c.assignedTo)
     setSug([]); setShowSug(false)
   }
@@ -69,9 +71,17 @@ export default function Estimates() {
   }
 
   async function sendEstimate(est) {
-    const { data: client } = await supabase.from('clients').select('email').eq('name', est.clientName).maybeSingle()
-    const { data: lead }   = await supabase.from('leads').select('email').eq('name', est.clientName).maybeSingle()
-    const to = client?.email || lead?.email
+    let client = null
+    if (est.client_id) {
+      const { data } = await supabase.from('clients').select('email').eq('id', est.client_id).maybeSingle()
+      client = data
+    }
+    if (!client) {
+      const { data } = await supabase.from('clients').select('email').eq('name', est.clientName).limit(1)
+      client = data?.[0] || null
+    }
+    const { data: leadRows } = client ? { data: [] } : await supabase.from('leads').select('email').eq('name', est.clientName).limit(1)
+    const to = client?.email || leadRows?.[0]?.email
     if (!to) { showToast('No email on file for this client'); return }
     const subject = `Estimate #${est.estNum||''} — Tax Case Review`
     const body = `Dear ${est.clientName},\n\nPlease review the following estimate from Tax Case Review.\n\nEstimate #: ${est.estNum||''}\nAmount: $${parseFloat(est.amount||0).toLocaleString()}\nValid Until: ${est.validUntil||'30 days'}\n\nServices:\n${est.description||''}\n\nTo accept this estimate, please reply to this email or call our office.`
@@ -87,7 +97,7 @@ export default function Estimates() {
     if (!confirm('Convert this estimate to an invoice?')) return
     const invNum = 'INV-' + Date.now().toString().slice(-6)
     const {error} = await supabase.from('invoices').insert([{
-      clientName: est.clientName, lineItems: est.service + (est.description?'\n'+est.description:''),
+      clientName: est.clientName, client_id: est.client_id || null, lineItems: est.service + (est.description?'\n'+est.description:''),
       total: est.amount, paid:'0', status:'Unpaid', invNum,
       created_at: new Date().toISOString()
     }])

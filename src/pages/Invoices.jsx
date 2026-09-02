@@ -11,7 +11,7 @@ import { useFirm } from '../lib/useFirm'
 import { generateInvoicePdfBase64 } from '../lib/invoicePdf'
 import ClientLink from '../components/ClientLink'
 
-const BLANK = { clientName:'', caseNum:'', lineItems:'', total:'', paid:'0', dueDate:'', taxRate:'0', status:'Unpaid', notes:'' }
+const BLANK = { clientName:'', client_id:'', caseNum:'', lineItems:'', total:'', paid:'0', dueDate:'', taxRate:'0', status:'Unpaid', notes:'' }
 const SERVICE_TEMPLATES = [
   'OIC Representation Services',
   'Installment Agreement Setup',
@@ -54,7 +54,7 @@ export default function Invoices() {
   async function load() {
     const [{ data:inv },{ data:cl },{ data:cs }] = await Promise.all([
       supabase.from('invoices').select('*').order('created_at',{ascending:false}),
-      supabase.from('clients').select('id,name,assignedTo'),
+      supabase.from('clients').select('id,name,email,assignedTo'),
       supabase.from('cases').select('clientName,caseNum,created_at').order('created_at',{ascending:false})
     ])
     if (inv) setItems(inv)
@@ -67,6 +67,7 @@ export default function Invoices() {
 
   function searchClient(val) {
     fld('clientName',val)
+    fld('client_id','')
     if (val.length < 2) { setSug([]); setShowSug(false); return }
     const matches = clients.filter(c=>c.name.toLowerCase().includes(val.toLowerCase())).slice(0,6)
     setSug(matches); setShowSug(matches.length > 0)
@@ -74,6 +75,7 @@ export default function Invoices() {
 
   function selectClient(c) {
     fld('clientName', c.name)
+    fld('client_id', c.id)
     // Auto-fill Case # from this client's most recent case, if they have one
     const match = cases.find(cs => cs.clientName === c.name)
     if (match) fld('caseNum', match.caseNum)
@@ -115,10 +117,18 @@ export default function Invoices() {
   }
 
   async function sendInvoiceEmail(inv, isReminder = false) {
-    // Look up client email
-    const { data: client } = await supabase.from('clients').select('id,email').eq('name', inv.clientName).maybeSingle()
-    const { data: lead }   = await supabase.from('leads').select('email').eq('name', inv.clientName).maybeSingle()
-    const to = client?.email || lead?.email
+    // Prefer the stable client id; keep a bounded name fallback only for legacy rows.
+    let client = null
+    if (inv.client_id) {
+      const { data } = await supabase.from('clients').select('id,email').eq('id', inv.client_id).maybeSingle()
+      client = data
+    }
+    if (!client) {
+      const { data } = await supabase.from('clients').select('id,email').eq('name', inv.clientName).limit(1)
+      client = data?.[0] || null
+    }
+    const { data: leadRows } = client ? { data: [] } : await supabase.from('leads').select('email').eq('name', inv.clientName).limit(1)
+    const to = client?.email || leadRows?.[0]?.email
     if (!to) { showToast('No email on file for this client'); return }
 
     const invNum = inv.invNum || inv.id?.slice(-6) || ''
@@ -197,13 +207,16 @@ Please contact our office with any questions.`
     const { error } = await supabase.from('invoices').update({ paid: String(newPaid), status, updated_at: new Date().toISOString() }).eq('id', inv.id)
     if (!error) {
       // Also create a payment record for this transaction only; invoice.paid is cumulative.
-      await supabase.from('payments').insert([{ clientName: inv.clientName, amount: paymentAmount, method: 'Manual', invoiceId: inv.id, notes: `Payment for Invoice #${inv.invNum||''}`, created_at: new Date().toISOString() }])
+      await supabase.from('payments').insert([{ clientName: inv.clientName, client_id: inv.client_id || null, amount: paymentAmount, method: 'Manual', invoiceId: inv.id, notes: `Payment for Invoice #${inv.invNum||''}`, created_at: new Date().toISOString() }])
       showToast(`✅ Payment of $${paymentAmount.toLocaleString()} recorded`)
       load()
     }
   }
 
-  async function markPaid(inv) {    const total = parseFloat(inv.total||0)
+  async function markPaid(inv) {
+    const subtotal = parseFloat(inv.total||0)
+    const taxRate = parseFloat(inv.taxRate||0)
+    const total = subtotal + (subtotal * taxRate / 100)
     const {error} = await supabase.from('invoices').update({paid:String(total), status:'Paid', updated_at:new Date().toISOString()}).eq('id',inv.id)
     if (!error) { showToast('✅ Marked as Paid!'); const actorIP = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Staff'; await triggerWorkflow('invoice_paid', 'client', inv?.clientName || '', actorIP).catch(()=>{}); await logActivity(supabase,{employeeName:actorIP,action:'invoice_paid',category:'invoice',description:`Marked invoice paid — ${inv.clientName}`,entityName:inv.clientName,meta:{invNum:inv.invNum}}).catch(()=>{}); load() }
   }
