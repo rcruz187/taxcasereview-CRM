@@ -1,0 +1,85 @@
+name: Production Capacity Certification
+
+on:
+  workflow_dispatch:
+    inputs:
+      users_per_role:
+        description: 'Temporary QA users per role (5 roles)'
+        required: false
+        default: '4'
+      phase10_seconds:
+        description: '10-user sustained phase seconds'
+        required: false
+        default: '90'
+      phase20_seconds:
+        description: '20-user sustained phase seconds'
+        required: false
+        default: '180'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/certify-production-capacity.mjs'
+      - '.github/workflows/production-capacity-certification.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tcr-production-capacity-certification
+  cancel-in-progress: false
+
+jobs:
+  certify:
+    name: 10-20 employee production certification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: mpxgxfqdbquzkrvvejkh
+      CERT_SUPABASE_URL: https://mpxgxfqdbquzkrvvejkh.supabase.co
+      CERT_TENANT_ID: 61a89aef-0e7e-4ea2-b222-44ab2024655a
+      CERT_TENANT_NAME: Tax Case Review
+      CERT_USERS_PER_ROLE: ${{ github.event.inputs.users_per_role || '4' }}
+      CERT_PHASE10_MS: ${{ format('{0}000', github.event.inputs.phase10_seconds || '90') }}
+      CERT_PHASE20_MS: ${{ format('{0}000', github.event.inputs.phase20_seconds || '180') }}
+      CERT_THINK_MS: '350'
+
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Resolve production API keys without exposing them
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${SUPABASE_ACCESS_TOKEN:-}" || { echo 'SUPABASE_ACCESS_TOKEN secret is missing'; exit 2; }
+          KEYS="$(curl -fsS -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" "https://api.supabase.com/v1/projects/${PROJECT_REF}/api-keys")"
+          ANON="$(printf '%s' "$KEYS" | jq -r '.[] | select(.name == "anon") | .api_key' | head -n1)"
+          SERVICE="$(printf '%s' "$KEYS" | jq -r '.[] | select(.name == "service_role") | .api_key' | head -n1)"
+          test -n "$ANON" && test "$ANON" != null || { echo 'Could not resolve anon key'; exit 2; }
+          test -n "$SERVICE" && test "$SERVICE" != null || { echo 'Could not resolve service role key'; exit 2; }
+          echo "::add-mask::$ANON"
+          echo "::add-mask::$SERVICE"
+          echo "CERT_SUPABASE_ANON_KEY=$ANON" >> "$GITHUB_ENV"
+          echo "CERT_SUPABASE_SERVICE_ROLE_KEY=$SERVICE" >> "$GITHUB_ENV"
+
+      - name: Run controlled production certification
+        run: node scripts/certify-production-capacity.mjs
+
+      - name: Upload certification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tcr-production-capacity-certification-${{ github.sha }}
+          path: artifacts/production-capacity-certification.json
+          if-no-files-found: warn
+          retention-days: 30
