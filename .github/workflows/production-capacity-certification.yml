@@ -6,13 +6,21 @@ on:
       users_per_role:
         description: 'Temporary QA users per role (5 roles)'
         required: false
-        default: '4'
-      phase10_seconds:
-        description: '10-user sustained phase seconds'
+        default: '20'
+      phase25_seconds:
+        description: '25-user sustained phase seconds'
+        required: false
+        default: '60'
+      phase50_seconds:
+        description: '50-user sustained phase seconds'
+        required: false
+        default: '60'
+      phase75_seconds:
+        description: '75-user sustained phase seconds'
         required: false
         default: '90'
-      phase20_seconds:
-        description: '20-user sustained phase seconds'
+      phase100_seconds:
+        description: '100-user sustained phase seconds'
         required: false
         default: '180'
   push:
@@ -22,6 +30,7 @@ on:
       - 'supabase/functions/**'
       - 'supabase/migrations/**'
       - 'scripts/certify-production-capacity.mjs'
+      - 'scripts/certify-production-capacity-100.mjs'
       - 'package.json'
       - 'package-lock.json'
       - 'vite.config.js'
@@ -36,18 +45,20 @@ concurrency:
 
 jobs:
   certify:
-    name: 10-20 employee production certification
+    name: 100 employee production certification
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       PROJECT_REF: mpxgxfqdbquzkrvvejkh
       CERT_SUPABASE_URL: https://mpxgxfqdbquzkrvvejkh.supabase.co
       CERT_TENANT_ID: 61a89aef-0e7e-4ea2-b222-44ab2024655a
       CERT_TENANT_NAME: Tax Case Review
-      CERT_USERS_PER_ROLE: ${{ github.event.inputs.users_per_role || '4' }}
-      CERT_PHASE10_MS: ${{ format('{0}000', github.event.inputs.phase10_seconds || '90') }}
-      CERT_PHASE20_MS: ${{ format('{0}000', github.event.inputs.phase20_seconds || '180') }}
+      CERT_USERS_PER_ROLE: ${{ github.event.inputs.users_per_role || '20' }}
+      CERT_PHASE25_MS: ${{ format('{0}000', github.event.inputs.phase25_seconds || '60') }}
+      CERT_PHASE50_MS: ${{ format('{0}000', github.event.inputs.phase50_seconds || '60') }}
+      CERT_PHASE75_MS: ${{ format('{0}000', github.event.inputs.phase75_seconds || '90') }}
+      CERT_PHASE100_MS: ${{ format('{0}000', github.event.inputs.phase100_seconds || '180') }}
       CERT_THINK_MS: '350'
 
     steps:
@@ -78,14 +89,14 @@ jobs:
           echo "CERT_SUPABASE_ANON_KEY=$ANON" >> "$GITHUB_ENV"
           echo "CERT_SUPABASE_SERVICE_ROLE_KEY=$SERVICE" >> "$GITHUB_ENV"
 
-      - name: Run controlled production certification
-        run: node scripts/certify-production-capacity.mjs
+      - name: Run controlled 100 employee production certification
+        run: node scripts/certify-production-capacity-100.mjs
 
       - name: Upload certification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: tcr-production-capacity-certification-${{ github.sha }}
+          name: tcr-100-employee-production-capacity-${{ github.sha }}
           path: artifacts/production-capacity-certification.json
           if-no-files-found: warn
           retention-days: 30
