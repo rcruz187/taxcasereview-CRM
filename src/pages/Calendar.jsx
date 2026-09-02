@@ -80,7 +80,7 @@ export default function Calendar() {
   const [confirmDel,    setConfirmDel]    = useState(null)
 
   const [form, setForm] = useState({
-    title: '', clientName: '', assignedTo: '', date: '', time: '',
+    title: '', clientName: '', client_id: '', assignedTo: '', date: '', time: '',
     endTime: '', eventType: 'Consultation Call', color: 'bb',
     notes: '', recurring: 'none', status: 'scheduled'
   })
@@ -132,9 +132,9 @@ export default function Calendar() {
     setLoading(true)
     const [{ data: ev }, { data: cl }, { data: em }, { data: dl }] = await Promise.all([
       supabase.from('calevents').select('*').order('date', { ascending: true }),
-      supabase.from('clients').select('id,name'),
+      supabase.from('clients').select('id,name,email,address'),
       supabase.from('employees').select('id,name').order('name'),
-      supabase.from('deadlines').select('id,title,dueDate,clientName,status').neq('status', 'Completed'),
+      supabase.from('deadlines').select('id,title,dueDate,clientName,client_id,status').neq('status', 'Completed'),
     ])
     setEvents(ev || [])
     setClients(cl || [])
@@ -174,11 +174,17 @@ export default function Calendar() {
 
   async function emailMeetingLink(ev) {
     if (!ev.clientName) { showToast('No client on this appointment to email'); return }
-    const [{ data: c }, { data: l }] = await Promise.all([
-      supabase.from('clients').select('email').eq('name', ev.clientName).maybeSingle(),
-      supabase.from('leads').select('email').eq('name', ev.clientName).maybeSingle(),
-    ])
-    const email = c?.email || l?.email
+    let c = null
+    if (ev.client_id) {
+      const { data } = await supabase.from('clients').select('email').eq('id', ev.client_id).maybeSingle()
+      c = data
+    }
+    if (!c) {
+      const { data } = await supabase.from('clients').select('email').eq('name', ev.clientName).limit(1)
+      c = data?.[0] || null
+    }
+    const { data: leadRows } = c ? { data: [] } : await supabase.from('leads').select('email').eq('name', ev.clientName).limit(1)
+    const email = c?.email || leadRows?.[0]?.email
     if (!email) { showToast('No email on file for ' + ev.clientName); return }
 
     const when = ev.date ? new Date(ev.date + 'T12:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : ''
@@ -230,14 +236,15 @@ export default function Calendar() {
     if (form.clientName) {
       const fmtTime = form.time ? new Date(`2000-01-01T${form.time}`).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}) : ''
       const noteText = `📅 Appointment ${form.id ? 'updated' : 'scheduled'}: ${form.title || form.eventType} on ${form.date}${fmtTime ? ' at ' + fmtTime : ''} — by ${actorCal}${form.notes ? '\nNotes: ' + form.notes : ''}`
-      const { data: leadRow } = await supabase.from('leads').select('id').eq('name', form.clientName).maybeSingle().catch(()=>({data:null}))
+      const { data: leadRows } = await supabase.from('leads').select('id').eq('name', form.clientName).limit(1).catch(()=>({data:[]}))
+      const leadRow = leadRows?.[0] || null
       if (leadRow?.id) {
         await supabase.from('lead_notes').insert({ lead_id: leadRow.id, lead_name: form.clientName, text: noteText, type: 'System', author: actorCal, created_at: new Date().toISOString() }).catch(()=>{})
       } else {
         await supabase.from('client_notes').insert({ clientname: form.clientName, text: noteText, author: actorCal, visible_to_client: false }).catch(()=>{})
       }
     }
-    setShowForm(false); setForm({ title:'',clientName:'',assignedTo:'',date:'',time:'',endTime:'',eventType:'Consultation Call',color:'bb',notes:'',recurring:'none',status:'scheduled' })
+    setShowForm(false); setForm({ title:'',clientName:'',client_id:'',assignedTo:'',date:'',time:'',endTime:'',eventType:'Consultation Call',color:'bb',notes:'',recurring:'none',status:'scheduled' })
     load()
   }
 
@@ -658,7 +665,7 @@ export default function Calendar() {
               { icon: '📆', label: 'View Day',       action: () => { setCurrentDate(dayMenuDate); setView('day'); setDayMenuPos(null) } },
               { icon: '📍', label: 'Map Route',      action: () => {
                 const addrs = eventsForDay(dayMenuDate).map(ev => {
-                  const c = clients.find(cl => cl.name === ev.clientName)
+                  const c = ev.client_id ? clients.find(cl => cl.id === ev.client_id) : clients.find(cl => cl.name === ev.clientName)
                   return c ? c.address : null
                 }).filter(Boolean)
                 if (addrs.length) window.open(`https://www.google.com/maps/dir/${addrs.map(a => encodeURIComponent(a)).join('/')}`, '_blank')
@@ -712,8 +719,10 @@ export default function Calendar() {
                 <input style={inp} value={form.title} onChange={e => fld('title', e.target.value)} autoFocus />
               </div>
               <div><label style={lbl}>Client</label>
-                <input style={inp} value={form.clientName} onChange={e => fld('clientName', e.target.value)} list="cal-clients" placeholder="Search client..." />
-                <datalist id="cal-clients">{clients.map(c => <option key={c.id} value={c.name} />)}</datalist>
+                <select style={inp} value={form.client_id || ''} onChange={e => { const c = clients.find(x => x.id === e.target.value); fld('client_id', e.target.value); fld('clientName', c?.name || '') }}>
+                  <option value="">— No client —</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
               </div>
               <div className="cal-form-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div><label style={lbl}>Date *</label>
