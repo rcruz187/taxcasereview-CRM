@@ -25,27 +25,21 @@ import './taxres-dashboard.css'
 import App from './App.jsx'
 import { getModel } from './lib/leadStatus'
 
-// Emergency compatibility guards for lazy-loaded modules that were recently
-// refactored to use new helpers/hooks without importing them locally. These are
-// synchronous and side-effect free; they mount nothing. Keep the app available
-// while the individual modules are normalized back to explicit imports.
 globalThis.React = React
 globalThis.getModel = getModel
 globalThis.useMemo = React.useMemo
 
-// A user can keep TCR open while a new GitHub Pages deploy replaces the hashed
-// lazy-page chunks underneath that already-running tab. The old shell then asks
-// for a chunk filename that no longer exists, which makes the clicked page fail
-// and can make subsequent lazy routes look broken until a hard refresh.
-// Detect only dynamic-import/chunk-load failures and perform ONE normal reload
-// per 60 seconds. The current URL is preserved, so React Router returns the user
-// to the page they clicked instead of leaving the shell poisoned.
+// A user can keep TCR open while a new deploy replaces the hashed lazy-page
+// JavaScript or CSS chunks underneath that already-running tab. Vite can report
+// either a dynamic import failure OR an "Unable to preload CSS" failure. Both
+// poison lazy navigation until the shell reloads. Recover exactly once per
+// minute while preserving the current URL.
 ;(function installStaleChunkRecovery() {
   const KEY = 'tcr_last_chunk_recovery'
   const WINDOW_MS = 60_000
   const matchesChunkFailure = value => {
     const msg = String(value?.message || value?.reason?.message || value?.reason || value || '')
-    return /Failed to fetch dynamically imported module|Importing a module script failed|ChunkLoadError|Loading chunk|dynamically imported module/i.test(msg)
+    return /Failed to fetch dynamically imported module|Importing a module script failed|ChunkLoadError|Loading chunk|dynamically imported module|Unable to preload CSS|Failed to fetch.*assets\/.+\.(?:js|css)|error loading dynamically imported module/i.test(msg)
   }
   const recover = value => {
     if (!matchesChunkFailure(value)) return
@@ -71,7 +65,6 @@ globalThis.useMemo = React.useMemo
   root.style.setProperty('--b2',   hex)
   root.style.setProperty('--blt',  `rgba(${rgb},.18)`)
   root.style.setProperty('--b2c',  `rgba(${rgb},.14)`)
-  // Re-inject override stylesheet so hardcoded rgba values also update
   const s = document.createElement('style')
   s.id = 'tcr-brand-override'
   s.textContent = `
@@ -92,9 +85,6 @@ globalThis.useMemo = React.useMemo
 })()
 
 // Restore deep-link URL after the GitHub Pages 404 SPA redirect.
-// 404.html saves the original URL to sessionStorage.redirect before bouncing
-// to the app root — we read it back here and replace the history entry so
-// React Router sees the correct path + query string on first render.
 ;(function() {
   try {
     const saved = sessionStorage.getItem('redirect') || sessionStorage.redirect
