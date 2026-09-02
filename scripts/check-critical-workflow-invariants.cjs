@@ -48,6 +48,23 @@ requireAll('supabase/functions/send-fax/index.ts', [
   "return json({ success: true, provider, sid:",
 ])
 
+requireAll('src/pages/Payments.jsx', [
+  "client_id:''",
+  "select('id,invNum,clientName,client_id,total,taxRate,paid,status')",
+  "fld('client_id',c.id)",
+  "fld('client_id', inv.client_id || '')",
+])
+
+const invoiceSync = requireAll('src/lib/invoiceSync.js', [
+  "select('id, invNum, total, taxRate, paid, status')",
+  "subtotal + (subtotal * taxRate / 100)",
+  "paid >= total - 0.005",
+])
+if (invoiceSync.includes(".maybeSingle()")) {
+  console.error('ERROR: invoiceSync reverted to duplicate-sensitive maybeSingle invoice lookup.')
+  process.exit(1)
+}
+
 requireAll('src/lib/i18n.js', [
   "'+ New Event': '+ Nuevo evento'",
   "'Save Event': 'Guardar evento'",
