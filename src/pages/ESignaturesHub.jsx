@@ -70,6 +70,7 @@ export default function ESignaturesHub(){
                 ].map(([k,v])=><div key={k} style={{background:'rgba(255,255,255,.025)',border:'1px solid rgba(99,102,241,.16)',borderRadius:10,padding:'12px 13px'}}><div style={{fontSize:9,color:'#64748b',fontWeight:900,textTransform:'uppercase',letterSpacing:'.06em'}}>{k}</div><div style={{fontSize:12,color:'#e2e8f0',fontWeight:800,marginTop:5,wordBreak:'break-word'}}>{String(v)}</div></div>)}
               </div>
               <UniversalOfficeESign
+                key={`${selected.product_key||'romylabs'}:${selected.external_office_id||selected.id}`}
                 supabase={supabase}
                 productKey={selected.product_key||'romylabs'}
                 externalOfficeId={selected.external_office_id||selected.id}

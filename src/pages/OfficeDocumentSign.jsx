@@ -16,6 +16,7 @@ export default function OfficeDocumentSign(){
   const [page,setPage]=useState(1)
   const [values,setValues]=useState({})
   const [signature,setSignature]=useState('')
+  const [consent,setConsent]=useState(false)
   const [loading,setLoading]=useState(true)
   const [working,setWorking]=useState(false)
   const [error,setError]=useState('')
@@ -77,6 +78,7 @@ export default function OfficeDocumentSign(){
 
   async function finish(){
     const fields=doc?.fields||[]
+    if(!consent){setError('You must consent to electronic records and signatures before finishing.');return}
     let sig=signature
     if(!sig){adoptSignature();setError('Adopt your signature, then click Finish & Sign again.');return}
     for(const f of fields){
@@ -84,7 +86,7 @@ export default function OfficeDocumentSign(){
     }
     if(!window.confirm('Finish signing this document? Your electronic signature will be applied to the contract.'))return
     setWorking(true);setError('')
-    const {data,error:e}=await supabase.functions.invoke('office-agreement-file',{body:{action:'esign_sign',token,signature_name:sig,values}})
+    const {data,error:e}=await supabase.functions.invoke('office-agreement-file',{body:{action:'esign_sign',token,signature_name:sig,values,consent:true}})
     setWorking(false)
     if(e||!data?.ok){setError(e?.message||data?.error||'Could not complete signature');return}
     setDone(true);await load()
@@ -113,7 +115,7 @@ export default function OfficeDocumentSign(){
       </div>
     </>}
 
-    {!done&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,marginTop:16,flexWrap:'wrap'}}><div style={{fontSize:11,color:'#64748b'}}>By clicking Finish & Sign, you agree to use an electronic signature for this document.</div><button disabled={working} onClick={finish} style={{...primaryBtn,background:'#059669'}}>{working?'Applying Signature…':'Finish & Sign'}</button></div>}
+    {!done&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,marginTop:16,flexWrap:'wrap'}}><label style={{fontSize:11,color:'#475569',display:'flex',gap:8,alignItems:'flex-start',maxWidth:650}}><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)} style={{marginTop:2}}/><span>I agree to use electronic records and signatures and intend the signature I adopt above to be legally binding for this document.</span></label><button disabled={working||!consent} onClick={finish} style={{...primaryBtn,background:'#059669',opacity:(working||!consent)?0.55:1}}>{working?'Applying Signature…':'Finish & Sign'}</button></div>}
   </Shell>
 }
 

@@ -53,6 +53,7 @@ serve(async(req)=>{
       const signatureName=String(b.signature_name||'').trim()
       const values=b.values&&typeof b.values==='object'?b.values:{}
       if(!signatureName)return json({error:'Signature name is required'},400)
+      if(b.consent!==true)return json({error:'Electronic signature consent is required'},400)
       const fields=Array.isArray(doc.fields)?doc.fields:[]
       for(const f of fields){
         const value=String(values[f.id]??'').trim()
@@ -82,13 +83,14 @@ serve(async(req)=>{
         page.drawText(text.slice(0,200),{x:x+3,y:y+Math.max(0,(boxH-size)/2),size,font:f.type==='signature'?oblique:regular,color:rgb(.05,.12,.22),maxWidth:Math.max(10,boxW-6)})
       }
       const finalBytes=await pdf.save()
-      const signedPath=`${doc.product_key}/${doc.external_office_id}/${doc.id}/signed-${safeFile(doc.source_filename)}`
-      const {error:up}=await admin.storage.from(ESIGN_BUCKET).upload(signedPath,finalBytes,{contentType:'application/pdf',upsert:true})
+      const signedPath=`${doc.product_key}/${doc.external_office_id}/${doc.id}/signed-${crypto.randomUUID()}-${safeFile(doc.source_filename)}`
+      const {error:up}=await admin.storage.from(ESIGN_BUCKET).upload(signedPath,finalBytes,{contentType:'application/pdf',upsert:false})
       if(up)return json({error:'Could not save signed document: '+up.message},500)
       const now=new Date().toISOString()
-      const audit=[...(Array.isArray(doc.audit)?doc.audit:[]),{event:'signed',at:now,signer:signatureName,email:doc.signer_email,ip:ip(req),user_agent:req.headers.get('user-agent')}]
-      const {error:upd}=await admin.from('romylabs_office_signing_documents').update({status:'signed',signed_path:signedPath,signed_at:now,signature_name:signatureName,signer_ip:ip(req),signer_user_agent:req.headers.get('user-agent'),audit,updated_at:now}).eq('id',doc.id).in('status',['sent','viewed'])
-      if(upd)return json({error:'Could not finalize signature'},500)
+      const audit=[...(Array.isArray(doc.audit)?doc.audit:[]),{event:'signed',at:now,signer:signatureName,email:doc.signer_email,consent_to_esign:true,ip:ip(req),user_agent:req.headers.get('user-agent')}]
+      const {data:updated,error:upd}=await admin.from('romylabs_office_signing_documents').update({status:'signed',signed_path:signedPath,signed_at:now,signature_name:signatureName,signer_ip:ip(req),signer_user_agent:req.headers.get('user-agent'),audit,updated_at:now}).eq('id',doc.id).in('status',['sent','viewed']).select('id').maybeSingle()
+      if(upd){await admin.storage.from(ESIGN_BUCKET).remove([signedPath]);return json({error:'Could not finalize signature'},500)}
+      if(!updated){await admin.storage.from(ESIGN_BUCKET).remove([signedPath]);return json({error:'This document was already signed or is no longer signable'},409)}
       return json({ok:true,signed_at:now})
     }
 
