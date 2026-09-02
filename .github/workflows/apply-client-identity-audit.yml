@@ -1,0 +1,34 @@
+name: Apply Client Identity Audit Fixes
+
+on:
+  push:
+    paths:
+      - '.github/scripts/fix_client_identity_and_invoice_tax.py'
+      - '.github/workflows/apply-client-identity-audit.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply stable client identity fixes
+        run: python .github/scripts/fix_client_identity_and_invoice_tax.py
+      - name: Commit repaired source
+        run: |
+          if git diff --quiet; then
+            echo 'No source changes required.'
+            exit 0
+          fi
+          git config user.name 'RomyLabs Audit Bot'
+          git config user.email 'actions@github.com'
+          git add src/pages/Deadlines.jsx src/pages/Estimates.jsx src/pages/Invoices.jsx
+          git commit -m 'fix(audit): use stable client ids in billing and deadlines'
+          git push origin HEAD:main
