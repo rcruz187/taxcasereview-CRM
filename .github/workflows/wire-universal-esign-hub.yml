@@ -26,6 +26,13 @@ jobs:
           cache: npm
       - name: Wire E-Signatures hub into Admin Portal
         run: node scripts/wire-universal-esign-hub.mjs
+      - name: Commit wiring before source verification
+        run: |
+          git config user.name 'RomyLabs E-Sign Bot'
+          git config user.email 'romy@romylabs.com'
+          git add src/pages/AdminPortal.jsx
+          git diff --cached --quiet || git commit -m 'feat(esign): expose universal office signing hub'
+          git push origin HEAD:main
       - name: Install dependencies
         run: npm ci
       - name: Build production bundle
@@ -37,10 +44,3 @@ jobs:
           grep -q "import('./ESignaturesHub')" src/pages/AdminPortal.jsx
           grep -q 'Upload any PDF contract' src/pages/ESignaturesHub.jsx
           grep -q 'UniversalOfficeESign' src/pages/ESignaturesHub.jsx
-      - name: Commit wiring
-        run: |
-          git config user.name 'RomyLabs E-Sign Bot'
-          git config user.email 'romy@romylabs.com'
-          git add src/pages/AdminPortal.jsx
-          git diff --cached --quiet || git commit -m 'feat(esign): expose universal office signing hub'
-          git push origin HEAD:main
