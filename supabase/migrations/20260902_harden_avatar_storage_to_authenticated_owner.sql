@@ -12,7 +12,7 @@ with check (
     from public.employees e
     where lower(e.email) = lower(auth.jwt() ->> 'email')
       and e.tenant_id = public.current_tenant_id()
-      and name like e.id::text || '-%'
+      and storage.objects.name like e.id::text || '-%'
   )
 );
 
@@ -25,7 +25,7 @@ using (
     from public.employees e
     where lower(e.email) = lower(auth.jwt() ->> 'email')
       and e.tenant_id = public.current_tenant_id()
-      and name like e.id::text || '-%'
+      and storage.objects.name like e.id::text || '-%'
   )
 )
 with check (
@@ -35,6 +35,6 @@ with check (
     from public.employees e
     where lower(e.email) = lower(auth.jwt() ->> 'email')
       and e.tenant_id = public.current_tenant_id()
-      and name like e.id::text || '-%'
+      and storage.objects.name like e.id::text || '-%'
   )
 );
