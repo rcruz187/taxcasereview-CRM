@@ -1,0 +1,34 @@
+name: Apply Calendar Client Identity Fix
+
+on:
+  push:
+    paths:
+      - '.github/scripts/fix_calendar_client_identity.py'
+      - '.github/workflows/apply-calendar-client-identity.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply Calendar stable identity fixes
+        run: python .github/scripts/fix_calendar_client_identity.py
+      - name: Commit repaired source
+        run: |
+          if git diff --quiet; then
+            echo 'No source changes required.'
+            exit 0
+          fi
+          git config user.name 'RomyLabs Audit Bot'
+          git config user.email 'actions@github.com'
+          git add src/pages/Calendar.jsx
+          git commit -m 'fix(calendar): use stable client ids'
+          git push origin HEAD:main
