@@ -111,9 +111,6 @@ async function boundaryProbe(session, table, permKey, minRead, minWrite, mkRow){
     const r=await session.client.from(table).select('id').eq('tenant_id',TENANT_ID).limit(1)
     const ms=performance.now()-readStart
     const visible=!r.error && Array.isArray(r.data) && r.data.length>0
-    // PostgreSQL RLS SELECT denial normally returns HTTP success with zero visible rows,
-    // not a permission error. Treat either an explicit error or an empty RLS-filtered
-    // result as denial. Seed targets guarantee authorized roles have at least one row.
     const denied=Boolean(r.error) || (!r.error && Array.isArray(r.data) && r.data.length===0)
     const ok=readExpected==='success' ? visible : denied
     record(`boundary.${table}.read`,session.role.key,ok,ms,r.error?.message || (visible?'visible row':'RLS filtered to zero rows'))
@@ -128,26 +125,37 @@ async function boundaryProbe(session, table, permKey, minRead, minWrite, mkRow){
   const row=mkRow()
   const w=await timed(`boundary.${table}.write`,session.role.key,()=>session.client.from(table).insert(row).select('id').maybeSingle(),writeExpected)
   if(writeExpected==='success'&&!w.error&&w.data?.id) track(table,w.data.id)
-  if(writeExpected==='deny'&&!w.error&&w.data?.id){ track(table,w.data.id) }
+  if(writeExpected==='deny'&&!w.error&&w.data?.id) track(table,w.data.id)
 }
 
-async function externalBoundaryProbe(session){
-  const funcs=['send-email','send-sms','send-fax','outbound-call']
+const outboundCases = [
+  { fn:'send-email', payload:{to:'qa-certification@example.invalid',subject:'QA certification dry run',text:'No delivery. Controlled QA validation.',qa_certification:true,dry_run:true} },
+  { fn:'send-sms', payload:{to:'+12025550100',body:'QA certification dry run - no delivery',qa_certification:true,dry_run:true} },
+  { fn:'send-fax', payload:{to:'+12025550100',document_url:`${SUPABASE_URL}/storage/v1/object/sign/documents/qa-certification-placeholder.pdf`,qa_certification:true,dry_run:true} },
+  { fn:'start-outbound-call', payload:{destinationNumber:'2025550100',qa_certification:true,dry_run:true} },
+]
+
+async function externalBoundaryProbe(session, expected='allow'){
   const {data:{session:authSession}}=await session.client.auth.getSession()
   const token=authSession?.access_token
   if(!token){ fail(`${session.role.key} missing access token for outbound boundary tests`); return }
-  for(const fn of funcs){
-    const url=`${SUPABASE_URL}/functions/v1/${fn}`
+  for(const test of outboundCases){
+    const url=`${SUPABASE_URL}/functions/v1/${test.fn}`
     const t0=performance.now()
-    let res
     try{
-      res=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${token}`,apikey:ANON_KEY,'Content-Type':'application/json','X-QA-Certification':runId},body:JSON.stringify({qa_certification:true,dry_run:true})})
-      const body=await res.text()
+      const res=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${token}`,apikey:ANON_KEY,'Content-Type':'application/json','X-QA-Certification':runId},body:JSON.stringify(test.payload)})
+      let parsed=null,raw=''
+      try{ raw=await res.text(); parsed=raw?JSON.parse(raw):null }catch{}
       const ms=performance.now()-t0
-      const safe=!res.ok
-      record(`outbound.${fn}.non_delivery_validation`,session.role.key,safe,ms,`${res.status} ${body.slice(0,160)}`)
-      if(!safe) fail(`${session.role.key} ${fn} accepted QA dry-run payload with HTTP ${res.status}; outbound delivery cannot be certified safe`)
-    }catch(e){ record(`outbound.${fn}.non_delivery_validation`,session.role.key,false,performance.now()-t0,e.message); fail(`${session.role.key} ${fn} validation probe errored: ${e.message}`) }
+      const allowed=Boolean(res.ok&&parsed?.success===true&&parsed?.dry_run===true&&parsed?.delivery===false)
+      const denied=res.status===403
+      const ok=expected==='allow'?allowed:denied
+      record(`outbound.${test.fn}.${expected==='allow'?'dry_run':'permission_denial'}`,session.role.key,ok,ms,`${res.status} ${raw.slice(0,220)}`)
+      if(!ok) fail(`${session.role.key} ${test.fn}: expected ${expected}, got HTTP ${res.status} ${raw.slice(0,160)}`)
+    }catch(e){
+      record(`outbound.${test.fn}.${expected==='allow'?'dry_run':'permission_denial'}`,session.role.key,false,performance.now()-t0,e.message)
+      fail(`${session.role.key} ${test.fn} boundary probe errored: ${e.message}`)
+    }
   }
 }
 
@@ -159,7 +167,21 @@ async function runBoundarySuite(sessions){
     await boundaryProbe(s,'calevents','perm_schedule',1,2,()=>({id:`${runId}_event_${s.role.key}_${Date.now()}`,title:`QA ${s.role.label} Meeting`,date:new Date().toISOString().slice(0,10),time:'23:55',eventType:'QA Certification',status:'QA_DRY_RUN',source:'qa_certification',tenant_id:TENANT_ID}))
     await boundaryProbe(s,'esigns','perm_documents',1,2,()=>({id:`${runId}_esign_${s.role.key}_${Date.now()}`,doc_type:'QA Certification',client_name:`QA ${s.role.label}`,client_email:`${runId}.${s.role.key}@example.com`,status:'QA_DRY_RUN',send_via:'qa_dry_run',tenant_id:TENANT_ID,message:`TEMP QA CERT ${runId}`}))
     await boundaryProbe(s,'chat_messages','perm_comms',1,2,()=>({channel:'general',sender:s.name,text:`[QA CERT ${runId}] ${s.role.label} chat write`,tenant_id:TENANT_ID,source:'qa_certification'}))
-    await externalBoundaryProbe(s)
+    await externalBoundaryProbe(s,'allow')
+  }
+}
+
+async function runDeniedOutboundSuite(sessions){
+  const target=sessions.find(s=>s.role.key==='tax_associate')
+  if(!target){ fail('No Tax Associate session available for outbound denial certification'); return }
+  const down=await admin.from('employees').update({perm_comms:0}).eq('id',target.employeeId).eq('tenant_id',TENANT_ID)
+  if(down.error){ fail(`Could not downgrade Tax Associate comm permission: ${down.error.message}`); return }
+  try{
+    await sleep(750)
+    await externalBoundaryProbe(target,'deny')
+  }finally{
+    const restore=await admin.from('employees').update({perm_comms:target.role.perms.perm_comms}).eq('id',target.employeeId).eq('tenant_id',TENANT_ID)
+    if(restore.error) fail(`Could not restore Tax Associate comm permission: ${restore.error.message}`)
   }
 }
 
@@ -207,8 +229,16 @@ async function cleanup(){
     if(q.error) fail(`cleanup verification ${table}: ${q.error.message}`)
     if((q.count||0)!==0) fail(`cleanup verification ${table}: ${q.count} QA rows remain`)
   }
-  const list=await admin.auth.admin.listUsers({page:1,perPage:1000})
-  if(!list.error){ const remain=(list.data?.users||[]).filter(u=>u.user_metadata?.qa_run===runId); if(remain.length)fail(`cleanup auth: ${remain.length} QA users remain`) }
+  let page=1,authRemain=[]
+  while(page<=20){
+    const list=await admin.auth.admin.listUsers({page,perPage:1000})
+    if(list.error){ fail(`cleanup auth verification: ${list.error.message}`); break }
+    const users=list.data?.users||[]
+    authRemain.push(...users.filter(u=>u.user_metadata?.qa_run===runId))
+    if(users.length<1000)break
+    page++
+  }
+  if(authRemain.length)fail(`cleanup auth: ${authRemain.length} QA users remain`)
   return checks
 }
 
@@ -219,20 +249,20 @@ function report(cleanupChecks){
   const total=metrics.length, failures=metrics.filter(x=>!x.ok).length, failureRate=total?failures/total:1
   const readMs=metrics.filter(x=>x.kind.startsWith('load.read.')).map(x=>x.ms)
   const writeMs=metrics.filter(x=>x.kind.startsWith('load.write.')).map(x=>x.ms)
-  const result={run_id:runId,tenant_id:TENANT_ID,tenant_name:TENANT_NAME,users_created:createdUsers.length,total_operations:total,failed_operations:failures,failure_rate:failureRate,load_read_p95_ms:Math.round(pct(readMs,.95)),load_read_p99_ms:Math.round(pct(readMs,.99)),load_write_p95_ms:Math.round(pct(writeMs,.95)),hard_failures:hardFailures,cleanup:cleanupChecks,metrics:summary}
+  if(failureRate>=0.01) fail(`overall operation failure rate ${(failureRate*100).toFixed(2)}% >= 1%`)
+  if(pct(readMs,.95)>=1500) fail(`load read p95 ${Math.round(pct(readMs,.95))}ms >= 1500ms`)
+  if(writeMs.length&&pct(writeMs,.95)>=2000) fail(`load write p95 ${Math.round(pct(writeMs,.95))}ms >= 2000ms`)
+  const result={run_id:runId,tenant_id:TENANT_ID,tenant_name:TENANT_NAME,users_created:createdUsers.length,total_operations:total,failed_operations:failures,failure_rate:failureRate,load_read_p95_ms:Math.round(pct(readMs,.95)),load_read_p99_ms:Math.round(pct(readMs,.99)),load_write_p95_ms:Math.round(pct(writeMs,.95)),hard_failures:[...hardFailures],cleanup:cleanupChecks,metrics:summary}
   fs.mkdirSync('artifacts',{recursive:true})
   fs.writeFileSync('artifacts/production-capacity-certification.json',JSON.stringify(result,null,2))
   console.log('\n=== CERTIFICATION RESULT ===')
   console.log(JSON.stringify(result,null,2))
-  if(failureRate>=0.01) fail(`overall operation failure rate ${(failureRate*100).toFixed(2)}% >= 1%`)
-  if(pct(readMs,.95)>=1500) fail(`load read p95 ${Math.round(pct(readMs,.95))}ms >= 1500ms`)
-  if(writeMs.length&&pct(writeMs,.95)>=2000) fail(`load write p95 ${Math.round(pct(writeMs,.95))}ms >= 2000ms`)
 }
 
 let cleanupChecks=[]
 try{
   console.log(`Starting controlled production certification ${runId} for ${TENANT_NAME} (${TENANT_ID})`)
-  console.log('Outbound customer delivery is disabled by design: only deliberately invalid QA validation payloads are sent to outbound functions.')
+  console.log('Outbound customer delivery is disabled by design: real authorized dry-run paths are required to return delivery=false.')
   await seedReadTargets()
   const sessions=[]
   for(const role of ROLES){ for(let i=1;i<=USERS_PER_ROLE;i++) sessions.push(await createQaUser(role,i)) }
@@ -240,6 +270,7 @@ try{
   await runBoundarySuite(sessions)
   await runPhase('10-user phase',sessions.slice(0,10),PHASE10_MS)
   await runPhase('20-user phase',sessions.slice(0,Math.min(20,sessions.length)),PHASE20_MS)
+  await runDeniedOutboundSuite(sessions)
 }catch(e){ fail(`fatal harness error: ${e?.stack||e}`) }
 finally{
   try{ cleanupChecks=await cleanup() }catch(e){ fail(`cleanup fatal: ${e?.stack||e}`) }
