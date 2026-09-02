@@ -229,16 +229,23 @@ async function cleanup(){
     if(q.error) fail(`cleanup verification ${table}: ${q.error.message}`)
     if((q.count||0)!==0) fail(`cleanup verification ${table}: ${q.count} QA rows remain`)
   }
-  let page=1,authRemain=[]
-  while(page<=20){
-    const list=await admin.auth.admin.listUsers({page,perPage:1000})
-    if(list.error){ fail(`cleanup auth verification: ${list.error.message}`); break }
-    const users=list.data?.users||[]
-    authRemain.push(...users.filter(u=>u.user_metadata?.qa_run===runId))
-    if(users.length<1000)break
-    page++
+
+  // Verify only the exact temporary auth IDs created by this run. Listing the
+  // entire auth.users catalog can fail independently on large/legacy projects
+  // and caused a false red certification even after every QA user was deleted.
+  // getUserById returning user_not_found/404 is the expected clean result.
+  for(const u of createdUsers){
+    const probe=await admin.auth.admin.getUserById(u.id)
+    if(!probe.error && probe.data?.user){
+      fail(`cleanup auth: QA user still exists ${u.email}`)
+      continue
+    }
+    const status=Number(probe.error?.status || 0)
+    const code=String(probe.error?.code || '').toLowerCase()
+    const msg=String(probe.error?.message || '').toLowerCase()
+    const notFound=status===404 || code.includes('user_not_found') || msg.includes('user not found')
+    if(!notFound) fail(`cleanup auth verification ${u.email}: ${probe.error?.message || 'unexpected response'}`)
   }
-  if(authRemain.length)fail(`cleanup auth: ${authRemain.length} QA users remain`)
   return checks
 }
 
