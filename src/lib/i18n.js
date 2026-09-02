@@ -145,7 +145,7 @@ const EN_ES = {
   'Switch to light mode': 'Cambiar a modo claro',
   'Switch to dark mode': 'Cambiar a modo oscuro',
 
-  // E-Signature and shared workflow coverage.
+  // E-Signature workflow.
   'New Signing Request': 'Nueva solicitud de firma',
   'Total Sent': 'Total enviado',
   'Awaiting': 'Pendiente de firma',
@@ -205,6 +205,63 @@ const EN_ES = {
   'Custom Document': 'Documento personalizado',
   'Client name required': 'Se requiere el nombre del cliente',
   'Deleted': 'Eliminado',
+
+  // Documents workflow.
+  'All client files and documents': 'Todos los archivos y documentos de clientes',
+  '＋ Upload Document': '＋ Cargar documento',
+  'Search documents…': 'Buscar documentos…',
+  'All Clients & Leads': 'Todos los clientes y prospectos',
+  'All Folders': 'Todas las carpetas',
+  'Grid view': 'Vista de cuadrícula',
+  'List view': 'Vista de lista',
+  'Table view': 'Vista de tabla',
+  '＋ New Folder': '＋ Nueva carpeta',
+  'Folder name': 'Nombre de carpeta',
+  'No documents found': 'No se encontraron documentos',
+  'Upload your first document to get started.': 'Cargue su primer documento para comenzar.',
+  'Client / Lead': 'Cliente / Prospecto',
+  'Folder': 'Carpeta',
+  'Size': 'Tamaño',
+  'Untitled document': 'Documento sin título',
+  'Delete Document?': '¿Eliminar documento?',
+  'Folder already exists': 'La carpeta ya existe',
+  'Name and folder required': 'Se requieren el nombre y la carpeta',
+  '✅ Document saved!': '✅ ¡Documento guardado!',
+  '🗑 Document deleted': '🗑 Documento eliminado',
+  'Add note:': 'Agregar nota:',
+
+  // Fax workflow.
+  '+ Send Fax': '+ Enviar fax',
+  'Successful': 'Exitosos',
+  'Failed': 'Fallidos',
+  'This Month': 'Este mes',
+  'Search client, number, subject…': 'Buscar cliente, número o asunto…',
+  '📠 No faxes yet. Click "+ Send Fax" to get started.': '📠 Aún no hay faxes. Haga clic en "+ Enviar fax" para comenzar.',
+  'No faxes match your filters.': 'Ningún fax coincide con sus filtros.',
+  'Recipient fax number required': 'Se requiere el número de fax del destinatario',
+  'Attach a PDF or enter a message': 'Adjunte un PDF o escriba un mensaje',
+  '✅ Fax sent successfully!': '✅ ¡Fax enviado correctamente!',
+  'This fax has no file attached': 'Este fax no tiene archivo adjunto',
+  'Pick who this belongs to first': 'Primero seleccione a quién pertenece',
+
+  // SMS workflow.
+  'Appointment Reminder': 'Recordatorio de cita',
+  'Document Request': 'Solicitud de documentos',
+  'Payment Due': 'Pago pendiente',
+  'Resolution Update': 'Actualización de resolución',
+  'Welcome Text': 'Mensaje de bienvenida',
+  'Missing Information': 'Información faltante',
+  'IRS Notice Received': 'Aviso del IRS recibido',
+  'Case Resolved': 'Caso resuelto',
+  'Templates': 'Plantillas',
+  '💬 Compose': '💬 Redactar',
+  'Send SMS': 'Enviar SMS',
+  'Client *': 'Cliente *',
+  'Search client...': 'Buscar cliente...',
+  'To (Phone #)': 'Para (teléfono)',
+  'Client and message required': 'Se requieren cliente y mensaje',
+  'Recipient phone number required': 'Se requiere el teléfono del destinatario',
+  '✅ SMS sent via SignalWire!': '✅ ¡SMS enviado por SignalWire!',
 }
 
 const ES_EN = Object.fromEntries(Object.entries(EN_ES).map(([en, es]) => [es, en]))
