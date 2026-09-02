@@ -217,7 +217,7 @@ function LeadInlineFax({ lead, onClose, onLogged }) {
 
       await supabase.from('fax_logs').insert([{
         to_number:toFull, client_name:lead?.name, subject, file_url:fileUrl,
-        file_name:file?.name||null, status:'Sent', provider_sid:resData?.sid || null,
+        file_name:file?.name||null, status:'Sent', ...(resData?.provider === 'telnyx' ? { telnyx_fax_id: resData?.sid || null } : { signalwire_fax_id: resData?.sid || null }),
         sent_at:new Date().toISOString(), created_at:new Date().toISOString()
       }])
 

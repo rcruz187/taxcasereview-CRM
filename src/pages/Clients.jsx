@@ -244,7 +244,7 @@ function InlineFaxForm({ client, onClose, showToast, onLogged }) {
       await supabase.from('fax_logs').insert([{
         to_number:toFull, client_name:client?.name, subject, notes,
         file_name:file?.name||null, file_url:fileUrl, status:'Sent',
-        provider_sid:resData?.sid || null, sent_at:new Date().toISOString(), created_at:new Date().toISOString()
+        ...(resData?.provider === 'telnyx' ? { telnyx_fax_id: resData?.sid || null } : { signalwire_fax_id: resData?.sid || null }), sent_at:new Date().toISOString(), created_at:new Date().toISOString()
       }])
 
       const { data: { user } } = await supabase.auth.getUser()
