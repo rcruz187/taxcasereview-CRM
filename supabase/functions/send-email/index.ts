@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-certification',
 }
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const SEND_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send'
@@ -72,17 +72,33 @@ serve(async (req) => {
   try {
     const body = await req.json()
     const url = Deno.env.get('SUPABASE_URL') ?? '', service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', anon = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    if (!url || !service || !anon) return new Response(JSON.stringify({ error: 'Server configuration missing' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     const admin = createClient(url, service)
-    let authenticated = false, esignIdToMark: string | null = null
+    let authenticated = false, authenticatedUser: any = null, authClient: any = null, resolvedTenantId: string | null = null, esignIdToMark: string | null = null
     const auth = req.headers.get('authorization') || ''
-    if (auth.startsWith('Bearer ') && anon) {
-      const jwt = auth.slice(7), uc = createClient(url, anon, { global: { headers: { Authorization: `Bearer ${jwt}` } } })
-      const { data } = await uc.auth.getUser(jwt)
-      authenticated = !!data?.user
+    if (auth.startsWith('Bearer ')) {
+      const jwt = auth.slice(7)
+      authClient = createClient(url, anon, { global: { headers: { Authorization: `Bearer ${jwt}` } } })
+      const { data } = await authClient.auth.getUser(jwt)
+      authenticatedUser = data?.user || null
+      authenticated = !!authenticatedUser
+      if (authenticated) {
+        const { data: tenant } = await authClient.rpc('current_tenant_id')
+        resolvedTenantId = tenant || null
+      }
     }
 
     let { to, subject, html, text, attachments, tenant_id, from_email, from_name } = body
-    if (!authenticated) {
+    if (authenticated) {
+      if (!resolvedTenantId) return new Response(JSON.stringify({ error: 'No active office context' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      const { data: isPlatformAdmin } = await authClient.rpc('_is_platform_admin')
+      const { data: employee } = await admin.from('employees').select('id,status,perm_comms,tenant_id').eq('tenant_id', resolvedTenantId).ilike('email', authenticatedUser?.email || '').limit(1).maybeSingle()
+      const active = employee && String(employee.status || 'Active').toLowerCase() === 'active'
+      if (!isPlatformAdmin && (!active || Number(employee?.perm_comms || 0) < 2)) return new Response(JSON.stringify({ error: 'Email permission denied' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      // Never trust a tenant supplied by the browser. The authenticated session
+      // decides which office may send this message.
+      tenant_id = resolvedTenantId
+    } else {
       if (body.kind === 'esign_signed_copy') {
         if (!body.esign_id) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
         const { data: e, error } = await admin.from('esigns').select('id,status,client_email,client_name,doc_type,tenant_id,signed_attachments,signed_at,signed_copy_sent_at').eq('id', String(body.esign_id)).maybeSingle()
@@ -154,6 +170,13 @@ serve(async (req) => {
     const { data: ts } = await q.maybeSingle()
     const { data: gs } = await admin.from('settings').select('*').not('gmail_refresh_token', 'is', null).limit(1).maybeSingle()
     if (!gs?.gmail_refresh_token) return new Response(JSON.stringify({ error: 'No Gmail OAuth configured' }), { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+
+    // Controlled certification path. It reaches real authentication, tenant,
+    // permission, payload and provider-configuration checks, but never refreshes
+    // OAuth and never calls Gmail.
+    if (authenticated && body.qa_certification === true && body.dry_run === true) {
+      return new Response(JSON.stringify({ success: true, dry_run: true, delivery: false, provider: 'gmail', tenant_id }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
 
     const atts: any[] = []
     if ((authenticated || body.kind === 'esign_signed_copy') && Array.isArray(attachments)) {
