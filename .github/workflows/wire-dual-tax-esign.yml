@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: {fetch-depth: 0}
-      - name: Prepare dual route in working tree
+      - name: Prepare and commit dual route locally
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -24,21 +24,13 @@ jobs:
           s=s.replace(old,new,1)
           p.write_text(s)
           PY
-      - name: Install dependencies
-        run: npm ci
-      - name: Capture build result
-        shell: bash
-        run: |
-          set +e
-          npm run build > dual-esign-build.log 2>&1
-          code=$?
-          echo "EXIT_CODE=$code" >> dual-esign-build.log
-          exit 0
-      - name: Commit diagnostic log
-        run: |
           git config user.name 'RomyLabs'
           git config user.email 'romy@romylabs.com'
-          git restore src/App.jsx
-          git add dual-esign-build.log
-          git commit -m 'chore(esign): capture dual signing build output'
-          git push origin HEAD:main
+          git add src/App.jsx
+          git diff --cached --quiet || git commit -m 'feat(esign): expose both signing options in tax offices'
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify production build
+        run: npm run build
+      - name: Push verified route wiring
+        run: git push origin HEAD:main
