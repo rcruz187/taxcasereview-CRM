@@ -2,6 +2,8 @@ import React,{useEffect,useMemo,useState} from 'react'
 import { supabase } from '../lib/supabase'
 import UniversalOfficeESign from '../components/admin/UniversalOfficeESign'
 
+// Universal RomyLabs contract-signing workspace. Office rows come from the shared registry,
+// so newly registered product offices automatically become available here.
 const PRODUCT_LABEL={taxres_crm:'TaxRes CRM',camvella:'Camvella',arcvena:'Arcvena',bocasync:'BocaSync',groundivo:'GroundIVO',oculivo:'Oculivo'}
 
 export default function ESignaturesHub(){
