@@ -32,6 +32,8 @@ jobs:
           npm ci
           npm install --no-save @playwright/test@1.55.0
           npx playwright install --with-deps chromium
+      - name: Verify Spanish dashboard translation contract
+        run: node scripts/test-i18n-dashboard.mjs
       - name: Build production bundle
         run: npm run build
       - name: Start production preview
