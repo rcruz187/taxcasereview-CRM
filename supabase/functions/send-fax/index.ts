@@ -3,102 +3,112 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-certification',
 }
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+const digits = (v: unknown) => String(v ?? '').replace(/\D/g, '')
 
-// Pure send — no DB writes here. The caller (Fax.jsx) already logs to
-// fax_logs itself with richer context (client_name, subject, notes, etc.)
-// than this function has access to, so logging here would double it up.
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
+    const url = Deno.env.get('SUPABASE_URL') || ''
+    const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+    const anon = Deno.env.get('SUPABASE_ANON_KEY') || ''
+    if (!url || !service || !anon) return json({ error: 'Server configuration missing' }, 500)
 
-    const { data: settings } = await supabase
+    const authHeader = req.headers.get('authorization') || ''
+    if (!authHeader.toLowerCase().startsWith('bearer ')) return json({ error: 'Unauthorized' }, 401)
+    const token = authHeader.slice(7).trim()
+    const authClient = createClient(url, anon, { global: { headers: { Authorization: `Bearer ${token}` } } })
+    const { data: userData, error: userErr } = await authClient.auth.getUser(token)
+    const user = userData?.user
+    if (userErr || !user?.email) return json({ error: 'Unauthorized' }, 401)
+
+    const { data: tenantId, error: tenantErr } = await authClient.rpc('current_tenant_id')
+    if (tenantErr || !tenantId) return json({ error: 'No active office context' }, 403)
+
+    const admin = createClient(url, service)
+    const { data: employee } = await admin.from('employees')
+      .select('id,email,status,perm_comms,tenant_id')
+      .eq('tenant_id', tenantId)
+      .ilike('email', user.email)
+      .limit(1)
+      .maybeSingle()
+    const { data: isPlatformAdmin } = await authClient.rpc('_is_platform_admin')
+    const active = employee && String(employee.status || 'Active').toLowerCase() === 'active'
+    const allowed = Boolean(isPlatformAdmin) || Boolean(active && Number(employee?.perm_comms || 0) >= 2)
+    if (!allowed) return json({ error: 'Fax permission denied' }, 403)
+
+    const payload = await req.json()
+    const { to, document_url, qa_certification, dry_run } = payload || {}
+    const toDigits = digits(to)
+    const toNumber = toDigits.length === 10 ? `+1${toDigits}` : (toDigits.length === 11 && toDigits.startsWith('1') ? `+${toDigits}` : '')
+    if (!toNumber || !document_url) return json({ error: 'to and document_url are required' }, 400)
+
+    let docUrl: URL
+    try { docUrl = new URL(String(document_url)) } catch { return json({ error: 'Invalid document_url' }, 400) }
+    const allowedHost = new URL(url).hostname
+    if (docUrl.protocol !== 'https:' || docUrl.hostname !== allowedHost) return json({ error: 'document_url must use this office storage host' }, 400)
+
+    const { data: settings } = await admin
       .from('settings')
-      .select('sw_space_url, sw_project_id, sw_api_token, sw_inbound_did, telnyx_api_key, firm_fax_number')
+      .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did,telnyx_api_key,firm_fax_number,tenant_id')
+      .eq('tenant_id', tenantId)
       .limit(1)
       .maybeSingle()
 
-    const { to, from, document_url } = await req.json()
+    const fromNumber = settings?.firm_fax_number || settings?.sw_inbound_did || ''
+    if (!fromNumber) return json({ error: 'Fax sending number not configured' }, 422)
+    const provider = settings?.telnyx_api_key ? 'telnyx' : (settings?.sw_space_url && settings?.sw_project_id && settings?.sw_api_token ? 'signalwire' : null)
+    if (!provider) return json({ error: 'No fax provider configured (Telnyx or SignalWire)' }, 422)
 
-    if (!to || !document_url) {
-      return new Response(JSON.stringify({ error: 'to and document_url are required' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+    // Production-safe validation path. Authorization, tenant resolution, recipient
+    // validation, storage-host validation and provider configuration all run first.
+    // No provider request and no database delivery log happens in dry-run mode.
+    if (qa_certification === true && dry_run === true) {
+      return json({ success: true, dry_run: true, delivery: false, provider, tenant_id: tenantId })
     }
 
-    // Explicit `from` from the caller wins (lets a specific fax go out from
-    // a different number than the default); otherwise fall back to the
-    // dedicated fax number, then the main inbound DID.
-    const fromNumber = from || settings?.firm_fax_number || settings?.sw_inbound_did || ''
-
     let faxResult: any = null
-
-    // Prefer Telnyx if configured, else SignalWire
-    if (settings?.telnyx_api_key) {
+    if (provider === 'telnyx') {
       const res = await fetch('https://api.telnyx.com/v2/faxes', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${settings.telnyx_api_key}`,
+          'Authorization': `Bearer ${settings!.telnyx_api_key}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           connection_id: Deno.env.get('TELNYX_CONNECTION_ID') || '',
           from: fromNumber,
-          to,
-          media_url: document_url,
+          to: toNumber,
+          media_url: docUrl.toString(),
         }),
       })
       faxResult = await res.json()
-      if (!res.ok) {
-        return new Response(JSON.stringify({ error: faxResult.errors?.[0]?.detail || 'Telnyx fax error' }), {
-          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
-      }
-      return new Response(JSON.stringify({ success: true, sid: faxResult.data?.id }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    } else if (settings?.sw_space_url) {
-      const auth = btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
-      const formData = new URLSearchParams({
-        From: fromNumber,
-        To: to,
-        MediaUrl: document_url,
-      })
-      const res = await fetch(
-        `https://${settings.sw_space_url}/api/laml/2010-04-01/Accounts/${settings.sw_project_id}/Faxes.json`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Basic ${auth}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: formData.toString(),
-        }
-      )
-      faxResult = await res.json()
-      if (!res.ok) {
-        return new Response(JSON.stringify({ error: faxResult.message || 'SignalWire fax error' }), {
-          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
-      }
-      return new Response(JSON.stringify({ success: true, sid: faxResult.sid }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    } else {
-      return new Response(JSON.stringify({ error: 'No fax provider configured (Telnyx or SignalWire)' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+      if (!res.ok) return json({ error: faxResult.errors?.[0]?.detail || 'Telnyx fax error' }, 400)
+      return json({ success: true, sid: faxResult.data?.id })
     }
 
+    const auth = btoa(`${settings!.sw_project_id}:${settings!.sw_api_token}`)
+    const formData = new URLSearchParams({ From: fromNumber, To: toNumber, MediaUrl: docUrl.toString() })
+    const res = await fetch(
+      `https://${String(settings!.sw_space_url).replace(/^https?:\/\//, '')}/api/laml/2010-04-01/Accounts/${settings!.sw_project_id}/Faxes.json`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData.toString(),
+      }
+    )
+    faxResult = await res.json()
+    if (!res.ok) return json({ error: faxResult.message || 'SignalWire fax error' }, 400)
+    return json({ success: true, sid: faxResult.sid })
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
+    console.error('[send-fax]', err)
+    return json({ error: err instanceof Error ? err.message : 'Fax send failed' }, 500)
   }
 })
