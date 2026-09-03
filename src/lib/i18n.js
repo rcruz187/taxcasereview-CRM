@@ -145,6 +145,38 @@ const EN_ES = {
   'Switch to light mode': 'Cambiar a modo claro',
   'Switch to dark mode': 'Cambiar a modo oscuro',
 
+  // TaxRes shared shell / presence / live UI
+  'Support': 'Soporte',
+  'On a call': 'En una llamada',
+  'In a huddle': 'En una reunión rápida',
+  'Available': 'Disponible',
+  'Busy': 'Ocupado',
+  'Searching…': 'Buscando…',
+  'No matching clients, cases, or leads.': 'No hay clientes, casos ni prospectos coincidentes.',
+  'Search clients, cases, leads…': 'Buscar clientes, casos y prospectos…',
+  'Search clients, cases, leads...': 'Buscar clientes, casos y prospectos…',
+  'Submit a support ticket': 'Enviar un ticket de soporte',
+  'All paid': 'Todo pagado',
+  'Scheduled installments': 'Cuotas programadas',
+  'Paid payments this month': 'Pagos cobrados este mes',
+  'All paid payments': 'Todos los pagos cobrados',
+  'CRM Tips': 'Consejos del CRM',
+  'Daily Hint': 'Consejo diario',
+  'Loading dashboard…': 'Cargando panel…',
+  'Drag any dashboard card to rearrange your layout — it saves automatically per employee.': 'Arrastre cualquier tarjeta del panel para reorganizar el diseño; se guarda automáticamente por empleado.',
+  'Add a new lead with the + New button in the top bar from any page.': 'Agregue un prospecto con el botón + Nuevo de la barra superior desde cualquier página.',
+  'Log a note on a lead by opening their file and scrolling to the Notes section.': 'Registre una nota en un prospecto abriendo su expediente y desplazándose a la sección Notas.',
+  'Book an appointment from a lead file — it logs a note with the date, time, and event type automatically.': 'Reserve una cita desde el expediente del prospecto; se registra automáticamente una nota con fecha, hora y tipo de evento.',
+  'Convert a lead to a client in one click — all notes, documents, and history carry over.': 'Convierta un prospecto en cliente con un clic; se conservan las notas, documentos e historial.',
+  'Assign a lead to a specific rep using the Assigned To field in their detail view.': 'Asigne un prospecto a un representante usando el campo Asignado a en la vista de detalles.',
+  'Archive a lead to hide it from the active list — restore it anytime from the Archived view.': 'Archive un prospecto para ocultarlo de la lista activa; puede restaurarlo desde la vista Archivados.',
+  'Click a lead phone number to dial them instantly through the built-in SignalWire dialer.': 'Haga clic en el teléfono de un prospecto para llamarlo de inmediato con el marcador integrado.',
+  'The Client Portal lets clients view documents, make payments, and sign forms — no app needed.': 'El Portal del cliente permite ver documentos, realizar pagos y firmar formularios sin instalar una aplicación.',
+  'Clients log into their portal with a one-time code sent to the email address on file.': 'Los clientes ingresan al portal con un código de un solo uso enviado al correo registrado.',
+  'Send a payment link via SMS or email from the Payments tab on any client file.': 'Envíe un enlace de pago por SMS o correo desde la pestaña Pagos de cualquier cliente.',
+  'Use Team Chat to message the whole team or start a direct conversation.': 'Use el Chat del equipo para escribir a todo el equipo o iniciar una conversación directa.',
+  'Start a video huddle from Team Chat — click the camera icon to go live with your team.': 'Inicie una reunión de video desde el Chat del equipo; haga clic en la cámara para conectarse con su equipo.',
+
   // Dashboard workflow.
   'Active Cases': 'Casos activos',
   'Open Leads': 'Prospectos abiertos',
@@ -385,6 +417,11 @@ const ES_EN = Object.fromEntries(Object.entries(EN_ES).map(([en, es]) => [es, en
 const ATTRS = ['placeholder', 'title', 'aria-label']
 
 const DASHBOARD_PATTERNS = [
+  [/^(\d+) results$/i, '$1 resultados'],
+  [/^(\d+) clients$/i, '$1 clientes'],
+  [/^(\d+) cases$/i, '$1 casos'],
+  [/^(\d+) tasks$/i, '$1 tareas'],
+  [/^Page (\d+) of (\d+)$/i, 'Página $1 de $2'],
   [/^Good morning,\s*/i, 'Buenos días, '],
   [/^Good afternoon,\s*/i, 'Buenas tardes, '],
   [/^Good evening,\s*/i, 'Buenas noches, '],
@@ -441,19 +478,40 @@ function translateNode(node, language) {
 
 let observer = null
 let activeLanguage = 'en'
+let applying = false
+let rescanFrame = 0
+
+function observeDocument() {
+  if (observer && document.body) observer.observe(document.body, { childList: true, subtree: true, characterData: true })
+}
+
+function translateWholeDocument() {
+  if (typeof document === 'undefined' || !document.body || applying) return
+  applying = true
+  observer?.disconnect()
+  try { translateNode(document.body, activeLanguage) } finally {
+    applying = false
+    observeDocument()
+  }
+}
+
+function scheduleDocumentTranslation() {
+  if (typeof window === 'undefined') return
+  if (rescanFrame) window.cancelAnimationFrame(rescanFrame)
+  rescanFrame = window.requestAnimationFrame(() => {
+    rescanFrame = 0
+    translateWholeDocument()
+  })
+}
 
 export function applyDocumentLanguage(language = 'en') {
   activeLanguage = language === 'es' ? 'es' : 'en'
+  if (typeof document === 'undefined') return
   document.documentElement.lang = activeLanguage
-  translateNode(document.body, activeLanguage)
   observer?.disconnect()
-  observer = new MutationObserver(mutations => {
-    for (const mutation of mutations) {
-      if (mutation.type === 'characterData') translateNode(mutation.target, activeLanguage)
-      for (const node of mutation.addedNodes || []) translateNode(node, activeLanguage)
-    }
-  })
-  if (document.body) observer.observe(document.body, { childList: true, subtree: true, characterData: true })
+  observer = new MutationObserver(() => scheduleDocumentTranslation())
+  translateWholeDocument()
+  scheduleDocumentTranslation()
 }
 
 export function getStoredLanguage() {
@@ -463,6 +521,7 @@ export function getStoredLanguage() {
 export function storeLanguage(language) {
   const next = language === 'es' ? 'es' : 'en'
   try { localStorage.setItem('tcr-language', next) } catch (_) {}
+  try { window.dispatchEvent(new CustomEvent('taxres-language-change', { detail: { language: next } })) } catch (_) {}
   return next
 }
 
