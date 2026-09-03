@@ -32,6 +32,7 @@ on:
       - 'scripts/certify-production-capacity.mjs'
       - 'scripts/certify-production-capacity-100.mjs'
       - 'scripts/certify-three-tenant-isolation.mjs'
+      - 'scripts/cleanup-certification-run.mjs'
       - 'package.json'
       - 'package-lock.json'
       - 'vite.config.js'
@@ -55,6 +56,8 @@ jobs:
       CERT_SUPABASE_URL: https://mpxgxfqdbquzkrvvejkh.supabase.co
       CERT_TENANT_ID: 61a89aef-0e7e-4ea2-b222-44ab2024655a
       CERT_TENANT_NAME: Tax Case Review
+      CERT_RUN_ID: qa_gh_${{ github.run_id }}_${{ github.run_attempt }}
+      CERT_ISOLATION_RUN_ID: qa_iso_gh_${{ github.run_id }}_${{ github.run_attempt }}
       CERT_USERS_PER_ROLE: ${{ github.event.inputs.users_per_role || '20' }}
       CERT_PHASE25_MS: ${{ format('{0}000', github.event.inputs.phase25_seconds || '60') }}
       CERT_PHASE50_MS: ${{ format('{0}000', github.event.inputs.phase50_seconds || '60') }}
@@ -96,6 +99,10 @@ jobs:
       - name: Prove Tax Case Review / Nashville / CloudCPA tenant isolation
         if: success()
         run: node scripts/certify-three-tenant-isolation.mjs
+
+      - name: Cancellation-safe QA cleanup
+        if: always()
+        run: node scripts/cleanup-certification-run.mjs
 
       - name: Upload certification evidence
         if: always()
