@@ -23,7 +23,7 @@ body {
   border-bottom: 1px solid rgba(120,170,220,.12);
 }
 .brand img { max-height: 118px; filter: drop-shadow(0 5px 12px rgba(0,0,0,.18)); }
-.nav-group { padding: 15px 13px 6px !important; font-size: 11px !important; letter-spacing: .13em !important; color: #8bb6da !important; }
+.nav-group { padding: 15px 13px 6px !important; font-size: 12px !important; letter-spacing: .12em !important; color: #8bb6da !important; }
 .nav-item { position: relative; margin: 2px 7px !important; padding: 9px 11px !important; border-radius: 9px !important; font-size: 15px !important; gap: 10px !important; transition: background .16s ease,color .16s ease,transform .16s ease,box-shadow .16s ease; }
 .nav-item:hover { transform: translateX(2px); background: rgba(255,255,255,.045) !important; }
 .nav-item.active { border-left: 0 !important; background: linear-gradient(90deg,rgba(245,158,11,.22),rgba(26,127,212,.12)) !important; color:#ffc14d !important; box-shadow: inset 3px 0 0 #f59e0b,0 6px 16px rgba(0,0,0,.14) !important; }
