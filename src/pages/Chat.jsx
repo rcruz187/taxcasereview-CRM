@@ -225,7 +225,7 @@ export default function Chat() {
   // ── Presence: online + live call/huddle state (Slack-style) ──
   useEffect(() => {
     if (!myName || myName === 'You') return
-    const presenceCh = supabase.channel('chat-presence', { config: { presence: { key: myName } } })
+    const presenceCh = supabase.channel(`chat-presence:${FIRM.tenantId || 'default'}`, { config: { presence: { key: myName } } })
     presenceChRef.current = presenceCh
     const syncPresence = () => {
       const state = presenceCh.presenceState()
