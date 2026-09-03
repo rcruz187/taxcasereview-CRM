@@ -125,86 +125,47 @@ export default function AIAssistant({ adminMode = false }) {
   return (
     <>
       <button
+        className="taxres-ai-fab"
         onClick={() => setOpen(v => !v)}
         title={open ? 'Close AI Assistant' : 'Open AI Assistant'}
         aria-label={open ? 'Close AI Assistant' : 'Open AI Assistant'}
-        style={{
-          position:'fixed', right:24, bottom:80, zIndex:10000,
-          width:56, height:56, borderRadius:18, border:'1px solid rgba(255,255,255,.16)',
-          background: open ? '#111827' : 'linear-gradient(135deg,#4f46e5,#7c3aed 62%,#9333ea)',
-          color:'#fff', cursor:'pointer', boxShadow:'0 14px 38px rgba(79,70,229,.38)',
-          display:'flex', alignItems:'center', justifyContent:'center', fontSize:22,
-          transition:'transform .18s ease, box-shadow .18s ease, background .18s ease',
-          transform: open ? 'scale(.96)' : 'scale(1)',
-        }}
       >
         {open ? '×' : '✦'}
       </button>
 
       {open && (
-        <div style={{
-          position:'fixed', right:24, bottom:148, zIndex:9999,
-          width:'min(430px, calc(100vw - 32px))', height:'min(610px, calc(100vh - 180px))',
-          background:'linear-gradient(180deg,#0b1220 0%,#0f172a 100%)',
-          border:'1px solid rgba(148,163,184,.2)', borderRadius:20,
-          boxShadow:'0 28px 80px rgba(2,6,23,.72)', overflow:'hidden',
-          display:'flex', flexDirection:'column', backdropFilter:'blur(16px)',
-        }}>
-          <div style={{
-            padding:'16px 17px', borderBottom:'1px solid rgba(148,163,184,.14)',
-            background:'linear-gradient(135deg,rgba(79,70,229,.2),rgba(124,58,237,.08))',
-            display:'flex', alignItems:'center', gap:12,
-          }}>
-            <div style={{
-              width:38, height:38, borderRadius:12,
-              background:'linear-gradient(135deg,#4f46e5,#8b5cf6)',
-              display:'flex', alignItems:'center', justifyContent:'center',
-              boxShadow:'0 8px 24px rgba(79,70,229,.35)', fontSize:18,
-            }}>✦</div>
-            <div style={{ minWidth:0 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                <div style={{ fontSize:14, fontWeight:800, color:'#f8fafc' }}>
-                  {adminMode ? 'Platform AI' : 'TaxRes AI'}
-                </div>
-                <span style={{ fontSize:10, fontWeight:800, letterSpacing:'.04em', color:'#86efac', background:'rgba(34,197,94,.1)', border:'1px solid rgba(34,197,94,.22)', padding:'2px 7px', borderRadius:999 }}>
-                  LIVE
-                </span>
+        <section className="taxres-ai-panel" aria-label={adminMode ? 'Platform AI assistant' : 'TaxRes AI assistant'}>
+          <header className="taxres-ai-header">
+            <div className="taxres-ai-mark">✦</div>
+            <div className="taxres-ai-heading">
+              <div className="taxres-ai-title-row">
+                <strong>{adminMode ? 'Platform AI' : 'TaxRes AI'}</strong>
+                <span className="taxres-ai-status"><i />Ready</span>
               </div>
-              <div style={{ fontSize:11, color:'#64748b', marginTop:2 }}>
-                {adminMode ? 'Platform strategy and operations assistant' : 'Tax resolution copilot with page context'}
-              </div>
+              <span>{adminMode ? 'Operations and platform copilot' : 'Resolution copilot · aware of this screen'}</span>
             </div>
             {messages.length > 0 && (
-              <button onClick={() => { setMessages([]); setLastError('') }} style={{ marginLeft:'auto', border:0, background:'transparent', color:'#64748b', cursor:'pointer', fontSize:11, padding:6 }}>
-                Clear
-              </button>
+              <button className="taxres-ai-clear" onClick={() => { setMessages([]); setLastError('') }}>New chat</button>
             )}
-          </div>
+          </header>
 
-          <div style={{ flex:1, overflowY:'auto', padding:'16px', display:'flex', flexDirection:'column', gap:12 }}>
+          <div className="taxres-ai-body">
             {messages.length === 0 && (
-              <div>
-                <div style={{
-                  padding:'16px', borderRadius:14,
-                  background:'rgba(79,70,229,.08)', border:'1px solid rgba(99,102,241,.16)', marginBottom:14,
-                }}>
-                  <div style={{ fontSize:13, fontWeight:800, color:'#e2e8f0', marginBottom:5 }}>
-                    {adminMode ? 'What can I help you run today?' : 'What can I help you solve today?'}
-                  </div>
-                  <div style={{ fontSize:12, color:'#94a3b8', lineHeight:1.55 }}>
+              <div className="taxres-ai-welcome">
+                <div className="taxres-ai-welcome-copy">
+                  <span className="taxres-ai-eyebrow">AI COPILOT</span>
+                  <h3>{adminMode ? 'What do you want to run?' : 'What do you want to solve?'}</h3>
+                  <p>
                     {adminMode
-                      ? 'Ask about operations, platform data, onboarding, pricing, or anything visible on this screen.'
-                      : 'Ask about the current client, case strategy, IRS procedures, forms, deadlines, or draft communications.'}
-                  </div>
+                      ? 'Use the current screen as context or ask about operations, onboarding, pricing, calendar, and communications.'
+                      : 'Use the current client and screen as context for case strategy, IRS procedures, forms, deadlines, and client communications.'}
+                  </p>
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                <div className="taxres-ai-suggestions">
                   {suggestions.slice(0, 6).map((s, i) => (
-                    <button key={i} onClick={() => send(s)} style={{
-                      textAlign:'left', minHeight:66, padding:'10px 11px', borderRadius:11,
-                      background:'rgba(15,23,42,.72)', border:'1px solid rgba(148,163,184,.14)',
-                      color:'#cbd5e1', cursor:'pointer', fontSize:11.5, lineHeight:1.45,
-                    }}>
-                      {s}
+                    <button key={i} onClick={() => send(s)}>
+                      <span>✦</span>
+                      <span>{s}</span>
                     </button>
                   ))}
                 </div>
@@ -212,40 +173,24 @@ export default function AIAssistant({ adminMode = false }) {
             )}
 
             {messages.map((m, i) => (
-              <div key={i} style={{ display:'flex', justifyContent:m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                <div style={{
-                  maxWidth:'88%', padding:'10px 12px',
-                  borderRadius:m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-                  background:m.role === 'user'
-                    ? 'linear-gradient(135deg,#4f46e5,#7c3aed)'
-                    : m.error ? 'rgba(127,29,29,.28)' : 'rgba(30,41,59,.86)',
-                  border:m.role === 'assistant' ? `1px solid ${m.error ? 'rgba(248,113,113,.28)' : 'rgba(148,163,184,.13)'}` : 'none',
-                  color:m.error ? '#fecaca' : '#e2e8f0',
-                  fontSize:13, lineHeight:1.6, whiteSpace:'pre-wrap',
-                  boxShadow:m.role === 'user' ? '0 8px 22px rgba(79,70,229,.2)' : 'none',
-                }}>
-                  {m.content}
-                </div>
+              <div key={i} className={`taxres-ai-message-row ${m.role === 'user' ? 'user' : 'assistant'}`}>
+                {m.role === 'assistant' && <div className="taxres-ai-avatar">✦</div>}
+                <div className={`taxres-ai-message ${m.role} ${m.error ? 'error' : ''}`}>{m.content}</div>
               </div>
             ))}
 
             {loading && (
-              <div style={{ display:'flex', alignItems:'center', gap:8, color:'#64748b', fontSize:12 }}>
-                <div style={{ width:28, height:28, borderRadius:9, background:'rgba(79,70,229,.12)', display:'flex', alignItems:'center', justifyContent:'center', color:'#a5b4fc' }}>✦</div>
-                <span>Analyzing<span style={{ animation:'aiPulse 1.2s infinite' }}>•••</span></span>
+              <div className="taxres-ai-thinking">
+                <div className="taxres-ai-avatar">✦</div>
+                <span>Working on it<span className="taxres-ai-dots">•••</span></span>
               </div>
             )}
-
             <div ref={bottomRef} />
           </div>
 
-          <div style={{ padding:'11px 12px 12px', borderTop:'1px solid rgba(148,163,184,.12)', background:'rgba(2,6,23,.28)' }}>
-            {lastError && (
-              <div style={{ fontSize:10.5, color:'#fca5a5', margin:'0 3px 7px' }}>
-                Last request failed — you can edit your prompt or retry.
-              </div>
-            )}
-            <div style={{ display:'flex', gap:8, alignItems:'flex-end' }}>
+          <footer className="taxres-ai-composer-wrap">
+            {lastError && <div className="taxres-ai-error-note">Last request failed. Edit your prompt or retry.</div>}
+            <div className="taxres-ai-composer">
               <textarea
                 ref={inputRef}
                 value={input}
@@ -253,40 +198,26 @@ export default function AIAssistant({ adminMode = false }) {
                 onKeyDown={handleKey}
                 placeholder="Ask TaxRes AI…"
                 rows={1}
-                style={{
-                  flex:1, minHeight:40, maxHeight:100, resize:'none', overflowY:'auto',
-                  background:'rgba(15,23,42,.9)', color:'#f8fafc', border:'1px solid rgba(148,163,184,.18)',
-                  borderRadius:12, padding:'10px 12px', outline:'none', fontFamily:'inherit', fontSize:13, lineHeight:1.45,
-                }}
               />
-              <button
-                onClick={() => send()}
-                disabled={loading || !input.trim()}
-                aria-label="Send message"
-                style={{
-                  width:40, height:40, borderRadius:12, border:0,
-                  cursor:loading || !input.trim() ? 'default' : 'pointer',
-                  background:input.trim() && !loading ? 'linear-gradient(135deg,#4f46e5,#7c3aed)' : '#1e293b',
-                  color:input.trim() && !loading ? '#fff' : '#475569', fontSize:17,
-                  display:'flex', alignItems:'center', justifyContent:'center',
-                }}
-              >
-                ↑
-              </button>
+              <button onClick={() => send()} disabled={loading || !input.trim()} aria-label="Send message">↑</button>
             </div>
-            <div style={{ display:'flex', justifyContent:'space-between', marginTop:7, padding:'0 3px', fontSize:10, color:'#475569' }}>
+            <div className="taxres-ai-footer-meta">
               <span>Enter to send · Shift+Enter for a new line</span>
-              <span>Powered by Groq</span>
+              <span>Secure office context</span>
             </div>
-          </div>
-        </div>
+          </footer>
+        </section>
       )}
 
       <style>{`
-        @keyframes aiPulse { 0%,100%{opacity:.35} 50%{opacity:1} }
-        @media (max-width: 640px) {
-          textarea[placeholder="Ask TaxRes AI…"] { font-size: 16px !important; }
-        }
+        .taxres-ai-fab{position:fixed;right:24px;bottom:80px;z-index:10000;width:56px;height:56px;border-radius:18px;border:1px solid rgba(255,255,255,.18);background:linear-gradient(135deg,#2563eb 0%,#4f46e5 52%,#7c3aed 100%);color:#fff;cursor:pointer;box-shadow:0 16px 38px rgba(37,99,235,.32);display:flex;align-items:center;justify-content:center;font-size:22px;transition:.18s ease}.taxres-ai-fab:hover{transform:translateY(-2px);box-shadow:0 20px 44px rgba(37,99,235,.4)}
+        .taxres-ai-panel{position:fixed;right:24px;bottom:148px;z-index:9999;width:min(456px,calc(100vw - 32px));height:min(568px,calc(100vh - 180px));background:#0f172a;border:1px solid rgba(148,163,184,.2);border-radius:20px;box-shadow:0 28px 76px rgba(2,6,23,.62);overflow:hidden;display:flex;flex-direction:column;color:#e2e8f0;font-family:inherit}
+        .taxres-ai-header{min-height:70px;padding:13px 15px;border-bottom:1px solid rgba(148,163,184,.13);background:linear-gradient(180deg,#111d33 0%,#0f172a 100%);display:flex;align-items:center;gap:11px}.taxres-ai-mark,.taxres-ai-avatar{display:flex;align-items:center;justify-content:center;color:#c7d2fe;background:linear-gradient(135deg,rgba(37,99,235,.28),rgba(124,58,237,.24));border:1px solid rgba(129,140,248,.22)}.taxres-ai-mark{width:38px;height:38px;border-radius:12px;font-size:17px;box-shadow:0 8px 20px rgba(37,99,235,.16)}.taxres-ai-heading{min-width:0;display:flex;flex-direction:column;gap:3px}.taxres-ai-title-row{display:flex;align-items:center;gap:8px}.taxres-ai-title-row strong{font-size:14px;color:#f8fafc}.taxres-ai-heading>span{font-size:11px;color:#8291a8}.taxres-ai-status{display:inline-flex;align-items:center;gap:5px;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#86efac;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.18);padding:2px 7px;border-radius:999px}.taxres-ai-status i{width:5px;height:5px;border-radius:50%;background:#4ade80;box-shadow:0 0 0 3px rgba(74,222,128,.09)}.taxres-ai-clear{margin-left:auto;border:1px solid rgba(148,163,184,.14);background:rgba(15,23,42,.7);color:#94a3b8;border-radius:9px;padding:7px 9px;font-size:10.5px;cursor:pointer}
+        .taxres-ai-body{flex:1;overflow-y:auto;padding:14px 14px 12px;display:flex;flex-direction:column;gap:11px;background:radial-gradient(circle at top right,rgba(79,70,229,.06),transparent 34%),#0b1322}.taxres-ai-welcome{display:flex;flex-direction:column;gap:12px}.taxres-ai-welcome-copy{padding:15px 15px 14px;border-radius:14px;background:linear-gradient(135deg,rgba(37,99,235,.1),rgba(79,70,229,.05));border:1px solid rgba(96,165,250,.13)}.taxres-ai-eyebrow{font-size:9px;font-weight:900;letter-spacing:.14em;color:#818cf8}.taxres-ai-welcome-copy h3{font-size:17px;line-height:1.25;color:#f8fafc;margin:6px 0 6px}.taxres-ai-welcome-copy p{font-size:11.75px;line-height:1.55;color:#94a3b8;margin:0}.taxres-ai-suggestions{display:grid;grid-template-columns:1fr 1fr;gap:7px}.taxres-ai-suggestions button{text-align:left;min-height:56px;padding:9px 10px;border-radius:11px;background:#111c2f;border:1px solid rgba(148,163,184,.12);color:#cbd5e1;cursor:pointer;font-size:11px;line-height:1.38;display:flex;gap:8px;align-items:flex-start;transition:.16s ease}.taxres-ai-suggestions button:hover{border-color:rgba(96,165,250,.3);background:#14213a;transform:translateY(-1px)}.taxres-ai-suggestions button>span:first-child{color:#818cf8;font-size:10px;margin-top:2px}
+        .taxres-ai-message-row{display:flex;align-items:flex-end;gap:7px}.taxres-ai-message-row.user{justify-content:flex-end}.taxres-ai-avatar{width:27px;height:27px;min-width:27px;border-radius:9px;font-size:11px}.taxres-ai-message{max-width:84%;padding:9px 11px;font-size:12.5px;line-height:1.57;white-space:pre-wrap}.taxres-ai-message.user{border-radius:13px 13px 4px 13px;background:linear-gradient(135deg,#2563eb,#4f46e5);color:#fff;box-shadow:0 7px 18px rgba(37,99,235,.17)}.taxres-ai-message.assistant{border-radius:13px 13px 13px 4px;background:#162236;border:1px solid rgba(148,163,184,.1);color:#dbe5f2}.taxres-ai-message.error{background:rgba(127,29,29,.24);border-color:rgba(248,113,113,.22);color:#fecaca}.taxres-ai-thinking{display:flex;align-items:center;gap:8px;color:#7f8fa7;font-size:11.5px}.taxres-ai-dots{animation:taxresAiPulse 1.2s infinite}
+        .taxres-ai-composer-wrap{padding:10px 11px 9px;border-top:1px solid rgba(148,163,184,.11);background:#0d1627}.taxres-ai-error-note{font-size:10px;color:#fca5a5;margin:0 3px 7px}.taxres-ai-composer{display:flex;gap:7px;align-items:flex-end;background:#121f33;border:1px solid rgba(148,163,184,.15);border-radius:13px;padding:5px 5px 5px 10px;box-shadow:inset 0 1px 0 rgba(255,255,255,.025)}.taxres-ai-composer:focus-within{border-color:rgba(96,165,250,.42);box-shadow:0 0 0 3px rgba(37,99,235,.08)}.taxres-ai-composer textarea{flex:1;min-height:34px;max-height:92px;resize:none;overflow-y:auto;background:transparent;color:#f8fafc;border:0;padding:7px 0;outline:none;font-family:inherit;font-size:12.75px;line-height:1.45}.taxres-ai-composer textarea::placeholder{color:#64748b}.taxres-ai-composer button{width:36px;height:36px;min-width:36px;border-radius:10px;border:0;background:linear-gradient(135deg,#2563eb,#4f46e5);color:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}.taxres-ai-composer button:disabled{background:#1e293b;color:#475569;cursor:default}.taxres-ai-footer-meta{display:flex;justify-content:space-between;gap:8px;margin-top:6px;padding:0 3px;font-size:9.5px;color:#4f6078}
+        @keyframes taxresAiPulse{0%,100%{opacity:.3}50%{opacity:1}}
+        @media(max-width:640px){.taxres-ai-fab{right:14px;bottom:72px}.taxres-ai-panel{right:10px;bottom:138px;width:calc(100vw - 20px);height:min(590px,calc(100vh - 156px));border-radius:17px}.taxres-ai-suggestions{grid-template-columns:1fr}.taxres-ai-composer textarea{font-size:16px}.taxres-ai-footer-meta span:first-child{display:none}}
       `}</style>
     </>
   )
