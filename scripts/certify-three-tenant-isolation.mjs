@@ -21,7 +21,7 @@ const TABLES = [
   { table:'chat_messages', make:(tenant,run)=>({channel:'general',sender:`QA Isolation ${tenant.code}`,text:`[QA ISOLATION ${run}] ${tenant.code}`,tenant_id:tenant.id,source:'qa_isolation'}) },
 ]
 
-const runId=`qa_iso_${Date.now()}_${Math.random().toString(36).slice(2,7)}`
+const runId=process.env.CERT_ISOLATION_RUN_ID || `qa_iso_${Date.now()}_${Math.random().toString(36).slice(2,7)}`
 const password=`QaIso!${Math.random().toString(36).slice(2)}A9#`
 const admin=createClient(SUPABASE_URL,SERVICE_KEY,{auth:{persistSession:false,autoRefreshToken:false}})
 const createdUsers=[]
@@ -98,7 +98,6 @@ async function cleanup(){
       try { await admin.from(table).delete().in('id',ids) } catch {}
     }
   }
-  // chat_messages may not have had a deterministic id returned on all schemas; remove by source/text marker too.
   try { await admin.from('chat_messages').delete().eq('source','qa_isolation').like('text',`%${runId}%`) } catch {}
   for(const id of createdUsers){
     try { await admin.auth.admin.deleteUser(id) } catch {}
