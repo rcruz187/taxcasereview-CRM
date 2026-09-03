@@ -2,20 +2,13 @@ from pathlib import Path
 
 p = Path('src/pages/Chat.jsx')
 s = p.read_text()
-
-def rep(old, new, label):
-    global s
-    if old not in s:
-        raise SystemExit(f'{label}: source shape changed')
+old = "const presenceCh = supabase.channel('chat-presence', { config: { presence: { key: myName } } })"
+new = "const presenceCh = supabase.channel(`chat-presence:${FIRM.tenantId || 'default'}`, { config: { presence: { key: myName } } })"
+if new in s:
+    print('tenant-scoped presence already current')
+elif old in s:
     s = s.replace(old, new, 1)
-
-rep("import { useApp } from '../context/AppContext'\n", "import { useApp } from '../context/AppContext'\nimport { useCall } from '../context/CallContext'\n", 'call import')
-rep("  const { user, role } = useApp()\n", "  const { user, role } = useApp()\n  const { calling, active: activeCall } = useCall()\n", 'call state')
-rep("  const [onlineUsers, setOnlineUsers] = useState(new Set()) // names of currently online employees\n", "  const [onlineUsers, setOnlineUsers] = useState(new Set()) // names of currently online employees\n  const [presenceMeta, setPresenceMeta] = useState({}) // { name: { activity, label } }\n  const presenceChRef = useRef(null)\n", 'presence state')
-old = '''  // ── Presence: track who is online ──\n  useEffect(() => {\n    if (!myName || myName === 'You') return\n    const presenceCh = supabase.channel('chat-presence', { config: { presence: { key: myName } } })\n    presenceCh\n      .on('presence', { event: 'sync' }, () => {\n        const state = presenceCh.presenceState()\n        setOnlineUsers(new Set(Object.keys(state)))\n      })\n      .on('presence', { event: 'join' }, ({ key }) => {\n        setOnlineUsers(prev => new Set([...prev, key]))\n      })\n      .on('presence', { event: 'leave' }, ({ key }) => {\n        setOnlineUsers(prev => { const n = new Set(prev); n.delete(key); return n })\n      })\n      .subscribe(async status => {\n        if (status === 'SUBSCRIBED') {\n          await presenceCh.track({ name: myName, online_at: new Date().toISOString() })\n        }\n      })\n    return () => { supabase.removeChannel(presenceCh) }\n  }, [myName])\n'''
-new = '''  // ── Presence: online + live call/huddle state (Slack-style) ──\n  useEffect(() => {\n    if (!myName || myName === 'You') return\n    const presenceCh = supabase.channel('chat-presence', { config: { presence: { key: myName } } })\n    presenceChRef.current = presenceCh\n    const syncPresence = () => {\n      const state = presenceCh.presenceState()\n      setOnlineUsers(new Set(Object.keys(state)))\n      const next = {}\n      for (const [name, entries] of Object.entries(state)) {\n        const latest = Array.isArray(entries) ? entries[entries.length - 1] : null\n        next[name] = { activity: latest?.activity || 'online', label: latest?.activity_label || 'Available' }\n      }\n      setPresenceMeta(next)\n    }\n    presenceCh\n      .on('presence', { event: 'sync' }, syncPresence)\n      .on('presence', { event: 'join' }, syncPresence)\n      .on('presence', { event: 'leave' }, syncPresence)\n      .subscribe(async status => {\n        if (status === 'SUBSCRIBED') {\n          await presenceCh.track({ name: myName, online_at: new Date().toISOString(), activity: 'online', activity_label: 'Available' })\n        }\n      })\n    return () => { presenceChRef.current = null; supabase.removeChannel(presenceCh) }\n  }, [myName])\n\n  // Re-track the existing realtime presence whenever this staff member enters\n  // a CRM phone call or Team Chat huddle. No extra polling table is needed.\n  useEffect(() => {\n    const presenceCh = presenceChRef.current\n    if (!presenceCh || !myName || myName === 'You') return\n    const activity = huddle ? 'huddle' : calling ? 'call' : 'online'\n    const activityLabel = huddle ? 'In a huddle' : calling ? 'On a call' : 'Available'\n    presenceCh.track({\n      name: myName,\n      online_at: new Date().toISOString(),\n      activity,\n      activity_label: activityLabel,\n      call_direction: calling ? (activeCall?.entityType || 'crm') : null,\n    }).catch(() => {})\n  }, [myName, huddle, calling, activeCall?.entityType])\n'''
-rep(old, new, 'presence block')
-rep("                <span style={{ fontSize: 14, flex: 1 }}>{dm.name}</span>\n", "                <span style={{ fontSize: 14, flex: 1 }}>{dm.name}</span>\n                {['call','huddle'].includes(presenceMeta[dm.name]?.activity) && <span title={presenceMeta[dm.name]?.label || (presenceMeta[dm.name]?.activity === 'huddle' ? 'In a huddle' : 'On a call')} aria-label={presenceMeta[dm.name]?.label || 'Busy'} style={{fontSize:13,opacity:.82,lineHeight:1,flexShrink:0}}>🎧</span>}\n", 'roster badge')
-
-p.write_text(s)
-print('patched Chat.jsx with realtime call/huddle presence')
+    p.write_text(s)
+    print('scoped chat call/huddle presence to current tenant')
+else:
+    raise SystemExit('presence channel source shape changed')
