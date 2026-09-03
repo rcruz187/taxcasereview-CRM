@@ -83,13 +83,14 @@ export async function loadFirmBranding() {
     try {
       const imp = sessionStorage.getItem('admin_impersonation')
       if (imp) {
-        const { firm_name, logo_url } = JSON.parse(imp)
+        const { tenant_id, firm_name, logo_url } = JSON.parse(imp)
+        if (tenant_id) FIRM.tenantId = tenant_id
         if (firm_name) FIRM.name = firm_name
         if (firm_name) FIRM.slug = firmSlug(firm_name)
         FIRM.logoUrl = logo_url || ''
         FIRM.loaded = true
         setBrowserTitle(`${FIRM.name} — IRS Resolution CRM`)
-        setFavicon('', FIRM.name) // impersonation = non-TCR tenant → taxrescrm favicon
+        setFavicon(FIRM.tenantId, FIRM.name)
         return FIRM
       }
     } catch (_) {}
