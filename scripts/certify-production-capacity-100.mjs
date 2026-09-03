@@ -16,6 +16,12 @@ function replaceOnce(from, to, label) {
 }
 
 replaceOnce(
+  "const runId = `qa_${Date.now()}_${Math.random().toString(36).slice(2,8)}`",
+  "const runId = process.env.CERT_RUN_ID || `qa_${Date.now()}_${Math.random().toString(36).slice(2,8)}`",
+  'workflow-bound QA run id'
+)
+
+replaceOnce(
   "async function loginSession(s){\n  const out=await timed('auth.sign_in',s.role.key,()=>s.client.auth.signInWithPassword({email:s.email,password}))\n  if(out.error) return\n  const tenant=await timed('rpc.current_tenant_id',s.role.key,()=>s.client.rpc('current_tenant_id'))\n  if(!tenant.error && tenant.data!==TENANT_ID) fail(`${s.role.key} resolved tenant ${tenant.data}, expected ${TENANT_ID}`)\n}",
   "async function loginSession(s){\n  const out=await timed('auth.sign_in',s.role.key,()=>s.client.auth.signInWithPassword({email:s.email,password}))\n  if(out.error) return\n  const transientJwt=/JWT issued at future|token is not yet valid|not active yet/i\n  let tenant=null\n  for(let attempt=1;attempt<=5;attempt++){\n    const t0=performance.now()\n    try{\n      tenant=await s.client.rpc('current_tenant_id')\n    }catch(e){\n      tenant={error:e}\n    }\n    const msg=tenant?.error?.message||String(tenant?.error||'')\n    if(!tenant?.error){\n      record('rpc.current_tenant_id',s.role.key,true,performance.now()-t0,attempt>1?`auth settled after ${attempt} attempts`:'')\n      break\n    }\n    if(!transientJwt.test(msg)||attempt===5){\n      record('rpc.current_tenant_id',s.role.key,false,performance.now()-t0,msg)\n      fail(`${s.role.key} rpc.current_tenant_id: expected success, got ${msg}`)\n      break\n    }\n    console.log(`Transient JWT clock skew for ${s.role.key} #${s.idx}; retry ${attempt}/5`)\n    await sleep(300*attempt)\n  }\n  if(tenant&&!tenant.error&&tenant.data!==TENANT_ID) fail(`${s.role.key} resolved tenant ${tenant.data}, expected ${TENANT_ID}`)\n}",
   'transient JWT clock-skew retry'
