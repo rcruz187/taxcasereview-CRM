@@ -94,11 +94,15 @@ async function cleanup(){
   const order=['chat_messages','tasks','leads','clients','employees']
   for(const table of order){
     const ids=createdRows.filter(r=>r.table===table).map(r=>r.id).filter(Boolean)
-    if(ids.length) await admin.from(table).delete().in('id',ids).catch(()=>{})
+    if(ids.length){
+      try { await admin.from(table).delete().in('id',ids) } catch {}
+    }
   }
   // chat_messages may not have had a deterministic id returned on all schemas; remove by source/text marker too.
-  await admin.from('chat_messages').delete().eq('source','qa_isolation').like('text',`%${runId}%`).catch(()=>{})
-  for(const id of createdUsers) await admin.auth.admin.deleteUser(id).catch(()=>{})
+  try { await admin.from('chat_messages').delete().eq('source','qa_isolation').like('text',`%${runId}%`) } catch {}
+  for(const id of createdUsers){
+    try { await admin.auth.admin.deleteUser(id) } catch {}
+  }
 }
 
 try{
