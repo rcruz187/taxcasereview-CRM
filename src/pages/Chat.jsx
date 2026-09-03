@@ -2,6 +2,7 @@ import { validateFile, maybeCompressImage } from '../lib/uploadUtils'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
+import { useCall } from '../context/CallContext'
 import { FIRM } from '../lib/firmBranding'
 import { useWebRTCRoom } from '../lib/webrtcRoom'
 import { useVideoBackground } from '../lib/videoBackground'
@@ -63,6 +64,7 @@ function Avatar({ name, size = 36, color, avatarUrl }) {
 
 export default function Chat() {
   const { user, role } = useApp()
+  const { calling, active: activeCall } = useCall()
   const canManageChannels = ['Super Admin','Admin'].includes(role)
   // Deep link from a chat notification: /chat?c=<channel id>. Falls back to
   // the default channel when the param is absent or doesn't match anything.
@@ -83,6 +85,8 @@ export default function Chat() {
   const [sending, setSending]     = useState(false)
   const [loading, setLoading]     = useState(false)
   const [onlineUsers, setOnlineUsers] = useState(new Set()) // names of currently online employees
+  const [presenceMeta, setPresenceMeta] = useState({}) // { name: { activity, label } }
+  const presenceChRef = useRef(null)
   const [huddleId, setHuddleId]         = useState(null)  // unique room ID
   const [isHuddleHost, setIsHuddleHost]   = useState(false)
   const [showHuddleInvite, setShowHuddleInvite] = useState(false)
@@ -218,28 +222,48 @@ export default function Chat() {
     return () => { el.style.padding = op; el.style.overflow = oo; el.style.height = oh; el.style.position = opos }
   }, [])
 
-  // ── Presence: track who is online ──
+  // ── Presence: online + live call/huddle state (Slack-style) ──
   useEffect(() => {
     if (!myName || myName === 'You') return
     const presenceCh = supabase.channel('chat-presence', { config: { presence: { key: myName } } })
+    presenceChRef.current = presenceCh
+    const syncPresence = () => {
+      const state = presenceCh.presenceState()
+      setOnlineUsers(new Set(Object.keys(state)))
+      const next = {}
+      for (const [name, entries] of Object.entries(state)) {
+        const latest = Array.isArray(entries) ? entries[entries.length - 1] : null
+        next[name] = { activity: latest?.activity || 'online', label: latest?.activity_label || 'Available' }
+      }
+      setPresenceMeta(next)
+    }
     presenceCh
-      .on('presence', { event: 'sync' }, () => {
-        const state = presenceCh.presenceState()
-        setOnlineUsers(new Set(Object.keys(state)))
-      })
-      .on('presence', { event: 'join' }, ({ key }) => {
-        setOnlineUsers(prev => new Set([...prev, key]))
-      })
-      .on('presence', { event: 'leave' }, ({ key }) => {
-        setOnlineUsers(prev => { const n = new Set(prev); n.delete(key); return n })
-      })
+      .on('presence', { event: 'sync' }, syncPresence)
+      .on('presence', { event: 'join' }, syncPresence)
+      .on('presence', { event: 'leave' }, syncPresence)
       .subscribe(async status => {
         if (status === 'SUBSCRIBED') {
-          await presenceCh.track({ name: myName, online_at: new Date().toISOString() })
+          await presenceCh.track({ name: myName, online_at: new Date().toISOString(), activity: 'online', activity_label: 'Available' })
         }
       })
-    return () => { supabase.removeChannel(presenceCh) }
+    return () => { presenceChRef.current = null; supabase.removeChannel(presenceCh) }
   }, [myName])
+
+  // Re-track the existing realtime presence whenever this staff member enters
+  // a CRM phone call or Team Chat huddle. No extra polling table is needed.
+  useEffect(() => {
+    const presenceCh = presenceChRef.current
+    if (!presenceCh || !myName || myName === 'You') return
+    const activity = huddle ? 'huddle' : calling ? 'call' : 'online'
+    const activityLabel = huddle ? 'In a huddle' : calling ? 'On a call' : 'Available'
+    presenceCh.track({
+      name: myName,
+      online_at: new Date().toISOString(),
+      activity,
+      activity_label: activityLabel,
+      call_direction: calling ? (activeCall?.entityType || 'crm') : null,
+    }).catch(() => {})
+  }, [myName, huddle, calling, activeCall?.entityType])
 
   // A deep-linked DM starts as a placeholder (we only have the channel id
   // before the roster loads); swap in the real entry once TEAM arrives so the
@@ -863,6 +887,7 @@ export default function Chat() {
                   <span style={{ position: 'absolute', bottom: -1, right: -1, width: 8, height: 8, borderRadius: '50%', background: onlineUsers.has(dm.name) ? '#22c55e' : '#475569', border: '2px solid #0d1526' }}/>
                 </div>
                 <span style={{ fontSize: 14, flex: 1 }}>{dm.name}</span>
+                {['call','huddle'].includes(presenceMeta[dm.name]?.activity) && <span title={presenceMeta[dm.name]?.label || (presenceMeta[dm.name]?.activity === 'huddle' ? 'In a huddle' : 'On a call')} aria-label={presenceMeta[dm.name]?.label || 'Busy'} style={{fontSize:13,opacity:.82,lineHeight:1,flexShrink:0}}>🎧</span>}
                 {isVip && <span style={{ fontSize: 11, color: '#f59e0b' }} title="VIP">★</span>}
               </div>
             )
