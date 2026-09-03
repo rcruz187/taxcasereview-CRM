@@ -1,5 +1,11 @@
 name: Production Capacity Certification
 
+# IMPORTANT: This is an intentionally HEAVY production load test.
+# Do not run it on ordinary pushes. It creates temporary Auth users/employees,
+# exercises tenant/RBAC boundaries, sustains up to 100 authenticated sessions,
+# writes synthetic chat traffic, and then cleans the QA rows back up.
+# Keeping this manual protects the production Supabase Disk IO budget while
+# preserving an on-demand capacity certification before major releases.
 on:
   workflow_dispatch:
     inputs:
@@ -23,20 +29,6 @@ on:
         description: '100-user sustained phase seconds'
         required: false
         default: '180'
-  push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'supabase/functions/**'
-      - 'supabase/migrations/**'
-      - 'scripts/certify-production-capacity.mjs'
-      - 'scripts/certify-production-capacity-100.mjs'
-      - 'scripts/certify-three-tenant-isolation.mjs'
-      - 'scripts/cleanup-certification-run.mjs'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'vite.config.js'
-      - '.github/workflows/production-capacity-certification.yml'
 
 permissions:
   contents: read
