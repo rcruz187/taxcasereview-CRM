@@ -54,6 +54,12 @@ class PageErrorBoundary extends React.Component {
 // first paint with no extra network round-trip, since these are the very
 // first thing a visitor (employee or client) sees.
 import Login      from './pages/Login'
+import Sms        from './pages/Sms'
+import Email      from './pages/Email'
+import Documents  from './pages/Documents'
+import TaxOfficeEsign from './pages/TaxOfficeEsign'
+import Chat       from './pages/Chat'
+import Fax        from './pages/Fax'
 const Kiosk = lazy(() => import('./pages/Kiosk'))
 const BookAppointment = lazy(() => import('./pages/BookAppointment'))
 const ManageBooking = lazy(() => import('./pages/ManageBooking'))
@@ -101,10 +107,6 @@ const Invoices      = lazy(() => import('./pages/Invoices'))
 const Payments      = lazy(() => import('./pages/Payments'))
 const AccountsReceivable = lazy(() => import('./pages/AccountsReceivable'))
 const Transactions = lazy(() => import('./pages/Transactions'))
-const Sms           = lazy(() => import('./pages/Sms'))
-const Email         = lazy(() => import('./pages/Email'))
-const Documents     = lazy(() => import('./pages/Documents'))
-const Esign         = lazy(() => import('./pages/TaxOfficeEsign'))
 const TimeClock     = lazy(() => import('./pages/TimeClock'))
 const Payroll       = lazy(() => import('./pages/Payroll'))
 const Employees     = lazy(() => import('./pages/Employees'))
@@ -112,10 +114,8 @@ const ActivityReport= lazy(() => import('./pages/ActivityReport'))
 const Reports       = lazy(() => import('./pages/Reports'))
 const Settings      = lazy(() => import('./pages/Settings'))
 const Dialer        = lazy(() => import('./pages/Dialer'))
-const Chat          = lazy(() => import('./pages/Chat'))
 const Books         = lazy(() => import('./pages/Books'))
 const FormaCorp     = lazy(() => import('./pages/FormaCorp'))
-const Fax           = lazy(() => import('./pages/Fax'))
 const Workflows     = lazy(() => import('./pages/Workflows'))
 const TimeEntry     = lazy(() => import('./pages/TimeEntry'))
 
@@ -245,7 +245,7 @@ function Shell() {
             <Route path="/sms"         element={<Guard section="sms"><Sms /></Guard>} />
             <Route path="/email"       element={<Guard section="email"><Email /></Guard>} />
             <Route path="/documents"   element={<Guard section="documents"><Documents /></Guard>} />
-            <Route path="/esign"       element={<Guard section="esign"><Esign /></Guard>} />
+            <Route path="/esign"       element={<Guard section="esign"><TaxOfficeEsign /></Guard>} />
             <Route path="/kiosk"       element={<Kiosk />} />
             <Route path="/employee"    element={<EmployeePortal />} />
             <Route path="/timeclock"   element={<TimeClock />} />
