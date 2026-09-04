@@ -25,7 +25,7 @@ serve(async (req) => {
     const { data: tenantId, error: tenantErr } = await authClient.rpc('current_tenant_id')
     if (tenantErr || !tenantId) return json({ error: 'No active office context' }, 403)
 
-    const { destinationNumber, qa_certification, dry_run } = await req.json()
+    const { destinationNumber, displayName, entityType, qa_certification, dry_run } = await req.json()
     const digits = String(destinationNumber || '').replace(/\D/g, '')
     const e164 = digits.length === 10 ? `+1${digits}` : (digits.length === 11 && digits.startsWith('1') ? `+${digits}` : '')
     if (!e164) return json({ error: 'Enter a valid 10-digit US phone number.' }, 400)
@@ -59,14 +59,16 @@ serve(async (req) => {
     }
 
     const conferenceName = `outbound-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`
-    const { error: insErr } = await db.from('outbound_calls').insert({
+    const { data: insertedCall, error: insErr } = await db.from('outbound_calls').insert({
       conference_name: conferenceName,
       destination_number: e164,
+      display_name: String(displayName || '').trim() || null,
+      entity_type: String(entityType || '').trim() || null,
       status: 'pending',
       tenant_id: tenantId,
       agent_name: employee?.name || user.email,
       agent_extension: employee?.extension || null,
-    })
+    }).select('id').single()
     if (insErr) return json({ error: insErr.message }, 500)
 
     const spaceDomain = String(settings.sw_space_url).replace(/^https?:\/\//, '')
@@ -112,7 +114,7 @@ serve(async (req) => {
     if (clientCallsid) {
       await db.from('outbound_calls').update({ provider_call_sid: clientCallsid }).eq('tenant_id', tenantId).eq('conference_name', conferenceName)
     }
-    return json({ ok: true, conferenceName, clientCallsid })
+    return json({ ok: true, conferenceName, clientCallsid, outboundCallId: insertedCall?.id || null })
   } catch (err) {
     console.error('start-outbound-call error:', err)
     return json({ error: 'Unable to start call.' }, 500)
