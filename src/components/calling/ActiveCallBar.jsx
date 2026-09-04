@@ -259,7 +259,7 @@ export default function ActiveCallBar() {
                 borderRadius: '0 0 8px 8px',
                 padding: '6px 16px 7px',
                 boxShadow: '0 4px 12px rgba(0,0,0,.25)',
-                fontSize: 12.5, fontWeight: 800, cursor: 'pointer',
+                fontSize: 13.5, fontWeight: 800, cursor: 'pointer',
                 display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap'
               }}
             >
@@ -272,7 +272,7 @@ export default function ActiveCallBar() {
             width: 'min(650px, 92vw)',
             background: 'linear-gradient(135deg, #0f6e2e, #25A25A)',
             borderRadius: showTranscript ? '12px 12px 0 0' : 12,
-            padding: '7px 11px', boxShadow: '0 7px 20px rgba(0,0,0,0.32)',
+            padding: '9px 13px', boxShadow: '0 7px 20px rgba(0,0,0,0.32)',
             display: 'flex', flexDirection: 'column', gap: 5,
           }}>
             {/* Row 1 — who you're talking to + End */}
@@ -296,7 +296,7 @@ export default function ActiveCallBar() {
                       </span>
                     )}
                   </div>
-                  <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 10.75, whiteSpace: 'nowrap' }}>
+                  <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11.75, whiteSpace: 'nowrap' }}>
                     {active.phone} <span style={{ opacity: 0.75, margin: '0 6px' }}>•</span> ⏱ {formatTime(elapsed)}
                   </div>
                 </div>
@@ -489,7 +489,7 @@ export default function ActiveCallBar() {
                 style={{
                   background: 'rgba(255,255,255,.12)', color: '#fff',
                   border: '1px solid rgba(255,255,255,.22)', borderRadius: 7,
-                  height: 26, padding: '0 9px', fontSize: 11.25, fontWeight: 800,
+                  height: 30, padding: '0 11px', fontSize: 12.25, fontWeight: 800,
                   cursor: 'pointer', whiteSpace: 'nowrap'
                 }}
               >
