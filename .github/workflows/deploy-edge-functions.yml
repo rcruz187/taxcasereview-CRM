@@ -9,6 +9,7 @@ on:
     paths:
       - 'supabase/functions/hub-proxy/**'
       - 'supabase/functions/support-api/**'
+      - 'supabase/functions/linkedin-publish/**'
       - 'supabase/functions/linkedin-scheduler/**'
       - 'supabase/functions/linkedin-queue-replenisher/**'
       - 'supabase/functions/send-email/**'
@@ -57,6 +58,7 @@ jobs:
           for FN in \
             hub-proxy \
             support-api \
+            linkedin-publish \
             linkedin-scheduler \
             linkedin-queue-replenisher \
             send-email \
