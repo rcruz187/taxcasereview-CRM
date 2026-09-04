@@ -25,7 +25,7 @@ serve(async (req) => {
     const { data: tenantId, error: tenantErr } = await authClient.rpc('current_tenant_id')
     if (tenantErr || !tenantId) return json({ error: 'No active office context' }, 403)
 
-    const { destinationNumber, displayName, entityType, qa_certification, dry_run } = await req.json()
+    const { destinationNumber, displayName, entityType, callerIdPreference, qa_certification, dry_run } = await req.json()
     const digits = String(destinationNumber || '').replace(/\D/g, '')
     const e164 = digits.length === 10 ? `+1${digits}` : (digits.length === 11 && digits.startsWith('1') ? `+${digits}` : '')
     if (!e164) return json({ error: 'Enter a valid 10-digit US phone number.' }, 400)
@@ -48,8 +48,13 @@ serve(async (req) => {
       return json({ error: 'SignalWire credentials or caller ID missing for this office.' }, 422)
     }
 
-    const fromDigits = String(settings.sw_outbound_did || settings.sw_inbound_did || '').replace(/\D/g, '')
-    const fromNumber = fromDigits.length === 10 ? `+1${fromDigits}` : (fromDigits.length === 11 && fromDigits.startsWith('1') ? `+${fromDigits}` : '')
+    const localDigits = String(settings.sw_outbound_did || '').replace(/\D/g, '')
+    const tollFreeDigits = String(settings.sw_inbound_did || '').replace(/\D/g, '')
+    const normalize = (d: string) => d.length === 10 ? `+1${d}` : (d.length === 11 && d.startsWith('1') ? `+${d}` : '')
+    const localNumber = normalize(localDigits)
+    const tollFreeNumber = normalize(tollFreeDigits)
+    const requestedCallerId = callerIdPreference === 'tollfree' ? tollFreeNumber : localNumber
+    const fromNumber = requestedCallerId || localNumber || tollFreeNumber
     if (!fromNumber) return json({ error: 'Configured outbound caller ID is invalid.' }, 422)
 
     // Real production authorization/provider validation, but guaranteed no call,
@@ -114,7 +119,7 @@ serve(async (req) => {
     if (clientCallsid) {
       await db.from('outbound_calls').update({ provider_call_sid: clientCallsid }).eq('tenant_id', tenantId).eq('conference_name', conferenceName)
     }
-    return json({ ok: true, conferenceName, clientCallsid, outboundCallId: insertedCall?.id || null })
+    return json({ ok: true, conferenceName, clientCallsid, outboundCallId: insertedCall?.id || null, fromNumber })
   } catch (err) {
     console.error('start-outbound-call error:', err)
     return json({ error: 'Unable to start call.' }, 500)
