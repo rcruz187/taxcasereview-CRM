@@ -253,18 +253,20 @@ export default function ActiveCallBar() {
               onClick={() => setCallBarCollapsed(false)}
               title="Show active call controls"
               style={{
-                position: 'fixed', top: 10, left: '45%', transform: 'translateX(-50%)', zIndex: 3501,
+                position: 'fixed', top: 0, left: '45%', transform: 'translateX(-50%)', zIndex: 3501,
                 background: 'linear-gradient(135deg, #0f6e2e, #25A25A)', color: '#fff',
-                border: '1px solid rgba(255,255,255,.2)', borderRadius: 999,
-                padding: '6px 11px', boxShadow: '0 6px 18px rgba(0,0,0,.28)',
+                border: '1px solid rgba(255,255,255,.2)', borderTop: 'none',
+                borderRadius: '0 0 8px 8px',
+                padding: '4px 12px 5px',
+                boxShadow: '0 4px 12px rgba(0,0,0,.25)',
                 fontSize: 11.5, fontWeight: 800, cursor: 'pointer',
                 display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap'
               }}
             >
-              📞 {active?.name || active?.phone || 'Active call'} · {formatTime(elapsed)} · Show
+              ▼ Show Call
             </button>
           )}
-          {!callBarCollapsed && (
+                    {!callBarCollapsed && (
           <div style={{
             position: 'fixed', top: 10, left: '45%', transform: 'translateX(-50%)', zIndex: 3500,
             width: 'min(650px, 92vw)',
@@ -485,14 +487,13 @@ export default function ActiveCallBar() {
                 }}
                 title="Hide active call controls"
                 style={{
-                  position: 'absolute', top: 6, right: 8,
                   background: 'rgba(255,255,255,.12)', color: '#fff',
-                  border: '1px solid rgba(255,255,255,.2)', borderRadius: 6,
-                  width: 24, height: 22, padding: 0, fontSize: 13, fontWeight: 800,
-                  cursor: 'pointer', lineHeight: 1
+                  border: '1px solid rgba(255,255,255,.22)', borderRadius: 7,
+                  height: 26, padding: '0 9px', fontSize: 11.25, fontWeight: 800,
+                  cursor: 'pointer', whiteSpace: 'nowrap'
                 }}
               >
-                −
+                ▲ Hide
               </button>
           </div>
           )}
