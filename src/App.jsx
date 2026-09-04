@@ -22,6 +22,11 @@ class PageErrorBoundary extends React.Component {
   static getDerivedStateFromError(error) {
     return { hasError: true, error }
   }
+  componentDidUpdate(prevProps) {
+    if (prevProps.resetKey !== this.props.resetKey && this.state.hasError) {
+      this.setState({ hasError: false, error: null })
+    }
+  }
   componentDidCatch(error, info) {
     console.error('[PageErrorBoundary] Page crash:', error, info)
   }
@@ -178,6 +183,7 @@ function Guard({ section, children }) {
 function Shell() {
   const { openModal, closeModal, realtimeOk } = useApp()
   const navigate = useNavigate()
+  const location = useLocation()
 
   function handleNew() {
     openModal('Quick Add', (
@@ -207,7 +213,7 @@ function Shell() {
       <div className="main-area">
         <TopBar onNew={handleNew} />
         <div className="page-content">
-          <PageErrorBoundary>
+          <PageErrorBoundary resetKey={location.pathname + location.search}>
           <Suspense fallback={
             <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'40vh', color:'var(--t3)', fontSize:13 }}>
               Loading…
