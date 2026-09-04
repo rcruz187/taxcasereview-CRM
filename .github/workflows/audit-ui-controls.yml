@@ -20,3 +20,13 @@ jobs:
           node-version: '24'
       - name: Scan for inert buttons
         run: node scripts/audit-ui-controls.mjs
+
+      - name: Verify Dialer authoritative call history
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q "from('incoming_calls')" src/pages/Dialer.jsx
+          grep -q "from('outbound_calls')" src/pages/Dialer.jsx
+          grep -q "window.addEventListener('focus', refresh)" src/pages/Dialer.jsx
+          grep -q "if (tab === 'log') loadCallLog()" src/pages/Dialer.jsx
+          grep -q "setInterval(loadCallLog, calling ? 2500 : 5000)" src/pages/Dialer.jsx
