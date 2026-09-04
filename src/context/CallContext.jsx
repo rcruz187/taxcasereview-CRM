@@ -166,6 +166,7 @@ export function CallProvider({ children }) {
   const activeConferenceRef = useRef(null)
   const activeInboundCallsidRef = useRef(null)
   const uiStartedRef = useRef(false)
+  const pageUnloadingRef = useRef(false)
   const callStartedAtRef = useRef(null)
   const restoreAttemptedRef = useRef(false)
   const inboundStatusPollRef = useRef(null)
@@ -239,6 +240,22 @@ export function CallProvider({ children }) {
   }
 
   useEffect(() => { elapsedRef.current = elapsed }, [elapsed])
+
+  // A hard refresh/page close destroys the browser RELAY leg. That must NEVER
+  // be interpreted as an intentional End Call. Mark unload before the SDK emits
+  // hangup/destroy so the provider conference survives and can be rejoined.
+  useEffect(() => {
+    const markUnloading = () => { pageUnloadingRef.current = true }
+    const clearUnloading = () => { pageUnloadingRef.current = false }
+    window.addEventListener('beforeunload', markUnloading)
+    window.addEventListener('pagehide', markUnloading)
+    window.addEventListener('pageshow', clearUnloading)
+    return () => {
+      window.removeEventListener('beforeunload', markUnloading)
+      window.removeEventListener('pagehide', markUnloading)
+      window.removeEventListener('pageshow', clearUnloading)
+    }
+  }, [])
 
   function showCallToast(msg) { setCallToast(msg); setTimeout(() => setCallToast(''), 4000) }
 
@@ -314,6 +331,13 @@ export function CallProvider({ children }) {
           setIncomingMatch(null)
           stopRing()
           if (liveCallRef.current === call) {
+            // During refresh/page close, only the local browser leg is dying.
+            // Do NOT terminate the provider conference or clear persisted call
+            // state; the next page load will verify and rejoin it.
+            if (pageUnloadingRef.current) {
+              liveCallRef.current = null
+              return
+            }
             finalizeCallEnd({ alreadyHungUp: true })
             handleRemoteHangup()
           }
