@@ -257,9 +257,9 @@ export default function ActiveCallBar() {
                 background: 'linear-gradient(135deg, #0f6e2e, #25A25A)', color: '#fff',
                 border: '1px solid rgba(255,255,255,.2)', borderTop: 'none',
                 borderRadius: '0 0 8px 8px',
-                padding: '4px 12px 5px',
+                padding: '6px 16px 7px',
                 boxShadow: '0 4px 12px rgba(0,0,0,.25)',
-                fontSize: 11.5, fontWeight: 800, cursor: 'pointer',
+                fontSize: 12.5, fontWeight: 800, cursor: 'pointer',
                 display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap'
               }}
             >
