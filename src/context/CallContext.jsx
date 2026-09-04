@@ -706,11 +706,11 @@ export function CallProvider({ children }) {
       }
     }
 
-    if (active.entityType !== 'client') {
+    // Only a real lead with a real lead id may advance the lead pipeline.
+    // Government/reference calls, manual dials and other non-client calls
+    // must never create or mutate lead state.
+    if (active.entityType === 'lead' && active.id) {
       if (logForm.outcome === 'Converted') {
-        // 'Converted' = call resulted in booking a consultation.
-        // Use advanceLeadStatus (forward-only) so a lead already further
-        // along in the pipeline is never regressed by logging a call.
         await advanceLeadStatus(supabase, active.name, 'Consultation Scheduled')
       }
       if (logForm.outcome === 'Callback Requested') {
