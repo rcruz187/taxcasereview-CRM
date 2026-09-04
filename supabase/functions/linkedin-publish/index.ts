@@ -77,6 +77,19 @@ Deno.serve(async (req) => {
     })
     const profile = await profileRes.json()
 
+    const grantedScopes = String(tokenData.scope || '')
+    const isArcvena = productId === 'arcvena'
+    if (isArcvena && !grantedScopes.split(/[ ,]+/).includes('w_organization_social')) {
+      return json({
+        ok: false,
+        error: 'Arcvena requires LinkedIn organization posting permission',
+        required_scope: 'w_organization_social',
+      }, 403)
+    }
+
+    const publishTargetType = isArcvena ? 'ORGANIZATION' : 'PERSON'
+    const linkedinOrganizationId = isArcvena ? '146118085' : null
+
     await supabase.from('linkedin_connections').upsert({
       tenant_id: tenantId,
       product_id: productId,
@@ -84,11 +97,19 @@ Deno.serve(async (req) => {
       display_name: profile.name || profile.email || 'LinkedIn Account',
       access_token: tokenData.access_token,
       expires_at: new Date(Date.now() + (tokenData.expires_in || 5184000) * 1000).toISOString(),
-      scopes: tokenData.scope || 'openid,profile,email,w_member_social',
+      scopes: grantedScopes || (isArcvena ? 'openid,profile,w_organization_social' : 'openid,profile,w_member_social'),
+      publish_target_type: publishTargetType,
+      linkedin_organization_id: linkedinOrganizationId,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'tenant_id,product_id' })
 
-    return json({ ok: true, name: profile.name || 'LinkedIn Account' })
+    return json({
+      ok: true,
+      name: profile.name || 'LinkedIn Account',
+      product_id: productId,
+      publish_target_type: publishTargetType,
+      linkedin_organization_id: linkedinOrganizationId,
+    })
   }
 
   if (action === 'status') {
