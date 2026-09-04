@@ -216,7 +216,7 @@ export default function ActiveCallBar() {
                 {incomingMatch ? incomingMatch.name : 'Incoming Call'}
                 {incomingMatch && !incomingMatch.isDepartment && (
                   <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, background: 'rgba(255,255,255,0.2)', borderRadius: 6, padding: '2px 8px' }}>
-                    {incomingMatch.entityType === 'client' ? 'Client' : 'Lead'}
+                    {incomingMatch.entityType === 'client' ? 'Client' : incomingMatch.entityType === 'lead' ? 'Lead' : incomingMatch.entityType === 'reference' ? 'Reference' : 'Call'}
                   </span>
                 )}
               </div>
@@ -267,7 +267,7 @@ export default function ActiveCallBar() {
                     {active?.name || `${active?.first || ''} ${active?.last || ''}`.trim()}
                     {active.entityType && (
                       <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, background: 'rgba(255,255,255,0.2)', borderRadius: 6, padding: '2px 8px', verticalAlign: 'middle' }}>
-                        {active.entityType === 'client' ? 'Client' : 'Lead'}
+                        {active.entityType === 'client' ? 'Client' : active.entityType === 'lead' ? 'Lead' : active.entityType === 'reference' ? 'Reference' : 'Call'}
                       </span>
                     )}
                     {onHold && (
