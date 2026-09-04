@@ -10,7 +10,7 @@ export default function PhoneNumber({ val, name = '' }) {
   function dial(e) {
     e.preventDefault()
     e.stopPropagation()
-    startCall({ name: name || val, phone: val, entityType: 'lead' })
+    startCall({ name: name || val, phone: val, entityType: 'reference', status: 'Reference' })
   }
 
   return (
