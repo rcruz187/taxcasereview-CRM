@@ -48,6 +48,6 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          npx gh-pages -d dist --dotfiles -u "GitHub Actions <actions@github.com>"
+          npx gh-pages -d dist --dotfiles --add -u "GitHub Actions <actions@github.com>"
 
 # deploy trigger: audited universal e-signature flow
