@@ -42,11 +42,15 @@ serve(async (req) => {
     if (!isPlatformAdmin && (!active || Number(employee?.perm_comms || 0) < 2)) return json({ error: 'Phone permission denied' }, 403)
 
     const { data: settings, error: sErr } = await db.from('settings')
-      .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did,tenant_id')
+      .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did,sw_outbound_did,tenant_id')
       .eq('tenant_id', tenantId).limit(1).maybeSingle()
-    if (sErr || !settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token || !settings?.sw_inbound_did) {
+    if (sErr || !settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token || (!settings?.sw_outbound_did && !settings?.sw_inbound_did)) {
       return json({ error: 'SignalWire credentials or caller ID missing for this office.' }, 422)
     }
+
+    const fromDigits = String(settings.sw_outbound_did || settings.sw_inbound_did || '').replace(/\\D/g, '')
+    const fromNumber = fromDigits.length === 10 ? `+1${fromDigits}` : (fromDigits.length === 11 && fromDigits.startsWith('1') ? `+${fromDigits}` : '')
+    if (!fromNumber) return json({ error: 'Configured outbound caller ID is invalid.' }, 422)
 
     // Real production authorization/provider validation, but guaranteed no call,
     // no outbound_calls insert and no SignalWire request.
@@ -75,7 +79,7 @@ serve(async (req) => {
       headers: { Authorization: providerAuth, 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         To: e164,
-        From: settings.sw_inbound_did,
+        From: fromNumber,
         Url: outboundLegUrl,
         Method: 'POST',
         StatusCallback: statusCallbackUrl,
@@ -87,8 +91,13 @@ serve(async (req) => {
     const text = await resp.text()
     if (!resp.ok) {
       await db.from('outbound_calls').update({ status: 'failed' }).eq('tenant_id', tenantId).eq('conference_name', conferenceName)
-      console.error('start-outbound-call: SignalWire rejected call', resp.status, text)
-      return json({ error: 'SignalWire could not start the call.' }, 502)
+      let providerMessage = ''
+      try {
+        const parsed = JSON.parse(text)
+        providerMessage = parsed?.message || parsed?.error || parsed?.errors?.[0]?.detail || ''
+      } catch {}
+      console.error('start-outbound-call: SignalWire rejected call', resp.status, providerMessage || text)
+      return json({ error: providerMessage ? `SignalWire rejected the call: ${providerMessage}` : `SignalWire rejected the call (HTTP ${resp.status}).`, provider_status: resp.status }, 502)
     }
 
     let clientCallsid = null
