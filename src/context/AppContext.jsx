@@ -381,6 +381,10 @@ export function AppProvider({ children }) {
       if (row.direction === 'inbound') playSound('fax')
     })
 
+    withReconnect('global-voicemail-notify', 'voicemails', ({ new: row }) => {
+      if (!row.is_read) playSound('voicemail')
+    })
+
     withReconnect('global-task-notify', 'tasks', ({ new: row }) => {
       playSound('task')
     })
