@@ -713,7 +713,13 @@ export function CallProvider({ children }) {
     // same proven bridge mechanism answerIncoming() already uses —
     // and receive-call's isAgentJoin branch bridges us into that same
     // conference once it sees the pending outbound_calls row.
-    supabase.functions.invoke('start-outbound-call', { body: { destinationNumber } })
+    supabase.functions.invoke('start-outbound-call', {
+      body: {
+        destinationNumber,
+        displayName: lead.name || lead.clientName || lead.phone || destinationNumber,
+        entityType: lead.entityType || (lead.status === 'Manual' ? 'manual' : null),
+      }
+    })
       .then(async ({ data, error }) => {
         let responseData = data
         if (error && !responseData && typeof error?.context?.json === 'function') {
