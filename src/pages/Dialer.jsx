@@ -86,6 +86,32 @@ export default function Dialer() {
     setClientQueue(q)
   }, [])
 
+  // Call history is authoritative from incoming_calls/outbound_calls. Refresh it
+  // whenever the Dialer becomes visible/focused, and whenever staff opens the
+  // Call History tab, so recent calls never wait on a hard refresh.
+  useEffect(() => {
+    const refresh = () => loadCallLog()
+    const onVisibility = () => { if (document.visibilityState === 'visible') refresh() }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (tab === 'log') loadCallLog()
+  }, [tab])
+
+  // While a call is active or has just ended, poll the authoritative call tables
+  // briefly so status/completion appears in History without requiring any reload.
+  useEffect(() => {
+    loadCallLog()
+    const t = setInterval(loadCallLog, calling ? 2500 : 5000)
+    return () => clearInterval(t)
+  }, [calling])
+
 
   async function loadLeads() {
     const { data, error } = await supabase
