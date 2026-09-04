@@ -52,15 +52,17 @@ function getRingAudio() {
 
 export function playRing() {
   if (!isSoundEnabled()) return
-  // Create a fresh Audio element each time — avoids stale state
-  // and sidesteps autoplay restrictions since the WAV is inline data
   try {
-    const a = new Audio(RING_WAV)
-    a.volume = 0.7
-    a.play().catch(err => {
-      console.warn('[playRing] Audio element blocked:', err)
-      playSound('call')
-    })
+    const a = getRingAudio()
+    a.pause()
+    a.currentTime = 0
+    const p = a.play()
+    if (p?.catch) {
+      p.catch(err => {
+        console.warn('[playRing] Audio element blocked:', err)
+        playSound('call')
+      })
+    }
   } catch(err) {
     console.warn('[playRing] Error:', err)
     playSound('call')
@@ -74,32 +76,35 @@ export function stopRingAudio() {
 }
 
 // ─── Autoplay-policy fix ─────────────────────────────────────────────────────
+// Browsers only unlock programmatic audio after a real user activation.
+// Mousemove/scroll do NOT count; treating them as activation caused us to
+// remove the genuine click/key listeners before audio was actually unlocked.
 let primed = false
-function primeOnce() {
+async function primeOnce() {
   if (primed) return
-  primed = true
   try {
     const c = getCtx()
-    const buf = c.createBuffer(1, 1, 22050)
-    const src = c.createBufferSource()
-    src.buffer = buf
-    src.connect(c.destination)
-    src.start(0)
-    // Also pre-load ring audio so it's ready to play instantly
-    getRingAudio().load()
-  } catch (_) {}
-  window.removeEventListener('pointerdown', primeOnce)
-  window.removeEventListener('keydown', primeOnce)
-  window.removeEventListener('touchstart', primeOnce)
-  window.removeEventListener('mousemove', primeOnce)
-  window.removeEventListener('scroll', primeOnce)
+    if (c.state === 'suspended') await c.resume()
+    const a = getRingAudio()
+    a.muted = true
+    a.currentTime = 0
+    await a.play()
+    a.pause()
+    a.currentTime = 0
+    a.muted = false
+    primed = true
+    window.removeEventListener('pointerdown', primeOnce)
+    window.removeEventListener('keydown', primeOnce)
+    window.removeEventListener('touchstart', primeOnce)
+  } catch (err) {
+    // Keep listeners installed so the next real user gesture can retry.
+    console.warn('[notifySound] audio unlock failed:', err)
+  }
 }
 if (typeof window !== 'undefined') {
   window.addEventListener('pointerdown', primeOnce)
   window.addEventListener('keydown', primeOnce)
   window.addEventListener('touchstart', primeOnce)
-  window.addEventListener('mousemove', primeOnce, { once: true })
-  window.addEventListener('scroll', primeOnce, { once: true })
 }
 
 export function isSoundEnabled() {
