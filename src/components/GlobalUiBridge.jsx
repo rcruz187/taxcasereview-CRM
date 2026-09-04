@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
-
-const LANG_KEY = 'taxres-ui-language'
+import { getStoredLanguage, storeLanguage } from '../lib/i18n'
 
 const ES = {
   'Dashboard':'Panel principal','Calendar':'Calendario','Leads':'Prospectos','Clients':'Clientes','Cases':'Casos','Tasks':'Tareas',
@@ -86,7 +85,7 @@ function translateElement(root, lang) {
 }
 
 function currentLang() {
-  return localStorage.getItem(LANG_KEY) === 'es' ? 'es' : 'en'
+  return getStoredLanguage()
 }
 
 function styleControls() {
@@ -155,6 +154,16 @@ function mountTopbar(lang, setLanguage) {
 export default function GlobalUiBridge() {
   useEffect(() => {
     styleControls()
+    // One canonical language source for the entire tax CRM. Older builds used
+    // taxres-ui-language here while the rest of the product used tcr-language,
+    // which allowed the shell and page content to disagree.
+    try {
+      const legacy = localStorage.getItem('taxres-ui-language')
+      if (!localStorage.getItem('tcr-language') && (legacy === 'en' || legacy === 'es')) {
+        storeLanguage(legacy)
+      }
+      localStorage.removeItem('taxres-ui-language')
+    } catch (_) {}
     let lang = currentLang()
     let translating = false
 
@@ -170,7 +179,7 @@ export default function GlobalUiBridge() {
 
     const setLanguage = next => {
       lang = next === 'es' ? 'es' : 'en'
-      localStorage.setItem(LANG_KEY, lang)
+      storeLanguage(lang)
       apply()
     }
 
@@ -183,6 +192,15 @@ export default function GlobalUiBridge() {
       const parentText = (b.parentElement?.textContent || '').replace(/\s+/g,'').toUpperCase()
       if (parentText.includes('EN') && parentText.includes('ES')) setLanguage(text.toLowerCase())
     }
+
+    const onLanguageChange = e => {
+      const next = e?.detail?.language === 'es' ? 'es' : 'en'
+      if (next === lang) return
+      lang = next
+      apply()
+    }
+    window.addEventListener('taxres-language-change', onLanguageChange)
+    window.addEventListener('nashville-language-change', onLanguageChange)
 
     document.addEventListener('click', clickCapture, true)
     const observer = new MutationObserver(mutations => {
@@ -202,6 +220,8 @@ export default function GlobalUiBridge() {
       observer.disconnect()
       clearInterval(timer)
       document.removeEventListener('click', clickCapture, true)
+      window.removeEventListener('taxres-language-change', onLanguageChange)
+      window.removeEventListener('nashville-language-change', onLanguageChange)
       document.getElementById('taxres-topbar-utilities')?.remove()
     }
   }, [])
