@@ -166,6 +166,17 @@ export function CallProvider({ children }) {
   const activeConferenceRef = useRef(null)
   const activeInboundCallsidRef = useRef(null)
   const uiStartedRef = useRef(false)
+  const callStartedAtRef = useRef(null)
+  const restoreAttemptedRef = useRef(false)
+  const inboundStatusPollRef = useRef(null)
+  const CALL_SESSION_KEY = 'taxres_active_call_v1'
+
+  function persistCallSession(payload) {
+    try { sessionStorage.setItem(CALL_SESSION_KEY, JSON.stringify(payload)) } catch (_) {}
+  }
+  function clearPersistedCallSession() {
+    try { sessionStorage.removeItem(CALL_SESSION_KEY) } catch (_) {}
+  }
   const elapsedRef = useRef(0)
   const incomingMatchRef = useRef(null)
   const timerRef = useRef(null)
@@ -324,6 +335,107 @@ export function CallProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // A browser refresh tears down only the local RELAY leg. The provider
+  // conference remains authoritative, so once RELAY reconnects we validate the
+  // stored conference against Supabase and automatically rejoin it.
+  useEffect(() => {
+    if (relayStatus !== 'ready' || restoreAttemptedRef.current) return
+    restoreAttemptedRef.current = true
+
+    let saved = null
+    try { saved = JSON.parse(sessionStorage.getItem(CALL_SESSION_KEY) || 'null') } catch (_) {}
+    if (!saved?.conferenceName || !saved?.kind) return
+
+    let cancelled = false
+    ;(async () => {
+      let row = null
+      if (saved.kind === 'outbound') {
+        const { data } = await supabase.from('outbound_calls')
+          .select('conference_name,status,provider_call_sid')
+          .eq('conference_name', saved.conferenceName)
+          .in('status', ['pending','ringing','answered','connected'])
+          .maybeSingle()
+        row = data
+      } else if (saved.kind === 'inbound' && saved.inboundCallsid) {
+        const { data } = await supabase.from('incoming_calls')
+          .select('conference_name,callsid,status')
+          .eq('callsid', saved.inboundCallsid)
+          .in('status', ['ringing','answered'])
+          .maybeSingle()
+        row = data
+      }
+      if (cancelled) return
+      if (!row || row.conference_name !== saved.conferenceName) {
+        clearPersistedCallSession()
+        return
+      }
+
+      const restoredActive = saved.active || {
+        id: null, name: saved.kind === 'inbound' ? 'Incoming Call' : 'Active Call',
+        phone: '—', status: 'Manual', entityType: null,
+      }
+      activeConferenceRef.current = saved.conferenceName
+      activeInboundCallsidRef.current = saved.kind === 'inbound' ? (saved.inboundCallsid || null) : null
+      transferableCallsidRef.current = saved.transferableCallsid || row.provider_call_sid || null
+      setCanTransfer(!!transferableCallsidRef.current)
+      callStartedAtRef.current = Number(saved.startedAt) || Date.now()
+      uiStartedRef.current = true
+      setActive(restoredActive)
+      setCalling(true)
+      const restoredElapsed = Math.max(0, Math.floor((Date.now() - callStartedAtRef.current) / 1000))
+      elapsedRef.current = restoredElapsed
+      setElapsed(restoredElapsed)
+      clearInterval(timerRef.current)
+      timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000)
+
+      if (saved.kind === 'outbound') {
+        const conf = saved.conferenceName
+        if (outboundPollRef.current) clearInterval(outboundPollRef.current)
+        outboundPollRef.current = setInterval(async () => {
+          const { data: live } = await supabase.from('outbound_calls')
+            .select('status').eq('conference_name', conf).maybeSingle()
+          if (live?.status === 'completed' || live?.status === 'failed') {
+            finalizeCallEnd({ alreadyHungUp: true })
+            handleRemoteHangup()
+          }
+        }, 3000)
+      } else if (saved.inboundCallsid) {
+        const callsid = saved.inboundCallsid
+        if (inboundStatusPollRef.current) clearInterval(inboundStatusPollRef.current)
+        inboundStatusPollRef.current = setInterval(async () => {
+          const { data: live } = await supabase.from('incoming_calls')
+            .select('status').eq('callsid', callsid).maybeSingle()
+          if (live?.status === 'completed' || live?.status === 'missed') {
+            clearInterval(inboundStatusPollRef.current)
+            inboundStatusPollRef.current = null
+            finalizeCallEnd({ alreadyHungUp: true })
+            handleRemoteHangup()
+          }
+        }, 3000)
+      }
+
+      // Re-create only the browser/agent leg. receive-call recognizes the
+      // business-number self-dial and rejoins the still-live conference.
+      setTimeout(() => {
+        if (cancelled || !uiStartedRef.current || !relayRef.current || !callerNumberRef.current) return
+        relayRef.current.newCall({
+          destinationNumber: callerNumberRef.current,
+          callerNumber: callerNumberRef.current,
+        }).then(call => {
+          liveCallRef.current = call
+          setMuted(false)
+          setOnHold(false)
+          showCallToast('📞 Reconnected to active call after refresh')
+        }).catch(err => {
+          console.error('[call-restore] rejoin failed:', err)
+          showCallToast('Could not reconnect to the active call. The remote call may still be live.')
+        })
+      }, 500)
+    })()
+
+    return () => { cancelled = true }
+  }, [relayStatus])
+
   // Polls for inbound calls being held by receive-call/ivr-route (see
   // those functions' comments for why — the direct Verto dial-in is
   // dead). When a new 'ringing' row shows up, show the same banner UI as
@@ -465,33 +577,45 @@ export function CallProvider({ children }) {
     setElapsed(0)
     setLogForm(BLANK_LOG)
     timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000)
-    setActive({
+    const activeEntry = {
       id: m?.id ?? null,
       name: (m && !m.isDepartment) ? m.name : (row.department ? `Incoming — ${row.department}` : 'Incoming Call'),
       first: 'Incoming', last: 'Call',
       phone: row.from_number || '—',
       status: 'Manual',
       entityType: (m && !m.isDepartment) ? m.entityType : null,
-    })
+    }
+    setActive(activeEntry)
 
     activeConferenceRef.current = row.conference_name || null
     activeInboundCallsidRef.current = row.callsid || null
     transferableCallsidRef.current = row.callsid || null
     setCanTransfer(!!row.callsid)
+    callStartedAtRef.current = Date.now()
+    persistCallSession({
+      kind: 'inbound',
+      conferenceName: row.conference_name || null,
+      inboundCallsid: row.callsid || null,
+      transferableCallsid: row.callsid || null,
+      active: activeEntry,
+      startedAt: callStartedAtRef.current,
+    })
 
     // Server-side backup hangup detector for inbound calls — mirrors outboundPollRef.
     // When the caller hangs up, caller-hangup marks the row 'completed' or 'missed'.
     // The RELAY SDK hangup event is unreliable for the agent's self-dial leg, so
     // poll the DB every 3s as a guaranteed fallback to end the active call UI.
     const inboundCallsid = row.callsid
-    const inboundPollRef = setInterval(async () => {
+    if (inboundStatusPollRef.current) clearInterval(inboundStatusPollRef.current)
+    inboundStatusPollRef.current = setInterval(async () => {
       const { data: row } = await supabase
         .from('incoming_calls')
         .select('status')
         .eq('callsid', inboundCallsid)
         .maybeSingle()
       if (row?.status === 'completed' || row?.status === 'missed') {
-        clearInterval(inboundPollRef)
+        clearInterval(inboundStatusPollRef.current)
+        inboundStatusPollRef.current = null
         finalizeCallEnd({ alreadyHungUp: true })
         handleRemoteHangup()
       }
@@ -542,6 +666,7 @@ export function CallProvider({ children }) {
 
     uiStartedRef.current = true
     activeInboundCallsidRef.current = null
+    callStartedAtRef.current = Date.now()
     setActive(lead)
     setCalling(true)
     setElapsed(0)
@@ -578,6 +703,13 @@ export function CallProvider({ children }) {
         activeConferenceRef.current = responseData.conferenceName || null
         transferableCallsidRef.current = responseData.clientCallsid || null
         setCanTransfer(!!responseData.clientCallsid)
+        persistCallSession({
+          kind: 'outbound',
+          conferenceName: responseData.conferenceName || null,
+          transferableCallsid: responseData.clientCallsid || null,
+          active: lead,
+          startedAt: callStartedAtRef.current || Date.now(),
+        })
         // Server-confirmed backup for noticing this call has truly ended,
         // independent of the RELAY SDK's own (sometimes unreliable)
         // call.state events. outbound-call-status writes 'completed' here
@@ -626,7 +758,10 @@ export function CallProvider({ children }) {
   // with each other again.
   function finalizeCallEnd({ alreadyHungUp, skipConferenceKill = false }) {
     stopRingback()
+    clearPersistedCallSession()
+    callStartedAtRef.current = null
     if (outboundPollRef.current) { clearInterval(outboundPollRef.current); outboundPollRef.current = null }
+    if (inboundStatusPollRef.current) { clearInterval(inboundStatusPollRef.current); inboundStatusPollRef.current = null }
     if (!alreadyHungUp) liveCallRef.current?.hangup()
     liveCallRef.current = null
     setMuted(false)
