@@ -104,6 +104,14 @@ export default function Dialer() {
     if (tab === 'log') loadCallLog()
   }, [tab])
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('dialer-calllog-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'calllog' }, () => loadCallLog())
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [])
+
   // While a call is active or has just ended, poll the authoritative call tables
   // briefly so status/completion appears in History without requiring any reload.
   useEffect(() => {
@@ -125,66 +133,79 @@ export default function Dialer() {
   }
 
   async function loadCallLog() {
-    // calllog only has a row when staff actually saved the "Log This Call"
-    // modal — skip/close it (or the modal never even fires, e.g. a call
-    // that rang and went to voicemail with nobody at a desk) and that call
-    // never showed up in History at all. incoming_calls/outbound_calls get
-    // a row for every real call attempt regardless, so pull from those and
-    // use calllog only to enrich with outcome/notes/duration when present.
-    // Also load contacts for name matching outbound calls (IRS, clients, leads)
-    const [{ data: inbound }, { data: outbound }, { data: logged }, { data: allLeads }, { data: allClients }] = await Promise.all([
+    // Durable call history now comes from calllog. Every outbound attempt is
+    // inserted there server-side by the outbound_calls trigger, so the Dialer
+    // no longer depends on browser access to outbound_calls or on a post-call
+    // modal being saved. Inbound provider rows are merged in until inbound
+    // history is migrated to the same durable path.
+    const [
+      { data: inbound, error: inboundError },
+      { data: logged, error: loggedError },
+      { data: allLeads, error: leadsError },
+      { data: allClients, error: clientsError },
+    ] = await Promise.all([
       supabase.from('incoming_calls').select('*').order('created_at', { ascending: false }).limit(150),
-      supabase.from('outbound_calls').select('*').order('created_at', { ascending: false }).limit(150),
       supabase.from('calllog').select('*').order('created_at', { ascending: false }).limit(300),
       supabase.from('leads').select('id,name,phone').limit(2000),
       supabase.from('clients').select('id,name,phone').limit(2000),
     ])
 
-    // Match a phone number to a known contact name
+    const firstError = loggedError || inboundError || leadsError || clientsError
+    if (firstError) {
+      console.error('loadCallLog error:', firstError)
+      showToast('Call history failed to load: ' + firstError.message)
+    }
+
     function matchPhone(phone) {
       if (!phone) return null
-      const digits = phone.replace(/\D/g,'')
+      const digits = phone.replace(/\D/g,'').slice(-10)
       const all = [...(allLeads||[]), ...(allClients||[])]
-      const found = all.find(c => c.phone?.replace(/\D/g,'') === digits || c.phone?.replace(/\D/g,'') === digits.slice(-10))
+      const found = all.find(c => c.phone?.replace(/\D/g,'').slice(-10) === digits)
       return found?.name || null
     }
 
-    // Best-effort match to a manually-logged outcome — same phone number,
-    // logged within 15 min of the raw call (the log modal saves moments
-    // after hangup). There's no shared call id between these tables, so
-    // this is approximate, not exact.
-    function findLogged(phone, createdAt) {
-      if (!phone || !createdAt) return null
-      const t = new Date(createdAt).getTime()
-      return (logged || []).find(l => l.phone === phone && l.created_at && Math.abs(new Date(l.created_at).getTime() - t) < 15 * 60 * 1000) || null
+    const durableRows = (logged || []).map(c => {
+      const direction = c.direction || (c.raw_call_id ? 'Outbound' : 'Outbound')
+      return {
+        id: 'log-' + c.id,
+        direction,
+        phone: c.phone,
+        clientName: c.clientName || matchPhone(c.phone) || null,
+        outcome: c.outcome || '—',
+        duration: c.duration || null,
+        notes: c.notes || null,
+        created_at: c.created_at,
+      }
+    })
+
+    // Avoid duplicating inbound rows that already have a manually-saved log
+    // near the same time/number.
+    function hasLoggedInbound(phone, createdAt) {
+      const t = new Date(createdAt || 0).getTime()
+      return durableRows.some(r =>
+        r.direction === 'Inbound' &&
+        r.phone === phone &&
+        Math.abs(new Date(r.created_at || 0).getTime() - t) < 15 * 60 * 1000
+      )
     }
 
-    const inRows = (inbound || []).map(c => {
-      const match = findLogged(c.from_number, c.created_at)
-      return {
-        id: 'in-' + c.id, direction: 'Inbound', phone: c.from_number,
-        clientName: match?.clientName || matchPhone(c.from_number) || null,
-        outcome: match?.outcome || RAW_STATUS_LABEL[c.status] || c.status || '—',
-        duration: match?.duration || null,
-        notes: match?.notes || null,
+    const inboundRows = (inbound || [])
+      .filter(c => !hasLoggedInbound(c.from_number, c.created_at))
+      .map(c => ({
+        id: 'in-' + c.id,
+        direction: 'Inbound',
+        phone: c.from_number,
+        clientName: matchPhone(c.from_number) || null,
+        outcome: RAW_STATUS_LABEL[c.status] || c.status || '—',
+        duration: null,
+        notes: null,
         created_at: c.created_at,
-      }
-    })
-    const outRows = (outbound || []).map(c => {
-      const match = findLogged(c.destination_number, c.created_at)
-      return {
-        id: 'out-' + c.id, direction: 'Outbound', phone: c.destination_number,
-        clientName: match?.clientName || matchPhone(c.destination_number) || null,
-        outcome: match?.outcome || RAW_STATUS_LABEL[c.status] || c.status || '—',
-        duration: match?.duration || null,
-        notes: match?.notes || null,
-        created_at: c.created_at,
-      }
-    })
+      }))
 
-    const merged = [...inRows, ...outRows]
+    const merged = [...durableRows, ...inboundRows]
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .slice(0, 100)
+      .slice(0, 150)
+
     setCallLog(merged)
   }
 
