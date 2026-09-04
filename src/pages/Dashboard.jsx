@@ -56,7 +56,7 @@ function StatCard({ card, idx, onDragStart, onDragOver, onDrop, onDragEnd, onCar
           transition: 'transform .16s ease, box-shadow .16s ease, border-color .16s ease, filter .16s ease',
           position: 'relative',
           overflow: 'hidden',
-          minHeight: 100,
+          minHeight: 122,
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
@@ -80,11 +80,23 @@ function StatCard({ card, idx, onDragStart, onDragOver, onDrop, onDragEnd, onCar
         <div style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, color: 'var(--t3)', opacity: 0.5, lineHeight: 1, letterSpacing: 1 }}>⠿</div>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', paddingTop: 6 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 10, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>{label}</div>
-            <div style={{ fontSize: 28, fontWeight: 900, color: color || 'var(--tx)', lineHeight: 1 }}>{val ?? '—'}</div>
-            {sub && <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 6 }}>{sub}</div>}
+            <div style={{
+            fontSize: 10, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase',
+            letterSpacing: '.06em', marginBottom: 8, lineHeight: 1.25,
+            minHeight: 25, maxWidth: 'calc(100% - 10px)',
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+            overflow: 'hidden', overflowWrap: 'anywhere'
+          }}>{label}</div>
+            <div style={{
+            fontSize: 28, fontWeight: 900, color: color || 'var(--tx)', lineHeight: 1,
+            minHeight: 30, overflowWrap: 'anywhere'
+          }}>{val ?? '—'}</div>
+            {sub && <div style={{
+            fontSize: 11, color: 'var(--t3)', marginTop: 6, lineHeight: 1.35,
+            minHeight: 15, maxWidth: '100%', overflowWrap: 'anywhere'
+          }}>{sub}</div>}
           </div>
-          {icon && <div style={{ fontSize: 28, opacity: .28, flexShrink: 0, filter: `drop-shadow(0 0 8px ${borderColor}55)` }}>{icon}</div>}
+          {icon && <div style={{ fontSize: 28, opacity: .28, flexShrink: 0, marginLeft: 10, filter: `drop-shadow(0 0 8px ${borderColor}55)` }}>{icon}</div>}
         </div>
       </div>
     )
