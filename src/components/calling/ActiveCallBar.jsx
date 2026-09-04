@@ -24,6 +24,7 @@ export default function ActiveCallBar() {
   const [interimText,    setInterimText]    = useState('')     // live unconfirmed text
   const [showTranscript, setShowTranscript] = useState(false)
   const [showDialpad,    setShowDialpad]    = useState(false)
+  const [callBarCollapsed, setCallBarCollapsed] = useState(false)
   const [dtmfPressed,    setDtmfPressed]    = useState('')
   const recognitionRef = useRef(null)
   const shouldRestartRef = useRef(false)
@@ -247,13 +248,30 @@ export default function ActiveCallBar() {
       {/* ── Active Call Bar ── */}
       {calling && active && (
         <>
+          {callBarCollapsed && (
+            <button
+              onClick={() => setCallBarCollapsed(false)}
+              title="Show active call controls"
+              style={{
+                position: 'fixed', top: 10, left: '45%', transform: 'translateX(-50%)', zIndex: 3501,
+                background: 'linear-gradient(135deg, #0f6e2e, #25A25A)', color: '#fff',
+                border: '1px solid rgba(255,255,255,.2)', borderRadius: 999,
+                padding: '6px 11px', boxShadow: '0 6px 18px rgba(0,0,0,.28)',
+                fontSize: 11.5, fontWeight: 800, cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap'
+              }}
+            >
+              📞 {active?.name || active?.phone || 'Active call'} · {formatTime(elapsed)} · Show
+            </button>
+          )}
+          {!callBarCollapsed && (
           <div style={{
             position: 'fixed', top: 10, left: '45%', transform: 'translateX(-50%)', zIndex: 3500,
             width: 'min(650px, 92vw)',
             background: 'linear-gradient(135deg, #0f6e2e, #25A25A)',
             borderRadius: showTranscript ? '12px 12px 0 0' : 12,
             padding: '7px 11px', boxShadow: '0 7px 20px rgba(0,0,0,0.32)',
-            display: 'flex', flexDirection: 'column', gap: 5,
+            display: 'flex', flexDirection: 'column', gap: 5, position: 'relative',
           }}>
             {/* Row 1 — who you're talking to + End */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
@@ -457,10 +475,30 @@ export default function ActiveCallBar() {
                 </div>
               </div>
             )}
+              <button
+                onClick={() => {
+                  setCallBarCollapsed(true)
+                  setShowDialpad(false)
+                  setShowTranscript(false)
+                  setShowAddCaller(false)
+                  setShowTransfer(false)
+                }}
+                title="Hide active call controls"
+                style={{
+                  position: 'absolute', top: 6, right: 8,
+                  background: 'rgba(255,255,255,.12)', color: '#fff',
+                  border: '1px solid rgba(255,255,255,.2)', borderRadius: 6,
+                  width: 24, height: 22, padding: 0, fontSize: 13, fontWeight: 800,
+                  cursor: 'pointer', lineHeight: 1
+                }}
+              >
+                −
+              </button>
           </div>
+          )}
 
           {/* ── DTMF Dialpad — appears below call bar ── */}
-          {showDialpad && (
+          {!callBarCollapsed && showDialpad && (
             <div style={{
               position: 'fixed', top: 122, left: '38%', transform: 'translateX(-50%)', zIndex: 3502,
               width: 205,
@@ -496,7 +534,7 @@ export default function ActiveCallBar() {
           )}
 
           {/* Live transcript panel — attached below the call bar */}
-          {showTranscript && (
+          {!callBarCollapsed && showTranscript && (
             <div style={{
               position: 'fixed', top: 122, left: '45%', transform: 'translateX(-50%)', zIndex: 3502,
               width: 'min(560px, 88vw)',
