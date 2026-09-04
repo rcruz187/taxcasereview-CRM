@@ -565,15 +565,19 @@ export function CallProvider({ children }) {
     // and receive-call's isAgentJoin branch bridges us into that same
     // conference once it sees the pending outbound_calls row.
     supabase.functions.invoke('start-outbound-call', { body: { destinationNumber } })
-      .then(({ data, error }) => {
-        if (error || !data?.ok) {
-          showCallToast('Call failed: ' + (data?.error || error?.message || 'unknown error'))
+      .then(async ({ data, error }) => {
+        let responseData = data
+        if (error && !responseData && typeof error?.context?.json === 'function') {
+          try { responseData = await error.context.json() } catch (_) {}
+        }
+        if (error || !responseData?.ok) {
+          showCallToast('Call failed: ' + (responseData?.error || error?.message || 'unknown error'))
           cancelCall()
           return
         }
-        activeConferenceRef.current = data.conferenceName || null
-        transferableCallsidRef.current = data.clientCallsid || null
-        setCanTransfer(!!data.clientCallsid)
+        activeConferenceRef.current = responseData.conferenceName || null
+        transferableCallsidRef.current = responseData.clientCallsid || null
+        setCanTransfer(!!responseData.clientCallsid)
         // Server-confirmed backup for noticing this call has truly ended,
         // independent of the RELAY SDK's own (sometimes unreliable)
         // call.state events. outbound-call-status writes 'completed' here
