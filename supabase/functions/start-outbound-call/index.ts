@@ -83,25 +83,35 @@ serve(async (req) => {
         Url: outboundLegUrl,
         Method: 'POST',
         StatusCallback: statusCallbackUrl,
-        StatusCallbackEvent: 'initiated ringing answered completed',
+        StatusCallbackEvent: 'completed',
         StatusCallbackMethod: 'POST',
       }),
     })
 
     const text = await resp.text()
     if (!resp.ok) {
-      await db.from('outbound_calls').update({ status: 'failed' }).eq('tenant_id', tenantId).eq('conference_name', conferenceName)
       let providerMessage = ''
       try {
         const parsed = JSON.parse(text)
         providerMessage = parsed?.message || parsed?.error || parsed?.errors?.[0]?.detail || ''
       } catch {}
+      await db.from('outbound_calls').update({
+        status: 'failed',
+        provider_http_status: resp.status,
+        provider_error: providerMessage || text.slice(0, 1000),
+      }).eq('tenant_id', tenantId).eq('conference_name', conferenceName)
       console.error('start-outbound-call: SignalWire rejected call', resp.status, providerMessage || text)
-      return json({ error: providerMessage ? `SignalWire rejected the call: ${providerMessage}` : `SignalWire rejected the call (HTTP ${resp.status}).`, provider_status: resp.status }, 502)
+      return json({
+        error: providerMessage ? `SignalWire rejected the call: ${providerMessage}` : `SignalWire rejected the call (HTTP ${resp.status}).`,
+        provider_status: resp.status,
+      }, 502)
     }
 
     let clientCallsid = null
     try { clientCallsid = JSON.parse(text)?.sid || null } catch {}
+    if (clientCallsid) {
+      await db.from('outbound_calls').update({ provider_call_sid: clientCallsid }).eq('tenant_id', tenantId).eq('conference_name', conferenceName)
+    }
     return json({ ok: true, conferenceName, clientCallsid })
   } catch (err) {
     console.error('start-outbound-call error:', err)
