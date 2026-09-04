@@ -22,7 +22,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -q "window.location.hostname === 'admin.romylabs.com'" src/pages/Login.jsx
+          grep -q "const ROMYLABS_ADMIN_HOST = 'admin.romylabs.com'" src/pages/Login.jsx
+          grep -q "window.location.hostname.toLowerCase() === ROMYLABS_ADMIN_HOST" src/pages/Login.jsx
           grep -q "window.location.replace('/')" public/romylabs-admin-hotfix.js
           ! grep -q "window.location.replace('https://admin.romylabs.com' + path" public/romylabs-admin-hotfix.js
           grep -q "const isAdminHost = window.location.hostname.toLowerCase() === 'admin.romylabs.com'" src/App.jsx
