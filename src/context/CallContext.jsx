@@ -70,6 +70,15 @@ export function CallProvider({ children }) {
   const [logModal, setLogModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [callToast, setCallToast] = useState('')
+  const [outboundCallerId, setOutboundCallerIdState] = useState(() =>
+    localStorage.getItem('taxres_outbound_caller_id') || 'local'
+  )
+
+  function setOutboundCallerId(value) {
+    const next = value === 'tollfree' ? 'tollfree' : 'local'
+    setOutboundCallerIdState(next)
+    try { localStorage.setItem('taxres_outbound_caller_id', next) } catch (_) {}
+  }
 
   const relayRef = useRef(null)
   const activeCallRef = useRef(null) // ref to the live RELAY call object for DTMF
@@ -718,6 +727,7 @@ export function CallProvider({ children }) {
         destinationNumber,
         displayName: lead.name || lead.clientName || lead.phone || destinationNumber,
         entityType: lead.entityType || (lead.status === 'Manual' ? 'manual' : null),
+        callerIdPreference: outboundCallerId,
       }
     })
       .then(async ({ data, error }) => {
@@ -920,6 +930,7 @@ export function CallProvider({ children }) {
 
   const value = {
     relayStatus, incomingCall, incomingMatch, calling, active, elapsed,
+    outboundCallerId, setOutboundCallerId,
     logForm, setLogForm, logModal, setLogModal, saving, callToast,
     OUTCOMES, formatTime,
     answerIncoming, declineIncoming, startCall, endCall, cancelCall,
