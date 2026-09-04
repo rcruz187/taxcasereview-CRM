@@ -248,22 +248,22 @@ export default function ActiveCallBar() {
       {calling && active && (
         <>
           <div style={{
-            position: 'fixed', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 3500,
-            width: 'min(720px, 96vw)',
+            position: 'fixed', top: 10, left: '45%', transform: 'translateX(-50%)', zIndex: 3500,
+            width: 'min(650px, 92vw)',
             background: 'linear-gradient(135deg, #0f6e2e, #25A25A)',
             borderRadius: showTranscript ? '12px 12px 0 0' : 12,
-            padding: '9px 14px', boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
-            display: 'flex', flexDirection: 'column', gap: 7,
+            padding: '7px 11px', boxShadow: '0 7px 20px rgba(0,0,0,0.32)',
+            display: 'flex', flexDirection: 'column', gap: 5,
           }}>
             {/* Row 1 — who you're talking to + End */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                 <div style={{
-                  width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.2)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0
+                  width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12.5, flexShrink: 0
                 }}>📞</div>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ color: '#fff', fontWeight: 700, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ color: '#fff', fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {active?.name || `${active?.first || ''} ${active?.last || ''}`.trim()}
                     {active.entityType && (
                       <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, background: 'rgba(255,255,255,0.2)', borderRadius: 6, padding: '2px 8px', verticalAlign: 'middle' }}>
@@ -276,7 +276,7 @@ export default function ActiveCallBar() {
                       </span>
                     )}
                   </div>
-                  <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11.5, whiteSpace: 'nowrap' }}>
+                  <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 10.75, whiteSpace: 'nowrap' }}>
                     {active.phone} <span style={{ opacity: 0.75, margin: '0 6px' }}>•</span> ⏱ {formatTime(elapsed)}
                   </div>
                 </div>
@@ -284,8 +284,8 @@ export default function ActiveCallBar() {
               <button onClick={endCall}
                 style={{
                   background: '#C0202F', color: '#fff', border: 'none', flexShrink: 0,
-                  borderRadius: 8, padding: '7px 16px', fontWeight: 800,
-                  cursor: 'pointer', fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 6,
+                  borderRadius: 7, padding: '6px 13px', fontWeight: 800,
+                  cursor: 'pointer', fontSize: 11.75, display: 'flex', alignItems: 'center', gap: 6,
                   whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
                 }}>
                 🔴 End Call
@@ -317,7 +317,7 @@ export default function ActiveCallBar() {
             )}
 
             {/* Row 2 — call controls, uniform sizing, never wrap labels */}
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
               {[
                 { key: 'mute', onClick: toggleMute, on: muted, onBg: '#C0202F',
                   label: muted ? '🔇 Unmute' : '🎤 Mute',
@@ -341,8 +341,8 @@ export default function ActiveCallBar() {
                 <button key={b.key} onClick={b.onClick} disabled={b.disabled} title={b.title}
                   style={{
                     background: b.on ? b.onBg : 'rgba(255,255,255,0.15)',
-                    color: '#fff', border: 'none', borderRadius: 8,
-                    height: 29, padding: '0 11px', fontWeight: 700, fontSize: 12,
+                    color: '#fff', border: 'none', borderRadius: 7,
+                    height: 26, padding: '0 9px', fontWeight: 700, fontSize: 11.25,
                     cursor: b.disabled ? 'not-allowed' : 'pointer', opacity: b.disabled ? 0.55 : 1,
                     display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
                     animation: b.pulse ? 'pulse 1.5s infinite' : 'none',
@@ -364,7 +364,7 @@ export default function ActiveCallBar() {
               <button onClick={cancelCall} title="Abort this call attempt"
                 style={{
                   background: 'transparent', color: 'rgba(255,255,255,0.75)', border: '1px solid rgba(255,255,255,0.35)',
-                  borderRadius: 8, height: 29, padding: '0 10px', fontWeight: 600, fontSize: 11.5,
+                  borderRadius: 7, height: 26, padding: '0 9px', fontWeight: 600, fontSize: 10.75,
                   cursor: 'pointer', whiteSpace: 'nowrap',
                 }}>
                 Cancel
@@ -462,18 +462,18 @@ export default function ActiveCallBar() {
           {/* ── DTMF Dialpad — appears below call bar ── */}
           {showDialpad && (
             <div style={{
-              position: 'fixed', top: 160, left: '50%', transform: 'translateX(-50%)', zIndex: 3502,
-              width: 240,
+              position: 'fixed', top: 122, left: '38%', transform: 'translateX(-50%)', zIndex: 3502,
+              width: 205,
               background: 'rgba(5,15,30,0.98)',
               border: '1px solid rgba(255,255,255,.2)',
-              borderRadius: '12px',
-              padding: '14px',
+              borderRadius: '10px',
+              padding: '10px',
               boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
             }}>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.08em' }}>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.08em' }}>
                 Keypad — {dtmfPressed || 'Press to send tones'}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 5 }}>
                 {['1','2','3','4','5','6','7','8','9','*','0','#'].map(d => (
                   <button key={d} onClick={() => {
                     sendDTMF(d)
@@ -481,7 +481,7 @@ export default function ActiveCallBar() {
                   }}
                     style={{
                       background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)',
-                      borderRadius: 8, padding: '10px 0', fontSize: 18, fontWeight: 700,
+                      borderRadius: 7, padding: '8px 0', fontSize: 16, fontWeight: 700,
                       cursor: 'pointer', fontFamily: 'monospace',
                       transition: 'background .1s',
                     }}
@@ -498,8 +498,8 @@ export default function ActiveCallBar() {
           {/* Live transcript panel — attached below the call bar */}
           {showTranscript && (
             <div style={{
-              position: 'fixed', top: 160, left: '50%', transform: 'translateX(-50%)', zIndex: 3502,
-              width: 'min(620px, 92vw)',
+              position: 'fixed', top: 122, left: '45%', transform: 'translateX(-50%)', zIndex: 3502,
+              width: 'min(560px, 88vw)',
               background: 'rgba(5,15,30,0.97)',
               border: '1px solid rgba(255,255,255,.15)',
               borderTop: 'none',
