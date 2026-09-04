@@ -271,7 +271,7 @@ export default function ActiveCallBar() {
             background: 'linear-gradient(135deg, #0f6e2e, #25A25A)',
             borderRadius: showTranscript ? '12px 12px 0 0' : 12,
             padding: '7px 11px', boxShadow: '0 7px 20px rgba(0,0,0,0.32)',
-            display: 'flex', flexDirection: 'column', gap: 5, position: 'relative',
+            display: 'flex', flexDirection: 'column', gap: 5,
           }}>
             {/* Row 1 — who you're talking to + End */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
