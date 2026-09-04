@@ -48,7 +48,7 @@ serve(async (req) => {
       return json({ error: 'SignalWire credentials or caller ID missing for this office.' }, 422)
     }
 
-    const fromDigits = String(settings.sw_outbound_did || settings.sw_inbound_did || '').replace(/\\D/g, '')
+    const fromDigits = String(settings.sw_outbound_did || settings.sw_inbound_did || '').replace(/\D/g, '')
     const fromNumber = fromDigits.length === 10 ? `+1${fromDigits}` : (fromDigits.length === 11 && fromDigits.startsWith('1') ? `+${fromDigits}` : '')
     if (!fromNumber) return json({ error: 'Configured outbound caller ID is invalid.' }, 422)
 
