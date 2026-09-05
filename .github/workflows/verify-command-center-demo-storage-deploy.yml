@@ -1,8 +1,7 @@
 name: Verify Command Center Demo Storage Deploy
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/verify-command-center-demo-storage-deploy.yml']
+  workflow_dispatch:
+
 permissions:
   contents: read
 jobs:
