@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import { FIRM } from '../lib/firmBranding'
 
-const CHANNELS = ['All', 'Email', 'SMS', 'Fax']
+const CHANNELS = ['All', 'Email', 'SMS', 'Fax', 'Voice']
 
 function when(value) {
   if (!value) return ''
@@ -48,6 +48,30 @@ function normalizeSms(row) {
   }
 }
 
+function normalizeVoice(row) {
+  const rawDirection = String(row.direction || row.call_direction || '').toLowerCase()
+  const inbound = rawDirection === 'inbound' || rawDirection === 'incoming'
+  const peer = inbound
+    ? (row.from_number || row.from || row.caller_number || row.phone || '')
+    : (row.to_number || row.to || row.dialed_number || row.phone || '')
+  const duration = Number(row.duration_seconds || row.duration || 0)
+  const voicemail = Boolean(row.voicemail_url || row.recording_url || row.audio_url || row.transcription || row.transcript)
+  return {
+    id: 'voice:' + (row.id || row.sid || row.call_sid || Math.random()),
+    rawId: row.id,
+    channel: 'Voice',
+    icon: voicemail ? '🎙️' : '📞',
+    inbound,
+    unread: inbound && row.is_read !== true,
+    person: row.client_name || row.clientName || row.contact_name || peer || 'Call',
+    address: peer,
+    subject: voicemail ? 'Voicemail' : (inbound ? 'Incoming call' : 'Outgoing call'),
+    preview: row.transcription || row.transcript || row.notes || row.status || (duration ? duration + ' sec' : ''),
+    at: row.received_at || row.started_at || row.created_at || row.timestamp,
+    route: '/dialer',
+  }
+}
+
 function normalizeFax(row) {
   const inbound = String(row.direction || '').toLowerCase() === 'inbound'
   return {
@@ -87,17 +111,21 @@ export default function UnifiedInbox() {
     try {
       const emailQuery = supabase.from('emails').select('*').order('created_at', { ascending:false }).limit(250)
       if (centralOwner) emailQuery.eq('mailbox_owner', centralOwner)
-      const [emails, sms, fax] = await Promise.all([
+      const [emails, sms, fax, calls, voicemails] = await Promise.all([
         emailQuery,
         supabase.from('sms_messages').select('*').order('created_at', { ascending:false }).limit(250),
         supabase.from('fax_logs').select('*').order('created_at', { ascending:false }).limit(150),
+        supabase.from('call_logs').select('*').order('created_at', { ascending:false }).limit(150),
+        supabase.from('voicemails').select('*').order('created_at', { ascending:false }).limit(150),
       ])
-      const errors = [emails.error, sms.error, fax.error].filter(Boolean)
+      const errors = [emails.error, sms.error, fax.error, calls.error, voicemails.error].filter(Boolean)
       if (errors.length) setError(errors.map(e => e.message).join(' · '))
       const merged = [
         ...(emails.data || []).map(normalizeEmail),
         ...(sms.data || []).map(normalizeSms),
         ...(fax.data || []).map(normalizeFax),
+        ...(calls.data || []).map(normalizeVoice),
+        ...(voicemails.data || []).map(normalizeVoice),
       ].sort((a,b) => new Date(b.at || 0) - new Date(a.at || 0))
       setItems(merged)
     } catch (e) {
@@ -115,12 +143,14 @@ export default function UnifiedInbox() {
       .on('postgres_changes', { event:'*', schema:'public', table:'emails' }, () => void load())
       .on('postgres_changes', { event:'*', schema:'public', table:'sms_messages' }, () => void load())
       .on('postgres_changes', { event:'*', schema:'public', table:'fax_logs' }, () => void load())
+      .on('postgres_changes', { event:'*', schema:'public', table:'call_logs' }, () => void load())
+      .on('postgres_changes', { event:'*', schema:'public', table:'voicemails' }, () => void load())
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [user?.email])
 
   const counts = useMemo(() => {
-    const result = { All: items.length, Email:0, SMS:0, Fax:0, unread:0 }
+    const result = { All: items.length, Email:0, SMS:0, Fax:0, Voice:0, unread:0 }
     items.forEach(item => {
       result[item.channel] = (result[item.channel] || 0) + 1
       if (item.unread) result.unread += 1
@@ -155,7 +185,7 @@ export default function UnifiedInbox() {
         <div>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
             <h1 style={{margin:0,fontSize:24,color:'var(--tx)'}}>Unified Inbox</h1>
-            <span style={{fontSize:10,fontWeight:900,letterSpacing:'.08em',textTransform:'uppercase',padding:'4px 8px',borderRadius:999,background:'rgba(59,130,246,.12)',color:'var(--blue)'}}>Email · SMS · Fax</span>
+            <span style={{fontSize:10,fontWeight:900,letterSpacing:'.08em',textTransform:'uppercase',padding:'4px 8px',borderRadius:999,background:'rgba(59,130,246,.12)',color:'var(--blue)'}}>Email · SMS · Fax · Voice</span>
           </div>
           <p style={{margin:'6px 0 0',fontSize:12,color:'var(--t3)'}}>One communications queue for {FIRM.name || 'your office'}. Replies stay in the original channel.</p>
         </div>
@@ -174,6 +204,7 @@ export default function UnifiedInbox() {
           ['Email', counts.Email, '✉️'],
           ['SMS', counts.SMS, '💬'],
           ['Fax', counts.Fax, '📠'],
+          ['Voice', counts.Voice, '📞'],
         ].map(([label,value,icon]) => (
           <div key={label} style={{...card,padding:'13px 15px'}}>
             <div style={{fontSize:11,color:'var(--t3)',fontWeight:700}}>{icon} {label}</div>
