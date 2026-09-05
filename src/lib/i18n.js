@@ -487,6 +487,38 @@ const EN_ES = {
   'IRS & State Reference': 'Referencia del IRS y estatal',
   'IRS Reference': 'Referencia del IRS',
 
+  // Dashboard/data-driven EN→ES parity
+  'Open Tasks': 'Tareas abiertas',
+  'IRS Deadlines': 'Fechas límite del IRS',
+  'Recent Leads': 'Prospectos recientes',
+  'Recent Leads — Yours': 'Prospectos recientes — Tuyos',
+  'View All →': 'Ver todos →',
+  'All Tasks →': 'Todas las tareas →',
+  'All Leads →': 'Todos los prospectos →',
+  'No open tasks': 'No hay tareas abiertas',
+  'No upcoming deadlines': 'No hay próximos vencimientos',
+  'No leads yet': 'Aún no hay prospectos',
+  'Lien Withdrawal': 'Retiro de gravamen',
+  'Penalty Reduction': 'Reducción de multas',
+  'Tax Investigation': 'Investigación tributaria',
+  'Tax Resolution': 'Resolución tributaria',
+  'POA Sent': 'Poder enviado',
+  'Under Review': 'En revisión',
+  'Tax Inv Agreement Signed': 'Acuerdo de investigación tributaria firmado',
+  'Normal': 'Normal',
+  'On track': 'Al día',
+  'outstanding': 'pendiente',
+  'Inv. fees sold': 'Honorarios de investigación vendidos',
+  'Total': 'Total',
+  'Daily Hint': 'Consejo diario',
+  'CRM Tips': 'Consejos del CRM',
+  'Read more →': 'Leer más →',
+  'NTA Blog: Understanding Your Rights as a Taxpayer': 'Blog del NTA: Comprenda sus derechos como contribuyente',
+  'TAS Tax Tips: What to Do When the IRS Contacts You': 'Consejos fiscales de TAS: Qué hacer cuando el IRS se comunica con usted',
+  'Know Your Rights: Free Tax Help Available Nationwide': 'Conozca sus derechos: Ayuda tributaria gratuita disponible en todo el país',
+  'Taxpayer Advocate Service': 'Servicio del Defensor del Contribuyente',
+  'Taxpayer Advocate': 'Defensor del Contribuyente',
+
 }
 
 const ES_EN = Object.fromEntries(Object.entries(EN_ES).map(([en, es]) => [es, en]))
