@@ -1,0 +1,60 @@
+name: BocaSync Production DB Closeout
+
+on:
+  push:
+    branches:
+      - ops/bocasync-live-closeout-2026-09-05
+    paths:
+      - '.github/workflows/bocasync-production-db-closeout.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  closeout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: zmejbkttzvaqzzbmjclz
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate target/token
+        run: |
+          set -euo pipefail
+          test "$PROJECT_REF" = "zmejbkttzvaqzzbmjclz"
+          test -n "${SUPABASE_ACCESS_TOKEN:-}"
+      - name: Preflight
+        run: |
+          SQL="select to_regclass('public.communication_attachments') is not null as has_0043,to_regclass('public.practice_sms_numbers') is not null as has_0044_numbers,to_regclass('public.inbox_unmatched_sms') is not null as has_0044_unmatched;"
+          BODY=$(printf '%s' "$SQL" | jq -Rs '{query:.}')
+          curl -fsS -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" --data-binary "$BODY" | tee /tmp/preflight.json
+      - name: Apply 0043 if missing
+        run: |
+          set -euo pipefail
+          if jq -e '.[0].has_0043 == true' /tmp/preflight.json >/dev/null; then exit 0; fi
+          BODY=$(jq -Rs '{query:.}' < ops/bocasync/0043_message_attachments.sql)
+          curl --fail-with-body -sS -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" --data-binary "$BODY"
+      - name: Apply 0044 if missing
+        run: |
+          set -euo pipefail
+          if jq -e '.[0].has_0044_numbers == true and .[0].has_0044_unmatched == true' /tmp/preflight.json >/dev/null; then exit 0; fi
+          BODY=$(jq -Rs '{query:.}' < ops/bocasync/0044_inbound_sms_routing.sql)
+          curl --fail-with-body -sS -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" --data-binary "$BODY"
+      - name: Permission audit
+        run: |
+          BODY=$(jq -Rs '{query:.}' < ops/bocasync/permission_boundary_closeout_readonly.sql)
+          curl --fail-with-body -sS -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" --data-binary "$BODY" | tee /tmp/audit.json
+          grep -q '"missing_permission_policy_count":0' /tmp/audit.json
+      - name: Advisors
+        run: |
+          curl -fsS "https://api.supabase.com/v1/projects/$PROJECT_REF/advisors/security" -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" | tee /tmp/security.json
+          curl -fsS "https://api.supabase.com/v1/projects/$PROJECT_REF/advisors/performance" -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" | tee /tmp/performance.json
+          if jq -e '.. | objects | select((.level? // .severity? // "") == "ERROR")' /tmp/security.json >/dev/null; then exit 1; fi
+      - name: Postflight
+        run: |
+          SQL="select to_regclass('public.communication_attachments') is not null as communication_attachments,to_regclass('public.practice_sms_numbers') is not null as practice_sms_numbers,to_regclass('public.inbox_unmatched_sms') is not null as inbox_unmatched_sms,coalesce((select relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='communication_attachments'),false) as communication_attachments_rls,coalesce((select relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='practice_sms_numbers'),false) as practice_sms_numbers_rls,coalesce((select relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='inbox_unmatched_sms'),false) as inbox_unmatched_sms_rls,exists(select 1 from storage.buckets where id='message-attachments' and public=false) as private_attachment_bucket;"
+          BODY=$(printf '%s' "$SQL" | jq -Rs '{query:.}')
+          curl --fail-with-body -sS -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" --data-binary "$BODY" | tee /tmp/postflight.json
+          jq -e '.[0] | .communication_attachments and .practice_sms_numbers and .inbox_unmatched_sms and .communication_attachments_rls and .practice_sms_numbers_rls and .inbox_unmatched_sms_rls and .private_attachment_bucket' /tmp/postflight.json >/dev/null
