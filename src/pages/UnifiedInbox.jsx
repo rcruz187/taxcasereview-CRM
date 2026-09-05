@@ -115,7 +115,7 @@ export default function UnifiedInbox() {
         emailQuery,
         supabase.from('sms_messages').select('*').order('created_at', { ascending:false }).limit(250),
         supabase.from('fax_logs').select('*').order('created_at', { ascending:false }).limit(150),
-        supabase.from('call_logs').select('*').order('created_at', { ascending:false }).limit(150),
+        supabase.from('calllog').select('*').order('created_at', { ascending:false }).limit(150),
         supabase.from('voicemails').select('*').order('created_at', { ascending:false }).limit(150),
       ])
       const errors = [emails.error, sms.error, fax.error, calls.error, voicemails.error].filter(Boolean)
@@ -143,7 +143,7 @@ export default function UnifiedInbox() {
       .on('postgres_changes', { event:'*', schema:'public', table:'emails' }, () => void load())
       .on('postgres_changes', { event:'*', schema:'public', table:'sms_messages' }, () => void load())
       .on('postgres_changes', { event:'*', schema:'public', table:'fax_logs' }, () => void load())
-      .on('postgres_changes', { event:'*', schema:'public', table:'call_logs' }, () => void load())
+      .on('postgres_changes', { event:'*', schema:'public', table:'calllog' }, () => void load())
       .on('postgres_changes', { event:'*', schema:'public', table:'voicemails' }, () => void load())
       .subscribe()
     return () => { supabase.removeChannel(ch) }
