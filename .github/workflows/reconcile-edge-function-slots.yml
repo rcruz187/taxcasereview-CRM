@@ -1,10 +1,6 @@
 name: Reconcile Edge Function Slots
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/reconcile-edge-function-slots.yml'
   workflow_dispatch:
 
 permissions:
