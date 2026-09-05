@@ -20,6 +20,7 @@ const loaders = {
   '/transactions': () => import('../pages/Transactions'),
   '/sms': () => import('../pages/Sms'),
   '/email': () => import('../pages/Email'),
+  '/communications': () => import('../pages/UnifiedInbox'),
   '/documents': () => import('../pages/Documents'),
   '/esign': () => import('../pages/Esign'),
   '/timeclock': () => import('../pages/TimeClock'),
