@@ -2292,20 +2292,25 @@ const PRODUCT_REGISTRY = [
     nextMilestone: 'Define product architecture / brand / build phase',
   },
   {
-    key:       'restoration_roofing',
-    label:     'Restoration / Roofing CRM',
-    icon:      '🏚️',
-    color:     '#64748b',
-    industry:  'Restoration & Roofing',
-    url:       null,
-    lifecycleStage: 'research',
+    key:        'restore_relay',
+    label:      'Restore Relay CRM',
+    icon:       '🏚️',
+    color:      '#F97316',
+    industry:   'Restoration & Roofing',
+    url:        null,
+    appUrl:     null,
+    websiteUrl: null,
+    lifecycleStage: 'building',
     connection:     'not_connected',
-    brandStatus:    'unnamed',
+    brandStatus:    'working_name',
     publicOnRomyLabs: false,
     commerciallyAvailable: false,
-    desc:      'Claim, project, and client management for restoration and roofing contractors',
+    nextToFinish:   true,
+    priorityRank:   1,
+    repo:            'taxresolutioncrm/p7-crm',
+    desc:      'RomyLabs Product #7 — restoration and roofing CRM for claims, projects, customers, crews, documents, estimates, and field operations.',
     metricsUrl: null,
-    nextMilestone: 'Define product architecture / brand / build phase',
+    nextMilestone: 'NEXT CRM TO FINISH — complete Restore Relay CRM build, lock final brand/domain, then deploy Supabase, platform metrics, SEO, and launch QA',
   },
 ]
 
@@ -2558,8 +2563,11 @@ function ProductsTab({ supabase, taxresActivity = [] }) {
 
   // ── Filtered list ───────────────────────────────────────────────────────
   const lifecycleOrder = { live:0, available:1, coming:2, internal:3, building:4, research:5 }
-  const sortByLifecycle = (a, b) =>
-    (lifecycleOrder[a.lifecycleStage] ?? 9) - (lifecycleOrder[b.lifecycleStage] ?? 9)
+  const sortByLifecycle = (a, b) => {
+    if (Boolean(a.nextToFinish) !== Boolean(b.nextToFinish)) return a.nextToFinish ? -1 : 1
+    if ((a.priorityRank ?? 999) !== (b.priorityRank ?? 999)) return (a.priorityRank ?? 999) - (b.priorityRank ?? 999)
+    return (lifecycleOrder[a.lifecycleStage] ?? 9) - (lifecycleOrder[b.lifecycleStage] ?? 9)
+  }
 
   const portfolioFiltered = portfolioFilter === 'total' ? products
     : portfolioFilter === 'live' ? products.filter(p => ['live','available'].includes(p.lifecycleStage))
@@ -2685,6 +2693,7 @@ function ProductsTab({ supabase, taxresActivity = [] }) {
 
                   {/* Status badges */}
                   <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:8 }}>
+                    {p.nextToFinish && BADGE('⭐ NEXT CRM TO FINISH', '#F97316')}
                     {BADGE(lc.label, lc.color)}
                     {BADGE(`${conn.dot} ${conn.label}`, conn.color)}
                     {p.isTenant && BADGE('Tenant', '#14b8a6')}
@@ -4196,6 +4205,7 @@ function CommandCenter() {
                           <span style={{ fontSize:14 }}>{p.icon}</span>
                           <div>
                             <div style={{ fontSize:12, fontWeight:700, color:'#e2e8f0' }}>{p.label}</div>
+                            {p.nextToFinish && <div style={{ fontSize:8, fontWeight:800, color:'#F97316', marginTop:1 }}>⭐ NEXT CRM TO FINISH</div>}
                             <div style={{ fontSize:9, color:'#475569' }}>{p.industry}</div>
                           </div>
                         </div>
