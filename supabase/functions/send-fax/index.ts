@@ -94,7 +94,14 @@ serve(async (req) => {
     }
 
     const auth = btoa(`${settings!.sw_project_id}:${settings!.sw_api_token}`)
-    const formData = new URLSearchParams({ From: fromNumber, To: toNumber, MediaUrl: docUrl.toString() })
+    const statusCallback = `${url}/functions/v1/receive-fax?outbound=1&tenant=${encodeURIComponent(String(tenantId))}`
+    const formData = new URLSearchParams({
+      From: fromNumber,
+      To: toNumber,
+      MediaUrl: docUrl.toString(),
+      StatusCallback: statusCallback,
+      StatusCallbackMethod: 'POST',
+    })
     const res = await fetch(
       `https://${String(settings!.sw_space_url).replace(/^https?:\/\//, '')}/api/laml/2010-04-01/Accounts/${settings!.sw_project_id}/Faxes.json`,
       {
