@@ -1,13 +1,7 @@
 name: Wire Universal E-Sign Hub
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'src/pages/ESignaturesHub.jsx'
-      - 'src/pages/AdminPortal.jsx'
-      - 'scripts/wire-universal-esign-hub.mjs'
-      - '.github/workflows/wire-universal-esign-hub.yml'
   workflow_dispatch:
+
 permissions:
   contents: read
 concurrency:
