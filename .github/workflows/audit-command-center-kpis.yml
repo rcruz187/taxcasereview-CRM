@@ -1,8 +1,7 @@
 name: Audit Command Center KPIs
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/audit-command-center-kpis.yml']
+  workflow_dispatch:
+
 permissions:
   contents: read
 jobs:
