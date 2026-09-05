@@ -1,9 +1,7 @@
 name: Admin Portal Final Certification
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/admin-portal-final-certification.yml'
+  workflow_dispatch:
+
 permissions:
   contents: read
 jobs:
