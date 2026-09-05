@@ -46,7 +46,20 @@ const EN = Object.fromEntries(Object.entries(ES).map(([k,v]) => [v,k]))
 
 function translateExact(value, lang) {
   const map = lang === 'es' ? ES : EN
-  return map[value] || value
+  if (map[value]) return map[value]
+
+  // Preserve emoji/bullet prefixes used by dashboard section headers.
+  for (const [from, to] of Object.entries(map)) {
+    if (!value.endsWith(from) || value === from) continue
+    const prefix = value.slice(0, value.length - from.length)
+    if (/^[^A-Za-z0-9À-ÿ]*$/.test(prefix)) return `${prefix}${to}`
+  }
+
+  // Preserve trailing arrow affordances on dashboard buttons.
+  const arrow = value.match(/^(.*?)(\s*[→↗])$/)
+  if (arrow && map[arrow[1].trim()]) return `${map[arrow[1].trim()]}${arrow[2]}`
+
+  return value
 }
 
 function translateTextNode(node, lang) {
