@@ -7,6 +7,9 @@ name: Production Capacity Certification
 # Keeping this manual protects the production Supabase Disk IO budget while
 # preserving an on-demand capacity certification before major releases.
 on:
+  push:
+    branches:
+      - cert/100-user-chat-fix-2026-09-05
   workflow_dispatch:
     inputs:
       users_per_role:
