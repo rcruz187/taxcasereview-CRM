@@ -1,8 +1,7 @@
 name: Verify RomyLabs Live Product Sync External
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/verify-romylabs-live-sync-external.yml']
+  workflow_dispatch:
+
 permissions:
   contents: read
 jobs:
