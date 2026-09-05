@@ -89,7 +89,7 @@ function StatCard({ card, idx, onDragStart, onDragOver, onDrop, onDragEnd, onCar
           }}>{label}</div>
             <div style={{
             fontSize: 28, fontWeight: 900, color: color || 'var(--tx)', lineHeight: 1,
-            minHeight: 30, overflowWrap: 'anywhere'
+            minHeight: 30, overflowWrap: 'normal', whiteSpace: 'nowrap'
           }}>{val ?? '—'}</div>
             {sub && <div style={{
             fontSize: 11, color: 'var(--t3)', marginTop: 6, lineHeight: 1.35,
@@ -505,7 +505,7 @@ export default function Dashboard() {
 
       {/* Stat cards — drag to rearrange, auto-saves per employee */}
       <div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 14 }}>
           {orderedCards.map((card, idx) => (
             <StatCard key={card.label} card={card} idx={idx}
               onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop} onDragEnd={onDragEnd}
