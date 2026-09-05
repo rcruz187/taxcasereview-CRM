@@ -1,8 +1,7 @@
 name: Inspect RomyLabs Rebuild Trigger
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/inspect-romylabs-rebuild-trigger.yml']
+  workflow_dispatch:
+
 permissions:
   contents: read
 jobs:
