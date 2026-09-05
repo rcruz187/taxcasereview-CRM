@@ -1,8 +1,7 @@
 name: Apply RomyLabs Product Logo Sync
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/apply-romylabs-product-logo-sync.yml']
+  workflow_dispatch:
+
 permissions:
   contents: read
 jobs:
