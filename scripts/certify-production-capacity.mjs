@@ -91,8 +91,8 @@ async function seedReadTargets(){
   const eventId=`${runId}_event`
   const esignId=`${runId}_esign`
   const inserts=[
-    ['clients',{id:clientId,name:`QA Client ${runId}`,email:`${runId}.client@example.com`,phone:'0000000000',status:'Active',tenant_id:TENANT_ID,notes:`TEMP QA CERT ${runId}`}],
-    ['leads',{id:leadId,name:`QA Lead ${runId}`,email:`${runId}.lead@example.com`,phone:'0000000000',status:'New Lead',tenant_id:TENANT_ID,notes:`TEMP QA CERT ${runId}`}],
+    ['clients',{id:clientId,name:`Capacity Client ${runId}`,email:`${runId}.client@example.com`,phone:'2025550198',status:'Active',tenant_id:TENANT_ID,notes:`TEMP CAPACITY CERT ${runId}`}],
+    ['leads',{id:leadId,name:`Capacity Lead ${runId}`,email:`${runId}.lead@example.com`,phone:'2025550199',status:'New Lead',tenant_id:TENANT_ID,notes:`TEMP CAPACITY CERT ${runId}`}],
     ['tasks',{id:taskId,title:`QA Task ${runId}`,priority:'Normal',tenant_id:TENANT_ID,notes:`TEMP QA CERT ${runId}`}],
     ['calevents',{id:eventId,title:`QA Meeting ${runId}`,client:`QA Client ${runId}`,date:new Date().toISOString().slice(0,10),time:'23:55',eventType:'QA Certification',status:'QA_DRY_RUN',source:'qa_certification',tenant_id:TENANT_ID}],
     ['esigns',{id:esignId,doc_type:'QA Certification',client_name:`QA Client ${runId}`,client_email:`${runId}.esign@example.com`,message:`TEMP QA CERT ${runId}`,status:'QA_DRY_RUN',send_via:'qa_dry_run',tenant_id:TENANT_ID}],
