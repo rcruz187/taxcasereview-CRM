@@ -1,17 +1,5 @@
 name: UI Browser Smoke
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'index.html'
-      - 'src/**'
-      - 'scripts/**'
-      - 'e2e/**'
-      - 'playwright.config.mjs'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/ui-browser-smoke.yml'
-      - '.github/workflows/exhaustive-source-audit.yml'
   workflow_dispatch:
 
 permissions:
