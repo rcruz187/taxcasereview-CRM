@@ -174,6 +174,10 @@ export function CallProvider({ children }) {
   const callerNumberRef = useRef(null)
   const activeConferenceRef = useRef(null)
   const activeInboundCallsidRef = useRef(null)
+  // Durable outbound_calls.id for the current call. This is also the
+  // calllog.raw_call_id created by the DB sync trigger, so post-call recap
+  // enriches that one row instead of inserting a duplicate history row.
+  const activeOutboundCallIdRef = useRef(null)
   const uiStartedRef = useRef(false)
   const pageUnloadingRef = useRef(false)
   const callStartedAtRef = useRef(null)
@@ -384,7 +388,7 @@ export function CallProvider({ children }) {
       let row = null
       if (saved.kind === 'outbound') {
         const { data } = await supabase.from('outbound_calls')
-          .select('conference_name,status,provider_call_sid')
+          .select('id,conference_name,status,provider_call_sid')
           .eq('conference_name', saved.conferenceName)
           .in('status', ['pending','ringing','answered','connected'])
           .maybeSingle()
@@ -409,6 +413,7 @@ export function CallProvider({ children }) {
       }
       activeConferenceRef.current = saved.conferenceName
       activeInboundCallsidRef.current = saved.kind === 'inbound' ? (saved.inboundCallsid || null) : null
+      activeOutboundCallIdRef.current = saved.kind === 'outbound' ? (saved.outboundCallId || row.id || null) : null
       transferableCallsidRef.current = saved.transferableCallsid || row.provider_call_sid || null
       setCanTransfer(!!transferableCallsidRef.current)
       callStartedAtRef.current = Number(saved.startedAt) || Date.now()
@@ -699,6 +704,7 @@ export function CallProvider({ children }) {
 
     uiStartedRef.current = true
     activeInboundCallsidRef.current = null
+    activeOutboundCallIdRef.current = null
     callStartedAtRef.current = Date.now()
     setActive(lead)
     setCalling(true)
@@ -741,11 +747,13 @@ export function CallProvider({ children }) {
           return
         }
         activeConferenceRef.current = responseData.conferenceName || null
+        activeOutboundCallIdRef.current = responseData.outboundCallId || null
         transferableCallsidRef.current = responseData.clientCallsid || null
         setCanTransfer(!!responseData.clientCallsid)
         persistCallSession({
           kind: 'outbound',
           conferenceName: responseData.conferenceName || null,
+          outboundCallId: responseData.outboundCallId || null,
           transferableCallsid: responseData.clientCallsid || null,
           active: lead,
           startedAt: callStartedAtRef.current || Date.now(),
@@ -858,7 +866,33 @@ export function CallProvider({ children }) {
       duration: logForm.duration || formatTime(elapsed),
       created_at: new Date().toISOString()
     }
-    const { error } = await supabase.from('calllog').insert([record])
+    const outboundCallId = activeOutboundCallIdRef.current
+    let error = null
+    if (outboundCallId) {
+      // outbound_calls -> calllog is automatic and keyed by raw_call_id.
+      // Enrich that durable row with the human recap rather than creating
+      // a second history entry.
+      const { data: updated, error: updateError } = await supabase.from('calllog')
+        .update({
+          leadId: record.leadId,
+          clientName: record.clientName,
+          phone: record.phone,
+          outcome: record.outcome,
+          notes: record.notes,
+          duration: record.duration,
+          direction: 'Outbound',
+        })
+        .eq('raw_call_id', outboundCallId)
+        .select('id')
+      error = updateError
+      if (!error && (!updated || updated.length === 0)) {
+        const fallback = await supabase.from('calllog').insert([{ ...record, raw_call_id: outboundCallId, direction: 'Outbound' }])
+        error = fallback.error
+      }
+    } else {
+      const inserted = await supabase.from('calllog').insert([record])
+      error = inserted.error
+    }
     setSaving(false)
     if (error) { showCallToast('Error: ' + error.message); return }
 
@@ -918,12 +952,14 @@ export function CallProvider({ children }) {
       } catch { /* no-op */ }
     }
 
+    activeOutboundCallIdRef.current = null
     setActive(null)
     setElapsed(0)
     onSaved?.(record)
   }
 
   function closeLogModalWithoutSaving() {
+    activeOutboundCallIdRef.current = null
     setLogModal(false)
     setActive(null)
   }
