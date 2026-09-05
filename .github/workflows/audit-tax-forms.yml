@@ -1,17 +1,5 @@
 name: Audit Tax Forms
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/audit-tax-forms.mjs'
-      - 'scripts/fix-state-esign-prefill.mjs'
-      - 'scripts/fix-irs-current-field-maps.mjs'
-      - 'src/lib/irsFormUtils.js'
-      - 'src/pages/StateForms.jsx'
-      - 'src/pages/SignPage.jsx'
-      - 'public/templates/**'
-      - 'public/irs-forms/**'
-      - 'public/state-forms/**'
   workflow_dispatch:
 
 jobs:
