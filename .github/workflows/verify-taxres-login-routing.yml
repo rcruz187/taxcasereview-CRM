@@ -1,16 +1,7 @@
 name: Verify TaxRes Login Routing
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/verify-taxres-login-routing.yml'
-      - 'public/romylabs-admin-hotfix.js'
-      - 'public/tcr-routing-fingerprint.txt'
-      - 'public/email-refresh-deploy-marker.txt'
-      - 'src/pages/Login.jsx'
-      - 'src/App.jsx'
-      - 'src/pages/Email.jsx'
+  workflow_dispatch:
 
 jobs:
   verify:
