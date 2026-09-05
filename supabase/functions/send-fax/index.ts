@@ -59,8 +59,10 @@ serve(async (req) => {
       .limit(1)
       .maybeSingle()
 
-    const fromNumber = settings?.firm_fax_number || settings?.sw_inbound_did || ''
-    if (!fromNumber) return json({ error: 'Fax sending number not configured' }, 422)
+    const configuredFrom = settings?.firm_fax_number || settings?.sw_inbound_did || ''
+    const fromDigits = digits(configuredFrom)
+    const fromNumber = fromDigits.length === 10 ? `+1${fromDigits}` : (fromDigits.length === 11 && fromDigits.startsWith('1') ? `+${fromDigits}` : '')
+    if (!fromNumber) return json({ error: 'Fax sending number is not a valid US E.164 number' }, 422)
     const provider = settings?.telnyx_api_key ? 'telnyx' : (settings?.sw_space_url && settings?.sw_project_id && settings?.sw_api_token ? 'signalwire' : null)
     if (!provider) return json({ error: 'No fax provider configured (Telnyx or SignalWire)' }, 422)
 
@@ -104,9 +106,19 @@ serve(async (req) => {
         body: formData.toString(),
       }
     )
-    faxResult = await res.json()
-    if (!res.ok) return json({ error: faxResult.message || 'SignalWire fax error' }, 400)
-    return json({ success: true, provider, sid: faxResult.sid })
+    const faxText = await res.text()
+    try { faxResult = JSON.parse(faxText) } catch { faxResult = { raw: faxText } }
+    if (!res.ok) {
+      const providerError = faxResult?.message || faxResult?.error || faxResult?.detail || faxResult?.raw || 'SignalWire fax error'
+      console.error('[send-fax][signalwire]', JSON.stringify({
+        status: res.status,
+        from: fromNumber,
+        to: toNumber,
+        provider_error: providerError,
+      }))
+      return json({ error: providerError, provider_status: res.status }, 400)
+    }
+    return json({ success: true, provider, sid: faxResult.sid, provider_status: res.status })
   } catch (err) {
     console.error('[send-fax]', err)
     return json({ error: err instanceof Error ? err.message : 'Fax send failed' }, 500)
