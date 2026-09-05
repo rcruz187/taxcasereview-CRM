@@ -1,11 +1,6 @@
 name: Internal Load Test Auto
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/internal-load-test-auto.yml'
-      - 'tests/load/**'
   workflow_dispatch:
 
 permissions:
