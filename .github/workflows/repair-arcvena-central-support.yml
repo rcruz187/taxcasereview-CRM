@@ -1,8 +1,7 @@
 name: Repair Arcvena Central Support
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/repair-arcvena-central-support.yml']
+  workflow_dispatch:
+
 permissions:
   contents: read
 jobs:
