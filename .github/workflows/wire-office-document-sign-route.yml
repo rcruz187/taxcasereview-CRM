@@ -1,13 +1,7 @@
 name: Verify Office Document Sign Route
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/wire-office-document-sign-route.mjs'
-      - '.github/workflows/wire-office-document-sign-route.yml'
-      - 'src/App.jsx'
-      - 'src/components/admin/UniversalOfficeESign.jsx'
   workflow_dispatch:
+
 permissions:
   contents: read
 jobs:
