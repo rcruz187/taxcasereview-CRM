@@ -91,8 +91,8 @@ async function seedReadTargets(){
   const eventId=`${runId}_event`
   const esignId=`${runId}_esign`
   const inserts=[
-    ['clients',{id:clientId,name:`QA Client ${runId}`,email:`${runId}.client@example.com`,phone:'0000000000',status:'Active',tenant_id:TENANT_ID,notes:`TEMP QA CERT ${runId}`}],
-    ['leads',{id:leadId,name:`QA Lead ${runId}`,email:`${runId}.lead@example.com`,phone:'0000000000',status:'New Lead',tenant_id:TENANT_ID,notes:`TEMP QA CERT ${runId}`}],
+    ['clients',{id:clientId,name:`Capacity Client ${runId}`,email:`${runId}.client@example.com`,phone:'2025550198',status:'Active',tenant_id:TENANT_ID,notes:`TEMP CAPACITY CERT ${runId}`}],
+    ['leads',{id:leadId,name:`Capacity Lead ${runId}`,email:`${runId}.lead@example.com`,phone:'2025550199',status:'New Lead',tenant_id:TENANT_ID,notes:`TEMP CAPACITY CERT ${runId}`}],
     ['tasks',{id:taskId,title:`QA Task ${runId}`,priority:'Normal',tenant_id:TENANT_ID,notes:`TEMP QA CERT ${runId}`}],
     ['calevents',{id:eventId,title:`QA Meeting ${runId}`,client:`QA Client ${runId}`,date:new Date().toISOString().slice(0,10),time:'23:55',eventType:'QA Certification',status:'QA_DRY_RUN',source:'qa_certification',tenant_id:TENANT_ID}],
     ['esigns',{id:esignId,doc_type:'QA Certification',client_name:`QA Client ${runId}`,client_email:`${runId}.esign@example.com`,message:`TEMP QA CERT ${runId}`,status:'QA_DRY_RUN',send_via:'qa_dry_run',tenant_id:TENANT_ID}],
@@ -166,7 +166,7 @@ async function runBoundarySuite(sessions){
     await boundaryProbe(s,'clients','perm_clients',1,2,()=>({id:`${runId}_client_${s.role.key}_${Date.now()}`,name:`QA ${s.role.label} Client`,status:'Active',tenant_id:TENANT_ID,notes:`TEMP QA CERT ${runId}`}))
     await boundaryProbe(s,'calevents','perm_schedule',1,2,()=>({id:`${runId}_event_${s.role.key}_${Date.now()}`,title:`QA ${s.role.label} Meeting`,date:new Date().toISOString().slice(0,10),time:'23:55',eventType:'QA Certification',status:'QA_DRY_RUN',source:'qa_certification',tenant_id:TENANT_ID}))
     await boundaryProbe(s,'esigns','perm_documents',1,2,()=>({id:`${runId}_esign_${s.role.key}_${Date.now()}`,doc_type:'QA Certification',client_name:`QA ${s.role.label}`,client_email:`${runId}.${s.role.key}@example.com`,status:'QA_DRY_RUN',send_via:'qa_dry_run',tenant_id:TENANT_ID,message:`TEMP QA CERT ${runId}`}))
-    await boundaryProbe(s,'chat_messages','perm_comms',1,2,()=>({channel:'general',sender:s.name,text:`[QA CERT ${runId}] ${s.role.label} chat write`,tenant_id:TENANT_ID,source:'qa_certification'}))
+    await boundaryProbe(s,'chat_messages','perm_comms',1,2,()=>({channel:'general',sender:s.name,text:`[CAPACITY ${runId}] ${s.role.label} chat write`,tenant_id:TENANT_ID,source:'capacity_certification'}))
     await externalBoundaryProbe(s,'allow')
   }
 }
@@ -192,7 +192,7 @@ async function workloadIteration(s){
   const picked=reads[Math.floor(Math.random()*reads.length)]
   await timed(`load.read.${picked[0]}`,s.role.key,()=>s.client.from(picked[0]).select(picked[1]).limit(15))
   if((s.role.perms.perm_comms||0)>=2 && Math.random()<0.25){
-    const r=await timed('load.write.chat',s.role.key,()=>s.client.from('chat_messages').insert({channel:'general',sender:s.name,text:`[QA CERT ${runId}] heartbeat ${Date.now()}`,tenant_id:TENANT_ID,source:'qa_certification'}).select('id').maybeSingle())
+    const r=await timed('load.write.chat',s.role.key,()=>s.client.from('chat_messages').insert({channel:'general',sender:s.name,text:`[CAPACITY ${runId}] heartbeat ${Date.now()}`,tenant_id:TENANT_ID,source:'capacity_certification'}).select('id').maybeSingle())
     if(!r.error&&r.data?.id) track('chat_messages',r.data.id)
   }
 }
