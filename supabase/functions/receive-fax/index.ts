@@ -44,11 +44,43 @@ serve(async (req) => {
       console.warn('[receive-fax] SW_SIGNING_SECRET absent; structural callback validation only')
     }
 
+    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+
+    // Outbound delivery-status callback. The tenant is bound into the callback
+    // URL by send-fax; update only the matching provider SID in that tenant.
+    if (url.searchParams.get('outbound') === '1') {
+      const tenantId = String(url.searchParams.get('tenant') || '').trim()
+      const faxSid = String(params.get('FaxSid') || params.get('Sid') || '').trim()
+      const rawStatus = String(params.get('FaxStatus') || params.get('Status') || '').trim().toLowerCase()
+      if (!tenantId || !faxSid || !rawStatus) return new Response('', { status: 400 })
+
+      const delivered = ['delivered','completed','success','sent'].includes(rawStatus)
+      const failed = ['failed','no-answer','busy','canceled','cancelled','error'].includes(rawStatus)
+      const nextStatus = delivered ? 'Delivered' : failed ? 'Failed' : 'Pending'
+      const errorCode = params.get('ErrorCode') || params.get('ErrorMessage') || null
+
+      const { data: updated, error: updateError } = await supabase
+        .from('fax_logs')
+        .update({
+          status: nextStatus,
+          error_msg: failed ? (errorCode || rawStatus) : null,
+        })
+        .eq('tenant_id', tenantId)
+        .eq('signalwire_fax_id', faxSid)
+        .select('id')
+      if (updateError) {
+        console.error('[receive-fax] outbound status update failed:', updateError.message)
+        return new Response('', { status: 500 })
+      }
+      if (!updated?.length) {
+        console.warn('[receive-fax] outbound status arrived before log row existed', { tenantId, faxSid, rawStatus })
+      }
+      return new Response('', { status: 200 })
+    }
+
     const to = params.get('To') || ''
     const toDigits = digits10(to)
     if (toDigits.length !== 10) return xmlResponse('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', 400)
-
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
     const { data: rows, error: settingsError } = await supabase.from('settings').select('tenant_id,sw_inbound_did').not('tenant_id','is',null).not('sw_inbound_did','is',null)
     if (settingsError) throw settingsError
     const matches = (rows || []).filter((r: any) => digits10(r.sw_inbound_did) === toDigits)
