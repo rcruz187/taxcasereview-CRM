@@ -1,8 +1,7 @@
 name: Audit Command Center Live Contracts
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/audit-command-center-live-contracts.yml']
+  workflow_dispatch:
+
 permissions:
   contents: read
 jobs:
