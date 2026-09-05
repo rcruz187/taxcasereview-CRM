@@ -4,27 +4,7 @@ name: Deploy Supabase Edge Functions
 # is deployed from the exact source commit that changed it. Multiple function
 # changes in one commit are all deployed; there is no first-match/elif gap.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'supabase/functions/hub-proxy/**'
-      - 'supabase/functions/support-api/**'
-      - 'supabase/functions/linkedin-publish/**'
-      - 'supabase/functions/linkedin-scheduler/**'
-      - 'supabase/functions/linkedin-queue-replenisher/**'
-      - 'supabase/functions/send-email/**'
-      - 'supabase/functions/send-sms/**'
-      - 'supabase/functions/send-fax/**'
-      - 'supabase/functions/start-outbound-call/**'
-      - 'supabase/functions/save-email-account/**'
-      - 'supabase/functions/imap-sync/**'
-      - 'supabase/functions/smtp-send/**'
-      - '.github/workflows/deploy-edge-functions.yml'
   workflow_dispatch:
-    inputs:
-      function:
-        description: 'Function slug to deploy (or ALL_INTENTIONAL for a full redeploy)'
-        required: true
 
 permissions:
   contents: read
