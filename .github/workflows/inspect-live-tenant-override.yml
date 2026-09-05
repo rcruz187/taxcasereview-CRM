@@ -1,8 +1,7 @@
 name: Inspect Live Tenant Override
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/inspect-live-tenant-override.yml']
+  workflow_dispatch:
+
 permissions:
   contents: read
 jobs:
