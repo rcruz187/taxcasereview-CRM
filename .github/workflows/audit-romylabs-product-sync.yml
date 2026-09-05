@@ -1,8 +1,7 @@
 name: Audit RomyLabs Product Sync
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/audit-romylabs-product-sync.yml']
+  workflow_dispatch:
+
 permissions:
   contents: read
 jobs:
