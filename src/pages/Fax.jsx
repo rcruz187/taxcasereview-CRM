@@ -53,10 +53,14 @@ export default function Fax() {
 
   useEffect(() => {
     load()
+    const channel = supabase.channel('fax-log-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fax_logs' }, () => load())
+      .subscribe()
     // Mark inbound faxes as read in the database (not just a local timestamp)
     // the moment this page loads — mirrors how email/voicemail track read
     // state, so the badge count is reliable across browsers/devices.
     supabase.from('fax_logs').update({ is_read: true }).eq('direction', 'inbound').eq('is_read', false).then(()=>{})
+    return () => { supabase.removeChannel(channel) }
   }, [])
 
   async function load() {
@@ -155,7 +159,7 @@ export default function Fax() {
       })
 
       const sw_id = resData?.sid || null
-      const status = !invokeErr && resData?.success ? 'Sent' : 'Failed'
+      const status = !invokeErr && resData?.success ? 'Pending' : 'Failed'
 
       const { error: logErr } = await supabase.from('fax_logs').insert([{
         to_number: toNum, from_number: fromNum,
@@ -169,8 +173,8 @@ export default function Fax() {
       }])
 
       if (logErr) console.error('Log error:', logErr)
-      if (status === 'Sent') {
-        showToast('✅ Fax sent successfully!')
+      if (status === 'Pending') {
+        showToast('📠 Fax accepted — waiting for delivery confirmation')
         setModal(false); setForm(BLANK); setFile(null); load()
       } else {
         showToast('Error: ' + (resData?.error || invokeErr?.message || 'Check SignalWire credentials in Settings'), 'err')
@@ -198,14 +202,14 @@ export default function Fax() {
 
   const outboundLogs = logs.filter(l=>l.direction!=='inbound')
   const inboundLogs  = logs.filter(l=>l.direction==='inbound')
-  const sent     = outboundLogs.filter(l=>l.status==='Sent').length
+  const sent     = outboundLogs.filter(l=>l.status==='Delivered').length
   const failed   = outboundLogs.filter(l=>l.status==='Failed').length
   const received = inboundLogs.length
   const thisMonth = logs.filter(l=>(l.sent_at||l.created_at)?.slice(0,7)===new Date().toISOString().slice(0,7)).length
 
   const statCards = [
     { label: 'Total Sent',  value: outboundLogs.length, color: 'var(--tx)' },
-    { label: 'Successful',  value: sent,                color: 'var(--ok)' },
+    { label: 'Delivered',   value: sent,                color: 'var(--ok)' },
     { label: 'Failed',      value: failed,              color: 'var(--bad)' },
     { label: 'Received',    value: received,            color: 'var(--blue)' },
     { label: 'This Month',  value: thisMonth,           color: 'var(--b2)' },
@@ -242,7 +246,7 @@ export default function Fax() {
       <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search client, number, subject…"
           style={{flex:1,minWidth:200,padding:'9px 14px',background:'var(--s2)',border:'1px solid var(--br)',borderRadius:8,color:'var(--tx)',fontSize:14}}/>
-        {['All','Sent','Failed','Pending'].map(s=>(
+        {['All','Delivered','Failed','Pending'].map(s=>(
           <button key={s} className={`btn ${filterStatus===s?'pri':'sec'}`} style={{fontSize:12,padding:'6px 14px',fontWeight:600}} onClick={()=>setFilter(s)}>{s}</button>
         ))}
       </div>
@@ -300,7 +304,7 @@ export default function Fax() {
                       ) : <span style={{color:'var(--t3)'}}>—</span>}
                     </td>
                     <td style={{padding:'12px 14px'}}>
-                      <span className={`bdg ${l.status==='Sent'||l.status==='Received'?'bg':l.status==='Failed'?'br':'ba'}`}
+                      <span className={`bdg ${l.status==='Delivered'||l.status==='Received'?'bg':l.status==='Failed'?'br':'ba'}`}
                         style={{fontSize:12,padding:'3px 10px',fontWeight:700}}>
                         {l.status}
                       </span>
