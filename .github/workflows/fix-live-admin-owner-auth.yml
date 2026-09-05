@@ -1,8 +1,7 @@
 name: Fix Live Admin Owner Authorization
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/fix-live-admin-owner-auth.yml']
+  workflow_dispatch:
+
 permissions:
   contents: read
 jobs:
