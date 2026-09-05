@@ -1,9 +1,7 @@
 name: Admin Portal Deep Audit
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/admin-portal-deep-audit.yml'
+  workflow_dispatch:
+
 jobs:
   audit:
     runs-on: ubuntu-latest
