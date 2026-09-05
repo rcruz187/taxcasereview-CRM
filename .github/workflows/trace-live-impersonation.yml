@@ -1,8 +1,7 @@
 name: Trace Live Admin Impersonation
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/trace-live-impersonation.yml']
+  workflow_dispatch:
+
 permissions:
   contents: read
 jobs:
