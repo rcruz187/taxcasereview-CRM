@@ -2,12 +2,8 @@ name: LinkedIn Queue Replenishment
 
 on:
   schedule:
-    - cron: '15 12 * * *'
+      - cron: '15 12 * * *'
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/linkedin-queue-replenish.yml'
 
 jobs:
   cleanup-duplicate:
