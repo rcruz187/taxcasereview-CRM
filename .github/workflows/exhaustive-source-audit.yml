@@ -1,18 +1,6 @@
 name: Exhaustive Source Audit
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'index.html'
-      - 'src/**'
-      - 'supabase/**'
-      - 'scripts/**'
-      - 'e2e/**'
-      - 'playwright.config.mjs'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/**'
   workflow_dispatch:
 
 permissions:
