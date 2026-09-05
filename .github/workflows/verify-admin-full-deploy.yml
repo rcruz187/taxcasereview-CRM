@@ -1,9 +1,7 @@
 name: Verify Admin Full Deploy
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'public/admin-portal-build.txt'
+  workflow_dispatch:
+
 jobs:
   verify:
     runs-on: ubuntu-latest
