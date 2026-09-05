@@ -1,11 +1,6 @@
 name: Trace RomyLabs Admin Deploy
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'public/admin-portal-build.txt'
-      - '.github/workflows/trace-romylabs-admin-deploy.yml'
   workflow_dispatch:
 
 permissions:
