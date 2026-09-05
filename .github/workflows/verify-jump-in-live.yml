@@ -1,8 +1,7 @@
 name: Verify Live Admin Jump In
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/verify-jump-in-live.yml']
+  workflow_dispatch:
+
 permissions:
   contents: read
 jobs:
