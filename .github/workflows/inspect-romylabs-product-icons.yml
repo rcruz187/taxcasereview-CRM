@@ -1,8 +1,7 @@
 name: Inspect RomyLabs Product Icons
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/inspect-romylabs-product-icons.yml']
+  workflow_dispatch:
+
 permissions:
   contents: read
 jobs:
