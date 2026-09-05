@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
-import { getStoredLanguage, storeLanguage } from '../lib/i18n'
+import { EN_ES, getStoredLanguage, storeLanguage } from '../lib/i18n'
 
-const ES = {
+const ES_LOCAL = {
   'Dashboard':'Panel principal','Calendar':'Calendario','Leads':'Prospectos','Clients':'Clientes','Cases':'Casos','Tasks':'Tareas',
   'Transcripts':'Transcripciones','IRS Forms':'Formularios del IRS','Deadlines':'Fechas límite','Invoices':'Facturas','Payments':'Pagos',
   'Email':'Correo','Documents':'Documentos','E-Signatures':'Firmas electrónicas','Time Clock':'Reloj de tiempo','Payroll':'Nómina',
@@ -41,6 +41,7 @@ const ES = {
   'Good morning':'Buenos días','Good afternoon':'Buenas tardes','Good evening':'Buenas noches',
 }
 
+const ES = { ...EN_ES, ...ES_LOCAL }
 const EN = Object.fromEntries(Object.entries(ES).map(([k,v]) => [v,k]))
 
 function translateExact(value, lang) {
