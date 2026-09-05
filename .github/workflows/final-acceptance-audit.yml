@@ -1,8 +1,7 @@
 name: Final Acceptance Audit
 on:
-  push:
-    paths:
-      - '.github/workflows/final-acceptance-audit.yml'
+  workflow_dispatch:
+
 jobs:
   audit:
     runs-on: ubuntu-latest
