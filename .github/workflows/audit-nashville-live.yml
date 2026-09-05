@@ -2,9 +2,6 @@ name: Audit Nashville Live Admin Data
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - '.github/workflows/audit-nashville-live.yml'
 
 jobs:
   audit:
