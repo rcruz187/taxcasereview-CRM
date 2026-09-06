@@ -93,6 +93,18 @@ export const PRODUCT_BOOKING_CONFIGS = {
     fromName:      'BocaSync',
     inactive:      false,
   },
+  oculivo: {
+    key:           'oculivo',
+    name:          'Oculivo',
+    logoAlt:       'Oculivo',
+    headline:      'Schedule an Oculivo Demo',
+    types:         ['Oculivo Product Demo', 'Eye-Care Practice Consultation', 'Oculivo Follow-Up Call'],
+    calendarLabel: '[Oculivo]',
+    notifyEmail:   'info@romylabs.com',
+    replyTo:       'info@romylabs.com',
+    fromName:      'Oculivo',
+    inactive:      false,
+  },
   restore_relay: {
     key:           'restore_relay',
     name:          'Restore Relay CRM',
@@ -142,6 +154,7 @@ export const PRODUCT_BADGE_COLORS = {
   arcvena:    { bg: '#1a0a2e', text: '#a78bfa', label: 'Arcvena'    },
   bocasync:   { bg: '#1a2e1a', text: '#34d399', label: 'BocaSync'   },
   groundivo:  { bg: '#17351f', text: '#9bdc34', label: 'GroundIVO'  },
+  oculivo:     { bg: '#312e81', text: '#67e8f9', label: 'Oculivo'    },
   restore_relay: { bg: '#164e63', text: '#f59e0b', label: 'Restore Relay' },
 }
 
