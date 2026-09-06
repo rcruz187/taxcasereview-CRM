@@ -93,6 +93,20 @@ export const PRODUCT_BOOKING_CONFIGS = {
     fromName:      'BocaSync',
     inactive:      false,
   },
+  groundivo: {
+    key:           'groundivo',
+    name:          'GroundIVO',
+    logo:          '/groundivo-logo.svg?v=20260906-1',
+    favicon:       '/groundivo-logo.svg?v=20260906-1',
+    logoAlt:       'GroundIVO',
+    headline:      'Schedule a GroundIVO Demo',
+    types:         ['Product Demo', 'Landscaping Operations Consultation', 'Follow-Up Call'],
+    calendarLabel: '[GroundIVO]',
+    notifyEmail:   'info@romylabs.com',
+    replyTo:       'info@romylabs.com',
+    fromName:      'GroundIVO',
+    inactive:      false,
+  },
 }
 
 /**
@@ -115,6 +129,7 @@ export const PRODUCT_BADGE_COLORS = {
   camvella:   { bg: '#0b2748', text: '#55B96A', label: 'Camvella'   },
   arcvena:    { bg: '#1a0a2e', text: '#a78bfa', label: 'Arcvena'    },
   bocasync:   { bg: '#1a2e1a', text: '#34d399', label: 'BocaSync'   },
+  groundivo:  { bg: '#17351f', text: '#9bdc34', label: 'GroundIVO'  },
 }
 
 export function getProductBadge(productId) {
