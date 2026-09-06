@@ -32,6 +32,15 @@ export default function Email() {
   const [view, setView]         = useState('inbox') // inbox | compose | templates
   const [searchParams] = useSearchParams()
   useEffect(() => { if (searchParams.get('new') === '1') { setForm(BLANK); setView('compose') } }, [searchParams])
+  useEffect(() => {
+    const emailId = searchParams.get('email')
+    if (!emailId || emails.length === 0) return
+    const match = emails.find(row => String(row.id) === String(emailId))
+    if (!match) return
+    setTriageFilter(match.triage || 'Inbox')
+    setSelected(match)
+    setView('inbox')
+  }, [searchParams, emails])
   const [readLayout, setReadLayout] = useState(() => localStorage.getItem('tcr_email_layout') || 'side') // side | stacked
   const [listSize, setListSize] = useState(() => ({
     side: parseInt(localStorage.getItem('tcr_email_list_width')) || 320,
