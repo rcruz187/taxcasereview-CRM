@@ -1,0 +1,3 @@
+TAXCASE_CLOUDFLARE_CLOSEOUT_20260905_2231_ET
+source_commit_base=439626900392ac6bd4db597d43e5612ca5cc2801
+purpose=force_connected_cloudflare_pages_deploy_and_verify
