@@ -93,6 +93,18 @@ export const PRODUCT_BOOKING_CONFIGS = {
     fromName:      'BocaSync',
     inactive:      false,
   },
+  restore_relay: {
+    key:           'restore_relay',
+    name:          'Restore Relay CRM',
+    logoAlt:       'Restore Relay CRM',
+    headline:      'Schedule a Restore Relay Demo',
+    types:         ['Restore Relay Product Demo', 'Restoration / Roofing Operations Consultation', 'Restore Relay Follow-Up Call'],
+    calendarLabel: '[Restore Relay]',
+    notifyEmail:   'info@romylabs.com',
+    replyTo:       'info@romylabs.com',
+    fromName:      'Restore Relay CRM',
+    inactive:      false,
+  },
   groundivo: {
     key:           'groundivo',
     name:          'GroundIVO',
@@ -130,6 +142,7 @@ export const PRODUCT_BADGE_COLORS = {
   arcvena:    { bg: '#1a0a2e', text: '#a78bfa', label: 'Arcvena'    },
   bocasync:   { bg: '#1a2e1a', text: '#34d399', label: 'BocaSync'   },
   groundivo:  { bg: '#17351f', text: '#9bdc34', label: 'GroundIVO'  },
+  restore_relay: { bg: '#164e63', text: '#f59e0b', label: 'Restore Relay' },
 }
 
 export function getProductBadge(productId) {
