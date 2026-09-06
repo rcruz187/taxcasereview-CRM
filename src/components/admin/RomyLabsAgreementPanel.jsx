@@ -12,6 +12,7 @@ const BRAND = {
   bocasync:{name:'BocaSync',email:'romy@bocasync.com'},
   groundivo:{name:'Groundivo',email:'info@romylabs.com'},
   oculivo:{name:'Oculivo',email:'info@romylabs.com'},
+  restore_relay:{name:'Restore Relay',email:'info@romylabs.com'},
   romylabs:{name:'RomyLabs',email:'info@romylabs.com'},
 }
 
