@@ -2077,6 +2077,27 @@ const PRODUCT_REGISTRY = [
     desc:      'Eye-care CRM and practice operating system for optometry, ophthalmology, optical retail, and multi-location groups.',
     metricsUrl: null,
     nextMilestone: 'Finish product build, deploy platform metrics, and verify analytics reporting',
+    priorityRank:   1,
+  },  {
+    key:        'restore_relay',
+    label:      'Restore Relay',
+    icon:       '🏚️',
+    color:      '#F97316',
+    industry:   'Restoration & Roofing',
+    url:        null,
+    appUrl:     null,
+    websiteUrl: null,
+    lifecycleStage: 'building',
+    connection:     'not_connected',
+    brandStatus:    'branded',
+    publicOnRomyLabs: true,
+    commerciallyAvailable: false,
+    nextToFinish:   true,
+    priorityRank:   2,
+    repo:            'taxresolutioncrm/p7-crm',
+    desc:      'RomyLabs Product #7 — restoration and roofing CRM for claims, projects, customers, crews, documents, estimates, and field operations.',
+    metricsUrl: null,
+    nextMilestone: 'NEXT CRM TO FINISH — complete Restore Relay build, deploy Supabase, platform metrics, SEO, and launch QA',
   },
   // ── TENANTS (not products — operational data, not product counts) ─────────
   {
@@ -2291,27 +2312,7 @@ const PRODUCT_REGISTRY = [
     metricsUrl: null,
     nextMilestone: 'Define product architecture / brand / build phase',
   },
-  {
-    key:        'restore_relay',
-    label:      'Restore Relay CRM',
-    icon:       '🏚️',
-    color:      '#F97316',
-    industry:   'Restoration & Roofing',
-    url:        null,
-    appUrl:     null,
-    websiteUrl: null,
-    lifecycleStage: 'building',
-    connection:     'not_connected',
-    brandStatus:    'working_name',
-    publicOnRomyLabs: false,
-    commerciallyAvailable: false,
-    nextToFinish:   true,
-    priorityRank:   1,
-    repo:            'taxresolutioncrm/p7-crm',
-    desc:      'RomyLabs Product #7 — restoration and roofing CRM for claims, projects, customers, crews, documents, estimates, and field operations.',
-    metricsUrl: null,
-    nextMilestone: 'NEXT CRM TO FINISH — complete Restore Relay CRM build, lock final brand/domain, then deploy Supabase, platform metrics, SEO, and launch QA',
-  },
+
 ]
 
 function fmt$(n) { return n ? `$${Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—' }
@@ -2564,9 +2565,10 @@ function ProductsTab({ supabase, taxresActivity = [] }) {
   // ── Filtered list ───────────────────────────────────────────────────────
   const lifecycleOrder = { live:0, available:1, coming:2, internal:3, building:4, research:5 }
   const sortByLifecycle = (a, b) => {
-    if (Boolean(a.nextToFinish) !== Boolean(b.nextToFinish)) return a.nextToFinish ? -1 : 1
+    const lifecycleDiff = (lifecycleOrder[a.lifecycleStage] ?? 9) - (lifecycleOrder[b.lifecycleStage] ?? 9)
+    if (lifecycleDiff !== 0) return lifecycleDiff
     if ((a.priorityRank ?? 999) !== (b.priorityRank ?? 999)) return (a.priorityRank ?? 999) - (b.priorityRank ?? 999)
-    return (lifecycleOrder[a.lifecycleStage] ?? 9) - (lifecycleOrder[b.lifecycleStage] ?? 9)
+    return 0
   }
 
   const portfolioFiltered = portfolioFilter === 'total' ? products
