@@ -39,6 +39,7 @@ export default function Email() {
     if (!match) return
     setTriageFilter(match.triage || 'Inbox')
     setSelected(match)
+    if (!match.is_read) markRead(match)
     setView('inbox')
   }, [searchParams, emails])
   const [readLayout, setReadLayout] = useState(() => localStorage.getItem('tcr_email_layout') || 'side') // side | stacked
