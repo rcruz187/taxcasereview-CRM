@@ -18,6 +18,7 @@ const FALLBACK_PRODUCTS = [
   { product_id:'bocasync', name:'BocaSync' },
   { product_id:'groundivo', name:'GroundIVO' },
   { product_id:'oculivo', name:'Oculivo' },
+  { product_id:'restore_relay', name:'Restore Relay' },
 ]
 
 const SYMBOLS = '!@#$%^&*()-_=+[]{};:,.?'
