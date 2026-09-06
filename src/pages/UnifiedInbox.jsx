@@ -26,7 +26,7 @@ function normalizeEmail(row) {
     subject: row.subject || '(no subject)',
     preview: row.body_text || row.body || row.snippet || '',
     at: row.received_at || row.sent_at || row.created_at,
-    route: '/email',
+    route: `/email?email=${encodeURIComponent(row.id)}`,
   }
 }
 
@@ -44,7 +44,7 @@ function normalizeSms(row) {
     subject: inbound ? 'Incoming text' : 'Outgoing text',
     preview: row.body || row.message || '',
     at: row.received_at || row.sent_at || row.created_at,
-    route: '/sms',
+    route: `/sms?reply=1&phone=${encodeURIComponent(row.phone || row.from_number || row.to_number || '')}&client=${encodeURIComponent(row.clientName || row.client_name || '')}`,
   }
 }
 
@@ -68,7 +68,7 @@ function normalizeVoice(row) {
     subject: voicemail ? 'Voicemail' : (inbound ? 'Incoming call' : 'Outgoing call'),
     preview: row.transcription || row.transcript || row.notes || row.status || (duration ? duration + ' sec' : ''),
     at: row.received_at || row.started_at || row.created_at || row.timestamp,
-    route: '/dialer',
+    route: `/dialer?phone=${encodeURIComponent(peer)}`,
   }
 }
 
@@ -86,7 +86,7 @@ function normalizeFax(row) {
     subject: row.subject || (inbound ? 'Incoming fax' : 'Outgoing fax'),
     preview: row.notes || row.file_name || row.status || '',
     at: row.received_at || row.sent_at || row.created_at,
-    route: '/fax',
+    route: `/fax?new=1&phone=${encodeURIComponent(inbound ? (row.from_number || '') : (row.to_number || ''))}&client=${encodeURIComponent(row.client_name || '')}`,
   }
 }
 
