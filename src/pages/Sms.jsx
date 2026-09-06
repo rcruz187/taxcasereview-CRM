@@ -1,4 +1,5 @@
 import { useState, useEffect, Fragment } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import PhoneNumber from '../components/PhoneNumber'
 import { supabase } from '../lib/supabase'
 import { FIRM } from '../lib/firmBranding'
@@ -52,6 +53,7 @@ const BLANK = { phone:'', clientName:'', body:'', status:'Sent' }
 
 export default function Sms() {
   const { user } = useApp()
+  const [searchParams] = useSearchParams()
   const [sent,    setSent]    = useState([])
   const [clients, setClients] = useState([])
   const [form,    setForm]    = useState(BLANK)
@@ -64,6 +66,13 @@ export default function Sms() {
   const [attachPickerFor, setAttachPickerFor] = useState(null) // sms_messages.id currently showing the manual picker
   const [attachSearch, setAttachSearch] = useState('')
   const [attachFolder, setAttachFolder] = useState('Correspondence')
+  useEffect(() => {
+    if (searchParams.get('reply') !== '1') return
+    const phone = (searchParams.get('phone') || '').replace(/\D/g,'')
+    const clientName = searchParams.get('client') || ''
+    setForm(prev => ({ ...prev, phone, clientName }))
+    setView('compose')
+  }, [searchParams])
   const [attaching, setAttaching] = useState(null) // id of the media item currently being attached (disables button)
 
   useEffect(()=>{
