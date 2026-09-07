@@ -1,0 +1,33 @@
+name: Audit RomyLabs Sales Live
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: mpxgxfqdbquzkrvvejkh
+    steps:
+      - name: Inspect live sales and contract data
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >/tmp/q.json
+          import json
+          q=r'''
+          select jsonb_build_object(
+            'prospect_columns',(select jsonb_agg(jsonb_build_object('name',column_name,'type',data_type) order by ordinal_position) from information_schema.columns where table_schema='public' and table_name='prospects'),
+            'prospects',(select coalesce(jsonb_agg(to_jsonb(p)),'[]'::jsonb) from (select * from public.prospects limit 100) p),
+            'esign_columns',(select jsonb_agg(jsonb_build_object('name',column_name,'type',data_type) order by ordinal_position) from information_schema.columns where table_schema='public' and table_name='esigns'),
+            'recent_esigns',(select coalesce(jsonb_agg(to_jsonb(e)),'[]'::jsonb) from (select * from public.esigns order by created_at desc limit 50) e),
+            'tenant_columns',(select jsonb_agg(column_name order by ordinal_position) from information_schema.columns where table_schema='public' and table_name='tenants'),
+            'tenant_sample',(select coalesce(jsonb_agg(to_jsonb(t)),'[]'::jsonb) from (select * from public.tenants limit 50) t),
+            'contractish_tables',(select coalesce(jsonb_agg(table_name order by table_name),'[]'::jsonb) from information_schema.tables where table_schema='public' and (table_name ilike '%contract%' or table_name ilike '%proposal%' or table_name ilike '%esign%'))
+          ) as audit;
+          '''
+          print(json.dumps({'query':q}))
+          PY
+          curl --fail-with-body -sS -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" -H 'Content-Type: application/json' --data-binary @/tmp/q.json

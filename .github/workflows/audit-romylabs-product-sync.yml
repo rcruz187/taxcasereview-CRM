@@ -1,0 +1,40 @@
+name: Audit RomyLabs Product Sync
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: mpxgxfqdbquzkrvvejkh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect live registry schema and public RPC
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          python3 - <<'PY' >/tmp/q.json
+          import json
+          q=r'''
+          select jsonb_build_object(
+            'columns',(select jsonb_agg(jsonb_build_object('name',column_name,'type',data_type,'nullable',is_nullable) order by ordinal_position) from information_schema.columns where table_schema='public' and table_name='romylabs_products'),
+            'public_rpc',(select pg_get_functiondef(p.oid) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='get_public_products' limit 1),
+            'triggers',(select coalesce(jsonb_agg(jsonb_build_object('name',tgname,'def',pg_get_triggerdef(t.oid))), '[]'::jsonb) from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='romylabs_products' and not t.tgisinternal)
+          ) as audit;
+          '''
+          print(json.dumps({'query':q}))
+          PY
+          curl --fail-with-body -sS -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" -H 'Content-Type: application/json' \
+            --data-binary @/tmp/q.json | tee /tmp/out.json
+      - name: Check rebuild Edge Function endpoint
+        shell: bash
+        run: |
+          code=$(curl -sS -o /tmp/rebuild.txt -w '%{http_code}' -X POST "https://${PROJECT_REF}.supabase.co/functions/v1/trigger-site-rebuild" -H 'Content-Type: application/json' --data '{}')
+          echo "HTTP=$code"
+          cat /tmp/rebuild.txt
+          test "$code" != "404"

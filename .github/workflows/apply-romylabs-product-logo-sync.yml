@@ -1,0 +1,34 @@
+name: Apply RomyLabs Product Logo Sync
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: mpxgxfqdbquzkrvvejkh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply targeted registry migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >/tmp/q.json
+          import json,pathlib
+          sql=pathlib.Path('supabase/migrations/20260828052000_romylabs_product_logo_sync.sql').read_text()
+          print(json.dumps({'query':sql}))
+          PY
+          curl --fail-with-body -sS -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" -H 'Content-Type: application/json' --data-binary @/tmp/q.json
+      - name: Verify public RPC exposes logo_url
+        shell: bash
+        run: |
+          python3 - <<'PY' >/tmp/q.json
+          import json
+          print(json.dumps({'query':"select pg_get_functiondef('public.get_public_products()'::regprocedure) as def"}))
+          PY
+          OUT=$(curl --fail-with-body -sS -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" -H 'Content-Type: application/json' --data-binary @/tmp/q.json)
+          echo "$OUT" | grep -q 'logo_url'
+          echo 'ROMYLABS_PRODUCT_LOGO_CONTRACT_LIVE'

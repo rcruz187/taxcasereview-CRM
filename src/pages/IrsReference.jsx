@@ -1,0 +1,330 @@
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import PhoneNumber from '../components/PhoneNumber'
+import { useState, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
+import { useApp } from '../context/AppContext'
+
+const CATEGORIES = ['IRS Phone Numbers', 'Mailing Addresses', 'State Info', 'Rep Info', 'Tips & Procedures', 'Other']
+
+const STATE_NAMES = {
+  AL:'Alabama', AZ:'Arizona', AR:'Arkansas', CA:'California', CO:'Colorado', CT:'Connecticut',
+  DE:'Delaware', FL:'Florida', GA:'Georgia', HI:'Hawaii', ID:'Idaho', IL:'Illinois', IN:'Indiana',
+  IA:'Iowa', KS:'Kansas', KY:'Kentucky', LA:'Louisiana', ME:'Maine', MD:'Maryland', MA:'Massachusetts',
+  MI:'Michigan', MN:'Minnesota', MS:'Mississippi', MO:'Missouri', MT:'Montana', NE:'Nebraska',
+  NJ:'New Jersey', NM:'New Mexico', NY:'New York', NC:'North Carolina', ND:'North Dakota', OH:'Ohio',
+  OK:'Oklahoma', OR:'Oregon', PA:'Pennsylvania', RI:'Rhode Island', SC:'South Carolina', TN:'Tennessee',
+  TX:'Texas', UT:'Utah', VA:'Virginia', DC:'Washington D.C.', WV:'West Virginia', WI:'Wisconsin', WY:'Wyoming',
+}
+
+const blankEntry = { category: 'IRS Phone Numbers', title: '', content: '', notes: '', state: '', sort_order: 0 }
+
+const GENERAL_CATEGORIES = CATEGORIES.filter(c => c !== 'State Info')
+
+export default function IrsReference() {
+  const { showToast, user } = useApp()
+  const [entries, setEntries] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch]   = useState('')
+  const [tab, setTab]         = useState('general') // 'general' | 'state'
+  const [stateFilter, setStateFilter] = useState('')
+  const [modal, setModal]     = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [form, setForm]       = useState(blankEntry)
+  const [saving, setSaving]   = useState(false)
+  const [confirmDel, setConfirmDel] = useState(null)
+
+  useEffect(() => { load() }, [])
+
+  async function load() {
+    setLoading(true)
+    const { data } = await supabase.from('irs_reference').select('*').order('category').order('sort_order').order('title')
+    setEntries(data || [])
+    setLoading(false)
+  }
+
+  function openNew() {
+    setEditing(null)
+    setForm(blankEntry)
+    setModal(true)
+  }
+
+  function openEdit(entry) {
+    setEditing(entry.id)
+    setForm({
+      category: entry.category || 'Other',
+      title: entry.title || '',
+      content: entry.content || '',
+      notes: entry.notes || '',
+      state: entry.state || '',
+      sort_order: entry.sort_order || 0,
+    })
+    setModal(true)
+  }
+
+  async function save() {
+    if (!form.title.trim()) return showToast('Title is required', 'err')
+    setSaving(true)
+    const payload = { ...form, updated_at: new Date().toISOString() }
+    let error
+    if (editing) {
+      ({ error } = await supabase.from('irs_reference').update(payload).eq('id', editing))
+    } else {
+      ({ error } = await supabase.from('irs_reference').insert([{
+        ...payload, created_by: user?.email || '', created_at: new Date().toISOString()
+      }]))
+    }
+    setSaving(false)
+    if (error) return showToast(error.message, 'err')
+    showToast(editing ? 'Entry updated!' : 'Entry added!')
+    setModal(false)
+    load()
+  }
+
+  async function remove(id) {
+    const { error } = await supabase.from('irs_reference').delete().eq('id', id)
+    if (error) { showToast('Error: ' + error.message); setConfirmDel(null); return }
+    setEntries(prev => prev.filter(i => i.id !== id)); setConfirmDel(null); showToast('Deleted')
+  }
+
+  function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => showToast('Copied!'))
+  }
+
+  const q = search.trim().toLowerCase()
+  const filtered = entries.filter(e => {
+    if (tab === 'state') {
+      if (e.category !== 'State Info') return false
+      if (stateFilter && e.state !== stateFilter) return false
+    } else {
+      if (e.category === 'State Info') return false
+    }
+    return !q ||
+      e.title?.toLowerCase().includes(q) ||
+      e.content?.toLowerCase().includes(q) ||
+      e.notes?.toLowerCase().includes(q) ||
+      e.category?.toLowerCase().includes(q) ||
+      e.state?.toLowerCase().includes(q) ||
+      (e.state && STATE_NAMES[e.state]?.toLowerCase().includes(q))
+  })
+
+  // All distinct states present, for the filter dropdown
+  const statesPresent = [...new Set(entries.filter(e => e.category === 'State Info' && e.state).map(e => e.state))]
+    .sort((a, b) => (STATE_NAMES[a] || a).localeCompare(STATE_NAMES[b] || b))
+
+  // Group by category, preserving category order (general tab only)
+  const grouped = {}
+  for (const e of filtered) {
+    if (!grouped[e.category]) grouped[e.category] = []
+    grouped[e.category].push(e)
+  }
+  const categoryOrder = [...GENERAL_CATEGORIES.filter(c => grouped[c]), ...Object.keys(grouped).filter(c => !GENERAL_CATEGORIES.includes(c))]
+
+  // For 'State Info', further group by state
+  function groupByState(list) {
+    const byState = {}
+    for (const e of list) {
+      const key = e.state || '—'
+      if (!byState[key]) byState[key] = []
+      byState[key].push(e)
+    }
+    return Object.entries(byState).sort(([a], [b]) => (STATE_NAMES[a] || a).localeCompare(STATE_NAMES[b] || b))
+  }
+
+  return (
+    <div style={{padding:'20px 24px',maxWidth:1000,margin:'0 auto'}}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 20, color: 'var(--tx)' }}>IRS Reference</div>
+          <div style={{ fontSize: 13, color: 'var(--t3)' }}>Phone numbers, addresses, and tips — shared by the whole team</div>
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {tab === 'state' && statesPresent.length > 0 && (
+            <select
+              value={stateFilter} onChange={e => setStateFilter(e.target.value)}
+              style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--tx)', fontSize: 13 }}
+            >
+              <option value="">All States</option>
+              {statesPresent.map(s => <option key={s} value={s}>{STATE_NAMES[s] || s}</option>)}
+            </select>
+          )}
+          <input
+            value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search…"
+            style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--br)', background: 'var(--s2)', color: 'var(--tx)', fontSize: 13, width: 200 }}
+          />
+          <button className="btn pri" onClick={openNew} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Entry
+          </button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--br)' }}>
+        {[
+          { key: 'general', label: 'General' },
+          { key: 'state', label: 'By State' },
+        ].map(t => (
+          <button key={t.key} onClick={() => { setTab(t.key); setStateFilter('') }} style={{
+            padding: '8px 18px', borderRadius: '8px 8px 0 0',
+            border: '1px solid var(--br)', borderBottom: tab === t.key ? '1px solid var(--sf)' : '1px solid var(--br)',
+            background: tab === t.key ? 'var(--sf)' : 'var(--s2)',
+            color: tab === t.key ? 'var(--tx)' : 'var(--t3)',
+            fontWeight: tab === t.key ? 700 : 400,
+            cursor: 'pointer', fontSize: 13, marginBottom: -1
+          }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--t3)' }}>Loading…</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 60, color: 'var(--t3)' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🏛️</div>
+          <div style={{ fontWeight: 600, fontSize: 16, color: 'var(--tx)' }}>{q ? 'No matching entries' : 'No entries yet'}</div>
+          <div style={{ fontSize: 13, marginTop: 4 }}>{q ? 'Try a different search' : tab === 'state' ? 'Add state-specific phone numbers, addresses, and tips' : 'Add IRS phone numbers, addresses, and tips for the team'}</div>
+        </div>
+      ) : tab === 'state' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {groupByState(filtered).map(([st, list]) => (
+            <div key={st}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--tx)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 12,
+                  background: 'var(--blt)', color: 'var(--b2)', border: '1px solid var(--blue)'
+                }}>{st}</span>
+                {STATE_NAMES[st] || st}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
+                {list.map(entry => <EntryCard key={entry.id} entry={entry} showState={false} onCopy={copyToClipboard} onEdit={openEdit} onDelete={setConfirmDel} />)}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {categoryOrder.map(cat => (
+            <div key={cat}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>
+                {cat}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
+                {grouped[cat].map(entry => <EntryCard key={entry.id} entry={entry} showState onCopy={copyToClipboard} onEdit={openEdit} onDelete={setConfirmDel} />)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add/Edit modal */}
+      {modal && (
+        <div className="modal-bg open" onClick={e => e.target === e.currentTarget && setModal(false)}>
+          <div className="modal" style={{ width: 460, maxWidth: '95vw' }}>
+            <div className="mh">
+              <span className="mt">{editing ? 'Edit Entry' : 'Add Entry'}</span>
+              <button className="xbtn" onClick={() => setModal(false)}>&times;</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '0 0 4px' }}>
+              <div className="field">
+                <label>Category</label>
+                <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                  {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label>Title *</label>
+                <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Tax Practitioner Line"/>
+              </div>
+              <div className="field">
+                <label>Content (number, address, etc.)</label>
+                <textarea rows={3} value={form.content} onChange={e => setForm(f => ({ ...f, content: e.target.value }))} placeholder="e.g. 866-860-4259"/>
+              </div>
+              <div className="field">
+                <label>Notes <span style={{ fontWeight: 400, color: 'var(--t3)', textTransform: 'none' }}>(optional)</span></label>
+                <textarea rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="e.g. Option 2 for personal, option 3 for business"/>
+              </div>
+              <div className="field">
+                <label>State <span style={{ fontWeight: 400, color: 'var(--t3)', textTransform: 'none' }}>(optional — for state-specific entries)</span></label>
+                <select value={form.state} onChange={e => setForm(f => ({ ...f, state: e.target.value }))}>
+                  <option value="">— None (federal/general) —</option>
+                  {Object.entries(STATE_NAMES).map(([code, name]) => <option key={code} value={code}>{name} ({code})</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--br)' }}>
+              <button className="btn" onClick={() => setModal(false)}>Cancel</button>
+              <button className="btn pri" onClick={save} disabled={saving}>
+                {saving ? 'Saving…' : (editing ? 'Save Changes' : 'Add Entry')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <DeleteConfirmModal open={!!confirmDel} label="IRS reference entry" onConfirm={() => remove(confirmDel)} onCancel={() => setConfirmDel(null)} />
+    </div>
+  )
+}
+
+function EntryCard({ entry, showState, onCopy, onEdit, onDelete }) {
+  return (
+    <div className="card" style={{ padding: '14px 16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--tx)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span>{entry.title}</span>
+            {showState && entry.state && (
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 12,
+                background: 'var(--blt)', color: 'var(--b2)', border: '1px solid var(--blue)'
+              }}>{entry.state}</span>
+            )}
+          </div>
+          {entry.content && (() => {
+            const isPhone = /^[\d\s\-().\/+]+$/.test(entry.content.trim()) && entry.content.replace(/\D/g,'').length >= 7
+            if (isPhone) {
+              const parts = entry.content.split(/\s*[\/\n]\s*/)
+              return (
+                <div style={{ fontSize: 14, marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                  {parts.map((p, i) => {
+                    const digits = p.replace(/\D/g,'')
+                    return digits.length >= 7
+                      ? <PhoneNumber key={i} val={p.trim()} name={entry.title} />
+                      : <span key={i} style={{ color: 'var(--t2)' }}>{p.trim()}</span>
+                  })}
+                </div>
+              )
+            }
+            return (
+              <div style={{ fontSize: 14, color: 'var(--t2)', marginTop: 6, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                {entry.content}
+              </div>
+            )
+          })()}
+          {entry.notes && (
+            <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 6, lineHeight: 1.5 }}>
+              {entry.notes}
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+          {entry.content && (
+            <button className="btn sm" onClick={() => onCopy(entry.content)} title="Copy" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          )}
+          <button className="btn sm" onClick={() => onEdit(entry)} title="Edit" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button className="btn sm" onClick={() => onDelete(entry.id)} title="Delete" style={{ width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--bad)' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+

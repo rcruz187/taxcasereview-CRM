@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Allow: /book
+Disallow: /portal/
+Disallow: /sign/
+Disallow: /employee/
+Disallow: /kiosk/
+Disallow: /meet/
+Disallow: /crm-admin
+Disallow: /crm-admin/
+
+Sitemap: https://taxrescrm.app/sitemap.xml

@@ -1,0 +1,165 @@
+project_id = "mpxgxfqdbquzkrvvejkh"
+
+# SignalWire/provider callbacks — external services call these directly.
+[functions.receive-call]
+verify_jwt = false
+[functions.call-recorded]
+verify_jwt = false
+[functions.receive-sms]
+verify_jwt = false
+[functions.receive-fax]
+verify_jwt = false
+[functions.caller-hangup]
+verify_jwt = false
+[functions.conference-ended]
+verify_jwt = false
+[functions.hold-music]
+verify_jwt = false
+[functions.ivr-route]
+verify_jwt = false
+[functions.ivr-extension]
+verify_jwt = false
+[functions.join-conference]
+verify_jwt = false
+[functions.outbound-call-status]
+verify_jwt = false
+[functions.outbound-leg]
+verify_jwt = false
+[functions.voicemail-prompt]
+verify_jwt = false
+[functions.voicemail-recorded]
+verify_jwt = false
+[functions.redirect-to-voicemail]
+verify_jwt = false
+
+# Staff-only Stalwart DATA-stage webhook. Supabase JWT verification is off only
+# here; the function validates STALWART_MTA_HOOK_TOKEN before touching data.
+[functions.romylabs-inbound-email]
+verify_jwt = false
+
+# Browser phone-control endpoints — authenticated CRM staff only.
+[functions.signalwire-relay-token]
+verify_jwt = true
+[functions.start-outbound-call]
+verify_jwt = true
+[functions.end-conference]
+verify_jwt = true
+[functions.call-hold]
+verify_jwt = true
+[functions.call-transfer]
+verify_jwt = true
+[functions.call-add-participant]
+verify_jwt = true
+[functions.log-call]
+verify_jwt = true
+
+# Staff-only payment control endpoints.
+[functions.stripe-create-checkout-session]
+verify_jwt = true
+[functions.stripe-create-subscription]
+verify_jwt = true
+[functions.run-autopay-batch]
+# Server-to-server cron; function validates x-cron-secret itself.
+verify_jwt = false
+
+# Client Portal payment endpoints use an opaque portal session token when the
+# browser is anonymous and validate authenticated staff server-side otherwise.
+# Supabase JWT verification must stay off so the anonymous portal can reach
+# the custom authorization layer.
+[functions.stripe-setup-intent]
+verify_jwt = false
+[functions.stripe-save-payment-method]
+verify_jwt = false
+[functions.stripe-set-autopay]
+verify_jwt = false
+[functions.stripe-invoice-pay-intent]
+verify_jwt = false
+[functions.stripe-invoice-pay-confirm]
+verify_jwt = false
+
+# Cron-only reminder sweeps. pg_cron calls these server-to-server; they do not
+# have a browser/user JWT. Function bodies use service-role access internally.
+[functions.send-appointment-reminders]
+verify_jwt = false
+[functions.booking-reminders]
+verify_jwt = false
+
+[functions.trigger-workflow]
+verify_jwt = false
+[functions.sunbiz-search]
+verify_jwt = false
+[functions.stripe-checkout-webhook]
+verify_jwt = false
+[functions.portal-login]
+verify_jwt = false
+[functions.portal-action]
+verify_jwt = false
+[functions.organizer-action]
+verify_jwt = false
+[functions.retention-purge]
+verify_jwt = false
+[functions.gmail-sync-cron]
+verify_jwt = false
+[functions.quickbooks-oauth-callback]
+verify_jwt = false
+[functions.xero-oauth-callback]
+verify_jwt = false
+[functions.quickbooks-sync]
+verify_jwt = true
+[functions.xero-sync]
+verify_jwt = true
+[functions.ga4-sync]
+verify_jwt = true
+[functions.linkedin-publish]
+verify_jwt = true
+[functions.m365-oauth-callback]
+verify_jwt = false
+[functions.m365-sync]
+verify_jwt = true
+[functions.slack-events]
+verify_jwt = false
+[functions.slack-send]
+verify_jwt = true
+[functions.slack-import]
+verify_jwt = true
+[functions.call-ai-summary]
+verify_jwt = false
+[functions.ai-chat]
+verify_jwt = true
+[functions.esign-reminders]
+verify_jwt = false
+[functions.turn-credentials]
+verify_jwt = false
+[functions.push-platform-metrics]
+verify_jwt = false
+[functions.platform-metrics]
+verify_jwt = false
+[functions.demo-followup]
+verify_jwt = false
+[functions.linkedin-scheduler]
+verify_jwt = false
+[functions.daily-briefing]
+verify_jwt = false
+[functions.gsc-data]
+# Admin Portal reporting; require an authenticated Supabase user.
+verify_jwt = true
+[functions.bing-data]
+verify_jwt = false
+[functions.content-generator]
+verify_jwt = false
+[functions.weekly-growth-report]
+verify_jwt = false
+[functions.gsc-sync]
+verify_jwt = false
+[functions.support-api]
+verify_jwt = false
+[functions.trigger-site-rebuild]
+verify_jwt = false
+[functions.romylabs-billing-cycle]
+verify_jwt = false
+[functions.romylabs-billing-notify]
+verify_jwt = false
+[functions.romylabs-billing-payment]
+verify_jwt = false
+[functions.romylabs-billing-enforce]
+verify_jwt = false

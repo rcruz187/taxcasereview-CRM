@@ -1,0 +1,13 @@
+-- Backfilled 3 existing documents' file_size from storage.objects metadata
+-- where a matching storage path was found (2 rows had no matching storage
+-- object -- the underlying file was likely deleted/moved after the doc
+-- record was created; 1 row is a fax stored on SignalWire's own servers,
+-- outside Supabase storage entirely -- neither is fixable by backfill).
+--
+-- Root cause fixed: esign_finalize's Certificate of Completion insert never
+-- captured file_size (the plain audit-note insert correctly has none since
+-- it has no file; the attachments-loop insert already captured it
+-- correctly). Added p_cert_size bigint DEFAULT NULL (new 10th param, old
+-- 9-arg signature dropped to avoid a PostgREST overload) and the frontend
+-- now passes the real byte length it already has in memory before upload.
+SELECT 1; -- schema change itself was applied directly via the SQL runner during this session; this file documents it for the repo history.

@@ -1,0 +1,19 @@
+name: Audit Tax Forms
+on:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Apply deterministic state e-sign safety patch
+        run: node scripts/fix-state-esign-prefill.mjs
+      - name: Apply current IRS field mappings and fail-closed guards
+        run: node scripts/fix-irs-current-field-maps.mjs
+      - name: Audit IRS/state PDF field mappings and e-sign path
+        run: node scripts/audit-tax-forms.mjs

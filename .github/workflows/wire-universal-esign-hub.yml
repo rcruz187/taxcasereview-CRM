@@ -1,0 +1,35 @@
+name: Wire Universal E-Sign Hub
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: wire-universal-esign-hub
+  cancel-in-progress: true
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Verify wiring script is already reflected in source
+        run: |
+          node scripts/wire-universal-esign-hub.mjs
+          git diff --exit-code -- src/pages/AdminPortal.jsx
+      - name: Install dependencies
+        run: npm ci
+      - name: Build production bundle
+        run: npm run build
+      - name: Verify E-Signature exposure
+        run: |
+          grep -q "label:'E-Signatures'" src/pages/AdminPortal.jsx
+          grep -q 'path="/esign"' src/pages/AdminPortal.jsx
+          grep -q "import('./ESignaturesHub')" src/pages/AdminPortal.jsx
+          grep -q 'Upload any PDF contract' src/pages/ESignaturesHub.jsx
+          grep -q 'UniversalOfficeESign' src/pages/ESignaturesHub.jsx

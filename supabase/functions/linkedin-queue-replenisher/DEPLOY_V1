@@ -1,0 +1,1 @@
+Rolling LinkedIn queue replenisher: maintain 8 upcoming Tue/Thu 9 AM ET slots. Deployment is intentionally scoped and uses --no-verify-jwt so the GitHub scheduled runner can invoke this idempotent function.

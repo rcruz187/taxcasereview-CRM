@@ -1,0 +1,25 @@
+name: Verify Command Center Demo Storage Deploy
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for production fingerprint
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            BODY=$(curl -fsS --max-time 15 "https://admin.romylabs.com/admin-portal-build.txt?ts=$(date +%s)" || true)
+            if echo "$BODY" | grep -q 'COMMAND_CENTER_CRM_SCOPE_20260828'; then
+              echo 'COMMAND_CENTER_CRM_SCOPE_DEPLOYED'
+              exit 0
+            fi
+            echo "waiting for deployment ($i/30)"
+            sleep 10
+          done
+          echo 'Production fingerprint not found' >&2
+          exit 1

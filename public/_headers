@@ -1,0 +1,24 @@
+# HTML / SPA shell must revalidate so users receive the newest deployment.
+/*
+  Cache-Control: no-cache, must-revalidate
+  Pragma: no-cache
+
+# Vite emits content-hashed JS/CSS assets. These are safe to cache for a year;
+# a new deploy changes the filename, so navigation can reuse already-downloaded
+# page/vendor chunks instead of fetching them again on every visit.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Static brand/media files may be reused briefly but still refresh regularly.
+/*.png
+  Cache-Control: public, max-age=86400
+/*.svg
+  Cache-Control: public, max-age=86400
+/*.webp
+  Cache-Control: public, max-age=86400
+
+# Admin portal routes — noindex on both taxrescrm.app and admin.romylabs.com
+/crm-admin
+  X-Robots-Tag: noindex, nofollow
+/crm-admin/*
+  X-Robots-Tag: noindex, nofollow

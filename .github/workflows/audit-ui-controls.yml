@@ -1,0 +1,28 @@
+name: UI Control Audit
+on:
+  workflow_dispatch:
+
+jobs:
+  controls:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Scan for inert buttons
+        run: node scripts/audit-ui-controls.mjs
+
+      - name: Verify Dialer authoritative call history
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q "from('incoming_calls')" src/pages/Dialer.jsx
+          grep -q "from('calllog')" src/pages/Dialer.jsx
+          grep -q "dialer-calllog-realtime" src/pages/Dialer.jsx
+          grep -q "Call history failed to load:" src/pages/Dialer.jsx
+          grep -q "window.addEventListener('focus', refresh)" src/pages/Dialer.jsx
+          grep -q "if (tab === 'log') loadCallLog()" src/pages/Dialer.jsx
+          grep -q "setInterval(loadCallLog, calling ? 2500 : 5000)" src/pages/Dialer.jsx

@@ -1,0 +1,43 @@
+name: UI Browser Smoke
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install app and browser test dependencies
+        run: |
+          npm ci
+          npm install --no-save @playwright/test@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Verify Spanish dashboard translation contract
+        run: node scripts/test-i18n-dashboard.mjs
+      - name: Build production bundle
+        run: npm run build
+      - name: Start production preview
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/tcr-preview.log 2>&1 &
+          echo $! > /tmp/tcr-preview.pid
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/tcr-preview.log
+          exit 1
+      - name: Click through authenticated shell and global create actions
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:4173
+        run: npx playwright test e2e/ui-shell.spec.mjs --browser=chromium --reporter=line
+      - name: Show preview log on failure
+        if: failure()
+        run: cat /tmp/tcr-preview.log || true

@@ -1,0 +1,39 @@
+name: Deploy RomyLabs Product Sync
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: mpxgxfqdbquzkrvvejkh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with: { version: latest }
+      - name: Deploy rebuild Edge Function
+        run: |
+          set -euo pipefail
+          supabase functions deploy trigger-site-rebuild --project-ref "$PROJECT_REF" --no-verify-jwt
+      - name: Check required rebuild secret is configured
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase secrets list --project-ref "$PROJECT_REF" > /tmp/secrets.txt
+          if grep -q 'CF_PAGES_DEPLOY_HOOK_ROMYLABS' /tmp/secrets.txt; then
+            echo 'CF_DEPLOY_HOOK_SECRET_PRESENT=true'
+          else
+            echo 'CF_DEPLOY_HOOK_SECRET_PRESENT=false'
+            exit 2
+          fi
+      - name: Verify deployed rebuild endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /tmp/body -w '%{http_code}' -X POST "https://${PROJECT_REF}.supabase.co/functions/v1/trigger-site-rebuild" -H 'Content-Type: application/json' --data '{}')
+          cat /tmp/body
+          test "$code" != '404'
+          grep -q '"triggered":true' /tmp/body

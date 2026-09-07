@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 76 86" width="76" height="86">
+  <!-- RomyLabs Core Connect — favicon mark -->
+  <!-- Outer hexagon — white, flat-top -->
+  <path d="M38,4 L68,21 L68,55 L38,72 L8,55 L8,21 Z"
+    fill="none" stroke="#FFFFFF" stroke-width="5.5" stroke-linejoin="round"/>
+  <!-- Inner hexagon — Core Lime #C6FF00, rotated 30deg (pointed-top) -->
+  <path d="M38,16 L57.05,27 L57.05,49 L38,60 L18.95,49 L18.95,27 Z"
+    fill="none" stroke="#C6FF00" stroke-width="4.5" stroke-linejoin="round"
+    transform="rotate(30,38,38)"/>
+  <!-- R letterform: stem -->
+  <rect x="26" y="24" width="5" height="34" rx="1.5" fill="#FFFFFF"/>
+  <!-- R bowl (top half arc) -->
+  <path d="M31,24 C48,24 48,38 31,38" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round"/>
+  <!-- R leg / diagonal -->
+  <line x1="39" y1="38" x2="50" y2="58" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round"/>
+</svg>

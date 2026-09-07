@@ -1,0 +1,71 @@
+name: Fix Live Admin Owner Authorization
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: mpxgxfqdbquzkrvvejkh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply targeted production SQL only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          python3 - <<'PY' > /tmp/payload.json
+          import json
+          sql = r'''
+          create or replace function public._is_platform_admin() returns boolean
+          language sql stable security definer
+          set search_path = public
+          as $$
+            select
+              auth.role() = 'service_role'
+              or lower(coalesce(auth.jwt()->>'email', auth.email(), '')) in (
+                'info@romylabs.com',
+                'romy@romylabs.com',
+                'romy@taxrescrm.net',
+                'romy@taxcasereview.org'
+              )
+              or exists (
+                select 1 from public.employees
+                where lower(email)=lower(coalesce(auth.jwt()->>'email', auth.email(), ''))
+                  and access='Super Admin'
+                  and tenant_id='61a89aef-0e7e-4ea2-b222-44ab2024655a'
+              )
+          $$;
+          revoke all on function public._is_platform_admin() from public, anon;
+          grant execute on function public._is_platform_admin() to authenticated, service_role;
+          revoke all on function public.admin_tenant_overview() from public, anon;
+          grant execute on function public.admin_tenant_overview() to authenticated, service_role;
+          revoke all on function public.list_tenants() from public, anon;
+          grant execute on function public.list_tenants() to authenticated, service_role;
+          '''
+          print(json.dumps({'query': sql}))
+          PY
+          curl --fail-with-body -sS -X POST \
+            "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            --data-binary @/tmp/payload.json
+      - name: Verify live function definition
+        shell: bash
+        run: |
+          python3 - <<'PY' > /tmp/verify.json
+          import json
+          q="select pg_get_functiondef('public._is_platform_admin()'::regprocedure) as def"
+          print(json.dumps({'query': q}))
+          PY
+          OUT=$(curl --fail-with-body -sS -X POST \
+            "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            --data-binary @/tmp/verify.json)
+          echo "$OUT" | grep -q 'info@romylabs.com'
+          echo "$OUT" | grep -q 'romy@romylabs.com'
+          echo 'LIVE_ADMIN_OWNER_AUTH_VERIFIED'

@@ -1,0 +1,4 @@
+select cron.unschedule('weekly-growth-report');
+select cron.unschedule('content-generator-weekly');
+select cron.schedule('weekly-growth-report','0 13 * * 1',$$select net.http_post(url := (select decrypted_secret from vault.decrypted_secrets where name='SUPABASE_URL') || '/functions/v1/weekly-growth-report', headers := jsonb_build_object('Content-Type','application/json','Authorization','Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name='SUPABASE_SERVICE_ROLE_KEY')), body := '{"action":"run"}'::jsonb);$$);
+select cron.schedule('content-generator-weekly','0 14 * * 1',$$select net.http_post(url := (select decrypted_secret from vault.decrypted_secrets where name='SUPABASE_URL') || '/functions/v1/content-generator', headers := jsonb_build_object('Content-Type','application/json','Authorization','Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name='SUPABASE_SERVICE_ROLE_KEY')), body := '{"useCrmData":true}'::jsonb);$$);

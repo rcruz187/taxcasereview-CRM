@@ -1,0 +1,32 @@
+name: Audit Command Center Live Contracts
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: mpxgxfqdbquzkrvvejkh
+    steps:
+      - name: Read live function definitions and schemas
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >/tmp/q.json
+          import json
+          q=r'''
+          select jsonb_build_object(
+            'calendar_columns',(select jsonb_agg(jsonb_build_object('name',column_name,'type',data_type) order by ordinal_position) from information_schema.columns where table_schema='public' and table_name='calevents'),
+            'document_columns',(select jsonb_agg(jsonb_build_object('name',column_name,'type',data_type) order by ordinal_position) from information_schema.columns where table_schema='public' and table_name='documents'),
+            'storage_stats_def',(select pg_get_functiondef(p.oid) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='admin_storage_stats' limit 1),
+            'cc_stats_def',(select pg_get_functiondef(p.oid) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='admin_command_center_stats' limit 1),
+            'storage_objects',(select jsonb_build_object('count',count(*),'metadata_bytes',coalesce(sum(coalesce((metadata->>'size')::bigint,0)),0)) from storage.objects where bucket_id='documents'),
+            'documents_rows',(select count(*) from public.documents)
+          ) as audit;
+          '''
+          print(json.dumps({'query':q}))
+          PY
+          curl --fail-with-body -sS -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" -H 'Content-Type: application/json' --data-binary @/tmp/q.json

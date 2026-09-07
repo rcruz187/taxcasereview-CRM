@@ -1,0 +1,85 @@
+name: Deploy Supabase Edge Functions
+
+# Scoped production deploys only. Every production-affecting function listed here
+# is deployed from the exact source commit that changed it. Multiple function
+# changes in one commit are all deployed; there is no first-match/elif gap.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: mpxgxfqdbquzkrvvejkh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Resolve scoped functions
+        id: scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "fns=${{ github.event.inputs.function }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CHANGED="$(git diff --name-only HEAD^ HEAD)"
+          FNS=()
+          for FN in \
+            hub-proxy \
+            support-api \
+            linkedin-publish \
+            linkedin-scheduler \
+            linkedin-queue-replenisher \
+            send-email \
+            send-sms \
+            send-fax \
+            start-outbound-call \
+            save-email-account \
+            imap-sync \
+            smtp-send
+          do
+            if echo "$CHANGED" | grep -q "^supabase/functions/${FN}/"; then
+              FNS+=("$FN")
+            fi
+          done
+
+          # Reassert the production communications/mailbox boundary whenever the
+          # deployment contract itself changes, preventing repository/live drift.
+          if [ ${#FNS[@]} -eq 0 ] && echo "$CHANGED" | grep -q '^.github/workflows/deploy-edge-functions.yml$'; then
+            FNS=(send-email send-sms send-fax start-outbound-call save-email-account imap-sync smtp-send)
+          fi
+
+          if [ ${#FNS[@]} -eq 0 ]; then
+            echo 'No supported function path changed.'
+            exit 1
+          fi
+          echo "fns=${FNS[*]}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy edge functions
+        shell: bash
+        run: |
+          set -euo pipefail
+          FNS="${{ steps.scope.outputs.fns }}"
+          if [ "$FNS" = "ALL_INTENTIONAL" ]; then
+            supabase functions deploy --project-ref "$PROJECT_REF"
+            exit 0
+          fi
+          for FN in $FNS; do
+            echo "Deploying $FN"
+            if [ "$FN" = "linkedin-queue-replenisher" ] || [ "$FN" = "linkedin-scheduler" ] || [ "$FN" = "support-api" ]; then
+              supabase functions deploy "$FN" --project-ref "$PROJECT_REF" --no-verify-jwt
+            else
+              supabase functions deploy "$FN" --project-ref "$PROJECT_REF"
+            fi
+          done

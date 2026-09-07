@@ -1,0 +1,2 @@
+TCR_EMAIL_REFRESH_BUTTON_DEPLOY_2026-08-28T04:25Z
+Current main includes the visible Refresh Email button and tenant-scoped Gmail sync repair.

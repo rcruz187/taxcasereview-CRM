@@ -1,0 +1,113 @@
+-- ============================================================================
+-- Support Architecture Implementation Plan
+-- RomyLabs Centralized Support Center
+-- Approved 2026-08-21 — CORRECTED 2026-08-21
+-- ============================================================================
+--
+-- STATUS: APPROVED FOR IMPLEMENTATION
+--
+-- ARCHITECTURE SUMMARY
+-- ====================
+-- romylabs_products          = master product registry (already live)
+-- romylabs_product_support   = support-specific enablement + config registry
+-- next_ticket_seq            = data-driven atomic ticket counter (row-based)
+-- SELECT ... FOR UPDATE      = concurrency serialization per product
+--
+-- ZERO DDL PER NEW PRODUCT
+-- ========================
+-- The final architecture requires ZERO database DDL to enable support for a
+-- new RomyLabs CRM product. Adding a product's support configuration is a
+-- single INSERT into romylabs_product_support with support_enabled=true.
+--
+-- There are NO per-product PostgreSQL sequences in this architecture.
+-- The four legacy sequences (ticket_seq_taxres_crm, ticket_seq_camvella,
+-- ticket_seq_arcvena, ticket_seq_bocasync) remain in the database temporarily
+-- as rollback infrastructure but the new architecture does not reference,
+-- depend on, or use them in any way. They will be dropped in a future cleanup
+-- migration once the new architecture has been stable.
+--
+-- The assign_ticket_number() trigger reads next_ticket_seq from the
+-- romylabs_product_support row for each product. No sequence object is
+-- involved. The ticket_seq_name column does NOT exist in this architecture.
+--
+-- PRODUCT REGISTRATION vs SUPPORT ENABLEMENT
+-- ===========================================
+-- romylabs_products.active = true    ← product is commercially active
+-- romylabs_product_support.support_enabled = true  ← support channel is open
+--
+-- BOTH must be true for ticket creation to proceed.
+-- A research or building product cannot create support tickets merely because
+-- it exists in romylabs_products.
+-- RomyLabs (operator brand) is in romylabs_products but has NO row in
+-- romylabs_product_support — ticket creation is rejected at the trigger.
+--
+-- IMPLEMENTATION PHASES
+-- =====================
+-- Phase A: Create + seed romylabs_product_support
+-- Phase B: Drop support_tickets.product_id CHECK, add FK to romylabs_products
+-- Phase C: Replace assign_ticket_number() trigger
+-- Phase D: Replace list_all_product_tickets() CASE labels with registry JOIN
+-- Phase E: Redeploy support-api with DB-lookup authentication
+-- Phase F: Admin Portal centralized Support Center UI
+--
+-- FUTURE PRODUCT SUPPORT ACTIVATION (ZERO DDL)
+-- ==============================================
+-- Prerequisites:
+--   1. Product exists in romylabs_products with active=true
+--   2. Product is commercially approved and launched
+--   3. Product CRM is built and operational
+--
+-- Activation steps:
+--   1. Choose unique 2-6 char uppercase ticket prefix (e.g. 'DEN', 'PHL')
+--      Verify not already in use: SELECT ticket_prefix FROM romylabs_product_support
+--   2. Generate HMAC secret: openssl rand -base64 32
+--      Set as PRODUCTNAME_SUPPORT_SECRET in TCR Supabase Edge Function secrets
+--   3. Set same secret in the product's Supabase secrets
+--      Also set ROMYLABS_SUPPORT_API_URL in the product's secrets
+--   4. Deploy product-side adapter edge function to product's Supabase project
+--      (copy camvella-support-api pattern, hardcode PRODUCT_ID = 'newproduct')
+--   5. INSERT INTO romylabs_product_support:
+--        (product_id, support_enabled, ticket_prefix, next_ticket_seq,
+--         display_name, notify_email, secret_env_key)
+--        VALUES ('newproduct', true, 'XXX', 1, 'New Product', 'info@romylabs.com',
+--                'NEWPRODUCT_SUPPORT_SECRET')
+--   6. Runtime test: create ticket, verify ticket_number = 'XXX-000001'
+--   7. Verify list_all_product_tickets() shows new product with correct label
+--   8. Verify cross-tenant isolation
+--   9. Verify is_internal exclusion from customer retrieval
+--  10. Verify Admin Portal Support Center shows new product automatically
+--
+-- NO CHECK modification.
+-- NO CASE modification.
+-- NO RPC rewrite.
+-- NO support-api code change.
+-- NO CREATE SEQUENCE.
+-- NO ticket_seq_name.
+-- ZERO DDL.
+-- ============================================================================
+
+-- PHASE A — Create romylabs_product_support
+-- (Migration A SQL — executed after this document is committed)
+
+-- PHASE B — Replace CHECK with FK
+-- ALTER TABLE support_tickets DROP CONSTRAINT support_tickets_product_id_check;
+-- ALTER TABLE support_tickets ADD CONSTRAINT support_tickets_product_id_fk
+--   FOREIGN KEY (product_id) REFERENCES romylabs_products(product_id) DEFERRABLE INITIALLY DEFERRED;
+
+-- PHASE C — Replace assign_ticket_number() trigger
+-- (See implementation — reads next_ticket_seq via SELECT FOR UPDATE)
+
+-- PHASE D — Replace list_all_product_tickets() CASE with LEFT JOIN
+-- (See implementation — COALESCE(rps.display_name, t.product_id))
+
+-- PHASE E — Redeploy support-api with DB-lookup authentication
+-- (See implementation — PRODUCT_SECRET_ENV replaced with romylabs_product_support query)
+
+-- ROLLBACK NOTES
+-- ==============
+-- Phase A rollback: DROP TABLE romylabs_product_support;
+-- Phase B rollback: DROP FK; restore CHECK constraint
+-- Phase C rollback: restore CASE-based trigger (body captured in audit run 32514870072)
+-- Phase D rollback: restore CASE-based RPC (body captured in audit run 32514905616)
+-- Phase E rollback: redeploy support-api at commit d43816e46293
+-- Legacy sequences remain untouched throughout — available for rollback reference

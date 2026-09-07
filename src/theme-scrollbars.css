@@ -1,0 +1,12 @@
+/* Theme-aware scrollbars — follow the active CRM primary color. */
+.page-content::-webkit-scrollbar { width: 6px; height: 0; }
+.page-content::-webkit-scrollbar-track { background: transparent; }
+.page-content::-webkit-scrollbar-thumb { background: var(--blue, #1A7FD4); border-radius: 3px; }
+.page-content::-webkit-scrollbar-thumb:hover { background: var(--blue, #1A7FD4); }
+.page-content { scrollbar-width: thin; scrollbar-color: var(--blue, #1A7FD4) transparent; }
+
+.client-roster-scroll::-webkit-scrollbar { width: 6px; }
+.client-roster-scroll::-webkit-scrollbar-track { background: var(--s2, #152840); }
+.client-roster-scroll::-webkit-scrollbar-thumb { background: var(--blue, #1A7FD4); border-radius: 3px; }
+.client-roster-scroll::-webkit-scrollbar-thumb:hover { background: var(--blue, #1A7FD4); }
+.client-roster-scroll { scrollbar-width: thin; scrollbar-color: var(--blue, #1A7FD4) var(--s2, #152840); }

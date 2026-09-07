@@ -1,0 +1,21 @@
+name: Verify Office Document Sign Route
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: npm }
+      - name: Verify route and sender safeguards are committed
+        run: |
+          node scripts/wire-office-document-sign-route.mjs
+          git diff --exit-code -- src/App.jsx src/components/admin/UniversalOfficeESign.jsx
+      - name: Install
+        run: npm ci
+      - name: Build
+        run: npm run build

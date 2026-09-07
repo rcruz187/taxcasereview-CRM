@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 64" role="img" aria-labelledby="title">
+  <title>Oculivo</title>
+  <g transform="translate(0 10)">
+    <path d="M3 22C11 7 25 1 32 1c11 0 22 7 29 21-8 14-20 21-29 21C19 43 10 36 3 22Z" fill="#6b22ff"/>
+    <path d="M14 22C20 10 27 7 34 7c9 0 17 6 23 15-6 10-14 15-23 15-9 0-15-5-20-15Z" fill="#04b9ff"/>
+    <circle cx="33" cy="22" r="10" fill="#11113b"/>
+    <circle cx="33" cy="22" r="5.4" fill="#8a58ff"/>
+  </g>
+  <text x="76" y="42" font-family="Arial,Helvetica,sans-serif" font-size="30" font-weight="800" fill="#6b22ff">OCUL</text>
+  <text x="162" y="42" font-family="Arial,Helvetica,sans-serif" font-size="30" font-weight="800" fill="#04b9ff">IVO</text>
+</svg>

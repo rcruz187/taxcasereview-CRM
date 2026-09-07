@@ -1,0 +1,43 @@
+name: Audit Nashville Live Admin Data
+
+on:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: mpxgxfqdbquzkrvvejkh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect Nashville across live central records
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/query.sql <<'SQL'
+          select json_build_object(
+            'nashville_tenants', coalesce((
+              select json_agg(x) from (
+                select id, firm_name, tenant_code, plan_tier, status, monthly_rate, per_seat_rate, created_at
+                from public.tenants
+                where lower(coalesce(firm_name,'')) like '%nashville%'
+                   or lower(coalesce(tenant_code,'')) like '%nashville%'
+                order by created_at
+              ) x
+            ), '[]'::json),
+            'all_tenants', coalesce((
+              select json_agg(x) from (
+                select id, firm_name, tenant_code, plan_tier, status, monthly_rate, per_seat_rate, created_at
+                from public.tenants order by created_at
+              ) x
+            ), '[]'::json)
+          ) as result;
+          SQL
+          jq -Rs '{query:.}' /tmp/query.sql > /tmp/payload.json
+          curl --fail-with-body -sS \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "User-Agent: RomyLabs-GitHub-Actions" \
+            --data-binary @/tmp/payload.json \
+            "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query"

@@ -1,0 +1,84 @@
+name: Admin Portal Deep Audit
+on:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Production build
+        run: npm run build
+      - name: Deep Admin Portal source audit
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,json
+          roots=['src/pages/AdminPortal.jsx','src/pages/AdminPortalGuard.jsx','src/pages/AdminPortalInner.jsx','src/components/admin','src/App.jsx','public/romylabs-admin-hotfix.js']
+          files=[]
+          for root in roots:
+            p=Path(root)
+            if p.is_file(): files.append(p)
+            elif p.is_dir(): files += [x for x in p.rglob('*') if x.is_file() and x.suffix in {'.js','.jsx','.ts','.tsx'}]
+          findings=[]; warnings=[]; lines=0
+          texts={}
+          for p in files:
+            s=p.read_text(errors='replace'); texts[str(p)]=s; lines += s.count('\n')+1
+            for i,line in enumerate(s.splitlines(),1):
+              if re.search(r'\b(TODO|FIXME|HACK|XXX)\b',line,re.I): warnings.append([str(p),i,'marker',line.strip()[:220]])
+              if re.search(r'\b(not implemented|coming soon|placeholder)\b',line,re.I): warnings.append([str(p),i,'incomplete',line.strip()[:220]])
+              if re.search(r'console\.(error|warn)\(',line): warnings.append([str(p),i,'console',line.strip()[:220]])
+              if re.search(r'window\.location\.(reload|replace)|style\.display\s*=|setInterval\(',line): warnings.append([str(p),i,'imperative-browser-behavior',line.strip()[:220]])
+              if re.search(r'VITE_.*SERVICE.*ROLE|SUPABASE_SERVICE_ROLE_KEY',line,re.I): findings.append([str(p),i,'secret-risk',line.strip()[:220]])
+          admin=texts.get('src/pages/AdminPortal.jsx','')
+          app=texts.get('src/App.jsx','')
+          hot=texts.get('public/romylabs-admin-hotfix.js','')
+          guard=texts.get('src/pages/AdminPortalGuard.jsx','')
+          # Regression patterns that have already crashed this portal.
+          if re.search(r'\{\s*\(\(\)\s*=>\s*\{[\s\S]{0,1500}?(React\.)?use(State|Effect|Memo|Callback)\(',admin): findings.append(['src/pages/AdminPortal.jsx',0,'conditional-hook','hook inside render IIFE'])
+          if 'removeResolvedAlert' in hot or "style.display = 'none'" in hot: findings.append(['public/romylabs-admin-hotfix.js',0,'dom-hiding-regression','dangerous text-scan DOM hiding returned'])
+          if 'function CommandCenter' not in admin: findings.append(['src/pages/AdminPortal.jsx',0,'missing-command-center','CommandCenter absent'])
+          if "const [crmAccount, setCrmAccount] = useState('all')" not in admin: findings.append(['src/pages/AdminPortal.jsx',0,'crm-state-contract','crmAccount top-level state absent'])
+          if re.search(r'\]\}\s*\.map\(',admin): findings.append(['src/pages/AdminPortal.jsx',0,'malformed-jsx-pattern',']} .map pattern'])
+          # Owner/admin route contracts.
+          for email in ['info@romylabs.com','romy@romylabs.com']:
+            if email not in app and email not in guard: findings.append(['src/App.jsx',0,'owner-route-missing',email])
+          if '/crm-admin' not in app: findings.append(['src/App.jsx',0,'admin-route-missing','/crm-admin'])
+          # Inventory all admin navigation targets and detect duplicate keys.
+          nav_targets=re.findall(r"(?:to:|path:|href:)\s*['\"]([^'\"]+)['\"]",admin)
+          # Supabase RPC/table/function inventory used by admin code.
+          rpcs=sorted(set(re.findall(r"\.rpc\(\s*['\"]([^'\"]+)",admin)))
+          tables=sorted(set(re.findall(r"\.from\(\s*['\"]([^'\"]+)",admin)))
+          invokes=sorted(set(re.findall(r"functions\.invoke\(\s*['\"]([^'\"]+)",admin)))
+          fn_dirs={p.parent.name for p in Path('supabase/functions').glob('*/index.ts')}
+          for name in invokes:
+            if name not in fn_dirs: findings.append(['src/pages/AdminPortal.jsx',0,'missing-edge-function-source',name])
+          report={'files':list(texts),'files_scanned':len(files),'lines_scanned':lines,'critical_count':len(findings),'warning_count':len(warnings),'critical':findings,'warnings':warnings,'rpcs':rpcs,'tables':tables,'edge_invokes':invokes,'nav_targets':nav_targets}
+          Path('admin-portal-deep-audit.json').write_text(json.dumps(report,indent=2))
+          print(json.dumps({k:v for k,v in report.items() if k not in ('critical','warnings','nav_targets')},indent=2))
+          if findings:
+            print('\nCRITICAL FINDINGS')
+            for x in findings: print(' | '.join(map(str,x)))
+            raise SystemExit(1)
+          PY
+      - name: Dependency production audit
+        if: always()
+        run: npm audit --omit=dev --json > admin-dependency-audit.json || true
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-portal-deep-audit
+          path: |
+            admin-portal-deep-audit.json
+            admin-dependency-audit.json
+          if-no-files-found: warn

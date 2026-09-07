@@ -1,0 +1,108 @@
+name: Production Capacity Certification
+
+# IMPORTANT: This is an intentionally HEAVY production load test.
+# Do not run it on ordinary pushes. It creates temporary Auth users/employees,
+# exercises tenant/RBAC boundaries, sustains up to 100 authenticated sessions,
+# writes synthetic chat traffic, and then cleans the QA rows back up.
+# Keeping this manual protects the production Supabase Disk IO budget while
+# preserving an on-demand capacity certification before major releases.
+on:
+  workflow_dispatch:
+    inputs:
+      users_per_role:
+        description: 'Temporary QA users per role (5 roles)'
+        required: false
+        default: '20'
+      phase25_seconds:
+        description: '25-user sustained phase seconds'
+        required: false
+        default: '60'
+      phase50_seconds:
+        description: '50-user sustained phase seconds'
+        required: false
+        default: '60'
+      phase75_seconds:
+        description: '75-user sustained phase seconds'
+        required: false
+        default: '90'
+      phase100_seconds:
+        description: '100-user sustained phase seconds'
+        required: false
+        default: '180'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tcr-production-capacity-certification
+  cancel-in-progress: true
+
+jobs:
+  certify:
+    name: 100 employee production certification
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: mpxgxfqdbquzkrvvejkh
+      CERT_SUPABASE_URL: https://mpxgxfqdbquzkrvvejkh.supabase.co
+      CERT_TENANT_ID: 61a89aef-0e7e-4ea2-b222-44ab2024655a
+      CERT_TENANT_NAME: Tax Case Review
+      CERT_RUN_ID: qa_gh_${{ github.run_id }}_${{ github.run_attempt }}
+      CERT_ISOLATION_RUN_ID: qa_iso_gh_${{ github.run_id }}_${{ github.run_attempt }}
+      CERT_USERS_PER_ROLE: ${{ github.event.inputs.users_per_role || '20' }}
+      CERT_PHASE25_MS: ${{ format('{0}000', github.event.inputs.phase25_seconds || '60') }}
+      CERT_PHASE50_MS: ${{ format('{0}000', github.event.inputs.phase50_seconds || '60') }}
+      CERT_PHASE75_MS: ${{ format('{0}000', github.event.inputs.phase75_seconds || '90') }}
+      CERT_PHASE100_MS: ${{ format('{0}000', github.event.inputs.phase100_seconds || '180') }}
+      CERT_THINK_MS: '350'
+
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Resolve production API keys without exposing them
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${SUPABASE_ACCESS_TOKEN:-}" || { echo 'SUPABASE_ACCESS_TOKEN secret is missing'; exit 2; }
+          KEYS="$(curl -fsS -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" "https://api.supabase.com/v1/projects/${PROJECT_REF}/api-keys")"
+          ANON="$(printf '%s' "$KEYS" | jq -r '.[] | select(.name == "anon") | .api_key' | head -n1)"
+          SERVICE="$(printf '%s' "$KEYS" | jq -r '.[] | select(.name == "service_role") | .api_key' | head -n1)"
+          test -n "$ANON" && test "$ANON" != null || { echo 'Could not resolve anon key'; exit 2; }
+          test -n "$SERVICE" && test "$SERVICE" != null || { echo 'Could not resolve service role key'; exit 2; }
+          echo "::add-mask::$ANON"
+          echo "::add-mask::$SERVICE"
+          echo "CERT_SUPABASE_ANON_KEY=$ANON" >> "$GITHUB_ENV"
+          echo "CERT_SUPABASE_SERVICE_ROLE_KEY=$SERVICE" >> "$GITHUB_ENV"
+
+      - name: Run controlled 100 employee production certification
+        run: node scripts/certify-production-capacity-100.mjs
+
+      - name: Prove Tax Case Review / Nashville / CloudCPA tenant isolation
+        if: success()
+        run: node scripts/certify-three-tenant-isolation.mjs
+
+      - name: Cancellation-safe QA cleanup
+        if: always()
+        run: node scripts/cleanup-certification-run.mjs
+
+      - name: Upload certification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tcr-100-employee-production-capacity-${{ github.sha }}
+          path: |
+            artifacts/production-capacity-certification.json
+            artifacts/three-tenant-isolation-certification.json
+          if-no-files-found: warn
+          retention-days: 30
