@@ -8,7 +8,6 @@ import { applyDocumentLanguage, getStoredLanguage, storeLanguage } from '../../l
 import GlobalSearch from '../GlobalSearch'
 
 const PAGE_TITLES = {
-  '/communications': 'Unified Inbox',
   '/':             'Dashboard',      '/calendar':    'Calendar',
   '/leads':        'Leads',          '/clients':     'Clients',
   '/cases':        'Cases',          '/tasks':       'Tasks',
