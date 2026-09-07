@@ -1,11 +1,6 @@
 name: Deploy RomyLabs Admin to Cloudflare
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'src/pages/AdminPortal.jsx'
-      - '.github/workflows/deploy-romylabs-admin-cloudflare.yml'
   workflow_dispatch:
 
 permissions:
