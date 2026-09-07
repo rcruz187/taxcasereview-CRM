@@ -98,7 +98,6 @@ const AccountsReceivable = lazy(() => import('./pages/AccountsReceivable'))
 const Transactions = lazy(() => import('./pages/Transactions'))
 const Sms           = lazy(() => import('./pages/Sms'))
 const Email         = lazy(() => import('./pages/Email'))
-const UnifiedInbox  = lazy(() => import('./pages/UnifiedInbox'))
 const Documents     = lazy(() => import('./pages/Documents'))
 const Esign         = lazy(() => import('./pages/TaxOfficeEsign'))
 const TimeClock     = lazy(() => import('./pages/TimeClock'))
@@ -239,7 +238,6 @@ function Shell() {
             <Route path="/transactions" element={<Guard section="payments"><Transactions /></Guard>} />
             <Route path="/sms"         element={<Guard section="sms"><Sms /></Guard>} />
             <Route path="/email"       element={<Guard section="email"><Email /></Guard>} />
-            <Route path="/communications" element={<Guard section="email"><UnifiedInbox /></Guard>} />
             <Route path="/documents"   element={<Guard section="documents"><Documents /></Guard>} />
             <Route path="/esign"       element={<Guard section="esign"><Esign /></Guard>} />
             <Route path="/kiosk"       element={<Kiosk />} />
