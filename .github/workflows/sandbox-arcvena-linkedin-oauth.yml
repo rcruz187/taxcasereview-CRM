@@ -40,5 +40,36 @@ jobs:
         shell: bash
         run: |
           ! git grep -nE '^(<<<<<<< .+|>>>>>>> .+)$' -- ':!package-lock.json'
+      - name: Read-only live admin fingerprint
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="$(curl -fsSL --max-time 20 -H 'Cache-Control: no-cache' 'https://admin.romylabs.com/?sandbox_probe=arcvena_linkedin' || true)"
+          if [ -z "$html" ]; then
+            echo LIVE_ADMIN_REACHABLE=0
+            exit 0
+          fi
+          echo LIVE_ADMIN_REACHABLE=1
+          asset="$(printf '%s' "$html" | grep -oE 'src="[^"]+\.js[^"]*"' | head -1 | cut -d'"' -f2 || true)"
+          if [ -z "$asset" ]; then
+            echo LIVE_ADMIN_JS_ASSET=0
+            exit 0
+          fi
+          case "$asset" in
+            http*) url="$asset" ;;
+            /*) url="https://admin.romylabs.com$asset" ;;
+            *) url="https://admin.romylabs.com/$asset" ;;
+          esac
+          js="$(curl -fsSL --max-time 30 -H 'Cache-Control: no-cache' "$url" || true)"
+          if printf '%s' "$js" | grep -Fq 'https://admin.romylabs.com/crm-admin/linkedin/callback'; then
+            echo LIVE_FIXED_REDIRECT=1
+          else
+            echo LIVE_FIXED_REDIRECT=0
+          fi
+          if printf '%s' "$js" | grep -Fq 'w_organization_social'; then
+            echo LIVE_ORG_SCOPE=1
+          else
+            echo LIVE_ORG_SCOPE=0
+          fi
       - name: Green marker
         run: echo SANDBOX_ARCVENA_LINKEDIN_OAUTH_GREEN
