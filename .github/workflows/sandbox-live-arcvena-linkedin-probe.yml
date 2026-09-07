@@ -22,6 +22,12 @@ jobs:
           echo LIVE_ADMIN_REACHABLE=1
           asset="$(printf '%s' "$html" | grep -oE 'src="[^"]+\.js[^"]*"' | head -1 | cut -d'"' -f2 || true)"
           test -n "$asset" || { echo LIVE_ADMIN_JS_ASSET=0; exit 1; }
+          echo "LIVE_ADMIN_JS_ASSET=$asset"
+          if [ "$asset" = "/assets/index-BgaOn7hq.js" ]; then
+            echo LIVE_MATCHES_GH_PAGES=1
+          else
+            echo LIVE_MATCHES_GH_PAGES=0
+          fi
           case "$asset" in
             http*) url="$asset" ;;
             /*) url="https://admin.romylabs.com$asset" ;;
