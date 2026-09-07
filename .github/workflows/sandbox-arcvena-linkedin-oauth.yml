@@ -1,0 +1,44 @@
+name: Sandbox Arcvena LinkedIn OAuth
+
+on:
+  push:
+    branches:
+      - sandbox/arcvena-linkedin-oauth
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Verify OAuth source contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq "const REDIRECT_URI = 'https://admin.romylabs.com/crm-admin/linkedin/callback'" src/pages/AdminPortal.jsx
+          grep -Fq "w_organization_social" src/pages/AdminPortal.jsx
+          grep -Fq "linkedin_oauth_product" src/pages/AdminPortal.jsx
+          grep -Fq "product_id: oauthProduct" src/pages/AdminPortal.jsx
+          grep -Fq "linkedin_organization_id: linkedinOrganizationId" supabase/functions/linkedin-publish/index.ts
+          grep -Fq "const linkedinOrganizationId = isArcvena ? '146118085' : null" supabase/functions/linkedin-publish/index.ts
+          echo SANDBOX_OAUTH_CONTRACT_GREEN
+      - name: Production build
+        run: npm run build
+      - name: Dependency audit
+        run: npm audit --omit=dev --audit-level=high
+      - name: No merge markers
+        shell: bash
+        run: |
+          ! git grep -nE '^(<<<<<<< .+|>>>>>>> .+)$' -- ':!package-lock.json'
+      - name: Green marker
+        run: echo SANDBOX_ARCVENA_LINKEDIN_OAUTH_GREEN
