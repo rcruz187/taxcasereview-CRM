@@ -38,3 +38,5 @@ jobs:
           printf '%s' "$js" | grep -Fq 'w_organization_social' && echo LIVE_ORG_SCOPE=1 || { echo LIVE_ORG_SCOPE=0; exit 3; }
           printf '%s' "$js" | grep -Fq '146118085' && echo LIVE_ARCVENA_ORG_ID=1 || { echo LIVE_ARCVENA_ORG_ID=0; exit 4; }
           echo LIVE_ARCVENA_LINKEDIN_BUNDLE_GREEN
+
+# probe-trigger: 20260907-1724
