@@ -25,7 +25,7 @@ const SECTIONS = [
     always: true,
     items: [
       { path: '/',          icon: GridIcon,    label: 'Home',     section: null },
-      { path: '/communications', icon: EmailIcon, label: 'Unified Inbox', badge: 'email', section: 'email' },
+      { path: '/email',     icon: EmailIcon,   label: 'Email',         badge: 'email',    section: 'email' },
       { path: '/chat',      icon: ChatIcon,    label: 'Team Chat',     badge: 'chat',     section: 'chat' },
       { path: '/calendar',  icon: CalIcon,     label: 'Calendar',      badge: 'calendar', section: 'calendar' },
       { path: '/tasks',     icon: TaskIcon,    label: 'Tasks',         badge: 'tasks',    section: 'tasks' },
@@ -46,7 +46,6 @@ const SECTIONS = [
     key: 'comms',
     label: 'Communications',
     items: [
-      { path: '/email',     icon: EmailIcon,   label: 'Email',         badge: 'email',  section: 'email' },
       { path: '/sms',       icon: SmsIcon,     label: 'SMS',           badge: 'sms',    section: 'sms' },
       { path: '/fax',       icon: FaxIcon,     label: 'Fax',           badge: 'fax',    section: 'fax' },
       { path: '/documents', icon: FolderIcon,  label: 'Documents',     section: 'documents' },
