@@ -20,7 +20,7 @@ jobs:
           html="$(curl -fsSL --max-time 20 -H 'Cache-Control: no-cache' 'https://admin.romylabs.com/?probe=arcvena_linkedin_live' || true)"
           test -n "$html" || { echo LIVE_ADMIN_REACHABLE=0; exit 1; }
           echo LIVE_ADMIN_REACHABLE=1
-          asset="$(printf '%s' "$html" | grep -oE 'src="[^"]+\.js[^"]*"' | head -1 | cut -d'"' -f2 || true)"
+          asset="$(printf '%s' "$html" | grep -oE 'src="/assets/index-[^"]+\.js"' | head -1 | cut -d'"' -f2 || true)"
           test -n "$asset" || { echo LIVE_ADMIN_JS_ASSET=0; exit 1; }
           echo "LIVE_ADMIN_JS_ASSET=$asset"
           if [ "$asset" = "/assets/index-BgaOn7hq.js" ]; then
