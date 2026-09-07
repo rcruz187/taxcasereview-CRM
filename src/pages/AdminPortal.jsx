@@ -5633,7 +5633,7 @@ function LinkedInPublisher({ embeddedMode = false }) {
   const [nextSlots, setNextSlots]     = React.useState([])
 
   const LINKEDIN_CLIENT_ID = '788n5oz5zrmb1o'
-  const REDIRECT_URI = `${window.location.origin}/crm-admin/linkedin/callback`
+  const REDIRECT_URI = 'https://admin.romylabs.com/crm-admin/linkedin/callback'
 
   // Derived: the selected product object
   const selectedProduct = products.find(p => p.product_id === selectedPid) || null
@@ -5676,7 +5676,16 @@ function LinkedInPublisher({ embeddedMode = false }) {
     const params = new URLSearchParams(window.location.search)
     const code = params.get('code')
     if (!code) return
+    const returnedState = params.get('state') || ''
+    const expectedState = sessionStorage.getItem('linkedin_oauth_state') || ''
+    const oauthProduct = sessionStorage.getItem('linkedin_oauth_product') || selectedPid
+    sessionStorage.removeItem('linkedin_oauth_state')
+    sessionStorage.removeItem('linkedin_oauth_product')
     window.history.replaceState({}, '', window.location.pathname)
+    if (!expectedState || returnedState !== expectedState) {
+      showToast('LinkedIn connection rejected — invalid OAuth state', false)
+      return
+    }
     const attempt = async () => {
       let session = null
       for (let i = 0; i < 5; i++) {
@@ -5687,9 +5696,13 @@ function LinkedInPublisher({ embeddedMode = false }) {
       if (!session) { showToast('Session expired — please log in again', false); return }
       const { data, error } = await supabase.functions.invoke('linkedin-publish', {
         body: { action: 'oauth_callback', code, redirect_uri: REDIRECT_URI,
-                state: params.get('state'), product_id: selectedPid }
+                state: returnedState, product_id: oauthProduct }
       })
-      if (data?.ok) { showToast(`Connected as ${data.name} ✓`); load() }
+      if (data?.ok) {
+        if (oauthProduct !== selectedPid) selectProduct(oauthProduct)
+        showToast(oauthProduct === 'arcvena' ? 'Arcvena LinkedIn company page connected ✓' : `Connected as ${data.name} ✓`)
+        load()
+      }
       else { showToast('LinkedIn connection failed — try again', false); console.error(error || data) }
     }
     attempt()
@@ -5740,11 +5753,15 @@ function LinkedInPublisher({ embeddedMode = false }) {
   }, [liTab, selectedPid])
 
   function connectLinkedIn() {
-    const state = Math.random().toString(36).slice(2)
+    const state = crypto.randomUUID() + crypto.randomUUID()
     sessionStorage.setItem('linkedin_oauth_state', state)
+    sessionStorage.setItem('linkedin_oauth_product', selectedPid)
+    const scope = selectedPid === 'arcvena'
+      ? 'openid profile w_organization_social'
+      : 'openid profile w_member_social'
     const params = new URLSearchParams({
       response_type: 'code', client_id: LINKEDIN_CLIENT_ID,
-      redirect_uri: REDIRECT_URI, scope: 'openid profile w_member_social', state,
+      redirect_uri: REDIRECT_URI, scope, state,
     })
     window.location.href = `https://www.linkedin.com/oauth/v2/authorization?${params}`
   }
