@@ -1,6 +1,17 @@
 name: Deploy TCR CRM
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'scripts/**'
+      - 'index.html'
+      - 'vite.config.*'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/deploy-crm-pages.yml'
   workflow_dispatch:
 
 permissions:
