@@ -40,7 +40,7 @@ function normalizeSms(row) {
     inbound,
     unread: inbound && row.is_read !== true,
     person: row.clientName || row.client_name || row.phone || 'Text contact',
-    address: row.phone || row.from_number || row.to_number || '',
+    address: row.phone || '',
     subject: inbound ? 'Incoming text' : 'Outgoing text',
     preview: row.body || row.message || '',
     at: row.received_at || row.sent_at || row.created_at,
