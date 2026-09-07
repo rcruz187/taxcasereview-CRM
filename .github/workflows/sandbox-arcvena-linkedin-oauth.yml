@@ -40,6 +40,18 @@ jobs:
         shell: bash
         run: |
           ! git grep -nE '^(<<<<<<< .+|>>>>>>> .+)$' -- ':!package-lock.json'
+      - name: Publish sandbox artifact branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          npx gh-pages -d dist -b sandbox-arcvena-linkedin-pages --dotfiles --add -u "GitHub Actions <actions@github.com>"
+          echo SANDBOX_PUBLISH_GREEN
+
       - name: Read-only live admin fingerprint
         shell: bash
         run: |
