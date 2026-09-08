@@ -34,9 +34,12 @@ jobs:
             *) url="https://admin.romylabs.com/$asset" ;;
           esac
           js="$(curl -fsSL --max-time 30 -H 'Cache-Control: no-cache' "$url" || true)"
-          printf '%s' "$js" | grep -Fq 'https://admin.romylabs.com/crm-admin/linkedin/callback' && echo LIVE_FIXED_REDIRECT=1 || { echo LIVE_FIXED_REDIRECT=0; exit 2; }
-          printf '%s' "$js" | grep -Fq 'w_organization_social' && echo LIVE_ORG_SCOPE=1 || { echo LIVE_ORG_SCOPE=0; exit 3; }
+          printf '%s' "$js" | grep -Fq 'https://taxrescrm.app/crm-admin/linkedin/callback' && echo LIVE_TRUSTED_REDIRECT=1 || { echo LIVE_FIXED_REDIRECT=0; exit 2; }
+          printf '%s' "$js" | grep -Fq 'https://admin.romylabs.com/crm-admin/linkedin/callback' && echo LIVE_BRIDGE_TARGET=1 || { echo LIVE_BRIDGE_TARGET=0; exit 3; }
+          printf '%s' "$js" | grep -Fq 'w_organization_social' && echo LIVE_ORG_SCOPE=1 || { echo LIVE_ORG_SCOPE=0; exit 5; }
           printf '%s' "$js" | grep -Fq '146118085' && echo LIVE_ARCVENA_ORG_ID=1 || { echo LIVE_ARCVENA_ORG_ID=0; exit 4; }
           echo LIVE_ARCVENA_LINKEDIN_BUNDLE_GREEN
 
 # probe-trigger: 20260907-1724
+
+# probe-trigger: trusted-callback-20260907
