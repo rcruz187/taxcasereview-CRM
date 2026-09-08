@@ -19,6 +19,7 @@ const FALLBACK_PRODUCTS = [
   { product_id:'groundivo', name:'GroundIVO' },
   { product_id:'oculivo', name:'Oculivo' },
   { product_id:'restore_relay', name:'Restore Relay' },
+  { product_id:'aquagrid', name:'AquaGrid' },
 ]
 
 const SYMBOLS = '!@#$%^&*()-_=+[]{};:,.?'
