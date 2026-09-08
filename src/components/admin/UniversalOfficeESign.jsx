@@ -9,6 +9,7 @@ const BRAND={
   arcvena:{name:'Arcvena',email:'romy@arcvena.com'},bocasync:{name:'BocaSync',email:'romy@bocasync.com'},
   groundivo:{name:'Groundivo',email:'info@romylabs.com'},oculivo:{name:'Oculivo',email:'info@romylabs.com'},
   restore_relay:{name:'Restore Relay',email:'info@romylabs.com'},
+  aquagrid:{name:'AquaGrid',email:'info@romylabs.com'},
   romylabs:{name:'RomyLabs',email:'info@romylabs.com'},
 }
 const STATUS={draft:'#64748b',sent:'#6366f1',viewed:'#0ea5e9',signed:'#10b981',declined:'#ef4444',expired:'#f59e0b',void:'#475569'}
