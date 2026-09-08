@@ -110,6 +110,8 @@ export const PRODUCT_BOOKING_CONFIGS = {
   restore_relay: {
     key:           'restore_relay',
     name:          'Restore Relay CRM',
+    logo:          '/restore-relay-logo.svg?v=20260908-1',
+    favicon:       '/restore-relay-favicon.svg?v=20260908-1',
     logoAlt:       'Restore Relay CRM',
     headline:      'Schedule a Restore Relay Demo',
     types:         ['Restore Relay Product Demo', 'Restoration / Roofing Operations Consultation', 'Restore Relay Follow-Up Call'],
