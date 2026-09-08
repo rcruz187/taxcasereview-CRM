@@ -5633,7 +5633,8 @@ function LinkedInPublisher({ embeddedMode = false }) {
   const [nextSlots, setNextSlots]     = React.useState([])
 
   const LINKEDIN_CLIENT_ID = '788n5oz5zrmb1o'
-  const REDIRECT_URI = 'https://admin.romylabs.com/crm-admin/linkedin/callback'
+  const LINKEDIN_REDIRECT_URI = 'https://taxrescrm.app/crm-admin/linkedin/callback'
+  const ADMIN_LINKEDIN_CALLBACK = 'https://admin.romylabs.com/crm-admin/linkedin/callback'
 
   // Derived: the selected product object
   const selectedProduct = products.find(p => p.product_id === selectedPid) || null
@@ -5671,21 +5672,42 @@ function LinkedInPublisher({ embeddedMode = false }) {
       })
   }, [])
 
-  // Handle OAuth callback
+  // Handle OAuth callback.
+  // LinkedIn's trusted redirect remains on taxrescrm.app (the original OAuth host).
+  // When LinkedIn returns there, bridge the code/state back to admin.romylabs.com
+  // where the authenticated RomyLabs session and product selection live.
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const code = params.get('code')
     if (!code) return
+
     const returnedState = params.get('state') || ''
+
+    if (window.location.hostname.toLowerCase() === 'taxrescrm.app') {
+      const bridge = new URL(ADMIN_LINKEDIN_CALLBACK)
+      bridge.searchParams.set('code', code)
+      bridge.searchParams.set('state', returnedState)
+      bridge.searchParams.set('oauth_redirect_uri', LINKEDIN_REDIRECT_URI)
+      window.location.replace(bridge.toString())
+      return
+    }
+
     const expectedState = sessionStorage.getItem('linkedin_oauth_state') || ''
     const oauthProduct = sessionStorage.getItem('linkedin_oauth_product') || selectedPid
+    const oauthRedirectUri = params.get('oauth_redirect_uri') || LINKEDIN_REDIRECT_URI
     sessionStorage.removeItem('linkedin_oauth_state')
     sessionStorage.removeItem('linkedin_oauth_product')
     window.history.replaceState({}, '', window.location.pathname)
+
     if (!expectedState || returnedState !== expectedState) {
       showToast('LinkedIn connection rejected — invalid OAuth state', false)
       return
     }
+    if (oauthRedirectUri !== LINKEDIN_REDIRECT_URI) {
+      showToast('LinkedIn connection rejected — invalid OAuth redirect', false)
+      return
+    }
+
     const attempt = async () => {
       let session = null
       for (let i = 0; i < 5; i++) {
@@ -5694,16 +5716,27 @@ function LinkedInPublisher({ embeddedMode = false }) {
         await new Promise(r => setTimeout(r, 500))
       }
       if (!session) { showToast('Session expired — please log in again', false); return }
+
       const { data, error } = await supabase.functions.invoke('linkedin-publish', {
-        body: { action: 'oauth_callback', code, redirect_uri: REDIRECT_URI,
-                state: returnedState, product_id: oauthProduct }
+        body: {
+          action: 'oauth_callback',
+          code,
+          redirect_uri: oauthRedirectUri,
+          state: returnedState,
+          product_id: oauthProduct,
+        }
       })
+
       if (data?.ok) {
         if (oauthProduct !== selectedPid) selectProduct(oauthProduct)
-        showToast(oauthProduct === 'arcvena' ? 'Arcvena LinkedIn company page connected ✓' : `Connected as ${data.name} ✓`)
+        showToast(oauthProduct === 'arcvena'
+          ? 'Arcvena LinkedIn company page connected ✓'
+          : `Connected as ${data.name} ✓`)
         load()
+      } else {
+        showToast('LinkedIn connection failed — try again', false)
+        console.error(error || data)
       }
-      else { showToast('LinkedIn connection failed — try again', false); console.error(error || data) }
     }
     attempt()
   }, [selectedPid])
@@ -5761,7 +5794,7 @@ function LinkedInPublisher({ embeddedMode = false }) {
       : 'openid profile w_member_social'
     const params = new URLSearchParams({
       response_type: 'code', client_id: LINKEDIN_CLIENT_ID,
-      redirect_uri: REDIRECT_URI, scope, state,
+      redirect_uri: LINKEDIN_REDIRECT_URI, scope, state,
     })
     window.location.href = `https://www.linkedin.com/oauth/v2/authorization?${params}`
   }
