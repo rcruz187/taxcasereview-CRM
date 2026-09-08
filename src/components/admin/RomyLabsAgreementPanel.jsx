@@ -13,6 +13,7 @@ const BRAND = {
   groundivo:{name:'Groundivo',email:'info@romylabs.com'},
   oculivo:{name:'Oculivo',email:'info@romylabs.com'},
   restore_relay:{name:'Restore Relay',email:'info@romylabs.com'},
+  aquagrid:{name:'AquaGrid',email:'info@romylabs.com'},
   romylabs:{name:'RomyLabs',email:'info@romylabs.com'},
 }
 
