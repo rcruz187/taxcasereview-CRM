@@ -1,0 +1,32 @@
+name: Sandbox Live LinkedIn OAuth Fingerprint 2
+
+on:
+  push:
+    branches:
+      - sandbox/live-linkedin-oauth-fingerprint-2
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read live admin bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="$(curl -fsSL --max-time 20 -H 'Cache-Control: no-cache' 'https://admin.romylabs.com/?oauth_probe=2')"
+          asset="$(printf '%s' "$html" | grep -oE 'src="/assets/index-[^"]+\.js"' | head -1 | cut -d'"' -f2)"
+          echo "LIVE_ASSET=$asset"
+          js="$(curl -fsSL --max-time 30 -H 'Cache-Control: no-cache' "https://admin.romylabs.com$asset?oauth_probe=2")"
+          printf '%s' "$js" | grep -Fq 'https://taxrescrm.app/crm-admin/linkedin/callback' && echo LIVE_TRUSTED_REDIRECT=1 || echo LIVE_TRUSTED_REDIRECT=0
+          printf '%s' "$js" | grep -Fq 'https://admin.romylabs.com/crm-admin/linkedin/callback' && echo LIVE_ADMIN_BRIDGE=1 || echo LIVE_ADMIN_BRIDGE=0
+          printf '%s' "$js" | grep -Fq 'w_organization_social' && echo LIVE_ORG_SCOPE=1 || echo LIVE_ORG_SCOPE=0
+          printf '%s' "$js" | grep -Fq '146118085' && echo LIVE_ARCVENA_ORG=1 || echo LIVE_ARCVENA_ORG=0
+          if printf '%s' "$js" | grep -Fq 'https://taxrescrm.app/crm-admin/linkedin/callback'             && printf '%s' "$js" | grep -Fq 'w_organization_social'; then
+            echo LIVE_OAUTH_BUNDLE_GREEN
+          else
+            exit 2
+          fi
