@@ -21,12 +21,15 @@ jobs:
           asset="$(printf '%s' "$html" | grep -oE 'src="/assets/index-[^"]+\.js"' | head -1 | cut -d'"' -f2)"
           echo "LIVE_ASSET=$asset"
           js="$(curl -fsSL --max-time 30 -H 'Cache-Control: no-cache' "https://admin.romylabs.com$asset?oauth_probe=2")"
-          printf '%s' "$js" | grep -Fq 'https://taxrescrm.app/crm-admin/linkedin/callback' && echo LIVE_TRUSTED_REDIRECT=1 || echo LIVE_TRUSTED_REDIRECT=0
-          printf '%s' "$js" | grep -Fq 'https://admin.romylabs.com/crm-admin/linkedin/callback' && echo LIVE_ADMIN_BRIDGE=1 || echo LIVE_ADMIN_BRIDGE=0
-          printf '%s' "$js" | grep -Fq 'w_organization_social' && echo LIVE_ORG_SCOPE=1 || echo LIVE_ORG_SCOPE=0
-          printf '%s' "$js" | grep -Fq '146118085' && echo LIVE_ARCVENA_ORG=1 || echo LIVE_ARCVENA_ORG=0
-          if printf '%s' "$js" | grep -Fq 'https://taxrescrm.app/crm-admin/linkedin/callback'             && printf '%s' "$js" | grep -Fq 'w_organization_social'; then
-            echo LIVE_OAUTH_BUNDLE_GREEN
+          guard="$(printf '%s' "$js" | grep -oE 'assets/AdminPortalGuard-[A-Za-z0-9_-]+\.js' | head -1 || true)"
+          echo "LIVE_ADMIN_GUARD=$guard"
+          test -n "$guard" || exit 2
+          portal="$(curl -fsSL --max-time 30 -H 'Cache-Control: no-cache' "https://admin.romylabs.com/$guard?oauth_probe=3")"
+          printf '%s' "$portal" | grep -Fq 'https://taxrescrm.app/crm-admin/linkedin/callback' && echo LIVE_TRUSTED_REDIRECT=1 || echo LIVE_TRUSTED_REDIRECT=0
+          printf '%s' "$portal" | grep -Fq 'https://admin.romylabs.com/crm-admin/linkedin/callback' && echo LIVE_ADMIN_REDIRECT=1 || echo LIVE_ADMIN_REDIRECT=0
+          printf '%s' "$portal" | grep -Fq 'w_organization_social' && echo LIVE_ORG_SCOPE=1 || echo LIVE_ORG_SCOPE=0
+          if printf '%s' "$portal" | grep -Fq 'https://taxrescrm.app/crm-admin/linkedin/callback'; then
+            echo LIVE_ADMINPORTAL_CALLBACK_GREEN
           else
-            exit 2
+            exit 3
           fi
