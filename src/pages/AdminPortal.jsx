@@ -1962,7 +1962,7 @@ function ProductReportingSetup({ productKey, channel, registryProduct }) {
 // Products tab — hub for all CRMs. Each card opens a live dashboard panel.
 const PRODUCT_REGISTRY = [
   // ── ARCHITECTURE NOTE ────────────────────────────────────────────────────
-  // PRODUCTS: TaxRes CRM (platform), Camvella, Arcvena, BocaSync, GroundIVO, Oculivo, Restore Relay, + planned verticals
+  // PRODUCTS: TaxRes CRM (platform), Camvella, Arcvena, BocaSync, GroundIVO, Oculivo, Restore Relay, AquaGrid (working name), + planned verticals
   // CUSTOMERS/TENANTS: Tax Case Review, Nashville, CloudCPA (live TaxRes tenants — not products)
   // connection: 'connected' | 'partial' | 'not_connected'
   // lifecycleStage: 'live' | 'available' | 'building' | 'research' | 'internal'
@@ -2078,6 +2078,26 @@ const PRODUCT_REGISTRY = [
     metricsUrl: null,
     nextMilestone: 'Finish product build, deploy platform metrics, and verify analytics reporting',
     priorityRank:   1,
+  },
+  {
+    key:        'aquagrid',
+    label:      'AquaGrid',
+    icon:       '💧',
+    color:      '#1BE0F0',
+    industry:   'Pool Service & Maintenance',
+    url:        null,
+    appUrl:     null,
+    websiteUrl: null,
+    lifecycleStage: 'building',
+    connection:     'not_connected',
+    brandStatus:    'working_name',
+    publicOnRomyLabs: false,
+    commerciallyAvailable: false,
+    priorityRank:   3,
+    repo:            'taxresolutioncrm/romylabs · incubator/pool-crm',
+    desc:      'Mobile-first pool-service operating system with routes, optimizer, chemistry, recurring service, repairs, inventory, billing, communications, and customer portal.',
+    metricsUrl: null,
+    nextMilestone: 'Finish AquaGrid source closeout → dedicated Supabase sandbox → full certification before repository/domain launch',
   },
   {
     key:        'restore_relay',
