@@ -119,6 +119,18 @@ export const PRODUCT_BOOKING_CONFIGS = {
     fromName:      'Restore Relay CRM',
     inactive:      false,
   },
+  aquagrid: {
+    key:           'aquagrid',
+    name:          'AquaGrid',
+    logoAlt:       'AquaGrid',
+    headline:      'Schedule an AquaGrid Demo',
+    types:         ['AquaGrid Product Demo', 'Pool Service Operations Consultation', 'AquaGrid Follow-Up Call'],
+    calendarLabel: '[AquaGrid]',
+    notifyEmail:   'info@romylabs.com',
+    replyTo:       'info@romylabs.com',
+    fromName:      'AquaGrid',
+    inactive:      false,
+  },
   groundivo: {
     key:           'groundivo',
     name:          'GroundIVO',
@@ -158,6 +170,7 @@ export const PRODUCT_BADGE_COLORS = {
   groundivo:  { bg: '#17351f', text: '#9bdc34', label: 'GroundIVO'  },
   oculivo:     { bg: '#312e81', text: '#67e8f9', label: 'Oculivo'    },
   restore_relay: { bg: '#164e63', text: '#f59e0b', label: 'Restore Relay' },
+  aquagrid:      { bg: '#062038', text: '#1be0f0', label: 'AquaGrid' },
 }
 
 export function getProductBadge(productId) {
