@@ -93,7 +93,11 @@ serve(async (req) => {
 
       if (mode === 'num') {
         if (!/^\+1\d{10}$/.test(target)) return xml('<Say>We are sorry, this transfer is no longer available. Goodbye.</Say><Hangup/>')
-        const callerId = tenantId === 'a0000000-0000-0000-0000-000000000001' ? (Deno.env.get('ROMYLABS_PHONE_NUMBER') || '') : (settings?.sw_inbound_did || '')
+        let callerId = settings?.sw_inbound_did || ''
+        if (tenantId === 'a0000000-0000-0000-0000-000000000001') {
+          const { data: adminPhone } = await db.from('settings').select('sw_inbound_did').eq('tenant_id',tenantId).limit(1).maybeSingle()
+          callerId = adminPhone?.sw_inbound_did || ''
+        }
         return xml(
           '<Say voice="Polly.Joanna-Neural">Please hold while we transfer your call.</Say>' +
           `<Dial timeout="30"${callerId ? ` callerId="${callerId}"` : ''}>${target}</Dial>` +
