@@ -116,7 +116,7 @@ serve(async (req) => {
       return json({ error: 'Call not found — it may have already ended.' }, 404)
     }
 
-    const joinUrl = `https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/join-conference?conf=${encodeURIComponent(conference_name)}`
+    const joinUrl = `https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/join-conference?conf=${encodeURIComponent(conference_name)}&tenant=${encodeURIComponent(tenantId)}`
 
     const dialResp = await fetch(`${base}/Calls.json`, {
       method: 'POST',
