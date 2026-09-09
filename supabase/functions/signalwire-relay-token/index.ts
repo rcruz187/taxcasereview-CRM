@@ -100,6 +100,10 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
+    const romylabsNumber = String(Deno.env.get('ROMYLABS_PHONE_NUMBER') || '').trim()
+    const useRomyLabs = requestedContext === 'romylabs' && platformAdmin && /^\+\d{10,15}$/.test(romylabsNumber)
+    if (useRomyLabs) resource = 'romylabs-owner'
+
     const auth = 'Basic ' + btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
     const resp = await fetch(`https://${settings.sw_space_url}/api/relay/rest/jwt`, {
       method: 'POST',
@@ -114,9 +118,6 @@ serve(async (req) => {
     }
 
     const { jwt_token } = await resp.json()
-    const romylabsNumber = String(Deno.env.get('ROMYLABS_PHONE_NUMBER') || '').trim()
-    const useRomyLabs = requestedContext === 'romylabs' && platformAdmin && /^\+\d{10,15}$/.test(romylabsNumber)
-    if (useRomyLabs) resource = 'romylabs-owner'
 
     return new Response(JSON.stringify({
       jwt_token,
