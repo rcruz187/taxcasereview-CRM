@@ -189,6 +189,12 @@ function AdminDialer() {
     if (!error && data?.ok) setVoicemails(v => v.map(x => x.id===id ? { ...x, is_read:true } : x))
   }
 
+  async function deleteVoicemail(id) {
+    if (!window.confirm('Delete this RomyLabs voicemail?')) return
+    const { data, error } = await supabase.functions.invoke('romylabs-voicemails', { body:{ action:'delete', id } })
+    if (!error && data?.ok) setVoicemails(v => v.filter(x => x.id !== id))
+  }
+
   const clean = number.replace(/\D/g, '')
   const canCall = relayStatus === 'ready' && !calling && clean.length >= 7
 
@@ -313,7 +319,10 @@ function AdminDialer() {
                   {vm.created_at ? new Date(vm.created_at).toLocaleString() : '—'}{vm.duration_seconds ? ` · ${vm.duration_seconds}s` : ''}
                 </div>
               </div>
-              {!vm.is_read && <button onClick={()=>markVoicemailRead(vm.id)} style={{ ...S.btn('ghost'),padding:'5px 9px',fontSize:10 }}>Mark read</button>}
+              <div style={{ display:'flex', gap:6 }}>
+                {!vm.is_read && <button onClick={()=>markVoicemailRead(vm.id)} style={{ ...S.btn('ghost'),padding:'5px 9px',fontSize:10 }}>Mark read</button>}
+                <button onClick={()=>deleteVoicemail(vm.id)} style={{ ...S.btn('danger'),padding:'5px 9px',fontSize:10 }}>Delete</button>
+              </div>
             </div>
             {vm.recording_url && <audio controls src={vm.recording_url} onPlay={()=>!vm.is_read&&markVoicemailRead(vm.id)} style={{ width:'100%',height:30,marginTop:10 }} />}
           </div>
