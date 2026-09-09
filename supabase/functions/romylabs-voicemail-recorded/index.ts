@@ -64,17 +64,18 @@ serve(async req=>{
     const {data:inserted,error}=await db.from('voicemails').insert({from_number:from.slice(0,32),to_number:to.slice(0,32),recording_url:stored,duration_seconds:/^\d+$/.test(duration)?Math.min(Number(duration),3600):null,call_sid:sid,is_read:false,created_at:new Date().toISOString(),tenant_id:ADMIN_TENANT,transcription_status:stored.startsWith('storage://voicemails/')?'pending':'unavailable'}).select('id').single()
     if(error&&error.code!=='23505')throw error
     if(!error){
-      await notifyVoicemail(db,from,duration)
+      const tasks:Promise<unknown>[]=[notifyVoicemail(db,from,duration)]
       const prefix='storage://voicemails/'
       if(inserted?.id&&stored.startsWith(prefix)){
-        const p=fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/romylabs-voicemail-transcribe`,{
+        tasks.push(fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/romylabs-voicemail-transcribe`,{
           method:'POST',
           headers:{'Content-Type':'application/json','x-internal-call-secret':Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')||''},
           body:JSON.stringify({voicemail_id:inserted.id,storage_path:stored.slice(prefix.length)}),
         }).then(async r=>{if(!r.ok)console.error('[romylabs-voicemail-recorded] transcription',r.status,await r.text())})
-          .catch(e=>console.error('[romylabs-voicemail-recorded] transcription trigger',e))
-        try{EdgeRuntime.waitUntil(p)}catch{void p}
+          .catch(e=>console.error('[romylabs-voicemail-recorded] transcription trigger',e)))
       }
+      const background=Promise.allSettled(tasks)
+      try{EdgeRuntime.waitUntil(background)}catch{void background}
     }
     return resp()
   }catch(e){console.error('[romylabs-voicemail-recorded]',e);return resp(500)}
