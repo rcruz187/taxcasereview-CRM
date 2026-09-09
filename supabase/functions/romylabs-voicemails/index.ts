@@ -30,6 +30,15 @@ serve(async req=>{
     if(action==='delete'){
       const id=String(body?.id||'')
       if(!id)return json({error:'id required'},400)
+      const {data:row}=await db.from('voicemails').select('recording_url').eq('tenant_id',ADMIN_TENANT).eq('id',id).limit(1).maybeSingle()
+      const recordingUrl=String(row?.recording_url||'')
+      try{
+        const marker='/storage/v1/object/sign/voicemails/'
+        if(recordingUrl.includes(marker)){
+          const path=decodeURIComponent(recordingUrl.split(marker)[1].split('?')[0]||'')
+          if(path)await db.storage.from('voicemails').remove([path])
+        }
+      }catch(e){console.error('[romylabs-voicemails] storage cleanup',e)}
       const {error}=await db.from('voicemails').delete().eq('tenant_id',ADMIN_TENANT).eq('id',id)
       return error?json({error:error.message},500):json({ok:true})
     }
