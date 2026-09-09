@@ -44,15 +44,20 @@ async function browserIdentity(req: Request) {
   const client = createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: `Bearer ${token}` } } })
   const { data: { user }, error } = await client.auth.getUser(token)
   if (error || !user?.email) return null
+  const { data: isPlatformAdmin } = await client.rpc('_is_platform_admin')
   const db = serviceDb()
   const { data: employee } = await db.from('employees')
     .select('tenant_id,status,email')
     .ilike('email', user.email)
     .limit(1)
     .maybeSingle()
-  if (!employee?.tenant_id || String(employee.status || 'Active').toLowerCase() !== 'active') return null
-  const { data: isPlatformAdmin } = await client.rpc('_is_platform_admin')
-  return { user, tenantId: employee.tenant_id as string, isPlatformAdmin: isPlatformAdmin === true }
+  const admin = isPlatformAdmin === true
+  if (!admin && (!employee?.tenant_id || String(employee.status || 'Active').toLowerCase() !== 'active')) return null
+  return {
+    user,
+    tenantId: (employee?.tenant_id || 'a0000000-0000-0000-0000-000000000001') as string,
+    isPlatformAdmin: admin,
+  }
 }
 
 serve(async (req) => {
