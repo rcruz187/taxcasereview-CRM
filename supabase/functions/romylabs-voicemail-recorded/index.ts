@@ -54,7 +54,7 @@ serve(async req=>{
     if(s?.sw_project_id&&s?.sw_api_token){
       try{
         const audio=await fetch(url.endsWith('.mp3')?url:`${url}.mp3`,{headers:{Authorization:'Basic '+btoa(`${s.sw_project_id}:${s.sw_api_token}`)}})
-        if(audio.ok){const bytes=new Uint8Array(await audio.arrayBuffer()),path=`${ADMIN_TENANT}/romylabs_vm_${sid.replace(/[^A-Za-z0-9_-]/g,'')}_${crypto.randomUUID()}.mp3`;const{error:up}=await db.storage.from('voicemails').upload(path,bytes,{contentType:'audio/mpeg',upsert:false});if(!up){const{data:signed}=await db.storage.from('voicemails').createSignedUrl(path,60*60*24*365);if(signed?.signedUrl)stored=signed.signedUrl}}
+        if(audio.ok){const bytes=new Uint8Array(await audio.arrayBuffer()),path=`${ADMIN_TENANT}/romylabs_vm_${sid.replace(/[^A-Za-z0-9_-]/g,'')}_${crypto.randomUUID()}.mp3`;const{error:up}=await db.storage.from('voicemails').upload(path,bytes,{contentType:'audio/mpeg',upsert:false});if(!up)stored=`storage://voicemails/${path}`}
       }catch(e){console.error('[romylabs-voicemail-recorded] audio',e)}
     }
     const {error}=await db.from('voicemails').insert({from_number:from.slice(0,32),to_number:to.slice(0,32),recording_url:stored,duration_seconds:/^\d+$/.test(duration)?Math.min(Number(duration),3600):null,call_sid:sid,is_read:false,created_at:new Date().toISOString(),tenant_id:ADMIN_TENANT})
