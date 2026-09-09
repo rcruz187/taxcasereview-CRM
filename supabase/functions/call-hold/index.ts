@@ -67,7 +67,13 @@ serve(async(req)=>{
         isAgent=!!businessDigits&&fromD===businessDigits&&toD===businessDigits
       }catch(e){console.error('call-hold call fetch failed',callSid,e)}
       if(isAgent) continue
-      const upd=await fetch(`${base}/Conferences/${conf.sid}/Participants/${callSid}.json`,{method:'POST',headers:{Authorization:providerAuth,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({Hold:hold?'true':'false'})})
+      const holdBody:Record<string,string>={Hold:hold?'true':'false'}
+      if(hold){
+        // SignalWire supports a HoldUrl for participant hold media.
+        // Use the provider's default conference music by omitting HoldUrl
+        // rather than pointing at custom LaML that may not be valid for hold media.
+      }
+      const upd=await fetch(`${base}/Conferences/${conf.sid}/Participants/${callSid}.json`,{method:'POST',headers:{Authorization:providerAuth,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(holdBody)})
       if(upd.ok) touched++; else console.error('call-hold participant update failed',callSid,upd.status,await upd.text())
     }
     if(touched===0) return json({error:'No caller leg found to '+(hold?'hold':'resume')+'.'},404)
