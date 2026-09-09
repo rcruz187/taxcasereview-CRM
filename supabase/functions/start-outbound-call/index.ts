@@ -31,20 +31,21 @@ serve(async (req) => {
     if (!e164) return json({ error: 'Enter a valid 10-digit US phone number.' }, 400)
 
     const db = createClient(SUPABASE_URL, SERVICE_KEY)
+    const { data: isPlatformAdmin } = await authClient.rpc('_is_platform_admin')
+    const romylabsContext = phoneContext === 'romylabs' && isPlatformAdmin === true
+    const effectiveTenantId = romylabsContext ? 'a0000000-0000-0000-0000-000000000001' : tenantId
     const { data: employee } = await db.from('employees')
       .select('tenant_id,name,extension,status,perm_comms')
-      .eq('tenant_id', tenantId)
+      .eq('tenant_id', effectiveTenantId)
       .ilike('email', user.email)
       .limit(1)
       .maybeSingle()
-    const { data: isPlatformAdmin } = await authClient.rpc('_is_platform_admin')
     const active = employee && String(employee.status || 'Active').toLowerCase() === 'active'
     if (!isPlatformAdmin && (!active || Number(employee?.perm_comms || 0) < 2)) return json({ error: 'Phone permission denied' }, 403)
 
-    const romylabsContext = phoneContext === 'romylabs' && isPlatformAdmin === true
     let { data: settings, error: sErr } = await db.from('settings')
       .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did,sw_outbound_did,tenant_id')
-      .eq('tenant_id', tenantId).limit(1).maybeSingle()
+      .eq('tenant_id', effectiveTenantId).limit(1).maybeSingle()
     if (romylabsContext && (!settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token)) {
       const fallback = await db.from('settings')
         .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did,sw_outbound_did,tenant_id')
@@ -70,7 +71,7 @@ serve(async (req) => {
     // Real production authorization/provider validation, but guaranteed no call,
     // no outbound_calls insert and no SignalWire request.
     if (qa_certification === true && dry_run === true) {
-      return json({ success: true, dry_run: true, delivery: false, provider: 'signalwire', tenant_id: tenantId })
+      return json({ success: true, dry_run: true, delivery: false, provider: 'signalwire', tenant_id: effectiveTenantId })
     }
 
     const conferenceName = `outbound-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`
@@ -80,7 +81,7 @@ serve(async (req) => {
       display_name: String(displayName || '').trim() || null,
       entity_type: String(entityType || '').trim() || null,
       status: 'pending',
-      tenant_id: tenantId,
+      tenant_id: effectiveTenantId,
       agent_name: employee?.name || user.email,
       agent_extension: employee?.extension || null,
     }).select('id').single()
@@ -88,8 +89,8 @@ serve(async (req) => {
 
     const spaceDomain = String(settings.sw_space_url).replace(/^https?:\/\//, '')
     const providerAuth = 'Basic ' + btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
-    const outboundLegUrl = `${SUPABASE_URL}/functions/v1/outbound-leg?conf=${encodeURIComponent(conferenceName)}&tenant=${encodeURIComponent(tenantId)}`
-    const statusCallbackUrl = `${SUPABASE_URL}/functions/v1/outbound-call-status?conf=${encodeURIComponent(conferenceName)}&tenant=${encodeURIComponent(tenantId)}`
+    const outboundLegUrl = `${SUPABASE_URL}/functions/v1/outbound-leg?conf=${encodeURIComponent(conferenceName)}&tenant=${encodeURIComponent(effectiveTenantId)}`
+    const statusCallbackUrl = `${SUPABASE_URL}/functions/v1/outbound-call-status?conf=${encodeURIComponent(conferenceName)}&tenant=${encodeURIComponent(effectiveTenantId)}`
 
     const resp = await fetch(`https://${spaceDomain}/api/laml/2010-04-01/Accounts/${settings.sw_project_id}/Calls.json`, {
       method: 'POST',
@@ -116,7 +117,7 @@ serve(async (req) => {
         status: 'failed',
         provider_http_status: resp.status,
         provider_error: providerMessage || text.slice(0, 1000),
-      }).eq('tenant_id', tenantId).eq('conference_name', conferenceName)
+      }).eq('tenant_id', effectiveTenantId).eq('conference_name', conferenceName)
       console.error('start-outbound-call: SignalWire rejected call', resp.status, providerMessage || text)
       return json({
         error: providerMessage ? `SignalWire rejected the call: ${providerMessage}` : `SignalWire rejected the call (HTTP ${resp.status}).`,
@@ -127,7 +128,7 @@ serve(async (req) => {
     let clientCallsid = null
     try { clientCallsid = JSON.parse(text)?.sid || null } catch {}
     if (clientCallsid) {
-      await db.from('outbound_calls').update({ provider_call_sid: clientCallsid }).eq('tenant_id', tenantId).eq('conference_name', conferenceName)
+      await db.from('outbound_calls').update({ provider_call_sid: clientCallsid }).eq('tenant_id', effectiveTenantId).eq('conference_name', conferenceName)
     }
     return json({ ok: true, conferenceName, clientCallsid, outboundCallId: insertedCall?.id || null, fromNumber })
   } catch (err) {
