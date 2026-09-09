@@ -14,12 +14,23 @@ serve(async req=>{
   const romy=normalize(Deno.env.get('ROMYLABS_PHONE_NUMBER')||'')
   if(!callSid||!romy||normalize(to)!==romy)return xml('<Hangup/>',403)
   const base=`${Deno.env.get('SUPABASE_URL')}/functions/v1`
-  if(digits==='0'||!['1','2','3','4'].includes(digits))return xml(`<Redirect method="POST">${base}/romylabs-voicemail-prompt</Redirect>`)
+  const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+  if(digits==='0'||!['1','2','3','4'].includes(digits)){
+    await db.from('incoming_calls').update({status:'missed',department:digits==='0'?'Voicemail':'No Selection'})
+      .eq('tenant_id',ADMIN_TENANT).eq('callsid',callSid).in('status',['menu','ringing'])
+    return xml(`<Redirect method="POST">${base}/romylabs-voicemail-prompt</Redirect>`)
+  }
   const dept:any={'1':'RomyLabs Sales','2':'RomyLabs Support','3':'RomyLabs Billing','4':'Romy'}
   const conf=`romylabs-${digits}-${callSid}`.replace(/[^A-Za-z0-9_-]/g,'').slice(0,160)
-  const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
-  const {error}=await db.from('incoming_calls').insert({callsid:callSid,conference_name:conf,from_number:from.slice(0,32),department:dept[digits],status:'ringing',tenant_id:ADMIN_TENANT})
-  if(error&&error.code!=='23505')throw error
+  const {data:updated,error}=await db.from('incoming_calls')
+    .update({conference_name:conf,from_number:from.slice(0,32),department:dept[digits],status:'ringing'})
+    .eq('tenant_id',ADMIN_TENANT).eq('callsid',callSid).in('status',['menu','missed'])
+    .select('callsid')
+  if(error)throw error
+  if(!updated?.length){
+    const {error:ins}=await db.from('incoming_calls').insert({callsid:callSid,conference_name:conf,from_number:from.slice(0,32),department:dept[digits],status:'ringing',tenant_id:ADMIN_TENANT})
+    if(ins&&ins.code!=='23505')throw ins
+  }
 
   // Server-side no-answer watchdog. The browser also has a voicemail timeout,
   // but RomyLabs must still reach voicemail when nobody has the Admin Portal open.
