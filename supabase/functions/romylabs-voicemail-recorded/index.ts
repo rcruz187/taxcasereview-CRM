@@ -21,13 +21,16 @@ async function gmailToken(db:any,s:any){
 }
 async function notifyVoicemail(db:any,from:string,duration:string){
   try{
-    const {data:gs}=await db.from('settings').select('id,gmail_refresh_token,gmail_client_id,gmail_client_secret,gmail_access_token,gmail_token_expiry').eq('tenant_id','61a89aef-0e7e-4ea2-b222-44ab2024655a').limit(1).maybeSingle()
+    const {data:gs}=await db.from('settings').select('id,email,gmail_refresh_token,gmail_client_id,gmail_client_secret,gmail_access_token,gmail_token_expiry').eq('tenant_id','61a89aef-0e7e-4ea2-b222-44ab2024655a').limit(1).maybeSingle()
     if(!gs)return
     const token=await gmailToken(db,gs)
     if(!token)return
     const dur=/^\d+$/.test(duration)?`${duration} seconds`:'unknown duration'
+    const sender=String(gs.email||'info@taxcasereview.org').replace(/[\r\n]/g,'')
     const raw=[
       'To: info@romylabs.com',
+      `From: RomyLabs Phone System <${sender}>`,
+      'Reply-To: info@romylabs.com',
       'Subject: New RomyLabs voicemail',
       'MIME-Version: 1.0',
       'Content-Type: text/plain; charset="UTF-8"',
