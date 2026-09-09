@@ -15,8 +15,8 @@ serve(async req=>{
   if(!callSid||!romy||normalize(to)!==romy)return xml('<Hangup/>',403)
   const base=`${Deno.env.get('SUPABASE_URL')}/functions/v1`
   const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
-  if(digits==='0'||!['1','2','3','4'].includes(digits)){
-    await db.from('incoming_calls').update({status:'missed',department:digits==='0'?'Voicemail':'No Selection'})
+  if(digits==='5'||!['1','2','3','4'].includes(digits)){
+    await db.from('incoming_calls').update({status:'missed',department:digits==='5'?'Voicemail':'No Selection'})
       .eq('tenant_id',ADMIN_TENANT).eq('callsid',callSid).in('status',['menu','ringing'])
     return xml(`<Redirect method="POST">${base}/romylabs-voicemail-prompt</Redirect>`)
   }
