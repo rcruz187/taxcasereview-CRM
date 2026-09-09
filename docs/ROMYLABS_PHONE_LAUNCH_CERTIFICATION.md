@@ -18,7 +18,7 @@ Production base remains untouched.
   - 2 Support
   - 3 Billing
   - 4 Romy
-  - 0 Voicemail
+  - 5 Voicemail
 - PASS — Business hours Monday–Friday, 9:00 AM–6:00 PM Eastern.
 - PASS — After-hours calls route directly to RomyLabs voicemail.
 - PASS — Server-side 28-second no-answer watchdog sends callers to voicemail even when the Admin Portal is closed.
@@ -43,7 +43,7 @@ Production base remains untouched.
 - PENDING — Deploy RomyLabs Supabase phone functions.
 - PENDING — Set production secret `ROMYLABS_PHONE_NUMBER=+15614206999`.
 - PENDING — Point SignalWire +15614206999 voice webhook to `romylabs-receive-call`.
-- PENDING — Live inbound IVR test for options 1, 2, 3, 4, and 0.
+- PENDING — Live inbound IVR test for options 1, 2, 3, 4, and 5.
 - PENDING — Live after-hours voicemail test.
 - PENDING — Live voicemail email notification test.
 - PENDING — Live outbound caller-ID test from Admin Portal.
