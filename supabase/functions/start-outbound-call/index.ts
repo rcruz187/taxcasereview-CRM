@@ -64,7 +64,11 @@ serve(async (req) => {
       const digits = String(d || '').replace(/\D/g, '')
       return digits.length === 10 ? `+1${digits}` : (digits.length === 11 && digits.startsWith('1') ? `+${digits}` : '')
     }
-    const romylabsNumber = normalize(Deno.env.get('ROMYLABS_PHONE_NUMBER') || '')
+    let romylabsNumber = ''
+    if (romylabsContext) {
+      const { data: adminPhone } = await db.from('settings').select('sw_inbound_did').eq('tenant_id','a0000000-0000-0000-0000-000000000001').limit(1).maybeSingle()
+      romylabsNumber = normalize(adminPhone?.sw_inbound_did || '')
+    }
     const localNumber = normalize(settings.sw_outbound_did || '')
     const tollFreeNumber = normalize(settings.sw_inbound_did || '')
     const requestedCallerId = callerIdPreference === 'tollfree' ? tollFreeNumber : localNumber
