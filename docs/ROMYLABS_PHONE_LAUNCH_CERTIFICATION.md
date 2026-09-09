@@ -21,12 +21,16 @@ Production base remains untouched.
   - 0 Voicemail
 - PASS — Business hours Monday–Friday, 9:00 AM–6:00 PM Eastern.
 - PASS — After-hours calls route directly to RomyLabs voicemail.
+- PASS — Server-side 28-second no-answer watchdog sends callers to voicemail even when the Admin Portal is closed.
 - PASS — RomyLabs-branded hold prompt.
 - PASS — Inbound browser bridge prioritizes claimed inbound calls before outbound and ignores unclaimed ringing calls.
 - PASS — Voicemail stored under RomyLabs control tenant.
 - PASS — Voicemail inbox supports playback, mark-read, delete, and storage cleanup.
+- PASS — Admin Portal shows recent inbound, missed, and outbound RomyLabs call history without duplicate recap rows.
 - PASS — New voicemail email alert targets info@romylabs.com.
 - PASS — RomyLabs voicemail API and phone-state API require authenticated platform-admin access.
+- PASS — SignalWire hangup and outbound recording callbacks carry explicit tenant/conference identity.
+- PASS — Existing Admin Portal tenant/impersonation behavior was restored; RomyLabs phone isolation no longer changes global Admin Portal tenant state.
 - PASS — Required provider callback functions are registered in supabase/config.toml.
 - PASS — Number cutover / rollback plan documented.
 - PASS — TaxRes local voice +15614206665 remains untouched.
