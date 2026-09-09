@@ -903,6 +903,42 @@ export function CallProvider({ children, phoneContext = 'taxres' }) {
   async function saveCallLog(onSaved) {
     if (!active) return
     setSaving(true)
+
+    if (phoneContext === 'romylabs') {
+      const direction = activeOutboundCallIdRef.current ? 'Outbound' : 'Inbound'
+      const { data, error } = await supabase.functions.invoke('romylabs-phone-state', {
+        body: {
+          action: 'save_log',
+          raw_call_id: activeOutboundCallIdRef.current || null,
+          client_name: active.name || 'RomyLabs Call',
+          phone: active.phone || '',
+          outcome: logForm.outcome,
+          notes: logForm.notes,
+          duration: logForm.duration || formatTime(elapsed),
+          direction,
+        }
+      })
+      setSaving(false)
+      if (error || data?.error) {
+        showCallToast('Error: ' + (data?.error || error?.message || 'Unable to save call log'))
+        return
+      }
+      const record = {
+        clientName: active.name || 'RomyLabs Call',
+        phone: active.phone || '',
+        outcome: logForm.outcome,
+        notes: logForm.notes,
+        duration: logForm.duration || formatTime(elapsed),
+        direction,
+      }
+      showCallToast('Call logged!')
+      setLogModal(false)
+      activeOutboundCallIdRef.current = null
+      setActive(null)
+      setElapsed(0)
+      onSaved?.(record)
+      return
+    }
     const record = {
       leadId: active.id,
       clientName: active.name || `${active.first || ''} ${active.last || ''}`.trim(),
