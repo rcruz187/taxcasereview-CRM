@@ -273,6 +273,69 @@ export function CallProvider({ children, phoneContext = 'taxres' }) {
 
   function showCallToast(msg) { setCallToast(msg); setTimeout(() => setCallToast(''), 4000) }
 
+  async function fetchIncomingStatus(callsid) {
+    if (phoneContext === 'romylabs') {
+      const { data, error } = await supabase.functions.invoke('romylabs-phone-state', { body:{ action:'incoming_status', callsid } })
+      return { data: data?.row || null, error: error || (data?.error ? new Error(data.error) : null) }
+    }
+    return supabase.from('incoming_calls').select('status,conference_name,callsid').eq('callsid', callsid).maybeSingle()
+  }
+
+  async function fetchOutboundStatus(conferenceName) {
+    if (phoneContext === 'romylabs') {
+      const { data, error } = await supabase.functions.invoke('romylabs-phone-state', { body:{ action:'outbound_status', conference_name:conferenceName } })
+      return { data: data?.row || null, error: error || (data?.error ? new Error(data.error) : null) }
+    }
+    return supabase.from('outbound_calls').select('id,status,conference_name,provider_call_sid').eq('conference_name', conferenceName).maybeSingle()
+  }
+
+  async function fetchLatestRinging() {
+    if (phoneContext === 'romylabs') {
+      const { data, error } = await supabase.functions.invoke('romylabs-phone-state', { body:{ action:'ringing' } })
+      return { data: data?.row || null, error: error || (data?.error ? new Error(data.error) : null) }
+    }
+    return supabase.from('incoming_calls')
+      .select('callsid, conference_name, from_number, department, created_at')
+      .eq('status', 'ringing')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+  }
+
+  async function claimInbound(row, agentName) {
+    if (phoneContext === 'romylabs') {
+      const { data, error } = await supabase.functions.invoke('romylabs-phone-state', {
+        body:{ action:'claim', callsid:row.callsid, claimed_by:agentName }
+      })
+      return { data: data?.claimed || [], error: error || (data?.error ? new Error(data.error) : null) }
+    }
+    return supabase.from('incoming_calls')
+      .update({ status: 'answered', claimed_by: agentName, claimed_at: new Date().toISOString() })
+      .eq('callsid', row.callsid)
+      .eq('status', 'ringing')
+      .select('callsid')
+  }
+
+  async function restoreCallState(saved) {
+    if (phoneContext !== 'romylabs') return null
+    const action = saved.kind === 'outbound' ? 'restore_outbound' : 'restore_inbound'
+    const body = saved.kind === 'outbound'
+      ? { action, conference_name:saved.conferenceName }
+      : { action, callsid:saved.inboundCallsid }
+    const { data, error } = await supabase.functions.invoke('romylabs-phone-state', { body })
+    if (error || data?.error) return null
+    return data?.row || null
+  }
+
+  async function completeInboundState(callsid) {
+    if (phoneContext === 'romylabs') {
+      await supabase.functions.invoke('romylabs-phone-state', { body:{ action:'complete_inbound', callsid } })
+      return
+    }
+    await supabase.from('incoming_calls').update({ status: 'completed' })
+      .eq('callsid', callsid).eq('status', 'answered')
+  }
+
   useEffect(() => {
     let disposed = false
     let audioEl = document.createElement('audio')
