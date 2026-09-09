@@ -12,7 +12,7 @@ Production base remains untouched.
 - PASS — RomyLabs phone state uses a platform-only server endpoint pinned to the RomyLabs control tenant.
 - PASS — Cross-office Admin Portal tenant switching cannot redirect RomyLabs call polling/claim/log state.
 - PASS — Outbound RomyLabs calls are pinned server-side to the RomyLabs control tenant.
-- PASS — Hold, End, Transfer, and Add Caller carry explicit RomyLabs phone context.
+- PASS — Hold, End, Transfer, and Add Caller carry explicit RomyLabs phone context and verify call ownership against the RomyLabs tenant before provider actions.
 - PASS — RomyLabs auto attendant:
   - 1 Sales
   - 2 Support
@@ -26,7 +26,14 @@ Production base remains untouched.
 - PASS — Inbound browser bridge prioritizes claimed inbound calls before outbound and ignores unclaimed ringing calls.
 - PASS — Voicemail stored under RomyLabs control tenant.
 - PASS — Voicemail inbox supports playback, mark-read, delete, and storage cleanup.
-- PASS — Admin Portal shows recent inbound, missed, and outbound RomyLabs call history without duplicate recap rows.
+- PASS — Voicemail recordings are stored in a private bucket as storage paths; one-hour signed playback URLs are issued only through the platform-admin API.
+- PASS — Voicemail transcription uses the existing Groq Whisper stack and cannot block voicemail delivery.
+- PASS — Voicemail provider retries are database-idempotent by tenant + CallSid.
+- PASS — RomyLabs full-call recordings are isolated in private storage rather than the shared documents bucket.
+- PASS — RomyLabs call-recording AI uses business/software context and does not create TaxRes client tasks or notes.
+- PASS — Recording and AI-summary provider retries are database-idempotent by tenant + CallSid.
+- PASS — Admin Portal shows complete inbound, missed, after-hours, voicemail, and outbound RomyLabs call history without duplicate recap rows.
+- PASS — Recent Calls and Voicemail include one-click Call Back controls.
 - PASS — New voicemail email alert targets info@romylabs.com.
 - PASS — RomyLabs voicemail API and phone-state API require authenticated platform-admin access.
 - PASS — SignalWire hangup and outbound recording callbacks carry explicit tenant/conference identity.
@@ -40,12 +47,15 @@ Production base remains untouched.
 ## Deployment / runtime gates
 
 - PENDING — Full local Vite build. The current execution container cannot resolve github.com, so the complete repository cannot be cloned into the local sandbox for a package build.
+- PENDING — Apply the voicemail transcription/idempotency migration.
 - PENDING — Deploy RomyLabs Supabase phone functions.
 - PENDING — Set production secret `ROMYLABS_PHONE_NUMBER=+15614206999`.
 - PENDING — Point SignalWire +15614206999 voice webhook to `romylabs-receive-call`.
 - PENDING — Live inbound IVR test for options 1, 2, 3, 4, and 5.
 - PENDING — Live after-hours voicemail test.
 - PENDING — Live voicemail email notification test.
+- PENDING — Live voicemail transcription/private playback test.
+- PENDING — Live call recording + RomyLabs AI summary test.
 - PENDING — Live outbound caller-ID test from Admin Portal.
 - PENDING — Live hold / transfer / add-caller / hangup test.
 - PENDING — Verify TaxRes voice and toll-free numbers remain unchanged after cutover.
