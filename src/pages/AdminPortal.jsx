@@ -350,6 +350,16 @@ function AdminDialer() {
               </div>
             </div>
             {vm.recording_url && <audio controls src={vm.recording_url} onPlay={()=>!vm.is_read&&markVoicemailRead(vm.id)} style={{ width:'100%',height:30,marginTop:10 }} />}
+            <div style={{ marginTop:9, padding:'9px 11px', borderRadius:8, background:'rgba(255,255,255,.025)', border:'1px solid rgba(99,102,241,.08)' }}>
+              <div style={{ fontSize:9,fontWeight:800,color:'#475569',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:4 }}>
+                Transcript · {vm.transcription_status || 'pending'}
+              </div>
+              <div style={{ fontSize:11,color:vm.transcript?'#94a3b8':'#475569',lineHeight:1.55,whiteSpace:'pre-wrap' }}>
+                {vm.transcript || (vm.transcription_status==='failed' ? 'Transcription failed — audio is still available.' :
+                  vm.transcription_status==='unavailable' ? 'Transcription is not configured for this recording.' :
+                  vm.transcription_status==='empty' ? 'No speech was detected.' : 'Transcription is processing…')}
+              </div>
+            </div>
           </div>
         ))}
       </div>
