@@ -2,6 +2,7 @@
 /*
   Cache-Control: no-cache, must-revalidate
   Pragma: no-cache
+  X-Robots-Tag: noindex, nofollow, noarchive, nosnippet
 
 # Vite emits content-hashed JS/CSS assets. These are safe to cache for a year;
 # a new deploy changes the filename, so navigation can reuse already-downloaded
