@@ -71,6 +71,8 @@ verify_jwt = false
 verify_jwt = true
 [functions.log-call]
 verify_jwt = true
+[functions.call-recap]
+verify_jwt = true
 
 # Staff-only payment control endpoints.
 [functions.stripe-create-checkout-session]
