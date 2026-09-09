@@ -46,7 +46,9 @@ serve(async(req)=>{
     const spaceDomain=settings.sw_space_url.replace(/^https?:\/\//,'')
     const providerAuth='Basic '+btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
     const base=`https://${spaceDomain}/api/laml/2010-04-01/Accounts/${settings.sw_project_id}`
-    const businessDigits=(isRomyLabs?(Deno.env.get('ROMYLABS_PHONE_NUMBER')||''):(settings.sw_inbound_did||'')).replace(/\D/g,'').slice(-10)
+    let businessNumber=settings.sw_inbound_did||''
+    if(isRomyLabs){const {data:adminPhone}=await db.from('settings').select('sw_inbound_did').eq('tenant_id','a0000000-0000-0000-0000-000000000001').limit(1).maybeSingle();businessNumber=adminPhone?.sw_inbound_did||''}
+    const businessDigits=businessNumber.replace(/\D/g,'').slice(-10)
     const confResp=await fetch(`${base}/Conferences.json?FriendlyName=${encodeURIComponent(conference_name)}&Status=in-progress`,{headers:{Authorization:providerAuth}})
     const confData=await confResp.json()
     const conf=confData?.conferences?.[0]
