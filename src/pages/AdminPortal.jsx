@@ -175,6 +175,8 @@ function AdminDialer() {
   const [vmLoading, setVmLoading] = useState(true)
   const [recentCalls, setRecentCalls] = useState([])
   const [callsLoading, setCallsLoading] = useState(true)
+  const [recordings, setRecordings] = useState([])
+  const [recordingsLoading, setRecordingsLoading] = useState(true)
 
   const loadVoicemails = useCallback(async () => {
     setVmLoading(true)
@@ -190,13 +192,21 @@ function AdminDialer() {
     setCallsLoading(false)
   }, [])
 
+  const loadRecordings = useCallback(async () => {
+    setRecordingsLoading(true)
+    const { data, error } = await supabase.functions.invoke('romylabs-phone-state', { body:{ action:'recordings' } })
+    if (!error && data?.ok) setRecordings(data.recordings || [])
+    setRecordingsLoading(false)
+  }, [])
+
   useEffect(() => {
     loadVoicemails()
     loadRecentCalls()
-    const refreshOnFocus = () => { loadVoicemails(); loadRecentCalls() }
+    loadRecordings()
+    const refreshOnFocus = () => { loadVoicemails(); loadRecentCalls(); loadRecordings() }
     window.addEventListener('focus', refreshOnFocus)
     return () => window.removeEventListener('focus', refreshOnFocus)
-  }, [loadVoicemails, loadRecentCalls])
+  }, [loadVoicemails, loadRecentCalls, loadRecordings])
 
   async function markVoicemailRead(id) {
     const { data, error } = await supabase.functions.invoke('romylabs-voicemails', { body:{ action:'mark_read', id } })
@@ -320,6 +330,38 @@ function AdminDialer() {
               <div style={{ fontSize:10,color:'#64748b',marginTop:2 }}>{call.phone || '—'} · {call.created_at?new Date(call.created_at).toLocaleString():'—'}</div>
             </div>
             <span style={{ fontSize:10,fontWeight:800,padding:'3px 8px',borderRadius:999,background:String(call.status).toLowerCase()==='missed'?'rgba(239,68,68,.12)':'rgba(99,102,241,.12)',color:String(call.status).toLowerCase()==='missed'?'#fca5a5':'#a5b4fc' }}>{call.status}</span>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ ...S.card, marginTop:18 }}>
+        <div style={{ padding:'14px 16px', borderBottom:'1px solid rgba(99,102,241,.12)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div>
+            <div style={{ fontSize:14,fontWeight:900,color:'#fff' }}>Recordings & AI Summaries</div>
+            <div style={{ fontSize:10,color:'#64748b',marginTop:2 }}>Private RomyLabs call recordings</div>
+          </div>
+          <button onClick={loadRecordings} style={{ ...S.btn('ghost'), padding:'6px 10px', fontSize:11 }}>Refresh</button>
+        </div>
+        {recordingsLoading ? <Spinner/> : recordings.length===0 ? (
+          <div style={{ padding:28,textAlign:'center',color:'#475569',fontSize:12 }}>No RomyLabs recordings yet.</div>
+        ) : recordings.slice(0,20).map((rec,i)=>(
+          <div key={rec.id} style={{ padding:'13px 16px',borderBottom:i<Math.min(recordings.length,20)-1?'1px solid rgba(99,102,241,.08)':'none' }}>
+            <div style={{ display:'flex',gap:12,alignItems:'flex-start' }}>
+              <div style={{ flex:1,minWidth:0 }}>
+                <div style={{ fontSize:12,fontWeight:800,color:'#e2e8f0' }}>{rec.from_number || 'Unknown'} → {rec.to_number || 'RomyLabs'}</div>
+                <div style={{ fontSize:10,color:'#64748b',marginTop:2 }}>
+                  {rec.created_at?new Date(rec.created_at).toLocaleString():'—'}{rec.duration_seconds?` · ${rec.duration_seconds}s`:''}
+                </div>
+              </div>
+              {rec.ai?.sentiment && <span style={{ fontSize:9,fontWeight:800,padding:'3px 7px',borderRadius:999,background:'rgba(99,102,241,.12)',color:'#a5b4fc' }}>{rec.ai.sentiment}</span>}
+            </div>
+            {rec.recording_url && <audio controls src={rec.recording_url} style={{ width:'100%',height:30,marginTop:9 }} />}
+            {rec.ai?.summary && <div style={{ marginTop:8,fontSize:11,color:'#94a3b8',lineHeight:1.55 }}><strong style={{color:'#cbd5e1'}}>Summary:</strong> {rec.ai.summary}</div>}
+            {rec.ai?.next_steps && <div style={{ marginTop:5,fontSize:11,color:'#64748b',lineHeight:1.5 }}><strong style={{color:'#94a3b8'}}>Next:</strong> {rec.ai.next_steps}</div>}
+            {rec.ai?.transcript && <details style={{ marginTop:8 }}>
+              <summary style={{ cursor:'pointer',fontSize:10,fontWeight:800,color:'#6366f1' }}>View transcript</summary>
+              <div style={{ marginTop:6,padding:'8px 10px',borderRadius:7,background:'rgba(255,255,255,.025)',fontSize:10,color:'#64748b',lineHeight:1.55,whiteSpace:'pre-wrap' }}>{rec.ai.transcript}</div>
+            </details>}
           </div>
         ))}
       </div>
