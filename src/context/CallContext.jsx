@@ -108,7 +108,7 @@ export function CallProvider({ children, phoneContext = 'taxres' }) {
     setHoldBusy(true)
     const next = !onHold
     const { data, error } = await supabase.functions.invoke('call-hold', {
-      body: { conference_name: conf, hold: next },
+      body: { conference_name: conf, hold: next, phoneContext },
     })
     setHoldBusy(false)
     if (error || data?.error) {
@@ -132,6 +132,7 @@ export function CallProvider({ children, phoneContext = 'taxres' }) {
         target_type: target.type,
         extension: target.extension || null,
         number: target.number || null,
+        phoneContext,
       },
     })
     if (error || data?.error) return { error: error?.message || data?.error || 'unknown error' }
@@ -150,7 +151,7 @@ export function CallProvider({ children, phoneContext = 'taxres' }) {
     const conf = activeConferenceRef.current
     if (!conf) return { error: 'No active call' }
     const { data, error } = await supabase.functions.invoke('call-add-participant', {
-      body: { conference_name: conf, number },
+      body: { conference_name: conf, number, phoneContext },
     })
     if (error || data?.error) return { error: error?.message || data?.error || 'unknown error' }
     showCallToast('📞 Dialing ' + number + ' into this call…')
@@ -242,7 +243,7 @@ export function CallProvider({ children, phoneContext = 'taxres' }) {
   // attempt that could fail for an ordinary transient reason (network
   // blip, SignalWire API hiccup).
   async function endConferenceWithRetry(conferenceName, attempt = 1) {
-    const { data, error } = await supabase.functions.invoke('end-conference', { body: { conferenceName } })
+    const { data, error } = await supabase.functions.invoke('end-conference', { body: { conferenceName, phoneContext } })
     if (error || data?.error) {
       if (attempt < 3) {
         setTimeout(() => endConferenceWithRetry(conferenceName, attempt + 1), 2000)
