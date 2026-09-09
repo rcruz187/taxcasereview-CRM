@@ -39,6 +39,8 @@ verify_jwt = false
 verify_jwt = false
 [functions.romylabs-hold-music]
 verify_jwt = false
+[functions.romylabs-voicemails]
+verify_jwt = true
 [functions.redirect-to-voicemail]
 verify_jwt = false
 
