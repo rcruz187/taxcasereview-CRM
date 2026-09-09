@@ -17,21 +17,28 @@ serve(async(req)=>{
     const {data:{user},error:userErr}=await authClient.auth.getUser(token)
     if(userErr||!user?.email) return json({error:'Unauthorized'},401)
 
-    const {conference_name,hold}=await req.json()
+    const {conference_name,hold,phoneContext}=await req.json()
     if(!conference_name||typeof hold!=='boolean') return json({error:'conference_name and hold (boolean) required'},400)
     if(!/^[A-Za-z0-9_-]+$/.test(conference_name)) return json({error:'invalid conference name'},400)
 
     const db=createClient(SUPABASE_URL,SERVICE_KEY)
+    const {data:isPlatformAdmin}=await authClient.rpc('_is_platform_admin')
+    const isRomyLabs=phoneContext==='romylabs'&&isPlatformAdmin===true
     const {data:emp}=await db.from('employees').select('tenant_id,status').ilike('email',user.email).limit(1).maybeSingle()
-    if(!emp?.tenant_id||String(emp.status||'Active').toLowerCase()!=='active') return json({error:'Unauthorized'},403)
+    const tenantId=isRomyLabs?'a0000000-0000-0000-0000-000000000001':emp?.tenant_id
+    if(!tenantId||(!isRomyLabs&&String(emp?.status||'Active').toLowerCase()!=='active')) return json({error:'Unauthorized'},403)
 
-    const {data:settings,error:sErr}=await db.from('settings').select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did').eq('tenant_id',emp.tenant_id).limit(1).maybeSingle()
-    if(sErr||!settings?.sw_space_url||!settings?.sw_project_id||!settings?.sw_api_token) return json({error:'SignalWire credentials missing for this office.'},400)
+    let {data:settings,error:sErr}=await db.from('settings').select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did').eq('tenant_id',tenantId).limit(1).maybeSingle()
+    if(isRomyLabs&&(!settings?.sw_space_url||!settings?.sw_project_id||!settings?.sw_api_token)){
+      const f=await db.from('settings').select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did').not('sw_api_token','is',null).not('sw_space_url','is',null).limit(1).maybeSingle()
+      if(f.data)settings=f.data;if(!sErr)sErr=f.error
+    }
+    if(sErr||!settings?.sw_space_url||!settings?.sw_project_id||!settings?.sw_api_token) return json({error:'SignalWire credentials missing for this calling context.'},400)
 
     const spaceDomain=settings.sw_space_url.replace(/^https?:\/\//,'')
     const providerAuth='Basic '+btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
     const base=`https://${spaceDomain}/api/laml/2010-04-01/Accounts/${settings.sw_project_id}`
-    const businessDigits=(settings.sw_inbound_did||'').replace(/\D/g,'').slice(-10)
+    const businessDigits=(isRomyLabs?(Deno.env.get('ROMYLABS_PHONE_NUMBER')||''):(settings.sw_inbound_did||'')).replace(/\D/g,'').slice(-10)
     const confResp=await fetch(`${base}/Conferences.json?FriendlyName=${encodeURIComponent(conference_name)}&Status=in-progress`,{headers:{Authorization:providerAuth}})
     const confData=await confResp.json()
     const conf=confData?.conferences?.[0]
