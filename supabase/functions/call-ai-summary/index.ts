@@ -80,11 +80,17 @@ serve(async (req) => {
       }
     }
 
-    await supabase.from('call_ai_summaries').insert({
+    const { error: summaryInsertError } = await supabase.from('call_ai_summaries').insert({
       tenant_id, call_sid, from_number, to_number, duration_seconds, recording_url,
       transcript, summary, key_points, action_items, sentiment, next_steps, client_id, case_id,
       created_at: new Date().toISOString()
     })
+    if (summaryInsertError) {
+      if (summaryInsertError.code === '23505') {
+        return new Response(JSON.stringify({ ok: true, duplicate: true }), { status: 200 })
+      }
+      throw summaryInsertError
+    }
 
     if (!isRomyLabs && action_items.length > 0 && client_id) {
       await supabase.from('tasks').insert(action_items.map((item: string) => ({
