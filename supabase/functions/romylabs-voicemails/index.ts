@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const ADMIN_TENANT='a0000000-0000-0000-0000-000000000001'
-const CORS={'Access-Control-Allow-Origin':'https://admin.romylabs.com','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type'}
+const CORS={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type'}
 const json=(b:unknown,s=200)=>new Response(JSON.stringify(b),{status:s,headers:{...CORS,'Content-Type':'application/json'}})
 serve(async req=>{
   if(req.method==='OPTIONS')return new Response('ok',{headers:CORS})
