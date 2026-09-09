@@ -11,6 +11,7 @@ import { FIRM, loadFirmBranding, loadFirmBrandingPublic } from '../lib/firmBrand
 import { useApp } from '../context/AppContext'
 import AIAssistant from '../components/AIAssistant'
 import { CallProvider, useCall } from '../context/CallContext'
+import ActiveCallBar from '../components/calling/ActiveCallBar'
 import RomyLabsBilling from '../components/admin/RomyLabsBilling'
 import TrafficCoverage from '../components/admin/TrafficCoverage'
 import CredentialVault from '../components/admin/CredentialVault'
@@ -6714,6 +6715,7 @@ export default function AdminPortal() {
       </div>
       <AIAssistant adminMode />
     </div>
+    <ActiveCallBar />
     </CallProvider>
     </ScreenShareProvider>
   )
