@@ -25,7 +25,7 @@ serve(async (req) => {
     const { data: tenantId, error: tenantErr } = await authClient.rpc('current_tenant_id')
     if (tenantErr || !tenantId) return json({ error: 'No active office context' }, 403)
 
-    const { destinationNumber, displayName, entityType, callerIdPreference, qa_certification, dry_run } = await req.json()
+    const { destinationNumber, displayName, entityType, callerIdPreference, phoneContext, qa_certification, dry_run } = await req.json()
     const digits = String(destinationNumber || '').replace(/\D/g, '')
     const e164 = digits.length === 10 ? `+1${digits}` : (digits.length === 11 && digits.startsWith('1') ? `+${digits}` : '')
     if (!e164) return json({ error: 'Enter a valid 10-digit US phone number.' }, 400)
@@ -41,21 +41,31 @@ serve(async (req) => {
     const active = employee && String(employee.status || 'Active').toLowerCase() === 'active'
     if (!isPlatformAdmin && (!active || Number(employee?.perm_comms || 0) < 2)) return json({ error: 'Phone permission denied' }, 403)
 
-    const { data: settings, error: sErr } = await db.from('settings')
+    const romylabsContext = phoneContext === 'romylabs' && isPlatformAdmin === true
+    let { data: settings, error: sErr } = await db.from('settings')
       .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did,sw_outbound_did,tenant_id')
       .eq('tenant_id', tenantId).limit(1).maybeSingle()
-    if (sErr || !settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token || (!settings?.sw_outbound_did && !settings?.sw_inbound_did)) {
-      return json({ error: 'SignalWire credentials or caller ID missing for this office.' }, 422)
+    if (romylabsContext && (!settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token)) {
+      const fallback = await db.from('settings')
+        .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did,sw_outbound_did,tenant_id')
+        .not('sw_api_token','is',null).not('sw_space_url','is',null).limit(1).maybeSingle()
+      if (fallback.data) settings = fallback.data
+      if (!sErr) sErr = fallback.error
+    }
+    if (sErr || !settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token) {
+      return json({ error: 'SignalWire credentials missing for this calling context.' }, 422)
     }
 
-    const localDigits = String(settings.sw_outbound_did || '').replace(/\D/g, '')
-    const tollFreeDigits = String(settings.sw_inbound_did || '').replace(/\D/g, '')
-    const normalize = (d: string) => d.length === 10 ? `+1${d}` : (d.length === 11 && d.startsWith('1') ? `+${d}` : '')
-    const localNumber = normalize(localDigits)
-    const tollFreeNumber = normalize(tollFreeDigits)
+    const normalize = (d: string) => {
+      const digits = String(d || '').replace(/\D/g, '')
+      return digits.length === 10 ? `+1${digits}` : (digits.length === 11 && digits.startsWith('1') ? `+${digits}` : '')
+    }
+    const romylabsNumber = normalize(Deno.env.get('ROMYLABS_PHONE_NUMBER') || '')
+    const localNumber = normalize(settings.sw_outbound_did || '')
+    const tollFreeNumber = normalize(settings.sw_inbound_did || '')
     const requestedCallerId = callerIdPreference === 'tollfree' ? tollFreeNumber : localNumber
-    const fromNumber = requestedCallerId || localNumber || tollFreeNumber
-    if (!fromNumber) return json({ error: 'Configured outbound caller ID is invalid.' }, 422)
+    const fromNumber = romylabsContext ? romylabsNumber : (requestedCallerId || localNumber || tollFreeNumber)
+    if (!fromNumber) return json({ error: romylabsContext ? 'RomyLabs phone number is not configured.' : 'Configured outbound caller ID is invalid.' }, 422)
 
     // Real production authorization/provider validation, but guaranteed no call,
     // no outbound_calls insert and no SignalWire request.
