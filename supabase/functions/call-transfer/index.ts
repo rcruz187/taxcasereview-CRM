@@ -159,6 +159,16 @@ serve(async (req) => {
       return json({ error: 'SignalWire credentials missing in Settings' }, 400)
     }
 
+    // The provider CallSid being redirected must belong to an active call
+    // owned by this tenant.
+    const [{ data: inboundOwned }, { data: outboundOwned }] = await Promise.all([
+      db.from('incoming_calls').select('id').eq('tenant_id', effectiveTenantId).eq('callsid', callsid)
+        .in('status', ['ringing','answered']).limit(1).maybeSingle(),
+      db.from('outbound_calls').select('id').eq('tenant_id', effectiveTenantId).eq('provider_call_sid', callsid)
+        .in('status', ['pending','ringing','answered','connected']).limit(1).maybeSingle(),
+    ])
+    if (!inboundOwned && !outboundOwned) return json({ error: 'Call not found — it may have already ended.' }, 404)
+
     let mode = ''
     let target = ''
     if (target_type === 'extension') {
