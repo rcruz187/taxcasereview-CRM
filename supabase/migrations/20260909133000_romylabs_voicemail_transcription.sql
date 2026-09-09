@@ -10,3 +10,11 @@ comment on column public.voicemails.transcription_status is
 create unique index if not exists uq_voicemails_tenant_call_sid
   on public.voicemails (tenant_id, call_sid)
   where call_sid is not null;
+
+create unique index if not exists uq_call_recordings_tenant_call_sid
+  on public.call_recordings (tenant_id, call_sid)
+  where call_sid is not null;
+
+create unique index if not exists uq_call_ai_summaries_tenant_call_sid
+  on public.call_ai_summaries (tenant_id, call_sid)
+  where call_sid is not null;
