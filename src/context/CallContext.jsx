@@ -551,7 +551,9 @@ export function CallProvider({ children, phoneContext = 'taxres' }) {
       // Client/Lead match comes back, same as before.
       setIncomingMatch(data.department ? { name: data.department, isDepartment: true } : null)
       incomingMatchRef.current = null
-      matchCallerToRecord(data.from_number).then(m => { incomingMatchRef.current = m; if (m) setIncomingMatch(m) })
+      if (phoneContext !== 'romylabs') {
+        matchCallerToRecord(data.from_number).then(m => { incomingMatchRef.current = m; if (m) setIncomingMatch(m) })
+      }
 
       // Give-up timer anchored to the row's created_at instead of "when
       // this browser noticed" — so every agent's timer converges on the
@@ -716,7 +718,7 @@ export function CallProvider({ children, phoneContext = 'taxres' }) {
     // Manual dial-pad calls don't know who they're calling yet — check
     // if the number matches an existing client/lead so the recap still
     // attaches to the right record once the call ends.
-    if (!lead.entityType && lead.status === 'Manual') {
+    if (phoneContext !== 'romylabs' && !lead.entityType && lead.status === 'Manual') {
       matchCallerToRecord(lead.phone).then(m => {
         if (m) setActive(prev => (prev === lead ? { ...lead, name: m.name, id: m.id, entityType: m.entityType } : prev))
       })
