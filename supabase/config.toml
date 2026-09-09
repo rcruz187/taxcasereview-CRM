@@ -40,8 +40,6 @@ verify_jwt = false
 [functions.romylabs-voicemail-transcribe]
 # Internal worker: authenticates x-internal-call-secret against service role.
 verify_jwt = false
-[functions.romylabs-hold-music]
-verify_jwt = false
 [functions.romylabs-voicemails]
 verify_jwt = true
 [functions.romylabs-phone-state]
