@@ -30,7 +30,7 @@ serve(async(req)=>{
 
     let {data:settings,error:sErr}=await db.from('settings').select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did').eq('tenant_id',tenantId).limit(1).maybeSingle()
     if(isRomyLabs&&(!settings?.sw_space_url||!settings?.sw_project_id||!settings?.sw_api_token)){
-      const f=await db.from('settings').select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did').not('sw_api_token','is',null).not('sw_space_url','is',null).limit(1).maybeSingle()
+      const f=await db.from('settings').select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did').eq('tenant_id','61a89aef-0e7e-4ea2-b222-44ab2024655a').limit(1).maybeSingle()
       if(f.data)settings=f.data;if(!sErr)sErr=f.error
     }
     if(sErr||!settings?.sw_space_url||!settings?.sw_project_id||!settings?.sw_api_token) return json({error:'SignalWire credentials missing for this calling context.'},400)
