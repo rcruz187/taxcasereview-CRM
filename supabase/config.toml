@@ -60,8 +60,10 @@ verify_jwt = true
 verify_jwt = true
 [functions.call-hold]
 verify_jwt = true
+# Mixed browser/provider endpoint: browser mode authenticates the user's JWT
+# inside the function; provider callback mode validates the server-generated HMAC.
 [functions.call-transfer]
-verify_jwt = true
+verify_jwt = false
 [functions.call-add-participant]
 verify_jwt = true
 [functions.log-call]
