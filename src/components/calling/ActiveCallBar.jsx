@@ -187,7 +187,7 @@ export default function ActiveCallBar() {
     if (!logForm.notes?.trim() || polishing) return
     setPolishing(true)
     const { data, error } = await supabase.functions.invoke('call-recap', {
-      body: { bullets: logForm.notes, contactName: active?.name, outcome: logForm.outcome }
+      body: { bullets: logForm.notes, contactName: active?.name, outcome: logForm.outcome, phoneContext }
     })
     setPolishing(false)
     if (error || data?.error) {
@@ -357,7 +357,7 @@ export default function ActiveCallBar() {
                   label: '↪ Transfer',
                   title: canTransfer ? 'Transfer this call to a teammate or an outside number' : 'Transfer becomes available once the call connects' },
                 { key: 'dialpad', onClick: () => setShowDialpad(d => !d), on: showDialpad, onBg: 'rgba(255,255,255,0.35)',
-                  label: '⌨️ Dialpad', title: 'Open dialpad for IRS prompts' },
+                  label: '⌨️ Dialpad', title: phoneContext === 'romylabs' ? 'Open dialpad for phone menus' : 'Open dialpad for IRS prompts' },
                 { key: 'transcribe', onClick: toggleTranscription, on: transcribing, onBg: 'rgba(239,68,68,0.85)',
                   label: transcribing ? '⏹ Stop' : '🎙️ Transcribe',
                   title: transcribing ? 'Stop transcription' : 'Start live transcription (Chrome only)',
