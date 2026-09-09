@@ -22,7 +22,7 @@ Production base remains untouched.
 - PASS — Business hours Monday–Friday, 9:00 AM–6:00 PM Eastern.
 - PASS — After-hours calls route directly to RomyLabs voicemail.
 - PASS — Server-side 28-second no-answer watchdog sends callers to voicemail even when the Admin Portal is closed.
-- PASS — RomyLabs-branded hold prompt.
+- PASS — RomyLabs conference waiting/hold uses SignalWire provider-native default hold music; no invalid custom waitUrl markup and no extra paid media service.
 - PASS — Inbound browser bridge prioritizes claimed inbound calls before outbound and ignores unclaimed ringing calls.
 - PASS — Voicemail stored under RomyLabs control tenant.
 - PASS — Voicemail inbox supports playback, mark-read, delete, and storage cleanup.
