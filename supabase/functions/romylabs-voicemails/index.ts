@@ -19,7 +19,18 @@ serve(async req=>{
     if(action==='list'){
       const {data,error}=await db.from('voicemails').select('id,from_number,to_number,recording_url,duration_seconds,is_read,created_at').eq('tenant_id',ADMIN_TENANT).order('created_at',{ascending:false}).limit(100)
       if(error)return json({error:error.message},500)
-      return json({ok:true,voicemails:data||[]})
+      const voicemails=[]
+      for(const vm of data||[]){
+        let playback_url=String(vm.recording_url||'')
+        const prefix='storage://voicemails/'
+        if(playback_url.startsWith(prefix)){
+          const path=playback_url.slice(prefix.length)
+          const {data:signed}=await db.storage.from('voicemails').createSignedUrl(path,60*60)
+          playback_url=signed?.signedUrl||''
+        }
+        voicemails.push({...vm,recording_url:playback_url})
+      }
+      return json({ok:true,voicemails})
     }
     if(action==='mark_read'){
       const id=String(body?.id||'')
@@ -33,11 +44,12 @@ serve(async req=>{
       const {data:row}=await db.from('voicemails').select('recording_url').eq('tenant_id',ADMIN_TENANT).eq('id',id).limit(1).maybeSingle()
       const recordingUrl=String(row?.recording_url||'')
       try{
+        const prefix='storage://voicemails/'
         const marker='/storage/v1/object/sign/voicemails/'
-        if(recordingUrl.includes(marker)){
-          const path=decodeURIComponent(recordingUrl.split(marker)[1].split('?')[0]||'')
-          if(path)await db.storage.from('voicemails').remove([path])
-        }
+        let path=''
+        if(recordingUrl.startsWith(prefix)) path=recordingUrl.slice(prefix.length)
+        else if(recordingUrl.includes(marker)) path=decodeURIComponent(recordingUrl.split(marker)[1].split('?')[0]||'')
+        if(path)await db.storage.from('voicemails').remove([path])
       }catch(e){console.error('[romylabs-voicemails] storage cleanup',e)}
       const {error}=await db.from('voicemails').delete().eq('tenant_id',ADMIN_TENANT).eq('id',id)
       return error?json({error:error.message},500):json({ok:true})
