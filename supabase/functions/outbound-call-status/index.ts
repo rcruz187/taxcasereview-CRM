@@ -20,6 +20,7 @@ serve(async(req)=>{
   try{
     const url=new URL(req.url)
     const conf=(url.searchParams.get('conf')||'').trim()
+    const tenant=(url.searchParams.get('tenant')||'').trim()
     if(!/^outbound-[A-Za-z0-9_-]{8,120}$/.test(conf))return new Response('Bad Request',{status:400})
 
     const body=await req.text()
@@ -43,12 +44,16 @@ serve(async(req)=>{
 
     const supabase=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
     const cutoff=new Date(Date.now()-24*60*60*1000).toISOString()
-    const {data:row,error:findErr}=await supabase.from('outbound_calls').select('id,status,created_at').eq('conference_name',conf).gte('created_at',cutoff).limit(1).maybeSingle()
+    let q=supabase.from('outbound_calls').select('id,status,created_at,tenant_id').eq('conference_name',conf).gte('created_at',cutoff)
+    if(tenant)q=q.eq('tenant_id',tenant)
+    const {data:row,error:findErr}=await q.limit(1).maybeSingle()
     if(findErr)throw findErr
     if(!row)return new Response('Not Found',{status:404})
     if(row.status==='completed')return new Response('ok')
 
-    const {error}=await supabase.from('outbound_calls').update({status}).eq('id',row.id).neq('status','completed')
+    let upd=supabase.from('outbound_calls').update({status}).eq('id',row.id).neq('status','completed')
+    if(tenant)upd=upd.eq('tenant_id',tenant)
+    const {error}=await upd
     if(error)throw error
     return new Response('ok')
   }catch(err){
