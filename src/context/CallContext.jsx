@@ -1047,6 +1047,7 @@ export function CallProvider({ children, phoneContext = 'taxres' }) {
   }
 
   const value = {
+    phoneContext,
     relayStatus, incomingCall, incomingMatch, calling, active, elapsed,
     outboundCallerId, setOutboundCallerId,
     logForm, setLogForm, logModal, setLogModal, saving, callToast,
