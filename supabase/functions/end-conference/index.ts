@@ -32,6 +32,14 @@ serve(async(req)=>{
     }
     if(sErr||!settings?.sw_space_url||!settings?.sw_project_id||!settings?.sw_api_token) return json({error:'SignalWire credentials missing for this calling context.'},400)
 
+    const [{data:inConf},{data:outConf}]=await Promise.all([
+      db.from('incoming_calls').select('id').eq('tenant_id',tenantId).eq('conference_name',conferenceName)
+        .in('status',['ringing','answered']).limit(1).maybeSingle(),
+      db.from('outbound_calls').select('id').eq('tenant_id',tenantId).eq('conference_name',conferenceName)
+        .in('status',['pending','ringing','answered','connected']).limit(1).maybeSingle(),
+    ])
+    if(!inConf&&!outConf) return json({ok:true,note:'Call already ended or unavailable'})
+
     const spaceDomain=settings.sw_space_url.replace(/^https?:\/\//,'')
     const providerAuth='Basic '+btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
     const base=`https://${spaceDomain}/api/laml/2010-04-01/Accounts/${settings.sw_project_id}`
