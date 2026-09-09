@@ -21,7 +21,10 @@ serve(async req=>{
   // Browser self-dial: rejoin the active RomyLabs inbound/outbound conference.
   if(normalize(from)===romy){
     const cutoff=new Date(Date.now()-15*60*1000).toISOString()
-    const {data:inc}=await db.from('incoming_calls').select('conference_name,callsid').eq('tenant_id',ADMIN_TENANT).in('status',['ringing','answered']).gte('created_at',cutoff).not('conference_name','is',null).order('claimed_at',{ascending:true,nullsFirst:false}).order('created_at',{ascending:false}).limit(1).maybeSingle()
+    // A browser self-dial belongs to an inbound call only AFTER the owner
+    // has claimed it. Never bridge to an unclaimed ringing call: otherwise an
+    // unrelated inbound ring could hijack an outbound browser bridge.
+    const {data:inc}=await db.from('incoming_calls').select('conference_name,callsid').eq('tenant_id',ADMIN_TENANT).eq('status','answered').gte('created_at',cutoff).not('conference_name','is',null).order('claimed_at',{ascending:false,nullsFirst:false}).limit(1).maybeSingle()
     if(inc?.conference_name){return xml(`<Dial><Conference endConferenceOnExit="false">${inc.conference_name}</Conference></Dial>`)}
     const {data:out}=await db.from('outbound_calls').select('id,conference_name').eq('tenant_id',ADMIN_TENANT).in('status',['pending','ringing','answered','connected']).not('conference_name','is',null).order('created_at',{ascending:false}).limit(1).maybeSingle()
     if(out?.conference_name){await db.from('outbound_calls').update({status:'connected'}).eq('id',out.id).eq('tenant_id',ADMIN_TENANT);return xml(`<Dial><Conference endConferenceOnExit="false">${out.conference_name}</Conference></Dial>`)}
