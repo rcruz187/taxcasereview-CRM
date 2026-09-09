@@ -4,8 +4,6 @@ import { useApp } from '../context/AppContext'
 import { supabase } from '../lib/supabase'
 import AdminPortal from './AdminPortal'
 
-const ROMYLABS_CONTROL_TENANT = 'a0000000-0000-0000-0000-000000000001'
-
 const PLATFORM_OWNER_EMAILS = new Set([
   'info@romylabs.com',
   'romy@romylabs.com',
@@ -24,16 +22,12 @@ export default function AdminPortalGuard() {
     let cancelled = false
 
     async function resetTenantContext() {
-      // /crm-admin uses the dedicated RomyLabs control-plane tenant for
-      // tenant-scoped infrastructure such as phone state and voicemail.
-      // This prevents a previous Jump In — or a TaxRes owner login — from
-      // making RomyLabs calls resolve against the wrong office.
+      // /crm-admin is the platform control plane, never a tenant session.
+      // A previous Jump In may leave BOTH browser state and the durable
+      // admin_tenant_overrides row pointing at CloudCPA/TCR/etc. Clear both
+      // before rendering the portal so tenant context can never bleed in.
       try { sessionStorage.removeItem('admin_impersonation') } catch (_) {}
-      const { error } = await supabase.rpc('set_admin_tenant_override', { p_tenant_id: ROMYLABS_CONTROL_TENANT })
-      if (error) {
-        console.error('Admin Portal control-plane tenant setup failed:', error)
-        if (!cancelled) return
-      }
+      try { await supabase.rpc('set_admin_tenant_override', { p_tenant_id: null }) } catch (_) {}
       if (!cancelled) setPortalReady(true)
     }
 
