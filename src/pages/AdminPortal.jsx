@@ -311,7 +311,7 @@ function AdminDialer() {
           ['2','Support','Rings the RomyLabs Admin Portal'],
           ['3','Billing','Rings the RomyLabs Admin Portal'],
           ['4','Romy','Direct-to-Romy ring path'],
-          ['0','Voicemail','Records directly to RomyLabs voicemail'],
+          ['5','Voicemail','Records directly to RomyLabs voicemail'],
         ].map(([digit,label,desc]) => (
           <div key={digit} style={{ ...S.card, padding:'14px 16px' }}>
             <div style={{ display:'flex', alignItems:'center', gap:9, marginBottom:5 }}>
