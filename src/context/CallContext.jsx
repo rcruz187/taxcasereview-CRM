@@ -450,7 +450,9 @@ export function CallProvider({ children, phoneContext = 'taxres' }) {
     let cancelled = false
     ;(async () => {
       let row = null
-      if (saved.kind === 'outbound') {
+      if (phoneContext === 'romylabs') {
+        row = await restoreCallState(saved)
+      } else if (saved.kind === 'outbound') {
         const { data } = await supabase.from('outbound_calls')
           .select('id,conference_name,status,provider_call_sid')
           .eq('conference_name', saved.conferenceName)
@@ -494,8 +496,7 @@ export function CallProvider({ children, phoneContext = 'taxres' }) {
         const conf = saved.conferenceName
         if (outboundPollRef.current) clearInterval(outboundPollRef.current)
         outboundPollRef.current = setInterval(async () => {
-          const { data: live } = await supabase.from('outbound_calls')
-            .select('status').eq('conference_name', conf).maybeSingle()
+          const { data: live } = await fetchOutboundStatus(conf)
           if (live?.status === 'completed' || live?.status === 'failed') {
             finalizeCallEnd({ alreadyHungUp: true })
             handleRemoteHangup()
@@ -505,8 +506,7 @@ export function CallProvider({ children, phoneContext = 'taxres' }) {
         const callsid = saved.inboundCallsid
         if (inboundStatusPollRef.current) clearInterval(inboundStatusPollRef.current)
         inboundStatusPollRef.current = setInterval(async () => {
-          const { data: live } = await supabase.from('incoming_calls')
-            .select('status').eq('callsid', callsid).maybeSingle()
+          const { data: live } = await fetchIncomingStatus(callsid)
           if (live?.status === 'completed' || live?.status === 'missed') {
             clearInterval(inboundStatusPollRef.current)
             inboundStatusPollRef.current = null
@@ -558,11 +558,7 @@ export function CallProvider({ children, phoneContext = 'taxres' }) {
       // colleague picked up, and its 15s give-up timer would then yank the
       // LIVE call into voicemail mid-conversation.
       if (pendingInboundRef.current && !calling) {
-        const { data: check } = await supabase
-          .from('incoming_calls')
-          .select('status')
-          .eq('callsid', pendingInboundRef.current.callsid)
-          .maybeSingle()
+        const { data: check } = await fetchIncomingStatus(pendingInboundRef.current.callsid)
         if (check?.status === 'missed' || check?.status === 'completed' || check?.status === 'answered') {
           console.log('[poll] call resolved elsewhere — clearing banner, status:', check.status)
           if (inboundTimeoutRef.current) { clearTimeout(inboundTimeoutRef.current); inboundTimeoutRef.current = null }
@@ -575,13 +571,7 @@ export function CallProvider({ children, phoneContext = 'taxres' }) {
       }
 
       if (pendingInboundRef.current || calling) return
-      const { data, error } = await supabase
-        .from('incoming_calls')
-        .select('callsid, conference_name, from_number, department, created_at')
-        .eq('status', 'ringing')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+      const { data, error } = await fetchLatestRinging()
       if (cancelled || error || !data) return
 
       // ── Extension-aware ring stages ──
@@ -655,12 +645,7 @@ export function CallProvider({ children, phoneContext = 'taxres' }) {
     // claimed_at lets receive-call's bridge_pop_claimed RPC pair agent
     // self-dials with claims in FIFO order — the fix for two simultaneous
     // held calls bridging the agent into the wrong caller's conference.
-    const { data: claimed, error: claimErr } = await supabase
-      .from('incoming_calls')
-      .update({ status: 'answered', claimed_by: agentName, claimed_at: new Date().toISOString() })
-      .eq('callsid', row.callsid)
-      .eq('status', 'ringing')
-      .select('callsid')
+    const { data: claimed, error: claimErr } = await claimInbound(row, agentName)
 
     if (claimErr) console.error('incoming_calls claim error:', claimErr)
 
@@ -712,11 +697,7 @@ export function CallProvider({ children, phoneContext = 'taxres' }) {
     const inboundCallsid = row.callsid
     if (inboundStatusPollRef.current) clearInterval(inboundStatusPollRef.current)
     inboundStatusPollRef.current = setInterval(async () => {
-      const { data: row } = await supabase
-        .from('incoming_calls')
-        .select('status')
-        .eq('callsid', inboundCallsid)
-        .maybeSingle()
+      const { data: row } = await fetchIncomingStatus(inboundCallsid)
       if (row?.status === 'completed' || row?.status === 'missed') {
         clearInterval(inboundStatusPollRef.current)
         inboundStatusPollRef.current = null
@@ -833,8 +814,7 @@ export function CallProvider({ children, phoneContext = 'taxres' }) {
         if (activeConferenceRef.current) {
           const conf = activeConferenceRef.current
           outboundPollRef.current = setInterval(async () => {
-            const { data: row } = await supabase.from('outbound_calls')
-              .select('status').eq('conference_name', conf).maybeSingle()
+            const { data: row } = await fetchOutboundStatus(conf)
             if (row?.status === 'completed') {
               finalizeCallEnd({ alreadyHungUp: true })
               handleRemoteHangup()
@@ -897,9 +877,8 @@ export function CallProvider({ children, phoneContext = 'taxres' }) {
       // Conditional on 'answered': after a transfer, this same callsid has
       // a fresh 'ringing' row for the target agent — completing THAT row
       // would kill the transfer. Only our own answered row gets closed.
-      supabase.from('incoming_calls').update({ status: 'completed' })
-        .eq('callsid', inboundCallsid).eq('status', 'answered')
-        .then(({ error }) => error && console.error('incoming_calls completion update error:', error))
+      completeInboundState(inboundCallsid)
+        .catch(error => console.error('incoming_calls completion update error:', error))
     }
   }
 
