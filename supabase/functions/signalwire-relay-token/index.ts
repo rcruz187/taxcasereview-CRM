@@ -55,7 +55,7 @@ serve(async (req) => {
         const { data: isAdmin } = await userClient.rpc('_is_platform_admin')
         platformAdmin = isAdmin === true
         const { data: emp, error: empErr } = await supabase
-          .from('employees').select('extension,tenant_id').eq('email', user.email).maybeSingle()
+          .from('employees').select('extension,tenant_id').ilike('email', user.email).limit(1).maybeSingle()
         if (empErr) console.error('signalwire-relay-token: employee lookup error:', empErr.message)
         if (emp?.tenant_id) agentTenantId = emp.tenant_id
         if (emp?.extension) {
@@ -90,7 +90,7 @@ serve(async (req) => {
     if (!settings || !settings.sw_space_url || !settings.sw_project_id || !settings.sw_api_token) {
       const r = await supabase.from('settings')
         .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did,tenant_id')
-        .not('sw_api_token', 'is', null).not('sw_space_url', 'is', null).not('sw_inbound_did', 'is', null).order('updated_at', { ascending: true }).limit(1).maybeSingle()
+        .eq('tenant_id','61a89aef-0e7e-4ea2-b222-44ab2024655a').limit(1).maybeSingle()
       if (r.data) settings = r.data
       if (!sErr) sErr = r.error
     }
