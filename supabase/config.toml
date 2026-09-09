@@ -29,6 +29,16 @@ verify_jwt = false
 verify_jwt = false
 [functions.voicemail-recorded]
 verify_jwt = false
+[functions.romylabs-receive-call]
+verify_jwt = false
+[functions.romylabs-ivr-route]
+verify_jwt = false
+[functions.romylabs-voicemail-prompt]
+verify_jwt = false
+[functions.romylabs-voicemail-recorded]
+verify_jwt = false
+[functions.romylabs-hold-music]
+verify_jwt = false
 [functions.redirect-to-voicemail]
 verify_jwt = false
 
