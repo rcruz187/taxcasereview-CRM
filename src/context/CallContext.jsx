@@ -893,6 +893,7 @@ export function CallProvider({ children, phoneContext = 'taxres' }) {
 
   function cancelCall() {
     finalizeCallEnd({ alreadyHungUp: false })
+    activeOutboundCallIdRef.current = null
     uiStartedRef.current = false
     clearInterval(timerRef.current)
     setCalling(false)
