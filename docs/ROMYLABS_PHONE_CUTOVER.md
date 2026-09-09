@@ -9,7 +9,7 @@ Current TaxRes toll-free DID: +1 888-334-5052
    - Adds nullable voicemail transcript/status fields.
    - Adds tenant+CallSid idempotency indexes for voicemails, call recordings, and AI summaries.
 2. Deploy the new/updated phone edge functions with the JWT settings in `supabase/config.toml`.
-3. Set `ROMYLABS_PHONE_NUMBER=+15614206999`.
+3. Confirm the RomyLabs control-plane settings row has `sw_inbound_did=+15614206999`.
 4. Confirm the existing SignalWire signing secret and Groq/Gmail configuration remain available to the deployed functions.
 5. Point SignalWire DID +15614206999 voice webhook to:
    `https://mpxgxfqdbquzkrvvejkh.supabase.co/functions/v1/romylabs-receive-call`
