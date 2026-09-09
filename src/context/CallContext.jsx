@@ -578,7 +578,8 @@ export function CallProvider({ children, phoneContext = 'taxres' }) {
       // Extension-targeted calls ("Extension NNN — Name" rows from
       // ivr-extension) ring ONLY the target agent for the first 12s, then
       // escalate to everyone until 22s, then voicemail. General IVR calls
-      // ring everyone immediately with the original 15s window.
+      // ring everyone immediately. RomyLabs uses a ~26s business ring window;
+      // TaxRes keeps its original 15s window.
       // FAIL OPEN: if this browser doesn't know its own extension (none on
       // file / lookup pending), it treats every call as general and rings —
       // extra ringing beats a silent office. The eligibility check happens
@@ -586,7 +587,7 @@ export function CallProvider({ children, phoneContext = 'taxres' }) {
       // the target-only stage still picks the call up when it escalates.
       const TARGET_ONLY_MS = 12000
       const EXT_DEADLINE_MS = 22000
-      const GENERAL_DEADLINE_MS = 15000
+      const GENERAL_DEADLINE_MS = phoneContext === 'romylabs' ? 26000 : 15000
       const extMatch = /^Extension (\d+)\b/.exec(data.department || '')
       const ageMs = Math.max(0, Date.now() - new Date(data.created_at).getTime())
       const myExt = myExtensionRef.current
