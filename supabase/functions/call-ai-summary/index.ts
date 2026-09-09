@@ -39,6 +39,7 @@ serve(async (req) => {
     if (transcribeRes.ok) transcript = await transcribeRes.text()
     else console.error('call-ai-summary: Whisper error', await transcribeRes.text())
 
+    const isRomyLabs = String(tenant_id) === 'a0000000-0000-0000-0000-000000000001'
     let summary = '', key_points: string[] = [], action_items: string[] = [], sentiment = 'Unknown', next_steps = ''
     if (transcript) {
       const analysisRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -47,7 +48,7 @@ serve(async (req) => {
         body: JSON.stringify({
           model: 'llama-3.3-70b-versatile',
           messages: [
-            { role: 'system', content: 'You are an AI assistant for a tax resolution firm. Analyze call transcripts and return JSON only.' },
+            { role: 'system', content: isRomyLabs ? 'You are an AI assistant for RomyLabs, a software company. Analyze business call transcripts and return JSON only. Never assume tax-resolution context.' : 'You are an AI assistant for a tax resolution firm. Analyze call transcripts and return JSON only.' },
             { role: 'user', content: `Analyze this call transcript and return ONLY a JSON object with these keys: summary (2-3 sentences), key_points (array of strings), action_items (array of strings - specific tasks), sentiment (one of: Positive/Neutral/Concerned/Frustrated), next_steps (string).\n\nTranscript:\n${transcript}` }
           ], max_tokens: 1024, temperature: 0.1,
         })
@@ -68,7 +69,7 @@ serve(async (req) => {
 
     let case_id = null, client_id = null, client_name = ''
     const searchPhone = (from_number || to_number || '').replace(/\D/g, '').slice(-10)
-    if (searchPhone) {
+    if (!isRomyLabs && searchPhone) {
       const { data: client } = await supabase.from('clients').select('id, name').eq('tenant_id', tenant_id)
         .or(`phone.ilike.%${searchPhone}%,mobile.ilike.%${searchPhone}%`).limit(1).maybeSingle()
       if (client) {
@@ -85,14 +86,14 @@ serve(async (req) => {
       created_at: new Date().toISOString()
     })
 
-    if (action_items.length > 0 && client_id) {
+    if (!isRomyLabs && action_items.length > 0 && client_id) {
       await supabase.from('tasks').insert(action_items.map((item: string) => ({
         tenant_id, client_id, clientName: client_name, linkedcase: case_id || null,
         title: item, status_label: 'Open', created_at: new Date().toISOString(),
       })))
     }
 
-    if (client_id && (summary || transcript)) {
+    if (!isRomyLabs && client_id && (summary || transcript)) {
       const mins = Math.floor((duration_seconds || 0) / 60), secs = (duration_seconds || 0) % 60
       const duration_str = duration_seconds ? `${mins}m ${secs}s` : 'unknown duration'
       const noteLines = [`📞 Call Summary — ${duration_str} · ${from_number || 'Unknown'}`, '', summary || 'No summary available.']
