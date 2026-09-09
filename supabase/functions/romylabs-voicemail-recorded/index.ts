@@ -48,9 +48,10 @@ serve(async req=>{
     const secret=Deno.env.get('SW_SIGNING_SECRET')||'',sig=req.headers.get('x-signalwire-signature')||''
     if(secret&&!await verify(secret,req.url,params,sig))return resp(403)
     const from=String(form.get('From')||''),to=String(form.get('To')||''),url=String(form.get('RecordingUrl')||''),sid=String(form.get('CallSid')||'').trim(),duration=String(form.get('RecordingDuration')||'')
-    const romy=normalize(Deno.env.get('ROMYLABS_PHONE_NUMBER')||'')
-    if(!sid||normalize(to)!==romy||!swUrl(url))return resp(400)
     const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+    const {data:adminSettings}=await db.from('settings').select('sw_inbound_did').eq('tenant_id',ADMIN_TENANT).limit(1).maybeSingle()
+    const romy=normalize(adminSettings?.sw_inbound_did||'')
+    if(!sid||normalize(to)!==romy||!swUrl(url))return resp(400)
     const {data:existing}=await db.from('voicemails').select('id').eq('tenant_id',ADMIN_TENANT).eq('call_sid',sid).maybeSingle()
     if(existing)return resp()
     const {data:s}=await db.from('settings').select('sw_project_id,sw_api_token').eq('tenant_id','61a89aef-0e7e-4ea2-b222-44ab2024655a').limit(1).maybeSingle()
