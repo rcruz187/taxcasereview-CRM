@@ -1,0 +1,2 @@
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+serve(async()=>{const xml='<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Ruth-Neural" language="en-US">Thank you for calling RomyLabs. Please hold while we connect your call.</Say><Pause length="8"/><Say voice="Polly.Ruth-Neural" language="en-US">We appreciate your patience. Someone will be with you shortly.</Say><Pause length="8"/></Response>';return new Response(xml,{headers:{'Content-Type':'text/xml'}})})
