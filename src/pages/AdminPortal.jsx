@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase'
 import { FIRM, loadFirmBranding, loadFirmBrandingPublic } from '../lib/firmBranding'
 import { useApp } from '../context/AppContext'
 import AIAssistant from '../components/AIAssistant'
+import { CallProvider, useCall } from '../context/CallContext'
 import RomyLabsBilling from '../components/admin/RomyLabsBilling'
 import TrafficCoverage from '../components/admin/TrafficCoverage'
 import CredentialVault from '../components/admin/CredentialVault'
@@ -105,6 +106,7 @@ const NAV = [
   { path:'/crm-admin/traffic',        label:'Traffic Coverage', icon:'🌐' },
   { path:'/crm-admin/vault',          label:'Credential Vault', icon:'🔐' },
   { path:'/crm-admin/email',          label:'Email',          icon:'📧' },
+  { path:'/crm-admin/dialer',         label:'Dialer',         icon:'📞' },
   { path:'/crm-admin/calendar',       label:'Calendar',       icon:'📅' },
   { path:'/crm-admin/meet',           label:'Meet & Training', icon:'🎥' },
   { path:'/crm-admin/chat',           label:'Chat (All)',      icon:'💬' },
@@ -156,6 +158,108 @@ function Sidebar({ onSignOut, mobile=false, onClose }) {
         <button onClick={onSignOut} style={{ ...S.btn('ghost'), width:'100%', justifyContent:'center', fontSize:12, padding:'7px 0' }}>
           Sign Out
         </button>
+      </div>
+    </div>
+  )
+}
+
+
+function AdminDialer() {
+  const {
+    relayStatus, incomingCall, incomingMatch, calling, active, elapsed,
+    startCall, endCall, cancelCall, answerIncoming, declineIncoming,
+    outboundCallerId, setOutboundCallerId,
+  } = useCall()
+  const [number, setNumber] = useState('')
+
+  const clean = number.replace(/\D/g, '')
+  const canCall = relayStatus === 'ready' && !calling && clean.length >= 7
+
+  function placeCall() {
+    if (!canCall) return
+    startCall({
+      id: null,
+      name: number,
+      phone: number,
+      status: 'Manual',
+      entityType: null,
+    })
+  }
+
+  return (
+    <div style={{ padding:'32px 36px', maxWidth:980 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:16, marginBottom:22 }}>
+        <div>
+          <div style={{ fontSize:26, fontWeight:900, color:'#fff', marginBottom:4 }}>RomyLabs Dialer</div>
+          <div style={{ fontSize:13, color:'#64748b' }}>Central calling from the RomyLabs Admin Portal.</div>
+        </div>
+        <div style={{ textAlign:'right' }}>
+          <div style={{ fontSize:10, color:'#64748b', fontWeight:800, textTransform:'uppercase', letterSpacing:'.06em' }}>SignalWire</div>
+          <div style={{ fontSize:13, fontWeight:800, color:relayStatus==='ready'?'#10b981':relayStatus==='error'?'#ef4444':'#f59e0b' }}>
+            {relayStatus==='ready' ? '● Ready' : relayStatus==='connecting' ? '● Connecting' : '● '+relayStatus}
+          </div>
+        </div>
+      </div>
+
+      {incomingCall && (
+        <div style={{ ...S.card, padding:18, marginBottom:16, border:'1px solid rgba(16,185,129,.35)', background:'rgba(16,185,129,.08)' }}>
+          <div style={{ fontSize:11, color:'#6ee7b7', fontWeight:800, textTransform:'uppercase', marginBottom:6 }}>Incoming Call</div>
+          <div style={{ fontSize:18, fontWeight:900, color:'#fff', marginBottom:4 }}>{incomingMatch?.name || incomingCall?.from_number || incomingCall?.from || 'Unknown caller'}</div>
+          <div style={{ display:'flex', gap:8, marginTop:12 }}>
+            <button onClick={answerIncoming} style={{ ...S.btn('primary'), flex:1 }}>Answer</button>
+            <button onClick={declineIncoming} style={{ ...S.btn('danger'), flex:1 }}>Decline</button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ ...S.card, padding:22, maxWidth:560 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', gap:12, marginBottom:16, alignItems:'end' }}>
+          <div>
+            <div style={{ fontSize:10, color:'#64748b', fontWeight:800, textTransform:'uppercase', marginBottom:5 }}>Outbound identity</div>
+            <select value={outboundCallerId} onChange={e=>setOutboundCallerId(e.target.value)}
+              style={{ background:'#12111f', color:'#e2e8f0', border:'1px solid rgba(99,102,241,.3)', borderRadius:8, padding:'8px 10px' }}>
+              <option value="local">Local / RomyLabs</option>
+              <option value="tollfree">Toll-free</option>
+            </select>
+          </div>
+          <div style={{ fontSize:11, color:'#475569', textAlign:'right' }}>
+            Number assignment stays configurable<br/>for the pending SignalWire DIDs.
+          </div>
+        </div>
+
+        <input
+          value={number}
+          onChange={e=>setNumber(e.target.value)}
+          onKeyDown={e=>e.key==='Enter' && placeCall()}
+          placeholder="Enter phone number"
+          inputMode="tel"
+          autoComplete="tel"
+          style={{ width:'100%', boxSizing:'border-box', background:'#0d0c1a', color:'#fff',
+            border:'1px solid rgba(99,102,241,.3)', borderRadius:10, padding:'14px 16px',
+            fontSize:20, letterSpacing:'.04em', marginBottom:12 }}
+        />
+
+        {!calling ? (
+          <button onClick={placeCall} disabled={!canCall}
+            style={{ ...S.btn('primary'), width:'100%', padding:'12px 18px', opacity:canCall?1:.5 }}>
+            📞 Call
+          </button>
+        ) : (
+          <div>
+            <div style={{ fontSize:14, color:'#e2e8f0', marginBottom:12 }}>
+              Calling <strong>{active?.name || active?.phone || number}</strong>
+              <span style={{ color:'#64748b' }}> · {Math.floor(elapsed/60)}:{String(elapsed%60).padStart(2,'0')}</span>
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={()=>endCall()} style={{ ...S.btn('danger'), flex:1 }}>End Call</button>
+              <button onClick={cancelCall} style={{ ...S.btn('ghost') }}>Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginTop:18, fontSize:11, color:'#475569', lineHeight:1.6 }}>
+        Manual Admin Portal calls do not create leads. Call state stays mounted while you move between Admin Portal pages.
       </div>
     </div>
   )
@@ -6425,6 +6529,7 @@ export default function AdminPortal() {
 
   return (
     <ScreenShareProvider>
+    <CallProvider>
     <div className="rl-admin-shell" style={{display:'flex',minHeight:'100vh',background:'#0d0c1a',fontFamily:'system-ui,Arial,sans-serif',width:'100%',overflowX:'hidden'}}>
       <style>{`
         .rl-admin-mobile-bar,.rl-admin-mobile-overlay{display:none}
@@ -6537,6 +6642,7 @@ export default function AdminPortal() {
             <Route path="/audit"          element={<AdminRouteErrorBoundary><AuditLog/></AdminRouteErrorBoundary>}/>
             <Route path="/support"        element={<div style={{padding:8}}><Support/></div>}/>
             <Route path="/email"          element={<div/>}/>
+            <Route path="/dialer"         element={<AdminRouteErrorBoundary><AdminDialer/></AdminRouteErrorBoundary>}/>
             <Route path="/calendar"       element={<AdminRouteErrorBoundary><AdminCalendar/></AdminRouteErrorBoundary>}/>
             <Route path="/meet"           element={<AdminRouteErrorBoundary><AdminTraining/></AdminRouteErrorBoundary>}/>
             <Route path="/training"       element={<AdminRouteErrorBoundary><AdminTraining/></AdminRouteErrorBoundary>}/>
@@ -6547,6 +6653,7 @@ export default function AdminPortal() {
       </div>
       <AIAssistant adminMode />
     </div>
+    </CallProvider>
     </ScreenShareProvider>
   )
 }
