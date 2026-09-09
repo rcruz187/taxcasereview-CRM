@@ -22,9 +22,6 @@ serve(async (req) => {
     const { data: { user }, error: userErr } = await authClient.auth.getUser(token)
     if (userErr || !user?.email) return json({ error: 'Unauthorized' }, 401)
 
-    const { data: tenantId, error: tenantErr } = await authClient.rpc('current_tenant_id')
-    if (tenantErr || !tenantId) return json({ error: 'No active office context' }, 403)
-
     const { destinationNumber, displayName, entityType, callerIdPreference, phoneContext, qa_certification, dry_run } = await req.json()
     const digits = String(destinationNumber || '').replace(/\D/g, '')
     const e164 = digits.length === 10 ? `+1${digits}` : (digits.length === 11 && digits.startsWith('1') ? `+${digits}` : '')
@@ -33,7 +30,13 @@ serve(async (req) => {
     const db = createClient(SUPABASE_URL, SERVICE_KEY)
     const { data: isPlatformAdmin } = await authClient.rpc('_is_platform_admin')
     const romylabsContext = phoneContext === 'romylabs' && isPlatformAdmin === true
-    const effectiveTenantId = romylabsContext ? 'a0000000-0000-0000-0000-000000000001' : tenantId
+    let tenantId: string | null = null
+    if (!romylabsContext) {
+      const { data, error } = await authClient.rpc('current_tenant_id')
+      if (error || !data) return json({ error: 'No active office context' }, 403)
+      tenantId = data
+    }
+    const effectiveTenantId = romylabsContext ? 'a0000000-0000-0000-0000-000000000001' : tenantId!
     const { data: employee } = await db.from('employees')
       .select('tenant_id,name,extension,status,perm_comms')
       .eq('tenant_id', effectiveTenantId)
