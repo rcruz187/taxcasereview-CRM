@@ -233,6 +233,19 @@ function AdminDialer() {
     })
   }
 
+  function callBack(phone, name) {
+    const digits=String(phone||'').replace(/\D/g,'')
+    if (relayStatus !== 'ready' || calling || digits.length < 7) return
+    setNumber(phone)
+    startCall({
+      id:null,
+      name:name || phone || 'RomyLabs Call',
+      phone,
+      status:'Manual',
+      entityType:null,
+    })
+  }
+
   return (
     <div style={{ padding:'32px 36px', maxWidth:980 }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:16, marginBottom:22 }}>
@@ -329,7 +342,10 @@ function AdminDialer() {
               <div style={{ fontSize:12,fontWeight:800,color:'#e2e8f0' }}>{call.name || call.phone || 'RomyLabs Call'}</div>
               <div style={{ fontSize:10,color:'#64748b',marginTop:2 }}>{call.phone || '—'} · {call.created_at?new Date(call.created_at).toLocaleString():'—'}</div>
             </div>
-            <span style={{ fontSize:10,fontWeight:800,padding:'3px 8px',borderRadius:999,background:String(call.status).toLowerCase()==='missed'?'rgba(239,68,68,.12)':'rgba(99,102,241,.12)',color:String(call.status).toLowerCase()==='missed'?'#fca5a5':'#a5b4fc' }}>{call.status}</span>
+            <div style={{ display:'flex',alignItems:'center',gap:6 }}>
+              <span style={{ fontSize:10,fontWeight:800,padding:'3px 8px',borderRadius:999,background:String(call.status).toLowerCase()==='missed'?'rgba(239,68,68,.12)':'rgba(99,102,241,.12)',color:String(call.status).toLowerCase()==='missed'?'#fca5a5':'#a5b4fc' }}>{call.status}</span>
+              {call.phone && <button disabled={relayStatus!=='ready'||calling} onClick={()=>callBack(call.phone,call.name)} style={{ ...S.btn('ghost'),padding:'4px 8px',fontSize:9,opacity:relayStatus==='ready'&&!calling?1:.45 }}>Call Back</button>}
+            </div>
           </div>
         ))}
       </div>
@@ -386,7 +402,8 @@ function AdminDialer() {
                   {vm.created_at ? new Date(vm.created_at).toLocaleString() : '—'}{vm.duration_seconds ? ` · ${vm.duration_seconds}s` : ''}
                 </div>
               </div>
-              <div style={{ display:'flex', gap:6 }}>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap', justifyContent:'flex-end' }}>
+                {vm.from_number && <button disabled={relayStatus!=='ready'||calling} onClick={()=>callBack(vm.from_number,'Voicemail Callback')} style={{ ...S.btn('ghost'),padding:'5px 9px',fontSize:10,opacity:relayStatus==='ready'&&!calling?1:.45 }}>Call Back</button>}
                 {!vm.is_read && <button onClick={()=>markVoicemailRead(vm.id)} style={{ ...S.btn('ghost'),padding:'5px 9px',fontSize:10 }}>Mark read</button>}
                 <button onClick={()=>deleteVoicemail(vm.id)} style={{ ...S.btn('danger'),padding:'5px 9px',fontSize:10 }}>Delete</button>
               </div>
