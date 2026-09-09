@@ -27,7 +27,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const { conference_name, number } = await req.json()
+    const { conference_name, number, phoneContext } = await req.json()
     if (!conference_name || !number) {
       return json({ error: 'conference_name and number required' }, 400)
     }
@@ -57,6 +57,8 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     )
     const { data: { user } } = await userClient.auth.getUser()
+    const { data: isPlatformAdmin } = await userClient.rpc('_is_platform_admin')
+    const isRomyLabs = phoneContext === 'romylabs' && isPlatformAdmin === true
     const userId = user?.id
 
     // Look up the tenant for this user
@@ -66,18 +68,27 @@ serve(async (req) => {
       .eq('user_id', userId)
       .maybeSingle() : { data: null }
 
-    const tenantId = emp?.tenant_id
+    const tenantId = isRomyLabs ? 'a0000000-0000-0000-0000-000000000001' : emp?.tenant_id
 
-    const settingsQuery = supabase
+    let settingsQuery = supabase
       .from('settings')
       .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did')
       .not('sw_api_token', 'is', null)
 
-    if (tenantId) settingsQuery.eq('tenant_id', tenantId)
+    if (tenantId) settingsQuery = settingsQuery.eq('tenant_id', tenantId)
 
-    const { data: settings, error: sErr } = await settingsQuery.limit(1).maybeSingle()
+    let { data: settings, error: sErr } = await settingsQuery.limit(1).maybeSingle()
+    if (isRomyLabs && (!settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token)) {
+      const fallback = await supabase.from('settings')
+        .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did')
+        .not('sw_api_token','is',null).not('sw_space_url','is',null).limit(1).maybeSingle()
+      if (fallback.data) settings = fallback.data
+      if (!sErr) sErr = fallback.error
+    }
 
-    if (sErr || !settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token || !settings?.sw_inbound_did) {
+    const romylabsDid = String(Deno.env.get('ROMYLABS_PHONE_NUMBER') || '').trim()
+    const fromDid = isRomyLabs ? romylabsDid : (settings?.sw_inbound_did || '')
+    if (sErr || !settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token || !fromDid) {
       console.error('call-add-participant: missing SignalWire credentials/DID', sErr)
       return json({ error: 'SignalWire credentials missing in Settings' }, 400)
     }
@@ -104,7 +115,7 @@ serve(async (req) => {
       headers: { Authorization: auth, 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         To: e164,
-        From: settings.sw_inbound_did,
+        From: fromDid,
         Url: joinUrl,
         Method: 'POST',
         Timeout: '30',
