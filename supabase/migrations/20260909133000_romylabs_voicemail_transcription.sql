@@ -1,10 +1,8 @@
 alter table public.voicemails
   add column if not exists transcript text,
-  add column if not exists transcription_status text not null default 'pending';
+  add column if not exists transcription_status text;
 
-update public.voicemails
-set transcription_status = case
-  when coalesce(transcript,'') <> '' then 'complete'
-  else 'pending'
-end
-where transcription_status is null;
+comment on column public.voicemails.transcript is
+  'Optional voicemail transcript. RomyLabs phone workflows populate this field.';
+comment on column public.voicemails.transcription_status is
+  'Optional transcription state used by RomyLabs voicemail workflows.';
