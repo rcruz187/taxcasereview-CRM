@@ -58,7 +58,7 @@ async function matchCallerToRecord(rawNumber) {
   return null
 }
 
-export function CallProvider({ children }) {
+export function CallProvider({ children, phoneContext = 'taxres' }) {
   const { user } = useApp()
   const [relayStatus, setRelayStatus] = useState('connecting')
   const [incomingCall, setIncomingCall] = useState(null)
@@ -71,13 +71,13 @@ export function CallProvider({ children }) {
   const [saving, setSaving] = useState(false)
   const [callToast, setCallToast] = useState('')
   const [outboundCallerId, setOutboundCallerIdState] = useState(() =>
-    localStorage.getItem('taxres_outbound_caller_id') || 'local'
+    localStorage.getItem(phoneContext === 'romylabs' ? 'romylabs_outbound_caller_id' : 'taxres_outbound_caller_id') || 'local'
   )
 
   function setOutboundCallerId(value) {
     const next = value === 'tollfree' ? 'tollfree' : 'local'
     setOutboundCallerIdState(next)
-    try { localStorage.setItem('taxres_outbound_caller_id', next) } catch (_) {}
+    try { localStorage.setItem(phoneContext === 'romylabs' ? 'romylabs_outbound_caller_id' : 'taxres_outbound_caller_id', next) } catch (_) {}
   }
 
   const relayRef = useRef(null)
@@ -288,7 +288,7 @@ export function CallProvider({ children }) {
     async function connect() {
       if (disposed) return
       setRelayStatus('connecting')
-      const { data, error } = await supabase.functions.invoke('signalwire-relay-token')
+      const { data, error } = await supabase.functions.invoke('signalwire-relay-token', { body: { phoneContext } })
       if (disposed) return
       if (error || !data?.jwt_token) {
         setRelayStatus('error')
@@ -562,7 +562,7 @@ export function CallProvider({ children }) {
       const remainingMs = Math.min(deadlineMs, Math.max(1500, deadlineMs - ageMs))
       inboundTimeoutRef.current = setTimeout(() => {
         if (pendingInboundRef.current?.callsid !== data.callsid) return
-        supabase.functions.invoke('redirect-to-voicemail', { body: { callsid: data.callsid } })
+        supabase.functions.invoke('redirect-to-voicemail', { body: { callsid: data.callsid, phoneContext } })
           .then(({ error: e }) => e && console.error('redirect-to-voicemail error:', e))
         pendingInboundRef.current = null
         setIncomingCall(null)
@@ -681,7 +681,7 @@ export function CallProvider({ children }) {
     setIncomingMatch(null)
     pendingInboundRef.current = null
     if (row?.callsid) {
-      supabase.functions.invoke('redirect-to-voicemail', { body: { callsid: row.callsid } })
+      supabase.functions.invoke('redirect-to-voicemail', { body: { callsid: row.callsid, phoneContext } })
         .then(({ error }) => error && console.error('redirect-to-voicemail error:', error))
     }
   }
@@ -734,6 +734,7 @@ export function CallProvider({ children }) {
         displayName: lead.name || lead.clientName || lead.phone || destinationNumber,
         entityType: lead.entityType || (lead.status === 'Manual' ? 'manual' : null),
         callerIdPreference: outboundCallerId,
+        phoneContext,
       }
     })
       .then(async ({ data, error }) => {
