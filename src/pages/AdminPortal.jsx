@@ -6529,7 +6529,7 @@ export default function AdminPortal() {
 
   return (
     <ScreenShareProvider>
-    <CallProvider>
+    <CallProvider phoneContext="romylabs">
     <div className="rl-admin-shell" style={{display:'flex',minHeight:'100vh',background:'#0d0c1a',fontFamily:'system-ui,Arial,sans-serif',width:'100%',overflowX:'hidden'}}>
       <style>{`
         .rl-admin-mobile-bar,.rl-admin-mobile-overlay{display:none}
