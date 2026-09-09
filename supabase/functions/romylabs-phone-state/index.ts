@@ -33,6 +33,32 @@ serve(async req=>{
       return error?json({error:error.message},500):json({ok:true,row:data||null})
     }
 
+    if(action==='recordings'){
+      const [recordings,summaries]=await Promise.all([
+        db.from('call_recordings')
+          .select('id,call_sid,from_number,to_number,recording_url,duration_seconds,created_at')
+          .eq('tenant_id',TENANT).order('created_at',{ascending:false}).limit(50),
+        db.from('call_ai_summaries')
+          .select('id,call_sid,transcript,summary,key_points,action_items,sentiment,next_steps,created_at')
+          .eq('tenant_id',TENANT).order('created_at',{ascending:false}).limit(50),
+      ])
+      const error=recordings.error||summaries.error
+      if(error)return json({error:error.message},500)
+      const bySid=new Map((summaries.data||[]).map((x:any)=>[String(x.call_sid||''),x]))
+      const rows=[]
+      for(const rec of recordings.data||[]){
+        let playback_url=String(rec.recording_url||'')
+        const prefix='storage://voicemails/'
+        if(playback_url.startsWith(prefix)){
+          const path=playback_url.slice(prefix.length)
+          const {data:signed}=await db.storage.from('voicemails').createSignedUrl(path,60*60)
+          playback_url=signed?.signedUrl||''
+        }
+        rows.push({...rec,recording_url:playback_url,ai:bySid.get(String(rec.call_sid||''))||null})
+      }
+      return json({ok:true,recordings:rows})
+    }
+
     if(action==='recent_calls'){
       const [incoming,outbound]=await Promise.all([
         db.from('incoming_calls')
