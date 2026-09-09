@@ -100,7 +100,11 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const romylabsNumber = String(Deno.env.get('ROMYLABS_PHONE_NUMBER') || '').trim()
+    let romylabsNumber = ''
+    if (requestedContext === 'romylabs' && platformAdmin) {
+      const { data: adminPhone } = await supabase.from('settings').select('sw_inbound_did').eq('tenant_id','a0000000-0000-0000-0000-000000000001').limit(1).maybeSingle()
+      romylabsNumber = String(adminPhone?.sw_inbound_did || '').trim()
+    }
     const useRomyLabs = requestedContext === 'romylabs' && platformAdmin && /^\+\d{10,15}$/.test(romylabsNumber)
     if (useRomyLabs) resource = 'romylabs-owner'
 
