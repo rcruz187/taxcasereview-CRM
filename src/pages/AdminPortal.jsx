@@ -10,6 +10,8 @@ import { supabase } from '../lib/supabase'
 import { FIRM, loadFirmBranding, loadFirmBrandingPublic } from '../lib/firmBranding'
 import { useApp } from '../context/AppContext'
 import AIAssistant from '../components/AIAssistant'
+import { CallProvider, useCall } from '../context/CallContext'
+import ActiveCallBar from '../components/calling/ActiveCallBar'
 import RomyLabsBilling from '../components/admin/RomyLabsBilling'
 import TrafficCoverage from '../components/admin/TrafficCoverage'
 import CredentialVault from '../components/admin/CredentialVault'
@@ -105,6 +107,7 @@ const NAV = [
   { path:'/crm-admin/traffic',        label:'Traffic Coverage', icon:'🌐' },
   { path:'/crm-admin/vault',          label:'Credential Vault', icon:'🔐' },
   { path:'/crm-admin/email',          label:'Email',          icon:'📧' },
+  { path:'/crm-admin/dialer',         label:'Dialer',         icon:'📞' },
   { path:'/crm-admin/calendar',       label:'Calendar',       icon:'📅' },
   { path:'/crm-admin/meet',           label:'Meet & Training', icon:'🎥' },
   { path:'/crm-admin/chat',           label:'Chat (All)',      icon:'💬' },
@@ -156,6 +159,272 @@ function Sidebar({ onSignOut, mobile=false, onClose }) {
         <button onClick={onSignOut} style={{ ...S.btn('ghost'), width:'100%', justifyContent:'center', fontSize:12, padding:'7px 0' }}>
           Sign Out
         </button>
+      </div>
+    </div>
+  )
+}
+
+
+function AdminDialer() {
+  const {
+    relayStatus, calling, active, elapsed,
+    startCall, endCall, cancelCall,
+  } = useCall()
+  const [number, setNumber] = useState('')
+  const [voicemails, setVoicemails] = useState([])
+  const [vmLoading, setVmLoading] = useState(true)
+  const [recentCalls, setRecentCalls] = useState([])
+  const [callsLoading, setCallsLoading] = useState(true)
+  const [recordings, setRecordings] = useState([])
+  const [recordingsLoading, setRecordingsLoading] = useState(true)
+
+  const loadVoicemails = useCallback(async () => {
+    setVmLoading(true)
+    const { data, error } = await supabase.functions.invoke('romylabs-voicemails', { body:{ action:'list' } })
+    if (!error && data?.ok) setVoicemails(data.voicemails || [])
+    setVmLoading(false)
+  }, [])
+
+  const loadRecentCalls = useCallback(async () => {
+    setCallsLoading(true)
+    const { data, error } = await supabase.functions.invoke('romylabs-phone-state', { body:{ action:'recent_calls' } })
+    if (!error && data?.ok) setRecentCalls(data.calls || [])
+    setCallsLoading(false)
+  }, [])
+
+  const loadRecordings = useCallback(async () => {
+    setRecordingsLoading(true)
+    const { data, error } = await supabase.functions.invoke('romylabs-phone-state', { body:{ action:'recordings' } })
+    if (!error && data?.ok) setRecordings(data.recordings || [])
+    setRecordingsLoading(false)
+  }, [])
+
+  useEffect(() => {
+    loadVoicemails()
+    loadRecentCalls()
+    loadRecordings()
+    const refreshOnFocus = () => { loadVoicemails(); loadRecentCalls(); loadRecordings() }
+    window.addEventListener('focus', refreshOnFocus)
+    return () => window.removeEventListener('focus', refreshOnFocus)
+  }, [loadVoicemails, loadRecentCalls, loadRecordings])
+
+  async function markVoicemailRead(id) {
+    const { data, error } = await supabase.functions.invoke('romylabs-voicemails', { body:{ action:'mark_read', id } })
+    if (!error && data?.ok) setVoicemails(v => v.map(x => x.id===id ? { ...x, is_read:true } : x))
+  }
+
+  async function deleteVoicemail(id) {
+    if (!window.confirm('Delete this RomyLabs voicemail?')) return
+    const { data, error } = await supabase.functions.invoke('romylabs-voicemails', { body:{ action:'delete', id } })
+    if (!error && data?.ok) setVoicemails(v => v.filter(x => x.id !== id))
+  }
+
+  const clean = number.replace(/\D/g, '')
+  const canCall = relayStatus === 'ready' && !calling && clean.length >= 7
+
+  function placeCall() {
+    if (!canCall) return
+    startCall({
+      id: null,
+      name: number,
+      phone: number,
+      status: 'Manual',
+      entityType: null,
+    })
+  }
+
+  function callBack(phone, name) {
+    const digits=String(phone||'').replace(/\D/g,'')
+    if (relayStatus !== 'ready' || calling || digits.length < 7) return
+    setNumber(phone)
+    startCall({
+      id:null,
+      name:name || phone || 'RomyLabs Call',
+      phone,
+      status:'Manual',
+      entityType:null,
+    })
+  }
+
+  return (
+    <div style={{ padding:'32px 36px', maxWidth:980 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:16, marginBottom:22 }}>
+        <div>
+          <div style={{ fontSize:26, fontWeight:900, color:'#fff', marginBottom:4 }}>RomyLabs Dialer</div>
+          <div style={{ fontSize:13, color:'#64748b' }}>Central calling from the RomyLabs Admin Portal.</div>
+        </div>
+        <div style={{ textAlign:'right' }}>
+          <div style={{ fontSize:10, color:'#64748b', fontWeight:800, textTransform:'uppercase', letterSpacing:'.06em' }}>SignalWire</div>
+          <div style={{ fontSize:13, fontWeight:800, color:relayStatus==='ready'?'#10b981':relayStatus==='error'?'#ef4444':'#f59e0b' }}>
+            {relayStatus==='ready' ? '● Ready' : relayStatus==='connecting' ? '● Connecting' : '● '+relayStatus}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ ...S.card, padding:22, maxWidth:560 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', gap:12, marginBottom:16, alignItems:'end' }}>
+          <div>
+            <div style={{ fontSize:10, color:'#64748b', fontWeight:800, textTransform:'uppercase', marginBottom:5 }}>Outbound identity</div>
+            <div style={{ background:'#12111f', color:'#e2e8f0', border:'1px solid rgba(99,102,241,.3)', borderRadius:8, padding:'8px 10px', fontSize:12, fontWeight:800 }}>
+              RomyLabs Main Line
+            </div>
+          </div>
+          <div style={{ fontSize:11, color:'#475569', textAlign:'right' }}>
+            Number assignment stays configurable<br/>for the pending SignalWire DIDs.
+          </div>
+        </div>
+
+        <input
+          value={number}
+          onChange={e=>setNumber(e.target.value)}
+          onKeyDown={e=>e.key==='Enter' && placeCall()}
+          placeholder="Enter phone number"
+          inputMode="tel"
+          autoComplete="tel"
+          style={{ width:'100%', boxSizing:'border-box', background:'#0d0c1a', color:'#fff',
+            border:'1px solid rgba(99,102,241,.3)', borderRadius:10, padding:'14px 16px',
+            fontSize:20, letterSpacing:'.04em', marginBottom:12 }}
+        />
+
+        {!calling ? (
+          <button onClick={placeCall} disabled={!canCall}
+            style={{ ...S.btn('primary'), width:'100%', padding:'12px 18px', opacity:canCall?1:.5 }}>
+            📞 Call
+          </button>
+        ) : (
+          <div>
+            <div style={{ fontSize:14, color:'#e2e8f0', marginBottom:12 }}>
+              Calling <strong>{active?.name || active?.phone || number}</strong>
+              <span style={{ color:'#64748b' }}> · {Math.floor(elapsed/60)}:{String(elapsed%60).padStart(2,'0')}</span>
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={()=>endCall()} style={{ ...S.btn('danger'), flex:1 }}>End Call</button>
+              <button onClick={cancelCall} style={{ ...S.btn('ghost') }}>Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))', gap:10, marginTop:18 }}>
+        {[
+          ['1','Sales','Rings the RomyLabs Admin Portal'],
+          ['2','Support','Rings the RomyLabs Admin Portal'],
+          ['3','Billing','Rings the RomyLabs Admin Portal'],
+          ['4','Romy','Direct-to-Romy ring path'],
+          ['5','Voicemail','Records directly to RomyLabs voicemail'],
+        ].map(([digit,label,desc]) => (
+          <div key={digit} style={{ ...S.card, padding:'14px 16px' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:9, marginBottom:5 }}>
+              <span style={{ width:25,height:25,borderRadius:7,display:'grid',placeItems:'center',background:'rgba(198,255,0,.12)',color:'#C6FF00',fontWeight:900 }}>{digit}</span>
+              <span style={{ fontSize:13,fontWeight:800,color:'#e2e8f0' }}>{label}</span>
+            </div>
+            <div style={{ fontSize:10,color:'#64748b',lineHeight:1.5 }}>{desc}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ ...S.card, marginTop:18 }}>
+        <div style={{ padding:'14px 16px', borderBottom:'1px solid rgba(99,102,241,.12)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div>
+            <div style={{ fontSize:14,fontWeight:900,color:'#fff' }}>Recent Calls</div>
+            <div style={{ fontSize:10,color:'#64748b',marginTop:2 }}>Inbound, missed and outbound RomyLabs activity</div>
+          </div>
+          <button onClick={loadRecentCalls} style={{ ...S.btn('ghost'), padding:'6px 10px', fontSize:11 }}>Refresh</button>
+        </div>
+        {callsLoading ? <Spinner/> : recentCalls.length===0 ? (
+          <div style={{ padding:28,textAlign:'center',color:'#475569',fontSize:12 }}>No RomyLabs call activity yet.</div>
+        ) : recentCalls.slice(0,25).map((call,i)=>(
+          <div key={call.id} style={{ padding:'10px 16px', display:'flex',alignItems:'center',gap:12,borderBottom:i<Math.min(recentCalls.length,25)-1?'1px solid rgba(99,102,241,.08)':'none' }}>
+            <div style={{ width:30,height:30,borderRadius:9,display:'grid',placeItems:'center',background:call.direction==='Inbound'?'rgba(16,185,129,.1)':'rgba(99,102,241,.1)' }}>
+              {call.direction==='Inbound'?'↙':'↗'}
+            </div>
+            <div style={{ flex:1,minWidth:0 }}>
+              <div style={{ fontSize:12,fontWeight:800,color:'#e2e8f0' }}>{call.name || call.phone || 'RomyLabs Call'}</div>
+              <div style={{ fontSize:10,color:'#64748b',marginTop:2 }}>{call.phone || '—'} · {call.created_at?new Date(call.created_at).toLocaleString():'—'}</div>
+            </div>
+            <div style={{ display:'flex',alignItems:'center',gap:6 }}>
+              <span style={{ fontSize:10,fontWeight:800,padding:'3px 8px',borderRadius:999,background:String(call.status).toLowerCase()==='missed'?'rgba(239,68,68,.12)':'rgba(99,102,241,.12)',color:String(call.status).toLowerCase()==='missed'?'#fca5a5':'#a5b4fc' }}>{call.status}</span>
+              {call.phone && <button disabled={relayStatus!=='ready'||calling} onClick={()=>callBack(call.phone,call.name)} style={{ ...S.btn('ghost'),padding:'4px 8px',fontSize:9,opacity:relayStatus==='ready'&&!calling?1:.45 }}>Call Back</button>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ ...S.card, marginTop:18 }}>
+        <div style={{ padding:'14px 16px', borderBottom:'1px solid rgba(99,102,241,.12)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div>
+            <div style={{ fontSize:14,fontWeight:900,color:'#fff' }}>Recordings & AI Summaries</div>
+            <div style={{ fontSize:10,color:'#64748b',marginTop:2 }}>Private RomyLabs call recordings</div>
+          </div>
+          <button onClick={loadRecordings} style={{ ...S.btn('ghost'), padding:'6px 10px', fontSize:11 }}>Refresh</button>
+        </div>
+        {recordingsLoading ? <Spinner/> : recordings.length===0 ? (
+          <div style={{ padding:28,textAlign:'center',color:'#475569',fontSize:12 }}>No RomyLabs recordings yet.</div>
+        ) : recordings.slice(0,20).map((rec,i)=>(
+          <div key={rec.id} style={{ padding:'13px 16px',borderBottom:i<Math.min(recordings.length,20)-1?'1px solid rgba(99,102,241,.08)':'none' }}>
+            <div style={{ display:'flex',gap:12,alignItems:'flex-start' }}>
+              <div style={{ flex:1,minWidth:0 }}>
+                <div style={{ fontSize:12,fontWeight:800,color:'#e2e8f0' }}>{rec.from_number || 'Unknown'} → {rec.to_number || 'RomyLabs'}</div>
+                <div style={{ fontSize:10,color:'#64748b',marginTop:2 }}>
+                  {rec.created_at?new Date(rec.created_at).toLocaleString():'—'}{rec.duration_seconds?` · ${rec.duration_seconds}s`:''}
+                </div>
+              </div>
+              {rec.ai?.sentiment && <span style={{ fontSize:9,fontWeight:800,padding:'3px 7px',borderRadius:999,background:'rgba(99,102,241,.12)',color:'#a5b4fc' }}>{rec.ai.sentiment}</span>}
+            </div>
+            {rec.recording_url && <audio controls src={rec.recording_url} style={{ width:'100%',height:30,marginTop:9 }} />}
+            {rec.ai?.summary && <div style={{ marginTop:8,fontSize:11,color:'#94a3b8',lineHeight:1.55 }}><strong style={{color:'#cbd5e1'}}>Summary:</strong> {rec.ai.summary}</div>}
+            {rec.ai?.next_steps && <div style={{ marginTop:5,fontSize:11,color:'#64748b',lineHeight:1.5 }}><strong style={{color:'#94a3b8'}}>Next:</strong> {rec.ai.next_steps}</div>}
+            {rec.ai?.transcript && <details style={{ marginTop:8 }}>
+              <summary style={{ cursor:'pointer',fontSize:10,fontWeight:800,color:'#6366f1' }}>View transcript</summary>
+              <div style={{ marginTop:6,padding:'8px 10px',borderRadius:7,background:'rgba(255,255,255,.025)',fontSize:10,color:'#64748b',lineHeight:1.55,whiteSpace:'pre-wrap' }}>{rec.ai.transcript}</div>
+            </details>}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ ...S.card, marginTop:18 }}>
+        <div style={{ padding:'14px 16px', borderBottom:'1px solid rgba(99,102,241,.12)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div>
+            <div style={{ fontSize:14,fontWeight:900,color:'#fff' }}>Voicemail</div>
+            <div style={{ fontSize:10,color:'#64748b',marginTop:2 }}>RomyLabs messages only</div>
+          </div>
+          <button onClick={loadVoicemails} style={{ ...S.btn('ghost'), padding:'6px 10px', fontSize:11 }}>Refresh</button>
+        </div>
+        {vmLoading ? <Spinner/> : voicemails.length===0 ? (
+          <div style={{ padding:28,textAlign:'center',color:'#475569',fontSize:12 }}>No RomyLabs voicemails yet.</div>
+        ) : voicemails.map((vm,i)=>(
+          <div key={vm.id} style={{ padding:'12px 16px', borderBottom:i<voicemails.length-1?'1px solid rgba(99,102,241,.08)':'none', background:vm.is_read?'transparent':'rgba(99,102,241,.06)' }}>
+            <div style={{ display:'flex',alignItems:'center',gap:12 }}>
+              <div style={{ width:32,height:32,borderRadius:10,display:'grid',placeItems:'center',background:'rgba(99,102,241,.12)',fontSize:15 }}>📵</div>
+              <div style={{ flex:1,minWidth:0 }}>
+                <div style={{ fontSize:13,fontWeight:800,color:'#e2e8f0' }}>{vm.from_number || 'Unknown caller'}</div>
+                <div style={{ fontSize:10,color:'#64748b',marginTop:2 }}>
+                  {vm.created_at ? new Date(vm.created_at).toLocaleString() : '—'}{vm.duration_seconds ? ` · ${vm.duration_seconds}s` : ''}
+                </div>
+              </div>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap', justifyContent:'flex-end' }}>
+                {vm.from_number && <button disabled={relayStatus!=='ready'||calling} onClick={()=>callBack(vm.from_number,'Voicemail Callback')} style={{ ...S.btn('ghost'),padding:'5px 9px',fontSize:10,opacity:relayStatus==='ready'&&!calling?1:.45 }}>Call Back</button>}
+                {!vm.is_read && <button onClick={()=>markVoicemailRead(vm.id)} style={{ ...S.btn('ghost'),padding:'5px 9px',fontSize:10 }}>Mark read</button>}
+                <button onClick={()=>deleteVoicemail(vm.id)} style={{ ...S.btn('danger'),padding:'5px 9px',fontSize:10 }}>Delete</button>
+              </div>
+            </div>
+            {vm.recording_url && <audio controls src={vm.recording_url} onPlay={()=>!vm.is_read&&markVoicemailRead(vm.id)} style={{ width:'100%',height:30,marginTop:10 }} />}
+            <div style={{ marginTop:9, padding:'9px 11px', borderRadius:8, background:'rgba(255,255,255,.025)', border:'1px solid rgba(99,102,241,.08)' }}>
+              <div style={{ fontSize:9,fontWeight:800,color:'#475569',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:4 }}>
+                Transcript · {vm.transcription_status || 'pending'}
+              </div>
+              <div style={{ fontSize:11,color:vm.transcript?'#94a3b8':'#475569',lineHeight:1.55,whiteSpace:'pre-wrap' }}>
+                {vm.transcript || (vm.transcription_status==='failed' ? 'Transcription failed — audio is still available.' :
+                  vm.transcription_status==='unavailable' ? 'Transcription is not configured for this recording.' :
+                  vm.transcription_status==='empty' ? 'No speech was detected.' : 'Transcription is processing…')}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop:18, fontSize:11, color:'#475569', lineHeight:1.6 }}>
+        Business hours are Monday–Friday, 9:00 AM–6:00 PM Eastern. After-hours calls go directly to RomyLabs voicemail. Manual Admin Portal calls do not create TaxRes leads.
       </div>
     </div>
   )
@@ -6425,6 +6694,7 @@ export default function AdminPortal() {
 
   return (
     <ScreenShareProvider>
+    <CallProvider phoneContext="romylabs">
     <div className="rl-admin-shell" style={{display:'flex',minHeight:'100vh',background:'#0d0c1a',fontFamily:'system-ui,Arial,sans-serif',width:'100%',overflowX:'hidden'}}>
       <style>{`
         .rl-admin-mobile-bar,.rl-admin-mobile-overlay{display:none}
@@ -6537,6 +6807,7 @@ export default function AdminPortal() {
             <Route path="/audit"          element={<AdminRouteErrorBoundary><AuditLog/></AdminRouteErrorBoundary>}/>
             <Route path="/support"        element={<div style={{padding:8}}><Support/></div>}/>
             <Route path="/email"          element={<div/>}/>
+            <Route path="/dialer"         element={<AdminRouteErrorBoundary><AdminDialer/></AdminRouteErrorBoundary>}/>
             <Route path="/calendar"       element={<AdminRouteErrorBoundary><AdminCalendar/></AdminRouteErrorBoundary>}/>
             <Route path="/meet"           element={<AdminRouteErrorBoundary><AdminTraining/></AdminRouteErrorBoundary>}/>
             <Route path="/training"       element={<AdminRouteErrorBoundary><AdminTraining/></AdminRouteErrorBoundary>}/>
@@ -6547,6 +6818,8 @@ export default function AdminPortal() {
       </div>
       <AIAssistant adminMode />
     </div>
+    <ActiveCallBar />
+    </CallProvider>
     </ScreenShareProvider>
   )
 }

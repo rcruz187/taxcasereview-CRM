@@ -39,6 +39,9 @@ serve(async (req) => {
     let resource = FALLBACK_RESOURCE
     let agentExtension = null
     let agentTenantId = null
+    let platformAdmin = false
+    let requestedContext = 'taxres'
+    try { requestedContext = String((await req.clone().json())?.phoneContext || 'taxres').toLowerCase() } catch (_) {}
     const authHeader = req.headers.get('Authorization')
     if (authHeader) {
       const userClient = createClient(
@@ -49,8 +52,10 @@ serve(async (req) => {
       const { data: { user }, error: userErr } = await userClient.auth.getUser()
       if (userErr) console.error('signalwire-relay-token: could not resolve calling user:', userErr.message)
       if (user?.email) {
+        const { data: isAdmin } = await userClient.rpc('_is_platform_admin')
+        platformAdmin = isAdmin === true
         const { data: emp, error: empErr } = await supabase
-          .from('employees').select('extension,tenant_id').eq('email', user.email).maybeSingle()
+          .from('employees').select('extension,tenant_id').ilike('email', user.email).limit(1).maybeSingle()
         if (empErr) console.error('signalwire-relay-token: employee lookup error:', empErr.message)
         if (emp?.tenant_id) agentTenantId = emp.tenant_id
         if (emp?.extension) {
@@ -85,7 +90,7 @@ serve(async (req) => {
     if (!settings || !settings.sw_space_url || !settings.sw_project_id || !settings.sw_api_token) {
       const r = await supabase.from('settings')
         .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did,tenant_id')
-        .not('sw_api_token', 'is', null).not('sw_space_url', 'is', null).not('sw_inbound_did', 'is', null).order('updated_at', { ascending: true }).limit(1).maybeSingle()
+        .eq('tenant_id','61a89aef-0e7e-4ea2-b222-44ab2024655a').limit(1).maybeSingle()
       if (r.data) settings = r.data
       if (!sErr) sErr = r.error
     }
@@ -94,6 +99,14 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'SignalWire credentials are not fully set up in Settings yet.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
+
+    let romylabsNumber = ''
+    if (requestedContext === 'romylabs' && platformAdmin) {
+      const { data: adminPhone } = await supabase.from('settings').select('sw_inbound_did').eq('tenant_id','a0000000-0000-0000-0000-000000000001').limit(1).maybeSingle()
+      romylabsNumber = String(adminPhone?.sw_inbound_did || '').trim()
+    }
+    const useRomyLabs = requestedContext === 'romylabs' && platformAdmin && /^\+\d{10,15}$/.test(romylabsNumber)
+    if (useRomyLabs) resource = 'romylabs-owner'
 
     const auth = 'Basic ' + btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
     const resp = await fetch(`https://${settings.sw_space_url}/api/relay/rest/jwt`, {
@@ -113,7 +126,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       jwt_token,
       project_id: settings.sw_project_id,
-      caller_number: settings.sw_inbound_did || null,
+      caller_number: useRomyLabs ? romylabsNumber : (settings.sw_inbound_did || null),
+      phone_context: useRomyLabs ? 'romylabs' : 'taxres',
       resource,
       agent_extension: agentExtension,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })

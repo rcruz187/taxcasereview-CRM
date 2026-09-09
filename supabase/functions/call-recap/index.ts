@@ -20,7 +20,7 @@ serve(async (req) => {
   }
 
   try {
-    const { bullets, contactName, outcome } = await req.json()
+    const { bullets, contactName, outcome, phoneContext } = await req.json()
     const notes = String(bullets || '').trim()
 
     if (!notes) {
@@ -45,7 +45,8 @@ serve(async (req) => {
       })
     }
 
-    const prompt = `Turn these rough call notes into a tight, professional call-log entry: 2-4 plain sentences, past tense, no headers, no bullet points, no markdown. Write it the way a staff member would document a call for the case file. Do not invent any detail that wasn't given — if something is unclear, leave it out rather than guessing.\n\nContact: ${String(contactName || 'Unknown').slice(0, 300)}\nOutcome: ${String(outcome || 'Unknown').slice(0, 300)}\nRep's rough notes: ${notes}`
+    const isRomyLabs = phoneContext === 'romylabs'
+    const prompt = `Turn these rough call notes into a tight, professional call-log entry: 2-4 plain sentences, past tense, no headers, no bullet points, no markdown. Write it the way a staff member would document a ${isRomyLabs ? 'business' : 'tax-resolution'} call. Do not invent any detail that wasn't given — if something is unclear, leave it out rather than guessing.\n\nContact: ${String(contactName || 'Unknown').slice(0, 300)}\nOutcome: ${String(outcome || 'Unknown').slice(0, 300)}\nRep's rough notes: ${notes}`
 
     const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -58,7 +59,7 @@ serve(async (req) => {
         max_tokens: 300,
         temperature: 0.2,
         messages: [
-          { role: 'system', content: 'You rewrite tax-resolution call notes. Never invent facts. Return only the polished call note.' },
+          { role: 'system', content: isRomyLabs ? 'You rewrite RomyLabs business call notes. Never invent facts. Return only the polished call note.' : 'You rewrite tax-resolution call notes. Never invent facts. Return only the polished call note.' },
           { role: 'user', content: prompt },
         ],
       }),

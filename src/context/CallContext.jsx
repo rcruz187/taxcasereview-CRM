@@ -58,7 +58,7 @@ async function matchCallerToRecord(rawNumber) {
   return null
 }
 
-export function CallProvider({ children }) {
+export function CallProvider({ children, phoneContext = 'taxres' }) {
   const { user } = useApp()
   const [relayStatus, setRelayStatus] = useState('connecting')
   const [incomingCall, setIncomingCall] = useState(null)
@@ -71,13 +71,13 @@ export function CallProvider({ children }) {
   const [saving, setSaving] = useState(false)
   const [callToast, setCallToast] = useState('')
   const [outboundCallerId, setOutboundCallerIdState] = useState(() =>
-    localStorage.getItem('taxres_outbound_caller_id') || 'local'
+    localStorage.getItem(phoneContext === 'romylabs' ? 'romylabs_outbound_caller_id' : 'taxres_outbound_caller_id') || 'local'
   )
 
   function setOutboundCallerId(value) {
     const next = value === 'tollfree' ? 'tollfree' : 'local'
     setOutboundCallerIdState(next)
-    try { localStorage.setItem('taxres_outbound_caller_id', next) } catch (_) {}
+    try { localStorage.setItem(phoneContext === 'romylabs' ? 'romylabs_outbound_caller_id' : 'taxres_outbound_caller_id', next) } catch (_) {}
   }
 
   const relayRef = useRef(null)
@@ -108,7 +108,7 @@ export function CallProvider({ children }) {
     setHoldBusy(true)
     const next = !onHold
     const { data, error } = await supabase.functions.invoke('call-hold', {
-      body: { conference_name: conf, hold: next },
+      body: { conference_name: conf, hold: next, phoneContext },
     })
     setHoldBusy(false)
     if (error || data?.error) {
@@ -132,6 +132,7 @@ export function CallProvider({ children }) {
         target_type: target.type,
         extension: target.extension || null,
         number: target.number || null,
+        phoneContext,
       },
     })
     if (error || data?.error) return { error: error?.message || data?.error || 'unknown error' }
@@ -150,7 +151,7 @@ export function CallProvider({ children }) {
     const conf = activeConferenceRef.current
     if (!conf) return { error: 'No active call' }
     const { data, error } = await supabase.functions.invoke('call-add-participant', {
-      body: { conference_name: conf, number },
+      body: { conference_name: conf, number, phoneContext },
     })
     if (error || data?.error) return { error: error?.message || data?.error || 'unknown error' }
     showCallToast('📞 Dialing ' + number + ' into this call…')
@@ -242,7 +243,7 @@ export function CallProvider({ children }) {
   // attempt that could fail for an ordinary transient reason (network
   // blip, SignalWire API hiccup).
   async function endConferenceWithRetry(conferenceName, attempt = 1) {
-    const { data, error } = await supabase.functions.invoke('end-conference', { body: { conferenceName } })
+    const { data, error } = await supabase.functions.invoke('end-conference', { body: { conferenceName, phoneContext } })
     if (error || data?.error) {
       if (attempt < 3) {
         setTimeout(() => endConferenceWithRetry(conferenceName, attempt + 1), 2000)
@@ -272,6 +273,69 @@ export function CallProvider({ children }) {
 
   function showCallToast(msg) { setCallToast(msg); setTimeout(() => setCallToast(''), 4000) }
 
+  async function fetchIncomingStatus(callsid) {
+    if (phoneContext === 'romylabs') {
+      const { data, error } = await supabase.functions.invoke('romylabs-phone-state', { body:{ action:'incoming_status', callsid } })
+      return { data: data?.row || null, error: error || (data?.error ? new Error(data.error) : null) }
+    }
+    return supabase.from('incoming_calls').select('status,conference_name,callsid').eq('callsid', callsid).maybeSingle()
+  }
+
+  async function fetchOutboundStatus(conferenceName) {
+    if (phoneContext === 'romylabs') {
+      const { data, error } = await supabase.functions.invoke('romylabs-phone-state', { body:{ action:'outbound_status', conference_name:conferenceName } })
+      return { data: data?.row || null, error: error || (data?.error ? new Error(data.error) : null) }
+    }
+    return supabase.from('outbound_calls').select('id,status,conference_name,provider_call_sid').eq('conference_name', conferenceName).maybeSingle()
+  }
+
+  async function fetchLatestRinging() {
+    if (phoneContext === 'romylabs') {
+      const { data, error } = await supabase.functions.invoke('romylabs-phone-state', { body:{ action:'ringing' } })
+      return { data: data?.row || null, error: error || (data?.error ? new Error(data.error) : null) }
+    }
+    return supabase.from('incoming_calls')
+      .select('callsid, conference_name, from_number, department, created_at')
+      .eq('status', 'ringing')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+  }
+
+  async function claimInbound(row, agentName) {
+    if (phoneContext === 'romylabs') {
+      const { data, error } = await supabase.functions.invoke('romylabs-phone-state', {
+        body:{ action:'claim', callsid:row.callsid, claimed_by:agentName }
+      })
+      return { data: data?.claimed || [], error: error || (data?.error ? new Error(data.error) : null) }
+    }
+    return supabase.from('incoming_calls')
+      .update({ status: 'answered', claimed_by: agentName, claimed_at: new Date().toISOString() })
+      .eq('callsid', row.callsid)
+      .eq('status', 'ringing')
+      .select('callsid')
+  }
+
+  async function restoreCallState(saved) {
+    if (phoneContext !== 'romylabs') return null
+    const action = saved.kind === 'outbound' ? 'restore_outbound' : 'restore_inbound'
+    const body = saved.kind === 'outbound'
+      ? { action, conference_name:saved.conferenceName }
+      : { action, callsid:saved.inboundCallsid }
+    const { data, error } = await supabase.functions.invoke('romylabs-phone-state', { body })
+    if (error || data?.error) return null
+    return data?.row || null
+  }
+
+  async function completeInboundState(callsid) {
+    if (phoneContext === 'romylabs') {
+      await supabase.functions.invoke('romylabs-phone-state', { body:{ action:'complete_inbound', callsid } })
+      return
+    }
+    await supabase.from('incoming_calls').update({ status: 'completed' })
+      .eq('callsid', callsid).eq('status', 'answered')
+  }
+
   useEffect(() => {
     let disposed = false
     let audioEl = document.createElement('audio')
@@ -288,7 +352,7 @@ export function CallProvider({ children }) {
     async function connect() {
       if (disposed) return
       setRelayStatus('connecting')
-      const { data, error } = await supabase.functions.invoke('signalwire-relay-token')
+      const { data, error } = await supabase.functions.invoke('signalwire-relay-token', { body: { phoneContext } })
       if (disposed) return
       if (error || !data?.jwt_token) {
         setRelayStatus('error')
@@ -386,7 +450,9 @@ export function CallProvider({ children }) {
     let cancelled = false
     ;(async () => {
       let row = null
-      if (saved.kind === 'outbound') {
+      if (phoneContext === 'romylabs') {
+        row = await restoreCallState(saved)
+      } else if (saved.kind === 'outbound') {
         const { data } = await supabase.from('outbound_calls')
           .select('id,conference_name,status,provider_call_sid')
           .eq('conference_name', saved.conferenceName)
@@ -430,8 +496,7 @@ export function CallProvider({ children }) {
         const conf = saved.conferenceName
         if (outboundPollRef.current) clearInterval(outboundPollRef.current)
         outboundPollRef.current = setInterval(async () => {
-          const { data: live } = await supabase.from('outbound_calls')
-            .select('status').eq('conference_name', conf).maybeSingle()
+          const { data: live } = await fetchOutboundStatus(conf)
           if (live?.status === 'completed' || live?.status === 'failed') {
             finalizeCallEnd({ alreadyHungUp: true })
             handleRemoteHangup()
@@ -441,8 +506,7 @@ export function CallProvider({ children }) {
         const callsid = saved.inboundCallsid
         if (inboundStatusPollRef.current) clearInterval(inboundStatusPollRef.current)
         inboundStatusPollRef.current = setInterval(async () => {
-          const { data: live } = await supabase.from('incoming_calls')
-            .select('status').eq('callsid', callsid).maybeSingle()
+          const { data: live } = await fetchIncomingStatus(callsid)
           if (live?.status === 'completed' || live?.status === 'missed') {
             clearInterval(inboundStatusPollRef.current)
             inboundStatusPollRef.current = null
@@ -494,11 +558,7 @@ export function CallProvider({ children }) {
       // colleague picked up, and its 15s give-up timer would then yank the
       // LIVE call into voicemail mid-conversation.
       if (pendingInboundRef.current && !calling) {
-        const { data: check } = await supabase
-          .from('incoming_calls')
-          .select('status')
-          .eq('callsid', pendingInboundRef.current.callsid)
-          .maybeSingle()
+        const { data: check } = await fetchIncomingStatus(pendingInboundRef.current.callsid)
         if (check?.status === 'missed' || check?.status === 'completed' || check?.status === 'answered') {
           console.log('[poll] call resolved elsewhere — clearing banner, status:', check.status)
           if (inboundTimeoutRef.current) { clearTimeout(inboundTimeoutRef.current); inboundTimeoutRef.current = null }
@@ -511,20 +571,15 @@ export function CallProvider({ children }) {
       }
 
       if (pendingInboundRef.current || calling) return
-      const { data, error } = await supabase
-        .from('incoming_calls')
-        .select('callsid, conference_name, from_number, department, created_at')
-        .eq('status', 'ringing')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+      const { data, error } = await fetchLatestRinging()
       if (cancelled || error || !data) return
 
       // ── Extension-aware ring stages ──
       // Extension-targeted calls ("Extension NNN — Name" rows from
       // ivr-extension) ring ONLY the target agent for the first 12s, then
       // escalate to everyone until 22s, then voicemail. General IVR calls
-      // ring everyone immediately with the original 15s window.
+      // ring everyone immediately. RomyLabs uses a ~26s business ring window;
+      // TaxRes keeps its original 15s window.
       // FAIL OPEN: if this browser doesn't know its own extension (none on
       // file / lookup pending), it treats every call as general and rings —
       // extra ringing beats a silent office. The eligibility check happens
@@ -532,7 +587,7 @@ export function CallProvider({ children }) {
       // the target-only stage still picks the call up when it escalates.
       const TARGET_ONLY_MS = 12000
       const EXT_DEADLINE_MS = 22000
-      const GENERAL_DEADLINE_MS = 15000
+      const GENERAL_DEADLINE_MS = phoneContext === 'romylabs' ? 26000 : 15000
       const extMatch = /^Extension (\d+)\b/.exec(data.department || '')
       const ageMs = Math.max(0, Date.now() - new Date(data.created_at).getTime())
       const myExt = myExtensionRef.current
@@ -551,7 +606,9 @@ export function CallProvider({ children }) {
       // Client/Lead match comes back, same as before.
       setIncomingMatch(data.department ? { name: data.department, isDepartment: true } : null)
       incomingMatchRef.current = null
-      matchCallerToRecord(data.from_number).then(m => { incomingMatchRef.current = m; if (m) setIncomingMatch(m) })
+      if (phoneContext !== 'romylabs') {
+        matchCallerToRecord(data.from_number).then(m => { incomingMatchRef.current = m; if (m) setIncomingMatch(m) })
+      }
 
       // Give-up timer anchored to the row's created_at instead of "when
       // this browser noticed" — so every agent's timer converges on the
@@ -562,7 +619,7 @@ export function CallProvider({ children }) {
       const remainingMs = Math.min(deadlineMs, Math.max(1500, deadlineMs - ageMs))
       inboundTimeoutRef.current = setTimeout(() => {
         if (pendingInboundRef.current?.callsid !== data.callsid) return
-        supabase.functions.invoke('redirect-to-voicemail', { body: { callsid: data.callsid } })
+        supabase.functions.invoke('redirect-to-voicemail', { body: { callsid: data.callsid, phoneContext } })
           .then(({ error: e }) => e && console.error('redirect-to-voicemail error:', e))
         pendingInboundRef.current = null
         setIncomingCall(null)
@@ -589,12 +646,7 @@ export function CallProvider({ children }) {
     // claimed_at lets receive-call's bridge_pop_claimed RPC pair agent
     // self-dials with claims in FIFO order — the fix for two simultaneous
     // held calls bridging the agent into the wrong caller's conference.
-    const { data: claimed, error: claimErr } = await supabase
-      .from('incoming_calls')
-      .update({ status: 'answered', claimed_by: agentName, claimed_at: new Date().toISOString() })
-      .eq('callsid', row.callsid)
-      .eq('status', 'ringing')
-      .select('callsid')
+    const { data: claimed, error: claimErr } = await claimInbound(row, agentName)
 
     if (claimErr) console.error('incoming_calls claim error:', claimErr)
 
@@ -646,11 +698,7 @@ export function CallProvider({ children }) {
     const inboundCallsid = row.callsid
     if (inboundStatusPollRef.current) clearInterval(inboundStatusPollRef.current)
     inboundStatusPollRef.current = setInterval(async () => {
-      const { data: row } = await supabase
-        .from('incoming_calls')
-        .select('status')
-        .eq('callsid', inboundCallsid)
-        .maybeSingle()
+      const { data: row } = await fetchIncomingStatus(inboundCallsid)
       if (row?.status === 'completed' || row?.status === 'missed') {
         clearInterval(inboundStatusPollRef.current)
         inboundStatusPollRef.current = null
@@ -681,7 +729,7 @@ export function CallProvider({ children }) {
     setIncomingMatch(null)
     pendingInboundRef.current = null
     if (row?.callsid) {
-      supabase.functions.invoke('redirect-to-voicemail', { body: { callsid: row.callsid } })
+      supabase.functions.invoke('redirect-to-voicemail', { body: { callsid: row.callsid, phoneContext } })
         .then(({ error }) => error && console.error('redirect-to-voicemail error:', error))
     }
   }
@@ -716,7 +764,7 @@ export function CallProvider({ children }) {
     // Manual dial-pad calls don't know who they're calling yet — check
     // if the number matches an existing client/lead so the recap still
     // attaches to the right record once the call ends.
-    if (!lead.entityType && lead.status === 'Manual') {
+    if (phoneContext !== 'romylabs' && !lead.entityType && lead.status === 'Manual') {
       matchCallerToRecord(lead.phone).then(m => {
         if (m) setActive(prev => (prev === lead ? { ...lead, name: m.name, id: m.id, entityType: m.entityType } : prev))
       })
@@ -734,6 +782,7 @@ export function CallProvider({ children }) {
         displayName: lead.name || lead.clientName || lead.phone || destinationNumber,
         entityType: lead.entityType || (lead.status === 'Manual' ? 'manual' : null),
         callerIdPreference: outboundCallerId,
+        phoneContext,
       }
     })
       .then(async ({ data, error }) => {
@@ -766,8 +815,7 @@ export function CallProvider({ children }) {
         if (activeConferenceRef.current) {
           const conf = activeConferenceRef.current
           outboundPollRef.current = setInterval(async () => {
-            const { data: row } = await supabase.from('outbound_calls')
-              .select('status').eq('conference_name', conf).maybeSingle()
+            const { data: row } = await fetchOutboundStatus(conf)
             if (row?.status === 'completed') {
               finalizeCallEnd({ alreadyHungUp: true })
               handleRemoteHangup()
@@ -830,9 +878,8 @@ export function CallProvider({ children }) {
       // Conditional on 'answered': after a transfer, this same callsid has
       // a fresh 'ringing' row for the target agent — completing THAT row
       // would kill the transfer. Only our own answered row gets closed.
-      supabase.from('incoming_calls').update({ status: 'completed' })
-        .eq('callsid', inboundCallsid).eq('status', 'answered')
-        .then(({ error }) => error && console.error('incoming_calls completion update error:', error))
+      completeInboundState(inboundCallsid)
+        .catch(error => console.error('incoming_calls completion update error:', error))
     }
   }
 
@@ -847,6 +894,7 @@ export function CallProvider({ children }) {
 
   function cancelCall() {
     finalizeCallEnd({ alreadyHungUp: false })
+    activeOutboundCallIdRef.current = null
     uiStartedRef.current = false
     clearInterval(timerRef.current)
     setCalling(false)
@@ -857,6 +905,42 @@ export function CallProvider({ children }) {
   async function saveCallLog(onSaved) {
     if (!active) return
     setSaving(true)
+
+    if (phoneContext === 'romylabs') {
+      const direction = activeOutboundCallIdRef.current ? 'Outbound' : 'Inbound'
+      const { data, error } = await supabase.functions.invoke('romylabs-phone-state', {
+        body: {
+          action: 'save_log',
+          raw_call_id: activeOutboundCallIdRef.current || null,
+          client_name: active.name || 'RomyLabs Call',
+          phone: active.phone || '',
+          outcome: logForm.outcome,
+          notes: logForm.notes,
+          duration: logForm.duration || formatTime(elapsed),
+          direction,
+        }
+      })
+      setSaving(false)
+      if (error || data?.error) {
+        showCallToast('Error: ' + (data?.error || error?.message || 'Unable to save call log'))
+        return
+      }
+      const record = {
+        clientName: active.name || 'RomyLabs Call',
+        phone: active.phone || '',
+        outcome: logForm.outcome,
+        notes: logForm.notes,
+        duration: logForm.duration || formatTime(elapsed),
+        direction,
+      }
+      showCallToast('Call logged!')
+      setLogModal(false)
+      activeOutboundCallIdRef.current = null
+      setActive(null)
+      setElapsed(0)
+      onSaved?.(record)
+      return
+    }
     const record = {
       leadId: active.id,
       clientName: active.name || `${active.first || ''} ${active.last || ''}`.trim(),
@@ -965,6 +1049,7 @@ export function CallProvider({ children }) {
   }
 
   const value = {
+    phoneContext,
     relayStatus, incomingCall, incomingMatch, calling, active, elapsed,
     outboundCallerId, setOutboundCallerId,
     logForm, setLogForm, logModal, setLogModal, saving, callToast,

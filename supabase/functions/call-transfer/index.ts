@@ -44,14 +44,20 @@ async function browserIdentity(req: Request) {
   const client = createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: `Bearer ${token}` } } })
   const { data: { user }, error } = await client.auth.getUser(token)
   if (error || !user?.email) return null
+  const { data: isPlatformAdmin } = await client.rpc('_is_platform_admin')
   const db = serviceDb()
   const { data: employee } = await db.from('employees')
     .select('tenant_id,status,email')
     .ilike('email', user.email)
     .limit(1)
     .maybeSingle()
-  if (!employee?.tenant_id || String(employee.status || 'Active').toLowerCase() !== 'active') return null
-  return { user, tenantId: employee.tenant_id as string }
+  const admin = isPlatformAdmin === true
+  if (!admin && (!employee?.tenant_id || String(employee.status || 'Active').toLowerCase() !== 'active')) return null
+  return {
+    user,
+    tenantId: (employee?.tenant_id || 'a0000000-0000-0000-0000-000000000001') as string,
+    isPlatformAdmin: admin,
+  }
 }
 
 serve(async (req) => {
@@ -87,7 +93,11 @@ serve(async (req) => {
 
       if (mode === 'num') {
         if (!/^\+1\d{10}$/.test(target)) return xml('<Say>We are sorry, this transfer is no longer available. Goodbye.</Say><Hangup/>')
-        const callerId = settings?.sw_inbound_did || ''
+        let callerId = settings?.sw_inbound_did || ''
+        if (tenantId === 'a0000000-0000-0000-0000-000000000001') {
+          const { data: adminPhone } = await db.from('settings').select('sw_inbound_did').eq('tenant_id',tenantId).limit(1).maybeSingle()
+          callerId = adminPhone?.sw_inbound_did || ''
+        }
         return xml(
           '<Say voice="Polly.Joanna-Neural">Please hold while we transfer your call.</Say>' +
           `<Dial timeout="30"${callerId ? ` callerId="${callerId}"` : ''}>${target}</Dial>` +
@@ -133,16 +143,35 @@ serve(async (req) => {
     const identity = await browserIdentity(req)
     if (!identity) return json({ error: 'Unauthorized' }, 401)
 
-    const { callsid, target_type, extension, number } = await req.json()
+    const { callsid, target_type, extension, number, phoneContext } = await req.json()
     if (!callsid || !target_type) return json({ error: 'callsid and target_type required' }, 400)
 
     const db = serviceDb()
-    const { data: settings, error: sErr } = await db.from('settings')
+    const isRomyLabs = phoneContext === 'romylabs' && identity.isPlatformAdmin === true
+    const effectiveTenantId = isRomyLabs ? 'a0000000-0000-0000-0000-000000000001' : identity.tenantId
+    let { data: settings, error: sErr } = await db.from('settings')
       .select('sw_space_url,sw_project_id,sw_api_token')
-      .eq('tenant_id', identity.tenantId).limit(1).maybeSingle()
+      .eq('tenant_id', effectiveTenantId).limit(1).maybeSingle()
+    if (isRomyLabs && (!settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token)) {
+      const fallback = await db.from('settings')
+        .select('sw_space_url,sw_project_id,sw_api_token')
+        .eq('tenant_id','61a89aef-0e7e-4ea2-b222-44ab2024655a').limit(1).maybeSingle()
+      if (fallback.data) settings = fallback.data
+      if (!sErr) sErr = fallback.error
+    }
     if (sErr || !settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token) {
       return json({ error: 'SignalWire credentials missing in Settings' }, 400)
     }
+
+    // The provider CallSid being redirected must belong to an active call
+    // owned by this tenant.
+    const [{ data: inboundOwned }, { data: outboundOwned }] = await Promise.all([
+      db.from('incoming_calls').select('id').eq('tenant_id', effectiveTenantId).eq('callsid', callsid)
+        .in('status', ['ringing','answered']).limit(1).maybeSingle(),
+      db.from('outbound_calls').select('id').eq('tenant_id', effectiveTenantId).eq('provider_call_sid', callsid)
+        .in('status', ['pending','ringing','answered','connected']).limit(1).maybeSingle(),
+    ])
+    if (!inboundOwned && !outboundOwned) return json({ error: 'Call not found — it may have already ended.' }, 404)
 
     let mode = ''
     let target = ''
@@ -150,7 +179,7 @@ serve(async (req) => {
       target = String(extension || '').replace(/\D/g, '')
       if (!target) return json({ error: 'Pick a teammate to transfer to.' }, 400)
       const { data: emp } = await db.from('employees')
-        .select('id').eq('tenant_id', identity.tenantId).eq('extension', target).limit(1)
+        .select('id').eq('tenant_id', effectiveTenantId).eq('extension', target).limit(1)
       if (!emp?.length) return json({ error: `No employee has extension ${target}.` }, 404)
       mode = 'ext'
     } else if (target_type === 'external') {
@@ -161,8 +190,8 @@ serve(async (req) => {
       mode = 'num'
     } else return json({ error: 'target_type must be extension or external' }, 400)
 
-    const sig = await hmac(`${callsid}|${identity.tenantId}|${mode}|${target}`)
-    const params = new URLSearchParams({ laml: '1', mode, tenant: identity.tenantId, sig })
+    const sig = await hmac(`${callsid}|${effectiveTenantId}|${mode}|${target}`)
+    const params = new URLSearchParams({ laml: '1', mode, tenant: effectiveTenantId, sig })
     if (mode === 'ext') params.set('ext', target); else params.set('num', target)
     const lamlUrl = `${SELF_URL}?${params.toString()}`
 
@@ -180,7 +209,7 @@ serve(async (req) => {
     }
 
     await db.from('incoming_calls').update({ status: 'completed' })
-      .eq('tenant_id', identity.tenantId).eq('callsid', callsid).eq('status', 'answered')
+      .eq('tenant_id', effectiveTenantId).eq('callsid', callsid).eq('status', 'answered')
     return json({ ok: true })
   } catch (err) {
     console.error('call-transfer error:', err)

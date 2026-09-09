@@ -20,6 +20,7 @@ serve(async (req) => {
   try {
     const url = new URL(req.url)
     const confFromQuery = url.searchParams.get('conf')
+    const tenantFromQuery = url.searchParams.get('tenant')
     const body = await req.text()
     const params = new URLSearchParams(body)
     const event = params.get('StatusCallbackEvent') || ''
@@ -49,11 +50,17 @@ serve(async (req) => {
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
     if (confName) {
-      await supabase.from('incoming_calls').update({ status: 'completed' }).eq('conference_name', confName).eq('status', 'answered')
-      await supabase.from('incoming_calls').update({ status: 'missed' }).eq('conference_name', confName).eq('status', 'ringing')
+      let answered = supabase.from('incoming_calls').update({ status: 'completed' }).eq('conference_name', confName).eq('status', 'answered')
+      let ringing = supabase.from('incoming_calls').update({ status: 'missed' }).eq('conference_name', confName).eq('status', 'ringing')
+      if (tenantFromQuery) { answered = answered.eq('tenant_id', tenantFromQuery); ringing = ringing.eq('tenant_id', tenantFromQuery) }
+      await answered
+      await ringing
     } else {
-      await supabase.from('incoming_calls').update({ status: 'completed' }).eq('callsid', callSid).eq('status', 'answered')
-      await supabase.from('incoming_calls').update({ status: 'missed' }).eq('callsid', callSid).eq('status', 'ringing')
+      let answered = supabase.from('incoming_calls').update({ status: 'completed' }).eq('callsid', callSid).eq('status', 'answered')
+      let ringing = supabase.from('incoming_calls').update({ status: 'missed' }).eq('callsid', callSid).eq('status', 'ringing')
+      if (tenantFromQuery) { answered = answered.eq('tenant_id', tenantFromQuery); ringing = ringing.eq('tenant_id', tenantFromQuery) }
+      await answered
+      await ringing
     }
     return new Response('ok')
   } catch (err) {

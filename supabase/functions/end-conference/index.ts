@@ -16,14 +16,29 @@ serve(async(req)=>{
     const authClient=createClient(SUPABASE_URL,ANON_KEY,{global:{headers:{Authorization:`Bearer ${token}`}}})
     const {data:{user},error:userErr}=await authClient.auth.getUser(token)
     if(userErr||!user?.email) return json({error:'Unauthorized'},401)
-    const {conferenceName}=await req.json()
+    const {conferenceName,phoneContext}=await req.json()
     if(!conferenceName||!/^[A-Za-z0-9_-]+$/.test(conferenceName)) return json({error:'valid conferenceName required'},400)
 
     const db=createClient(SUPABASE_URL,SERVICE_KEY)
+    const {data:isPlatformAdmin}=await authClient.rpc('_is_platform_admin')
+    const isRomyLabs=phoneContext==='romylabs'&&isPlatformAdmin===true
     const {data:emp}=await db.from('employees').select('tenant_id,status').ilike('email',user.email).limit(1).maybeSingle()
-    if(!emp?.tenant_id||String(emp.status||'Active').toLowerCase()!=='active') return json({error:'Unauthorized'},403)
-    const {data:settings,error:sErr}=await db.from('settings').select('sw_space_url,sw_project_id,sw_api_token').eq('tenant_id',emp.tenant_id).limit(1).maybeSingle()
-    if(sErr||!settings?.sw_space_url||!settings?.sw_project_id||!settings?.sw_api_token) return json({error:'SignalWire credentials missing for this office.'},400)
+    const tenantId=isRomyLabs?'a0000000-0000-0000-0000-000000000001':emp?.tenant_id
+    if(!tenantId||(!isRomyLabs&&String(emp?.status||'Active').toLowerCase()!=='active')) return json({error:'Unauthorized'},403)
+    let {data:settings,error:sErr}=await db.from('settings').select('sw_space_url,sw_project_id,sw_api_token').eq('tenant_id',tenantId).limit(1).maybeSingle()
+    if(isRomyLabs&&(!settings?.sw_space_url||!settings?.sw_project_id||!settings?.sw_api_token)){
+      const f=await db.from('settings').select('sw_space_url,sw_project_id,sw_api_token').eq('tenant_id','61a89aef-0e7e-4ea2-b222-44ab2024655a').limit(1).maybeSingle()
+      if(f.data)settings=f.data;if(!sErr)sErr=f.error
+    }
+    if(sErr||!settings?.sw_space_url||!settings?.sw_project_id||!settings?.sw_api_token) return json({error:'SignalWire credentials missing for this calling context.'},400)
+
+    const [{data:inConf},{data:outConf}]=await Promise.all([
+      db.from('incoming_calls').select('id').eq('tenant_id',tenantId).eq('conference_name',conferenceName)
+        .in('status',['ringing','answered']).limit(1).maybeSingle(),
+      db.from('outbound_calls').select('id').eq('tenant_id',tenantId).eq('conference_name',conferenceName)
+        .in('status',['pending','ringing','answered','connected']).limit(1).maybeSingle(),
+    ])
+    if(!inConf&&!outConf) return json({ok:true,note:'Call already ended or unavailable'})
 
     const spaceDomain=settings.sw_space_url.replace(/^https?:\/\//,'')
     const providerAuth='Basic '+btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
@@ -40,8 +55,8 @@ serve(async(req)=>{
 
     const updResp=await fetch(`${base}/Conferences/${conferenceSid}.json`,{method:'POST',headers:{Authorization:providerAuth,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({Status:'completed'})})
     if(!updResp.ok) return json({error:'SignalWire rejected conference termination.'},502)
-    await db.from('outbound_calls').update({status:'completed'}).eq('tenant_id',emp.tenant_id).eq('conference_name',conferenceName).neq('status','completed')
-    await db.from('incoming_calls').update({status:'completed'}).eq('tenant_id',emp.tenant_id).eq('conference_name',conferenceName).eq('status','answered')
+    await db.from('outbound_calls').update({status:'completed'}).eq('tenant_id',tenantId).eq('conference_name',conferenceName).neq('status','completed')
+    await db.from('incoming_calls').update({status:'completed'}).eq('tenant_id',tenantId).eq('conference_name',conferenceName).eq('status','answered')
     return json({ok:true})
   }catch(err){console.error('end-conference error:',err);return json({error:'Unable to end conference.'},500)}
 })

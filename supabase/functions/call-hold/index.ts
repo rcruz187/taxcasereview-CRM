@@ -17,21 +17,38 @@ serve(async(req)=>{
     const {data:{user},error:userErr}=await authClient.auth.getUser(token)
     if(userErr||!user?.email) return json({error:'Unauthorized'},401)
 
-    const {conference_name,hold}=await req.json()
+    const {conference_name,hold,phoneContext}=await req.json()
     if(!conference_name||typeof hold!=='boolean') return json({error:'conference_name and hold (boolean) required'},400)
     if(!/^[A-Za-z0-9_-]+$/.test(conference_name)) return json({error:'invalid conference name'},400)
 
     const db=createClient(SUPABASE_URL,SERVICE_KEY)
+    const {data:isPlatformAdmin}=await authClient.rpc('_is_platform_admin')
+    const isRomyLabs=phoneContext==='romylabs'&&isPlatformAdmin===true
     const {data:emp}=await db.from('employees').select('tenant_id,status').ilike('email',user.email).limit(1).maybeSingle()
-    if(!emp?.tenant_id||String(emp.status||'Active').toLowerCase()!=='active') return json({error:'Unauthorized'},403)
+    const tenantId=isRomyLabs?'a0000000-0000-0000-0000-000000000001':emp?.tenant_id
+    if(!tenantId||(!isRomyLabs&&String(emp?.status||'Active').toLowerCase()!=='active')) return json({error:'Unauthorized'},403)
 
-    const {data:settings,error:sErr}=await db.from('settings').select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did').eq('tenant_id',emp.tenant_id).limit(1).maybeSingle()
-    if(sErr||!settings?.sw_space_url||!settings?.sw_project_id||!settings?.sw_api_token) return json({error:'SignalWire credentials missing for this office.'},400)
+    let {data:settings,error:sErr}=await db.from('settings').select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did').eq('tenant_id',tenantId).limit(1).maybeSingle()
+    if(isRomyLabs&&(!settings?.sw_space_url||!settings?.sw_project_id||!settings?.sw_api_token)){
+      const f=await db.from('settings').select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did').eq('tenant_id','61a89aef-0e7e-4ea2-b222-44ab2024655a').limit(1).maybeSingle()
+      if(f.data)settings=f.data;if(!sErr)sErr=f.error
+    }
+    if(sErr||!settings?.sw_space_url||!settings?.sw_project_id||!settings?.sw_api_token) return json({error:'SignalWire credentials missing for this calling context.'},400)
+
+    const [{data:inConf},{data:outConf}]=await Promise.all([
+      db.from('incoming_calls').select('id').eq('tenant_id',tenantId).eq('conference_name',conference_name)
+        .in('status',['ringing','answered']).limit(1).maybeSingle(),
+      db.from('outbound_calls').select('id').eq('tenant_id',tenantId).eq('conference_name',conference_name)
+        .in('status',['pending','ringing','answered','connected']).limit(1).maybeSingle(),
+    ])
+    if(!inConf&&!outConf) return json({error:'Call not found — it may have already ended.'},404)
 
     const spaceDomain=settings.sw_space_url.replace(/^https?:\/\//,'')
     const providerAuth='Basic '+btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
     const base=`https://${spaceDomain}/api/laml/2010-04-01/Accounts/${settings.sw_project_id}`
-    const businessDigits=(settings.sw_inbound_did||'').replace(/\D/g,'').slice(-10)
+    let businessNumber=settings.sw_inbound_did||''
+    if(isRomyLabs){const {data:adminPhone}=await db.from('settings').select('sw_inbound_did').eq('tenant_id','a0000000-0000-0000-0000-000000000001').limit(1).maybeSingle();businessNumber=adminPhone?.sw_inbound_did||''}
+    const businessDigits=businessNumber.replace(/\D/g,'').slice(-10)
     const confResp=await fetch(`${base}/Conferences.json?FriendlyName=${encodeURIComponent(conference_name)}&Status=in-progress`,{headers:{Authorization:providerAuth}})
     const confData=await confResp.json()
     const conf=confData?.conferences?.[0]
@@ -52,7 +69,13 @@ serve(async(req)=>{
         isAgent=!!businessDigits&&fromD===businessDigits&&toD===businessDigits
       }catch(e){console.error('call-hold call fetch failed',callSid,e)}
       if(isAgent) continue
-      const upd=await fetch(`${base}/Conferences/${conf.sid}/Participants/${callSid}.json`,{method:'POST',headers:{Authorization:providerAuth,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({Hold:hold?'true':'false'})})
+      const holdBody:Record<string,string>={Hold:hold?'true':'false'}
+      if(hold){
+        // SignalWire supports a HoldUrl for participant hold media.
+        // Use the provider's default conference music by omitting HoldUrl
+        // rather than pointing at custom LaML that may not be valid for hold media.
+      }
+      const upd=await fetch(`${base}/Conferences/${conf.sid}/Participants/${callSid}.json`,{method:'POST',headers:{Authorization:providerAuth,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(holdBody)})
       if(upd.ok) touched++; else console.error('call-hold participant update failed',callSid,upd.status,await upd.text())
     }
     if(touched===0) return json({error:'No caller leg found to '+(hold?'hold':'resume')+'.'},404)

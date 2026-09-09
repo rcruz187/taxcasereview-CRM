@@ -29,6 +29,21 @@ verify_jwt = false
 verify_jwt = false
 [functions.voicemail-recorded]
 verify_jwt = false
+[functions.romylabs-receive-call]
+verify_jwt = false
+[functions.romylabs-ivr-route]
+verify_jwt = false
+[functions.romylabs-voicemail-prompt]
+verify_jwt = false
+[functions.romylabs-voicemail-recorded]
+verify_jwt = false
+[functions.romylabs-voicemail-transcribe]
+# Internal worker: authenticates x-internal-call-secret against service role.
+verify_jwt = false
+[functions.romylabs-voicemails]
+verify_jwt = true
+[functions.romylabs-phone-state]
+verify_jwt = true
 [functions.redirect-to-voicemail]
 verify_jwt = false
 
@@ -46,11 +61,15 @@ verify_jwt = true
 verify_jwt = true
 [functions.call-hold]
 verify_jwt = true
+# Mixed browser/provider endpoint: browser mode authenticates the user's JWT
+# inside the function; provider callback mode validates the server-generated HMAC.
 [functions.call-transfer]
-verify_jwt = true
+verify_jwt = false
 [functions.call-add-participant]
 verify_jwt = true
 [functions.log-call]
+verify_jwt = true
+[functions.call-recap]
 verify_jwt = true
 
 # Staff-only payment control endpoints.
