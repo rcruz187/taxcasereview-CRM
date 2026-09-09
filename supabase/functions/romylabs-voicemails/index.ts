@@ -17,7 +17,7 @@ serve(async req=>{
     if(isAdmin!==true)return json({error:'Forbidden'},403)
     const db=createClient(url,service),body=await req.json().catch(()=>({})),action=String(body?.action||'list')
     if(action==='list'){
-      const {data,error}=await db.from('voicemails').select('id,from_number,to_number,recording_url,duration_seconds,is_read,created_at').eq('tenant_id',ADMIN_TENANT).order('created_at',{ascending:false}).limit(100)
+      const {data,error}=await db.from('voicemails').select('id,from_number,to_number,recording_url,duration_seconds,is_read,created_at,transcript,transcription_status').eq('tenant_id',ADMIN_TENANT).order('created_at',{ascending:false}).limit(100)
       if(error)return json({error:error.message},500)
       const voicemails=[]
       for(const vm of data||[]){
