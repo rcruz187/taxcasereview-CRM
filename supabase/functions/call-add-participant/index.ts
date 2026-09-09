@@ -71,14 +71,11 @@ serve(async (req) => {
     const tenantId = isRomyLabs ? 'a0000000-0000-0000-0000-000000000001' : emp?.tenant_id
     if (!tenantId) return json({ error: 'Unauthorized' }, 403)
 
-    let settingsQuery = supabase
+    let { data: settings, error: sErr } = await supabase
       .from('settings')
       .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did')
-      .not('sw_api_token', 'is', null)
-
-    if (tenantId) settingsQuery = settingsQuery.eq('tenant_id', tenantId)
-
-    let { data: settings, error: sErr } = await settingsQuery.limit(1).maybeSingle()
+      .eq('tenant_id', tenantId)
+      .limit(1).maybeSingle()
     if (isRomyLabs && (!settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token)) {
       const fallback = await supabase.from('settings')
         .select('sw_space_url,sw_project_id,sw_api_token,sw_inbound_did')
