@@ -69,6 +69,7 @@ serve(async (req) => {
       .maybeSingle() : { data: null }
 
     const tenantId = isRomyLabs ? 'a0000000-0000-0000-0000-000000000001' : emp?.tenant_id
+    if (!tenantId) return json({ error: 'Unauthorized' }, 403)
 
     let settingsQuery = supabase
       .from('settings')
@@ -97,8 +98,18 @@ serve(async (req) => {
     const auth = 'Basic ' + btoa(`${settings.sw_project_id}:${settings.sw_api_token}`)
     const base = `https://${spaceDomain}/api/laml/2010-04-01/Accounts/${settings.sw_project_id}`
 
-    // The conference must be live — this is the guard that keeps this
-    // endpoint from being usable as a free dialer.
+    // The conference must belong to THIS tenant in our own database before
+    // we even ask SignalWire whether it is live.
+    const [{ data: inConf }, { data: outConf }] = await Promise.all([
+      supabase.from('incoming_calls').select('id').eq('tenant_id', tenantId).eq('conference_name', conference_name)
+        .in('status', ['ringing','answered']).limit(1).maybeSingle(),
+      supabase.from('outbound_calls').select('id').eq('tenant_id', tenantId).eq('conference_name', conference_name)
+        .in('status', ['pending','ringing','answered','connected']).limit(1).maybeSingle(),
+    ])
+    if (!inConf && !outConf) return json({ error: 'Call not found — it may have already ended.' }, 404)
+
+    // The conference must also be live at SignalWire — this keeps the endpoint
+    // from placing arbitrary calls against a stale local row.
     const confResp = await fetch(
       `${base}/Conferences.json?FriendlyName=${encodeURIComponent(conference_name)}&Status=in-progress`,
       { headers: { Authorization: auth } }
