@@ -60,6 +60,13 @@ serve(async req=>{
     }
 
     if(action==='recent_calls'){
+      // A caller can hang up while the auto-attendant greeting is still
+      // playing, before SignalWire invokes the Gather action. Clean those
+      // abandoned menu rows so call history never shows phantom active calls.
+      const staleMenuCutoff=new Date(Date.now()-2*60*1000).toISOString()
+      await db.from('incoming_calls').update({status:'missed',department:'Auto Attendant'})
+        .eq('tenant_id',TENANT).eq('status','menu').lt('created_at',staleMenuCutoff)
+
       const [incoming,outbound]=await Promise.all([
         db.from('incoming_calls')
           .select('id,callsid,from_number,department,status,created_at')
