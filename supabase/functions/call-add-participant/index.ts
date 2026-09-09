@@ -84,7 +84,11 @@ serve(async (req) => {
       if (!sErr) sErr = fallback.error
     }
 
-    const romylabsDid = String(Deno.env.get('ROMYLABS_PHONE_NUMBER') || '').trim()
+    let romylabsDid = ''
+    if (isRomyLabs) {
+      const { data: adminPhone } = await supabase.from('settings').select('sw_inbound_did').eq('tenant_id','a0000000-0000-0000-0000-000000000001').limit(1).maybeSingle()
+      romylabsDid = String(adminPhone?.sw_inbound_did || '').trim()
+    }
     const fromDid = isRomyLabs ? romylabsDid : (settings?.sw_inbound_did || '')
     if (sErr || !settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token || !fromDid) {
       console.error('call-add-participant: missing SignalWire credentials/DID', sErr)
