@@ -174,6 +174,8 @@ function AdminDialer() {
   const [number, setNumber] = useState('')
   const [voicemails, setVoicemails] = useState([])
   const [vmLoading, setVmLoading] = useState(true)
+  const [recentCalls, setRecentCalls] = useState([])
+  const [callsLoading, setCallsLoading] = useState(true)
 
   const loadVoicemails = useCallback(async () => {
     setVmLoading(true)
@@ -182,7 +184,17 @@ function AdminDialer() {
     setVmLoading(false)
   }, [])
 
-  useEffect(() => { loadVoicemails() }, [loadVoicemails])
+  const loadRecentCalls = useCallback(async () => {
+    setCallsLoading(true)
+    const { data, error } = await supabase.functions.invoke('romylabs-phone-state', { body:{ action:'recent_calls' } })
+    if (!error && data?.ok) setRecentCalls(data.calls || [])
+    setCallsLoading(false)
+  }, [])
+
+  useEffect(() => {
+    loadVoicemails()
+    loadRecentCalls()
+  }, [loadVoicemails, loadRecentCalls])
 
   async function markVoicemailRead(id) {
     const { data, error } = await supabase.functions.invoke('romylabs-voicemails', { body:{ action:'mark_read', id } })
@@ -293,6 +305,30 @@ function AdminDialer() {
               <span style={{ fontSize:13,fontWeight:800,color:'#e2e8f0' }}>{label}</span>
             </div>
             <div style={{ fontSize:10,color:'#64748b',lineHeight:1.5 }}>{desc}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ ...S.card, marginTop:18 }}>
+        <div style={{ padding:'14px 16px', borderBottom:'1px solid rgba(99,102,241,.12)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div>
+            <div style={{ fontSize:14,fontWeight:900,color:'#fff' }}>Recent Calls</div>
+            <div style={{ fontSize:10,color:'#64748b',marginTop:2 }}>Inbound, missed and outbound RomyLabs activity</div>
+          </div>
+          <button onClick={loadRecentCalls} style={{ ...S.btn('ghost'), padding:'6px 10px', fontSize:11 }}>Refresh</button>
+        </div>
+        {callsLoading ? <Spinner/> : recentCalls.length===0 ? (
+          <div style={{ padding:28,textAlign:'center',color:'#475569',fontSize:12 }}>No RomyLabs call activity yet.</div>
+        ) : recentCalls.slice(0,25).map((call,i)=>(
+          <div key={call.id} style={{ padding:'10px 16px', display:'flex',alignItems:'center',gap:12,borderBottom:i<Math.min(recentCalls.length,25)-1?'1px solid rgba(99,102,241,.08)':'none' }}>
+            <div style={{ width:30,height:30,borderRadius:9,display:'grid',placeItems:'center',background:call.direction==='Inbound'?'rgba(16,185,129,.1)':'rgba(99,102,241,.1)' }}>
+              {call.direction==='Inbound'?'↙':'↗'}
+            </div>
+            <div style={{ flex:1,minWidth:0 }}>
+              <div style={{ fontSize:12,fontWeight:800,color:'#e2e8f0' }}>{call.name || call.phone || 'RomyLabs Call'}</div>
+              <div style={{ fontSize:10,color:'#64748b',marginTop:2 }}>{call.phone || '—'} · {call.created_at?new Date(call.created_at).toLocaleString():'—'}</div>
+            </div>
+            <span style={{ fontSize:10,fontWeight:800,padding:'3px 8px',borderRadius:999,background:String(call.status).toLowerCase()==='missed'?'rgba(239,68,68,.12)':'rgba(99,102,241,.12)',color:String(call.status).toLowerCase()==='missed'?'#fca5a5':'#a5b4fc' }}>{call.status}</span>
           </div>
         ))}
       </div>
