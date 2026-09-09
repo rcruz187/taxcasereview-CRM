@@ -169,7 +169,7 @@ function AdminDialer() {
   const {
     relayStatus, incomingCall, incomingMatch, calling, active, elapsed,
     startCall, endCall, cancelCall, answerIncoming, declineIncoming,
-    outboundCallerId, setOutboundCallerId,
+    outboundCallerId,
   } = useCall()
   const [number, setNumber] = useState('')
   const [voicemails, setVoicemails] = useState([])
@@ -239,11 +239,9 @@ function AdminDialer() {
         <div style={{ display:'flex', justifyContent:'space-between', gap:12, marginBottom:16, alignItems:'end' }}>
           <div>
             <div style={{ fontSize:10, color:'#64748b', fontWeight:800, textTransform:'uppercase', marginBottom:5 }}>Outbound identity</div>
-            <select value={outboundCallerId} onChange={e=>setOutboundCallerId(e.target.value)}
-              style={{ background:'#12111f', color:'#e2e8f0', border:'1px solid rgba(99,102,241,.3)', borderRadius:8, padding:'8px 10px' }}>
-              <option value="local">Local / RomyLabs</option>
-              <option value="tollfree">Toll-free</option>
-            </select>
+            <div style={{ background:'#12111f', color:'#e2e8f0', border:'1px solid rgba(99,102,241,.3)', borderRadius:8, padding:'8px 10px', fontSize:12, fontWeight:800 }}>
+              RomyLabs Main Line
+            </div>
           </div>
           <div style={{ fontSize:11, color:'#475569', textAlign:'right' }}>
             Number assignment stays configurable<br/>for the pending SignalWire DIDs.
