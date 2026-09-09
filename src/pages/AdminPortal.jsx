@@ -176,24 +176,16 @@ function AdminDialer() {
 
   const loadVoicemails = useCallback(async () => {
     setVmLoading(true)
-    const { data, error } = await supabase.from('voicemails')
-      .select('id,from_number,to_number,recording_url,duration_seconds,is_read,created_at')
-      .order('created_at', { ascending:false }).limit(50)
-    if (!error) setVoicemails(data || [])
+    const { data, error } = await supabase.functions.invoke('romylabs-voicemails', { body:{ action:'list' } })
+    if (!error && data?.ok) setVoicemails(data.voicemails || [])
     setVmLoading(false)
   }, [])
 
-  useEffect(() => {
-    loadVoicemails()
-    const channel = supabase.channel('romylabs-admin-voicemail')
-      .on('postgres_changes', { event:'*', schema:'public', table:'voicemails' }, loadVoicemails)
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [loadVoicemails])
+  useEffect(() => { loadVoicemails() }, [loadVoicemails])
 
   async function markVoicemailRead(id) {
-    await supabase.from('voicemails').update({ is_read:true }).eq('id', id)
-    setVoicemails(v => v.map(x => x.id===id ? { ...x, is_read:true } : x))
+    const { data, error } = await supabase.functions.invoke('romylabs-voicemails', { body:{ action:'mark_read', id } })
+    if (!error && data?.ok) setVoicemails(v => v.map(x => x.id===id ? { ...x, is_read:true } : x))
   }
 
   const clean = number.replace(/\D/g, '')
