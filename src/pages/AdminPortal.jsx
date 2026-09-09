@@ -171,6 +171,30 @@ function AdminDialer() {
     outboundCallerId, setOutboundCallerId,
   } = useCall()
   const [number, setNumber] = useState('')
+  const [voicemails, setVoicemails] = useState([])
+  const [vmLoading, setVmLoading] = useState(true)
+
+  const loadVoicemails = useCallback(async () => {
+    setVmLoading(true)
+    const { data, error } = await supabase.from('voicemails')
+      .select('id,from_number,to_number,recording_url,duration_seconds,is_read,created_at')
+      .order('created_at', { ascending:false }).limit(50)
+    if (!error) setVoicemails(data || [])
+    setVmLoading(false)
+  }, [])
+
+  useEffect(() => {
+    loadVoicemails()
+    const channel = supabase.channel('romylabs-admin-voicemail')
+      .on('postgres_changes', { event:'*', schema:'public', table:'voicemails' }, loadVoicemails)
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [loadVoicemails])
+
+  async function markVoicemailRead(id) {
+    await supabase.from('voicemails').update({ is_read:true }).eq('id', id)
+    setVoicemails(v => v.map(x => x.id===id ? { ...x, is_read:true } : x))
+  }
 
   const clean = number.replace(/\D/g, '')
   const canCall = relayStatus === 'ready' && !calling && clean.length >= 7
@@ -258,8 +282,53 @@ function AdminDialer() {
         )}
       </div>
 
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))', gap:10, marginTop:18 }}>
+        {[
+          ['1','Sales','Rings the RomyLabs Admin Portal'],
+          ['2','Support','Rings the RomyLabs Admin Portal'],
+          ['3','Billing','Rings the RomyLabs Admin Portal'],
+          ['4','Romy','Direct-to-Romy ring path'],
+          ['0','Voicemail','Records directly to RomyLabs voicemail'],
+        ].map(([digit,label,desc]) => (
+          <div key={digit} style={{ ...S.card, padding:'14px 16px' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:9, marginBottom:5 }}>
+              <span style={{ width:25,height:25,borderRadius:7,display:'grid',placeItems:'center',background:'rgba(198,255,0,.12)',color:'#C6FF00',fontWeight:900 }}>{digit}</span>
+              <span style={{ fontSize:13,fontWeight:800,color:'#e2e8f0' }}>{label}</span>
+            </div>
+            <div style={{ fontSize:10,color:'#64748b',lineHeight:1.5 }}>{desc}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ ...S.card, marginTop:18 }}>
+        <div style={{ padding:'14px 16px', borderBottom:'1px solid rgba(99,102,241,.12)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div>
+            <div style={{ fontSize:14,fontWeight:900,color:'#fff' }}>Voicemail</div>
+            <div style={{ fontSize:10,color:'#64748b',marginTop:2 }}>RomyLabs messages only</div>
+          </div>
+          <button onClick={loadVoicemails} style={{ ...S.btn('ghost'), padding:'6px 10px', fontSize:11 }}>Refresh</button>
+        </div>
+        {vmLoading ? <Spinner/> : voicemails.length===0 ? (
+          <div style={{ padding:28,textAlign:'center',color:'#475569',fontSize:12 }}>No RomyLabs voicemails yet.</div>
+        ) : voicemails.map((vm,i)=>(
+          <div key={vm.id} style={{ padding:'12px 16px', borderBottom:i<voicemails.length-1?'1px solid rgba(99,102,241,.08)':'none', background:vm.is_read?'transparent':'rgba(99,102,241,.06)' }}>
+            <div style={{ display:'flex',alignItems:'center',gap:12 }}>
+              <div style={{ width:32,height:32,borderRadius:10,display:'grid',placeItems:'center',background:'rgba(99,102,241,.12)',fontSize:15 }}>📵</div>
+              <div style={{ flex:1,minWidth:0 }}>
+                <div style={{ fontSize:13,fontWeight:800,color:'#e2e8f0' }}>{vm.from_number || 'Unknown caller'}</div>
+                <div style={{ fontSize:10,color:'#64748b',marginTop:2 }}>
+                  {vm.created_at ? new Date(vm.created_at).toLocaleString() : '—'}{vm.duration_seconds ? ` · ${vm.duration_seconds}s` : ''}
+                </div>
+              </div>
+              {!vm.is_read && <button onClick={()=>markVoicemailRead(vm.id)} style={{ ...S.btn('ghost'),padding:'5px 9px',fontSize:10 }}>Mark read</button>}
+            </div>
+            {vm.recording_url && <audio controls src={vm.recording_url} onPlay={()=>!vm.is_read&&markVoicemailRead(vm.id)} style={{ width:'100%',height:30,marginTop:10 }} />}
+          </div>
+        ))}
+      </div>
+
       <div style={{ marginTop:18, fontSize:11, color:'#475569', lineHeight:1.6 }}>
-        Manual Admin Portal calls do not create leads. Call state stays mounted while you move between Admin Portal pages.
+        Business hours are Monday–Friday, 9:00 AM–6:00 PM Eastern. After-hours calls go directly to RomyLabs voicemail. Manual Admin Portal calls do not create TaxRes leads.
       </div>
     </div>
   )
