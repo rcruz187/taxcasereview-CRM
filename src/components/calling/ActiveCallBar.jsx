@@ -30,6 +30,7 @@ export default function ActiveCallBar() {
   const shouldRestartRef = useRef(false)
 
   const {
+    phoneContext,
     incomingCall, incomingMatch, calling, active, elapsed, formatTime,
     answerIncoming, declineIncoming, cancelCall, endCall,
     logModal, logForm, setLogForm, saving, OUTCOMES, saveCallLog, closeLogModalWithoutSaving,
@@ -79,10 +80,14 @@ export default function ActiveCallBar() {
 
   useEffect(() => {
     if (!showTransfer) return
+    if (phoneContext === 'romylabs') {
+      setXferEmployees([])
+      return
+    }
     supabase.from('employees').select('name,title,extension')
       .not('extension', 'is', null).neq('extension', '').order('name')
       .then(({ data }) => setXferEmployees(data || []))
-  }, [showTransfer])
+  }, [showTransfer, phoneContext])
 
   async function handleTransfer(target) {
     if (xferBusy) return
@@ -432,7 +437,9 @@ export default function ActiveCallBar() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   <span style={{ color: '#fff', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', marginRight: 2 }}>Transfer to:</span>
                   {xferEmployees.length === 0 && (
-                    <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12 }}>No teammates with extensions found.</span>
+                    <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12 }}>
+                      {phoneContext === 'romylabs' ? 'RomyLabs internal extensions are not configured yet.' : 'No teammates with extensions found.'}
+                    </span>
                   )}
                   {xferEmployees.map(e => (
                     <button key={e.extension} disabled={xferBusy}
@@ -626,7 +633,14 @@ export default function ActiveCallBar() {
             <div className="field">
               <label>Notes {transcript && <span style={{ fontSize: 10, color: 'var(--blue)', fontWeight: 600 }}>✓ Transcript included</span>}</label>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-                {CALL_LOG_TEMPLATES.map(t => (
+                {(phoneContext === 'romylabs' ? [
+                  { label:'Follow-up', body:'Follow-up needed.' },
+                  { label:'Demo discussed', body:'Discussed a RomyLabs product demo and next steps.' },
+                  { label:'Support request', body:'Reviewed the support request and next steps.' },
+                  { label:'Billing discussed', body:'Discussed billing or account questions.' },
+                  { label:'Left voicemail', body:'Left a voicemail. Will follow up if no callback.' },
+                  { label:'No answer', body:'No answer — will attempt again.' },
+                ] : CALL_LOG_TEMPLATES).map(t => (
                   <button key={t.label} className="btn sec" style={{ fontSize: 11, padding: '4px 9px' }}
                     onClick={() => setLogForm(f => ({ ...f, notes: f.notes?.trim() ? f.notes + '\n' + t.body : t.body }))}>
                     {t.label}
