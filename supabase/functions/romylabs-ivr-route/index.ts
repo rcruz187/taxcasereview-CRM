@@ -11,10 +11,11 @@ serve(async req=>{
   const secret=Deno.env.get('SW_SIGNING_SECRET')||'',sig=req.headers.get('x-signalwire-signature')||''
   if(secret&&!await verify(secret,req.url,params,sig))return xml('<Hangup/>',403)
   const digits=form.get('Digits')||'',callSid=form.get('CallSid')||'',from=form.get('From')||'',to=form.get('To')||''
-  const romy=normalize(Deno.env.get('ROMYLABS_PHONE_NUMBER')||'')
-  if(!callSid||!romy||normalize(to)!==romy)return xml('<Hangup/>',403)
   const base=`${Deno.env.get('SUPABASE_URL')}/functions/v1`
   const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+  const {data:adminSettings}=await db.from('settings').select('sw_inbound_did').eq('tenant_id',ADMIN_TENANT).limit(1).maybeSingle()
+  const romy=normalize(adminSettings?.sw_inbound_did||'')
+  if(!callSid||!romy||normalize(to)!==romy)return xml('<Hangup/>',403)
   if(digits==='5'||!['1','2','3','4'].includes(digits)){
     await db.from('incoming_calls').update({status:'missed',department:digits==='5'?'Voicemail':'No Selection'})
       .eq('tenant_id',ADMIN_TENANT).eq('callsid',callSid).in('status',['menu','ringing'])
