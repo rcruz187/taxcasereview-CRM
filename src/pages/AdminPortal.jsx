@@ -167,8 +167,8 @@ function Sidebar({ onSignOut, mobile=false, onClose }) {
 
 function AdminDialer() {
   const {
-    relayStatus, incomingCall, incomingMatch, calling, active, elapsed,
-    startCall, endCall, cancelCall, answerIncoming, declineIncoming,
+    relayStatus, calling, active, elapsed,
+    startCall, endCall, cancelCall,
   } = useCall()
   const [number, setNumber] = useState('')
   const [voicemails, setVoicemails] = useState([])
@@ -193,6 +193,9 @@ function AdminDialer() {
   useEffect(() => {
     loadVoicemails()
     loadRecentCalls()
+    const refreshOnFocus = () => { loadVoicemails(); loadRecentCalls() }
+    window.addEventListener('focus', refreshOnFocus)
+    return () => window.removeEventListener('focus', refreshOnFocus)
   }, [loadVoicemails, loadRecentCalls])
 
   async function markVoicemailRead(id) {
@@ -234,17 +237,6 @@ function AdminDialer() {
           </div>
         </div>
       </div>
-
-      {incomingCall && (
-        <div style={{ ...S.card, padding:18, marginBottom:16, border:'1px solid rgba(16,185,129,.35)', background:'rgba(16,185,129,.08)' }}>
-          <div style={{ fontSize:11, color:'#6ee7b7', fontWeight:800, textTransform:'uppercase', marginBottom:6 }}>Incoming Call</div>
-          <div style={{ fontSize:18, fontWeight:900, color:'#fff', marginBottom:4 }}>{incomingMatch?.name || incomingCall?.from_number || incomingCall?.from || 'Unknown caller'}</div>
-          <div style={{ display:'flex', gap:8, marginTop:12 }}>
-            <button onClick={answerIncoming} style={{ ...S.btn('primary'), flex:1 }}>Answer</button>
-            <button onClick={declineIncoming} style={{ ...S.btn('danger'), flex:1 }}>Decline</button>
-          </div>
-        </div>
-      )}
 
       <div style={{ ...S.card, padding:22, maxWidth:560 }}>
         <div style={{ display:'flex', justifyContent:'space-between', gap:12, marginBottom:16, alignItems:'end' }}>
