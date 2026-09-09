@@ -39,6 +39,9 @@ serve(async (req) => {
     let resource = FALLBACK_RESOURCE
     let agentExtension = null
     let agentTenantId = null
+    let platformAdmin = false
+    let requestedContext = 'taxres'
+    try { requestedContext = String((await req.clone().json())?.phoneContext || 'taxres').toLowerCase() } catch (_) {}
     const authHeader = req.headers.get('Authorization')
     if (authHeader) {
       const userClient = createClient(
@@ -49,6 +52,8 @@ serve(async (req) => {
       const { data: { user }, error: userErr } = await userClient.auth.getUser()
       if (userErr) console.error('signalwire-relay-token: could not resolve calling user:', userErr.message)
       if (user?.email) {
+        const { data: isAdmin } = await userClient.rpc('_is_platform_admin')
+        platformAdmin = isAdmin === true
         const { data: emp, error: empErr } = await supabase
           .from('employees').select('extension,tenant_id').eq('email', user.email).maybeSingle()
         if (empErr) console.error('signalwire-relay-token: employee lookup error:', empErr.message)
@@ -109,11 +114,15 @@ serve(async (req) => {
     }
 
     const { jwt_token } = await resp.json()
+    const romylabsNumber = String(Deno.env.get('ROMYLABS_PHONE_NUMBER') || '').trim()
+    const useRomyLabs = requestedContext === 'romylabs' && platformAdmin && /^\+\d{10,15}$/.test(romylabsNumber)
+    if (useRomyLabs) resource = 'romylabs-owner'
 
     return new Response(JSON.stringify({
       jwt_token,
       project_id: settings.sw_project_id,
-      caller_number: settings.sw_inbound_did || null,
+      caller_number: useRomyLabs ? romylabsNumber : (settings.sw_inbound_did || null),
+      phone_context: useRomyLabs ? 'romylabs' : 'taxres',
       resource,
       agent_extension: agentExtension,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
