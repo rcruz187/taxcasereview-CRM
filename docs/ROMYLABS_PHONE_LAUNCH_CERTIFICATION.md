@@ -47,9 +47,9 @@ Production base remains untouched.
 ## Deployment / runtime gates
 
 - PENDING — Full local Vite build. The current execution container cannot resolve github.com, so the complete repository cannot be cloned into the local sandbox for a package build.
-- PENDING — Apply the voicemail transcription/idempotency migration.
-- PENDING — Deploy RomyLabs Supabase phone functions.
-- PENDING — Set production secret `ROMYLABS_PHONE_NUMBER=+15614206999`.
+- PASS — Voicemail transcription/idempotency migration applied.
+- PASS — RomyLabs Supabase phone functions deployed and ACTIVE.
+- PASS — RomyLabs control-plane DID set to `+15614206999` in existing settings; no new secret or paid branch required.
 - PENDING — Point SignalWire +15614206999 voice webhook to `romylabs-receive-call`.
 - PENDING — Live inbound IVR test for options 1, 2, 3, 4, and 5.
 - PENDING — Live after-hours voicemail test.
