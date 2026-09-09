@@ -49,7 +49,7 @@ serve(async req=>{
     const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
     const {data:existing}=await db.from('voicemails').select('id').eq('tenant_id',ADMIN_TENANT).eq('call_sid',sid).maybeSingle()
     if(existing)return resp()
-    const {data:s}=await db.from('settings').select('sw_project_id,sw_api_token').not('sw_api_token','is',null).limit(1).maybeSingle()
+    const {data:s}=await db.from('settings').select('sw_project_id,sw_api_token').eq('tenant_id','61a89aef-0e7e-4ea2-b222-44ab2024655a').limit(1).maybeSingle()
     let stored=url
     if(s?.sw_project_id&&s?.sw_api_token){
       try{
