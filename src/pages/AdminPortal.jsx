@@ -169,7 +169,6 @@ function AdminDialer() {
   const {
     relayStatus, incomingCall, incomingMatch, calling, active, elapsed,
     startCall, endCall, cancelCall, answerIncoming, declineIncoming,
-    outboundCallerId,
   } = useCall()
   const [number, setNumber] = useState('')
   const [voicemails, setVoicemails] = useState([])
