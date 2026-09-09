@@ -40,14 +40,21 @@ serve(async (req) => {
     if (claimErr) return json({ error: 'Unable to claim ringing call.' }, 500)
     if (!claimed?.length) return json({ ok: true, skipped: true })
 
-    const { data: settings, error: sErr } = await db.from('settings')
+    let { data: settings, error: sErr } = await db.from('settings')
       .select('sw_space_url,sw_project_id,sw_api_token')
       .eq('tenant_id', tenantId).limit(1).maybeSingle()
+    if (isRomyLabs && (!settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token)) {
+      const fallback = await db.from('settings')
+        .select('sw_space_url,sw_project_id,sw_api_token')
+        .not('sw_api_token','is',null).not('sw_space_url','is',null).limit(1).maybeSingle()
+      if (fallback.data) settings = fallback.data
+      if (!sErr) sErr = fallback.error
+    }
     if (sErr || !settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token) {
       // Put the row back so another attempt can safely handle it once config is corrected.
       await db.from('incoming_calls').update({ status: 'ringing' })
         .eq('tenant_id', tenantId).eq('callsid', callsid).eq('status', 'missed')
-      return json({ error: 'SignalWire credentials missing for this office.' }, 400)
+      return json({ error: 'SignalWire credentials missing for this calling context.' }, 400)
     }
 
     const spaceDomain = settings.sw_space_url.replace(/^https?:\/\//, '')
