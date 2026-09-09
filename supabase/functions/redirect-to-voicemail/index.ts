@@ -20,17 +20,20 @@ serve(async (req) => {
     const { data: { user }, error: userErr } = await authClient.auth.getUser(token)
     if (userErr || !user?.email) return json({ error: 'Unauthorized' }, 401)
 
-    const { callsid } = await req.json()
+    const { callsid, phoneContext } = await req.json()
     if (!callsid) return json({ error: 'callsid required' }, 400)
 
     const db = createClient(SUPABASE_URL, SERVICE_KEY)
+    const { data: isPlatformAdmin } = await authClient.rpc('_is_platform_admin')
+    const isRomyLabs = phoneContext === 'romylabs' && isPlatformAdmin === true
     const { data: employee } = await db.from('employees')
       .select('tenant_id,status').ilike('email', user.email).limit(1).maybeSingle()
-    if (!employee?.tenant_id || String(employee.status || 'Active').toLowerCase() !== 'active') return json({ error: 'Unauthorized' }, 403)
+    const tenantId = isRomyLabs ? 'a0000000-0000-0000-0000-000000000001' : employee?.tenant_id
+    if (!tenantId || (!isRomyLabs && String(employee?.status || 'Active').toLowerCase() !== 'active')) return json({ error: 'Unauthorized' }, 403)
 
     const { data: claimed, error: claimErr } = await db.from('incoming_calls')
       .update({ status: 'missed' })
-      .eq('tenant_id', employee.tenant_id)
+      .eq('tenant_id', tenantId)
       .eq('callsid', callsid)
       .eq('status', 'ringing')
       .select('callsid')
@@ -39,11 +42,11 @@ serve(async (req) => {
 
     const { data: settings, error: sErr } = await db.from('settings')
       .select('sw_space_url,sw_project_id,sw_api_token')
-      .eq('tenant_id', employee.tenant_id).limit(1).maybeSingle()
+      .eq('tenant_id', tenantId).limit(1).maybeSingle()
     if (sErr || !settings?.sw_space_url || !settings?.sw_project_id || !settings?.sw_api_token) {
       // Put the row back so another attempt can safely handle it once config is corrected.
       await db.from('incoming_calls').update({ status: 'ringing' })
-        .eq('tenant_id', employee.tenant_id).eq('callsid', callsid).eq('status', 'missed')
+        .eq('tenant_id', tenantId).eq('callsid', callsid).eq('status', 'missed')
       return json({ error: 'SignalWire credentials missing for this office.' }, 400)
     }
 
@@ -52,12 +55,12 @@ serve(async (req) => {
     const resp = await fetch(`https://${spaceDomain}/api/laml/2010-04-01/Accounts/${settings.sw_project_id}/Calls/${callsid}.json`, {
       method: 'POST',
       headers: { Authorization: providerAuth, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ Url: `${SUPABASE_URL}/functions/v1/voicemail-prompt`, Method: 'POST' }),
+      body: new URLSearchParams({ Url: `${SUPABASE_URL}/functions/v1/${isRomyLabs ? 'romylabs-voicemail-prompt' : 'voicemail-prompt'}`, Method: 'POST' }),
     })
     const text = await resp.text()
     if (!resp.ok) {
       await db.from('incoming_calls').update({ status: 'ringing' })
-        .eq('tenant_id', employee.tenant_id).eq('callsid', callsid).eq('status', 'missed')
+        .eq('tenant_id', tenantId).eq('callsid', callsid).eq('status', 'missed')
       console.error('redirect-to-voicemail: provider rejected redirect', resp.status, text)
       return json({ error: 'Could not redirect the call to voicemail.' }, 502)
     }
