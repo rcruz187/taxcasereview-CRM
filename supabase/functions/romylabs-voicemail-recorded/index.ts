@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+declare const EdgeRuntime:{waitUntil(p:Promise<unknown>):void}
 const ADMIN_TENANT='a0000000-0000-0000-0000-000000000001'
 const ACK='<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Ruth-Neural" language="en-US">Thank you. Your message has been recorded. RomyLabs will return your call as soon as possible.</Say></Response>'
 const resp=(status=200)=>new Response(ACK,{status,headers:{'Content-Type':'text/xml'}})
@@ -57,9 +58,21 @@ serve(async req=>{
         if(audio.ok){const bytes=new Uint8Array(await audio.arrayBuffer()),path=`${ADMIN_TENANT}/romylabs_vm_${sid.replace(/[^A-Za-z0-9_-]/g,'')}_${crypto.randomUUID()}.mp3`;const{error:up}=await db.storage.from('voicemails').upload(path,bytes,{contentType:'audio/mpeg',upsert:false});if(!up)stored=`storage://voicemails/${path}`}
       }catch(e){console.error('[romylabs-voicemail-recorded] audio',e)}
     }
-    const {error}=await db.from('voicemails').insert({from_number:from.slice(0,32),to_number:to.slice(0,32),recording_url:stored,duration_seconds:/^\d+$/.test(duration)?Math.min(Number(duration),3600):null,call_sid:sid,is_read:false,created_at:new Date().toISOString(),tenant_id:ADMIN_TENANT})
+    const {data:inserted,error}=await db.from('voicemails').insert({from_number:from.slice(0,32),to_number:to.slice(0,32),recording_url:stored,duration_seconds:/^\d+$/.test(duration)?Math.min(Number(duration),3600):null,call_sid:sid,is_read:false,created_at:new Date().toISOString(),tenant_id:ADMIN_TENANT,transcription_status:stored.startsWith('storage://voicemails/')?'pending':'unavailable'}).select('id').single()
     if(error&&error.code!=='23505')throw error
-    if(!error) await notifyVoicemail(db,from,duration)
+    if(!error){
+      await notifyVoicemail(db,from,duration)
+      const prefix='storage://voicemails/'
+      if(inserted?.id&&stored.startsWith(prefix)){
+        const p=fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/romylabs-voicemail-transcribe`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json','x-internal-call-secret':Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')||''},
+          body:JSON.stringify({voicemail_id:inserted.id,storage_path:stored.slice(prefix.length)}),
+        }).then(async r=>{if(!r.ok)console.error('[romylabs-voicemail-recorded] transcription',r.status,await r.text())})
+          .catch(e=>console.error('[romylabs-voicemail-recorded] transcription trigger',e))
+        try{EdgeRuntime.waitUntil(p)}catch{void p}
+      }
+    }
     return resp()
   }catch(e){console.error('[romylabs-voicemail-recorded]',e);return resp(500)}
 })
