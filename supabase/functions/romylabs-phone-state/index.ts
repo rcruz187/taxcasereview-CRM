@@ -33,6 +33,34 @@ serve(async req=>{
       return error?json({error:error.message},500):json({ok:true,row:data||null})
     }
 
+    if(action==='recent_calls'){
+      const [incoming,outbound,logs]=await Promise.all([
+        db.from('incoming_calls')
+          .select('id,callsid,from_number,department,status,created_at')
+          .eq('tenant_id',TENANT).order('created_at',{ascending:false}).limit(50),
+        db.from('outbound_calls')
+          .select('id,destination_number,display_name,status,created_at,provider_call_sid')
+          .eq('tenant_id',TENANT).order('created_at',{ascending:false}).limit(50),
+        db.from('calllog')
+          .select('id,clientName,phone,outcome,duration,direction,created_at,raw_call_id')
+          .eq('tenant_id',TENANT).order('created_at',{ascending:false}).limit(50),
+      ])
+      const error=incoming.error||outbound.error||logs.error
+      if(error)return json({error:error.message},500)
+      const rows=[
+        ...(incoming.data||[]).map((r:any)=>({
+          id:`in:${r.id}`,direction:'Inbound',phone:r.from_number||'',name:r.department||'RomyLabs',status:r.status||'unknown',created_at:r.created_at
+        })),
+        ...(outbound.data||[]).map((r:any)=>({
+          id:`out:${r.id}`,direction:'Outbound',phone:r.destination_number||'',name:r.display_name||'RomyLabs Call',status:r.status||'unknown',created_at:r.created_at
+        })),
+        ...(logs.data||[]).map((r:any)=>({
+          id:`log:${r.id}`,direction:r.direction||'Call',phone:r.phone||'',name:r.clientName||'RomyLabs Call',status:r.outcome||'Logged',duration:r.duration||'',created_at:r.created_at
+        })),
+      ].sort((a:any,b:any)=>new Date(b.created_at||0).getTime()-new Date(a.created_at||0).getTime()).slice(0,75)
+      return json({ok:true,calls:rows})
+    }
+
     if(action==='claim'){
       const callsid=String(body?.callsid||'')
       const claimedBy=String(body?.claimed_by||user.email).slice(0,120)
